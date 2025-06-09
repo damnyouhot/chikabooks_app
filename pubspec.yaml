@@ -1,0 +1,45 @@
+name: chikabooks_app
+description: A new Flutter project.
+publish_to: 'none' 
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  firebase_core: ^2.16.2
+  cloud_firestore: ^4.17.5
+  firebase_auth: ^4.6.5
+  firebase_storage: ^11.6.5
+  google_sign_in: ^6.3.0
+
+  epub_view: ^3.2.0
+  path_provider: ^2.1.2
+  http: ^1.2.1
+  file_selector: ^1.0.3
+
+  in_app_purchase: ^3.2.1
+  in_app_purchase_android: ^0.4.0+1
+
+  cupertino_icons: ^1.0.8
+  fl_chart: ^0.66.0
+  pedometer: ^4.1.1
+  provider: ^6.1.2
+  intl: ^0.18.1
+  flutter_naver_map: ^1.2.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    # ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼ 이 부분 원상 복구 ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
+    - assets/characters/
+    # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ 이 부분 원상 복구 ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
