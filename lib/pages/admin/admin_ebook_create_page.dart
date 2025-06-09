@@ -6,7 +6,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import '../../services/storage_service.dart';
+import '../../services/storage_service.dart'; // ◀◀◀ 이 줄 추가
 
 class AdminEbookCreatePage extends StatefulWidget {
   const AdminEbookCreatePage({super.key});
@@ -25,14 +25,13 @@ class _AdminEbookCreatePageState extends State<AdminEbookCreatePage> {
       _productId = '';
   DateTime _publishedAt = DateTime.now();
   int _price = 0;
-  Uint8List? _epub; // ePub 파일 바이트
+  Uint8List? _epub;
+  bool _isLoading = false; // 로딩 상태 변수 추가
 
-  /* ───────── ePub 선택 ───────── */
   Future<void> _pickEpub() async {
     const typeGroup = XTypeGroup(
       label: 'epub',
       extensions: ['epub'],
-      mimeTypes: ['application/epub+zip'],
     );
 
     final file = await openFile(acceptedTypeGroups: [typeGroup]);
@@ -42,7 +41,6 @@ class _AdminEbookCreatePageState extends State<AdminEbookCreatePage> {
     }
   }
 
-  /* ───────── Firestore + Storage 저장 ───────── */
   Future<void> _create() async {
     if (!_formKey.currentState!.validate()) return;
     if (_epub == null) {
@@ -50,32 +48,38 @@ class _AdminEbookCreatePageState extends State<AdminEbookCreatePage> {
       return;
     }
     _formKey.currentState!.save();
+    setState(() => _isLoading = true);
 
-    // ① 문서 ID 먼저 확보
-    final doc = FirebaseFirestore.instance.collection('ebooks').doc();
+    try {
+      final doc = FirebaseFirestore.instance.collection('ebooks').doc();
+      final fileUrl =
+          await StorageService.uploadEpub(docId: doc.id, bytes: _epub!);
+      await doc.set({
+        'title': _title.trim(),
+        'author': _author.trim(),
+        'coverUrl': _coverUrl.trim(),
+        'description': _description.trim(),
+        'productId': _productId.trim(),
+        'publishedAt': Timestamp.fromDate(_publishedAt),
+        'price': _price,
+        'fileUrl': fileUrl,
+      });
 
-    // ② Storage 업로드
-    final fileUrl =
-        await StorageService.uploadEpub(docId: doc.id, bytes: _epub!);
-
-    // ③ Firestore 저장
-    await doc.set({
-      'title': _title.trim(),
-      'author': _author.trim(),
-      'coverUrl': _coverUrl.trim(),
-      'description': _description.trim(),
-      'productId': _productId.trim(),
-      'publishedAt': Timestamp.fromDate(_publishedAt),
-      'price': _price,
-      'fileUrl': fileUrl,
-    });
-
-    if (!mounted) return;
-    _snack('전자책이 추가되었습니다.');
-    DefaultTabController.of(context).animateTo(0); // 목록 탭으로
+      if (!mounted) return;
+      _snack('전자책이 추가되었습니다.');
+      _formKey.currentState?.reset();
+      setState(() => _epub = null);
+      DefaultTabController.of(context).animateTo(0);
+    } catch (e) {
+      if (!mounted) return;
+      _snack('오류 발생: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
-  /* ───────── UI ───────── */
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -115,14 +119,16 @@ class _AdminEbookCreatePageState extends State<AdminEbookCreatePage> {
               onPressed: _pickEpub,
             ),
             const SizedBox(height: 24),
-            ElevatedButton(onPressed: _create, child: const Text('추가하기')),
+            ElevatedButton(
+              onPressed: _isLoading ? null : _create,
+              child: Text(_isLoading ? '등록 중...' : '추가하기'),
+            ),
           ],
         ),
       ),
     );
   }
 
-  /* ───────── 헬퍼 ───────── */
   Widget _field(
     String label, {
     int maxLines = 1,
@@ -140,6 +146,8 @@ class _AdminEbookCreatePageState extends State<AdminEbookCreatePage> {
 
   String? _req(String v) => v.isEmpty ? '필수 입력' : null;
 
-  void _snack(String msg) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  void _snack(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
 }

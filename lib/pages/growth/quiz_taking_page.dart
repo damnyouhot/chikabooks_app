@@ -21,9 +21,8 @@ class _QuizTakingPageState extends State<QuizTakingPage> {
 
     final isCorrect = _selectedOptionIndex == widget.quiz.answerIndex;
 
-    // 정답을 맞췄을 경우에만 성장 이벤트 기록
     if (isCorrect) {
-      GrowthService.recordEvent(type: 'quiz', value: 1.0); // 퀴즈 완료 1회
+      GrowthService.recordEvent(type: 'quiz', value: 1.0);
     }
 
     showDialog(
@@ -35,8 +34,8 @@ class _QuizTakingPageState extends State<QuizTakingPage> {
         actions: [
           TextButton(
             onPressed: () {
-              Navigator.of(context).pop(); // 다이얼로그 닫기
-              Navigator.of(context).pop(); // 퀴즈 목록 페이지로 돌아가기
+              Navigator.of(context).pop();
+              Navigator.of(context).pop();
             },
             child: const Text('확인'),
           ),
@@ -63,13 +62,15 @@ class _QuizTakingPageState extends State<QuizTakingPage> {
               final bool isSelected = _selectedOptionIndex == index;
               Color? tileColor;
 
+              // ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼ withOpacity 경고 수정 ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
               if (_submitted) {
                 if (index == widget.quiz.answerIndex) {
-                  tileColor = Colors.green.withOpacity(0.3); // 정답
+                  tileColor = Colors.green.shade100; // 정답
                 } else if (isSelected) {
-                  tileColor = Colors.red.withOpacity(0.3); // 선택한 오답
+                  tileColor = Colors.red.shade100; // 선택한 오답
                 }
               }
+              // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ withOpacity 경고 수정 ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
               return Card(
                 color: tileColor,
@@ -80,7 +81,6 @@ class _QuizTakingPageState extends State<QuizTakingPage> {
                   onChanged: _submitted
                       ? null
                       : (value) {
-                          // 제출 후에는 변경 불가
                           setState(() {
                             _selectedOptionIndex = value;
                           });

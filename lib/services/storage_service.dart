@@ -1,26 +1,30 @@
-// lib/services/storage_service.dart
 import 'dart:typed_data';
 import 'package:firebase_storage/firebase_storage.dart';
 
-/// Firebase Storage 헬퍼
+/// Firebase Storage 관련 유틸리티를 모아 둔 서비스.
+/// 모든 메서드는 `static` 으로 제공하므로 인스턴스를 만들 필요가 없습니다.
 class StorageService {
-  static final _storage = FirebaseStorage.instance;
+  StorageService._(); // 인스턴스화 방지용 private 생성자
 
-  /// bytes →  `ebooks/{docId}.epub`  업로드 후 downloadURL 반환
+  /// ePub 파일을 `ebooks/{docId}.epub` 경로에 업로드한 뒤
+  /// 다운로드 URL(String)을 반환합니다.
+  ///
+  /// - [docId] : Firestore 문서 ID (ebooks/{docId})
+  /// - [bytes] : 업로드할 ePub 파일 바이트
   static Future<String> uploadEpub({
     required String docId,
     required Uint8List bytes,
   }) async {
-    final ref = _storage.ref('ebooks/$docId.epub');
-    await ref.putData(
+    // 1) 참조 객체
+    final ref = FirebaseStorage.instance.ref().child('ebooks/$docId.epub');
+
+    // 2) 업로드
+    final task = await ref.putData(
       bytes,
       SettableMetadata(contentType: 'application/epub+zip'),
     );
-    return ref.getDownloadURL();
-  }
 
-  /// 필요 시 삭제(편집 화면에서 교체 전 호출해도 됨)
-  static Future<void> deleteEpub(String docId) async {
-    await _storage.ref('ebooks/$docId.epub').delete();
+    // 3) 다운로드 URL 반환
+    return await task.ref.getDownloadURL();
   }
 }

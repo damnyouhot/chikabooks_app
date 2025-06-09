@@ -11,6 +11,8 @@ class Character {
   double affection;
   int emotionPoints;
   int tenureYears;
+  List<String> inventory; // ◀◀◀ 구매한 아이템 ID 목록 필드 추가
+  String? equippedItemId;
 
   Character({
     required this.id,
@@ -23,6 +25,8 @@ class Character {
     this.affection = 0.0,
     this.emotionPoints = 0,
     this.tenureYears = 0,
+    this.inventory = const [], // ◀◀◀ 생성자에 추가
+    this.equippedItemId,
   });
 
   factory Character.fromDoc(DocumentSnapshot doc) {
@@ -38,20 +42,24 @@ class Character {
       affection: (data['affection'] ?? 0).toDouble(),
       emotionPoints: data['emotionPoints'] ?? 0,
       tenureYears: data['tenureYears'] ?? 0,
+      inventory: List<String>.from(data['inventory'] ?? []), // ◀◀◀ 추가
+      equippedItemId: data['equippedItemId'],
     );
   }
 
   Map<String, dynamic> toJson() => {
-    'level': level,
-    'experience': experience,
-    'studyMinutes': studyMinutes,
-    'stepCount': stepCount,
-    'sleepHours': sleepHours,
-    'quizCount': quizCount,
-    'affection': affection,
-    'emotionPoints': emotionPoints,
-    'tenureYears': tenureYears,
-  };
+        'level': level,
+        'experience': experience,
+        'studyMinutes': studyMinutes,
+        'stepCount': stepCount,
+        'sleepHours': sleepHours,
+        'quizCount': quizCount,
+        'affection': affection,
+        'emotionPoints': emotionPoints,
+        'tenureYears': tenureYears,
+        'inventory': inventory, // ◀◀◀ 추가
+        'equippedItemId': equippedItemId,
+      };
 
   void gainExperience(double amount) {
     experience += amount;
