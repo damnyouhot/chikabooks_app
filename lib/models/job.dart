@@ -4,50 +4,82 @@ class Job {
   final String id;
   final String title;
   final String clinicName;
-  final String career; // '신입' | '경력'
-  final String type; // 정규직 등
-  final List<int> salaryRange; // [min, max]  단위: 만원
-  final String address; // 시/도 포함 주소
+  final String address;
+  final double lat;
+  final double lng;
+  final String type;
+  final String career;
+  final List<int> salaryRange;
+  final DateTime postedAt;
   final String details;
   final List<String> benefits;
   final List<String> images;
-  final double lat;
-  final double lng;
 
   Job({
     required this.id,
     required this.title,
     required this.clinicName,
-    required this.career,
-    required this.type,
-    required this.salaryRange,
     required this.address,
+    required this.lat,
+    required this.lng,
+    required this.type,
+    required this.career,
+    required this.salaryRange,
+    required this.postedAt,
     required this.details,
     required this.benefits,
     required this.images,
-    required this.lat,
-    required this.lng,
   });
 
-  /// Firestore JSON → Job
-  factory Job.fromJson(String id, Map<String, dynamic> json) => Job(
-        id: id,
-        title: json['title'] as String,
-        clinicName: json['clinicName'] as String,
-        career: json['career'] as String,
-        type: json['type'] as String,
-        salaryRange: (json['salaryRange'] as List)
-            .map((e) => (e as num).toInt())
-            .toList(),
-        address: json['address'] as String,
-        details: json['details'] as String? ?? '',
-        benefits: (json['benefits'] as List? ?? []).cast<String>(),
-        images: (json['images'] as List? ?? []).cast<String>(),
-        lat: (json['lat'] as num).toDouble(),
-        lng: (json['lng'] as num).toDouble(),
-      );
+  factory Job.fromDoc(DocumentSnapshot doc) {
+    // ◀◀◀ 타입 수정
+    final json = doc.data() as Map<String, dynamic>;
+    return Job.fromJson(json, docId: doc.id);
+  }
 
-  /// 문서 스냅샷 → Job (id 자동 포함)
-  factory Job.fromDoc(QueryDocumentSnapshot<Map<String, dynamic>> doc) =>
-      Job.fromJson(doc.id, doc.data());
+  factory Job.fromJson(Map<String, dynamic> json, {String? docId}) {
+    final loc = json['location'] ?? {};
+    DateTime posted;
+    final pa = json['postedAt'];
+    if (pa is Timestamp) {
+      posted = pa.toDate();
+    } else if (pa is String) {
+      posted = DateTime.parse(pa);
+    } else {
+      posted = DateTime.now();
+    }
+
+    return Job(
+      id: docId ?? (json['id'] ?? ''),
+      title: json['title'] ?? '',
+      clinicName: json['clinicName'] ?? '',
+      address: loc['address'] ?? '',
+      lat: (loc['lat'] ?? 0).toDouble(),
+      lng: (loc['lng'] ?? 0).toDouble(),
+      type: json['type'] ?? '',
+      career: json['career'] ?? '미정',
+      salaryRange: List<int>.from(json['salaryRange'] ?? [0, 0]),
+      postedAt: posted,
+      details: json['details'] ?? '',
+      benefits: List<String>.from(json['benefits'] ?? []),
+      images: List<String>.from(json['images'] ?? []),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'title': title,
+        'clinicName': clinicName,
+        'location': {
+          'address': address,
+          'lat': lat,
+          'lng': lng,
+        },
+        'type': type,
+        'career': career,
+        'salaryRange': salaryRange,
+        'postedAt': Timestamp.fromDate(postedAt),
+        'details': details,
+        'benefits': benefits,
+        'images': images,
+      };
 }

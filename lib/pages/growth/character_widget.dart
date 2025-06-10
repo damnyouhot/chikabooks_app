@@ -12,7 +12,9 @@ class CharacterWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = context.watch<User?>();
-    if (user == null) return const SizedBox(height: 160);
+    if (user == null) {
+      return const SizedBox(height: 160, child: Center(child: Text("로그인 필요")));
+    }
 
     return StreamBuilder<Character?>(
       stream: CharacterService.watchCharacter(user.uid),
@@ -25,14 +27,15 @@ class CharacterWidget extends StatelessWidget {
         final character = characterSnapshot.data!;
 
         String baseCharacterAssetPath;
-        if (character.emotionPoints < 100)
+        if (character.emotionPoints < 100) {
           baseCharacterAssetPath = 'assets/characters/chick_lv1.png';
-        else if (character.emotionPoints < 200)
+        } else if (character.emotionPoints < 200) {
           baseCharacterAssetPath = 'assets/characters/chick_lv2.png';
-        else if (character.emotionPoints < 400)
+        } else if (character.emotionPoints < 400) {
           baseCharacterAssetPath = 'assets/characters/chick_lv3.png';
-        else
+        } else {
           baseCharacterAssetPath = 'assets/characters/chick_lv4.png';
+        }
 
         return Column(
           children: [
@@ -48,16 +51,24 @@ class CharacterWidget extends StatelessWidget {
                 ],
               ),
             ),
+            const SizedBox(height: 12),
+            Text(
+              '감정 점수: ${character.emotionPoints}',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
           ],
         );
       },
     );
   }
 
+  // ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼ 이 함수의 로직을 수정합니다 ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
   Widget _buildEquippedItem(BuildContext context, String itemId) {
+    // FutureBuilder는 항상 위젯을 반환해야 합니다.
     return FutureBuilder<StoreItem?>(
       future: context.read<StoreService>().fetchItemById(itemId),
       builder: (context, itemSnapshot) {
+        // 아이템 정보가 없거나, 로딩 중이거나, 에러가 발생하면 빈 위젯을 반환합니다.
         if (!itemSnapshot.hasData || itemSnapshot.data == null) {
           return const SizedBox.shrink();
         }
@@ -69,4 +80,5 @@ class CharacterWidget extends StatelessWidget {
       },
     );
   }
+  // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ 이 함수의 로직을 수정합니다 ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 }

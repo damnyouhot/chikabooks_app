@@ -1,4 +1,3 @@
-// lib/pages/admin/admin_ebook_create_page.dart
 import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -6,7 +5,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import '../../services/storage_service.dart'; // ◀◀◀ 이 줄 추가
+import '../../services/storage_service.dart'; // ◀◀◀ 빠져있던 이 줄을 추가합니다.
 
 class AdminEbookCreatePage extends StatefulWidget {
   const AdminEbookCreatePage({super.key});
@@ -26,14 +25,13 @@ class _AdminEbookCreatePageState extends State<AdminEbookCreatePage> {
   DateTime _publishedAt = DateTime.now();
   int _price = 0;
   Uint8List? _epub;
-  bool _isLoading = false; // 로딩 상태 변수 추가
+  bool _isLoading = false;
 
   Future<void> _pickEpub() async {
     const typeGroup = XTypeGroup(
       label: 'epub',
       extensions: ['epub'],
     );
-
     final file = await openFile(acceptedTypeGroups: [typeGroup]);
     if (file != null) {
       final bytes = await file.readAsBytes();
@@ -69,14 +67,12 @@ class _AdminEbookCreatePageState extends State<AdminEbookCreatePage> {
       _snack('전자책이 추가되었습니다.');
       _formKey.currentState?.reset();
       setState(() => _epub = null);
-      DefaultTabController.of(context).animateTo(0);
+      if (mounted) DefaultTabController.of(context).animateTo(0);
     } catch (e) {
       if (!mounted) return;
       _snack('오류 발생: $e');
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 

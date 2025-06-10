@@ -7,8 +7,7 @@ class FilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final filter = context.watch<JobFilterNotifier>();
-
+    final jobFilter = context.watch<JobFilterNotifier>();
     const regions = [
       '전체',
       '서울',
@@ -25,64 +24,66 @@ class FilterBar extends StatelessWidget {
     return Card(
       elevation: 2,
       margin: const EdgeInsets.all(8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: const EdgeInsets.all(8),
+        padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
         child: Column(
           children: [
-            /* ── 경력 & 지역 ── */
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                const Text('경력:'),
-                const SizedBox(width: 8),
-                _Chip(
-                  label: '전체',
-                  selected: filter.careerFilter == '전체',
-                  onTap: () => filter.setCareerFilter('전체'),
-                ),
-                _Chip(
-                  label: '신입',
-                  selected: filter.careerFilter == '신입',
-                  onTap: () => filter.setCareerFilter('신입'),
-                ),
-                _Chip(
-                  label: '경력',
-                  selected: filter.careerFilter == '경력',
-                  onTap: () => filter.setCareerFilter('경력'),
-                ),
-                const Spacer(),
-                const Text('지역:'),
+                const Text("경력:"),
+                ...['전체', '신입', '경력']
+                    .map((career) => _Chip(
+                          label: career,
+                          isSelected: jobFilter.careerFilter == career,
+                          onPressed: () => jobFilter.setCareerFilter(career),
+                        ))
+                    .toList(),
+                const SizedBox(width: 16),
+                const Text("지역:"),
                 const SizedBox(width: 8),
                 DropdownButton<String>(
-                  value: filter.regionFilter,
+                  value: jobFilter.regionFilter,
+                  items: regions.map((String value) {
+                    return DropdownMenuItem<String>(
+                        value: value,
+                        child:
+                            Text(value, style: const TextStyle(fontSize: 14)));
+                  }).toList(),
+                  onChanged: (String? newValue) {
+                    if (newValue != null) {
+                      jobFilter.setRegionFilter(newValue);
+                    }
+                  },
                   underline: const SizedBox(),
-                  items: regions
-                      .map((r) => DropdownMenuItem(value: r, child: Text(r)))
-                      .toList(),
-                  onChanged: (v) => filter.setRegionFilter(v!),
                 ),
               ],
             ),
-
-            /* ── 급여 슬라이더 ── */
             Row(
               children: [
-                Text(
-                    '급여(만): ${filter.salaryRange.start.round()} ~ ${filter.salaryRange.end.round()}'),
+                Padding(
+                  padding: const EdgeInsets.only(left: 8.0),
+                  child: Text(
+                      '급여(만): ${jobFilter.salaryRange.start.round()} ~ ${jobFilter.salaryRange.end.round() >= 10000 ? '1억+' : jobFilter.salaryRange.end.round()}'),
+                ),
                 Expanded(
                   child: RangeSlider(
-                    values: filter.salaryRange,
+                    values: jobFilter.salaryRange,
                     min: 0,
                     max: 10000,
-                    divisions: 100,
+                    divisions: 20,
                     labels: RangeLabels(
-                      filter.salaryRange.start.round().toString(),
-                      filter.salaryRange.end.round().toString(),
+                      jobFilter.salaryRange.start.round().toString(),
+                      jobFilter.salaryRange.end.round().toString(),
                     ),
-                    onChanged: filter.setSalaryRange,
+                    onChanged: (RangeValues values) {
+                      jobFilter.setSalaryRange(values);
+                    },
                   ),
                 ),
               ],
-            ),
+            )
           ],
         ),
       ),
@@ -90,26 +91,23 @@ class FilterBar extends StatelessWidget {
   }
 }
 
-/* 재사용 Chip */
 class _Chip extends StatelessWidget {
   final String label;
-  final bool selected;
-  final VoidCallback onTap;
-  const _Chip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
+  final bool isSelected;
+  final VoidCallback onPressed;
+
+  const _Chip(
+      {required this.label, required this.isSelected, required this.onPressed});
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 6),
-      child: ChoiceChip(
-        label: Text(label),
-        selected: selected,
-        onSelected: (_) => onTap(),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: ChoiceChip(
+          label: Text(label),
+          selected: isSelected,
+          onSelected: (_) => onPressed(),
+          showCheckmark: false,
+          selectedColor: Theme.of(context).primaryColorLight.withOpacity(0.5),
+        ),
+      );
 }

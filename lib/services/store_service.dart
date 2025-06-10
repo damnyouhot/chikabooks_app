@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart'; // debugPrint를 위해 추가
 import '../models/character.dart';
 import '../models/store_item.dart';
 
@@ -12,7 +13,6 @@ class StoreService {
     return snapshot.docs.map((doc) => StoreItem.fromDoc(doc)).toList();
   }
 
-  // ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼ 이 함수들의 로직이 누락/오류 상태였습니다 ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
   Future<List<StoreItem>> fetchMyItems() async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return [];
@@ -38,11 +38,10 @@ class StoreService {
       if (!doc.exists) return null;
       return StoreItem.fromDoc(doc);
     } catch (e) {
-      print('Error fetching item by ID: $e');
+      debugPrint('Error fetching item by ID: $e');
       return null;
     }
   }
-  // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ 이 함수들의 로직이 누락/오류 상태였습니다 ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
   Future<String> purchaseItem(StoreItem item) async {
     final uid = _auth.currentUser?.uid;
@@ -56,21 +55,39 @@ class StoreService {
 
       final character = Character.fromDoc(userDoc);
 
-      if (character.inventory.contains(item.id)) {
-        return "이미 보유하고 있는 아이템입니다.";
+      if (item.type == StoreItemType.coupon) {
+        // 쿠폰 구매 로직 (이번 단계에서는 일단 통과)
+      } else {
+        if (character.inventory.contains(item.id)) {
+          return "이미 보유하고 있는 아이템입니다.";
+        }
       }
+
       if (character.emotionPoints < item.price) {
         return "포인트가 부족합니다!";
       }
 
-      transaction.update(userRef, {
-        'emotionPoints': FieldValue.increment(-item.price),
-        'inventory': FieldValue.arrayUnion([item.id]),
-      });
+      transaction.update(
+          userRef, {'emotionPoints': FieldValue.increment(-item.price)});
+
+      if (item.type == StoreItemType.coupon) {
+        final couponRef = userRef.collection('coupons').doc();
+        transaction.set(couponRef, {
+          'itemId': item.id,
+          'name': item.name,
+          'value': item.value,
+          'isUsed': false,
+          'purchasedAt': FieldValue.serverTimestamp(),
+        });
+      } else {
+        transaction.update(userRef, {
+          'inventory': FieldValue.arrayUnion([item.id])
+        });
+      }
 
       return "${item.name} 구매 완료!";
     }).catchError((error) {
-      print("구매 중 오류 발생: $error");
+      debugPrint("구매 중 오류 발생: $error");
       return "구매 중 오류가 발생했습니다.";
     });
   }

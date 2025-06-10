@@ -1,5 +1,7 @@
-// 파일 경로: lib/models/store_item.dart
+// lib/models/store_item.dart (전체 코드)
 import 'package:cloud_firestore/cloud_firestore.dart';
+
+enum StoreItemType { cosmetic, coupon }
 
 class StoreItem {
   final String id;
@@ -7,6 +9,8 @@ class StoreItem {
   final String description;
   final int price;
   final String imageUrl;
+  final StoreItemType type;
+  final double? value; // 쿠폰일 경우 할인율/할인액
 
   StoreItem({
     required this.id,
@@ -14,6 +18,8 @@ class StoreItem {
     required this.description,
     required this.price,
     required this.imageUrl,
+    this.type = StoreItemType.cosmetic,
+    this.value,
   });
 
   factory StoreItem.fromDoc(DocumentSnapshot doc) {
@@ -24,6 +30,8 @@ class StoreItem {
       description: data['description'] ?? '',
       price: data['price'] ?? 9999,
       imageUrl: data['imageUrl'] ?? '',
+      type: StoreItemType.values.byName(data['type'] ?? 'cosmetic'),
+      value: (data['value'] ?? 0).toDouble(),
     );
   }
 }

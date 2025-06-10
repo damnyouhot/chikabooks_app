@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:provider/provider.dart';
+// import 'services/notification_service.dart'; // 다음 단계에서 사용할 예정
 
 import 'firebase_options.dart';
 import 'models/character.dart';
@@ -19,7 +20,7 @@ import 'pages/growth/growth_page.dart';
 import 'pages/job_page.dart';
 import 'services/ebook_service.dart';
 import 'services/job_service.dart';
-import 'services/store_service.dart';
+import 'services/store_service.dart'; // ◀◀◀ 이 줄 추가
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,7 +34,7 @@ Future<void> main() async {
     try {
       FirebaseFirestore.instance.useFirestoreEmulator('localhost', 8081);
       await FirebaseAuth.instance.useAuthEmulator('localhost', 9099);
-      FirebaseStorage.instance.useStorageEmulator('localhost', 9199);
+      await FirebaseStorage.instance.useStorageEmulator('localhost', 9199);
       debugPrint('🔥 Firebase Emulators connected');
     } catch (e) {
       debugPrint('❌ Error connecting to Firebase Emulators: $e');
@@ -50,7 +51,7 @@ Future<void> main() async {
         ChangeNotifierProvider(create: (_) => JobFilterNotifier()),
         Provider(create: (_) => JobService()),
         Provider(create: (_) => EbookService()),
-        Provider(create: (_) => StoreService()),
+        Provider(create: (_) => StoreService()), // ◀◀◀ 이 줄 추가
       ],
       child: const ChikabooksApp(),
     ),
@@ -81,11 +82,8 @@ class AuthGate extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = context.watch<User?>();
-
-    // 1) 로그인 안 돼 있으면 → Sign-in
     if (user == null) return const SignInPage();
 
-    // 2) 사용자 문서 조회
     return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       future:
           FirebaseFirestore.instance.collection('users').doc(user.uid).get(),
@@ -98,7 +96,6 @@ class AuthGate extends StatelessWidget {
         final data = snap.data!.data();
         final role = data?['role'] as String? ?? '';
 
-        // 첫 로그인 → 기본 캐릭터 문서 생성
         if (snap.data!.exists == false) {
           final defaultChar = Character(id: user.uid);
           FirebaseFirestore.instance

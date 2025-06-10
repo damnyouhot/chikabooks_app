@@ -15,6 +15,9 @@ dependencies:
   firebase_auth: ^4.6.5
   firebase_storage: ^11.6.5
   google_sign_in: ^6.3.0
+  shimmer: ^3.0.0
+  firebase_messaging: ^14.7.10 # ◀◀◀ 푸시 알림 패키지 추가
+  badges: ^3.1.2    
 
   epub_view: ^3.2.0
   path_provider: ^2.1.2

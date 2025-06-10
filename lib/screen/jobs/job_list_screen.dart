@@ -19,7 +19,6 @@ class JobListScreen extends StatelessWidget {
         const FilterBar(),
         Expanded(
           child: FutureBuilder<List<Job>>(
-            // ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼ key와 future 호출 수정 ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
             key: ValueKey(
                 "${jobFilter.careerFilter}_${jobFilter.regionFilter}_${jobFilter.salaryRange}"),
             future: jobService.fetchJobs(
@@ -27,7 +26,6 @@ class JobListScreen extends StatelessWidget {
               regionFilter: jobFilter.regionFilter,
               salaryRange: jobFilter.salaryRange,
             ),
-            // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ key와 future 호출 수정 ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
@@ -46,6 +44,7 @@ class JobListScreen extends StatelessWidget {
                 );
               }
               return ListView.builder(
+                padding: const EdgeInsets.only(bottom: 80),
                 itemCount: jobs.length,
                 itemBuilder: (_, i) => JobCard(job: jobs[i]),
               );

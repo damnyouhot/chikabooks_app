@@ -8,7 +8,6 @@ import '../services/store_service.dart';
 import 'growth/character_widget.dart';
 import 'growth/emotion_record_page.dart';
 
-// UI의 시각적 효과(애니메이션) 상태를 관리하기 위해 StatelessWidget -> StatefulWidget으로 변경
 class CaringPage extends StatefulWidget {
   const CaringPage({super.key});
 
@@ -16,43 +15,121 @@ class CaringPage extends StatefulWidget {
   State<CaringPage> createState() => _CaringPageState();
 }
 
-class _CaringPageState extends State<CaringPage> {
-  // 하트 애니메이션 표시 여부를 제어하는 상태 변수
-  bool _showHeart = false;
+class _CaringPageState extends State<CaringPage>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _heartAnimationController;
+  late Animation<double> _heartAnimation;
 
-  // '밥주기' 버튼을 눌렀을 때 실행될 함수
+  @override
+  void initState() {
+    super.initState();
+    _heartAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
+    _heartAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _heartAnimationController, curve: Curves.easeOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _heartAnimationController.dispose();
+    super.dispose();
+  }
+
   void _onFeed() {
-    CharacterService.feedCharacter(); // Firestore 데이터 업데이트
+    CharacterService.feedCharacter();
     if (mounted) {
-      // 하트 표시 상태를 true로 변경하여 애니메이션 시작
-      setState(() => _showHeart = true);
-      // 1초 뒤에 하트가 사라지도록 타이머 설정
-      Future.delayed(const Duration(milliseconds: 1000), () {
-        if (mounted) {
-          setState(() => _showHeart = false);
-        }
-      });
+      _heartAnimationController.forward(from: 0.0);
     }
   }
 
-  // 인벤토리 UI를 보여주는 함수
   void _showInventory(BuildContext context, Character character) {
-    // ... (이전 코드와 동일)
+    final storeService = context.read<StoreService>();
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) {
+        return FutureBuilder<List<StoreItem>>(
+          future: storeService.fetchMyItems(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              return const Center(child: Text('보유한 아이템이 없습니다.'));
+            }
+            final myItems = snapshot.data!;
+            return GridView.builder(
+              padding: const EdgeInsets.all(24),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 4,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+              ),
+              itemCount: myItems.length + 1,
+              itemBuilder: (context, index) {
+                if (index == 0) {
+                  return Tooltip(
+                    message: "아이템 해제",
+                    child: InkWell(
+                      onTap: () {
+                        CharacterService.equipItem(null);
+                        Navigator.pop(context);
+                      },
+                      child: const CircleAvatar(
+                        backgroundColor: Colors.grey,
+                        child:
+                            Icon(Icons.do_not_disturb_on, color: Colors.white),
+                      ),
+                    ),
+                  );
+                }
+                final item = myItems[index - 1];
+                final isEquipped = character.equippedItemId == item.id;
+                return Tooltip(
+                  message: item.name,
+                  child: InkWell(
+                    onTap: () {
+                      CharacterService.equipItem(item.id);
+                      Navigator.pop(context);
+                    },
+                    child: CircleAvatar(
+                      backgroundImage: NetworkImage(item.imageUrl),
+                      child: isEquipped
+                          ? Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border:
+                                    Border.all(color: Colors.green, width: 3),
+                              ),
+                            )
+                          : null,
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final user = context.watch<User?>();
-    if (user == null) return const Center(child: Text('로그인이 필요합니다.'));
+    if (user == null) {
+      return const Center(child: Text('로그인이 필요합니다.'));
+    }
 
     return StreamBuilder<Character?>(
       stream: CharacterService.watchCharacter(user.uid),
       builder: (context, snapshot) {
-        if (!snapshot.hasData)
+        if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
+        }
         final character = snapshot.data!;
-
-        // 캐릭터 정보를 UI 빌드 함수로 전달
         return _buildCaringUI(context, character);
       },
     );
@@ -60,27 +137,32 @@ class _CaringPageState extends State<CaringPage> {
 
   Widget _buildCaringUI(BuildContext context, Character character) {
     final affection = character.affection.clamp(0.0, 1.0);
-
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 24, 16, 48),
       child: Center(
         child: Column(
           children: [
-            // ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼ 캐릭터와 하트 효과를 겹치기 위해 Stack 사용 ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
             Stack(
-              alignment: Alignment.topCenter,
+              alignment: Alignment.center,
+              clipBehavior: Clip.none,
               children: [
                 const CharacterWidget(),
-                // AnimatedOpacity를 사용하여 하트가 부드럽게 나타났다 사라지게 함
-                AnimatedOpacity(
-                  opacity: _showHeart ? 1.0 : 0.0,
-                  duration: const Duration(milliseconds: 500),
-                  child: const Icon(Icons.favorite,
-                      color: Colors.pinkAccent, size: 50),
+                Positioned(
+                  top: -20,
+                  child: FadeTransition(
+                    opacity: _heartAnimation
+                        .drive(CurveTween(curve: Curves.easeOut)),
+                    child: SlideTransition(
+                      position: _heartAnimation.drive(Tween(
+                          begin: const Offset(0.2, 0.2),
+                          end: const Offset(0.2, -1.5))),
+                      child: const Icon(Icons.favorite,
+                          color: Colors.pinkAccent, size: 40),
+                    ),
+                  ),
                 ),
               ],
             ),
-            // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ 캐릭터와 하트 효과를 겹치기 위해 Stack 사용 ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
             const SizedBox(height: 24),
             Wrap(
               spacing: 8.0,
@@ -88,17 +170,15 @@ class _CaringPageState extends State<CaringPage> {
               alignment: WrapAlignment.center,
               children: [
                 ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => const EmotionRecordPage()));
-                  },
+                  onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const EmotionRecordPage())),
                   icon: const Icon(Icons.edit_note),
                   label: const Text('응원하기'),
                 ),
                 ElevatedButton.icon(
-                  onPressed: _onFeed, // 수정된 밥주기 함수 연결
+                  onPressed: _onFeed,
                   icon: const Icon(Icons.pets),
                   label: const Text("밥주기"),
                 ),
@@ -120,9 +200,45 @@ class _CaringPageState extends State<CaringPage> {
                 ),
               ],
             ),
-            // ... (이하 스탯 표시는 이전 코드와 동일) ...
+            const SizedBox(height: 32),
+            const Divider(),
+            const SizedBox(height: 16),
+            const Text("🟡 나의 현재 상태",
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            _buildStatRow("레벨", "${character.level}"),
+            _buildStatRow("경험치", character.experience.toStringAsFixed(1)),
+            _buildStatRow("❤️ 애정도", "${(affection * 100).toInt()}%"),
+            _buildStatRow("💰 보유 포인트", "${character.emotionPoints} P"),
+            const SizedBox(height: 16),
+            const Text("📊 나의 활동 기록",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            _buildStatRow("학습 시간", "${character.studyMinutes}분"),
+            _buildStatRow("걸음 수", "${character.stepCount} 걸음"),
+            _buildStatRow(
+                "수면 시간", "${character.sleepHours.toStringAsFixed(1)} 시간"),
+            _buildStatRow("퀴즈 완료", "${character.quizCount} 회"),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildStatRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          SizedBox(
+              width: 100,
+              child: Text("$label:", style: const TextStyle(fontSize: 16))),
+          const SizedBox(width: 8),
+          Text(value,
+              style:
+                  const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+        ],
       ),
     );
   }

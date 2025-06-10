@@ -1,11 +1,9 @@
-// lib/pages/admin/admin_ebook_edit_page.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-
 import '../../models/ebook.dart';
-import '../../services/storage_service.dart'; // ◀◀◀ 이 줄 추가
+import '../../services/storage_service.dart'; // ◀◀◀ 빠져있던 이 줄을 추가합니다.
 
 class AdminEbookEditPage extends StatefulWidget {
   final Ebook ebook;
@@ -21,7 +19,7 @@ class _AdminEbookEditPageState extends State<AdminEbookEditPage> {
   late String _title, _author, _coverUrl, _description, _productId;
   late DateTime _publishedAt;
   late int _price;
-  bool _isLoading = false; // 로딩 상태 변수 추가
+  bool _isLoading = false;
 
   @override
   void initState() {

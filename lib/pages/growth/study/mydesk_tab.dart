@@ -2,8 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:epub_view/epub_view.dart' hide Image; // Image 충돌 방지
-import '../../../services/growth_service.dart';
+
 import 'epub_reader_page.dart'; // 수정: EpubReaderPage 경로 추가
 import '../../../models/ebook.dart'; // 수정: Ebook 모델 경로 추가
 
