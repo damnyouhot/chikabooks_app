@@ -1,18 +1,30 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 
-// 구직 필터의 상태를 관리할 '인테리어 디자이너'
 class JobFilterNotifier extends ChangeNotifier {
-  String _careerFilter = '전체'; // 기본값은 '전체'
+  String _careerFilter = '전체';
+  String _regionFilter = '전체'; // ◀◀◀ 지역 필터 상태 추가
+  RangeValues _salaryRange = const RangeValues(0, 10000); // ◀◀◀ 급여 범위 상태 추가
 
   String get careerFilter => _careerFilter;
+  String get regionFilter => _regionFilter;
+  RangeValues get salaryRange => _salaryRange;
 
-  // 필터 값을 변경하는 함수
   void setCareerFilter(String newFilter) {
     if (_careerFilter != newFilter) {
       _careerFilter = newFilter;
-      // "상태가 변경되었으니, 나를 지켜보는 모든 위젯들아, 화면을 새로 그려라!"
-      // 라고 알려주는 가장 중요한 부분입니다.
       notifyListeners();
     }
+  }
+
+  void setRegionFilter(String newFilter) {
+    if (_regionFilter != newFilter) {
+      _regionFilter = newFilter;
+      notifyListeners();
+    }
+  }
+
+  void setSalaryRange(RangeValues newRange) {
+    _salaryRange = newRange;
+    notifyListeners();
   }
 }

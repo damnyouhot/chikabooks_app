@@ -12,7 +12,7 @@ class StoreService {
     return snapshot.docs.map((doc) => StoreItem.fromDoc(doc)).toList();
   }
 
-  // ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼ 이 함수의 로직을 최종 수정합니다 ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
+  // ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼ 이 함수들의 로직이 누락/오류 상태였습니다 ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
   Future<List<StoreItem>> fetchMyItems() async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return [];
@@ -31,7 +31,6 @@ class StoreService {
         .get();
     return snapshot.docs.map((doc) => StoreItem.fromDoc(doc)).toList();
   }
-  // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ 이 함수의 로직을 최종 수정합니다 ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
   Future<StoreItem?> fetchItemById(String itemId) async {
     try {
@@ -43,6 +42,7 @@ class StoreService {
       return null;
     }
   }
+  // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ 이 함수들의 로직이 누락/오류 상태였습니다 ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
   Future<String> purchaseItem(StoreItem item) async {
     final uid = _auth.currentUser?.uid;

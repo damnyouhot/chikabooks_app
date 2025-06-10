@@ -5,50 +5,42 @@ import '../../services/job_service.dart';
 
 class JobDetailScreen extends StatefulWidget {
   final String jobId;
-  // ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼ autoOpenApply 파라미터 다시 추가 ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
   final bool autoOpenApply;
   const JobDetailScreen({
     super.key,
     required this.jobId,
     this.autoOpenApply = false,
   });
-  // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ autoOpenApply 파라미터 다시 추가 ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
   @override
   State<JobDetailScreen> createState() => _JobDetailScreenState();
 }
 
 class _JobDetailScreenState extends State<JobDetailScreen> {
-  // Job 데이터를 저장할 변수를 State 내부에 선언
   Job? _job;
 
   @override
   void initState() {
     super.initState();
-    // initState에서 한 번만 Job 데이터를 불러오도록 수정
-    _fetchJobData();
+    _load();
   }
 
-  Future<void> _fetchJobData() async {
+  Future<void> _load() async {
     final job = await context.read<JobService>().fetchJob(widget.jobId);
-    if (mounted) {
-      setState(() {
-        _job = job;
+    if (!mounted) return;
+    setState(() => _job = job);
+
+    if (widget.autoOpenApply) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _openApplyModal(context, job);
       });
-      // autoOpenApply가 true이면, 데이터 로딩 후 바로 지원 모달을 엽니다.
-      if (widget.autoOpenApply) {
-        // 프레임이 렌더링된 후 모달을 열기 위해 addPostFrameCallback 사용
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _openApplyModal(context, job);
-        });
-      }
     }
   }
 
   void _openApplyModal(BuildContext context, Job job) {
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true, // 키보드가 올라올 때 UI가 밀리는 것을 방지
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -63,9 +55,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                     const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             const TextField(decoration: InputDecoration(labelText: '이름')),
-            const SizedBox(height: 8),
             const TextField(decoration: InputDecoration(labelText: '연락처')),
-            const SizedBox(height: 8),
             const TextField(
                 decoration: InputDecoration(labelText: '경력/포트폴리오 링크')),
             const SizedBox(height: 16),
@@ -86,19 +76,17 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // _job 데이터가 아직 로드되지 않았다면 로딩 인디케이터 표시
     if (_job == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-
     final job = _job!;
     final jobService = context.read<JobService>();
 
     return StreamBuilder<List<String>>(
       stream: jobService.watchBookmarkedJobIds(),
-      builder: (context, bookmarkSnap) {
-        final bookmarkedIds = bookmarkSnap.data ?? [];
-        final isBookmarked = bookmarkedIds.contains(widget.jobId);
+      builder: (context, snap) {
+        final ids = snap.data ?? [];
+        final bookmarked = ids.contains(widget.jobId);
 
         return Scaffold(
           appBar: AppBar(
@@ -106,15 +94,13 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             actions: [
               IconButton(
                 icon: Icon(
-                  isBookmarked ? Icons.star : Icons.star_border,
-                  color: isBookmarked ? Colors.amber : null,
+                  bookmarked ? Icons.star : Icons.star_border,
+                  color: bookmarked ? Colors.amber : null,
                 ),
                 onPressed: () {
-                  if (isBookmarked) {
-                    jobService.unbookmarkJob(widget.jobId);
-                  } else {
-                    jobService.bookmarkJob(widget.jobId);
-                  }
+                  bookmarked
+                      ? jobService.unbookmarkJob(widget.jobId)
+                      : jobService.bookmarkJob(widget.jobId);
                 },
               ),
             ],
@@ -127,9 +113,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
           body: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              // ... (기존 body 내용은 동일하게 유지)
-              // 여기부터는 기존에 제공된 body 코드와 동일합니다.
-              // 지도 미리보기 (임시)
+              /* Map Preview & Job Info */
               Container(
                 height: 180,
                 decoration: BoxDecoration(

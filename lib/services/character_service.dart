@@ -18,12 +18,20 @@ class CharacterService {
     return Character.fromDoc(doc);
   }
 
+  // ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼ 이 함수들이 누락되었습니다 ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
   static Stream<Character?> watchCharacter(String uid) {
     return _db.collection('users').doc(uid).snapshots().map((doc) {
       if (!doc.exists) return null;
       return Character.fromDoc(doc);
     });
   }
+
+  static Future<void> equipItem(String? itemId) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    await _db.collection('users').doc(uid).update({'equippedItemId': itemId});
+  }
+  // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ 이 함수들이 누락되었습니다 ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
   static Future<void> feedCharacter() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
@@ -49,19 +57,12 @@ class CharacterService {
       return "오늘은 이미 출석했습니다!";
     }
 
-    // 출석 시 경험치와 포인트를 함께 지급하도록 수정
     await docRef.update({
       'experience': FieldValue.increment(10.0),
-      'emotionPoints': FieldValue.increment(5), // 감정 포인트 +5
+      'emotionPoints': FieldValue.increment(5),
       'lastCheckIn': Timestamp.fromDate(now),
     });
 
     return "출석 완료! 경험치 +10, 포인트 +5";
-  }
-
-  static Future<void> equipItem(String? itemId) async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return;
-    await _db.collection('users').doc(uid).update({'equippedItemId': itemId});
   }
 }

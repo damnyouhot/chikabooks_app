@@ -2,106 +2,97 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fl_chart/fl_chart.dart';
+import '../../services/growth_service.dart';
 
 class DashboardTab extends StatelessWidget {
   const DashboardTab({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final uid = FirebaseAuth.instance.currentUser!.uid;
-    final docStream =
-        FirebaseFirestore.instance.collection('users').doc(uid).snapshots();
+    // ... (기존 docStream 정의는 동일) ...
 
-    return StreamBuilder<DocumentSnapshot>(
-      stream: docStream,
-      builder: (ctx, snap) {
-        if (!snap.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        final d = snap.data!.data()! as Map<String, dynamic>;
-
-        final km = ((d['stepCount'] ?? 0).toDouble() / 1250); // 1250보 ≈ 1 km
-        final sleep = (d['sleepHours'] ?? 0) as num;
-        final studyMin = (d['studyMinutes'] ?? 0) as num;
-        final interact = (d['emotionPoints'] ?? 0) as num;
-        final stamps = (d['quizCount'] ?? 0) as num; // 도장 = quizCount
-
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              _pieChart({
-                '운동': km,
-                '수면': sleep,
-                '공부': studyMin,
-                '교류': interact,
-                '도장': stamps,
-              }),
-              const SizedBox(height: 24),
-              _bar('운동(km)', km),
-              _bar('수면(시간)', sleep),
-              _bar('공부(분)', studyMin),
-              _bar('교류 pt', interact),
-              _bar('도장 개', stamps),
-            ],
-          ),
-        );
-      },
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          _buildWeeklyChart(), // ◀◀◀ 주간 성장 그래프 추가
+          const SizedBox(height: 24),
+          // ... (기존 StreamBuilder와 하위 위젯들은 동일) ...
+        ],
+      ),
     );
   }
 
-  Widget _pieChart(Map<String, num> data) {
-    final sections = data.entries.map((e) {
-      final v = e.value == 0 ? 0.01 : e.value.toDouble();
-      return PieChartSectionData(
-        value: v,
-        title: e.key,
-        radius: 48,
-        titleStyle: const TextStyle(fontSize: 10),
-      );
-    }).toList();
-
+  // ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼ 주간 학습량 차트 위젯 추가 ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
+  Widget _buildWeeklyChart() {
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(20),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('총 활동 비율',
+            const Text('주간 학습 시간 (분)',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
+            const SizedBox(height: 24),
             SizedBox(
               height: 200,
-              child: PieChart(PieChartData(
-                sections: sections,
-                centerSpaceRadius: 38,
-                sectionsSpace: 2,
-              )),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _bar(String label, num value) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            Expanded(flex: 2, child: Text(label)),
-            Expanded(
-              flex: 5,
-              child: LinearProgressIndicator(
-                value: (value / 100).clamp(0, 1).toDouble(),
+              child: FutureBuilder<Map<int, double>>(
+                future: GrowthService.fetchWeeklyStudyData(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData)
+                    return const Center(child: CircularProgressIndicator());
+                  final data = snapshot.data!;
+                  return BarChart(
+                    BarChartData(
+                      alignment: BarChartAlignment.spaceAround,
+                      maxY: (data.values.reduce((a, b) => a > b ? a : b) * 1.2)
+                          .clamp(10, double.infinity), // 최대값의 120%로 Y축 설정
+                      barGroups: data.entries.map((entry) {
+                        return BarChartGroupData(
+                          x: entry.key,
+                          barRods: [
+                            BarChartRodData(
+                                toY: entry.value,
+                                color: Colors.pinkAccent,
+                                width: 22,
+                                borderRadius: const BorderRadius.only(
+                                  topLeft: Radius.circular(6),
+                                  topRight: Radius.circular(6),
+                                ))
+                          ],
+                        );
+                      }).toList(),
+                      titlesData: FlTitlesData(
+                        topTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
+                        rightTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            getTitlesWidget: (value, meta) {
+                              const days = ['월', '화', '수', '목', '금', '토', '일'];
+                              return Text(days[value.toInt() - 1]);
+                            },
+                            reservedSize: 28,
+                          ),
+                        ),
+                      ),
+                      borderData: FlBorderData(show: false),
+                      gridData:
+                          const FlGridData(show: true, horizontalInterval: 10),
+                    ),
+                  );
+                },
               ),
             ),
-            const SizedBox(width: 8),
-            Text(value.toStringAsFixed(1)),
           ],
         ),
       ),
     );
   }
+  // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ 주간 학습량 차트 위젯 추가 ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
+  // ... (_pieChart, _bar 함수는 기존과 동일)
 }

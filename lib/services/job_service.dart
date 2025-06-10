@@ -1,78 +1,67 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import '../models/job.dart';
-import 'package:flutter/foundation.dart';
 
 class JobService {
   final _db = FirebaseFirestore.instance;
   final _auth = FirebaseAuth.instance;
 
-  Future<List<Job>> fetchJobs({String careerFilter = '전체'}) async {
-    Query query = _db.collection('jobs').orderBy('postedAt', descending: true);
+  /* ── 공고 리스트 (필터 적용) ───────────────────────── */
+  Future<List<Job>> fetchJobs({
+    String careerFilter = '전체',
+    String regionFilter = '전체',
+    RangeValues? salaryRange,
+  }) async {
+    final qs = await _db
+        .collection('jobs')
+        .orderBy('postedAt', descending: true)
+        .get();
+
+    List<Job> jobs = qs.docs.map(Job.fromDoc).toList();
 
     if (careerFilter != '전체') {
-      query = query.where('career', isEqualTo: careerFilter);
+      jobs = jobs.where((j) => j.career == careerFilter).toList();
     }
-
-    final snapshot = await query.get();
-    debugPrint('🗂️ 불러온 공고 수: ${snapshot.docs.length} (필터: $careerFilter)');
-    return snapshot.docs.map((d) {
-      final data = d.data() as Map<String, dynamic>;
-      return Job.fromJson(data, docId: d.id);
-    }).toList();
+    if (regionFilter != '전체') {
+      jobs = jobs.where((j) => j.address.contains(regionFilter)).toList();
+    }
+    if (salaryRange != null) {
+      jobs = jobs.where((j) {
+        final min = j.salaryRange.first;
+        final max = j.salaryRange.last;
+        return max >= salaryRange.start && min <= salaryRange.end;
+      }).toList();
+    }
+    return jobs;
   }
 
+  /* ── 단건 조회 ───────────────────────── */
   Future<Job> fetchJob(String id) async {
     final doc = await _db.collection('jobs').doc(id).get();
-    return Job.fromJson(doc.data()!, docId: doc.id);
+    return Job.fromJson(doc.id, doc.data()!);
   }
 
-  // ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼ 북마크 관련 함수들 추가 ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
-  // 현재 사용자의 북마크된 직업 ID 목록을 실시간으로 감시
-  Stream<List<String>> watchBookmarkedJobIds() {
-    final uid = _auth.currentUser?.uid;
-    if (uid == null) return Stream.value([]);
-    return _db.collection('users').doc(uid).snapshots().map((doc) {
-      if (!doc.exists) return [];
-      return List<String>.from(doc.data()?['bookmarkedJobs'] ?? []);
-    });
-  }
+  /* ── 북마크 ───────────────────────────── */
+  CollectionReference<Map<String, dynamic>> _bkCol() => _db
+      .collection('users')
+      .doc(_auth.currentUser!.uid)
+      .collection('bookmarks');
 
-  // 북마크 추가
-  Future<void> bookmarkJob(String jobId) async {
-    final uid = _auth.currentUser?.uid;
-    if (uid == null) return;
-    await _db.collection('users').doc(uid).update({
-      'bookmarkedJobs': FieldValue.arrayUnion([jobId])
-    });
-  }
+  Future<void> bookmarkJob(String id) =>
+      _bkCol().doc(id).set({'ts': FieldValue.serverTimestamp()});
+  Future<void> unbookmarkJob(String id) => _bkCol().doc(id).delete();
 
-  // 북마크 제거
-  Future<void> unbookmarkJob(String jobId) async {
-    final uid = _auth.currentUser?.uid;
-    if (uid == null) return;
-    await _db.collection('users').doc(uid).update({
-      'bookmarkedJobs': FieldValue.arrayRemove([jobId])
-    });
-  }
+  Stream<List<String>> watchBookmarkedJobIds() =>
+      _bkCol().snapshots().map((qs) => qs.docs.map((d) => d.id).toList());
 
-  // 북마크된 직업 목록 불러오기
   Future<List<Job>> fetchBookmarkedJobs() async {
-    final uid = _auth.currentUser?.uid;
-    if (uid == null) return [];
-
-    final userDoc = await _db.collection('users').doc(uid).get();
-    final List<String> bookmarkedIds =
-        List<String>.from(userDoc.data()?['bookmarkedJobs'] ?? []);
-
-    if (bookmarkedIds.isEmpty) return [];
-
-    // ID 목록으로 여러 문서를 한 번에 가져오기
-    final jobDocs = await _db
+    final ids = (await _bkCol().get()).docs.map((d) => d.id).toList();
+    if (ids.isEmpty) return [];
+    final qs = await _db
         .collection('jobs')
-        .where(FieldPath.documentId, whereIn: bookmarkedIds)
+        .where(FieldPath.documentId, whereIn: ids)
         .get();
-    return jobDocs.docs.map((doc) => Job.fromDoc(doc)).toList();
+    return qs.docs.map(Job.fromDoc).toList();
   }
-  // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ 북마크 관련 함수들 추가 ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 }

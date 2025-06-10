@@ -15,18 +15,17 @@ class AppliedJobsScreen extends StatelessWidget {
       appBar: AppBar(title: const Text('관심 공고')),
       body: FutureBuilder<List<Job>>(
         future: jobService.fetchBookmarkedJobs(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+        builder: (context, snap) {
+          if (snap.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (snapshot.hasError) {
-            return Center(child: Text('오류: ${snapshot.error}'));
+          if (snap.hasError) {
+            return Center(child: Text('오류: ${snap.error}'));
           }
-          final jobs = snapshot.data ?? [];
+          final jobs = snap.data ?? [];
           if (jobs.isEmpty) {
             return const Center(child: Text('관심 등록한 공고가 없습니다.'));
           }
-
           return ListView.builder(
             itemCount: jobs.length,
             itemBuilder: (_, i) => JobCard(job: jobs[i]),
