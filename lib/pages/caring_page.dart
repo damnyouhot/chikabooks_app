@@ -92,8 +92,6 @@ class CaringPage extends StatelessWidget {
                                 border:
                                     Border.all(color: Colors.green, width: 3),
                               ),
-                              child: const Icon(Icons.check,
-                                  color: Colors.white, size: 32),
                             )
                           : null,
                     ),
@@ -164,7 +162,8 @@ class CaringPage extends StatelessWidget {
             _buildStatRow("레벨", "${character.level}"),
             _buildStatRow("경험치", character.experience.toStringAsFixed(1)),
             _buildStatRow("❤️ 애정도", "${(affection * 100).toInt()}%"),
-            _buildStatRow("💰 포인트", "${character.emotionPoints}"),
+            _buildStatRow("💰 보유 포인트",
+                "${character.emotionPoints} P"), // ◀◀◀ 보유 포인트 표시 추가
             const SizedBox(height: 16),
             const Text("📊 나의 활동 기록",
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),

@@ -1,21 +1,13 @@
-// 최신 v2 버전의 함수들을 import 합니다.
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 import * as admin from "firebase-admin";
 
-// Firestore 앱 초기화
 admin.initializeApp();
 const db = admin.firestore();
 
-/**
- * growthEvents 컬렉션에 새 문서가 생성될 때마다 트리거됩니다. (v2 구문)
- * 이벤트 유형에 따라 users/{uid}/stats 필드를 안전하게 업데이트합니다.
- */
 export const onGrowthEventCreated = onDocumentCreated(
-  "growthEvents/{eventId}", // 1. 감시할 문서 경로
-  (event) => {                // 2. 이벤트가 발생했을 때 실행할 내용
-
-    // 생성된 이벤트 데이터(주문서) 가져오기
+  "growthEvents/{eventId}",
+  (event) => {
     const snap = event.data;
     if (!snap) {
       logger.error("No data associated with the event", event);
@@ -29,51 +21,42 @@ export const onGrowthEventCreated = onDocumentCreated(
       return;
     }
 
-    // 통계(stats)의 어느 필드를 업데이트할지 결정
-    let fieldToUpdate: string;
+    const userRef = db.doc(`users/${userId}`);
+    let updates: { [key: string]: any } = {};
+
+    // 각 활동 유형에 따라 적절한 스탯과 포인트를 함께 업데이트합니다.
     switch (type) {
       case "exercise":
-        fieldToUpdate = "stepCount";
+        updates['stats.stepCount'] = admin.firestore.FieldValue.increment(value);
+        updates['stats.emotionPoints'] = admin.firestore.FieldValue.increment(Math.round(value / 100)); // 100걸음당 1포인트
         break;
       case "sleep":
-        fieldToUpdate = "sleepHours";
+        updates['stats.sleepHours'] = admin.firestore.FieldValue.increment(value);
+        updates['stats.emotionPoints'] = admin.firestore.FieldValue.increment(Math.round(value * 5)); // 1시간당 5포인트
         break;
       case "study":
-        fieldToUpdate = "studyMinutes";
+        updates['stats.studyMinutes'] = admin.firestore.FieldValue.increment(value);
+        updates['stats.emotionPoints'] = admin.firestore.FieldValue.increment(Math.round(value / 10)); // 10분당 1포인트
         break;
       case "emotion":
       case "interaction":
-        fieldToUpdate = "emotionPoints";
+        updates['stats.emotionPoints'] = admin.firestore.FieldValue.increment(value);
         break;
-      case "stamp":
       case "quiz":
-        fieldToUpdate = "quizCount";
+        updates['stats.quizCount'] = admin.firestore.FieldValue.increment(value);
+        updates['stats.emotionPoints'] = admin.firestore.FieldValue.increment(10); // 퀴즈 정답 시 10포인트
         break;
       default:
         logger.log(`Unhandled event type: ${type}`);
         return;
     }
 
-    const userRef = db.doc(`users/${userId}`);
-
-    // users/{uid} 문서의 stats 필드 누적 (안전한 방식)
     try {
-      userRef.set(
-        {
-          stats: {
-            [fieldToUpdate]: admin.firestore.FieldValue.increment(value),
-          },
-        },
-        { merge: true }
-      );
-      logger.log(
-        `User ${userId} stats updated: ${fieldToUpdate} by ${value}`
-      );
+      // set({}, {merge: true})를 사용하여 stats 필드 내의 특정 값들만 안전하게 업데이트
+      userRef.set({ stats: updates }, { merge: true });
+      logger.log(`User ${userId} stats updated:`, updates);
     } catch (error) {
-      logger.error(
-        `Failed to update stats for user ${userId}`,
-        error
-      );
+      logger.error(`Failed to update stats for user ${userId}`, error);
     }
   }
 );
