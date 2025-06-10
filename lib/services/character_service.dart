@@ -18,6 +18,15 @@ class CharacterService {
     return Character.fromDoc(doc);
   }
 
+  // ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼ 실시간 감시 스트림 추가 ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
+  static Stream<Character?> watchCharacter(String uid) {
+    return _db.collection('users').doc(uid).snapshots().map((doc) {
+      if (!doc.exists) return null;
+      return Character.fromDoc(doc);
+    });
+  }
+  // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ 실시간 감시 스트림 추가 ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
   static Future<void> feedCharacter() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
@@ -25,7 +34,6 @@ class CharacterService {
     await docRef.update({'affection': FieldValue.increment(0.1)});
   }
 
-  // ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼ 출석 체크 함수 추가 ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
   static Future<String> dailyCheckIn() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return "로그인이 필요합니다.";
@@ -36,7 +44,6 @@ class CharacterService {
     final lastCheckIn = (doc.data()?['lastCheckIn'] as Timestamp?)?.toDate();
     final now = DateTime.now();
 
-    // 마지막 출석일이 오늘과 같은지 확인
     if (lastCheckIn != null &&
         lastCheckIn.year == now.year &&
         lastCheckIn.month == now.month &&
@@ -44,7 +51,6 @@ class CharacterService {
       return "오늘은 이미 출석했습니다!";
     }
 
-    // 출석 보상 (경험치 +10) 및 마지막 출석일 업데이트
     await docRef.update({
       'experience': FieldValue.increment(10.0),
       'lastCheckIn': Timestamp.fromDate(now),
@@ -52,5 +58,12 @@ class CharacterService {
 
     return "출석 완료! 경험치 +10";
   }
-  // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ 출석 체크 함수 추가 ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
+  // ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼ 아이템 장착/해제 함수 추가 ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
+  static Future<void> equipItem(String? itemId) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    await _db.collection('users').doc(uid).update({'equippedItemId': itemId});
+  }
+  // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ 아이템 장착/해제 함수 추가 ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 }

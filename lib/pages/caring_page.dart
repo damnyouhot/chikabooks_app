@@ -1,111 +1,120 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:chikabooks_app/pages/growth/character_widget.dart';
-import 'package:chikabooks_app/pages/growth/emotion_record_page.dart';
+import 'package:provider/provider.dart';
 import '../models/character.dart';
+import '../models/store_item.dart';
 import '../services/character_service.dart';
+import '../services/store_service.dart';
+import 'growth/character_widget.dart';
+import 'growth/emotion_record_page.dart';
 
-class CaringPage extends StatefulWidget {
+class CaringPage extends StatelessWidget {
   const CaringPage({super.key});
 
   @override
-  State<CaringPage> createState() => _CaringPageState();
-}
-
-class _CaringPageState extends State<CaringPage> {
-  Character? _character;
-  bool _loading = true;
-  bool _feeding = false;
-  bool _checkingIn = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadCharacter();
-  }
-
-  Future<void> _loadCharacter() async {
-    if (!mounted) return;
-    setState(() => _loading = true);
-    final char = await CharacterService.fetchCharacter();
-    if (!mounted) return;
-    setState(() {
-      _character = char;
-      _loading = false;
-    });
-  }
-
-  Future<void> _onFeed() async {
-    if (_feeding) return;
-    setState(() => _feeding = true);
-    await CharacterService.feedCharacter();
-    await _loadCharacter();
-    if (!mounted) return;
-    setState(() => _feeding = false);
-  }
-
-  Future<void> _onCheckIn() async {
-    if (_checkingIn) return;
-    setState(() => _checkingIn = true);
-    final message = await CharacterService.dailyCheckIn();
-
-    if (mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(message)));
-    }
-
-    await _loadCharacter();
-    if (mounted) {
-      setState(() => _checkingIn = false);
-    }
-  }
-
-  // ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼ 말풍선 텍스트를 결정하는 함수 추가 ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
-  String _getCharacterQuote(Character character) {
-    if (character.affection < 0.2) {
-      return "배고파요... 밥을 주세요...";
-    }
-    if (character.emotionPoints < 50) {
-      return "오늘 하루는 어땠나요? 제게 응원을 보내주세요!";
-    }
-    if (character.studyMinutes > 60) {
-      return "열심히 공부하는 모습이 멋져요!";
-    }
-    return "오늘도 함께 성장해요!";
-  }
-  // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ 말풍선 텍스트를 결정하는 함수 추가 ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
-
-  @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (_character == null) {
-      return const Center(child: Text("❌ 캐릭터 데이터를 불러올 수 없습니다."));
+    final user = context.watch<User?>();
+
+    if (user == null) {
+      return const Center(child: Text('로그인이 필요합니다.'));
     }
 
-    final c = _character!;
-    final affection = c.affection.clamp(0.0, 1.0);
+    return StreamBuilder<Character?>(
+      stream: CharacterService.watchCharacter(user.uid),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final character = snapshot.data!;
+        return _buildCaringUI(context, character);
+      },
+    );
+  }
+
+  void _showInventory(BuildContext context, Character character) {
+    final storeService = context.read<StoreService>();
+
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) {
+        return FutureBuilder<List<StoreItem>>(
+          future: storeService.fetchMyItems(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            final myItems = snapshot.data!;
+            if (myItems.isEmpty) {
+              return const Center(child: Text('보유한 아이템이 없습니다.'));
+            }
+
+            return GridView.builder(
+              padding: const EdgeInsets.all(24),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 4,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+              ),
+              itemCount: myItems.length + 1,
+              itemBuilder: (context, index) {
+                if (index == 0) {
+                  return Tooltip(
+                    message: "아이템 해제",
+                    child: InkWell(
+                      onTap: () {
+                        CharacterService.equipItem(null);
+                        Navigator.pop(context);
+                      },
+                      child: const CircleAvatar(
+                        backgroundColor: Colors.grey,
+                        child:
+                            Icon(Icons.do_not_disturb_on, color: Colors.white),
+                      ),
+                    ),
+                  );
+                }
+                final item = myItems[index - 1];
+                final isEquipped = character.equippedItemId == item.id;
+
+                return Tooltip(
+                  message: item.name,
+                  child: InkWell(
+                    onTap: () {
+                      CharacterService.equipItem(item.id);
+                      Navigator.pop(context);
+                    },
+                    child: CircleAvatar(
+                      backgroundImage: NetworkImage(item.imageUrl),
+                      child: isEquipped
+                          ? Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border:
+                                    Border.all(color: Colors.green, width: 3),
+                              ),
+                              child: const Icon(Icons.check,
+                                  color: Colors.white, size: 32),
+                            )
+                          : null,
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildCaringUI(BuildContext context, Character character) {
+    final affection = character.affection.clamp(0.0, 1.0);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 24, 16, 48),
       child: Center(
         child: Column(
           children: [
-            // ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼ 말풍선 UI 추가 ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade200,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                _getCharacterQuote(c),
-                style: const TextStyle(fontSize: 15),
-                textAlign: TextAlign.center,
-              ),
-            ),
-            const SizedBox(height: 8),
-            // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ 말풍선 UI 추가 ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
             const CharacterWidget(),
             const SizedBox(height: 24),
             Wrap(
@@ -116,35 +125,33 @@ class _CaringPageState extends State<CaringPage> {
                 ElevatedButton.icon(
                   onPressed: () {
                     Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => const EmotionRecordPage()),
-                    ).then((_) => _loadCharacter());
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const EmotionRecordPage()));
                   },
                   icon: const Icon(Icons.edit_note),
                   label: const Text('응원하기'),
                 ),
                 ElevatedButton.icon(
-                  icon: _feeding
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white))
-                      : const Icon(Icons.pets),
-                  label: Text(_feeding ? "주는중..." : "밥주기"),
-                  onPressed: _feeding ? null : _onFeed,
+                  onPressed: CharacterService.feedCharacter,
+                  icon: const Icon(Icons.pets),
+                  label: const Text("밥주기"),
                 ),
                 ElevatedButton.icon(
-                  icon: _checkingIn
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white))
-                      : const Icon(Icons.check_circle_outline),
-                  label: Text(_checkingIn ? "확인중..." : "출석하기"),
-                  onPressed: _checkingIn ? null : _onCheckIn,
+                  onPressed: () async {
+                    final message = await CharacterService.dailyCheckIn();
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context)
+                          .showSnackBar(SnackBar(content: Text(message)));
+                    }
+                  },
+                  icon: const Icon(Icons.check_circle_outline),
+                  label: const Text("출석하기"),
+                ),
+                ElevatedButton.icon(
+                  onPressed: () => _showInventory(context, character),
+                  icon: const Icon(Icons.checkroom),
+                  label: const Text('꾸미기'),
                 ),
               ],
             ),
@@ -154,19 +161,19 @@ class _CaringPageState extends State<CaringPage> {
             const Text("🟡 나의 현재 상태",
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
-            _buildStatRow("레벨", "${c.level}"),
-            _buildStatRow("경험치", c.experience.toStringAsFixed(1)),
+            _buildStatRow("레벨", "${character.level}"),
+            _buildStatRow("경험치", character.experience.toStringAsFixed(1)),
             _buildStatRow("❤️ 애정도", "${(affection * 100).toInt()}%"),
+            _buildStatRow("💰 포인트", "${character.emotionPoints}"),
             const SizedBox(height: 16),
             const Text("📊 나의 활동 기록",
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            _buildStatRow("학습 시간", "${c.studyMinutes}분"),
-            _buildStatRow("걸음 수", "${c.stepCount} 걸음"),
-            _buildStatRow("수면 시간", "${c.sleepHours.toStringAsFixed(1)} 시간"),
-            _buildStatRow("퀴즈 완료", "${c.quizCount} 회"),
-            _buildStatRow("감정치", "${c.emotionPoints} 점"),
-            _buildStatRow("연차", "${c.tenureYears} 년"),
+            _buildStatRow("학습 시간", "${character.studyMinutes}분"),
+            _buildStatRow("걸음 수", "${character.stepCount} 걸음"),
+            _buildStatRow(
+                "수면 시간", "${character.sleepHours.toStringAsFixed(1)} 시간"),
+            _buildStatRow("퀴즈 완료", "${character.quizCount} 회"),
           ],
         ),
       ),

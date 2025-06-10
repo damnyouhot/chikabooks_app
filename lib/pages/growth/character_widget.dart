@@ -1,50 +1,70 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import '../../services/emotion_service.dart';
+import 'package:provider/provider.dart';
+import '../../models/character.dart';
+import '../../models/store_item.dart';
+import '../../services/character_service.dart';
+import '../../services/store_service.dart';
 
 class CharacterWidget extends StatelessWidget {
   const CharacterWidget({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final uid = FirebaseAuth.instance.currentUser!.uid;
+    final user = context.watch<User?>();
+    if (user == null) return const SizedBox(height: 160);
 
-    return StreamBuilder<int>(
-      stream: EmotionService.emotionPointStream(uid),
-      builder: (context, snapshot) {
-        final points = snapshot.data ?? 0;
-
-        // ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼ 레벨 계산 로직 원상 복구 ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
-        String assetPath;
-        if (points < 100) {
-          assetPath = 'assets/characters/chick_lv1.png';
-        } else if (points < 200) {
-          assetPath = 'assets/characters/chick_lv2.png';
-        } else if (points < 400) {
-          assetPath = 'assets/characters/chick_lv3.png';
-        } else {
-          assetPath = 'assets/characters/chick_lv4.png';
+    return StreamBuilder<Character?>(
+      stream: CharacterService.watchCharacter(user.uid),
+      builder: (context, characterSnapshot) {
+        if (!characterSnapshot.hasData) {
+          return const SizedBox(
+              height: 180, child: Center(child: CircularProgressIndicator()));
         }
-        // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ 레벨 계산 로직 원상 복구 ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
+        final character = characterSnapshot.data!;
+
+        String baseCharacterAssetPath;
+        if (character.emotionPoints < 100)
+          baseCharacterAssetPath = 'assets/characters/chick_lv1.png';
+        else if (character.emotionPoints < 200)
+          baseCharacterAssetPath = 'assets/characters/chick_lv2.png';
+        else if (character.emotionPoints < 400)
+          baseCharacterAssetPath = 'assets/characters/chick_lv3.png';
+        else
+          baseCharacterAssetPath = 'assets/characters/chick_lv4.png';
 
         return Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Image.asset(
-              assetPath,
+            SizedBox(
               width: 160,
               height: 160,
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) {
-                return const Icon(Icons.error, size: 160);
-              },
-            ),
-            const SizedBox(height: 12),
-            Text(
-              '감정 점수: $points',
-              style: Theme.of(context).textTheme.titleMedium,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Image.asset(baseCharacterAssetPath),
+                  if (character.equippedItemId != null)
+                    _buildEquippedItem(context, character.equippedItemId!),
+                ],
+              ),
             ),
           ],
+        );
+      },
+    );
+  }
+
+  Widget _buildEquippedItem(BuildContext context, String itemId) {
+    return FutureBuilder<StoreItem?>(
+      future: context.read<StoreService>().fetchItemById(itemId),
+      builder: (context, itemSnapshot) {
+        if (!itemSnapshot.hasData || itemSnapshot.data == null) {
+          return const SizedBox.shrink();
+        }
+        final item = itemSnapshot.data!;
+        return Image.network(
+          item.imageUrl,
+          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
         );
       },
     );

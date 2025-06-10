@@ -1,24 +1,25 @@
-// 최종 경로: lib/main.dart
+// lib/main.dart
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
-
-import 'models/character.dart';
-import 'notifiers/job_filter_notifier.dart';
-import 'services/ebook_service.dart';
-import 'services/job_service.dart';
-
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:provider/provider.dart';
 
+import 'firebase_options.dart';
+import 'models/character.dart';
+import 'notifiers/job_filter_notifier.dart';
 import 'pages/admin/admin_dashboard_page.dart';
 import 'pages/caring_page.dart';
 import 'pages/growth/growth_page.dart';
 import 'pages/job_page.dart';
+import 'services/ebook_service.dart';
+import 'services/job_service.dart';
+import 'services/store_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,7 +33,7 @@ Future<void> main() async {
     try {
       FirebaseFirestore.instance.useFirestoreEmulator('localhost', 8081);
       await FirebaseAuth.instance.useAuthEmulator('localhost', 9099);
-      await FirebaseStorage.instance.useStorageEmulator('localhost', 9199);
+      FirebaseStorage.instance.useStorageEmulator('localhost', 9199);
       debugPrint('🔥 Firebase Emulators connected');
     } catch (e) {
       debugPrint('❌ Error connecting to Firebase Emulators: $e');
@@ -42,9 +43,14 @@ Future<void> main() async {
   runApp(
     MultiProvider(
       providers: [
+        StreamProvider<User?>(
+          create: (_) => FirebaseAuth.instance.authStateChanges(),
+          initialData: null,
+        ),
         ChangeNotifierProvider(create: (_) => JobFilterNotifier()),
         Provider(create: (_) => JobService()),
         Provider(create: (_) => EbookService()),
+        Provider(create: (_) => StoreService()),
       ],
       child: const ChikabooksApp(),
     ),
@@ -74,42 +80,34 @@ class AuthGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.authStateChanges(),
-      builder: (context, authSnap) {
-        if (authSnap.connectionState == ConnectionState.waiting) {
+    final user = context.watch<User?>();
+
+    // 1) 로그인 안 돼 있으면 → Sign-in
+    if (user == null) return const SignInPage();
+
+    // 2) 사용자 문서 조회
+    return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      future:
+          FirebaseFirestore.instance.collection('users').doc(user.uid).get(),
+      builder: (context, snap) {
+        if (!snap.hasData) {
           return const Scaffold(
               body: Center(child: CircularProgressIndicator()));
         }
-        final user = authSnap.data;
-        if (user == null) return const SignInPage();
 
-        return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-          future: FirebaseFirestore.instance
+        final data = snap.data!.data();
+        final role = data?['role'] as String? ?? '';
+
+        // 첫 로그인 → 기본 캐릭터 문서 생성
+        if (snap.data!.exists == false) {
+          final defaultChar = Character(id: user.uid);
+          FirebaseFirestore.instance
               .collection('users')
               .doc(user.uid)
-              .get(),
-          builder: (context, userSnap) {
-            if (userSnap.connectionState == ConnectionState.waiting) {
-              return const Scaffold(
-                  body: Center(child: CircularProgressIndicator()));
-            }
-            final data = userSnap.data?.data();
-            final role = data?['role'] as String? ?? '';
+              .set(defaultChar.toJson());
+        }
 
-            if (userSnap.data?.exists == false) {
-              final defaultChar = Character(id: user.uid);
-              FirebaseFirestore.instance
-                  .collection('users')
-                  .doc(user.uid)
-                  .set(defaultChar.toJson());
-            }
-
-            return role == 'admin'
-                ? const AdminDashboardPage()
-                : const MyHome();
-          },
-        );
+        return role == 'admin' ? const AdminDashboardPage() : const MyHome();
       },
     );
   }
@@ -120,9 +118,7 @@ class SignInPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final GoogleSignIn googleSignIn = GoogleSignIn(
-      scopes: ['email'],
-    );
+    final GoogleSignIn googleSignIn = GoogleSignIn(scopes: ['email']);
 
     return Scaffold(
       body: Center(
@@ -132,8 +128,10 @@ class SignInPage extends StatelessWidget {
           onPressed: () async {
             final googleUser = await googleSignIn.signIn();
             if (googleUser == null) return;
+
             final googleAuth = await googleUser.authentication;
             if (googleAuth.idToken == null) return;
+
             final credential = GoogleAuthProvider.credential(
               accessToken: googleAuth.accessToken,
               idToken: googleAuth.idToken,
@@ -148,6 +146,7 @@ class SignInPage extends StatelessWidget {
 
 class MyHome extends StatefulWidget {
   const MyHome({super.key});
+
   @override
   State<MyHome> createState() => _MyHomeState();
 }
