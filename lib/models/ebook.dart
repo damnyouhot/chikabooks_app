@@ -1,3 +1,5 @@
+// lib/models/ebook.dart
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Ebook {
@@ -23,14 +25,11 @@ class Ebook {
     required this.fileUrl,
   });
 
-  /// Firestore 문서에서 Ebook 객체 생성
   factory Ebook.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final j = doc.data()!;
     return Ebook.fromJson(j, id: doc.id);
   }
 
-  // ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼ 이 부분이 새로 추가됩니다 ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
-  /// Map(Json)에서 Ebook 객체 생성 (MyDeskTab에서 사용)
   factory Ebook.fromJson(Map<String, dynamic> json, {required String id}) {
     final pub = _toDate(json['publishedAt']);
     return Ebook(
@@ -45,29 +44,48 @@ class Ebook {
       fileUrl: json['fileUrl'] ?? '',
     );
   }
-  // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ 이 부분이 새로 추가됩니다 ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
-  /// 저장을 위한 JSON 변환
+  // ▼▼▼ 오류 해결을 위해 이 부분을 추가합니다 ▼▼▼
+  factory Ebook.empty() {
+    return Ebook(
+      id: '',
+      title: '',
+      author: '',
+      coverUrl: '',
+      description: '',
+      publishedAt: DateTime.now(),
+      price: 0,
+      productId: '',
+      fileUrl: '',
+    );
+  }
+  // ▲▲▲ 오류 해결을 위해 이 부분을 추가합니다 ▲▲▲
+
   Map<String, dynamic> toJson() => {
-        'title': title,
-        'author': author,
-        'coverUrl': coverUrl,
-        'description': description,
-        'publishedAt': publishedAt.year * 10000 +
-            publishedAt.month * 100 +
-            publishedAt.day,
-        'price': price,
-        'productId': productId,
-        'fileUrl': fileUrl,
-      };
+    'title': title,
+    'author': author,
+    'coverUrl': coverUrl,
+    'description': description,
+    'publishedAt':
+        publishedAt.year * 10000 + publishedAt.month * 100 + publishedAt.day,
+    'price': price,
+    'productId': productId,
+    'fileUrl': fileUrl,
+  };
 
   static DateTime _toDate(dynamic v) {
     if (v is int) {
-      final y = v ~/ 10000, m = (v % 10000) ~/ 100, d = v % 100;
+      final y = v ~/ 10000;
+      final m = (v % 10000) ~/ 100;
+      final d = v % 100;
       return DateTime(y, m, d);
     }
-    if (v is Timestamp) return v.toDate();
-    if (v is String) return DateTime.parse(v);
+    if (v is Timestamp) {
+      return v.toDate();
+    }
+    if (v is String) {
+      return DateTime.parse(v);
+    }
     return DateTime.now();
   }
 }

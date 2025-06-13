@@ -1,3 +1,5 @@
+// lib/pages/store/reward_store_page.dart
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/store_item.dart';
@@ -11,12 +13,11 @@ class RewardStorePage extends StatefulWidget {
 }
 
 class _RewardStorePageState extends State<RewardStorePage> {
-  // 구매 버튼 로딩 상태 관리를 위해 StatefulWidget으로 변경
-  Set<String> _isPurchasing = {};
+  // ▼▼▼ 변경될 일이 없는 변수이므로 final로 선언 ▼▼▼
+  final Set<String> _isPurchasing = {};
 
   @override
   Widget build(BuildContext context) {
-    // Provider를 통해 StoreService 인스턴스를 가져옵니다.
     final storeService = Provider.of<StoreService>(context, listen: false);
 
     return FutureBuilder<List<StoreItem>>(
@@ -52,14 +53,20 @@ class _RewardStorePageState extends State<RewardStorePage> {
                     child: Image.network(
                       item.imageUrl,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Icon(Icons.redeem,
-                          size: 48, color: Colors.grey),
+                      errorBuilder:
+                          (_, __, ___) => const Icon(
+                            Icons.redeem,
+                            size: 48,
+                            color: Colors.grey,
+                          ),
                     ),
                   ),
                   Padding(
                     padding: const EdgeInsets.all(8.0),
-                    child: Text(item.name,
-                        style: const TextStyle(fontWeight: FontWeight.bold)),
+                    child: Text(
+                      item.name,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8.0),
@@ -68,24 +75,31 @@ class _RewardStorePageState extends State<RewardStorePage> {
                   Padding(
                     padding: const EdgeInsets.all(8.0),
                     child: ElevatedButton(
-                      onPressed: purchasing
-                          ? null
-                          : () async {
-                              setState(() => _isPurchasing.add(item.id));
-                              final result =
-                                  await storeService.purchaseItem(item);
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text(result)));
-                              }
-                              setState(() => _isPurchasing.remove(item.id));
-                            },
-                      child: purchasing
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2))
-                          : const Text('구매하기'),
+                      onPressed:
+                          purchasing
+                              ? null
+                              : () async {
+                                setState(() => _isPurchasing.add(item.id));
+                                final result = await storeService.purchaseItem(
+                                  item,
+                                );
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text(result)),
+                                  );
+                                }
+                                setState(() => _isPurchasing.remove(item.id));
+                              },
+                      child:
+                          purchasing
+                              ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                              : const Text('구매하기'),
                     ),
                   ),
                 ],

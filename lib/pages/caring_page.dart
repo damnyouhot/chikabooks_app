@@ -15,10 +15,11 @@ class CaringPage extends StatefulWidget {
   State<CaringPage> createState() => _CaringPageState();
 }
 
-class _CaringPageState extends State<CaringPage>
-    with SingleTickerProviderStateMixin {
+class _CaringPageState extends State<CaringPage> with TickerProviderStateMixin {
   late AnimationController _heartAnimationController;
   late Animation<double> _heartAnimation;
+  late AnimationController _sparkleAnimationController;
+  late Animation<double> _sparkleAnimation;
 
   @override
   void initState() {
@@ -30,11 +31,20 @@ class _CaringPageState extends State<CaringPage>
     _heartAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _heartAnimationController, curve: Curves.easeOut),
     );
+    _sparkleAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    );
+    _sparkleAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+          parent: _sparkleAnimationController, curve: Curves.easeInOut),
+    );
   }
 
   @override
   void dispose() {
     _heartAnimationController.dispose();
+    _sparkleAnimationController.dispose();
     super.dispose();
   }
 
@@ -42,6 +52,16 @@ class _CaringPageState extends State<CaringPage>
     CharacterService.feedCharacter();
     if (mounted) {
       _heartAnimationController.forward(from: 0.0);
+    }
+  }
+
+  void _onCheerUp() async {
+    final success = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => const EmotionRecordPage()),
+    );
+    if (success == true && mounted) {
+      _sparkleAnimationController.forward(from: 0.0);
     }
   }
 
@@ -122,7 +142,6 @@ class _CaringPageState extends State<CaringPage>
     if (user == null) {
       return const Center(child: Text('로그인이 필요합니다.'));
     }
-
     return StreamBuilder<Character?>(
       stream: CharacterService.watchCharacter(user.uid),
       builder: (context, snapshot) {
@@ -161,6 +180,22 @@ class _CaringPageState extends State<CaringPage>
                     ),
                   ),
                 ),
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: FadeTransition(
+                      opacity: _sparkleAnimation.drive(CurveTween(
+                          curve:
+                              const Interval(0.0, 0.2, curve: Curves.easeIn))),
+                      child: FadeTransition(
+                        opacity: _sparkleAnimation.drive(CurveTween(
+                            curve: const Interval(0.8, 1.0,
+                                curve: Curves.easeOut))),
+                        child: const Icon(Icons.auto_awesome,
+                            color: Colors.amber, size: 80),
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 24),
@@ -170,10 +205,7 @@ class _CaringPageState extends State<CaringPage>
               alignment: WrapAlignment.center,
               children: [
                 ElevatedButton.icon(
-                  onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => const EmotionRecordPage())),
+                  onPressed: _onCheerUp,
                   icon: const Icon(Icons.edit_note),
                   label: const Text('응원하기'),
                 ),

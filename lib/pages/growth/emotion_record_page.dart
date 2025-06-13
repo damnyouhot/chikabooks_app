@@ -1,4 +1,5 @@
 // lib/pages/growth/emotion_record_page.dart
+
 import 'package:flutter/material.dart';
 import '../../services/emotion_service.dart';
 
@@ -29,7 +30,7 @@ class _EmotionRecordPageState extends State<EmotionRecordPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('오늘은 이미 감정을 기록했어요!')),
         );
-        Navigator.pop(context); // 이전 화면으로 돌아가기
+        Navigator.pop(context, false); // ▶▶▶ MODIFIED: 실패 시 false 반환
       }
       return;
     }
@@ -40,7 +41,7 @@ class _EmotionRecordPageState extends State<EmotionRecordPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('오늘의 감정이 기록되었습니다 🙂')),
       );
-      Navigator.pop(context); // 기록 후 이전 화면으로 돌아가기
+      Navigator.pop(context, true); // ▶▶▶ MODIFIED: 성공 시 true 반환
     }
   }
 

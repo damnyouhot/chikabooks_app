@@ -9,18 +9,16 @@ class SelfCareTab extends StatefulWidget {
   const SelfCareTab({super.key});
 
   @override
-  _SelfCareTabState createState() => _SelfCareTabState();
+  // ▼▼▼ State 클래스를 public으로 변경 ▼▼▼
+  SelfCareTabState createState() => SelfCareTabState();
 }
 
-class _SelfCareTabState extends State<SelfCareTab> {
+// ▼▼▼ State 클래스를 public으로 변경 ▼▼▼
+class SelfCareTabState extends State<SelfCareTab> {
   late Stream<StepCount> _stepStream;
   int _steps = 0;
-
-  // 운동 세션
   bool _isExercising = false;
   int _startSteps = 0;
-
-  // 수면 세션
   DateTime? _sleepStart;
 
   final String uid = FirebaseAuth.instance.currentUser!.uid;
@@ -30,19 +28,19 @@ class _SelfCareTabState extends State<SelfCareTab> {
     super.initState();
     _stepStream = Pedometer.stepCountStream;
     _stepStream.listen((event) {
-      setState(() => _steps = event.steps);
+      if (mounted) {
+        setState(() => _steps = event.steps);
+      }
     });
   }
 
   void _toggleExercise() async {
     if (!_isExercising) {
-      // 시작
       _startSteps = _steps;
       setState(() => _isExercising = true);
     } else {
-      // 종료
       final delta = _steps - _startSteps;
-      final km = delta * 0.0008; // 1걸음 ≒ 0.8m
+      final km = delta * 0.0008;
       await GrowthService.recordEvent(uid: uid, type: 'exercise', value: km);
       setState(() => _isExercising = false);
     }
@@ -50,10 +48,8 @@ class _SelfCareTabState extends State<SelfCareTab> {
 
   void _toggleSleep() async {
     if (_sleepStart == null) {
-      // 수면 시작
       _sleepStart = DateTime.now();
     } else {
-      // 수면 종료
       final duration = DateTime.now().difference(_sleepStart!);
       final hours = duration.inMinutes / 60.0;
       await GrowthService.recordEvent(uid: uid, type: 'sleep', value: hours);

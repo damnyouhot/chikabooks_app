@@ -1,6 +1,7 @@
+// lib/pages/growth/study/store_tab.dart
+
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -46,14 +47,19 @@ class _StoreTabState extends State<StoreTab> {
   Future<void> _loadIAP() async {
     try {
       final books = await _booksStream.first;
-      final ids = books.where((e) => e.price > 0).map((e) => e.id).toSet();
-      if (ids.isEmpty) return;
+      final ids =
+          books.where((e) => e.price > 0).map((e) => e.productId).toSet();
+      if (ids.isEmpty) {
+        return;
+      }
 
       final resp = await iap.queryProductDetails(ids);
-      setState(() {
-        _products = resp.productDetails;
-        _iapReady = true;
-      });
+      if (mounted) {
+        setState(() {
+          _products = resp.productDetails;
+          _iapReady = true;
+        });
+      }
     } catch (e) {
       debugPrint('[StoreTab] IAP load error: $e');
     }
@@ -65,25 +71,32 @@ class _StoreTabState extends State<StoreTab> {
       return;
     }
     if (!_iapReady) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('상품 정보를 불러오는 중입니다.')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('상품 정보를 불러오는 중입니다.')));
+      }
       return;
     }
 
-    final product = _products.firstWhere((p) => p.id == book.id,
-        orElse: () => ProductDetails(
-              id: '',
-              title: '',
-              description: '',
-              price: '',
-              rawPrice: 0,
-              currencyCode: 'KRW',
-            ));
+    final product = _products.firstWhere(
+      (p) => p.id == book.productId,
+      orElse:
+          () => ProductDetails(
+            id: '',
+            title: '',
+            description: '',
+            price: '',
+            rawPrice: 0,
+            currencyCode: 'KRW',
+          ),
+    );
     if (product.id.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('인앱 상품을 찾을 수 없습니다.')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('인앱 상품을 찾을 수 없습니다.')));
+      }
       return;
     }
 
@@ -93,19 +106,14 @@ class _StoreTabState extends State<StoreTab> {
 
   Future<void> _grantBookByProductId(String productId) async {
     final ebooks = await _booksStream.first;
-    final book = ebooks.firstWhere((e) => e.id == productId,
-        orElse: () => Ebook(
-              id: productId,
-              title: '',
-              author: '',
-              coverUrl: '',
-              description: '',
-              publishedAt: DateTime.now(),
-              price: 0,
-              productId: '',
-              fileUrl: '',
-            ));
-    if (book.title.isNotEmpty) await _grantBook(book);
+    // orElse에서 Ebook.empty()를 호출합니다.
+    final book = ebooks.firstWhere(
+      (e) => e.productId == productId,
+      orElse: () => Ebook.empty(),
+    );
+    if (book.title.isNotEmpty) {
+      await _grantBook(book);
+    }
   }
 
   Future<void> _grantBook(Ebook book) async {
@@ -115,17 +123,19 @@ class _StoreTabState extends State<StoreTab> {
         .collection('purchases')
         .doc(book.id)
         .set({
-      'progress': 0,
-      'lastOpened': null,
-      // 메타를 함께 저장 → MyDeskTab 에서 바로 사용
-      'title': book.title,
-      'coverUrl': book.coverUrl,
-      'fileUrl': book.fileUrl,
-    }, SetOptions(merge: true));
+          'progress': 0,
+          'lastOpened': null,
+          'title': book.title,
+          'author': book.author,
+          'coverUrl': book.coverUrl,
+          'fileUrl': book.fileUrl,
+        }, SetOptions(merge: true));
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('도서가 라이브러리에 추가되었습니다!')),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('도서가 라이브러리에 추가되었습니다!')));
+    }
   }
 
   @override
@@ -164,18 +174,22 @@ class _StoreTabState extends State<StoreTab> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(
-                    child: b.coverUrl.isEmpty
-                        ? const Icon(Icons.menu_book, size: 48)
-                        : Image.network(
-                            b.coverUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                const Icon(Icons.menu_book, size: 48),
-                          ),
+                    child:
+                        b.coverUrl.isEmpty
+                            ? const Icon(Icons.menu_book, size: 48)
+                            : Image.network(
+                              b.coverUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder:
+                                  (_, __, ___) =>
+                                      const Icon(Icons.menu_book, size: 48),
+                            ),
                   ),
                   Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 4,
+                    ),
                     child: Text(
                       b.title,
                       maxLines: 2,

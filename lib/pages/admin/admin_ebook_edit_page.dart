@@ -1,9 +1,12 @@
+// lib/pages/admin/admin_ebook_edit_page.dart
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../models/ebook.dart';
-import '../../services/storage_service.dart'; // ◀◀◀ 빠져있던 이 줄을 추가합니다.
+import '../../services/epub_utility.dart';
+import '../../services/storage_service.dart';
 
 class AdminEbookEditPage extends StatefulWidget {
   final Ebook ebook;
@@ -53,15 +56,10 @@ class _AdminEbookEditPageState extends State<AdminEbookEditPage> {
         'price': _price,
       });
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('수정이 완료되었습니다.')),
-      );
+      _snack('수정이 완료되었습니다.');
       Navigator.pop(context);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('오류 발생: $e')));
-      }
+      _snack('오류 발생: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -81,16 +79,41 @@ class _AdminEbookEditPageState extends State<AdminEbookEditPage> {
           .collection('ebooks')
           .doc(widget.ebook.id)
           .update({'fileUrl': url});
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('ePub 파일이 교체되었습니다.')),
-        );
-      }
+      _snack('ePub 파일이 교체되었습니다.');
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('ePub 교체 실패: $e')));
+      _snack('ePub 교체 실패: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _reExtractCover() async {
+    const group = XTypeGroup(label: 'epub', extensions: ['epub']);
+    final file = await openFile(acceptedTypeGroups: [group]);
+    if (file == null) return;
+
+    setState(() => _isLoading = true);
+    try {
+      final bytes = await file.readAsBytes();
+      final coverBytes = await EpubUtility.extractCoverImage(bytes);
+
+      if (coverBytes == null) {
+        _snack('ePub 파일에서 표지를 추출하지 못했습니다.');
+        return;
       }
+
+      final newCoverUrl = await StorageService.uploadCoverImage(
+          ebookId: widget.ebook.id, bytes: coverBytes);
+
+      await FirebaseFirestore.instance
+          .collection('ebooks')
+          .doc(widget.ebook.id)
+          .update({'coverUrl': newCoverUrl});
+
+      setState(() => _coverUrl = newCoverUrl);
+      _snack('표지 이미지가 교체되었습니다.');
+    } catch (e) {
+      _snack('표지 교체 실패: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -140,10 +163,21 @@ class _AdminEbookEditPageState extends State<AdminEbookEditPage> {
                       if (d != null) setState(() => _publishedAt = d);
                     },
                   ),
-                  OutlinedButton.icon(
-                    icon: const Icon(Icons.upload_file),
-                    label: const Text('ePub 교체'),
-                    onPressed: _replaceEpub,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.image_search),
+                        label: const Text('표지 재추출'),
+                        onPressed: _reExtractCover,
+                      ),
+                      const SizedBox(width: 16),
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.upload_file),
+                        label: const Text('ePub 교체'),
+                        onPressed: _replaceEpub,
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton(
@@ -177,4 +211,9 @@ class _AdminEbookEditPageState extends State<AdminEbookEditPage> {
       );
 
   String? _req(String v) => v.isEmpty ? '필수 입력' : null;
+
+  void _snack(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
 }

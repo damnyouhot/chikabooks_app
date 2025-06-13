@@ -4,7 +4,7 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.2.0 <4.0.0'
+  sdk: '>=3.7.0 <4.0.0'
 
 dependencies:
   flutter:
@@ -16,8 +16,12 @@ dependencies:
   firebase_storage: ^11.6.5
   google_sign_in: ^6.3.0
   shimmer: ^3.0.0
-  firebase_messaging: ^14.7.10 # ◀◀◀ 푸시 알림 패키지 추가
+  firebase_messaging: ^14.7.10
   badges: ^3.1.2    
+
+  epubx: ^4.0.0
+  archive: ^3.4.9
+  image: ^3.3.0
 
   epub_view: ^3.2.0
   path_provider: ^2.1.2
@@ -43,6 +47,21 @@ flutter:
   uses-material-design: true
 
   assets:
-    # ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼ 이 부분 원상 복구 ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
     - assets/characters/
-    # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ 이 부분 원상 복구 ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
+  # ▼▼▼ 에러의 원인이 된 폰트 설정을 임시로 주석 처리합니다. ▼▼▼
+  # fonts:
+  #   - family: NotoSansKR
+  #     fonts:
+  #       - asset: assets/fonts/NotoSansKR-Thin.otf
+  #         weight: 100
+  #       - asset: assets/fonts/NotoSansKR-Light.otf
+  #         weight: 300
+  #       - asset: assets/fonts/NotoSansKR-Regular.otf
+  #         weight: 400
+  #       - asset: assets/fonts/NotoSansKR-Medium.otf
+  #         weight: 500
+  #       - asset: assets/fonts/NotoSansKR-Bold.otf
+  #         weight: 700
+  #       - asset: assets/fonts/NotoSansKR-Black.otf
+  #         weight: 900
