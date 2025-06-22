@@ -1,7 +1,7 @@
-// lib/pages/growth/emotion_record_page.dart
-
+// lib/pages/growth/emotion_record_page.dart (진단용 코드)
 import 'package:flutter/material.dart';
 import '../../services/emotion_service.dart';
+import 'dart:developer' as developer;
 
 class EmotionRecordPage extends StatefulWidget {
   const EmotionRecordPage({super.key});
@@ -11,37 +11,60 @@ class EmotionRecordPage extends StatefulWidget {
 }
 
 class _EmotionRecordPageState extends State<EmotionRecordPage> {
-  // 사용자가 슬라이더로 선택한 점수를 저장할 변수
-  int _score = 3; // 기본값 3점
-  // 로딩 중일 때 버튼을 비활성화하기 위한 변수
+  int _score = 3;
   bool _loading = false;
 
-  // '기록하기' 버튼을 눌렀을 때 실행될 함수
   Future<void> _submit() async {
-    // 로딩 시작
+    developer.log('--- 감정 기록 시작 ---', name: 'EmotionDebug');
     setState(() => _loading = true);
 
-    // EmotionService를 호출하여 오늘 이미 기록했는지 확인
-    final canRecord = await EmotionService.canRecordToday();
-    if (!canRecord) {
-      // 위젯이 화면에 아직 붙어있는지 확인 (안전장치)
-      if (mounted) {
-        // 이미 기록했다면 사용자에게 알림 메시지 표시
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('오늘은 이미 감정을 기록했어요!')),
-        );
-        Navigator.pop(context, false); // ▶▶▶ MODIFIED: 실패 시 false 반환
-      }
-      return;
-    }
+    try {
+      developer.log('1. 오늘 기록 가능한지 확인 시작...', name: 'EmotionDebug');
+      final canRecord = await EmotionService.canRecordToday();
+      developer.log('2. 오늘 기록 가능 여부: $canRecord', name: 'EmotionDebug');
 
-    // EmotionService를 호출하여 점수 기록
-    await EmotionService.recordEmotion(_score);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('오늘의 감정이 기록되었습니다 🙂')),
+      if (!canRecord) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('오늘은 이미 감정을 기록했어요!')));
+          Navigator.pop(context, false);
+        }
+        developer.log('--- 이미 기록하여 프로세스 종료 ---', name: 'EmotionDebug');
+        return;
+      }
+
+      developer.log(
+        '3. Firestore에 감정 기록 시작 (점수: $_score)...',
+        name: 'EmotionDebug',
       );
-      Navigator.pop(context, true); // ▶▶▶ MODIFIED: 성공 시 true 반환
+      await EmotionService.recordEmotion(_score);
+      developer.log('4. Firestore에 감정 기록 성공!', name: 'EmotionDebug');
+
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('오늘의 감정이 기록되었습니다 🙂')));
+        Navigator.pop(context, true);
+      }
+      developer.log('--- 모든 프로세스 정상 종료 ---', name: 'EmotionDebug');
+    } catch (e, s) {
+      developer.log(
+        '!!! 감정 기록 중 치명적인 오류 발생 !!!',
+        name: 'EmotionDebug',
+        error: e,
+        stackTrace: s,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('오류 발생: $e')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+      developer.log('--- finally 블록 실행 ---', name: 'EmotionDebug');
     }
   }
 
@@ -61,7 +84,7 @@ class _EmotionRecordPageState extends State<EmotionRecordPage> {
             ),
             const SizedBox(height: 16),
             Text(
-              '$_score점', // 선택된 점수 표시
+              '$_score점',
               style: TextStyle(
                 fontSize: 48,
                 fontWeight: FontWeight.bold,
@@ -69,31 +92,26 @@ class _EmotionRecordPageState extends State<EmotionRecordPage> {
               ),
             ),
             const SizedBox(height: 24),
-            // 점수를 선택하는 슬라이더
             Slider(
               value: _score.toDouble(),
               min: 1,
               max: 5,
-              divisions: 4, // 1~5점이므로 4개의 구간으로 나눔
-              label: '$_score점', // 슬라이더를 움직일 때 표시될 라벨
+              divisions: 4,
+              label: '$_score점',
               onChanged: (value) {
-                // 슬라이더 값이 바뀔 때마다 _score 변수 업데이트 및 화면 새로고침
-                setState(() {
-                  _score = value.round();
-                });
+                setState(() => _score = value.round());
               },
             ),
             const SizedBox(height: 48),
-            // 기록하기 버튼
             SizedBox(
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
-                // _loading이 true이면 버튼 비활성화, 아니면 _submit 함수 실행
                 onPressed: _loading ? null : _submit,
-                child: _loading
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text('기록하기', style: TextStyle(fontSize: 18)),
+                child:
+                    _loading
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text('기록하기', style: TextStyle(fontSize: 18)),
               ),
             ),
           ],

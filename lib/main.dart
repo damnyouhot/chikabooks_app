@@ -1,15 +1,11 @@
-// lib/main.dart
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:provider/provider.dart';
-// import 'services/notification_service.dart'; // 다음 단계에서 사용할 예정
 
 import 'firebase_options.dart';
 import 'models/character.dart';
@@ -20,38 +16,33 @@ import 'pages/growth/growth_page.dart';
 import 'pages/job_page.dart';
 import 'services/ebook_service.dart';
 import 'services/job_service.dart';
-import 'services/store_service.dart'; // ◀◀◀ 이 줄 추가
+import 'services/store_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
 
-  const bool useEmulator = true;
-
-  if (kDebugMode && useEmulator) {
-    try {
-      FirebaseFirestore.instance.useFirestoreEmulator('localhost', 8081);
-      await FirebaseAuth.instance.useAuthEmulator('localhost', 9099);
-      await FirebaseStorage.instance.useStorageEmulator('localhost', 9199);
-      debugPrint('🔥 Firebase Emulators connected');
-    } catch (e) {
-      debugPrint('❌ Error connecting to Firebase Emulators: $e');
+  // 중복 초기화 에러 무시
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } on FirebaseException catch (e) {
+    if (e.code != 'duplicate-app') {
+      rethrow;
     }
   }
 
   runApp(
     MultiProvider(
       providers: [
-        StreamProvider<User?>(
-          create: (_) => FirebaseAuth.instance.authStateChanges(),
+        StreamProvider<User?>.value(
+          value: FirebaseAuth.instance.authStateChanges(),
           initialData: null,
         ),
         ChangeNotifierProvider(create: (_) => JobFilterNotifier()),
         Provider(create: (_) => JobService()),
         Provider(create: (_) => EbookService()),
-        Provider(create: (_) => StoreService()), // ◀◀◀ 이 줄 추가
+        Provider(create: (_) => StoreService()),
       ],
       child: const ChikabooksApp(),
     ),
@@ -88,15 +79,17 @@ class AuthGate extends StatelessWidget {
       future:
           FirebaseFirestore.instance.collection('users').doc(user.uid).get(),
       builder: (context, snap) {
-        if (!snap.hasData) {
+        if (snap.connectionState != ConnectionState.done) {
           return const Scaffold(
-              body: Center(child: CircularProgressIndicator()));
+            body: Center(child: CircularProgressIndicator()),
+          );
         }
 
-        final data = snap.data!.data();
+        final doc = snap.data;
+        final data = doc?.data();
         final role = data?['role'] as String? ?? '';
 
-        if (snap.data!.exists == false) {
+        if (doc != null && !doc.exists) {
           final defaultChar = Character(id: user.uid);
           FirebaseFirestore.instance
               .collection('users')
@@ -115,7 +108,7 @@ class SignInPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final GoogleSignIn googleSignIn = GoogleSignIn(scopes: ['email']);
+    final googleSignIn = GoogleSignIn(scopes: ['email']);
 
     return Scaffold(
       body: Center(
@@ -123,17 +116,21 @@ class SignInPage extends StatelessWidget {
           icon: const Icon(Icons.login),
           label: const Text('Google로 로그인'),
           onPressed: () async {
-            final googleUser = await googleSignIn.signIn();
-            if (googleUser == null) return;
+            try {
+              final googleUser = await googleSignIn.signIn();
+              if (googleUser == null) return;
 
-            final googleAuth = await googleUser.authentication;
-            if (googleAuth.idToken == null) return;
+              final googleAuth = await googleUser.authentication;
+              if (googleAuth.idToken == null) return;
 
-            final credential = GoogleAuthProvider.credential(
-              accessToken: googleAuth.accessToken,
-              idToken: googleAuth.idToken,
-            );
-            await FirebaseAuth.instance.signInWithCredential(credential);
+              final credential = GoogleAuthProvider.credential(
+                accessToken: googleAuth.accessToken,
+                idToken: googleAuth.idToken,
+              );
+              await FirebaseAuth.instance.signInWithCredential(credential);
+            } catch (e) {
+              debugPrint('로그인 실패: $e');
+            }
           },
         ),
       ),
@@ -143,7 +140,6 @@ class SignInPage extends StatelessWidget {
 
 class MyHome extends StatefulWidget {
   const MyHome({super.key});
-
   @override
   State<MyHome> createState() => _MyHomeState();
 }
@@ -151,12 +147,7 @@ class MyHome extends StatefulWidget {
 class _MyHomeState extends State<MyHome> {
   int _selectedIndex = 0;
 
-  static final List<Widget> _pages = <Widget>[
-    const CaringPage(),
-    const GrowthPage(),
-    const JobPage(),
-  ];
-
+  static const _pages = [CaringPage(), GrowthPage(), JobPage()];
   static const _titles = ['돌보기', '성장하기', '나아가기'];
 
   void _onTap(int idx) => setState(() => _selectedIndex = idx);

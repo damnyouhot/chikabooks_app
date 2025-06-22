@@ -5,9 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:epub_view/epub_view.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-// ▼▼▼ 이 부분의 치명적인 오타를 수정했습니다 ▼▼▼
 import 'package:cloud_firestore/cloud_firestore.dart';
-// ▲▲▲ 이 부분의 치명적인 오타를 수정했습니다 ▲▲▲
 import 'package:provider/provider.dart';
 import '../../../models/ebook.dart';
 import '../../../services/ebook_service.dart';
@@ -47,8 +45,18 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
                 .collection('purchases')
                 .doc(widget.ebook.id)
                 .get();
-        lastCfi = doc.data()?['lastOpened'] as String?;
+
+        // ▼▼▼ 오류가 발생한 부분을 안전한 코드로 수정합니다 ▼▼▼
+        if (doc.exists) {
+          final data = doc.data();
+          final lastOpenedValue = data?['lastOpened'];
+          if (lastOpenedValue is String) {
+            lastCfi = lastOpenedValue;
+          }
+        }
+        // ▲▲▲ 오류가 발생한 부분을 안전한 코드로 수정합니다 ▲▲▲
       }
+
       final res = await http.get(Uri.parse(widget.ebook.fileUrl));
       if (res.statusCode != 200) {
         throw 'ePub 다운로드 실패 (${res.statusCode})';

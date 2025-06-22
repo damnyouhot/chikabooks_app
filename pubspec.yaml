@@ -10,10 +10,13 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # ▼▼▼ 모든 Firebase 패키지를 충돌 없던 이전 버전으로 되돌립니다 ▼▼▼
   firebase_core: ^2.16.2
   cloud_firestore: ^4.17.5
   firebase_auth: ^4.6.5
   firebase_storage: ^11.6.5
+  # ▲▲▲ 모든 Firebase 패키지를 충돌 없던 이전 버전으로 되돌립니다 ▲▲▲
+
   google_sign_in: ^6.3.0
   shimmer: ^3.0.0
   firebase_messaging: ^14.7.10
@@ -49,7 +52,7 @@ flutter:
   assets:
     - assets/characters/
 
-  # ▼▼▼ 에러의 원인이 된 폰트 설정을 임시로 주석 처리합니다. ▼▼▼
+  # 폰트 파일이 실제 assets/fonts 폴더에 있을 경우 주석을 해제하여 사용합니다.
   # fonts:
   #   - family: NotoSansKR
   #     fonts:
