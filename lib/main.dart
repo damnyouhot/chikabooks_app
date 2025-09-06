@@ -30,9 +30,13 @@ Future<void> main() async {
     '${DefaultFirebaseOptions.currentPlatform.projectId}',
   );
 
-  // 2) Naver Map SDK 초기화 (반드시 Firebase 다음, runApp 이전)
+  // 2) Naver Map SDK 초기화 (Firebase 다음, runApp 이전)
   await NaverMapSdk.instance.initialize(
-    clientId: 'YOUR_NAVER_CLIENT_ID', // ← 네이버 클라우드 플랫폼에서 발급받은 클라이언트 ID로 교체
+    clientId: '3amqdx6zuh', // ← 네이버 클라우드 플랫폼 "모바일용" Client ID
+    onAuthFailed: (ex) {
+      // 여기서 인증 실패 원인을 확인할 수 있습니다.
+      debugPrint('❌ NaverMap auth failed: $ex');
+    },
   );
   debugPrint('✅ NaverMap SDK initialized');
 
