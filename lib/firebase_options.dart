@@ -4,17 +4,6 @@ import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
 
-/// Default [FirebaseOptions] for use with your Firebase apps.
-///
-/// Example:
-///
-/// import 'firebase_options.dart';
-/// // ...
-/// await Firebase.initializeApp(
-///   options: DefaultFirebaseOptions.currentPlatform,
-/// );
-///
-
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
@@ -31,8 +20,7 @@ class DefaultFirebaseOptions {
         return windows;
       case TargetPlatform.linux:
         throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for linux - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
+          'DefaultFirebaseOptions have not been configured for linux.',
         );
       default:
         throw UnsupportedError(
@@ -41,52 +29,48 @@ class DefaultFirebaseOptions {
     }
   }
 
+  // 웹 환경
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyCW9j-dsh6dFSWh9NWzJ7OPRPYasvgO0E0',
-    appId: '1:1022322314972:web:1de7a492567244842bee19',
-    messagingSenderId: '1022322314972',
-    projectId: 'chikabooks-app',
-    authDomain: 'chikabooks-app.firebaseapp.com',
-    storageBucket: 'chikabooks-app.firebasestorage.app',
-    measurementId: 'G-WNLEHLVTB2',
-  );
-
-  static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyD57iT3qghJek-CrNoPKoWKybuTTsPixkk',
-    appId: '1:1022322314972:android:699c2c36ebbc30462bee19',
-    messagingSenderId: '1022322314972',
-    projectId: 'chikabooks-app',
-    storageBucket: 'chikabooks-app.firebasestorage.app',
-  );
-
-  static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyCW9j-dsh6dFSWh9NWzJ7OPRPYasvgO0E0',
-    appId: '1:1022322314972:web:cf277512da9f5b842bee19',
-    messagingSenderId: '1022322314972',
-    projectId: 'chikabooks-app',
-    authDomain: 'chikabooks-app.firebaseapp.com',
-    storageBucket: 'chikabooks-app.firebasestorage.app',
+    apiKey: 'AIzaSyAFSsIsl1dtspv1l7r8v6zNHo28TfGwZwM',
+    authDomain: 'chikabooks3rd.firebaseapp.com',
+    projectId: 'chikabooks3rd',
+    storageBucket: 'chikabooks3rd.firebasestorage.app',
+    messagingSenderId: '215876124758',
+    appId: '1:215876124758:web:cf277512da9f5b842bee19',
     measurementId: 'G-GYVF2JVZ1H',
   );
 
-  static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyDOgB-gSurY2JKxumN1bsAV6t5bcVrscA4',
-    appId: '1:1022322314972:ios:1623d705fd4073912bee19',
-    messagingSenderId: '1022322314972',
-    projectId: 'chikabooks-app',
-    storageBucket: 'chikabooks-app.firebasestorage.app',
-    iosClientId: '1022322314972-aise0ql6la51arel1m0ou6csb80bsrda.apps.googleusercontent.com',
-    iosBundleId: 'com.example.chikabooksApp',
+  // Android 환경
+  static const FirebaseOptions android = FirebaseOptions(
+    apiKey: 'AIzaSyAFSsIsl1dtspv1l7r8v6zNHo28TfGwZwM',
+    projectId: 'chikabooks3rd',
+    storageBucket: 'chikabooks3rd.firebasestorage.app',
+    messagingSenderId: '215876124758',
+    appId: '1:215876124758:android:b6d89b37d421f22b723bf7',
   );
 
+  // iOS 환경
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyDOgB-gSurY2JKxumN1bsAV6t5bcVrscA4',
-    appId: '1:1022322314972:ios:1623d705fd4073912bee19',
-    messagingSenderId: '1022322314972',
-    projectId: 'chikabooks-app',
-    storageBucket: 'chikabooks-app.firebasestorage.app',
-    iosClientId: '1022322314972-aise0ql6la51arel1m0ou6csb80bsrda.apps.googleusercontent.com',
-    iosBundleId: 'com.example.chikabooksApp',
+    apiKey: 'AIzaSyAFSsIsl1dtspv1l7r8v6zNHo28TfGwZwM',
+    projectId: 'chikabooks3rd',
+    storageBucket: 'chikabooks3rd.firebasestorage.app',
+    messagingSenderId: '215876124758',
+    appId: '1:215876124758:ios:1623d705fd4073912bee19',
+    iosClientId:
+        '215876124758-aise0ql6la51arel1m0ou6csb80bsrda.apps.googleusercontent.com',
+    iosBundleId: 'com.chikabooks.appnew',
   );
 
+  // macOS 환경 (iOS와 동일)
+  static const FirebaseOptions macos = ios;
+
+  // Windows 환경 (web과 동일 App-ID만 다름)
+  static const FirebaseOptions windows = FirebaseOptions(
+    apiKey: 'AIzaSyAFSsIsl1dtspv1l7r8v6zNHo28TfGwZwM',
+    projectId: 'chikabooks3rd',
+    storageBucket: 'chikabooks3rd.firebasestorage.app',
+    messagingSenderId: '215876124758',
+    appId: '1:215876124758:web:cf277512da9f5b842bee19',
+    measurementId: 'G-GYVF2JVZ1H',
+  );
 }

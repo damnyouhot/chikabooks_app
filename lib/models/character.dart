@@ -1,5 +1,7 @@
+// lib/models/character.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+/// Firestore 'users/{uid}' 문서에 저장되는 캐릭터 상태 모델
 class Character {
   String id;
   int level;
@@ -11,8 +13,8 @@ class Character {
   double affection;
   int emotionPoints;
   int tenureYears;
-  List<String> inventory; // ◀◀◀ 구매한 아이템 ID 목록 필드 추가
-  String? equippedItemId;
+  List<String> inventory; // 구매한 아이템 ID 목록
+  String? equippedItemId; // 착용 중인 아이템 ID
 
   Character({
     required this.id,
@@ -25,7 +27,7 @@ class Character {
     this.affection = 0.0,
     this.emotionPoints = 0,
     this.tenureYears = 0,
-    this.inventory = const [], // ◀◀◀ 생성자에 추가
+    this.inventory = const [],
     this.equippedItemId,
   });
 
@@ -42,25 +44,26 @@ class Character {
       affection: (data['affection'] ?? 0).toDouble(),
       emotionPoints: data['emotionPoints'] ?? 0,
       tenureYears: data['tenureYears'] ?? 0,
-      inventory: List<String>.from(data['inventory'] ?? []), // ◀◀◀ 추가
+      inventory: List<String>.from(data['inventory'] ?? []),
       equippedItemId: data['equippedItemId'],
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'level': level,
-        'experience': experience,
-        'studyMinutes': studyMinutes,
-        'stepCount': stepCount,
-        'sleepHours': sleepHours,
-        'quizCount': quizCount,
-        'affection': affection,
-        'emotionPoints': emotionPoints,
-        'tenureYears': tenureYears,
-        'inventory': inventory, // ◀◀◀ 추가
-        'equippedItemId': equippedItemId,
-      };
+    'level': level,
+    'experience': experience,
+    'studyMinutes': studyMinutes,
+    'stepCount': stepCount,
+    'sleepHours': sleepHours,
+    'quizCount': quizCount,
+    'affection': affection,
+    'emotionPoints': emotionPoints,
+    'tenureYears': tenureYears,
+    'inventory': inventory,
+    'equippedItemId': equippedItemId,
+  };
 
+  /// 경험치를 획득하고 레벨업이 가능하면 자동으로 처리합니다.
   void gainExperience(double amount) {
     experience += amount;
     double needed = level * level * 100;

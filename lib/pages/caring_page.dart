@@ -37,7 +37,9 @@ class _CaringPageState extends State<CaringPage> with TickerProviderStateMixin {
     );
     _sparkleAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
-          parent: _sparkleAnimationController, curve: Curves.easeInOut),
+        parent: _sparkleAnimationController,
+        curve: Curves.easeInOut,
+      ),
     );
   }
 
@@ -49,9 +51,11 @@ class _CaringPageState extends State<CaringPage> with TickerProviderStateMixin {
   }
 
   void _onFeed() {
-    CharacterService.feedCharacter();
-    if (mounted) {
+    try {
+      CharacterService.feedCharacter();
       _heartAnimationController.forward(from: 0.0);
+    } catch (e) {
+      debugPrint('⚠️ feedCharacter error: $e');
     }
   }
 
@@ -60,7 +64,7 @@ class _CaringPageState extends State<CaringPage> with TickerProviderStateMixin {
       context,
       MaterialPageRoute(builder: (_) => const EmotionRecordPage()),
     );
-    if (success == true && mounted) {
+    if (success == true) {
       _sparkleAnimationController.forward(from: 0.0);
     }
   }
@@ -71,15 +75,21 @@ class _CaringPageState extends State<CaringPage> with TickerProviderStateMixin {
       context: context,
       builder: (ctx) {
         return FutureBuilder<List<StoreItem>>(
-          future: storeService.fetchMyItems(),
+          future: storeService.fetchMyItems().catchError((e) {
+            debugPrint('⚠️ fetchMyItems error: $e');
+            return <StoreItem>[];
+          }),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             }
-            if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            if (snapshot.hasError) {
+              return Center(child: Text('에러 발생: ${snapshot.error}'));
+            }
+            final myItems = snapshot.data ?? [];
+            if (myItems.isEmpty) {
               return const Center(child: Text('보유한 아이템이 없습니다.'));
             }
-            final myItems = snapshot.data!;
             return GridView.builder(
               padding: const EdgeInsets.all(24),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -99,8 +109,10 @@ class _CaringPageState extends State<CaringPage> with TickerProviderStateMixin {
                       },
                       child: const CircleAvatar(
                         backgroundColor: Colors.grey,
-                        child:
-                            Icon(Icons.do_not_disturb_on, color: Colors.white),
+                        child: Icon(
+                          Icons.do_not_disturb_on,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   );
@@ -116,15 +128,18 @@ class _CaringPageState extends State<CaringPage> with TickerProviderStateMixin {
                     },
                     child: CircleAvatar(
                       backgroundImage: NetworkImage(item.imageUrl),
-                      child: isEquipped
-                          ? Container(
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border:
-                                    Border.all(color: Colors.green, width: 3),
-                              ),
-                            )
-                          : null,
+                      child:
+                          isEquipped
+                              ? Container(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.green,
+                                    width: 3,
+                                  ),
+                                ),
+                              )
+                              : null,
                     ),
                   ),
                 );
@@ -145,6 +160,9 @@ class _CaringPageState extends State<CaringPage> with TickerProviderStateMixin {
     return StreamBuilder<Character?>(
       stream: CharacterService.watchCharacter(user.uid),
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(child: Text('데이터 로드 실패: ${snapshot.error}'));
+        }
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
@@ -169,29 +187,47 @@ class _CaringPageState extends State<CaringPage> with TickerProviderStateMixin {
                 Positioned(
                   top: -20,
                   child: FadeTransition(
-                    opacity: _heartAnimation
-                        .drive(CurveTween(curve: Curves.easeOut)),
+                    opacity: _heartAnimation.drive(
+                      CurveTween(curve: Curves.easeOut),
+                    ),
                     child: SlideTransition(
-                      position: _heartAnimation.drive(Tween(
+                      position: _heartAnimation.drive(
+                        Tween(
                           begin: const Offset(0.2, 0.2),
-                          end: const Offset(0.2, -1.5))),
-                      child: const Icon(Icons.favorite,
-                          color: Colors.pinkAccent, size: 40),
+                          end: const Offset(0.2, -1.5),
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.favorite,
+                        color: Colors.pinkAccent,
+                        size: 40,
+                      ),
                     ),
                   ),
                 ),
                 Positioned.fill(
                   child: IgnorePointer(
                     child: FadeTransition(
-                      opacity: _sparkleAnimation.drive(CurveTween(
-                          curve:
-                              const Interval(0.0, 0.2, curve: Curves.easeIn))),
+                      opacity: _sparkleAnimation.drive(
+                        CurveTween(
+                          curve: const Interval(0.0, 0.2, curve: Curves.easeIn),
+                        ),
+                      ),
                       child: FadeTransition(
-                        opacity: _sparkleAnimation.drive(CurveTween(
-                            curve: const Interval(0.8, 1.0,
-                                curve: Curves.easeOut))),
-                        child: const Icon(Icons.auto_awesome,
-                            color: Colors.amber, size: 80),
+                        opacity: _sparkleAnimation.drive(
+                          CurveTween(
+                            curve: const Interval(
+                              0.8,
+                              1.0,
+                              curve: Curves.easeOut,
+                            ),
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.auto_awesome,
+                          color: Colors.amber,
+                          size: 80,
+                        ),
                       ),
                     ),
                   ),
@@ -216,10 +252,15 @@ class _CaringPageState extends State<CaringPage> with TickerProviderStateMixin {
                 ),
                 ElevatedButton.icon(
                   onPressed: () async {
-                    final message = await CharacterService.dailyCheckIn();
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context)
-                          .showSnackBar(SnackBar(content: Text(message)));
+                    try {
+                      final message = await CharacterService.dailyCheckIn();
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(
+                          context,
+                        ).showSnackBar(SnackBar(content: Text(message)));
+                      }
+                    } catch (e) {
+                      debugPrint('⚠️ dailyCheckIn error: $e');
                     }
                   },
                   icon: const Icon(Icons.check_circle_outline),
@@ -235,21 +276,27 @@ class _CaringPageState extends State<CaringPage> with TickerProviderStateMixin {
             const SizedBox(height: 32),
             const Divider(),
             const SizedBox(height: 16),
-            const Text("🟡 나의 현재 상태",
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const Text(
+              "🟡 나의 현재 상태",
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 16),
             _buildStatRow("레벨", "${character.level}"),
             _buildStatRow("경험치", character.experience.toStringAsFixed(1)),
             _buildStatRow("❤️ 애정도", "${(affection * 100).toInt()}%"),
             _buildStatRow("💰 보유 포인트", "${character.emotionPoints} P"),
             const SizedBox(height: 16),
-            const Text("📊 나의 활동 기록",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text(
+              "📊 나의 활동 기록",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
             _buildStatRow("학습 시간", "${character.studyMinutes}분"),
             _buildStatRow("걸음 수", "${character.stepCount} 걸음"),
             _buildStatRow(
-                "수면 시간", "${character.sleepHours.toStringAsFixed(1)} 시간"),
+              "수면 시간",
+              "${character.sleepHours.toStringAsFixed(1)} 시간",
+            ),
             _buildStatRow("퀴즈 완료", "${character.quizCount} 회"),
           ],
         ),
@@ -264,12 +311,14 @@ class _CaringPageState extends State<CaringPage> with TickerProviderStateMixin {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           SizedBox(
-              width: 100,
-              child: Text("$label:", style: const TextStyle(fontSize: 16))),
+            width: 100,
+            child: Text("$label:", style: const TextStyle(fontSize: 16)),
+          ),
           const SizedBox(width: 8),
-          Text(value,
-              style:
-                  const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+          ),
         ],
       ),
     );

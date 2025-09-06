@@ -1,9 +1,11 @@
-import 'dart:async';
+// lib/main.dart
 
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_naver_map/flutter_naver_map.dart'; // ← NaverMap 플러그인
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:provider/provider.dart';
 
@@ -21,17 +23,20 @@ import 'services/store_service.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 중복 초기화 에러 무시
-  try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-  } on FirebaseException catch (e) {
-    if (e.code != 'duplicate-app') {
-      rethrow;
-    }
-  }
+  // 1) Firebase 초기화
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  debugPrint(
+    '✅ Firebase initialized with projectId='
+    '${DefaultFirebaseOptions.currentPlatform.projectId}',
+  );
 
+  // 2) Naver Map SDK 초기화 (반드시 Firebase 다음, runApp 이전)
+  await NaverMapSdk.instance.initialize(
+    clientId: 'YOUR_NAVER_CLIENT_ID', // ← 네이버 클라우드 플랫폼에서 발급받은 클라이언트 ID로 교체
+  );
+  debugPrint('✅ NaverMap SDK initialized');
+
+  // 3) 앱 실행
   runApp(
     MultiProvider(
       providers: [
@@ -109,7 +114,6 @@ class SignInPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final googleSignIn = GoogleSignIn(scopes: ['email']);
-
     return Scaffold(
       body: Center(
         child: ElevatedButton.icon(
@@ -119,10 +123,8 @@ class SignInPage extends StatelessWidget {
             try {
               final googleUser = await googleSignIn.signIn();
               if (googleUser == null) return;
-
               final googleAuth = await googleUser.authentication;
               if (googleAuth.idToken == null) return;
-
               final credential = GoogleAuthProvider.credential(
                 accessToken: googleAuth.accessToken,
                 idToken: googleAuth.idToken,
@@ -146,7 +148,6 @@ class MyHome extends StatefulWidget {
 
 class _MyHomeState extends State<MyHome> {
   int _selectedIndex = 0;
-
   static const _pages = [CaringPage(), GrowthPage(), JobPage()];
   static const _titles = ['돌보기', '성장하기', '나아가기'];
 

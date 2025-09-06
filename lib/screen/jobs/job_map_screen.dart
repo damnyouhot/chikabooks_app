@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_naver_map/flutter_naver_map.dart';
 import 'package:provider/provider.dart';
 import '../../models/job.dart';
 import '../../services/job_service.dart';
 import 'job_detail_screen.dart';
+import 'package:flutter_naver_map/flutter_naver_map.dart';
 
 class JobMapScreen extends StatefulWidget {
   const JobMapScreen({super.key});
@@ -59,10 +59,7 @@ class _JobMapScreenState extends State<JobMapScreen> {
 
   void _onMarkerTap(NMarker marker, Job job) {
     _mapController?.updateCamera(
-      NCameraUpdate.scrollAndZoomTo(
-        target: marker.position,
-        zoom: 15,
-      ),
+      NCameraUpdate.scrollAndZoomTo(target: marker.position, zoom: 15),
     );
     Navigator.push(
       context,
