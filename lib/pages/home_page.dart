@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // [수정] 사용자 ID를 가져오기 위해 import 추가
 import 'package:chikabooks_app/pages/growth/growth_tab.dart';
 import 'package:chikabooks_app/pages/job_page.dart';
 import 'package:chikabooks_app/pages/store/store_tab.dart';
-import '../models/character.dart';
+import '../models/character_model.dart'; // [수정] character_model.dart로 경로 수정 (Character -> character_model)
 import '../services/character_service.dart';
 
 class HomePage extends StatefulWidget {
@@ -28,7 +29,19 @@ class _HomePageState extends State<HomePage> {
   Future<void> _loadCharacter() async {
     if (!mounted) return;
     setState(() => _loading = true);
-    final char = await CharacterService.fetchCharacter();
+
+    // [수정] 현재 로그인한 사용자의 ID를 가져옵니다.
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      print("사용자가 로그인하지 않았습니다."); // 로그인 안된 경우 처리
+      return;
+    }
+
+    // [수정] 사용자 ID를 인자로 전달하여 캐릭터 정보를 가져옵니다.
+    final char = await CharacterService.fetchCharacter(userId);
+
     if (!mounted) return;
     setState(() {
       _character = char;
@@ -39,8 +52,20 @@ class _HomePageState extends State<HomePage> {
   Future<void> _onFeed() async {
     if (_feeding) return;
     setState(() => _feeding = true);
-    await CharacterService.feedCharacter();
-    await _loadCharacter();
+
+    // [수정] 현재 로그인한 사용자의 ID를 가져옵니다.
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) {
+      if (!mounted) return;
+      setState(() => _feeding = false);
+      print("사용자가 로그인하지 않아 밥주기를 실행할 수 없습니다.");
+      return;
+    }
+
+    // [수정] 사용자 ID를 인자로 전달하여 밥주기를 실행합니다.
+    await CharacterService.feedCharacter(userId);
+
+    await _loadCharacter(); // 캐릭터 정보 다시 로드
     if (!mounted) return;
     setState(() => _feeding = false);
   }
@@ -66,7 +91,9 @@ class _HomePageState extends State<HomePage> {
           BottomNavigationBarItem(icon: Icon(Icons.home), label: '홈'),
           BottomNavigationBarItem(icon: Icon(Icons.store), label: '스토어'),
           BottomNavigationBarItem(
-              icon: Icon(Icons.emoji_emotions), label: '성장'),
+            icon: Icon(Icons.emoji_emotions),
+            label: '성장',
+          ),
           BottomNavigationBarItem(icon: Icon(Icons.work), label: '구직'),
         ],
       ),
@@ -93,13 +120,16 @@ class _HomePageState extends State<HomePage> {
           Center(
             child: Column(
               children: [
-                const Text("🟡 캐릭터 상태",
-                    style:
-                        TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                const Text(
+                  "🟡 캐릭터 상태",
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
                 const SizedBox(height: 16),
                 Text("레벨: ${c.level}", style: const TextStyle(fontSize: 18)),
-                Text("경험치: ${c.experience.toStringAsFixed(1)}",
-                    style: const TextStyle(fontSize: 18)),
+                Text(
+                  "경험치: ${c.experience.toStringAsFixed(1)}",
+                  style: const TextStyle(fontSize: 18),
+                ),
               ],
             ),
           ),
@@ -111,8 +141,10 @@ class _HomePageState extends State<HomePage> {
           _buildStatRow("감정치", "${c.emotionPoints} 점"),
           _buildStatRow("연차", "${c.tenureYears} 년"),
           const SizedBox(height: 24),
-          const Text("❤️ 애정도",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          const Text(
+            "❤️ 애정도",
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 8),
           Row(
             children: [
@@ -124,24 +156,27 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
               const SizedBox(width: 8),
-              Text("${(affection * 100).toInt()}%",
-                  style: const TextStyle(fontSize: 16)),
+              Text(
+                "${(affection * 100).toInt()}%",
+                style: const TextStyle(fontSize: 16),
+              ),
             ],
           ),
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              icon: _feeding
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Icon(Icons.pets),
+              icon:
+                  _feeding
+                      ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                      : const Icon(Icons.pets),
               label: Text(_feeding ? "주시는 중..." : "밥 주기"),
               onPressed: _feeding ? null : _onFeed,
             ),
@@ -159,9 +194,10 @@ class _HomePageState extends State<HomePage> {
         children: [
           Text("$label:", style: const TextStyle(fontSize: 16)),
           const SizedBox(width: 8),
-          Text(value,
-              style:
-                  const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+          ),
         ],
       ),
     );
