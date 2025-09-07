@@ -1,44 +1,48 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    id("com.google.gms.google-services")
+    id("dev.flutter.flutter-gradle-plugin")
 }
 
-apply(from = "$flutterRoot/packages/flutter_tools/gradle/flutter.gradle")
-
 android {
-    namespace = "com.example.chikabooks_app"
+    namespace = "com.example.chikabooks_app" // 실제 패키지 쓰면 교체
     compileSdk = 34
+
     defaultConfig {
         applicationId = "com.example.chikabooks_app"
         minSdk = 21
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
+        multiDexEnabled = true
     }
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug")
+            isMinifyEnabled = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
+    kotlinOptions { jvmTarget = "17" }
 
-    kotlinOptions {
-        jvmTarget = "1.8"
-    }
-
-    sourceSets {
-        getByName("main") {
-            java.srcDirs("src/main/kotlin")
+    packaging {
+        resources {
+            excludes += setOf(
+                "META-INF/DEPENDENCIES","META-INF/LICENSE","META-INF/LICENSE.txt",
+                "META-INF/NOTICE","META-INF/NOTICE.txt","META-INF/AL2.1","META-INF/LGPL2.1"
+            )
         }
     }
 }
 
 dependencies {
-    // Add your dependencies here
+    implementation("org.jetbrains.kotlin:kotlin-stdlib:1.9.24")
 }

@@ -16,9 +16,7 @@ Future<void> main() async {
 
   // 1) Firebase
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  debugPrint(
-    '✅ Firebase initialized with projectId=${DefaultFirebaseOptions.currentPlatform.projectId}',
-  );
+  debugPrint('✅ Firebase initialized with projectId=${DefaultFirebaseOptions.currentPlatform.projectId}');
 
   // 2) Naver Map (정식 초기화 방식)
   await FlutterNaverMap.init(
@@ -65,22 +63,16 @@ class AuthGate extends StatelessWidget {
     if (user == null) return const _SignInStub(); // 최소 로그인 스텁
 
     return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      future:
-          FirebaseFirestore.instance.collection('users').doc(user.uid).get(),
+      future: FirebaseFirestore.instance.collection('users').doc(user.uid).get(),
       builder: (context, snap) {
         if (snap.connectionState != ConnectionState.done) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
 
         final doc = snap.data;
         if (doc != null && !doc.exists) {
           final defaultChar = Character(id: user.uid);
-          FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.uid)
-              .set(defaultChar.toJson());
+          FirebaseFirestore.instance.collection('users').doc(user.uid).set(defaultChar.toJson());
         }
         return const _HomeShell();
       },
@@ -93,7 +85,9 @@ class _SignInStub extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: Text('로그인 화면 준비 중')));
+    return const Scaffold(
+      body: Center(child: Text('로그인 화면 준비 중')),
+    );
   }
 }
 
