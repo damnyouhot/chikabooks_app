@@ -1,192 +1,157 @@
-import 'package:flutter/material.dart';
+// lib/services/character_service.dart  (전체)
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:chikabooks_app/pages/growth/growth_tab.dart';
-import 'package:chikabooks_app/pages/job_page.dart';
-import 'package:chikabooks_app/pages/store/store_tab.dart';
-// [수정] 경로 문제를 해결하기 위해 절대 경로로 변경
-import 'package:chikabooks_app/models/character_model.dart';
-import 'package:chikabooks_app/services/character_service.dart';
+import '../models/character.dart';
 
-class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+class CharacterService {
+  static final _db = FirebaseFirestore.instance;
+  static final _auth = FirebaseAuth.instance;
 
-  @override
-  State<HomePage> createState() => _HomePageState();
-}
-
-class _HomePageState extends State<HomePage> {
-  int _currentIndex = 0;
-
-  Character? _character;
-  bool _loading = true;
-  bool _feeding = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadCharacter();
+  static Future<void> _ensureUserDoc(String uid) async {
+    final ref = _db.collection('users').doc(uid);
+    final snap = await ref.get();
+    if (!snap.exists) {
+      final defaultChar = Character(id: uid);
+      await ref.set(defaultChar.toJson(), SetOptions(merge: true));
+    }
   }
 
-  Future<void> _loadCharacter() async {
-    if (!mounted) return;
-    setState(() => _loading = true);
-
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId == null) {
-      if (!mounted) return;
-      setState(() => _loading = false);
-      return;
+  static Future<Character> fetchCharacter(String uid) async {
+    final ref = _db.collection('users').doc(uid);
+    final snap = await ref.get();
+    if (!snap.exists) {
+      final defaultChar = Character(id: uid);
+      await ref.set(defaultChar.toJson());
+      return defaultChar;
     }
+    return Character.fromDoc(snap);
+  }
 
-    final char = await CharacterService.fetchCharacter(userId);
-
-    if (!mounted) return;
-    setState(() {
-      _character = char;
-      _loading = false;
+  static Stream<Character> watchCharacter(String uid) async* {
+    await _ensureUserDoc(uid);
+    yield* _db.collection('users').doc(uid).snapshots().map((doc) {
+      return Character.fromDoc(doc);
     });
   }
 
-  Future<void> _onFeed() async {
-    if (_feeding) return;
-    setState(() => _feeding = true);
+  static Future<void> feedCharacter() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+    final ref = _db.collection('users').doc(uid);
 
-    // [수정] feedCharacter 함수는 인자를 받지 않으므로 인자 없이 호출
-    await CharacterService.feedCharacter();
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      final ch = snap.exists ? Character.fromDoc(snap) : Character(id: uid);
 
-    await _loadCharacter();
-    if (!mounted) return;
-    setState(() => _feeding = false);
+      final newAff = (ch.affection ?? 0) + 2;
+      ch.affection = newAff;
+      ch.gainExperience(5);
+
+      final data = ch.toJson();
+      final stats = Map<String, dynamic>.from(data['stats'] ?? {});
+      final current = (stats['emotionPoints'] ?? 0) as int;
+      stats['emotionPoints'] = current + 1;
+      data['stats'] = stats;
+
+      tx.set(ref, data, SetOptions(merge: true));
+    });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final pages = [
-      _buildCharacterDashboard(),
-      const StoreTab(),
-      const GrowthTab(),
-      const JobPage(),
-    ];
+  static Future<void> equipItem(String? itemId) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+    final ref = _db.collection('users').doc(uid);
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('치과책방')),
-      body: pages[_currentIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (i) => setState(() => _currentIndex = i),
-        type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: '홈'),
-          BottomNavigationBarItem(icon: Icon(Icons.store), label: '스토어'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.emoji_emotions),
-            label: '성장',
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.work), label: '구직'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCharacterDashboard() {
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+    await ref.set({'equippedItemId': itemId}, SetOptions(merge: true));
+    if (itemId != null) {
+      await ref.set({
+        'inventory': FieldValue.arrayUnion([itemId]),
+      }, SetOptions(merge: true));
     }
-    if (_character == null) {
-      return const Center(child: Text("❌ 캐릭터 데이터를 불러올 수 없습니다."));
-    }
-
-    final c = _character!;
-    final affection = c.affection.clamp(0.0, 1.0);
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Column(
-              children: [
-                const Text(
-                  "🟡 캐릭터 상태",
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 16),
-                Text("레벨: ${c.level}", style: const TextStyle(fontSize: 18)),
-                Text(
-                  "경험치: ${c.experience.toStringAsFixed(1)}",
-                  style: const TextStyle(fontSize: 18),
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 32),
-          _buildStatRow("학습 시간", "${c.studyMinutes}분"),
-          _buildStatRow("걸음 수", "${c.stepCount} 걸음"),
-          _buildStatRow("수면 시간", "${c.sleepHours} 시간"),
-          _buildStatRow("퀴즈 완료", "${c.quizCount} 회"),
-          _buildStatRow("감정치", "${c.emotionPoints} 점"),
-          _buildStatRow("연차", "${c.tenureYears} 년"),
-          const SizedBox(height: 24),
-          const Text(
-            "❤️ 애정도",
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: LinearProgressIndicator(
-                  value: affection,
-                  minHeight: 10,
-                  backgroundColor: Colors.grey[300],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                "${(affection * 100).toInt()}%",
-                style: const TextStyle(fontSize: 16),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              icon:
-                  _feeding
-                      ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                      : const Icon(Icons.pets),
-              label: Text(_feeding ? "주시는 중..." : "밥 주기"),
-              onPressed: _feeding ? null : _onFeed,
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
-  Widget _buildStatRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text("$label:", style: const TextStyle(fontSize: 16)),
-          const SizedBox(width: 8),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-          ),
-        ],
-      ),
-    );
+  static Future<String> dailyCheckIn() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return '로그인이 필요합니다.';
+
+    final now = DateTime.now();
+    final ymd =
+        '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
+    final checkRef = _db
+        .collection('users')
+        .doc(uid)
+        .collection('daily')
+        .doc(ymd);
+    if ((await checkRef.get()).exists) {
+      return '오늘은 이미 체크인 했어요!';
+    }
+
+    await _db.runTransaction((tx) async {
+      tx.set(checkRef, {'createdAt': FieldValue.serverTimestamp()});
+
+      final userRef = _db.collection('users').doc(uid);
+      final snap = await tx.get(userRef);
+      final ch = snap.exists ? Character.fromDoc(snap) : Character(id: uid);
+
+      ch.affection = (ch.affection ?? 0) + 1;
+      ch.gainExperience(3);
+
+      final data = ch.toJson();
+      final stats = Map<String, dynamic>.from(data['stats'] ?? {});
+      final cur = (stats['emotionPoints'] ?? 0) as int;
+      stats['emotionPoints'] = cur + 10;
+      data['stats'] = stats;
+
+      tx.set(userRef, data, SetOptions(merge: true));
+    });
+
+    return '체크인 완료! 보상을 받았어요 😊';
+  }
+
+  static Future<void> addExperience(double amount) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+    final ref = _db.collection('users').doc(uid);
+
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      final ch = snap.exists ? Character.fromDoc(snap) : Character(id: uid);
+      ch.gainExperience(amount);
+      tx.set(ref, ch.toJson(), SetOptions(merge: true));
+    });
+  }
+
+  static Future<void> incrementStats({
+    int emotionPoints = 0,
+    int studyMinutes = 0,
+    int stepCount = 0,
+    int quizCount = 0,
+    double affection = 0.0,
+  }) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+    final ref = _db.collection('users').doc(uid);
+
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      final base = Map<String, dynamic>.from(snap.data() ?? {});
+
+      // 상위 필드
+      base['emotionPoints'] = (base['emotionPoints'] ?? 0) + emotionPoints;
+      base['studyMinutes'] = (base['studyMinutes'] ?? 0) + studyMinutes;
+      base['stepCount'] = (base['stepCount'] ?? 0) + stepCount;
+      base['quizCount'] = (base['quizCount'] ?? 0) + quizCount;
+      base['affection'] = (base['affection'] ?? 0).toDouble() + affection;
+
+      // stats 서브필드
+      final stats = Map<String, dynamic>.from(base['stats'] ?? {});
+      stats['emotionPoints'] = (stats['emotionPoints'] ?? 0) + emotionPoints;
+      stats['studyMinutes'] = (stats['studyMinutes'] ?? 0) + studyMinutes;
+      stats['stepCount'] = (stats['stepCount'] ?? 0) + stepCount;
+      stats['quizCount'] = (stats['quizCount'] ?? 0) + quizCount;
+
+      base['stats'] = stats;
+      tx.set(ref, base, SetOptions(merge: true));
+    });
   }
 }

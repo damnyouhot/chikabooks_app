@@ -37,6 +37,7 @@ dependencies:
   in_app_purchase_android: ^0.4.0+1
 
   cupertino_icons: ^1.0.8
+  curved_navigation_bar: ^1.0.3 # <--- 이 줄을 추가하세요.
   fl_chart: ^0.66.0
   pedometer: ^4.1.1
   provider: ^6.1.2

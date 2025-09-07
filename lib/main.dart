@@ -1,46 +1,32 @@
-// lib/main.dart
-
-import 'dart:async';
+// lib/main.dart  (전체 교체)
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_naver_map/flutter_naver_map.dart'; // ← NaverMap 플러그인
+import 'package:flutter_naver_map/flutter_naver_map.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:provider/provider.dart';
 
 import 'firebase_options.dart';
 import 'models/character.dart';
-import 'notifiers/job_filter_notifier.dart';
-import 'pages/admin/admin_dashboard_page.dart';
 import 'pages/caring_page.dart';
 import 'pages/growth/growth_page.dart';
 import 'pages/job_page.dart';
-import 'services/ebook_service.dart';
-import 'services/job_service.dart';
-import 'services/store_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 1) Firebase 초기화
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  debugPrint(
-    '✅ Firebase initialized with projectId='
-    '${DefaultFirebaseOptions.currentPlatform.projectId}',
+  debugPrint('✅ Firebase initialized');
+
+  // 최신 API (deprecated 아님)
+  await FlutterNaverMap.init(
+    clientId: '3amqdx6zuh',
+    onAuthFailed: (ex) => debugPrint('❌ NaverMap auth failed: $ex'),
   );
 
-  // 2) Naver Map SDK 초기화 (Firebase 다음, runApp 이전)
-  await NaverMapSdk.instance.initialize(
-    clientId: '3amqdx6zuh', // ← 네이버 클라우드 플랫폼 "모바일용" Client ID
-    onAuthFailed: (ex) {
-      // 여기서 인증 실패 원인을 확인할 수 있습니다.
-      debugPrint('❌ NaverMap auth failed: $ex');
-    },
-  );
-  debugPrint('✅ NaverMap SDK initialized');
+  debugPrint('✅ NaverMap initialized');
 
-  // 3) 앱 실행
   runApp(
     MultiProvider(
       providers: [
@@ -48,10 +34,6 @@ Future<void> main() async {
           value: FirebaseAuth.instance.authStateChanges(),
           initialData: null,
         ),
-        ChangeNotifierProvider(create: (_) => JobFilterNotifier()),
-        Provider(create: (_) => JobService()),
-        Provider(create: (_) => EbookService()),
-        Provider(create: (_) => StoreService()),
       ],
       child: const ChikabooksApp(),
     ),
@@ -106,7 +88,7 @@ class AuthGate extends StatelessWidget {
               .set(defaultChar.toJson());
         }
 
-        return role == 'admin' ? const AdminDashboardPage() : const MyHome();
+        return role == 'admin' ? const _DummyAdmin() : const MyHome();
       },
     );
   }
@@ -128,7 +110,6 @@ class SignInPage extends StatelessWidget {
               final googleUser = await googleSignIn.signIn();
               if (googleUser == null) return;
               final googleAuth = await googleUser.authentication;
-              if (googleAuth.idToken == null) return;
               final credential = GoogleAuthProvider.credential(
                 accessToken: googleAuth.accessToken,
                 idToken: googleAuth.idToken,
@@ -173,5 +154,13 @@ class _MyHomeState extends State<MyHome> {
         ],
       ),
     );
+  }
+}
+
+class _DummyAdmin extends StatelessWidget {
+  const _DummyAdmin({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(body: Center(child: Text('Admin Page (임시)')));
   }
 }
