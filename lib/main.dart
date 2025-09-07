@@ -1,43 +1,33 @@
-// lib/main.dart  (전체 교체)
+// lib/main.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_naver_map/flutter_naver_map.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:provider/provider.dart';
 
 import 'firebase_options.dart';
 import 'models/character.dart';
-import 'pages/caring_page.dart';
-import 'pages/growth/growth_page.dart';
+import 'pages/home_page.dart';
 import 'pages/job_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // 1) Firebase
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  debugPrint('✅ Firebase initialized');
+  debugPrint(
+    '✅ Firebase initialized with projectId=${DefaultFirebaseOptions.currentPlatform.projectId}',
+  );
 
-  // 최신 API (deprecated 아님)
+  // 2) Naver Map (정식 초기화 방식)
   await FlutterNaverMap.init(
-    clientId: '3amqdx6zuh',
+    clientId: '여기에_네이버맵_Client_ID',
     onAuthFailed: (ex) => debugPrint('❌ NaverMap auth failed: $ex'),
   );
+  debugPrint('✅ NaverMap init done');
 
-  debugPrint('✅ NaverMap initialized');
-
-  runApp(
-    MultiProvider(
-      providers: [
-        StreamProvider<User?>.value(
-          value: FirebaseAuth.instance.authStateChanges(),
-          initialData: null,
-        ),
-      ],
-      child: const ChikabooksApp(),
-    ),
-  );
+  runApp(const ChikabooksApp());
 }
 
 class ChikabooksApp extends StatelessWidget {
@@ -45,15 +35,23 @@ class ChikabooksApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: '치과책방',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primarySwatch: Colors.pink,
-        fontFamily: 'NotoSansKR',
-        fontFamilyFallback: const ['Apple SD Gothic Neo', 'Roboto'],
+    return MultiProvider(
+      providers: [
+        StreamProvider<User?>.value(
+          value: FirebaseAuth.instance.authStateChanges(),
+          initialData: null,
+        ),
+      ],
+      child: MaterialApp(
+        title: '치과책방',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          primarySwatch: Colors.pink,
+          fontFamily: 'NotoSansKR',
+          fontFamilyFallback: const ['Apple SD Gothic Neo', 'Roboto'],
+        ),
+        home: const AuthGate(),
       ),
-      home: const AuthGate(),
     );
   }
 }
@@ -64,7 +62,7 @@ class AuthGate extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = context.watch<User?>();
-    if (user == null) return const SignInPage();
+    if (user == null) return const _SignInStub(); // 최소 로그인 스텁
 
     return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       future:
@@ -77,9 +75,6 @@ class AuthGate extends StatelessWidget {
         }
 
         final doc = snap.data;
-        final data = doc?.data();
-        final role = data?['role'] as String? ?? '';
-
         if (doc != null && !doc.exists) {
           final defaultChar = Character(id: user.uid);
           FirebaseFirestore.instance
@@ -87,80 +82,46 @@ class AuthGate extends StatelessWidget {
               .doc(user.uid)
               .set(defaultChar.toJson());
         }
-
-        return role == 'admin' ? const _DummyAdmin() : const MyHome();
+        return const _HomeShell();
       },
     );
   }
 }
 
-class SignInPage extends StatelessWidget {
-  const SignInPage({super.key});
+class _SignInStub extends StatelessWidget {
+  const _SignInStub();
 
   @override
   Widget build(BuildContext context) {
-    final googleSignIn = GoogleSignIn(scopes: ['email']);
-    return Scaffold(
-      body: Center(
-        child: ElevatedButton.icon(
-          icon: const Icon(Icons.login),
-          label: const Text('Google로 로그인'),
-          onPressed: () async {
-            try {
-              final googleUser = await googleSignIn.signIn();
-              if (googleUser == null) return;
-              final googleAuth = await googleUser.authentication;
-              final credential = GoogleAuthProvider.credential(
-                accessToken: googleAuth.accessToken,
-                idToken: googleAuth.idToken,
-              );
-              await FirebaseAuth.instance.signInWithCredential(credential);
-            } catch (e) {
-              debugPrint('로그인 실패: $e');
-            }
-          },
-        ),
-      ),
-    );
+    return const Scaffold(body: Center(child: Text('로그인 화면 준비 중')));
   }
 }
 
-class MyHome extends StatefulWidget {
-  const MyHome({super.key});
+class _HomeShell extends StatefulWidget {
+  const _HomeShell();
+
   @override
-  State<MyHome> createState() => _MyHomeState();
+  State<_HomeShell> createState() => _HomeShellState();
 }
 
-class _MyHomeState extends State<MyHome> {
-  int _selectedIndex = 0;
-  static const _pages = [CaringPage(), GrowthPage(), JobPage()];
-  static const _titles = ['돌보기', '성장하기', '나아가기'];
-
-  void _onTap(int idx) => setState(() => _selectedIndex = idx);
+class _HomeShellState extends State<_HomeShell> {
+  int _index = 0;
+  final _pages = const [HomePage(), JobPage()];
+  final _titles = const ['홈', '나아가기'];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(_titles[_selectedIndex])),
-      body: _pages[_selectedIndex],
+      appBar: AppBar(title: Text(_titles[_index])),
+      body: _pages[_index],
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: _onTap,
-        type: BottomNavigationBarType.fixed,
+        currentIndex: _index,
+        onTap: (i) => setState(() => _index = i),
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.favorite), label: '돌보기'),
-          BottomNavigationBarItem(icon: Icon(Icons.auto_graph), label: '성장하기'),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: '홈'),
           BottomNavigationBarItem(icon: Icon(Icons.work), label: '나아가기'),
         ],
       ),
     );
-  }
-}
-
-class _DummyAdmin extends StatelessWidget {
-  const _DummyAdmin({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: Text('Admin Page (임시)')));
   }
 }
