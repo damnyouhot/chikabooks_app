@@ -1,3 +1,17 @@
 {
-    "java.configuration.updateBuildConfiguration": "interactive"
+  // Flutter & Dart
+  "dart.flutterSdkPath": "C:\\SDK\\2nd_account\\flutter",
+
+  // 이 워크스페이스에서 Java 확장이 android/를 스캔하지 않게
+  "java.configuration.excludePath": [
+    "**/android/**"
+  ],
+
+  // Gradle import/빌드 비활성화 (이 워크스페이스 한정)
+  "java.import.gradle.enabled": false,
+  "java.import.gradle.wrapper.enabled": false,
+  "java.configuration.updateBuildConfiguration": "disabled",
+
+  // (선택) Kotlin/Java 언어 서버가 불필요한 알림을 줄이도록
+  "java.errors.incompleteClasspath.severity": "ignore"
 }
