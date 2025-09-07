@@ -29,4 +29,4 @@ plugins {
 
 include(":app")
 
-// [수정] 아래에 중복으로 있던 pluginManagement 블록을 모두 삭제했습니다.
+// [수정] 이 파일의 맨 아래에 중복으로 존재하던 pluginManagement 블록을 완전히 삭제했습니다.

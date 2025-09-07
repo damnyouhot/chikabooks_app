@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // [수정] 사용자 ID를 가져오기 위해 import 추가
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:chikabooks_app/pages/growth/growth_tab.dart';
 import 'package:chikabooks_app/pages/job_page.dart';
 import 'package:chikabooks_app/pages/store/store_tab.dart';
-import '../models/character_model.dart'; // [수정] character_model.dart로 경로 수정 (Character -> character_model)
-import '../services/character_service.dart';
+// [수정] 경로 문제를 해결하기 위해 절대 경로로 변경
+import 'package:chikabooks_app/models/character_model.dart';
+import 'package:chikabooks_app/services/character_service.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -14,7 +15,7 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  int _currentIndex = 0; // 하단 탭 상태 관리
+  int _currentIndex = 0;
 
   Character? _character;
   bool _loading = true;
@@ -30,16 +31,13 @@ class _HomePageState extends State<HomePage> {
     if (!mounted) return;
     setState(() => _loading = true);
 
-    // [수정] 현재 로그인한 사용자의 ID를 가져옵니다.
     final userId = FirebaseAuth.instance.currentUser?.uid;
     if (userId == null) {
       if (!mounted) return;
       setState(() => _loading = false);
-      print("사용자가 로그인하지 않았습니다."); // 로그인 안된 경우 처리
       return;
     }
 
-    // [수정] 사용자 ID를 인자로 전달하여 캐릭터 정보를 가져옵니다.
     final char = await CharacterService.fetchCharacter(userId);
 
     if (!mounted) return;
@@ -53,35 +51,25 @@ class _HomePageState extends State<HomePage> {
     if (_feeding) return;
     setState(() => _feeding = true);
 
-    // [수정] 현재 로그인한 사용자의 ID를 가져옵니다.
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId == null) {
-      if (!mounted) return;
-      setState(() => _feeding = false);
-      print("사용자가 로그인하지 않아 밥주기를 실행할 수 없습니다.");
-      return;
-    }
+    // [수정] feedCharacter 함수는 인자를 받지 않으므로 인자 없이 호출
+    await CharacterService.feedCharacter();
 
-    // [수정] 사용자 ID를 인자로 전달하여 밥주기를 실행합니다.
-    await CharacterService.feedCharacter(userId);
-
-    await _loadCharacter(); // 캐릭터 정보 다시 로드
+    await _loadCharacter();
     if (!mounted) return;
     setState(() => _feeding = false);
   }
 
   @override
   Widget build(BuildContext context) {
-    // 4개의 탭에 해당하는 페이지 리스트 정의
     final pages = [
-      _buildCharacterDashboard(), // 홈 탭
-      const StoreTab(), // 스토어 탭
-      const GrowthTab(), // 성장 탭
-      const JobPage(), // 구직 탭
+      _buildCharacterDashboard(),
+      const StoreTab(),
+      const GrowthTab(),
+      const JobPage(),
     ];
 
     return Scaffold(
-      appBar: AppBar(title: const Text('치과책방')), // AppBar 추가
+      appBar: AppBar(title: const Text('치과책방')),
       body: pages[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
@@ -100,7 +88,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // 홈 탭에 들어갈 상세 스탯 위젯
   Widget _buildCharacterDashboard() {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
