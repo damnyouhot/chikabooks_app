@@ -1,24 +1,13 @@
-<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.chikabooks.appnew">
-
-    <!-- 인터넷/네트워크/위치 권한 -->
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
+        android:label="chikabooks_app"
         android:name="${applicationName}"
-        android:label="Chikabooks"
-        android:icon="@mipmap/ic_launcher"
-        android:usesCleartextTraffic="false">
+        android:icon="@mipmap/ic_launcher">
 
-        <!-- ✅ 네이버맵 Client ID (모바일용) -->
         <meta-data
-            android:name="com.naver.maps.map.CLIENT_ID"
-            android:value="여기에_모바일용_Client_ID" />
+            android:name="flutterEmbedding"
+            android:value="2" />
 
-        <!-- Flutter V2 임베딩 Activity -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -28,19 +17,11 @@
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
             
-            <!-- 런처 인텐트 -->
             <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
 
-        <!-- 스플래시/테마 -->
-        <meta-data
-            android:name="io.flutter.embedding.android.SplashScreenDrawable"
-            android:resource="@drawable/launch_background" />
-        <meta-data
-            android:name="io.flutter.embedding.android.NormalTheme"
-            android:resource="@style/NormalTheme" />
     </application>
 </manifest>
