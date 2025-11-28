@@ -1,4 +1,4 @@
-package com.chikabooks.appnew
+package com.example.chikabooks_app
 
 import io.flutter.embedding.android.FlutterActivity
 

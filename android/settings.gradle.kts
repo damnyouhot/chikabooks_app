@@ -1,16 +1,15 @@
-// C:\dev\chikabooks_app\android\settings.gradle.kts
-pluginManagement {
-    // flutter.sdk (gradle.properties) → 없으면 FLUTTER_ROOT
-    val flutterSdkPath: String = providers
-        .gradleProperty("flutter.sdk")
-        .orNull
-        ?: System.getenv("FLUTTER_ROOT")
-        ?: error(
-            "flutter.sdk 가 gradle.properties 에 없고, FLUTTER_ROOT 환경변수도 없습니다."
-        )
+// android/settings.gradle.kts
 
-    // Flutter Gradle 플러그인 포함
-    includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
+pluginManagement {
+    val flutterSdkPath = runCatching {
+        val properties = java.util.Properties()
+        properties.load(java.io.File(settingsDir, "local.properties").inputStream())
+        properties.getProperty("flutter.sdk")
+    }.getOrNull()
+
+    if (flutterSdkPath != null) {
+        includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
+    }
 
     repositories {
         google()
@@ -21,8 +20,11 @@ pluginManagement {
 
 plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
-    id("com.android.application") version "8.9.1" apply false
-    id("org.jetbrains.kotlin.android") version "2.1.21" apply false
+    id("com.android.application") version "8.7.0" apply false // 버전은 자동생성된 것 유지
+    id("org.jetbrains.kotlin.android") version "1.8.22" apply false // 버전은 자동생성된 것 유지
+    
+    // [▼ 이 줄을 추가해주세요]
+    id("com.google.gms.google-services") version "4.4.2" apply false
 }
 
 include(":app")
