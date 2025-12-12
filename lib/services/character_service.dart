@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../config/reward_constants.dart';
 import '../models/character.dart';
 
 class CharacterService {
@@ -33,13 +34,45 @@ class CharacterService {
   }
   // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ 이 함수들이 누락되었습니다 ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
-  static Future<void> feedCharacter() async {
+  /// 밥주기 - 배고픔 해소 + 애정도 증가 + 포인트 획득
+  static Future<String> feedCharacter() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return;
+    if (uid == null) return "로그인이 필요합니다.";
     final docRef = _db.collection('users').doc(uid);
-    await docRef.update({'affection': FieldValue.increment(0.1)});
+    await docRef.update({
+      'hunger': FieldValue.increment(RewardPolicy.feedHungerIncrease),
+      'affection': FieldValue.increment(RewardPolicy.feedAffectionIncrease),
+      'emotionPoints': FieldValue.increment(RewardPolicy.feed),
+    });
+    return "냠냠~ 맛있게 먹었어요! +${RewardPolicy.feed}P 🍽️";
   }
 
+  /// 캐릭터 쓰다듬기 - 애정도 소량 증가 + 포인트 획득
+  static Future<String> petCharacter() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return "로그인이 필요합니다.";
+    final docRef = _db.collection('users').doc(uid);
+    await docRef.update({
+      'affection': FieldValue.increment(RewardPolicy.petAffectionIncrease),
+      'emotionPoints': FieldValue.increment(RewardPolicy.petCharacter),
+    });
+    return "+${RewardPolicy.petCharacter}P ❤️";
+  }
+
+  /// 휴식하기 - 피로도 감소 + 포인트 획득
+  static Future<String> rest() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return "로그인이 필요합니다.";
+    final docRef = _db.collection('users').doc(uid);
+    await docRef.update({
+      'fatigue': FieldValue.increment(-RewardPolicy.restFatigueDecrease),
+      'sleepHours': FieldValue.increment(RewardPolicy.restSleepIncrease),
+      'emotionPoints': FieldValue.increment(RewardPolicy.rest),
+    });
+    return "푹 쉬었어요! +${RewardPolicy.rest}P 😴";
+  }
+
+  /// 일일 출석 체크
   static Future<String> dailyCheckIn() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return "로그인이 필요합니다.";
@@ -59,10 +92,10 @@ class CharacterService {
 
     await docRef.update({
       'experience': FieldValue.increment(10.0),
-      'emotionPoints': FieldValue.increment(5),
+      'emotionPoints': FieldValue.increment(RewardPolicy.attendance),
       'lastCheckIn': Timestamp.fromDate(now),
     });
 
-    return "출석 완료! 경험치 +10, 포인트 +5";
+    return "출석 완료! +${RewardPolicy.attendance}P 🎉";
   }
 }

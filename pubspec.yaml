@@ -51,6 +51,7 @@ flutter:
 
   assets:
     - assets/characters/
+    - assets/home/
 
   # 폰트 파일이 실제 assets/fonts 폴더에 있을 경우 주석을 해제하여 사용합니다.
   # fonts:

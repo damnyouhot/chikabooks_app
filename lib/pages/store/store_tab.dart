@@ -38,22 +38,37 @@ class StoreTab extends StatelessWidget {
               itemBuilder: (context, i) {
                 final b = books[i];
                 return InkWell(
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => EbookDetailPage(ebook: b),
-                    ),
-                  ),
+                  onTap:
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => EbookDetailPage(ebook: b),
+                        ),
+                      ),
                   child: Column(
                     children: [
                       Expanded(
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(12),
-                          child: Image.network(
-                            b.coverUrl,
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                          ),
+                          child:
+                              b.coverUrl.isNotEmpty
+                                  ? Image.network(
+                                    b.coverUrl,
+                                    fit: BoxFit.cover,
+                                    width: double.infinity,
+                                    errorBuilder:
+                                        (_, __, ___) => Container(
+                                          color: Colors.grey[300],
+                                          child: const Icon(
+                                            Icons.book,
+                                            size: 48,
+                                          ),
+                                        ),
+                                  )
+                                  : Container(
+                                    color: Colors.grey[300],
+                                    child: const Icon(Icons.book, size: 48),
+                                  ),
                         ),
                       ),
                       const SizedBox(height: 8),

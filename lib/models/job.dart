@@ -38,7 +38,7 @@ class Job {
   }
 
   factory Job.fromJson(Map<String, dynamic> json, {String? docId}) {
-    final loc = json['location'] ?? {};
+    final loc = json['location'];
     DateTime posted;
     final pa = json['postedAt'];
     if (pa is Timestamp) {
@@ -49,16 +49,31 @@ class Job {
       posted = DateTime.now();
     }
 
+    // location이 GeoPoint 타입일 수 있음
+    double lat = 0;
+    double lng = 0;
+    String address = '';
+
+    if (loc is GeoPoint) {
+      lat = loc.latitude;
+      lng = loc.longitude;
+      address = json['address'] ?? '';
+    } else if (loc is Map) {
+      lat = (loc['lat'] ?? 0).toDouble();
+      lng = (loc['lng'] ?? 0).toDouble();
+      address = loc['address'] ?? '';
+    }
+
     return Job(
       id: docId ?? (json['id'] ?? ''),
       title: json['title'] ?? '',
       clinicName: json['clinicName'] ?? '',
-      address: loc['address'] ?? '',
-      lat: (loc['lat'] ?? 0).toDouble(),
-      lng: (loc['lng'] ?? 0).toDouble(),
+      address: address,
+      lat: lat,
+      lng: lng,
       type: json['type'] ?? '',
       career: json['career'] ?? '미정',
-      salaryRange: List<int>.from(json['salaryRange'] ?? [0, 0]),
+      salaryRange: _parseSalaryRange(json['salaryRange']),
       postedAt: posted,
       details: json['details'] ?? '',
       benefits: List<String>.from(json['benefits'] ?? []),
@@ -66,20 +81,33 @@ class Job {
     );
   }
 
+  /// salaryRange 파싱 - String/int 혼합 처리
+  static List<int> _parseSalaryRange(dynamic value) {
+    if (value == null) return [0, 0];
+    if (value is List) {
+      return value
+          .map((e) {
+            if (e is int) return e;
+            if (e is double) return e.toInt();
+            if (e is String) return int.tryParse(e) ?? 0;
+            return 0;
+          })
+          .toList()
+          .cast<int>();
+    }
+    return [0, 0];
+  }
+
   Map<String, dynamic> toJson() => {
-        'title': title,
-        'clinicName': clinicName,
-        'location': {
-          'address': address,
-          'lat': lat,
-          'lng': lng,
-        },
-        'type': type,
-        'career': career,
-        'salaryRange': salaryRange,
-        'postedAt': Timestamp.fromDate(postedAt),
-        'details': details,
-        'benefits': benefits,
-        'images': images,
-      };
+    'title': title,
+    'clinicName': clinicName,
+    'location': {'address': address, 'lat': lat, 'lng': lng},
+    'type': type,
+    'career': career,
+    'salaryRange': salaryRange,
+    'postedAt': Timestamp.fromDate(postedAt),
+    'details': details,
+    'benefits': benefits,
+    'images': images,
+  };
 }

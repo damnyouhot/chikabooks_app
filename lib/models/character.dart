@@ -11,8 +11,12 @@ class Character {
   double affection;
   int emotionPoints;
   int tenureYears;
-  List<String> inventory; // ◀◀◀ 구매한 아이템 ID 목록 필드 추가
+  List<String> inventory;
   String? equippedItemId;
+  // 새로 추가된 필드들
+  double hunger; // 배고픔 지수 (0.0 ~ 1.0, 1.0이 배부름)
+  double fatigue; // 피로도 (0.0 ~ 1.0, 0.0이 피곤하지 않음)
+  List<String> foodInventory; // 보유 음식 ID 목록
 
   Character({
     required this.id,
@@ -25,8 +29,11 @@ class Character {
     this.affection = 0.0,
     this.emotionPoints = 0,
     this.tenureYears = 0,
-    this.inventory = const [], // ◀◀◀ 생성자에 추가
+    this.inventory = const [],
     this.equippedItemId,
+    this.hunger = 0.5, // 기본값: 중간
+    this.fatigue = 0.0, // 기본값: 피곤하지 않음
+    this.foodInventory = const [],
   });
 
   factory Character.fromDoc(DocumentSnapshot doc) {
@@ -42,24 +49,30 @@ class Character {
       affection: (data['affection'] ?? 0).toDouble(),
       emotionPoints: data['emotionPoints'] ?? 0,
       tenureYears: data['tenureYears'] ?? 0,
-      inventory: List<String>.from(data['inventory'] ?? []), // ◀◀◀ 추가
+      inventory: List<String>.from(data['inventory'] ?? []),
       equippedItemId: data['equippedItemId'],
+      hunger: (data['hunger'] ?? 0.5).toDouble(),
+      fatigue: (data['fatigue'] ?? 0.0).toDouble(),
+      foodInventory: List<String>.from(data['foodInventory'] ?? []),
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'level': level,
-        'experience': experience,
-        'studyMinutes': studyMinutes,
-        'stepCount': stepCount,
-        'sleepHours': sleepHours,
-        'quizCount': quizCount,
-        'affection': affection,
-        'emotionPoints': emotionPoints,
-        'tenureYears': tenureYears,
-        'inventory': inventory, // ◀◀◀ 추가
-        'equippedItemId': equippedItemId,
-      };
+    'level': level,
+    'experience': experience,
+    'studyMinutes': studyMinutes,
+    'stepCount': stepCount,
+    'sleepHours': sleepHours,
+    'quizCount': quizCount,
+    'affection': affection,
+    'emotionPoints': emotionPoints,
+    'tenureYears': tenureYears,
+    'inventory': inventory,
+    'equippedItemId': equippedItemId,
+    'hunger': hunger,
+    'fatigue': fatigue,
+    'foodInventory': foodInventory,
+  };
 
   void gainExperience(double amount) {
     experience += amount;
