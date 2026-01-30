@@ -39,10 +39,18 @@ class Ebook {
       coverUrl: json['coverUrl'] ?? '',
       description: json['description'] ?? '',
       publishedAt: pub,
-      price: (json['price'] ?? 0) as int,
-      productId: json['productId'] ?? '',
+      price: _toInt(json['price']),
+      productId: json['productId']?.toString() ?? '',  // 숫자여도 문자열로 변환
       fileUrl: json['fileUrl'] ?? '',
     );
+  }
+  
+  /// 다양한 타입을 int로 변환
+  static int _toInt(dynamic v) {
+    if (v is int) return v;
+    if (v is double) return v.toInt();
+    if (v is String) return int.tryParse(v) ?? 0;
+    return 0;
   }
 
   // ▼▼▼ 오류 해결을 위해 이 부분을 추가합니다 ▼▼▼

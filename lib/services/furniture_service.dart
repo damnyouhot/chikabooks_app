@@ -155,3 +155,15 @@ class FurnitureService {
         .update({'gridX': newGridX, 'gridY': newGridY});
   }
 }
+
+
+
+
+
+
+
+
+
+
+
+

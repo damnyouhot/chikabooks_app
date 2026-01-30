@@ -72,6 +72,14 @@ class CharacterService {
     return "푹 쉬었어요! +${RewardPolicy.rest}P 😴";
   }
 
+  /// [DEBUG] 테스트용 포인트 지급
+  static Future<void> grantTestPoints(int amount) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    final docRef = _db.collection('users').doc(uid);
+    await docRef.update({'emotionPoints': FieldValue.increment(amount)});
+  }
+
   /// 일일 출석 체크
   static Future<String> dailyCheckIn() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;

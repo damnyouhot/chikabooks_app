@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/character.dart';
 import '../services/character_service.dart';
+import '../widgets/unicorn_sprite_widget.dart';
 
 class FeedingPage extends StatefulWidget {
   const FeedingPage({super.key});
@@ -131,15 +132,6 @@ class _FeedingPageState extends State<FeedingPage>
   }
 
   Widget _buildContent(Character character) {
-    String assetPath = 'assets/characters/chick_lv1.png';
-    if (character.emotionPoints >= 400) {
-      assetPath = 'assets/characters/chick_lv4.png';
-    } else if (character.emotionPoints >= 200) {
-      assetPath = 'assets/characters/chick_lv3.png';
-    } else if (character.emotionPoints >= 100) {
-      assetPath = 'assets/characters/chick_lv2.png';
-    }
-
     final hunger = character.hunger.clamp(0.0, 1.0);
 
     return Column(
@@ -149,7 +141,7 @@ class _FeedingPageState extends State<FeedingPage>
         const SizedBox(height: 16),
         _buildHungerBar(hunger),
         const Spacer(),
-        _buildCharacterWithTable(assetPath),
+        _buildCharacterWithTable(),
         const SizedBox(height: 40),
         _buildFoodMenu(),
         const SizedBox(height: 24),
@@ -176,11 +168,9 @@ class _FeedingPageState extends State<FeedingPage>
             '${(character.affection * 100).toInt()}%',
           ),
           Container(width: 1, height: 40, color: Colors.white24),
-          _buildInfoItem(Icons.star, '레벨', 'Lv.${character.level}'),
-          Container(width: 1, height: 40, color: Colors.white24),
           _buildInfoItem(
             Icons.monetization_on,
-            '포인트',
+            '교감 포인트',
             '${character.emotionPoints}P',
           ),
         ],
@@ -260,7 +250,7 @@ class _FeedingPageState extends State<FeedingPage>
     );
   }
 
-  Widget _buildCharacterWithTable(String assetPath) {
+  Widget _buildCharacterWithTable() {
     return Stack(
       alignment: Alignment.center,
       children: [
@@ -276,7 +266,11 @@ class _FeedingPageState extends State<FeedingPage>
               ),
             );
           },
-          child: Image.asset(assetPath, width: 200, height: 200),
+          child: const UnicornSpriteWidget(
+            size: 180,
+            fps: 12,
+            showDialogue: false,
+          ),
         ),
         if (_isEating)
           const Positioned(

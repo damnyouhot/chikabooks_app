@@ -161,3 +161,15 @@ class OwnedFurniture {
     'purchasedAt': Timestamp.fromDate(purchasedAt),
   };
 }
+
+
+
+
+
+
+
+
+
+
+
+

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/character.dart';
 import '../services/character_service.dart';
+import '../widgets/unicorn_sprite_widget.dart';
 
 /// 휴식 페이지 - 캐릭터 피로도 회복
 class RestPage extends StatefulWidget {
@@ -129,17 +130,6 @@ class _RestPageState extends State<RestPage>
   }
 
   Widget _buildContent(Character character) {
-    String assetPath;
-    if (character.emotionPoints < 100) {
-      assetPath = 'assets/characters/chick_lv1.png';
-    } else if (character.emotionPoints < 200) {
-      assetPath = 'assets/characters/chick_lv2.png';
-    } else if (character.emotionPoints < 400) {
-      assetPath = 'assets/characters/chick_lv3.png';
-    } else {
-      assetPath = 'assets/characters/chick_lv4.png';
-    }
-
     final fatigue = character.fatigue.clamp(0.0, 1.0);
 
     return Column(
@@ -157,7 +147,7 @@ class _RestPageState extends State<RestPage>
           children: [
             // 침대
             _buildBed(),
-            // 캐릭터
+            // 유니콘 캐릭터
             AnimatedBuilder(
               animation: _sleepAnimation,
               builder: (context, child) {
@@ -173,7 +163,11 @@ class _RestPageState extends State<RestPage>
                   ),
                 );
               },
-              child: Image.asset(assetPath, width: 160, height: 160),
+              child: const UnicornSpriteWidget(
+                size: 150,
+                fps: 8,
+                showDialogue: false,
+              ),
             ),
             // 수면 이펙트 (Z Z Z)
             if (_isResting)
@@ -317,14 +311,8 @@ class _RestPageState extends State<RestPage>
           ),
           Container(width: 1, height: 40, color: Colors.white24),
           _buildInfoItem(
-            icon: Icons.star,
-            label: '레벨',
-            value: 'Lv.${character.level}',
-          ),
-          Container(width: 1, height: 40, color: Colors.white24),
-          _buildInfoItem(
             icon: Icons.monetization_on,
-            label: '포인트',
+            label: '교감 포인트',
             value: '${character.emotionPoints}P',
           ),
         ],

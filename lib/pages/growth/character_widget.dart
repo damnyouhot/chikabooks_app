@@ -2,9 +2,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/character.dart';
-import '../../models/store_item.dart';
 import '../../services/character_service.dart';
-import '../../services/store_service.dart';
+import '../../widgets/unicorn_sprite_widget.dart';
 
 class CharacterWidget extends StatelessWidget {
   const CharacterWidget({super.key});
@@ -13,7 +12,7 @@ class CharacterWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final user = context.watch<User?>();
     if (user == null) {
-      return const SizedBox(height: 160, child: Center(child: Text("로그인 필요")));
+      return const SizedBox(height: 200, child: Center(child: Text("로그인 필요")));
     }
 
     return StreamBuilder<Character?>(
@@ -21,64 +20,48 @@ class CharacterWidget extends StatelessWidget {
       builder: (context, characterSnapshot) {
         if (!characterSnapshot.hasData) {
           return const SizedBox(
-              height: 180, child: Center(child: CircularProgressIndicator()));
+            height: 220,
+            child: Center(child: CircularProgressIndicator()),
+          );
         }
 
         final character = characterSnapshot.data!;
 
-        String baseCharacterAssetPath;
-        if (character.emotionPoints < 100) {
-          baseCharacterAssetPath = 'assets/characters/chick_lv1.png';
-        } else if (character.emotionPoints < 200) {
-          baseCharacterAssetPath = 'assets/characters/chick_lv2.png';
-        } else if (character.emotionPoints < 400) {
-          baseCharacterAssetPath = 'assets/characters/chick_lv3.png';
-        } else {
-          baseCharacterAssetPath = 'assets/characters/chick_lv4.png';
-        }
-
         return Column(
           children: [
-            SizedBox(
-              width: 160,
-              height: 160,
-              child: Stack(
-                alignment: Alignment.center,
+            // 유니콘 스프라이트 애니메이션
+            const UnicornSpriteWidget(
+              size: 180,
+              fps: 12,
+              showDialogue: true,
+            ),
+            const SizedBox(height: 8),
+            // 감정 점수 표시
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.pink.shade50,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Image.asset(baseCharacterAssetPath),
-                  if (character.equippedItemId != null)
-                    _buildEquippedItem(context, character.equippedItemId!),
+                  Icon(Icons.favorite, color: Colors.pink.shade300, size: 18),
+                  const SizedBox(width: 6),
+                  Text(
+                    '교감 포인트: ${character.emotionPoints}',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.pink.shade700,
+                    ),
+                  ),
                 ],
               ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              '감정 점수: ${character.emotionPoints}',
-              style: Theme.of(context).textTheme.titleMedium,
             ),
           ],
         );
       },
     );
   }
-
-  // ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼ 이 함수의 로직을 수정합니다 ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
-  Widget _buildEquippedItem(BuildContext context, String itemId) {
-    // FutureBuilder는 항상 위젯을 반환해야 합니다.
-    return FutureBuilder<StoreItem?>(
-      future: context.read<StoreService>().fetchItemById(itemId),
-      builder: (context, itemSnapshot) {
-        // 아이템 정보가 없거나, 로딩 중이거나, 에러가 발생하면 빈 위젯을 반환합니다.
-        if (!itemSnapshot.hasData || itemSnapshot.data == null) {
-          return const SizedBox.shrink();
-        }
-        final item = itemSnapshot.data!;
-        return Image.network(
-          item.imageUrl,
-          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-        );
-      },
-    );
-  }
-  // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ 이 함수의 로직을 수정합니다 ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 }

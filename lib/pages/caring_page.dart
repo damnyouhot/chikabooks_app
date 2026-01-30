@@ -1,18 +1,13 @@
+import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../config/reward_constants.dart';
 import '../main.dart';
-import '../models/character.dart';
-import '../models/furniture.dart';
-import '../services/character_service.dart';
-import '../services/furniture_service.dart';
-import 'dressup_page.dart';
-import 'feeding_page.dart';
-import 'furniture_page.dart';
-import 'rest_page.dart';
-import 'growth/study/study_tab.dart';
+import '../providers/character_status_provider.dart';
+import '../widgets/unicorn_sprite_widget.dart';
 
-/// 홈 화면 - 아이소메트릭 방 UI
+/// 홈 화면 - 캐릭터 교감 UI
 class CaringPage extends StatefulWidget {
   const CaringPage({super.key});
 
@@ -21,13 +16,20 @@ class CaringPage extends StatefulWidget {
 }
 
 class _CaringPageState extends State<CaringPage> with TickerProviderStateMixin {
-  // 캐릭터 터치/문지르기 애니메이션
+  // 유니콘 위젯 제어용 키
+  final GlobalKey<UnicornSpriteWidgetState> _unicornKey = GlobalKey();
+
+  // 캐릭터 터치 애니메이션
   late AnimationController _heartController;
   late Animation<double> _heartAnimation;
 
-  // 문지르기 감지용
-  int _petCount = 0;
-  DateTime? _lastPetTime;
+  // 말풍선 애니메이션
+  late AnimationController _dialogueController;
+  String _currentDialogue = '';
+  bool _showDialogue = false;
+
+  // 쿨타임 표시용 타이머
+  Timer? _cooldownTimer;
 
   @override
   void initState() {
@@ -40,77 +42,93 @@ class _CaringPageState extends State<CaringPage> with TickerProviderStateMixin {
       begin: 0.0,
       end: 1.0,
     ).animate(CurvedAnimation(parent: _heartController, curve: Curves.easeOut));
+
+    _dialogueController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+
+    // 쿨타임 갱신 타이머
+    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
   void dispose() {
     _heartController.dispose();
+    _dialogueController.dispose();
+    _cooldownTimer?.cancel();
     super.dispose();
   }
 
-  // 캐릭터 터치 시
-  void _onCharacterTap() async {
-    _heartController.forward(from: 0.0);
-    final message = await CharacterService.petCharacter();
-    if (mounted) {
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(
-          SnackBar(
-            content: Text(message),
-            duration: const Duration(seconds: 1),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-    }
-  }
+  /// 말풍선 표시
+  void _showDialogueBubble(String message) {
+    setState(() {
+      _currentDialogue = message;
+      _showDialogue = true;
+    });
+    _dialogueController.forward(from: 0.0);
 
-  // 일일 출석 체크
-  void _onCheckIn() async {
-    final message = await CharacterService.dailyCheckIn();
-    if (mounted) {
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(
-          SnackBar(
-            content: Text(message),
-            duration: const Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: AppColors.accent,
-          ),
-        );
-    }
-  }
-
-  // 캐릭터 문지르기 시
-  void _onCharacterPan(DragUpdateDetails details) async {
-    final now = DateTime.now();
-    if (_lastPetTime == null ||
-        now.difference(_lastPetTime!).inMilliseconds > 100) {
-      _petCount++;
-      _lastPetTime = now;
-
-      // 5번 문지를 때마다 하트 이펙트 + 포인트
-      if (_petCount % 5 == 0) {
-        _heartController.forward(from: 0.0);
-        final message = await CharacterService.petCharacter();
-        if (mounted) {
-          ScaffoldMessenger.of(context)
-            ..clearSnackBars()
-            ..showSnackBar(
-              SnackBar(
-                content: Text(message),
-                duration: const Duration(seconds: 1),
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-        }
+    // 3초 후 자동으로 사라짐
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) {
+        setState(() => _showDialogue = false);
       }
-    }
+    });
   }
 
-  void _onCharacterPanEnd(DragEndDetails details) {
-    _petCount = 0;
+  /// 캐릭터 터치 (쓰다듬기) - UnicornSpriteWidget의 onTap에서 호출됨
+  void _onCharacterTap() async {
+    final provider = context.read<CharacterStatusProvider>();
+    final message = await provider.pet();
+
+    _heartController.forward(from: 0.0);
+    _showDialogueBubble(message);
+    
+    // playTouchReaction()은 UnicornSpriteWidget 내부에서 이미 호출됨
+    // 이중 호출 방지를 위해 여기서는 호출하지 않음
+  }
+
+  /// 확인하기 버튼
+  void _onCheck() async {
+    final provider = context.read<CharacterStatusProvider>();
+    final message = await provider.checkCharacter();
+    _showDialogueBubble(message);
+  }
+
+  /// 일반식 먹기
+  void _onEatMeal() async {
+    final provider = context.read<CharacterStatusProvider>();
+    
+    // 포만감 100이면 거부 애니메이션
+    if (provider.fullness >= 100) {
+      _unicornKey.currentState?.playNo();
+      _showDialogueBubble('배가 너무 불러요~ 🙅');
+      return;
+    }
+    
+    final message = await provider.eatMeal();
+    _showDialogueBubble(message);
+    // 먹기 애니메이션 재생
+    _unicornKey.currentState?.playEating();
+  }
+
+  /// 간식 먹기
+  void _onEatSnack() async {
+    final provider = context.read<CharacterStatusProvider>();
+    
+    // 포만감 100이면 거부 애니메이션
+    if (provider.fullness >= 100) {
+      _unicornKey.currentState?.playNo();
+      _showDialogueBubble('배가 너무 불러요~ 🙅');
+      return;
+    }
+    
+    final message = await provider.eatSnack();
+    _showDialogueBubble(message);
+    // 먹기 애니메이션 재생
+    _unicornKey.currentState?.playEating();
   }
 
   @override
@@ -120,137 +138,335 @@ class _CaringPageState extends State<CaringPage> with TickerProviderStateMixin {
       return const Center(child: Text('로그인이 필요합니다.'));
     }
 
-    return StreamBuilder<Character?>(
-      stream: CharacterService.watchCharacter(user.uid),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return Container(
-            color: AppColors.background,
-            child: const Center(child: CircularProgressIndicator()),
-          );
-        }
-        final character = snapshot.data!;
-        return _buildHomeUI(context, character);
+    return Consumer<CharacterStatusProvider>(
+      builder: (context, status, _) {
+        return Stack(
+          children: [
+            // 배경 이미지 (화면 꽉 채우기, 좌우 잘림)
+            Positioned.fill(
+              child: Image.asset(
+                'assets/dreamy background/dreamy background.png',
+                fit: BoxFit.cover,
+                alignment: Alignment.center,
+              ),
+            ),
+            // 콘텐츠
+            SafeArea(
+              child: Column(
+                children: [
+                  // 상단: 상태 바들
+                  _buildStatusBars(status),
+
+                  // 중앙: 캐릭터 + 말풍선
+                  Expanded(child: _buildCharacterArea(status)),
+
+                  // 하단: 액션 버튼들
+                  _buildActionButtons(status),
+                ],
+              ),
+            ),
+          ],
+        );
       },
     );
   }
 
-  Widget _buildHomeUI(BuildContext context, Character character) {
-    final screenSize = MediaQuery.of(context).size;
-
+  /// 상단 상태 바들
+  Widget _buildStatusBars(CharacterStatusProvider status) {
     return Container(
-      color: AppColors.background,
-      child: SafeArea(
-        child: Column(
-          children: [
-            // 상단 헤더 (레벨, 포인트)
-            _buildHeader(character),
-
-            // 중앙: 아이소메트릭 방 + 버튼들
-            Expanded(flex: 3, child: _buildRoomSection(context, screenSize)),
-
-            // 하단: 캐릭터 (터치/문지르기)
-            Expanded(flex: 2, child: _buildCharacterSection(character)),
-          ],
-        ),
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.85),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // 포만감
+          _buildStatusBar(
+            icon: Icons.restaurant,
+            label: '포만감',
+            value: status.fullness,
+            color: Colors.orange,
+          ),
+          const SizedBox(height: 8),
+          // 애정도
+          _buildStatusBar(
+            icon: Icons.favorite,
+            label: '애정도',
+            value: status.affection,
+            color: Colors.pinkAccent,
+          ),
+          const SizedBox(height: 8),
+          // 건강
+          _buildStatusBar(
+            icon: Icons.health_and_safety,
+            label: '건강',
+            value: status.health,
+            color: Colors.green,
+          ),
+          const SizedBox(height: 8),
+          // 정신력
+          _buildStatusBar(
+            icon: Icons.psychology,
+            label: '정신',
+            value: status.spirit,
+            color: Colors.purple,
+          ),
+          const SizedBox(height: 8),
+          // 지혜 (무제한이라 다르게 표시)
+          _buildWisdomBar(status.wisdom),
+        ],
       ),
     );
   }
 
-  /// 상단 헤더: 레벨 (좌) / 출석 (중) / 포인트 (우)
-  Widget _buildHeader(Character character) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // 레벨 배지
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.black87,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.star, color: AppColors.gold, size: 18),
-                const SizedBox(width: 4),
-                Text(
-                  'Lv. ${character.level}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
+  Widget _buildStatusBar({
+    required IconData icon,
+    required String label,
+    required double value,
+    required Color color,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, color: color, size: 20),
+        const SizedBox(width: 8),
+        SizedBox(
+          width: 50,
+          child: Text(
+            label,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+          ),
+        ),
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: LinearProgressIndicator(
+              value: value / 100,
+              backgroundColor: Colors.grey[300],
+              valueColor: AlwaysStoppedAnimation<Color>(color),
+              minHeight: 12,
             ),
           ),
-          // 출석 체크 버튼
-          GestureDetector(
-            onTap: _onCheckIn,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.accent,
-                borderRadius: BorderRadius.circular(20),
+        ),
+        const SizedBox(width: 8),
+        SizedBox(
+          width: 40,
+          child: Text(
+            '${value.toInt()}',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+            textAlign: TextAlign.right,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWisdomBar(double wisdom) {
+    return Row(
+      children: [
+        const Icon(Icons.auto_stories, color: Colors.amber, size: 20),
+        const SizedBox(width: 8),
+        const SizedBox(
+          width: 50,
+          child: Text(
+            '지혜',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+          ),
+        ),
+        Expanded(
+          child: Container(
+            height: 12,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              gradient: const LinearGradient(
+                colors: [Colors.amber, Colors.orange],
               ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
+            ),
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: Text(
+                '${wisdom.toInt()} ✨',
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        const SizedBox(
+          width: 40,
+          child: Text(
+            '∞',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Colors.amber,
+            ),
+            textAlign: TextAlign.right,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 중앙: 캐릭터 영역 (배경 단상 위에 배치 + 그림자)
+  Widget _buildCharacterArea(CharacterStatusProvider status) {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        // 감정 상태 배지
+        Positioned(top: 10, child: _buildEmotionBadge(status.currentEmotion)),
+
+        // 캐릭터 + 그림자 (터치 가능) - 단상 위에 배치
+        Positioned(
+          bottom: 20,  // 단상 위에 위치하도록 조정
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 말풍선
+              if (_showDialogue)
+                FadeTransition(
+                  opacity: _dialogueController,
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 250),
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.95),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.15),
+                          blurRadius: 15,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Text(
+                      _currentDialogue,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+
+              // 유니콘 캐릭터 + 하트 이펙트
+              Stack(
+                alignment: Alignment.center,
                 children: [
-                  Icon(Icons.calendar_today, color: Colors.white, size: 16),
-                  SizedBox(width: 4),
-                  Text(
-                    '출석',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
+                  UnicornSpriteWidget(
+                    key: _unicornKey,
+                    size: 280,  // 단상에 맞게 크기 조정
+                    fps: 12,
+                    showDialogue: false,
+                    onTap: _onCharacterTap,  // 터치 콜백을 여기서 전달
+                  ),
+
+                  // 하트 이펙트
+                  Positioned(
+                    top: -20,
+                    child: FadeTransition(
+                      opacity: _heartAnimation,
+                      child: SlideTransition(
+                        position: _heartAnimation.drive(
+                          Tween(
+                            begin: const Offset(0, 0),
+                            end: const Offset(0, -1.5),
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.favorite,
+                          color: Colors.pinkAccent,
+                          size: 40,
+                        ),
+                      ),
                     ),
                   ),
                 ],
               ),
-            ),
+
+              // 쓰다듬기 상태
+              const SizedBox(height: 15),
+              _buildPetStatus(status),
+            ],
           ),
-          // 포인트 배지
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.black87,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 18,
-                  height: 18,
-                  decoration: const BoxDecoration(
-                    color: AppColors.gold,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Center(
-                    child: Text(
-                      '\$',
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  '${character.emotionPoints}P',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmotionBadge(CharacterEmotion emotion) {
+    String label;
+    Color color;
+    IconData icon;
+
+    switch (emotion) {
+      case CharacterEmotion.burnout:
+        label = '번아웃';
+        color = Colors.grey;
+        icon = Icons.battery_0_bar;
+        break;
+      case CharacterEmotion.hungry:
+        label = '배고파요';
+        color = Colors.orange;
+        icon = Icons.restaurant;
+        break;
+      case CharacterEmotion.lonely:
+        label = '외로워요';
+        color = Colors.blue;
+        icon = Icons.sentiment_dissatisfied;
+        break;
+      case CharacterEmotion.bestCondition:
+        label = '최고 컨디션!';
+        color = Colors.green;
+        icon = Icons.star;
+        break;
+      case CharacterEmotion.idle:
+        label = '평온해요';
+        color = AppColors.accent;
+        icon = Icons.sentiment_satisfied;
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 16),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
             ),
           ),
         ],
@@ -258,228 +474,142 @@ class _CaringPageState extends State<CaringPage> with TickerProviderStateMixin {
     );
   }
 
-  /// 중앙 섹션: 아이소메트릭 방 + 가구 + 버튼들
-  Widget _buildRoomSection(BuildContext context, Size screenSize) {
-    return StreamBuilder<List<PlacedFurniture>>(
-      stream: FurnitureService.watchPlacedFurniture(),
-      builder: (context, furnitureSnapshot) {
-        final placedFurniture = furnitureSnapshot.data ?? [];
-
-        return Center(
-          child: AspectRatio(
-            aspectRatio: 1.0,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                // 아이소메트릭 방 배경 이미지
-                Positioned.fill(
-                  child: Image.asset(
-                    'assets/home/home_basic.png',
-                    fit: BoxFit.contain,
-                  ),
-                ),
-
-                // 배치된 가구들 표시
-                ...placedFurniture.map((placed) {
-                  return _buildPlacedFurniture(placed, screenSize.width);
-                }),
-
-                // 가구 상점 버튼 (우측 상단)
-                Positioned(
-                  top: screenSize.width * 0.05,
-                  right: screenSize.width * 0.05,
-                  child: _buildRoomButton(
-                    context,
-                    label: '🛋️ 가구',
-                    onTap:
-                        () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const FurniturePage(),
-                          ),
-                        ),
-                  ),
-                ),
-
-                // 공부 버튼 (책상 위치 - 좌측 상단)
-                Positioned(
-                  top: screenSize.width * 0.18,
-                  left: screenSize.width * 0.12,
-                  child: _buildRoomButton(
-                    context,
-                    label: '공부',
-                    onTap:
-                        () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const StudyTab()),
-                        ),
-                  ),
-                ),
-
-                // 꾸미기 버튼 (옷장 위치 - 중앙 상단)
-                Positioned(
-                  top: screenSize.width * 0.22,
-                  left: screenSize.width * 0.30,
-                  child: _buildRoomButton(
-                    context,
-                    label: '꾸미기',
-                    onTap:
-                        () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const DressUpPage(),
-                          ),
-                        ),
-                  ),
-                ),
-
-                // 휴식 버튼 (침대 위치 - 좌측)
-                Positioned(
-                  top: screenSize.width * 0.32,
-                  left: screenSize.width * 0.02,
-                  child: _buildRoomButton(
-                    context,
-                    label: '휴식',
-                    onTap:
-                        () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const RestPage()),
-                        ),
-                  ),
-                ),
-
-                // 밥먹기 버튼 (식탁 위치 - 중앙 하단)
-                Positioned(
-                  top: screenSize.width * 0.48,
-                  left: screenSize.width * 0.28,
-                  child: _buildRoomButton(
-                    context,
-                    label: '밥먹기',
-                    onTap:
-                        () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const FeedingPage(),
-                          ),
-                        ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  /// 배치된 가구 위젯 (아이소메트릭 좌표로 변환)
-  Widget _buildPlacedFurniture(PlacedFurniture placed, double roomSize) {
-    final definition = placed.definition;
-    if (definition == null) return const SizedBox.shrink();
-
-    // 아이소메트릭 타일 크기 (방 이미지 기준)
-    const tileHeight = 0.12; // 타일 높이 비율
-
-    // gridY에 따른 세로 위치 계산 (2칸씩 차지)
-    final baseY = 0.15 + (placed.gridY * tileHeight * 2);
-
-    // L(왼쪽 벽) / R(오른쪽 벽)에 따른 가로 위치
-    double baseX;
-    if (definition.direction == FurnitureDirection.L) {
-      // 왼쪽 벽: 왼쪽에서 약간 안쪽으로
-      baseX = 0.02 + (placed.gridY * 0.08); // 아이소메트릭 보정
-    } else {
-      // 오른쪽 벽: 오른쪽에서 약간 안쪽으로
-      baseX = 0.55 - (placed.gridY * 0.08); // 아이소메트릭 보정
+  Widget _buildPetStatus(CharacterStatusProvider status) {
+    if (!status.canPet) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.grey[200],
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          '쉬는 중... ${status.petCooldownRemaining}초',
+          style: const TextStyle(fontSize: 12, color: Colors.grey),
+        ),
+      );
     }
 
-    return Positioned(
-      top: roomSize * baseY,
-      left: roomSize * baseX,
-      child: Image.asset(
-        definition.assetPath,
-        width: roomSize * 0.25,
-        height: roomSize * 0.25,
-        fit: BoxFit.contain,
-        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.pink[50],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('터치해서 쓰다듬기 ', style: TextStyle(fontSize: 12)),
+          ...List.generate(
+            CharacterStats.petMaxConsecutive,
+            (i) => Icon(
+              Icons.favorite,
+              size: 14,
+              color: i < status.petCount ? Colors.pinkAccent : Colors.grey[300],
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  /// 방 안의 인터랙티브 버튼
-  Widget _buildRoomButton(
-    BuildContext context, {
+  /// 하단: 액션 버튼들
+  Widget _buildActionButtons(CharacterStatusProvider status) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.9),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // 첫 번째 줄: 확인하기, 일반식, 간식
+          Row(
+            children: [
+              Expanded(
+                child: _buildActionButton(
+                  icon: Icons.visibility,
+                  label: '확인하기',
+                  sublabel: '${status.checkRemaining}회 남음',
+                  color: Colors.blue,
+                  onTap: status.canCheck ? _onCheck : null,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildActionButton(
+                  icon: Icons.restaurant,
+                  label: '일반식',
+                  sublabel: '+${CharacterStats.mealFullnessIncrease.toInt()}',
+                  color: Colors.orange,
+                  onTap: _onEatMeal,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildActionButton(
+                  icon: Icons.cookie,
+                  label: '간식',
+                  sublabel: '+${CharacterStats.snackFullnessIncrease.toInt()}',
+                  color: Colors.amber,
+                  onTap: _onEatSnack,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButton({
+    required IconData icon,
     required String label,
-    required VoidCallback onTap,
+    required String sublabel,
+    required Color color,
+    VoidCallback? onTap,
   }) {
+    final isDisabled = onTap == null;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.7),
+          color: isDisabled ? Colors.grey[200] : color.withOpacity(0.15),
           borderRadius: BorderRadius.circular(16),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
+          border: Border.all(
+            color: isDisabled ? Colors.grey[300]! : color.withOpacity(0.3),
           ),
         ),
-      ),
-    );
-  }
-
-  /// 하단 섹션: 캐릭터 (터치/문지르기)
-  Widget _buildCharacterSection(Character character) {
-    // 감정 점수에 따른 캐릭터 이미지
-    String assetPath;
-    if (character.emotionPoints < 100) {
-      assetPath = 'assets/characters/chick_lv1.png';
-    } else if (character.emotionPoints < 200) {
-      assetPath = 'assets/characters/chick_lv2.png';
-    } else if (character.emotionPoints < 400) {
-      assetPath = 'assets/characters/chick_lv3.png';
-    } else {
-      assetPath = 'assets/characters/chick_lv4.png';
-    }
-
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        // 캐릭터 (터치/문지르기 가능)
-        GestureDetector(
-          onTap: _onCharacterTap,
-          onPanUpdate: _onCharacterPan,
-          onPanEnd: _onCharacterPanEnd,
-          child: Image.asset(
-            assetPath,
-            width: 180,
-            height: 180,
-            fit: BoxFit.contain,
-          ),
-        ),
-
-        // 하트 이펙트
-        Positioned(
-          top: 0,
-          child: FadeTransition(
-            opacity: _heartAnimation.drive(CurveTween(curve: Curves.easeOut)),
-            child: SlideTransition(
-              position: _heartAnimation.drive(
-                Tween(begin: const Offset(0, 0), end: const Offset(0, -1.5)),
-              ),
-              child: const Icon(
-                Icons.favorite,
-                color: Colors.pinkAccent,
-                size: 40,
+        child: Column(
+          children: [
+            Icon(icon, color: isDisabled ? Colors.grey : color, size: 28),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: isDisabled ? Colors.grey : Colors.black87,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
               ),
             ),
-          ),
+            Text(
+              sublabel,
+              style: TextStyle(
+                color: isDisabled ? Colors.grey : color,
+                fontSize: 10,
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }

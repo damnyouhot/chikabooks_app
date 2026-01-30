@@ -16,6 +16,7 @@ import 'pages/caring_page.dart';
 import 'pages/growth/growth_page.dart';
 import 'pages/job_page.dart';
 import 'pages/store/store_tab.dart' as store;
+import 'providers/character_status_provider.dart';
 import 'services/ebook_service.dart';
 import 'services/job_service.dart';
 import 'services/store_service.dart';
@@ -42,7 +43,7 @@ Future<void> main() async {
   }
 
   // 네이버 맵 SDK 초기화
-  await NaverMapSdk.instance.initialize(clientId: 'w3ep74sghk');
+  await NaverMapSdk.instance.initialize(clientId: '3amqdx6zuh');
 
   runApp(
     MultiProvider(
@@ -52,6 +53,7 @@ Future<void> main() async {
           initialData: null,
         ),
         ChangeNotifierProvider(create: (_) => JobFilterNotifier()),
+        ChangeNotifierProvider(create: (_) => CharacterStatusProvider()),
         Provider(create: (_) => JobService()),
         Provider(create: (_) => EbookService()),
         Provider(create: (_) => StoreService()),
@@ -178,8 +180,9 @@ class MyHome extends StatefulWidget {
   State<MyHome> createState() => _MyHomeState();
 }
 
-class _MyHomeState extends State<MyHome> {
+class _MyHomeState extends State<MyHome> with WidgetsBindingObserver {
   int _selectedIndex = 0;
+  bool _initialized = false;
 
   // 4탭 구조: 홈, 스토어, 성장, 구직
   static const _pages = [
@@ -188,6 +191,37 @@ class _MyHomeState extends State<MyHome> {
     GrowthPage(), // 성장
     JobPage(), // 구직
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _initializeCharacterStatus();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// 앱 라이프사이클 변경 감지
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final provider = context.read<CharacterStatusProvider>();
+    if (state == AppLifecycleState.paused) {
+      provider.onAppPause();
+    } else if (state == AppLifecycleState.resumed) {
+      provider.onAppResume();
+    }
+  }
+
+  Future<void> _initializeCharacterStatus() async {
+    if (!_initialized) {
+      await context.read<CharacterStatusProvider>().initialize();
+      _initialized = true;
+    }
+  }
 
   void _onTap(int idx) => setState(() => _selectedIndex = idx);
 
