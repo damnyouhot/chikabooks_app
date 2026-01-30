@@ -110,12 +110,133 @@ class EbookDetailPage extends StatelessWidget {
   }
 
   void _onReadPressed(BuildContext context) {
-    // TODO: 추후 IAP 결제 로직 추가
-    // if (ebook.price > 0 && !isPurchased) {
-    //   // 결제 진행
-    // }
-    
-    // 파일 형식에 따라 적절한 뷰어로 이동
+    // 유료 책인 경우 구매 완료 팝업 표시
+    if (ebook.price > 0) {
+      _showPurchaseCompleteDialog(context);
+    } else {
+      // 무료 책은 바로 읽기
+      _navigateToReader(context);
+    }
+  }
+
+  /// 구매 완료 후 동선 팝업
+  void _showPurchaseCompleteDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 성공 아이콘
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: Colors.green[50],
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.check_circle,
+                  size: 50,
+                  color: Colors.green[600],
+                ),
+              ),
+              const SizedBox(height: 20),
+              
+              // 제목
+              const Text(
+                '구매 완료! 🎉',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              
+              // 책 제목
+              Text(
+                ebook.title,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[700],
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              // 안내 메시지
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue[50],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, size: 20, color: Colors.blue[700]),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '구매한 책은 "내 서재"에서 언제든 다시 읽을 수 있어요!',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.blue[800],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              
+              // 버튼들
+              Row(
+                children: [
+                  // 내 서재로 가기
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.of(ctx).pop(); // 팝업 닫기
+                        Navigator.of(context).pop(); // 상세 페이지 닫기
+                        // 내 서재로 이동하는 콜백이 필요하지만, 
+                        // 현재는 단순히 뒤로가기로 처리
+                      },
+                      icon: const Icon(Icons.library_books, size: 18),
+                      label: const Text('내 서재'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // 바로 읽기
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () {
+                        Navigator.of(ctx).pop(); // 팝업 닫기
+                        _navigateToReader(context);
+                      },
+                      icon: const Icon(Icons.auto_stories, size: 18),
+                      label: const Text('바로 읽기'),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 리더 페이지로 이동
+  void _navigateToReader(BuildContext context) {
     Navigator.push(
       context,
       MaterialPageRoute(
