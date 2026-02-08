@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import '../../models/job.dart';
 import '../../services/job_service.dart';
@@ -113,15 +114,51 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
           body: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              /* Map Preview & Job Info */
-              Container(
-                height: 180,
-                decoration: BoxDecoration(
+              /* Map Preview — 실제 Google Maps 미니맵 */
+              if (job.lat != 0 || job.lng != 0)
+                ClipRRect(
                   borderRadius: BorderRadius.circular(16),
-                  color: Colors.grey.shade200,
+                  child: SizedBox(
+                    height: 180,
+                    child: GoogleMap(
+                      initialCameraPosition: CameraPosition(
+                        target: LatLng(job.lat, job.lng),
+                        zoom: 15,
+                      ),
+                      markers: {
+                        Marker(
+                          markerId: const MarkerId('clinic'),
+                          position: LatLng(job.lat, job.lng),
+                        ),
+                      },
+                      zoomControlsEnabled: false,
+                      scrollGesturesEnabled: false,
+                      rotateGesturesEnabled: false,
+                      tiltGesturesEnabled: false,
+                      zoomGesturesEnabled: false,
+                      myLocationButtonEnabled: false,
+                      liteModeEnabled: true, // 정적 이미지로 렌더 (가볍고 빠름)
+                    ),
+                  ),
                 ),
-                child: const Center(child: Text('Map Preview')),
-              ),
+              if (job.address.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Row(
+                    children: [
+                      Icon(Icons.location_on,
+                          size: 16, color: Colors.grey[500]),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          job.address,
+                          style: TextStyle(
+                              fontSize: 13, color: Colors.grey[600]),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               const SizedBox(height: 12),
               Text(job.title,
                   style: const TextStyle(
