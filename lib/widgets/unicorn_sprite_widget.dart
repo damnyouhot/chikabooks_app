@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../models/unicorn.dart';
 
@@ -37,6 +38,7 @@ class UnicornSpriteWidget extends StatefulWidget {
   final int fps;
   final VoidCallback? onTap;
   final bool showDialogue;
+  final bool useGlow; // 발광 효과 여부
 
   const UnicornSpriteWidget({
     super.key,
@@ -45,6 +47,7 @@ class UnicornSpriteWidget extends StatefulWidget {
     this.fps = 12,
     this.onTap,
     this.showDialogue = true,
+    this.useGlow = true, // 기본값 true
   });
 
   @override
@@ -154,6 +157,7 @@ class UnicornSpriteWidgetState extends State<UnicornSpriteWidget> {
     final actionInfo = _actionInfoMap[action]!;
     for (int i = 0; i < actionInfo.frameCount; i++) {
       final frameNumber = (actionInfo.startFrame + i).toString().padLeft(4, '0');
+      // 파일명에 공백이 포함되어 있는지 주의 깊게 확인 (Image Sequence_...)
       final imagePath = 'assets/characters/unicorn1/${actionInfo.folder}/Image Sequence_${actionInfo.prefix}_$frameNumber.png';
       precacheImage(AssetImage(imagePath), context);
     }
@@ -210,7 +214,7 @@ class UnicornSpriteWidgetState extends State<UnicornSpriteWidget> {
           // idle2 재생
           if (_currentFrame < actionInfo.frameCount - 1) {
             _currentFrame++;
-          } else {
+        } else {
             // idle2 완료 → idle1로 돌아감
             _currentAction = UnicornAction.idle1;
             _currentFrame = 0;
@@ -358,6 +362,7 @@ class UnicornSpriteWidgetState extends State<UnicornSpriteWidget> {
   Widget build(BuildContext context) {
     final actionInfo = _actionInfoMap[_currentAction]!;
     final frameNumber = (actionInfo.startFrame + _currentFrame).toString().padLeft(4, '0');
+    // 파일명에 공백이 포함되어 있는지 주의 깊게 확인 (Image Sequence_...)
     final imagePath = 'assets/characters/unicorn1/${actionInfo.folder}/Image Sequence_${actionInfo.prefix}_$frameNumber.png';
 
     return Column(
@@ -367,29 +372,55 @@ class UnicornSpriteWidgetState extends State<UnicornSpriteWidget> {
         if (widget.showDialogue && _currentDialogue != null)
           _buildDialogueBubble(),
         
-        // 유니콘 스프라이트 (gaplessPlayback으로 깜빡임 방지)
+        // 유니콘 스프라이트
         GestureDetector(
           onTap: _onTap,
-          child: SizedBox(
-            width: widget.size,
-            height: widget.size,
-            child: Image.asset(
-              imagePath,
-              fit: BoxFit.contain,
-              gaplessPlayback: true,  // 이전 이미지 유지 (깜빡임 방지)
-              errorBuilder: (context, error, stackTrace) {
-                debugPrint('이미지 로드 실패: $imagePath');
-                return Container(
-                  color: Colors.grey[200],
-                  child: const Center(
-                    child: Icon(Icons.pets, size: 60, color: Colors.grey),
-                  ),
-                );
-              },
-            ),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // 1. 발광 효과 제거됨 (사용자 요청)
+
+              // 2. 메인 캐릭터 이미지
+              SizedBox(
+                width: widget.size,
+                height: widget.size,
+                child: Image.asset(
+                  imagePath,
+                  fit: BoxFit.contain,
+                  gaplessPlayback: true,
+                  errorBuilder: (context, error, stackTrace) {
+                    debugPrint('이미지 로드 실패: $imagePath');
+                    return Container(
+                      color: Colors.grey[200],
+                      child: const Center(
+                        child: Icon(Icons.pets, size: 60, color: Colors.grey),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
         ),
       ],
+    );
+  }
+
+  /// 발광 레이어 생성 (캐릭터 실루엣에 맞춤)
+  Widget _buildGlowLayer(String path, Color color, double sigma) {
+    return SizedBox(
+      width: widget.size + (sigma * 2),
+      height: widget.size + (sigma * 2),
+      child: ImageFiltered(
+        imageFilter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
+        child: Image.asset(
+          path,
+          fit: BoxFit.contain,
+          color: color,
+          colorBlendMode: BlendMode.srcATop,
+          gaplessPlayback: true,
+        ),
+      ),
     );
   }
 

@@ -61,35 +61,107 @@ class SelfCareTabState extends State<SelfCareTab> {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       children: [
-        Card(
-          child: ListTile(
-            leading: const Icon(Icons.directions_walk),
-            title: const Text('운동하기'),
-            subtitle: Text('걸음수: $_steps'),
-            trailing: ElevatedButton(
-              onPressed: _toggleExercise,
-              child: Text(_isExercising ? '종료' : '시작'),
-            ),
-          ),
+        _buildActionCard(
+          icon: Icons.directions_walk_rounded,
+          title: '운동하기',
+          subtitle: '오늘의 걸음수: $_steps',
+          buttonText: _isExercising ? '종료하기' : '시작하기',
+          color: Colors.greenAccent.shade700,
+          onPressed: _toggleExercise,
+          isActive: _isExercising,
         ),
-        Card(
-          child: ListTile(
-            leading: const Icon(Icons.bedtime),
-            title: const Text('수면 기록'),
-            subtitle: Text(
-              _sleepStart == null
-                  ? '수면 전'
-                  : '수면 중: ${DateTime.now().difference(_sleepStart!).inMinutes}분',
-            ),
-            trailing: ElevatedButton(
-              onPressed: _toggleSleep,
-              child: Text(_sleepStart == null ? '시작' : '종료'),
-            ),
-          ),
+        const SizedBox(height: 16),
+        _buildActionCard(
+          icon: Icons.bedtime_rounded,
+          title: '수면 기록',
+          subtitle: _sleepStart == null
+              ? '편안한 잠자리를 준비하세요'
+              : '수면 중: ${DateTime.now().difference(_sleepStart!).inMinutes}분 경과',
+          buttonText: _sleepStart == null ? '수면 시작' : '수면 종료',
+          color: Colors.indigoAccent,
+          onPressed: _toggleSleep,
+          isActive: _sleepStart != null,
         ),
       ],
+    );
+  }
+
+  Widget _buildActionCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required String buttonText,
+    required Color color,
+    required VoidCallback onPressed,
+    required bool isActive,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(20),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(icon, color: color, size: 28),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          ElevatedButton(
+            onPressed: onPressed,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isActive ? Colors.grey[100] : color,
+              foregroundColor: isActive ? Colors.black54 : Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            child: Text(
+              buttonText,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -1,8 +1,4 @@
-import 'package:badges/badges.dart' as badges; // 뱃지 패키지 import
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'ebook_list_page.dart';
 import 'mydesk_tab.dart';
 
 class StudyTab extends StatelessWidget {
@@ -24,36 +20,15 @@ class StudyTab extends StatelessWidget {
                     onPressed: () => Navigator.pop(context),
                   )
                   : null,
-          title: const Text('공부하기'),
-          bottom: TabBar(
+          title: const Text('나의 기록'),
+          bottom: const TabBar(
             tabs: [
-              const Tab(text: '나의 서재'),
-              // ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼ 쿠폰 갯수를 보여주는 뱃지 추가 ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
-              StreamBuilder<QuerySnapshot>(
-                stream:
-                    FirebaseFirestore.instance
-                        .collection('users')
-                        .doc(FirebaseAuth.instance.currentUser!.uid)
-                        .collection('coupons')
-                        .where('isUsed', isEqualTo: false)
-                        .snapshots(),
-                builder: (context, snapshot) {
-                  final count = snapshot.data?.docs.length ?? 0;
-                  return badges.Badge(
-                    showBadge: count > 0,
-                    badgeContent: Text(
-                      '$count',
-                      style: const TextStyle(color: Colors.white, fontSize: 10),
-                    ),
-                    child: const Tab(text: '전자책 스토어'),
-                  );
-                },
-              ),
-              // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ 쿠폰 갯수를 보여주는 뱃지 추가 ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+              Tab(text: '나의 서재'),
+              Tab(text: '나의 노트'),
             ],
           ),
         ),
-        body: const TabBarView(children: [MyDeskTab(), EbookListPage()]),
+        body: const TabBarView(children: [MyDeskTab(), Center(child: Text('준비 중인 기능입니다.'))]),
       ),
     );
   }

@@ -1,7 +1,9 @@
 // lib/pages/ebook/ebook_detail_page.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../../models/ebook.dart';
+import '../../services/ebook_service.dart';
 import 'epub_reader_page.dart';
 import 'pdf_reader_page.dart';
 
@@ -109,10 +111,24 @@ class EbookDetailPage extends StatelessWidget {
     );
   }
 
-  void _onReadPressed(BuildContext context) {
-    // 유료 책인 경우 구매 완료 팝업 표시
+  Future<void> _onReadPressed(BuildContext context) async {
+    final ebookService = context.read<EbookService>();
+    
+    // 유료 책인 경우 구매 처리
     if (ebook.price > 0) {
-      _showPurchaseCompleteDialog(context);
+      try {
+        // Firestore에 구매 기록 저장
+        await ebookService.purchaseEbook(ebook.id);
+        if (context.mounted) {
+          _showPurchaseCompleteDialog(context);
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('구매 처리 중 오류가 발생했습니다: $e')),
+          );
+        }
+      }
     } else {
       // 무료 책은 바로 읽기
       _navigateToReader(context);

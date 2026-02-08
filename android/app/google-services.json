@@ -41,6 +41,43 @@
           ]
         }
       }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:215876124758:android:348adb3bac7ac6c7723bf7",
+        "android_client_info": {
+          "package_name": "com.chikabooks.tenth"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "215876124758-5qbbnfkigab2giadmcd4b6beivts1bif.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.chikabooks.tenth",
+            "certificate_hash": "62a8fc427be2eb6b3d0135b6fda6528fa7dfe3ae"
+          }
+        },
+        {
+          "client_id": "215876124758-kjskotu3j5ljbn8vo7sjrh417krndodd.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAFSsIsl1dtspv1l7r8v6zNHo28TfGwZwM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "215876124758-dgrun2571e7uuscf9pa22rubruae2elb.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
     }
   ],
   "configuration_version": "1"

@@ -26,35 +26,47 @@ class _StoreTabState extends State<StoreTab> {
     final iapService = IapService.instance;
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FE),
       appBar: AppBar(
-        title: const Text('e-Book'),
+        title: const Text(
+          'e-Book Store',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
+        backgroundColor: Colors.transparent,
       ),
       body: Column(
         children: [
           // 세그먼트 토글
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.grey[200],
-                borderRadius: BorderRadius.circular(12),
+                color: Colors.white.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.02),
+                    blurRadius: 10,
+                  ),
+                ],
               ),
-              padding: const EdgeInsets.all(4),
+              padding: const EdgeInsets.all(6),
               child: Row(
                 children: [
                   Expanded(
                     child: _SegmentButton(
                       label: '스토어',
-                      icon: Icons.storefront,
+                      icon: Icons.storefront_rounded,
                       isSelected: !_showMyLibrary,
                       onTap: () => setState(() => _showMyLibrary = false),
                     ),
                   ),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: _SegmentButton(
                       label: '내 서재',
-                      icon: Icons.library_books,
+                      icon: Icons.library_books_rounded,
                       isSelected: _showMyLibrary,
                       onTap: () => setState(() => _showMyLibrary = true),
                     ),
@@ -76,7 +88,6 @@ class _StoreTabState extends State<StoreTab> {
   }
 }
 
-/// 세그먼트 버튼 위젯
 class _SegmentButton extends StatelessWidget {
   final String label;
   final IconData icon;
@@ -95,17 +106,17 @@ class _SegmentButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        duration: const Duration(milliseconds: 300),
+        padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.white : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
+          color: isSelected ? const Color(0xFF6C63FF) : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
+                    color: const Color(0xFF6C63FF).withOpacity(0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
                   ),
                 ]
               : null,
@@ -115,15 +126,15 @@ class _SegmentButton extends StatelessWidget {
           children: [
             Icon(
               icon,
-              size: 18,
-              color: isSelected ? Colors.brown[700] : Colors.grey[600],
+              size: 20,
+              color: isSelected ? Colors.white : Colors.grey[400],
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 8),
             Text(
               label,
               style: TextStyle(
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected ? Colors.brown[700] : Colors.grey[600],
+                color: isSelected ? Colors.white : Colors.grey[500],
               ),
             ),
           ],
@@ -133,10 +144,8 @@ class _SegmentButton extends StatelessWidget {
   }
 }
 
-/// 스토어 뷰 (전체 책 목록 + 큐레이션)
 class _StoreView extends StatelessWidget {
   final EbookService service;
-
   const _StoreView({required this.service});
 
   @override
@@ -152,7 +161,6 @@ class _StoreView extends StatelessWidget {
           return const Center(child: Text('등록된 전자책이 없습니다.'));
         }
 
-        // 카테고리별 분류
         final freeBooks = books.where((b) => b.price == 0).toList();
         final newBooks = books.toList()
           ..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
@@ -162,12 +170,9 @@ class _StoreView extends StatelessWidget {
           onRefresh: () async {},
           child: CustomScrollView(
             slivers: [
-              // 배너/히어로 섹션
               SliverToBoxAdapter(
-                child: _buildHeroBanner(context, books.isNotEmpty ? books.first : null),
+                child: _buildHeroBanner(context),
               ),
-
-              // 신간 섹션
               if (recentBooks.isNotEmpty) ...[
                 SliverToBoxAdapter(
                   child: _buildSectionHeader('📚 신간 도서', null),
@@ -176,8 +181,6 @@ class _StoreView extends StatelessWidget {
                   child: _buildHorizontalBookList(context, recentBooks),
                 ),
               ],
-
-              // 무료 책 섹션
               if (freeBooks.isNotEmpty) ...[
                 SliverToBoxAdapter(
                   child: _buildSectionHeader('🎁 무료 도서', null),
@@ -186,8 +189,6 @@ class _StoreView extends StatelessWidget {
                   child: _buildHorizontalBookList(context, freeBooks),
                 ),
               ],
-
-              // 전체 책 그리드
               SliverToBoxAdapter(
                 child: _buildSectionHeader('📖 전체 도서', '${books.length}권'),
               ),
@@ -214,34 +215,31 @@ class _StoreView extends StatelessWidget {
     );
   }
 
-  /// 히어로 배너
-  Widget _buildHeroBanner(BuildContext context, Ebook? featuredBook) {
+  Widget _buildHeroBanner(BuildContext context) {
     return Container(
       margin: const EdgeInsets.all(16),
-      height: 160,
+      height: 180,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: LinearGradient(
-          colors: [Colors.brown[700]!, Colors.brown[400]!],
+        borderRadius: BorderRadius.circular(28),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF6C63FF), Color(0xFF8E87FF)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
       ),
       child: Stack(
         children: [
-          // 배경 패턴
           Positioned(
-            right: -20,
-            bottom: -20,
+            right: -30,
+            bottom: -30,
             child: Icon(
-              Icons.menu_book,
-              size: 120,
-              color: Colors.white.withOpacity(0.1),
+              Icons.auto_stories_rounded,
+              size: 180,
+              color: Colors.white.withOpacity(0.15),
             ),
           ),
-          // 콘텐츠
           Padding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
@@ -250,7 +248,7 @@ class _StoreView extends StatelessWidget {
                   '치과 전문 전자책 📖',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 20,
+                    fontSize: 22,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -259,24 +257,7 @@ class _StoreView extends StatelessWidget {
                   '치과인을 위한 전문 도서를\n언제 어디서나 편리하게',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.9),
-                    fontSize: 13,
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '신간 보러가기 →',
-                    style: TextStyle(
-                      color: Colors.brown[700],
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    fontSize: 14,
                   ),
                 ),
               ],
@@ -287,7 +268,6 @@ class _StoreView extends StatelessWidget {
     );
   }
 
-  /// 섹션 헤더
   Widget _buildSectionHeader(String title, String? count) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -296,25 +276,18 @@ class _StoreView extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
           if (count != null)
             Text(
               count,
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey[600],
-              ),
+              style: TextStyle(fontSize: 13, color: Colors.grey[600]),
             ),
         ],
       ),
     );
   }
 
-  /// 수평 책 리스트 (큐레이션용)
   Widget _buildHorizontalBookList(BuildContext context, List<Ebook> books) {
     return SizedBox(
       height: 200,
@@ -323,11 +296,10 @@ class _StoreView extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         itemCount: books.length,
         itemBuilder: (context, i) {
-          final book = books[i];
           return Container(
             width: 120,
-            margin: EdgeInsets.only(right: i < books.length - 1 ? 12 : 0),
-            child: _MiniBookCard(book: book),
+            margin: const EdgeInsets.only(right: 12),
+            child: _MiniBookCard(book: books[i]),
           );
         },
       ),
@@ -335,11 +307,9 @@ class _StoreView extends StatelessWidget {
   }
 }
 
-/// 내 서재 뷰 (구매한 책 목록 + 정렬/진행률)
 class _MyLibraryView extends StatefulWidget {
   final EbookService service;
   final IapService iapService;
-
   const _MyLibraryView({required this.service, required this.iapService});
 
   @override
@@ -347,161 +317,46 @@ class _MyLibraryView extends StatefulWidget {
 }
 
 class _MyLibraryViewState extends State<_MyLibraryView> {
-  String _sortBy = 'recent'; // 'recent', 'title', 'progress'
+  String _sortBy = 'recent';
 
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return const Center(child: Text('로그인이 필요합니다'));
 
-    if (user == null) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.login, size: 64, color: Colors.grey[400]),
-            const SizedBox(height: 16),
-            const Text('로그인이 필요합니다'),
-          ],
-        ),
-      );
-    }
+    return StreamBuilder<List<String>>(
+      stream: widget.service.watchPurchasedEbookIds(),
+      builder: (context, purchasedSnap) {
+        final purchasedIds = purchasedSnap.data ?? [];
+        return StreamBuilder<List<Ebook>>(
+          stream: widget.service.watchEbooks(),
+          builder: (context, snap) {
+            if (snap.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            final allBooks = snap.data ?? [];
+            final purchasedBooks = allBooks.where((book) {
+              return book.price == 0 || purchasedIds.contains(book.id);
+            }).toList();
 
-    return StreamBuilder<List<Ebook>>(
-      stream: widget.service.watchEbooks(),
-      builder: (context, snap) {
-        if (snap.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
+            if (purchasedBooks.isEmpty) {
+              return const Center(child: Text('구매한 책이 없습니다'));
+            }
 
-        final allBooks = snap.data ?? [];
-        // 구매한 책만 필터링
-        var purchasedBooks = allBooks.where((book) {
-          return book.price == 0 || widget.iapService.isPurchased(book.productId);
-        }).toList();
-
-        // 정렬 적용
-        purchasedBooks = _sortBooks(purchasedBooks);
-
-        if (purchasedBooks.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.library_books, size: 64, color: Colors.grey[400]),
-                const SizedBox(height: 16),
-                const Text('구매한 책이 없습니다'),
-                const SizedBox(height: 8),
-                Text(
-                  '스토어에서 책을 구매해보세요!',
-                  style: TextStyle(color: Colors.grey[600], fontSize: 13),
-                ),
-                const SizedBox(height: 16),
-                FilledButton.icon(
-                  onPressed: () {
-                    _StoreTabState? state;
-                    context.visitAncestorElements((element) {
-                      if (element is StatefulElement && element.state is _StoreTabState) {
-                        state = element.state as _StoreTabState;
-                        return false;
-                      }
-                      return true;
-                    });
-                    state?._switchToStore();
-                  },
-                  icon: const Icon(Icons.storefront),
-                  label: const Text('스토어 가기'),
-                ),
-              ],
-            ),
-          );
-        }
-
-        return Column(
-          children: [
-            // 정렬 필터 바
-            _buildSortBar(purchasedBooks.length),
-            
-            // 책 리스트
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: purchasedBooks.length,
-                itemBuilder: (context, i) {
-                  final book = purchasedBooks[i];
-                  return _LibraryBookCard(book: book);
-                },
-              ),
-            ),
-          ],
+            return ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: purchasedBooks.length,
+              itemBuilder: (context, i) => _LibraryBookCard(book: purchasedBooks[i]),
+            );
+          },
         );
       },
     );
   }
-
-  List<Ebook> _sortBooks(List<Ebook> books) {
-    switch (_sortBy) {
-      case 'title':
-        return books..sort((a, b) => a.title.compareTo(b.title));
-      case 'progress':
-        // TODO: 실제 진행률 데이터로 정렬 (현재는 랜덤)
-        return books;
-      case 'recent':
-      default:
-        return books..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
-    }
-  }
-
-  Widget _buildSortBar(int count) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.grey[50],
-        border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            '총 $count권',
-            style: TextStyle(
-              fontSize: 13,
-              color: Colors.grey[700],
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          // 정렬 드롭다운
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey[300]!),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _sortBy,
-                icon: const Icon(Icons.sort, size: 18),
-                style: TextStyle(fontSize: 13, color: Colors.grey[800]),
-                items: const [
-                  DropdownMenuItem(value: 'recent', child: Text('최근 추가순')),
-                  DropdownMenuItem(value: 'title', child: Text('제목순')),
-                  DropdownMenuItem(value: 'progress', child: Text('읽는 중')),
-                ],
-                onChanged: (value) {
-                  if (value != null) setState(() => _sortBy = value);
-                },
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
-/// 미니 책 카드 (수평 스크롤용)
 class _MiniBookCard extends StatelessWidget {
   final Ebook book;
-
   const _MiniBookCard({required this.book});
 
   @override
@@ -511,56 +366,23 @@ class _MiniBookCard extends StatelessWidget {
         context,
         MaterialPageRoute(builder: (_) => EbookDetailPage(ebook: book)),
       ),
-      borderRadius: BorderRadius.circular(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 표지
           Expanded(
             child: ClipRRect(
               borderRadius: BorderRadius.circular(10),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  book.coverUrl.isNotEmpty
-                      ? Image.network(
-                          book.coverUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => const _PlaceholderCover(),
-                        )
-                      : const _PlaceholderCover(),
-                  // 무료 뱃지
-                  if (book.price == 0)
-                    Positioned(
-                      top: 6,
-                      left: 6,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.green,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text(
-                          '무료',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
+              child: book.coverUrl.isNotEmpty
+                  ? Image.network(book.coverUrl, fit: BoxFit.cover)
+                  : Container(color: Colors.grey[200]),
             ),
           ),
           const SizedBox(height: 8),
-          // 제목
           Text(
             book.title,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+            style: const TextStyle(fontSize: 12),
           ),
         ],
       ),
@@ -568,10 +390,8 @@ class _MiniBookCard extends StatelessWidget {
   }
 }
 
-/// 스토어용 책 카드 (그리드)
 class _BookCard extends StatelessWidget {
   final Ebook book;
-
   const _BookCard({required this.book});
 
   @override
@@ -581,223 +401,56 @@ class _BookCard extends StatelessWidget {
         context,
         MaterialPageRoute(builder: (_) => EbookDetailPage(ebook: book)),
       ),
-      borderRadius: BorderRadius.circular(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 표지 이미지 (비율 유지)
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: AspectRatio(
-                aspectRatio: 0.7, // 일반적인 책 표지 비율 (가로:세로 = 7:10)
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          children: [
+            Expanded(
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                 child: book.coverUrl.isNotEmpty
-                    ? Image.network(
-                        book.coverUrl,
-                        fit: BoxFit.contain, // 비율 유지
-                        alignment: Alignment.center,
-                        errorBuilder: (_, __, ___) => const _PlaceholderCover(),
-                      )
-                    : const _PlaceholderCover(),
+                    ? Image.network(book.coverUrl, fit: BoxFit.cover)
+                    : Container(color: Colors.grey[200]),
               ),
             ),
-          ),
-          const SizedBox(height: 8),
-          // 제목
-          Text(
-            book.title,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text(
+                book.title,
+                maxLines: 2,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
             ),
-          ),
-          const SizedBox(height: 2),
-          // 가격
-          Text(
-            book.price == 0 ? '무료' : '${_formatPrice(book.price)}원',
-            style: TextStyle(
-              fontSize: 12,
-              color: book.price == 0 ? Colors.green[700] : Colors.brown[600],
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
-    );
-  }
-
-  String _formatPrice(int price) {
-    return price.toString().replaceAllMapped(
-      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-      (m) => '${m[1]},',
     );
   }
 }
 
-/// 내 서재용 책 카드 (리스트 + 진행률)
 class _LibraryBookCard extends StatelessWidget {
   final Ebook book;
-
   const _LibraryBookCard({required this.book});
-
-  // TODO: 실제 진행률 데이터 연동
-  double get _readProgress => 0.0; // 0.0 ~ 1.0
 
   @override
   Widget build(BuildContext context) {
-    final progressPercent = (_readProgress * 100).toInt();
-    
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: InkWell(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: ListTile(
+        leading: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: book.coverUrl.isNotEmpty
+              ? Image.network(book.coverUrl, width: 50, fit: BoxFit.cover)
+              : Container(width: 50, color: Colors.grey[200]),
+        ),
+        title: Text(book.title),
+        subtitle: Text(book.author),
         onTap: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => EbookDetailPage(ebook: book)),
-        ),
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              // 표지 (비율 유지) + 진행률 오버레이
-              Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: SizedBox(
-                      width: 70,
-                      height: 100,
-                      child: book.coverUrl.isNotEmpty
-                          ? Image.network(
-                              book.coverUrl,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const _PlaceholderCover(small: true),
-                            )
-                          : const _PlaceholderCover(small: true),
-                    ),
-                  ),
-                  // 진행률 바 (하단)
-                  Positioned(
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    child: Container(
-                      height: 4,
-                      decoration: BoxDecoration(
-                        borderRadius: const BorderRadius.only(
-                          bottomLeft: Radius.circular(8),
-                          bottomRight: Radius.circular(8),
-                        ),
-                        color: Colors.black.withOpacity(0.3),
-                      ),
-                      child: FractionallySizedBox(
-                        alignment: Alignment.centerLeft,
-                        widthFactor: _readProgress,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.green,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(width: 16),
-              // 정보
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      book.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      book.author,
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                        fontSize: 12,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    // 진행률 표시
-                    Row(
-                      children: [
-                        Icon(
-                          _readProgress > 0 ? Icons.auto_stories : Icons.book_outlined,
-                          size: 14,
-                          color: _readProgress > 0 ? Colors.green : Colors.grey,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          _readProgress > 0 ? '$progressPercent% 읽음' : '읽지 않음',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: _readProgress > 0 ? Colors.green[700] : Colors.grey[500],
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    // 읽기 버튼
-                    SizedBox(
-                      height: 32,
-                      child: FilledButton.icon(
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => EbookDetailPage(ebook: book)),
-                        ),
-                        icon: Icon(
-                          _readProgress > 0 ? Icons.play_arrow : Icons.menu_book,
-                          size: 16,
-                        ),
-                        label: Text(
-                          _readProgress > 0 ? '이어 읽기' : '읽기 시작',
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                        style: FilledButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// 표지 없을 때 플레이스홀더
-class _PlaceholderCover extends StatelessWidget {
-  final bool small;
-
-  const _PlaceholderCover({this.small = false});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: Colors.grey[200],
-      child: Center(
-        child: Icon(
-          Icons.book,
-          size: small ? 24 : 48,
-          color: Colors.grey[400],
         ),
       ),
     );

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_naver_map/flutter_naver_map.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import '../../models/job.dart';
 import '../../services/job_service.dart';
@@ -13,57 +13,69 @@ class JobMapScreen extends StatefulWidget {
 }
 
 class _JobMapScreenState extends State<JobMapScreen> {
-  NaverMapController? _mapController;
-  final Set<NMarker> _markers = {};
+  GoogleMapController? _mapController;
+  final Set<Marker> _markers = {};
   bool _isLoading = true;
 
-  static const _initialPosition = NCameraPosition(
-    target: NLatLng(37.5665, 126.9780), // 서울 시청
+  // 서울 시청 기본 위치
+  static const _initialPosition = CameraPosition(
+    target: LatLng(37.5665, 126.9780),
     zoom: 11,
   );
+
+  late final JobService _jobService;
 
   @override
   void initState() {
     super.initState();
-    _loadJobMarkers();
+    // Provider.of는 didChangeDependencies에서 사용하는 것이 안전
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _jobService = context.read<JobService>();
+    if (_isLoading) {
+      _loadJobMarkers();
+    }
   }
 
   Future<void> _loadJobMarkers() async {
-    final jobs = await context.read<JobService>().fetchJobs();
-    if (!mounted) return;
+    try {
+      final jobs = await _jobService.fetchJobs();
+      if (!mounted) return;
 
-    final newMarkers = <NMarker>{};
-    for (final job in jobs) {
-      // ───────────────────────────────────────────────────────────
-      final marker = NMarker(
-        id: job.id,
-        position: NLatLng(job.lat, job.lng),
-        caption: NOverlayCaption(text: job.clinicName),
-      );
-      // ⭐️ 탭 콜백은 이렇게 별도로 지정
-      marker.setOnTapListener((NOverlay overlay) {
-        _onMarkerTap(marker, job);
-      });
-      // ───────────────────────────────────────────────────────────
-      newMarkers.add(marker);
-    }
+      final newMarkers = <Marker>{};
+      for (final job in jobs) {
+        if (job.lat == 0 && job.lng == 0) continue; // 좌표 없는 공고 건너뜀
 
-    if (mounted) {
-      setState(() {
-        _markers.addAll(newMarkers);
-        _isLoading = false;
-      });
-      _mapController?.addOverlayAll(newMarkers);
+        final marker = Marker(
+          markerId: MarkerId(job.id),
+          position: LatLng(job.lat, job.lng),
+          infoWindow: InfoWindow(
+            title: job.clinicName,
+            snippet: job.title,
+            onTap: () => _onMarkerTap(job),
+          ),
+        );
+        newMarkers.add(marker);
+      }
+
+      if (mounted) {
+        setState(() {
+          _markers.addAll(newMarkers);
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('마커 로딩 실패: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
-  void _onMarkerTap(NMarker marker, Job job) {
-    _mapController?.updateCamera(
-      NCameraUpdate.scrollAndZoomTo(
-        target: marker.position,
-        zoom: 15,
-      ),
-    );
+  void _onMarkerTap(Job job) {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => JobDetailScreen(jobId: job.id)),
@@ -75,15 +87,13 @@ class _JobMapScreenState extends State<JobMapScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          NaverMap(
-            options: const NaverMapViewOptions(
-              initialCameraPosition: _initialPosition,
-            ),
-            onMapReady: (controller) {
+          GoogleMap(
+            initialCameraPosition: _initialPosition,
+            markers: _markers,
+            myLocationEnabled: false,
+            zoomControlsEnabled: true,
+            onMapCreated: (controller) {
               _mapController = controller;
-              if (_markers.isNotEmpty) {
-                _mapController?.addOverlayAll(_markers);
-              }
             },
           ),
           if (_isLoading) const Center(child: CircularProgressIndicator()),
