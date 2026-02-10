@@ -1,8 +1,7 @@
 import 'dart:async';
-import 'dart:math';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../models/unicorn.dart';
+import '../services/dialogue_service.dart';
 
 /// 유니콘 동작 타입
 enum UnicornAction {
@@ -113,34 +112,10 @@ class UnicornSpriteWidgetState extends State<UnicornSpriteWidget> {
   String? _currentDialogue;
   Timer? _dialogueTimer;
 
-  // 기본 대화 목록
-  static const List<String> _idleDialogues = [
-    '오늘 하루도 화이팅! ✨',
-    '뭐 하고 있어요?',
-    '저랑 같이 놀아요~',
-    '오늘 기분이 어때요?',
-    '힘내요! 응원할게요 💪',
-    '잠깐 쉬어가도 괜찮아요~',
-    '제가 옆에 있을게요 🦄',
-    '오늘도 수고했어요!',
-  ];
-
-  // 조언 목록
-  static const List<String> _adviceDialogues = [
-    '물 한 잔 마셔요! 💧',
-    '잠깐 스트레칭 어때요?',
-    '눈 좀 쉬게 해주세요 👀',
-    '깊게 숨 한번 쉬어봐요~',
-    '오늘 점심은 드셨어요?',
-    '자세 바르게! 허리 펴세요~',
-    '작은 목표부터 시작해봐요!',
-  ];
-
   @override
   void initState() {
     super.initState();
     _startIdleAnimation();
-    _startRandomDialogue();
   }
 
   @override
@@ -314,47 +289,19 @@ class UnicornSpriteWidgetState extends State<UnicornSpriteWidget> {
     });
   }
 
-  void _startRandomDialogue() {
-    _scheduleNextDialogue();
-  }
-
-  void _scheduleNextDialogue() {
-    final random = Random();
-    final delay = Duration(seconds: 15 + random.nextInt(16));
-    
+  /// 외부에서 호출: 행동에 맞는 대사를 말풍선에 표시
+  void showDialogue(String text) {
+    if (!mounted) return;
     _dialogueTimer?.cancel();
-    _dialogueTimer = Timer(delay, () {
-      if (mounted) {
-        _showRandomDialogue();
-        _scheduleNextDialogue();
-      }
-    });
-  }
-
-  void _showRandomDialogue() {
-    final random = Random();
-    final allDialogues = [..._idleDialogues, ..._adviceDialogues];
-    
-    setState(() {
-      _currentDialogue = allDialogues[random.nextInt(allDialogues.length)];
-    });
-
-    Future.delayed(const Duration(seconds: 5), () {
-      if (mounted) {
-        setState(() {
-          _currentDialogue = null;
-        });
-      }
+    setState(() => _currentDialogue = text);
+    _dialogueTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted) setState(() => _currentDialogue = null);
     });
   }
 
   void _onTap() {
-    // 터치 반응 동작 (jump/happy 번갈아) - 바운스 효과 제거하고 애니메이션만
     playTouchReaction();
-    
-    // 대화 표시
-    _showRandomDialogue();
-    
+    showDialogue(DialogueService.forAction(ActionTrigger.tap));
     widget.onTap?.call();
   }
 
@@ -403,24 +350,6 @@ class UnicornSpriteWidgetState extends State<UnicornSpriteWidget> {
           ),
         ),
       ],
-    );
-  }
-
-  /// 발광 레이어 생성 (캐릭터 실루엣에 맞춤)
-  Widget _buildGlowLayer(String path, Color color, double sigma) {
-    return SizedBox(
-      width: widget.size + (sigma * 2),
-      height: widget.size + (sigma * 2),
-      child: ImageFiltered(
-        imageFilter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
-        child: Image.asset(
-          path,
-          fit: BoxFit.contain,
-          color: color,
-          colorBlendMode: BlendMode.srcATop,
-          gaplessPlayback: true,
-        ),
-      ),
     );
   }
 
