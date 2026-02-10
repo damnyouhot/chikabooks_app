@@ -71,7 +71,7 @@ class _BondPageState extends State<BondPage> {
                 isScrollControlled: true,
                 backgroundColor: Colors.transparent,
                 builder: (_) => const DailyWallSheet(),
-              );
+              ).then((_) => _loadData()); // 시트 닫힌 후 갱신
             }
           },
         ),
@@ -82,11 +82,11 @@ class _BondPageState extends State<BondPage> {
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
         builder: (_) => const DailyWallSheet(),
-      );
+      ).then((_) => _loadData()); // 시트 닫힌 후 갱신
     }
   }
 
-  // ── 파트너 열기 ──
+  // ── 파트너 열기 (복귀 시 자동 갱신) ──
   void _openPartner() async {
     final hasProfile = await UserProfileService.hasBasicProfile();
     if (!mounted) return;
@@ -103,7 +103,7 @@ class _BondPageState extends State<BondPage> {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const PartnerPage()),
-              );
+              ).then((_) => _loadData()); // 복귀 시 갱신
             }
           },
         ),
@@ -112,7 +112,7 @@ class _BondPageState extends State<BondPage> {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const PartnerPage()),
-      );
+      ).then((_) => _loadData()); // 복귀 시 갱신
     }
   }
 

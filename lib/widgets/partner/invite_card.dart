@@ -9,7 +9,10 @@ import '../profile_gate_sheet.dart';
 /// "추천으로 찾기" → Cloud Function(requestPartnerMatching) 호출
 /// 결과에 따라 matched / waiting / error UI 피드백
 class InviteCard extends StatefulWidget {
-  const InviteCard({super.key});
+  /// 매칭 성공 시 부모(PartnerPage)가 데이터를 갱신할 수 있도록 콜백
+  final VoidCallback? onMatchSuccess;
+
+  const InviteCard({super.key, this.onMatchSuccess});
 
   @override
   State<InviteCard> createState() => _InviteCardState();
@@ -214,9 +217,9 @@ class _InviteCardState extends State<InviteCard> {
             subtitle: '1주일간 서로의 하루를 나눠보세요.',
             buttonText: '확인',
             onButton: () {
-              Navigator.pop(context); // dialog 닫기
-              // PartnerPage 새로고침을 위해 이전 화면도 pop
-              if (context.mounted) Navigator.pop(context);
+              Navigator.pop(context); // dialog만 닫기
+              // PartnerPage를 pop하지 않고, 콜백으로 데이터 갱신
+              widget.onMatchSuccess?.call();
             },
           );
           break;

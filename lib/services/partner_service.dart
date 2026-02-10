@@ -32,7 +32,8 @@ class PartnerService {
     if (uid == null) return null;
 
     try {
-      final profile = await UserProfileService.getMyProfile();
+      // 항상 최신 프로필을 읽어야 매칭 직후에도 groupId 반영됨
+      final profile = await UserProfileService.getMyProfile(forceRefresh: true);
       final groupId = profile?.partnerGroupId;
       if (groupId == null || groupId.isEmpty) return null;
 

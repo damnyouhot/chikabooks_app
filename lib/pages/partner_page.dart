@@ -51,6 +51,13 @@ class _PartnerPageState extends State<PartnerPage> {
     }
   }
 
+  /// 매칭 성공 시 호출 — 캐시 초기화 후 데이터 다시 로드
+  void _onMatchSuccess() {
+    UserProfileService.clearCache();
+    setState(() => _loading = true);
+    _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -92,7 +99,7 @@ class _PartnerPageState extends State<PartnerPage> {
                   ],
 
                   // ── 카드 4: 추천/초대 ──
-                  const InviteCard(),
+                  InviteCard(onMatchSuccess: _onMatchSuccess),
                 ],
               ),
             ),
