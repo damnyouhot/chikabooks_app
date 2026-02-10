@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import '../models/daily_wall_post.dart';
 
 /// "오늘의 한 문장" Firestore 서비스
@@ -75,13 +76,19 @@ class DailyWallService {
   // ───────────────────────── CRUD ─────────────────────────
 
   /// 오늘 이미 게시했는지 확인
+  /// (복합 인덱스 불필요 — dateKey 1필드 쿼리 + 클라이언트 필터)
   static Future<bool> hasPostedToday(String uid, String dateKey) async {
-    final snap = await _postsRef
-        .where('authorUid', isEqualTo: uid)
-        .where('dateKey', isEqualTo: dateKey)
-        .limit(1)
-        .get();
-    return snap.docs.isNotEmpty;
+    try {
+      final snap = await _postsRef
+          .where('dateKey', isEqualTo: dateKey)
+          .get();
+      return snap.docs.any(
+        (doc) => (doc.data())['authorUid'] == uid,
+      );
+    } catch (e) {
+      debugPrint('⚠️ hasPostedToday error: $e');
+      return false; // 에러 시 게시 허용 (서버 중복은 createPost에서 재검증)
+    }
   }
 
   /// 게시물 생성 (유저당 하루 1개 — 서버 측 검증)
@@ -130,19 +137,21 @@ class DailyWallService {
     await _postsRef.add(post.toMap());
   }
 
-  /// 오늘 게시물 스트림 (최신순, limit 적용 → UI에서 셔플)
+  /// 오늘 게시물 스트림
+  /// (복합 인덱스 불필요 — dateKey 1필드 쿼리 + 클라이언트 필터/셔플)
   static Stream<List<DailyWallPost>> streamTodayPosts(
     String dateKey, {
     int limit = 20,
   }) {
     return _postsRef
         .where('dateKey', isEqualTo: dateKey)
-        .where('isHidden', isEqualTo: false)
-        .orderBy('createdAt', descending: true)
-        .limit(limit)
         .snapshots()
         .map((snap) {
-      final posts = snap.docs.map(DailyWallPost.fromDoc).toList();
+      final posts = snap.docs
+          .map(DailyWallPost.fromDoc)
+          .where((p) => !p.isHidden) // 클라이언트 필터
+          .take(limit)
+          .toList();
       // 여론 쏠림 방지: 셔플
       posts.shuffle(_rng);
       return posts;

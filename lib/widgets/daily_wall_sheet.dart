@@ -28,15 +28,25 @@ class _DailyWallSheetState extends State<DailyWallSheet>
   }
 
   Future<void> _checkAlreadyPosted() async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return;
-    final posted = await DailyWallService.hasPostedToday(uid, _dateKey);
-    if (mounted) {
-      setState(() {
-        _alreadyPosted = posted;
-        _checking = false;
-        if (posted) _tabCtrl.index = 1; // 이미 게시 → 피드 탭으로
-      });
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) {
+        if (mounted) setState(() => _checking = false);
+        return;
+      }
+      final posted = await DailyWallService.hasPostedToday(uid, _dateKey);
+      if (mounted) {
+        setState(() {
+          _alreadyPosted = posted;
+          _checking = false;
+          if (posted) _tabCtrl.index = 1;
+        });
+      }
+    } catch (e) {
+      debugPrint('⚠️ _checkAlreadyPosted error: $e');
+      if (mounted) {
+        setState(() => _checking = false); // 에러여도 UI 풀어줌
+      }
     }
   }
 
@@ -384,6 +394,23 @@ class _FeedTab extends StatelessWidget {
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
+        }
+        if (snap.hasError) {
+          debugPrint('⚠️ FeedTab stream error: ${snap.error}');
+          return Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.cloud_off, size: 48, color: Colors.grey[300]),
+                const SizedBox(height: 12),
+                Text(
+                  '불러오는 중 문제가 생겼어요.\n잠시 후 다시 시도해 주세요.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey[500], fontSize: 14),
+                ),
+              ],
+            ),
+          );
         }
         final posts = snap.data ?? [];
         if (posts.isEmpty) {
