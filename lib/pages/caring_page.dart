@@ -5,6 +5,7 @@ import '../models/character.dart';
 import '../models/store_item.dart';
 import '../services/character_service.dart';
 import '../services/store_service.dart';
+import '../widgets/daily_wall_sheet.dart';
 import 'growth/character_widget.dart';
 import 'growth/emotion_record_page.dart';
 
@@ -65,6 +66,15 @@ class _CaringPageState extends State<CaringPage>
     if (success == true && mounted) {
       _sparkleAnimationController.forward(from: 0.0);
     }
+  }
+
+  void _openDailyWall(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const DailyWallSheet(),
+    );
   }
 
   void _showInventory(BuildContext context, Character character) {
@@ -244,6 +254,44 @@ class _CaringPageState extends State<CaringPage>
                       ),
                     ),
                   ],
+                ),
+              ),
+
+              // ── 오늘의 한 문장 캡슐 버튼 ──
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: GestureDetector(
+                  onTap: () => _openDailyWall(context),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 18, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.9),
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF6A5ACD).withOpacity(0.25),
+                          blurRadius: 12,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('✍️', style: TextStyle(fontSize: 18)),
+                        SizedBox(width: 8),
+                        Text(
+                          '오늘의 한 문장',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF6A5ACD),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
 
