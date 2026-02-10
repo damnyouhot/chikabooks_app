@@ -215,6 +215,17 @@ export const requestPartnerMatching = onCall(
     }
 
     // ── 2. 이미 활성 그룹이 있으면 반환 (중복 매칭 방지) ──
+    // 먼저 매칭 풀 상태 확인 (가장 최신 상태)
+    const poolSnap = await db.collection("partnerMatchingPool").doc(uid).get();
+    if (poolSnap.exists && poolSnap.data()?.status === "matched") {
+      const existingGroupId = poolSnap.data()?.matchedGroupId as string | undefined;
+      if (existingGroupId) {
+        // 매칭 풀에 이미 matched 상태로 있으면 바로 반환
+        return {status: "matched", groupId: existingGroupId};
+      }
+    }
+
+    // users 문서의 partnerGroupId도 체크
     if (me.partnerGroupId) {
       const gSnap = await db
         .collection("partnerGroups")

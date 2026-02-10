@@ -96,10 +96,10 @@ class _PartnerPageState extends State<PartnerPage> {
                     // 결 점수 (그룹 없어도 표시)
                     BondScoreCard(score: _bondScore),
                     const SizedBox(height: 12),
-                  ],
 
-                  // ── 카드 4: 추천/초대 ──
-                  InviteCard(onMatchSuccess: _onMatchSuccess),
+                    // ── 카드 4: 추천/초대 (그룹 없을 때만) ──
+                    InviteCard(onMatchSuccess: _onMatchSuccess),
+                  ],
                 ],
               ),
             ),
