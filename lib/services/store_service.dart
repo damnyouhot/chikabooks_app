@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart'; // debugPrint를 위해 추가
-import '../models/character.dart';
+import 'package:flutter/foundation.dart';
 import '../models/store_item.dart';
 
 class StoreService {
@@ -13,6 +12,8 @@ class StoreService {
     return snapshot.docs.map((doc) => StoreItem.fromDoc(doc)).toList();
   }
 
+  /// 내 인벤토리에 있는 아이템 목록
+  /// Character 모델 대신 users/{uid} 문서에서 inventory 필드 직접 읽기
   Future<List<StoreItem>> fetchMyItems() async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return [];
@@ -20,9 +21,7 @@ class StoreService {
     final userDoc = await _db.collection('users').doc(uid).get();
     if (!userDoc.exists) return [];
 
-    final character = Character.fromDoc(userDoc);
-    final myItemIds = character.inventory;
-
+    final myItemIds = List<String>.from(userDoc.data()?['inventory'] ?? []);
     if (myItemIds.isEmpty) return [];
 
     final snapshot = await _db
@@ -53,17 +52,19 @@ class StoreService {
       final userDoc = await transaction.get(userRef);
       if (!userDoc.exists) throw "사용자 정보를 찾을 수 없습니다.";
 
-      final character = Character.fromDoc(userDoc);
+      final data = userDoc.data() ?? {};
+      final inventory = List<String>.from(data['inventory'] ?? []);
+      final emotionPoints = (data['emotionPoints'] ?? 0) as int;
 
       if (item.type == StoreItemType.coupon) {
-        // 쿠폰 구매 로직 (이번 단계에서는 일단 통과)
+        // 쿠폰 구매 로직
       } else {
-        if (character.inventory.contains(item.id)) {
+        if (inventory.contains(item.id)) {
           return "이미 보유하고 있는 아이템입니다.";
         }
       }
 
-      if (character.emotionPoints < item.price) {
+      if (emotionPoints < item.price) {
         return "포인트가 부족합니다!";
       }
 

@@ -1,11 +1,9 @@
 import 'dart:math';
 
-/// 캐릭터 행동 기반 대사 서비스
+/// 행동 기반 대사 서비스 — 중립/힐링 톤
 ///
-/// 랜덤 타이머가 아닌, 유저의 **행동**에 반응하여 대사를 반환합니다.
-/// 사용법:
-///   final line = DialogueService.forAction(ActionTrigger.feed);
-///   spriteWidgetKey.currentState?.showDialogue(line);
+/// "냠냠", "헤헤" 등 유아체 금지.
+/// 짧은 문장, 담백한 피드백, 정서적 문장(힐링 톤).
 class DialogueService {
   DialogueService._();
 
@@ -14,40 +12,39 @@ class DialogueService {
   /// 행동별 대사 풀
   static const Map<ActionTrigger, List<String>> _pool = {
     ActionTrigger.feed: [
-      '냠냠! 맛있어요~ 🍽️',
-      '배 부르다~ 고마워요!',
-      '최고의 밥이에요! ✨',
-      '에너지 충전 완료!',
+      '기록했어요.',
+      '한 걸음 더.',
+      '오늘의 작은 실천.',
+      '꾸준함이 힘이에요.',
     ],
     ActionTrigger.feedFull: [
-      '배가 너무 불러요… 🫃',
-      '더 이상 못 먹겠어요~',
-      '나중에 줘요!',
+      '오늘은 충분해요.',
+      '천천히 해도 괜찮아요.',
+      '나중에 또.',
     ],
     ActionTrigger.pet: [
-      '기분 좋아요~ 💕',
-      '더 쓰다듬어 줘요!',
-      '행복해요! 🦄',
-      '엄마 손이 따뜻해요~',
+      '따뜻한 마음이에요.',
+      '그 마음, 전해졌어요.',
+      '고마워요.',
+      '괜찮아요.',
     ],
     ActionTrigger.checkIn: [
-      '와! 만나서 반가워요!',
-      '오늘도 와줬군요~ 🎉',
-      '보고 싶었어요!',
+      '오늘도 와줬군요.',
+      '여기 있어요.',
+      '만나서 반가워요.',
     ],
     ActionTrigger.studyStart: [
-      '같이 공부해요! 📖',
-      '오늘도 성장하는 거예요!',
-      '집중! 집중! 🔥',
+      '같이 읽어요.',
+      '오늘도 한 페이지.',
+      '천천히, 꾸준히.',
     ],
     ActionTrigger.tap: [
-      '왜요? 뭐 필요해요?',
-      '저 여기 있어요~ 👋',
-      '같이 놀아요!',
-      '헤헤~ 간지러워요!',
+      '여기 있어요.',
+      '괜찮아요.',
+      '잠깐 쉬어가요.',
+      '조용한 시간.',
     ],
     ActionTrigger.partnerAmbient: [
-      // PartnerDialogueService에서 직접 생성하지만 fallback용
       '오늘도 여기 있었어.',
       '조용했지만 비어있진 않았어.',
     ],
@@ -62,12 +59,11 @@ class DialogueService {
 
 /// 대사를 호출하는 트리거 종류
 enum ActionTrigger {
-  feed,             // 밥 주기
-  feedFull,         // 밥 주기 (포만감 max)
-  pet,              // 쓰다듬기
-  checkIn,          // 출석 / 확인하기
-  studyStart,       // 공부 시작
-  tap,              // 단순 터치
-  partnerAmbient,   // 파트너 활동 감지 (우회 멘트)
+  feed,
+  feedFull,
+  pet,
+  checkIn,
+  studyStart,
+  tap,
+  partnerAmbient,
 }
-

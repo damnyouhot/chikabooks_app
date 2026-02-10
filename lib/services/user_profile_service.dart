@@ -95,10 +95,28 @@ class UserProfileService {
     _cache = profile;
   }
 
-  /// 현재 결 점수 (캐시에서 읽기, 없으면 60.0)
+  /// 현재 결 점수 (마이그레이션 포함, 0~100 범위)
+  /// 구버전(35~85) 데이터가 있으면 자동 변환 후 저장
   static Future<double> getBondScore() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return 50.0;
+
     final profile = await getMyProfile();
-    return profile?.bondScore ?? 60.0;
+    if (profile == null) return 50.0;
+
+    // 이미 v2면 캐시값 그대로
+    if (profile.bondScoreVersion >= 2) return profile.bondScore;
+
+    // 구버전 → BondScoreService.readAndMigrate 로 1회 변환+저장
+    // (순환 import 방지: 여기서 직접 변환)
+    final raw = profile.bondScore;
+    final migrated = ((raw.clamp(35.0, 85.0) - 35.0) * 2.0).clamp(0.0, 100.0);
+    await _db.collection('users').doc(uid).update({
+      'bondScore': migrated,
+      'bondScoreVersion': 2,
+    });
+    _cache = null; // 캐시 갱신 유도
+    return migrated;
   }
 
   /// 활성 파트너 그룹 ID (없으면 null)

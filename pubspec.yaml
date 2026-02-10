@@ -51,21 +51,6 @@ flutter:
 
   assets:
     - assets/
-    - assets/characters/
-    - assets/characters/unicorn1/idle1/
-    - assets/characters/unicorn1/idle2/
-    - assets/characters/unicorn1/happy/
-    - assets/characters/unicorn1/jump/
-    - assets/characters/unicorn1/run/
-    - assets/characters/unicorn1/walk/
-    - assets/characters/unicorn1/eating/
-    - assets/characters/unicorn1/sleep/
-    - assets/characters/unicorn1/rest/
-    - assets/characters/unicorn1/flying/
-    - assets/characters/unicorn1/horn/
-    - assets/characters/unicorn1/no/
-    - assets/characters/unicorn1/die/
-    - assets/dreamy background/
     - assets/home/
 
   # 폰트 파일이 실제 assets/fonts 폴더에 있을 경우 주석을 해제하여 사용합니다.

@@ -10,7 +10,8 @@ class UserPublicProfile {
   final String? workplaceType;     // "개인치과" | "네트워크" | "대학병원" | "기타"
 
   // ─── 파트너 시스템 필드 ───
-  final double bondScore;          // 결 점수 (초기값 60.0, 범위 35~85)
+  final double bondScore;          // 결 점수 (초기값 50.0, 범위 0~100)
+  final int bondScoreVersion;      // 1=구버전(35~85), 2=신버전(0~100)
   final String? partnerGroupId;    // 현재 속한 파트너 그룹 ID
   final DateTime? partnerGroupEndsAt; // 그룹 종료일
 
@@ -20,7 +21,8 @@ class UserPublicProfile {
     this.careerBucket = '',
     this.mainConcerns = const [],
     this.workplaceType,
-    this.bondScore = 60.0,
+    this.bondScore = 50.0,
+    this.bondScoreVersion = 2,
     this.partnerGroupId,
     this.partnerGroupEndsAt,
   });
@@ -57,7 +59,8 @@ class UserPublicProfile {
       careerBucket: m['careerBucket'] ?? '',
       mainConcerns: List<String>.from(m['mainConcerns'] ?? []),
       workplaceType: m['workplaceType'],
-      bondScore: (m['bondScore'] ?? 60.0).toDouble(),
+      bondScore: (m['bondScore'] ?? 50.0).toDouble(),
+      bondScoreVersion: (m['bondScoreVersion'] ?? 1) as int,
       partnerGroupId: m['partnerGroupId'],
       partnerGroupEndsAt: endsAt,
     );

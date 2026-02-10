@@ -1,6 +1,3 @@
-import 'dart:async';
-
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -8,12 +5,10 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:provider/provider.dart';
 
 import 'firebase_options.dart';
-import 'models/character.dart';
 import 'notifiers/job_filter_notifier.dart';
 import 'pages/caring_page.dart';
 import 'pages/growth/growth_page.dart';
 import 'pages/job_page.dart';
-import 'pages/settings/communion_profile_page.dart';
 import 'pages/store/store_tab.dart';
 import 'services/ebook_service.dart';
 import 'services/job_service.dart';
@@ -59,9 +54,18 @@ class ChikabooksApp extends StatelessWidget {
       title: '치과책방',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        primarySwatch: Colors.pink,
+        // 미니멀 컬러: 시안/블루 계열 포인트
+        colorSchemeSeed: const Color(0xFF1E88E5),
+        brightness: Brightness.light,
+        useMaterial3: true,
         fontFamily: 'NotoSansKR',
         fontFamilyFallback: const ['Apple SD Gothic Neo', 'Roboto'],
+        scaffoldBackgroundColor: const Color(0xFFFCFCFF),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+        ),
       ),
       home: const AuthGate(),
     );
@@ -76,29 +80,8 @@ class AuthGate extends StatelessWidget {
     final user = context.watch<User?>();
     if (user == null) return const SignInPage();
 
-    return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      future:
-          FirebaseFirestore.instance.collection('users').doc(user.uid).get(),
-      builder: (context, snap) {
-        if (snap.connectionState != ConnectionState.done) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
-
-        final doc = snap.data;
-
-        if (doc != null && !doc.exists) {
-          final defaultChar = Character(id: user.uid);
-          FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.uid)
-              .set(defaultChar.toJson());
-        }
-
-        return const MyHome();
-      },
-    );
+    // 유저 문서 존재 여부만 확인 (Character 초기화 제거)
+    return const MyHome();
   }
 }
 
@@ -136,6 +119,7 @@ class SignInPage extends StatelessWidget {
     );
   }
 }
+
 class MyHome extends StatefulWidget {
   const MyHome({super.key});
   @override
@@ -146,42 +130,48 @@ class _MyHomeState extends State<MyHome> {
   int _selectedIndex = 0;
 
   static const _pages = [CaringPage(), StoreTab(), GrowthPage(), JobPage()];
-  static const _titles = ['돌보기', '서재', '성장하기', '나아가기'];
 
   void _onTap(int idx) => setState(() => _selectedIndex = idx);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_titles[_selectedIndex]),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.person_outline),
-            tooltip: '교감 프로필',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => const CommunionProfilePage()),
-              );
-            },
-          ),
-        ],
-      ),
+      // 홈 탭(0)은 AppBar 없음 (CaringPage 내부에서 설정 아이콘 처리)
+      // 나머지 탭은 자체 Scaffold/AppBar 사용
       body: _pages[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: _onTap,
         type: BottomNavigationBarType.fixed,
+        backgroundColor: Colors.white,
+        selectedItemColor: const Color(0xFF1E88E5),
+        unselectedItemColor: Colors.grey[350],
+        selectedFontSize: 11,
+        unselectedFontSize: 11,
+        elevation: 0,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.favorite), label: '돌보기'),
-          BottomNavigationBarItem(icon: Icon(Icons.menu_book), label: '서재'),
-          BottomNavigationBarItem(icon: Icon(Icons.auto_graph), label: '성장하기'),
-          BottomNavigationBarItem(icon: Icon(Icons.work), label: '나아가기'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.circle_outlined),
+            activeIcon: Icon(Icons.circle),
+            label: '홈',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.menu_book_outlined),
+            activeIcon: Icon(Icons.menu_book),
+            label: '서재',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.auto_graph_outlined),
+            activeIcon: Icon(Icons.auto_graph),
+            label: '성장하기',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.work_outline),
+            activeIcon: Icon(Icons.work),
+            label: '나아가기',
+          ),
         ],
       ),
     );
   }
 }
-
