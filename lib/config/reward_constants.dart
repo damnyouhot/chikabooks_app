@@ -5,20 +5,16 @@ class RewardPolicy {
   // [1] 돌보기 활동 보상 (Points)
   static const int attendance = 5;
   static const int petCharacter = 2;
-  static const int petCharacterDailyLimit = 5;
   static const int feed = 3;
-  static const int feedDailyLimit = 3;
   static const int rest = 2;
 
   // [2] 성장하기 보상
   static const int ebookReadPer3Min = 1;
-  static const int ebookDailyMax = 30;
   static const int dailyGrowthRecord = 10;
   static const int quizCorrect = 5;
 
   // [3] 구직 활동 보상
   static const int jobPostView = 1;
-  static const int jobPostViewDailyMax = 10;
   static const int mapHospitalClick = 3;
 
   // [4] 그레이드 기준 (누적 포인트)
@@ -98,9 +94,6 @@ class CharacterStats {
   // ─────────────────────────────────────────────
   /// 확인하기 1회당 애정도 증가량
   static const double checkAffectionIncrease = 1.0;
-
-  /// 확인하기 하루 최대 횟수
-  static const int checkDailyLimit = 12;
 
   // ─────────────────────────────────────────────
   // [4] 운동 관련
