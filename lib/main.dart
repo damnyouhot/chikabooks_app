@@ -13,6 +13,7 @@ import 'notifiers/job_filter_notifier.dart';
 import 'pages/caring_page.dart';
 import 'pages/growth/growth_page.dart';
 import 'pages/job_page.dart';
+import 'pages/settings/communion_profile_page.dart';
 import 'pages/store/store_tab.dart';
 import 'services/ebook_service.dart';
 import 'services/job_service.dart';
@@ -152,7 +153,22 @@ class _MyHomeState extends State<MyHome> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(_titles[_selectedIndex])),
+      appBar: AppBar(
+        title: Text(_titles[_selectedIndex]),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.person_outline),
+            tooltip: '교감 프로필',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const CommunionProfilePage()),
+              );
+            },
+          ),
+        ],
+      ),
       body: _pages[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,

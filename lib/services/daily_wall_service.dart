@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/daily_wall_post.dart';
+import 'user_profile_service.dart';
 
 /// "오늘의 한 문장" Firestore 서비스
 class DailyWallService {
@@ -106,19 +107,10 @@ class DailyWallService {
       throw Exception('오늘은 이미 남겼어요.');
     }
 
-    // 경력·지역 메타 가져오기 (users 문서에서)
-    final userDoc = await _db.collection('users').doc(uid).get();
-    final userData = userDoc.data() ?? {};
-    final tenureYears = (userData['tenureYears'] ?? 0) as int;
-    String careerBucket;
-    if (tenureYears <= 2) {
-      careerBucket = '0-2';
-    } else if (tenureYears <= 5) {
-      careerBucket = '3-5';
-    } else {
-      careerBucket = '6+';
-    }
-    final region = (userData['region'] ?? '') as String;
+    // 교감 프로필에서 경력·지역 가져오기 (캐시 우선)
+    final profile = await UserProfileService.getMyProfile();
+    final careerBucket = profile?.careerBucket ?? '';
+    final region = profile?.region ?? '';
 
     final renderedText = renderText(situationTag, toneEmoji, endingKey);
 

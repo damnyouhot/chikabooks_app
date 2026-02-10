@@ -5,7 +5,9 @@ import '../models/character.dart';
 import '../models/store_item.dart';
 import '../services/character_service.dart';
 import '../services/store_service.dart';
+import '../services/user_profile_service.dart';
 import '../widgets/daily_wall_sheet.dart';
+import '../widgets/profile_gate_sheet.dart';
 import 'growth/character_widget.dart';
 import 'growth/emotion_record_page.dart';
 
@@ -68,13 +70,39 @@ class _CaringPageState extends State<CaringPage>
     }
   }
 
-  void _openDailyWall(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const DailyWallSheet(),
-    );
+  /// 프로필 게이트 → DailyWallSheet 열기
+  void _openDailyWall(BuildContext context) async {
+    final hasProfile = await UserProfileService.hasBasicProfile();
+    if (!context.mounted) return;
+
+    if (!hasProfile) {
+      // Step A 프로필 입력 먼저
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => ProfileGateSheet(
+          onComplete: () {
+            // 프로필 저장 완료 → DailyWallSheet 열기
+            if (context.mounted) {
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (_) => const DailyWallSheet(),
+              );
+            }
+          },
+        ),
+      );
+    } else {
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => const DailyWallSheet(),
+      );
+    }
   }
 
   void _showInventory(BuildContext context, Character character) {
