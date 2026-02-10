@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 /// 교감 프로필 모델
 /// Firestore users/{uid} 에 저장되는 공개 프로필 필드
 class UserPublicProfile {
@@ -7,12 +9,20 @@ class UserPublicProfile {
   final List<String> mainConcerns; // 최대 2개
   final String? workplaceType;     // "개인치과" | "네트워크" | "대학병원" | "기타"
 
+  // ─── 파트너 시스템 필드 ───
+  final double bondScore;          // 결 점수 (초기값 60.0, 범위 35~85)
+  final String? partnerGroupId;    // 현재 속한 파트너 그룹 ID
+  final DateTime? partnerGroupEndsAt; // 그룹 종료일
+
   const UserPublicProfile({
     this.nickname = '',
     this.region = '',
     this.careerBucket = '',
     this.mainConcerns = const [],
     this.workplaceType,
+    this.bondScore = 60.0,
+    this.partnerGroupId,
+    this.partnerGroupEndsAt,
   });
 
   /// Step A(기본 프로필) 완료 여부
@@ -25,13 +35,31 @@ class UserPublicProfile {
   bool get hasPartnerProfile =>
       hasBasicProfile && mainConcerns.isNotEmpty;
 
+  /// 현재 파트너 그룹이 활성 상태인지
+  bool get hasActiveGroup =>
+      partnerGroupId != null &&
+      partnerGroupId!.isNotEmpty &&
+      partnerGroupEndsAt != null &&
+      partnerGroupEndsAt!.isAfter(DateTime.now());
+
   factory UserPublicProfile.fromMap(Map<String, dynamic> m) {
+    DateTime? endsAt;
+    final raw = m['partnerGroupEndsAt'];
+    if (raw is Timestamp) {
+      endsAt = raw.toDate();
+    } else if (raw is DateTime) {
+      endsAt = raw;
+    }
+
     return UserPublicProfile(
       nickname: m['nickname'] ?? '',
       region: m['region'] ?? '',
       careerBucket: m['careerBucket'] ?? '',
       mainConcerns: List<String>.from(m['mainConcerns'] ?? []),
       workplaceType: m['workplaceType'],
+      bondScore: (m['bondScore'] ?? 60.0).toDouble(),
+      partnerGroupId: m['partnerGroupId'],
+      partnerGroupEndsAt: endsAt,
     );
   }
 

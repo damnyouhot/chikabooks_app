@@ -94,5 +94,20 @@ class UserProfileService {
     await _db.collection('users').doc(uid).update(profile.toMap());
     _cache = profile;
   }
+
+  /// 현재 결 점수 (캐시에서 읽기, 없으면 60.0)
+  static Future<double> getBondScore() async {
+    final profile = await getMyProfile();
+    return profile?.bondScore ?? 60.0;
+  }
+
+  /// 활성 파트너 그룹 ID (없으면 null)
+  static Future<String?> getPartnerGroupId() async {
+    final profile = await getMyProfile(forceRefresh: true);
+    if (profile?.hasActiveGroup == true) {
+      return profile!.partnerGroupId;
+    }
+    return null;
+  }
 }
 

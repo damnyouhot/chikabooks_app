@@ -3,13 +3,18 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/character.dart';
 import '../models/store_item.dart';
+import '../services/activity_log_service.dart';
+import '../services/bond_score_service.dart';
 import '../services/character_service.dart';
+import '../services/partner_dialogue_service.dart';
 import '../services/store_service.dart';
 import '../services/user_profile_service.dart';
 import '../widgets/daily_wall_sheet.dart';
+import '../widgets/partner_summary_card.dart';
 import '../widgets/profile_gate_sheet.dart';
 import 'growth/character_widget.dart';
 import 'growth/emotion_record_page.dart';
+import 'partner_page.dart';
 
 class CaringPage extends StatefulWidget {
   const CaringPage({super.key});
@@ -24,6 +29,10 @@ class _CaringPageState extends State<CaringPage>
   late Animation<double> _heartAnimation;
   late AnimationController _sparkleAnimationController;
   late Animation<double> _sparkleAnimation;
+
+  // 파트너 소식 관련
+  String? _partnerGroupId;
+  String? _ambientLine; // 캐릭터 우회 멘트
 
   @override
   void initState() {
@@ -44,6 +53,32 @@ class _CaringPageState extends State<CaringPage>
       CurvedAnimation(
           parent: _sparkleAnimationController, curve: Curves.easeInOut),
     );
+    _loadPartnerState();
+  }
+
+  /// 파트너 그룹 + 결 중심회귀 + 캐릭터 우회 멘트
+  Future<void> _loadPartnerState() async {
+    try {
+      final groupId = await UserProfileService.getPartnerGroupId();
+
+      // 결 점수 중심 회귀 (하루 1회)
+      await BondScoreService.applyCenterGravity();
+
+      if (groupId != null) {
+        // unread 로그로 캐릭터 우회 멘트 생성
+        final logs = await ActivityLogService.getUnreadLogs(groupId);
+        final line = PartnerDialogueService.generateAmbientLine(logs);
+
+        if (mounted) {
+          setState(() {
+            _partnerGroupId = groupId;
+            _ambientLine = line;
+          });
+        }
+      }
+    } catch (_) {
+      // 에러 무시 (파트너 기능 없어도 앱은 동작)
+    }
   }
 
   @override
@@ -101,6 +136,35 @@ class _CaringPageState extends State<CaringPage>
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
         builder: (_) => const DailyWallSheet(),
+      );
+    }
+  }
+
+  /// 파트너 진입: Step A 게이트 → PartnerPage
+  void _openPartner(BuildContext context) async {
+    final hasProfile = await UserProfileService.hasBasicProfile();
+    if (!context.mounted) return;
+
+    if (!hasProfile) {
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => ProfileGateSheet(
+          onComplete: () {
+            if (context.mounted) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const PartnerPage()),
+              );
+            }
+          },
+        ),
+      );
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const PartnerPage()),
       );
     }
   }
@@ -285,43 +349,57 @@ class _CaringPageState extends State<CaringPage>
                 ),
               ),
 
-              // ── 오늘의 한 문장 캡슐 버튼 ──
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: GestureDetector(
-                  onTap: () => _openDailyWall(context),
+              // ── 캐릭터 우회 멘트 (파트너 소식 기반) ──
+              if (_ambientLine != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
                   child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 40),
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 18, vertical: 10),
+                        horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.9),
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF6A5ACD).withOpacity(0.25),
-                          blurRadius: 12,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
+                      color: Colors.white.withOpacity(0.85),
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text('✍️', style: TextStyle(fontSize: 18)),
-                        SizedBox(width: 8),
-                        Text(
-                          '오늘의 한 문장',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF6A5ACD),
-                          ),
-                        ),
-                      ],
+                    child: Text(
+                      _ambientLine!,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                        fontStyle: FontStyle.italic,
+                        height: 1.4,
+                      ),
                     ),
                   ),
                 ),
+
+              // ── 캡슐 버튼 행: 오늘의 한 문장 + 파트너 ──
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // 오늘의 한 문장
+                    _buildCapsuleButton(
+                      icon: '✍️',
+                      label: '오늘의 한 문장',
+                      onTap: () => _openDailyWall(context),
+                    ),
+                    const SizedBox(width: 10),
+                    // 파트너
+                    _buildCapsuleButton(
+                      icon: '🤝',
+                      label: '파트너',
+                      onTap: () => _openPartner(context),
+                    ),
+                  ],
+                ),
               ),
+
+              // ── 파트너 소식 요약 카드 ──
+              if (_partnerGroupId != null)
+                PartnerSummaryCard(groupId: _partnerGroupId!),
 
               // ── 액션 버튼 ──
               Padding(
@@ -455,6 +533,46 @@ class _CaringPageState extends State<CaringPage>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // ── 캡슐 버튼 빌더 ──
+  Widget _buildCapsuleButton({
+    required String icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.9),
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF6A5ACD).withOpacity(0.2),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(icon, style: const TextStyle(fontSize: 16)),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF6A5ACD),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

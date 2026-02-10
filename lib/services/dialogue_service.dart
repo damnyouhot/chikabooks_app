@@ -46,6 +46,11 @@ class DialogueService {
       '같이 놀아요!',
       '헤헤~ 간지러워요!',
     ],
+    ActionTrigger.partnerAmbient: [
+      // PartnerDialogueService에서 직접 생성하지만 fallback용
+      '오늘도 여기 있었어.',
+      '조용했지만 비어있진 않았어.',
+    ],
   };
 
   /// 행동에 맞는 대사 1줄 반환
@@ -57,11 +62,12 @@ class DialogueService {
 
 /// 대사를 호출하는 트리거 종류
 enum ActionTrigger {
-  feed,       // 밥 주기
-  feedFull,   // 밥 주기 (포만감 max)
-  pet,        // 쓰다듬기
-  checkIn,    // 출석 / 확인하기
-  studyStart, // 공부 시작
-  tap,        // 단순 터치
+  feed,             // 밥 주기
+  feedFull,         // 밥 주기 (포만감 max)
+  pet,              // 쓰다듬기
+  checkIn,          // 출석 / 확인하기
+  studyStart,       // 공부 시작
+  tap,              // 단순 터치
+  partnerAmbient,   // 파트너 활동 감지 (우회 멘트)
 }
 
