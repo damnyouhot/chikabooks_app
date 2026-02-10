@@ -121,19 +121,7 @@ class CharacterStats {
   static const double studySpiritPer10Min = 3.0;
 
   // ─────────────────────────────────────────────
-  // [6] 오프라인 하락 관련
-  // ─────────────────────────────────────────────
-  /// 시간당 포만감 하락량
-  static const double fullnessDecreasePerHour = 4.0;
-
-  /// 시간당 애정도 하락량
-  static const double affectionDecreasePerHour = 2.0;
-
-  /// 포만감 0일 때 시간당 건강 하락량
-  static const double healthDecreasePerHourWhenHungry = 3.0;
-
-  // ─────────────────────────────────────────────
-  // [7] 감정 상태 판단 임계값
+  // [6] 감정 상태 판단 임계값
   // ─────────────────────────────────────────────
   /// 번아웃 판단: 정신력 이 수치 이하
   static const double burnoutThreshold = 20.0;
@@ -147,8 +135,6 @@ class CharacterStats {
   /// 최상 컨디션 판단: 모든 수치 이 수치 이상
   static const double bestConditionThreshold = 70.0;
 }
-
-
 
 
 
