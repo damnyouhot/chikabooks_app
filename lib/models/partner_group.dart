@@ -67,16 +67,26 @@ class PartnerGroup {
 /// 매칭 시 사용한 메타 정보
 class MatchingMeta {
   final String? mainConcern;
-  final String? regionMix;
-  final String? careerMix;
+  final List<String>? regionMix;
+  final List<String>? careerMix;
 
   const MatchingMeta({this.mainConcern, this.regionMix, this.careerMix});
 
-  factory MatchingMeta.fromMap(Map<String, dynamic> m) => MatchingMeta(
-        mainConcern: m['mainConcern'],
-        regionMix: m['regionMix'],
-        careerMix: m['careerMix'],
-      );
+  factory MatchingMeta.fromMap(Map<String, dynamic> m) {
+    // regionMix와 careerMix는 배열 또는 문자열일 수 있음 (안전 파싱)
+    List<String>? parseStringList(dynamic value) {
+      if (value == null) return null;
+      if (value is List) return value.map((e) => e.toString()).toList();
+      if (value is String) return [value];
+      return null;
+    }
+
+    return MatchingMeta(
+      mainConcern: m['mainConcern'] as String?,
+      regionMix: parseStringList(m['regionMix']),
+      careerMix: parseStringList(m['careerMix']),
+    );
+  }
 
   Map<String, dynamic> toMap() => {
         'mainConcern': mainConcern,
