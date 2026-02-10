@@ -7,14 +7,51 @@ import '../../services/ebook_service.dart';
 import 'epub_reader_page.dart';
 import 'pdf_reader_page.dart';
 
-class EbookDetailPage extends StatelessWidget {
+class EbookDetailPage extends StatefulWidget {
   final Ebook ebook;
   const EbookDetailPage({super.key, required this.ebook});
+
+  @override
+  State<EbookDetailPage> createState() => _EbookDetailPageState();
+}
+
+class _EbookDetailPageState extends State<EbookDetailPage> {
+  bool _isPurchased = false;
+  bool _checkingPurchase = true;
+
+  Ebook get ebook => widget.ebook;
 
   /// 파일 확장자로 PDF인지 확인
   bool get _isPdf {
     final url = ebook.fileUrl.toLowerCase();
     return url.contains('.pdf');
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _checkPurchaseStatus();
+  }
+
+  Future<void> _checkPurchaseStatus() async {
+    // 무료 책은 항상 구매된 것으로 취급
+    if (ebook.price == 0) {
+      if (mounted) setState(() { _isPurchased = true; _checkingPurchase = false; });
+      return;
+    }
+
+    try {
+      final ebookService = context.read<EbookService>();
+      final purchased = await ebookService.hasPurchased(ebook.id);
+      if (mounted) {
+        setState(() {
+          _isPurchased = purchased;
+          _checkingPurchase = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _checkingPurchase = false);
+    }
   }
 
   @override
@@ -86,16 +123,35 @@ class EbookDetailPage extends StatelessWidget {
             // 구매/읽기 버튼
             SizedBox(
               width: double.infinity,
-              child: FilledButton(
-                onPressed: () => _onReadPressed(context),
-                child: Text(
-                  ebook.price == 0 ? '바로 읽기' : '$priceText • 구매 후 읽기',
+              child: _checkingPurchase
+                  ? const Center(child: CircularProgressIndicator())
+                  : FilledButton(
+                      onPressed: () => _onButtonPressed(context),
+                      child: Text(
+                        _isPurchased
+                            ? '바로 읽기'
+                            : ebook.price == 0
+                                ? '바로 읽기'
+                                : '$priceText • 구매 후 읽기',
+                      ),
+                    ),
+            ),
+
+            // 이미 구매한 경우 안내
+            if (_isPurchased && ebook.price > 0) ...[
+              const SizedBox(height: 8),
+              Text(
+                '✓ 이미 구매한 책입니다.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.green[600],
+                  fontWeight: FontWeight.w500,
                 ),
               ),
-            ),
+            ],
             
-            // 무료가 아닌 경우 안내 문구
-            if (ebook.price > 0) ...[
+            // 무료가 아니고 미구매인 경우 안내 문구
+            if (!_isPurchased && ebook.price > 0) ...[
               const SizedBox(height: 8),
               Text(
                 '* 현재 테스트 모드: 결제 없이 바로 읽을 수 있습니다.',
@@ -111,27 +167,27 @@ class EbookDetailPage extends StatelessWidget {
     );
   }
 
-  Future<void> _onReadPressed(BuildContext context) async {
-    final ebookService = context.read<EbookService>();
-    
-    // 유료 책인 경우 구매 처리
-    if (ebook.price > 0) {
-      try {
-        // Firestore에 구매 기록 저장
-        await ebookService.purchaseEbook(ebook.id);
-        if (context.mounted) {
-          _showPurchaseCompleteDialog(context);
-        }
-      } catch (e) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('구매 처리 중 오류가 발생했습니다: $e')),
-          );
-        }
-      }
-    } else {
-      // 무료 책은 바로 읽기
+  Future<void> _onButtonPressed(BuildContext context) async {
+    // 이미 구매했거나 무료면 바로 읽기
+    if (_isPurchased) {
       _navigateToReader(context);
+      return;
+    }
+
+    // 미구매 유료 책 → 구매 처리
+    final ebookService = context.read<EbookService>();
+    try {
+      await ebookService.purchaseEbook(ebook.id);
+      if (mounted) {
+        setState(() => _isPurchased = true);
+        _showPurchaseCompleteDialog(context);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('구매 처리 중 오류가 발생했습니다: $e')),
+        );
+      }
     }
   }
 
@@ -217,8 +273,6 @@ class EbookDetailPage extends StatelessWidget {
                       onPressed: () {
                         Navigator.of(ctx).pop(); // 팝업 닫기
                         Navigator.of(context).pop(); // 상세 페이지 닫기
-                        // 내 서재로 이동하는 콜백이 필요하지만, 
-                        // 현재는 단순히 뒤로가기로 처리
                       },
                       icon: const Icon(Icons.library_books, size: 18),
                       label: const Text('내 서재'),

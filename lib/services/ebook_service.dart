@@ -62,6 +62,20 @@ class EbookService {
     }, SetOptions(merge: true));
   }
 
+  /// 특정 도서 구매 여부 확인 (1회 조회)
+  Future<bool> hasPurchased(String ebookId) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return false;
+
+    final doc = await _db
+        .collection('users')
+        .doc(uid)
+        .collection('purchases')
+        .doc(ebookId)
+        .get();
+    return doc.exists;
+  }
+
   /// 구매한 도서 목록 스트림
   Stream<List<String>> watchPurchasedEbookIds() {
     final uid = _auth.currentUser?.uid;

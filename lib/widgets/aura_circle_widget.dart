@@ -28,7 +28,7 @@ class AuraCircleWidget extends StatefulWidget {
   const AuraCircleWidget({
     super.key,
     required this.bondScore,
-    this.size = 260,
+    this.size = 300,
     this.mainText = '오늘도 여기.',
     this.subText,
     this.onTap,
@@ -90,7 +90,7 @@ class _AuraCircleWidgetState extends State<AuraCircleWidget>
 
   @override
   Widget build(BuildContext context) {
-    final circleInnerRadius = widget.size * 0.33;
+    final circleInnerRadius = widget.size * 0.37;
 
     return GestureDetector(
       onTap: widget.onTap,
@@ -182,7 +182,7 @@ class _AuraPainterV2 extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final baseCircleRadius = size.width * 0.35;
+    final baseCircleRadius = size.width * 0.40;
 
     // 호흡에 따른 미세 반경 변화 (±3px)
     final breathDelta = sin(breathValue * pi) * 3.0;
@@ -239,6 +239,35 @@ class _AuraPainterV2 extends CustomPainter {
       canvas.drawCircle(center, circleRadius * pulseScale + 20, pulseRing);
     }
 
+    // ── 그림자 (1시→7시 방향, 빛 = 우상단 → 그림자 = 좌하단) ──
+    // 1시 방향(약 -60°)에서 빛이 오므로 그림자는 7시 방향(+120°)으로 떨어짐
+    // offset: x = cos(120°) * dist, y = sin(120°) * dist
+    const shadowDist = 6.0;
+    final shadowOffsetX = cos(120 * pi / 180) * shadowDist; // ≈ -3
+    final shadowOffsetY = sin(120 * pi / 180) * shadowDist; // ≈ +5.2
+    final shadowCenter = Offset(
+      center.dx + shadowOffsetX,
+      center.dy + shadowOffsetY,
+    );
+
+    // 그림자 Layer 1: 넓고 흐린 (멀리 퍼지는 그림자)
+    canvas.drawCircle(
+      shadowCenter + Offset(shadowOffsetX * 0.5, shadowOffsetY * 0.5),
+      circleRadius + 2,
+      Paint()
+        ..color = const Color(0xFF9E9EBE).withOpacity(0.12)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18),
+    );
+
+    // 그림자 Layer 2: 가까운 진한 그림자
+    canvas.drawCircle(
+      shadowCenter,
+      circleRadius,
+      Paint()
+        ..color = const Color(0xFF8888AA).withOpacity(0.18)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10),
+    );
+
     // ── 흰색 원 (중앙) ──
     canvas.drawCircle(
       center,
@@ -253,7 +282,7 @@ class _AuraPainterV2 extends CustomPainter {
       center,
       circleRadius,
       Paint()
-        ..color = const Color(0xFFE8E8F0).withOpacity(0.35)
+        ..color = const Color(0xFFE0E0ED).withOpacity(0.4)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 0.8
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
