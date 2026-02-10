@@ -66,3 +66,7 @@ android/app/google-services.json
 *.jks
 key.properties
 *.keystore
+
+# 4. Firebase 서비스 계정 키 (절대 커밋 금지)
+**/serviceAccountKey.json
+**/service-account*.json

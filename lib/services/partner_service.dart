@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/partner_group.dart';
@@ -308,7 +309,7 @@ class PartnerService {
 
   // ═══════════════════════ 매칭풀 ═══════════════════════
 
-  /// 매칭풀에 등록
+  /// 매칭풀에 등록 (기존 — 로컬 전용, 서버 매칭 미포함)
   static Future<void> joinMatchingPool() async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return;
@@ -325,6 +326,45 @@ class PartnerService {
       });
     } catch (e) {
       debugPrint('⚠️ joinMatchingPool error: $e');
+    }
+  }
+
+  /// 추천 매칭 요청 (Cloud Functions callable)
+  ///
+  /// 반환값:
+  /// - `MatchingResult.matched(groupId)` — 3명 매칭 성공
+  /// - `MatchingResult.waiting(message)` — 풀에 등록, 대기 중
+  /// - `MatchingResult.error(message)` — 에러
+  static Future<MatchingResult> requestMatching() async {
+    try {
+      final callable = FirebaseFunctions.instanceFor(
+        region: 'asia-northeast3',
+      ).httpsCallable('requestPartnerMatching');
+
+      final result = await callable.call<Map<String, dynamic>>();
+      final data = result.data;
+
+      final status = data['status'] as String? ?? '';
+      final groupId = data['groupId'] as String?;
+      final message = data['message'] as String?;
+
+      if (status == 'matched' && groupId != null) {
+        // 캐시 갱신 — 새 그룹 반영
+        UserProfileService.clearCache();
+        return MatchingResult.matched(groupId);
+      }
+
+      return MatchingResult.waiting(
+        message ?? '아직 함께할 사람이 부족해요.',
+      );
+    } on FirebaseFunctionsException catch (e) {
+      debugPrint('⚠️ requestMatching FunctionsError: ${e.code} ${e.message}');
+      return MatchingResult.error(
+        e.message ?? '매칭 요청 중 문제가 생겼어요.',
+      );
+    } catch (e) {
+      debugPrint('⚠️ requestMatching error: $e');
+      return MatchingResult.error('매칭 요청 중 문제가 생겼어요.');
     }
   }
 
@@ -433,4 +473,28 @@ class SlotReactionOption {
   final String label;
   const SlotReactionOption(this.emoji, this.label);
 }
+
+/// 매칭 요청 결과
+class MatchingResult {
+  final MatchingStatus status;
+  final String? groupId;
+  final String? message;
+
+  const MatchingResult._({
+    required this.status,
+    this.groupId,
+    this.message,
+  });
+
+  factory MatchingResult.matched(String groupId) =>
+      MatchingResult._(status: MatchingStatus.matched, groupId: groupId);
+
+  factory MatchingResult.waiting(String message) =>
+      MatchingResult._(status: MatchingStatus.waiting, message: message);
+
+  factory MatchingResult.error(String message) =>
+      MatchingResult._(status: MatchingStatus.error, message: message);
+}
+
+enum MatchingStatus { matched, waiting, error }
 
