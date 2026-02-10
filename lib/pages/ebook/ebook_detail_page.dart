@@ -129,7 +129,7 @@ class _EbookDetailPageState extends State<EbookDetailPage> {
                       onPressed: () => _onButtonPressed(context),
                       child: Text(
                         _isPurchased
-                            ? '바로 읽기'
+                            ? '이어서 읽기'
                             : ebook.price == 0
                                 ? '바로 읽기'
                                 : '$priceText • 구매 후 읽기',
@@ -290,7 +290,7 @@ class _EbookDetailPageState extends State<EbookDetailPage> {
                         _navigateToReader(context);
                       },
                       icon: const Icon(Icons.auto_stories, size: 18),
-                      label: const Text('바로 읽기'),
+                      label: const Text('이어서 읽기'),
                       style: FilledButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),

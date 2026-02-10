@@ -89,6 +89,34 @@ class EbookService {
         .map((qs) => qs.docs.map((doc) => doc.id).toList());
   }
 
+  /// 읽기 진행도 저장 (PDF: lastPage, EPUB: lastCfi)
+  Future<void> saveReadingProgress(
+    String ebookId, {
+    int? lastPage,
+    String? lastCfi,
+  }) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+
+    final data = <String, dynamic>{
+      'lastReadAt': FieldValue.serverTimestamp(),
+    };
+    if (lastPage != null) data['lastPage'] = lastPage;
+    if (lastCfi != null) data['lastCfi'] = lastCfi;
+
+    await _getPurchaseDocRef(ebookId).set(data, SetOptions(merge: true));
+  }
+
+  /// 읽기 진행도 가져오기
+  Future<Map<String, dynamic>?> getReadingProgress(String ebookId) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return null;
+
+    final doc = await _getPurchaseDocRef(ebookId).get();
+    if (!doc.exists) return null;
+    return doc.data() as Map<String, dynamic>?;
+  }
+
   Stream<QuerySnapshot> watchBookmarks(String ebookId) {
     return _getPurchaseDocRef(ebookId)
         .collection('bookmarks')

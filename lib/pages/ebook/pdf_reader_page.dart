@@ -1,10 +1,12 @@
 // lib/pages/ebook/pdf_reader_page.dart
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:pdfx/pdfx.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 import '../../models/ebook.dart';
+import '../../services/ebook_service.dart';
 
 class PdfReaderPage extends StatefulWidget {
   final Ebook ebook;
@@ -21,6 +23,9 @@ class _PdfReaderPageState extends State<PdfReaderPage> {
   int _currentPage = 1;
   int _totalPages = 0;
 
+  final _ebookService = EbookService();
+  Timer? _saveDebounce;
+
   @override
   void initState() {
     super.initState();
@@ -29,7 +34,16 @@ class _PdfReaderPageState extends State<PdfReaderPage> {
 
   Future<void> _loadPdf() async {
     try {
-      // PDF 파일 다운로드
+      // 1. 저장된 진행도 불러오기
+      int initialPage = 1;
+      final progress =
+          await _ebookService.getReadingProgress(widget.ebook.id);
+      if (progress != null) {
+        final savedPage = progress['lastPage'];
+        if (savedPage is int && savedPage > 0) initialPage = savedPage;
+      }
+
+      // 2. PDF 파일 다운로드
       final dir = await getApplicationDocumentsDirectory();
       final file = File('${dir.path}/${widget.ebook.id}.pdf');
 
@@ -43,15 +57,17 @@ class _PdfReaderPageState extends State<PdfReaderPage> {
         }
       }
 
-      // PDF 컨트롤러 생성
+      // 3. PDF 컨트롤러 생성 (저장된 페이지에서 시작)
       _pdfController = PdfControllerPinch(
         document: PdfDocument.openFile(file.path),
+        initialPage: initialPage,
       );
-      
+
       // 페이지 수 가져오기
       final document = await PdfDocument.openFile(file.path);
       setState(() {
         _totalPages = document.pagesCount;
+        _currentPage = initialPage;
         _isLoading = false;
       });
     } catch (e) {
@@ -62,8 +78,35 @@ class _PdfReaderPageState extends State<PdfReaderPage> {
     }
   }
 
+  /// 페이지 변경 시 호출
+  void _onPageChanged(int page) {
+    setState(() => _currentPage = page);
+    _saveProgressDebounced(page);
+  }
+
+  /// 진행도 저장 (디바운스: 2초)
+  void _saveProgressDebounced(int page) {
+    _saveDebounce?.cancel();
+    _saveDebounce = Timer(const Duration(seconds: 2), () async {
+      try {
+        await _ebookService.saveReadingProgress(
+          widget.ebook.id,
+          lastPage: page,
+        );
+      } catch (e) {
+        debugPrint('⚠️ PDF 진행도 저장 실패: $e');
+      }
+    });
+  }
+
   @override
   void dispose() {
+    _saveDebounce?.cancel();
+    // 닫힐 때 마지막 페이지 저장
+    _ebookService.saveReadingProgress(
+      widget.ebook.id,
+      lastPage: _currentPage,
+    );
     _pdfController?.dispose();
     super.dispose();
   }
@@ -145,9 +188,7 @@ class _PdfReaderPageState extends State<PdfReaderPage> {
 
     return PdfViewPinch(
       controller: _pdfController!,
-      onPageChanged: (page) {
-        setState(() => _currentPage = page);
-      },
+      onPageChanged: _onPageChanged,
       builders: PdfViewPinchBuilders<DefaultBuilderOptions>(
         options: const DefaultBuilderOptions(),
         documentLoaderBuilder: (_) => const Center(

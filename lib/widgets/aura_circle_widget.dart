@@ -1,10 +1,10 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 
-/// 중앙 원 + 확산광(오라) 위젯 v2
+/// 중앙 원 + 확산광(오라) 위젯 v3
 ///
-/// 오라 = SweepGradient 기반 부드러운 확산광 (구름/안개 느낌)
-/// 발화 = 텍스트 변경 시 펄스 애니메이션 (팽창+밝기)
+/// 기본: 360도 오라가 잔잔한 물결처럼 천천히 움직임
+/// 발화: 텍스트 변경 시 오라가 드라마틱하게 팽창·밝아짐
 /// 렌더링: CustomPainter + MaskFilter.blur + RepaintBoundary
 class AuraCircleWidget extends StatefulWidget {
   /// 결 점수 (0~100)
@@ -41,50 +41,42 @@ class AuraCircleWidget extends StatefulWidget {
 
 class _AuraCircleWidgetState extends State<AuraCircleWidget>
     with TickerProviderStateMixin {
-  // 호흡 애니메이션 (항상 반복)
-  late AnimationController _breathController;
+  // 물결 애니메이션 (항상 반복, 느리게)
+  late AnimationController _waveController;
 
-  // 발화(펄스) 애니메이션 (텍스트 변경 시 1회)
-  late AnimationController _pulseController;
-  late Animation<double> _pulseScale;
-  late Animation<double> _pulseOpacity;
+  // 발화(드라마틱) 애니메이션 (텍스트 변경 시 1회)
+  late AnimationController _speakController;
 
   @override
   void initState() {
     super.initState();
 
-    // 호흡: 느린 사이클 (5초)
-    _breathController = AnimationController(
+    // 물결: 10초 주기 무한 반복 (잔잔한 물결)
+    _waveController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 5000),
-    )..repeat(reverse: true);
+      duration: const Duration(milliseconds: 10000),
+    )..repeat();
 
-    // 펄스: 텍스트 변경 시 1회 재생 (800ms)
-    _pulseController = AnimationController(
+    // 발화: 2초짜리 드라마틱 효과 (1회성)
+    _speakController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-    _pulseScale = Tween<double>(begin: 1.0, end: 1.18).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeOutCubic),
-    );
-    _pulseOpacity = Tween<double>(begin: 0.55, end: 0.0).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeOut),
+      duration: const Duration(milliseconds: 2000),
     );
   }
 
   @override
   void didUpdateWidget(covariant AuraCircleWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // 텍스트가 바뀌면 펄스 발화
+    // 텍스트가 바뀌면 → 발화 (드라마틱 모션)
     if (oldWidget.mainText != widget.mainText) {
-      _pulseController.forward(from: 0.0);
+      _speakController.forward(from: 0.0);
     }
   }
 
   @override
   void dispose() {
-    _breathController.dispose();
-    _pulseController.dispose();
+    _waveController.dispose();
+    _speakController.dispose();
     super.dispose();
   }
 
@@ -105,15 +97,14 @@ class _AuraCircleWidgetState extends State<AuraCircleWidget>
             RepaintBoundary(
               child: AnimatedBuilder(
                 animation:
-                    Listenable.merge([_breathController, _pulseController]),
+                    Listenable.merge([_waveController, _speakController]),
                 builder: (context, _) {
                   return CustomPaint(
                     size: Size(widget.size, widget.size),
-                    painter: _AuraPainterV2(
+                    painter: _AuraWavePainter(
                       bondScore: widget.bondScore,
-                      breathValue: _breathController.value,
-                      pulseScale: _pulseScale.value,
-                      pulseOpacity: _pulseOpacity.value,
+                      wavePhase: _waveController.value,
+                      speakProgress: _speakController.value,
                     ),
                   );
                 },
@@ -161,99 +152,126 @@ class _AuraCircleWidgetState extends State<AuraCircleWidget>
   }
 }
 
-/// 오라 페인터 v2 — SweepGradient 기반 부드러운 확산광
+/// 360도 물결 오라 페인터
 ///
-/// 이전 v1의 drawArc(stroke) 방식은 "네온 링" 느낌이었음.
-/// v2는 SweepGradient + 넓은 strokeWidth + 높은 blurSigma로
-/// "구름/안개" 같은 부드러운 확산광 구현.
-class _AuraPainterV2 extends CustomPainter {
+/// idle: 4개 레이어가 각각 다른 위상으로 천천히 팽창/수축 (잔잔한 물결)
+/// speak: 진폭·밝기·회전속도 급상승 + 파동 링 2개 추가 (드라마틱)
+class _AuraWavePainter extends CustomPainter {
   final double bondScore;
-  final double breathValue; // 0~1 호흡
-  final double pulseScale; // 1.0~1.18 펄스 팽창
-  final double pulseOpacity; // 0.55~0.0 펄스 추가 밝기
+  final double wavePhase; // 0~1 (continuous loop)
+  final double speakProgress; // 0~1 (one-shot, 0=idle)
 
-  _AuraPainterV2({
+  _AuraWavePainter({
     required this.bondScore,
-    required this.breathValue,
-    required this.pulseScale,
-    required this.pulseOpacity,
+    required this.wavePhase,
+    required this.speakProgress,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final baseCircleRadius = size.width * 0.40;
-
-    // 호흡에 따른 미세 반경 변화 (±3px)
-    final breathDelta = sin(breathValue * pi) * 3.0;
-    final circleRadius = baseCircleRadius + breathDelta;
-
-    // 오라 비율: bondScore/100 → 0.0 ~ 1.0
     final ratio = (bondScore / 100.0).clamp(0.0, 1.0);
 
-    // 호흡 opacity: 0.55 ~ 1.0 범위
-    final breathOpacity = 0.55 + 0.45 * sin(breathValue * pi);
+    // 발화 강도: sin curve로 자연스럽게 상승 → 하강
+    final speakIntensity = sin(speakProgress * pi);
 
-    if (ratio > 0.01) {
-      // ── Layer 1: 넓은 확산광 (가장 바깥, 구름/안개 느낌) ──
-      _drawAuraLayer(
+    // ── 물결 파라미터 ──
+    // idle(잔잔한 물결): 진폭 2~4px (결에 따라)
+    // speak(드라마틱): 진폭 최대 18px
+    final idleAmplitude = 2.0 + ratio * 2.0;
+    const speakAmplitude = 18.0;
+    final amplitude =
+        idleAmplitude + (speakAmplitude - idleAmplitude) * speakIntensity;
+
+    // 기본 opacity: 결에 따라 0.08~0.30
+    final idleOpacity = 0.08 + ratio * 0.22;
+    // 발화 시 추가 밝기
+    final extraOpacity = 0.25 * speakIntensity;
+
+    // 그라데이션 회전 (idle: 느리게, speak: 빠르게)
+    final rotationSpeed = 0.3 + speakIntensity * 2.5;
+    final baseRotation = wavePhase * 2 * pi * rotationSpeed;
+
+    // ── 4개의 물결 레이어 (360도 전체 감싸기) ──
+    for (int i = 0; i < 4; i++) {
+      final phaseOffset = i * pi / 2; // 각 레이어마다 90도 위상차
+      final layerWave = sin(wavePhase * 2 * pi + phaseOffset);
+
+      // 각 레이어의 반경: 안쪽부터 바깥으로
+      final layerBaseOffset = 8.0 + i * 7.0;
+      final layerRadius =
+          baseCircleRadius + layerBaseOffset + amplitude * layerWave;
+
+      // 안쪽 레이어일수록 밝고, 바깥일수록 투명
+      final layerFade = 1.0 - i * 0.2;
+      final opacityWave =
+          0.75 + 0.25 * cos(wavePhase * 2 * pi + phaseOffset * 0.7);
+      final layerOpacity =
+          ((idleOpacity + extraOpacity) * layerFade * opacityWave)
+              .clamp(0.0, 1.0);
+
+      // blur: 바깥 레이어일수록 더 퍼짐
+      final blurSigma = 14.0 + i * 10.0 + speakIntensity * 8.0;
+      final strokeWidth = 18.0 + i * 8.0 + speakIntensity * 12.0;
+
+      _drawWaveLayer(
         canvas: canvas,
         center: center,
-        radius: (circleRadius + 28) * pulseScale,
-        sweepFraction: ratio,
-        blurSigma: 45,
-        opacity: (0.12 * breathOpacity + pulseOpacity * 0.15).clamp(0.0, 1.0),
-        strokeWidth: 55,
-      );
-
-      // ── Layer 2: 중간 확산광 ──
-      _drawAuraLayer(
-        canvas: canvas,
-        center: center,
-        radius: (circleRadius + 14) * pulseScale,
-        sweepFraction: ratio,
-        blurSigma: 28,
-        opacity: (0.20 * breathOpacity + pulseOpacity * 0.2).clamp(0.0, 1.0),
-        strokeWidth: 36,
-      );
-
-      // ── Layer 3: 코어 확산광 (원에 가까운 은은한 빛) ──
-      _drawAuraLayer(
-        canvas: canvas,
-        center: center,
-        radius: (circleRadius + 5) * pulseScale,
-        sweepFraction: ratio,
-        blurSigma: 16,
-        opacity: (0.28 * breathOpacity + pulseOpacity * 0.25).clamp(0.0, 1.0),
-        strokeWidth: 20,
+        radius: layerRadius,
+        opacity: layerOpacity,
+        blurSigma: blurSigma,
+        strokeWidth: strokeWidth,
+        rotationAngle: baseRotation + i * 0.4 + wavePhase * i * 0.5,
       );
     }
 
-    // ── 펄스 링 (발화 시 퍼지는 파동) ──
-    if (pulseOpacity > 0.01) {
-      final pulseRing = Paint()
-        ..color = Color(0xFF00BCD4).withOpacity(pulseOpacity * 0.3)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, 12 * pulseScale);
-      canvas.drawCircle(center, circleRadius * pulseScale + 20, pulseRing);
+    // ── 발화 시 추가 파동 링 (팽창하며 사라짐) ──
+    if (speakIntensity > 0.01) {
+      // 파동 1: 메인 파동
+      final pulseRadius = baseCircleRadius + 35 * speakProgress;
+      final pulseOpacity = speakIntensity * 0.35;
+      canvas.drawCircle(
+        center,
+        pulseRadius,
+        Paint()
+          ..color = const Color(0xFF00BCD4).withOpacity(pulseOpacity)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 3.0 * (1.0 - speakProgress * 0.5)
+          ..maskFilter =
+              MaskFilter.blur(BlurStyle.normal, 10 + speakProgress * 8),
+      );
+
+      // 파동 2: 약간 딜레이된 두 번째 파동
+      final pulse2Raw = (speakProgress - 0.15).clamp(0.0, 1.0);
+      if (pulse2Raw > 0) {
+        final pulse2Intensity = sin(pulse2Raw / 0.85 * pi);
+        canvas.drawCircle(
+          center,
+          baseCircleRadius + 25 * pulse2Raw,
+          Paint()
+            ..color =
+                const Color(0xFF00E5FF).withOpacity(pulse2Intensity * 0.2)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2.0
+            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 14),
+        );
+      }
     }
 
     // ── 그림자 (1시→7시 방향, 빛 = 우상단 → 그림자 = 좌하단) ──
-    // 1시 방향(약 -60°)에서 빛이 오므로 그림자는 7시 방향(+120°)으로 떨어짐
-    // offset: x = cos(120°) * dist, y = sin(120°) * dist
     const shadowDist = 6.0;
-    final shadowOffsetX = cos(120 * pi / 180) * shadowDist; // ≈ -3
-    final shadowOffsetY = sin(120 * pi / 180) * shadowDist; // ≈ +5.2
+    final shadowOffsetX = cos(120 * pi / 180) * shadowDist;
+    final shadowOffsetY = sin(120 * pi / 180) * shadowDist;
     final shadowCenter = Offset(
       center.dx + shadowOffsetX,
       center.dy + shadowOffsetY,
     );
 
-    // 그림자 Layer 1: 넓고 흐린 (멀리 퍼지는 그림자)
+    // 그림자 Layer 1: 넓고 흐린
     canvas.drawCircle(
       shadowCenter + Offset(shadowOffsetX * 0.5, shadowOffsetY * 0.5),
-      circleRadius + 2,
+      baseCircleRadius + 2,
       Paint()
         ..color = const Color(0xFF9E9EBE).withOpacity(0.12)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18),
@@ -262,13 +280,17 @@ class _AuraPainterV2 extends CustomPainter {
     // 그림자 Layer 2: 가까운 진한 그림자
     canvas.drawCircle(
       shadowCenter,
-      circleRadius,
+      baseCircleRadius,
       Paint()
         ..color = const Color(0xFF8888AA).withOpacity(0.18)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10),
     );
 
-    // ── 흰색 원 (중앙) ──
+    // ── 원 내부: 미세 호흡 (반경 ±1.5px) ──
+    final breathDelta = sin(wavePhase * 2 * pi) * 1.5;
+    final circleRadius = baseCircleRadius + breathDelta;
+
+    // 흰색 원
     canvas.drawCircle(
       center,
       circleRadius,
@@ -277,7 +299,7 @@ class _AuraPainterV2 extends CustomPainter {
         ..style = PaintingStyle.fill,
     );
 
-    // ── 원 경계: 극미세 블러 (선이 아닌 그림자) ──
+    // 경계: 극미세 블러 (선이 아닌 은은한 그림자)
     canvas.drawCircle(
       center,
       circleRadius,
@@ -289,43 +311,32 @@ class _AuraPainterV2 extends CustomPainter {
     );
   }
 
-  /// SweepGradient 기반 오라 레이어 1개 그리기
+  /// 360도 SweepGradient 기반 물결 레이어 1개
   ///
-  /// 시안→블루 연속 그라데이션, 끝은 투명으로 자연스럽게 사라짐.
-  /// drawArc(선) 대신 drawCircle + SweepGradient.shader 로
-  /// gradient가 투명 영역을 담당 → 구름 느낌.
-  void _drawAuraLayer({
+  /// 시안→틸→블루→틸→시안 그라데이션이 원 전체를 감싸며
+  /// 회전·블러로 잔잔한 물결/구름 느낌 표현.
+  void _drawWaveLayer({
     required Canvas canvas,
     required Offset center,
     required double radius,
-    required double sweepFraction,
-    required double blurSigma,
     required double opacity,
+    required double blurSigma,
     required double strokeWidth,
+    required double rotationAngle,
   }) {
     final rect = Rect.fromCircle(center: center, radius: radius);
 
-    // SweepGradient: 12시 방향에서 시작
-    // 시안 → 블루 → 투명 으로 부드럽게 전환
+    // 360도 전체를 감싸는 SweepGradient (회전 적용)
     final gradient = SweepGradient(
-      startAngle: -pi / 2,
-      endAngle: 2 * pi - pi / 2,
       colors: [
-        Color(0xFF00E5FF).withOpacity(opacity * 0.7), // 시안 (시작)
-        Color(0xFF00BCD4).withOpacity(opacity), // 시안-틸
-        Color(0xFF1E88E5).withOpacity(opacity), // 블루
-        Color(0xFF1E88E5).withOpacity(opacity * 0.3), // 블루 (페이드)
-        Colors.transparent, // 투명 (끝)
-        Colors.transparent, // 투명 (나머지)
+        Color(0xFF00E5FF).withOpacity(opacity),
+        Color(0xFF00BCD4).withOpacity(opacity * 0.85),
+        Color(0xFF1E88E5).withOpacity(opacity * 0.65),
+        Color(0xFF00BCD4).withOpacity(opacity * 0.85),
+        Color(0xFF00E5FF).withOpacity(opacity),
       ],
-      stops: [
-        0.0,
-        sweepFraction * 0.3,
-        sweepFraction * 0.7,
-        sweepFraction * 0.92,
-        sweepFraction, // 여기서 투명으로 전환
-        1.0,
-      ],
+      stops: const [0.0, 0.25, 0.5, 0.75, 1.0],
+      transform: GradientRotation(rotationAngle),
     );
 
     final paint = Paint()
@@ -335,15 +346,13 @@ class _AuraPainterV2 extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..maskFilter = MaskFilter.blur(BlurStyle.normal, blurSigma);
 
-    // 원형 전체를 그리되, gradient가 투명 처리를 담당
     canvas.drawCircle(center, radius, paint);
   }
 
   @override
-  bool shouldRepaint(covariant _AuraPainterV2 old) {
+  bool shouldRepaint(covariant _AuraWavePainter old) {
     return old.bondScore != bondScore ||
-        old.breathValue != breathValue ||
-        old.pulseScale != pulseScale ||
-        old.pulseOpacity != pulseOpacity;
+        old.wavePhase != wavePhase ||
+        old.speakProgress != speakProgress;
   }
 }
