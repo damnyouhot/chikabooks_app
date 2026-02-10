@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import 'firebase_options.dart';
 import 'notifiers/job_filter_notifier.dart';
+import 'pages/bond_page.dart';
 import 'pages/caring_page.dart';
 import 'pages/job_page.dart';
 import 'pages/store/store_tab.dart';
@@ -128,16 +129,29 @@ class MyHome extends StatefulWidget {
 class _MyHomeState extends State<MyHome> {
   int _selectedIndex = 0;
 
-  static const _pages = [CaringPage(), StoreTab(), JobPage()];
+  /// 결 탭 인덱스
+  static const int _bondTabIndex = 1;
 
   void _onTap(int idx) => setState(() => _selectedIndex = idx);
 
+  /// CaringPage에서 "결 탭으로 이동" 콜백
+  void _goToBondTab() => setState(() => _selectedIndex = _bondTabIndex);
+
   @override
   Widget build(BuildContext context) {
+    // CaringPage에 탭 전환 콜백 주입
+    final pages = <Widget>[
+      CaringPage(onNavigateToBond: _goToBondTab),
+      const BondPage(),
+      const StoreTab(),
+      const JobPage(),
+    ];
+
     return Scaffold(
-      // 홈 탭(0)은 AppBar 없음 (CaringPage 내부에서 설정 아이콘 처리)
-      // 나머지 탭은 자체 Scaffold/AppBar 사용
-      body: _pages[_selectedIndex],
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: pages,
+      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: _onTap,
@@ -150,9 +164,14 @@ class _MyHomeState extends State<MyHome> {
         elevation: 0,
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.circle_outlined),
-            activeIcon: Icon(Icons.circle),
-            label: '홈',
+            icon: Icon(Icons.spa_outlined),
+            activeIcon: Icon(Icons.spa),
+            label: '돌보기',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.all_inclusive_outlined),
+            activeIcon: Icon(Icons.all_inclusive),
+            label: '결',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.menu_book_outlined),
