@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../growth/study/ebook_list_page.dart';
+import '../ebook/ebook_list_page.dart';
 import 'admin_ebook_create_page.dart';
 import 'admin_item_create_page.dart'; // 아이템 등록 페이지 import
 import 'admin_quiz_create_page.dart';

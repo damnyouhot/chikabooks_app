@@ -7,7 +7,6 @@ import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'notifiers/job_filter_notifier.dart';
 import 'pages/caring_page.dart';
-import 'pages/growth/growth_page.dart';
 import 'pages/job_page.dart';
 import 'pages/store/store_tab.dart';
 import 'services/ebook_service.dart';
@@ -129,7 +128,7 @@ class MyHome extends StatefulWidget {
 class _MyHomeState extends State<MyHome> {
   int _selectedIndex = 0;
 
-  static const _pages = [CaringPage(), StoreTab(), GrowthPage(), JobPage()];
+  static const _pages = [CaringPage(), StoreTab(), JobPage()];
 
   void _onTap(int idx) => setState(() => _selectedIndex = idx);
 
@@ -159,11 +158,6 @@ class _MyHomeState extends State<MyHome> {
             icon: Icon(Icons.menu_book_outlined),
             activeIcon: Icon(Icons.menu_book),
             label: '서재',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.auto_graph_outlined),
-            activeIcon: Icon(Icons.auto_graph),
-            label: '성장하기',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.work_outline),

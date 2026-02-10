@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../models/ebook.dart';
-import '../../../services/ebook_service.dart';
-import '../../../widgets/shimmer_list_tile.dart'; // ◀◀◀ 쉬머 위젯 import
+import '../../models/ebook.dart';
+import '../../services/ebook_service.dart';
+import '../../widgets/shimmer_list_tile.dart';
 import 'ebook_detail_page.dart';
 
 class EbookListPage extends StatelessWidget {
@@ -19,13 +19,11 @@ class EbookListPage extends StatelessWidget {
           return Center(child: Text('오류: ${snap.error}'));
         }
         if (snap.connectionState == ConnectionState.waiting || !snap.hasData) {
-          // ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼ 로딩 UI를 쉬머 효과로 교체 ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
           return ListView.builder(
             padding: const EdgeInsets.all(16),
             itemCount: 7,
             itemBuilder: (_, __) => const ShimmerListTile(),
           );
-          // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ 로딩 UI를 쉬머 효과로 교체 ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
         }
 
         final list = snap.data!;
@@ -67,3 +65,4 @@ class EbookListPage extends StatelessWidget {
     );
   }
 }
+

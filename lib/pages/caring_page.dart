@@ -11,7 +11,7 @@ import '../widgets/aura_circle_widget.dart';
 import '../widgets/daily_wall_sheet.dart';
 import '../widgets/partner_summary_card.dart';
 import '../widgets/profile_gate_sheet.dart';
-import 'growth/emotion_record_page.dart';
+import 'emotion_record_page.dart';
 import 'partner_page.dart';
 import 'settings/communion_profile_page.dart';
 

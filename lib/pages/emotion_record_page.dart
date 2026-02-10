@@ -1,6 +1,6 @@
-// lib/pages/growth/emotion_record_page.dart (진단용 코드)
+// lib/pages/emotion_record_page.dart
 import 'package:flutter/material.dart';
-import '../../services/emotion_service.dart';
+import '../services/emotion_service.dart';
 import 'dart:developer' as developer;
 
 class EmotionRecordPage extends StatefulWidget {
@@ -120,3 +120,4 @@ class _EmotionRecordPageState extends State<EmotionRecordPage> {
     );
   }
 }
+

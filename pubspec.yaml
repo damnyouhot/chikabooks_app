@@ -36,7 +36,6 @@ dependencies:
   in_app_purchase_android: ^0.4.0+1
 
   cupertino_icons: ^1.0.8
-  pedometer: ^4.1.1
   provider: ^6.1.2
   intl: ^0.18.1
   google_maps_flutter: ^2.5.0
