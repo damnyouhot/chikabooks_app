@@ -3,7 +3,7 @@ import '../models/partner_group.dart';
 import '../services/partner_service.dart';
 import '../services/user_profile_service.dart';
 import '../widgets/partner/group_status_card.dart';
-import '../widgets/partner/slot_card.dart';
+import '../widgets/partner/new_slot_card.dart';
 import '../widgets/partner/bond_score_card.dart';
 import '../widgets/partner/invite_card.dart';
 
@@ -81,8 +81,8 @@ class _PartnerPageState extends State<PartnerPage> {
                         group: _group!, members: _members),
                     const SizedBox(height: 12),
 
-                    // ── 카드 2: 오늘의 말 ──
-                    SlotCard(groupId: _group!.id),
+                    // ── 카드 2: 오늘의 말 (새로운 서버 기준 슬롯) ──
+                    NewSlotCard(groupId: _group!.id),
                     const SizedBox(height: 12),
 
                     // ── 카드 3: 결 점수 ──

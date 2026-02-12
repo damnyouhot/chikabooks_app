@@ -2,6 +2,7 @@ import {onDocumentCreated} from "firebase-functions/v2/firestore";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
 import {logger} from "firebase-functions";
 import * as admin from "firebase-admin";
+import {DateTime} from "luxon";
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -417,3 +418,390 @@ export const requestPartnerMatching = onCall(
     }
   }
 );
+
+// ═══════════════════════════════════════════════════════════
+// 슬롯 시스템: 서버 시간 기준 슬롯 상태 + 한마디 + 리액션
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * 서버 시간 기준 슬롯 상태 반환
+ * 슬롯: 12:30~12:59, 19:00~19:29 (KST 기준)
+ */
+export const getSlotStatus = onCall(
+  {region: "asia-northeast3"},
+  async (request) => {
+    const uid = request.auth?.uid;
+    if (!uid) {
+      throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+
+    const {groupId} = request.data;
+    if (!groupId) {
+      throw new HttpsError("invalid-argument", "groupId가 필요합니다.");
+    }
+
+    // 서버 시간 기준 KST
+    const nowKst = DateTime.now().setZone("Asia/Seoul");
+    const hour = nowKst.hour;
+    const minute = nowKst.minute;
+    const dateKey = nowKst.toFormat("yyyy-MM-dd");
+
+    let isOpen = false;
+    let slotKey: string | null = null;
+    let windowEndsAt: string | null = null;
+    let nextOpensAt: string | null = null;
+
+    // 12:30~12:59
+    if (hour === 12 && minute >= 30 && minute < 60) {
+      isOpen = true;
+      slotKey = "1230";
+      windowEndsAt = nowKst.set({hour: 13, minute: 0, second: 0}).toISO();
+      nextOpensAt = nowKst.set({hour: 19, minute: 0, second: 0}).toISO();
+    }
+    // 19:00~19:29
+    else if (hour === 19 && minute >= 0 && minute < 30) {
+      isOpen = true;
+      slotKey = "1900";
+      windowEndsAt = nowKst.set({hour: 19, minute: 30, second: 0}).toISO();
+      nextOpensAt = nowKst.plus({days: 1}).set({
+        hour: 12,
+        minute: 30,
+        second: 0,
+      }).toISO();
+    }
+    // 닫혀 있음
+    else {
+      isOpen = false;
+      // 다음 슬롯 계산
+      if (hour < 12 || (hour === 12 && minute < 30)) {
+        nextOpensAt = nowKst.set({hour: 12, minute: 30, second: 0}).toISO();
+      } else if (hour < 19) {
+        nextOpensAt = nowKst.set({hour: 19, minute: 0, second: 0}).toISO();
+      } else {
+        nextOpensAt = nowKst.plus({days: 1}).set({
+          hour: 12,
+          minute: 30,
+          second: 0,
+        }).toISO();
+      }
+    }
+
+    const slotId = slotKey ? `${dateKey}_${slotKey}` : null;
+
+    return {
+      nowKst: nowKst.toISO(),
+      isOpen,
+      slotId,
+      slotKey,
+      windowEndsAt,
+      nextOpensAt,
+    };
+  }
+);
+
+/**
+ * 슬롯 한마디 작성 (60자 제한, 1인만 작성 가능)
+ */
+export const submitSlotMessage = onCall(
+  {region: "asia-northeast3"},
+  async (request) => {
+    const uid = request.auth?.uid;
+    if (!uid) {
+      throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+
+    const {groupId, message} = request.data;
+    if (!groupId || !message) {
+      throw new HttpsError(
+        "invalid-argument",
+        "groupId와 message가 필요합니다."
+      );
+    }
+
+    // 메시지 길이 검증
+    if (message.length > 60) {
+      throw new HttpsError(
+        "invalid-argument",
+        "메시지는 60자 이하여야 합니다."
+      );
+    }
+
+    // 그룹 멤버 확인
+    const groupDoc = await db.collection("partnerGroups").doc(groupId).get();
+    if (!groupDoc.exists) {
+      throw new HttpsError("not-found", "그룹을 찾을 수 없습니다.");
+    }
+    const groupData = groupDoc.data()!;
+    if (!groupData.memberUids.includes(uid)) {
+      throw new HttpsError(
+        "permission-denied",
+        "그룹 멤버만 작성할 수 있습니다."
+      );
+    }
+
+    // 서버 시간 기준 슬롯 상태 확인
+    const nowKst = DateTime.now().setZone("Asia/Seoul");
+    const hour = nowKst.hour;
+    const minute = nowKst.minute;
+    const dateKey = nowKst.toFormat("yyyy-MM-dd");
+
+    let slotKey: string | null = null;
+    if (hour === 12 && minute >= 30 && minute < 60) {
+      slotKey = "1230";
+    } else if (hour === 19 && minute >= 0 && minute < 30) {
+      slotKey = "1900";
+    }
+
+    if (!slotKey) {
+      throw new HttpsError(
+        "failed-precondition",
+        "지금은 말할 수 있는 시간이 아닙니다."
+      );
+    }
+
+    const slotId = `${dateKey}_${slotKey}`;
+    const slotRef = db
+      .collection("partnerGroups")
+      .doc(groupId)
+      .collection("slots")
+      .doc(slotId);
+
+    // 트랜잭션: 이미 작성된 슬롯인지 확인
+    await db.runTransaction(async (tx) => {
+      const slotSnap = await tx.get(slotRef);
+      if (slotSnap.exists && slotSnap.data()?.authorUid) {
+        throw new HttpsError(
+          "already-exists",
+          "이 슬롯은 이미 한마디가 올라왔어요. 리액션만 가능해요."
+        );
+      }
+
+      // 슬롯 문서 생성/업데이트
+      tx.set(slotRef, {
+        slotKey,
+        date: dateKey,
+        groupId,
+        message,
+        authorUid: uid,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        reactions: {},
+      });
+
+      // 이벤트 로그 생성
+      const eventRef = db
+        .collection("partnerGroups")
+        .doc(groupId)
+        .collection("events")
+        .doc();
+      const targetUids = groupData.memberUids.filter((u: string) => u !== uid);
+      tx.set(eventRef, {
+        type: "slot_message",
+        actorUid: uid,
+        targetUids,
+        slotId,
+        payload: {message: message.substring(0, 20)},
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    });
+
+    // 인박스 요약 카드 업데이트 (비동기)
+    await updateInboxCards(groupId, uid, "slot_message", dateKey);
+
+    return {success: true, slotId};
+  }
+);
+
+/**
+ * 슬롯 리액션 작성
+ */
+export const submitSlotReaction = onCall(
+  {region: "asia-northeast3"},
+  async (request) => {
+    const uid = request.auth?.uid;
+    if (!uid) {
+      throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+
+    const {groupId, slotId, emoji, phraseId, phraseText} = request.data;
+    if (!groupId || !slotId || !emoji || !phraseId || !phraseText) {
+      throw new HttpsError(
+        "invalid-argument",
+        "필수 파라미터가 누락되었습니다."
+      );
+    }
+
+    // 그룹 멤버 확인
+    const groupDoc = await db.collection("partnerGroups").doc(groupId).get();
+    if (!groupDoc.exists) {
+      throw new HttpsError("not-found", "그룹을 찾을 수 없습니다.");
+    }
+    const groupData = groupDoc.data()!;
+    if (!groupData.memberUids.includes(uid)) {
+      throw new HttpsError(
+        "permission-denied",
+        "그룹 멤버만 리액션할 수 있습니다."
+      );
+    }
+
+    // 슬롯 문서 확인
+    const slotRef = db
+      .collection("partnerGroups")
+      .doc(groupId)
+      .collection("slots")
+      .doc(slotId);
+    const slotSnap = await slotRef.get();
+    if (!slotSnap.exists || !slotSnap.data()?.message) {
+      throw new HttpsError(
+        "failed-precondition",
+        "한마디가 있어야 리액션할 수 있습니다."
+      );
+    }
+
+    // 리액션 저장
+    await slotRef.update({
+      [`reactions.${uid}`]: {
+        emoji,
+        phraseId,
+        phraseText,
+        reactedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+    });
+
+    // 이벤트 로그 생성
+    const eventRef = db
+      .collection("partnerGroups")
+      .doc(groupId)
+      .collection("events")
+      .doc();
+    const targetUids = groupData.memberUids.filter((u: string) => u !== uid);
+    await eventRef.set({
+      type: "reaction",
+      actorUid: uid,
+      targetUids,
+      slotId,
+      payload: {emoji, phraseText},
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // 인박스 요약 카드 업데이트
+    const dateKey = slotId.split("_")[0];
+    await updateInboxCards(groupId, uid, "reaction", dateKey);
+
+    return {success: true};
+  }
+);
+
+/**
+ * 인박스 요약 카드 읽음 처리
+ */
+export const markInboxRead = onCall(
+  {region: "asia-northeast3"},
+  async (request) => {
+    const uid = request.auth?.uid;
+    if (!uid) {
+      throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+
+    const {inboxId} = request.data;
+    if (!inboxId) {
+      throw new HttpsError("invalid-argument", "inboxId가 필요합니다.");
+    }
+
+    await db
+      .collection("users")
+      .doc(uid)
+      .collection("partnerInbox")
+      .doc(inboxId)
+      .update({
+        unread: false,
+        readAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+    return {success: true};
+  }
+);
+
+/**
+ * 인박스 요약 카드 업데이트 (내부 헬퍼)
+ */
+async function updateInboxCards(
+  groupId: string,
+  actorUid: string,
+  actionType: string,
+  dateKey: string
+) {
+  try {
+    // 그룹 멤버 가져오기
+    const groupDoc = await db.collection("partnerGroups").doc(groupId).get();
+    if (!groupDoc.exists) return;
+    const groupData = groupDoc.data()!;
+    const memberUids = groupData.memberUids as string[];
+
+    // 행동한 사람의 프로필 가져오기
+    const actorDoc = await db.collection("users").doc(actorUid).get();
+    const actorData = actorDoc.data();
+    const actorRegion = actorData?.region ?? "";
+    const actorCareerBucket = actorData?.careerBucket ?? "";
+
+    // 나머지 멤버들의 인박스 업데이트
+    const targetUids = memberUids.filter((u) => u !== actorUid);
+    const inboxId = `${groupId}_${dateKey}`;
+
+    for (const targetUid of targetUids) {
+      const inboxRef = db
+        .collection("users")
+        .doc(targetUid)
+        .collection("partnerInbox")
+        .doc(inboxId);
+
+      await db.runTransaction(async (tx) => {
+        const inboxSnap = await tx.get(inboxRef);
+        let items: any[] = [];
+
+        if (inboxSnap.exists) {
+          items = inboxSnap.data()?.items ?? [];
+        }
+
+        // 같은 actorUid가 있는지 찾기
+        const existingIndex = items.findIndex(
+          (item) => item.actorUid === actorUid
+        );
+
+        const actionLabel =
+          actionType === "slot_message" ? "한마디 1개" : "리액션 1개";
+
+        if (existingIndex >= 0) {
+          // 기존 항목 업데이트
+          const lines = items[existingIndex].lines ?? [];
+          lines.push(actionLabel);
+          items[existingIndex].lines = lines;
+          items[existingIndex].lastAt =
+            admin.firestore.FieldValue.serverTimestamp();
+        } else {
+          // 새 항목 추가
+          items.push({
+            actorUid,
+            actorRegion,
+            actorCareerBucket,
+            lines: [actionLabel],
+            lastAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        }
+
+        tx.set(
+          inboxRef,
+          {
+            groupId,
+            date: dateKey,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            items,
+            unread: true,
+          },
+          {merge: true}
+        );
+      });
+    }
+  } catch (e) {
+    logger.error("updateInboxCards error:", e);
+  }
+}

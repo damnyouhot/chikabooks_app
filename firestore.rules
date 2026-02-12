@@ -1,6 +1,61 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // ══════════════════════════════════════════════════
+    // 파트너 그룹
+    // ══════════════════════════════════════════════════
+    match /partnerGroups/{groupId} {
+      // 그룹 멤버만 읽기 가능
+      allow read: if request.auth != null && 
+                     request.auth.uid in resource.data.memberUids;
+      // 쓰기는 서버만 (Cloud Functions)
+      allow write: if false;
+
+      // ── 슬롯 (서버만 쓰기) ──
+      match /slots/{slotId} {
+        allow read: if request.auth != null && 
+                       request.auth.uid in get(/databases/$(database)/documents/partnerGroups/$(groupId)).data.memberUids;
+        allow write: if false; // 서버만
+      }
+
+      // ── 이벤트 로그 (서버 내부용) ──
+      match /events/{eventId} {
+        allow read: if false; // 클라이언트 읽기 금지
+        allow write: if false; // 서버만
+      }
+
+      // ── 멤버 메타 ──
+      match /memberMeta/{uid} {
+        allow read: if request.auth != null && 
+                       request.auth.uid in get(/databases/$(database)/documents/partnerGroups/$(groupId)).data.memberUids;
+        allow write: if false;
+      }
+
+      // ── 활동 로그 (기존) ──
+      match /activityLogs/{logId} {
+        allow read: if request.auth != null && 
+                       request.auth.uid in get(/databases/$(database)/documents/partnerGroups/$(groupId)).data.memberUids;
+        allow write: if false;
+      }
+    }
+
+    // ══════════════════════════════════════════════════
+    // 유저
+    // ══════════════════════════════════════════════════
+    match /users/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if request.auth != null && request.auth.uid == uid;
+
+      // ── 파트너 인박스 (서버만 쓰기) ──
+      match /partnerInbox/{inboxId} {
+        allow read: if request.auth != null && request.auth.uid == uid;
+        allow write: if false; // 서버만
+      }
+    }
+
+    // ══════════════════════════════════════════════════
+    // 기타 컬렉션 (임시로 전체 허용)
+    // ══════════════════════════════════════════════════
     match /{document=**} {
       allow read, write: if true;
     }

@@ -1,44 +1,51 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../services/activity_log_service.dart';
-import '../services/bond_score_service.dart';
-import '../services/partner_dialogue_service.dart';
-import '../services/store_service.dart';
+import 'package:flutter/services.dart';
+import 'package:rive/rive.dart';
+import '../services/caring_state_service.dart';
 import '../services/user_action_service.dart';
 import '../services/user_profile_service.dart';
-import '../widgets/aura_circle_widget.dart';
-import 'emotion_record_page.dart';
-import 'settings/communion_profile_page.dart';
+import '../services/bond_score_service.dart';
 
-/// 돌보기(홈) 탭 — 오라 원 + 세그먼트(오늘/함께)
+/// 돌보기(1탭) — 아침 인사 리추얼 + 4 아이콘 + 재우기/깨우기
 ///
-/// 오늘: 중앙 오라 원 + 미니멀 액션 버튼
-/// 함께: 결 탭(교류)으로의 안내
+/// 상태 흐름:
+///   새 날짜 + 자고있음 → 디밍 + [아침 인사] → 깨우기+인사+출석 → 4버튼
+///   새 날짜 + 깨어있음 → [아침 인사] 버튼만 → 인사+출석 → 4버튼
+///   같은 날 + 자고있음 → 디밍 + [깨우기] → 깨우기 → 4버튼
+///   같은 날 + 인사완료 → 4버튼 정상
 class CaringPage extends StatefulWidget {
-  /// 결 탭으로 이동하기 위한 콜백 (MyHome에서 주입)
-  final VoidCallback? onNavigateToBond;
+  /// 성장(3탭)으로 이동하기 위한 콜백
+  final VoidCallback? onNavigateToGrowth;
 
-  const CaringPage({super.key, this.onNavigateToBond});
+  const CaringPage({super.key, this.onNavigateToGrowth});
 
   @override
   State<CaringPage> createState() => _CaringPageState();
 }
 
-class _CaringPageState extends State<CaringPage> {
-  // ── 세그먼트 ──
-  int _segmentIndex = 0; // 0: 오늘, 1: 함께
-
-  // ── 결 점수 + 텍스트 ──
+class _CaringPageState extends State<CaringPage>
+    with SingleTickerProviderStateMixin {
+  // ── 상태 ──
+  bool _loading = true;
+  bool _isSleeping = false;
+  bool _hasGreetedToday = false;
   double _bondScore = 50.0;
-  String _defaultText = '오늘도 여기.';
-  String? _feedbackText; // 즉시 피드백 (3~5초)
 
-  // ── 파트너 ──
-  String? _partnerGroupId;
-  String? _ambientLine;
+  // ── 캐릭터 텍스트 ──
+  String _displayText = '';
+  String? _feedbackText;
 
-  // ── 기본 정서 문장 풀 ──
+  // ── 디밍 애니메이션 ──
+  late AnimationController _dimController;
+  late Animation<double> _dimAnimation;
+
+  // ── Rive 관련 ──
+  Artboard? _dogArtboard;
+  StateMachineController? _dogStateMachine;
+  SMITrigger? _tapTrigger;
+
+  // ── 정서 문장 풀 (죄책감 유발 멘트 금지) ──
   static const List<String> _neutralPhrases = [
     '오늘도 여기.',
     '천천히 해도 괜찮아.',
@@ -53,193 +60,162 @@ class _CaringPageState extends State<CaringPage> {
   @override
   void initState() {
     super.initState();
-    _defaultText = _neutralPhrases[Random().nextInt(_neutralPhrases.length)];
-    _loadData();
+    _displayText = _neutralPhrases[Random().nextInt(_neutralPhrases.length)];
+
+    _dimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    _dimAnimation = CurvedAnimation(
+      parent: _dimController,
+      curve: Curves.easeInOut,
+    );
+
+    _loadRiveFile();
+    _loadState();
   }
 
-  /// 결 점수, 파트너 상태, 중심회귀 등 초기 로드
-  Future<void> _loadData() async {
+  /// Rive 파일 로드 및 State Machine 연결
+  Future<void> _loadRiveFile() async {
     try {
-      final score = await UserProfileService.getBondScore();
-      await BondScoreService.applyCenterGravity();
-      final groupId = await UserProfileService.getPartnerGroupId();
+      final data = await rootBundle.load('assets/dog.riv');
+      final file = RiveFile.import(data);
+      final artboard = file.mainArtboard.instance();
 
-      String? line;
-      if (groupId != null) {
-        final logs = await ActivityLogService.getUnreadLogs(groupId);
-        line = PartnerDialogueService.generateAmbientLine(logs);
+      // State Machine 연결 (트리거 확인)
+      final controller = StateMachineController.fromArtboard(
+        artboard,
+        'State Machine 1', // dog.riv의 State Machine 이름
+      );
+
+      if (controller != null) {
+        artboard.addController(controller);
+        _dogStateMachine = controller;
+
+        // 'tap' 트리거 찾기
+        _tapTrigger = controller.findInput<bool>('tap') as SMITrigger?;
+        
+        if (_tapTrigger != null) {
+          debugPrint('✅ dog.riv tap 트리거 연결 성공');
+        } else {
+          debugPrint('⚠️ tap 트리거를 찾을 수 없습니다');
+        }
       }
 
       if (mounted) {
-        setState(() {
-          _bondScore = score;
-          _partnerGroupId = groupId;
-          _ambientLine = line;
-        });
+        setState(() => _dogArtboard = artboard);
       }
-    } catch (_) {}
-  }
-
-  /// 즉시 피드백 표시 (3초 후 자동 해제)
-  void _showFeedback(String text) {
-    setState(() => _feedbackText = text);
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) setState(() => _feedbackText = null);
-    });
-  }
-
-  // ── 액션 핸들러 ──
-
-  void _onCheerUp() async {
-    final success = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(builder: (_) => const EmotionRecordPage()),
-    );
-    if (success == true && mounted) {
-      _showFeedback('마음을 기록했어.');
+    } catch (e) {
+      debugPrint('❌ dog.riv 로드 실패: $e');
     }
   }
 
+  @override
+  void dispose() {
+    _dogStateMachine?.dispose();
+    _dimController.dispose();
+    super.dispose();
+  }
+
+  /// Firestore에서 상태 로드
+  Future<void> _loadState() async {
+    try {
+      final state = await CaringStateService.loadState();
+      final score = await UserProfileService.getBondScore();
+      await BondScoreService.applyCenterGravity();
+
+      if (!mounted) return;
+
+      final greeted = CaringStateService.hasGreetedToday(state);
+
+      setState(() {
+        _isSleeping = state.isSleeping;
+        _hasGreetedToday = greeted;
+        _bondScore = score;
+        _loading = false;
+      });
+
+      // 디밍 상태 반영
+      if (_isSleeping) {
+        _dimController.value = 1.0;
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  // ═══════════════════════════════════════════════
+  // 핸들러
+  // ═══════════════════════════════════════════════
+
+  /// 아침 인사 (출석 통합 + 깨우기 통합)
+  Future<void> _onGreeting() async {
+    final msg = await CaringStateService.completeGreeting();
+    if (!mounted) return;
+
+    // 디밍 해제 (자고있었으면)
+    if (_isSleeping) {
+      _dimController.reverse();
+    }
+
+    setState(() {
+      _isSleeping = false;
+      _hasGreetedToday = true;
+    });
+    _showFeedback(msg);
+  }
+
+  /// 깨우기 (같은 날, 아침 인사 이미 완료)
+  Future<void> _onWake() async {
+    await CaringStateService.wake();
+    if (!mounted) return;
+
+    _dimController.reverse();
+    setState(() => _isSleeping = false);
+    _showFeedback('좋은 아침.');
+  }
+
+  /// 밥주기
   void _onFeed() async {
+    _tapTrigger?.fire(); // 🔥 Rive 트리거 발동
     final msg = await UserActionService.feed();
     if (mounted) _showFeedback(msg);
   }
 
-  void _onCheckIn() async {
-    final msg = await UserActionService.dailyCheckIn();
-    if (mounted) _showFeedback(msg);
+  /// 이야기나누기 (추후 기능 추가 예정)
+  void _onTalk() {
+    // 트리거 작동 안 함 (사용자 요청)
+    _showFeedback('이야기나누기 기능은 곧 추가될 예정입니다.');
   }
 
-  void _onDressUp() {
-    final storeService = context.read<StoreService>();
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        return FutureBuilder(
-          future: storeService.fetchMyItems(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const SizedBox(
-                height: 200,
-                child: Center(child: CircularProgressIndicator()),
-              );
-            }
-            if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              return const SizedBox(
-                height: 200,
-                child: Center(
-                  child: Text(
-                    '보유한 아이템이 없습니다.',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                ),
-              );
-            }
-            final myItems = snapshot.data!;
-            return GridView.builder(
-              padding: const EdgeInsets.all(24),
-              shrinkWrap: true,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 4,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-              ),
-              itemCount: myItems.length + 1,
-              itemBuilder: (context, index) {
-                if (index == 0) {
-                  return Tooltip(
-                    message: "아이템 해제",
-                    child: InkWell(
-                      onTap: () {
-                        UserActionService.equipSkin(null);
-                        Navigator.pop(context);
-                      },
-                      child: const CircleAvatar(
-                        backgroundColor: Colors.grey,
-                        child: Icon(Icons.do_not_disturb_on,
-                            color: Colors.white),
-                      ),
-                    ),
-                  );
-                }
-                final item = myItems[index - 1];
-                return Tooltip(
-                  message: item.name,
-                  child: InkWell(
-                    onTap: () {
-                      UserActionService.equipSkin(item.id);
-                      Navigator.pop(context);
-                    },
-                    child: CircleAvatar(
-                      backgroundImage: NetworkImage(item.imageUrl),
-                    ),
-                  ),
-                );
-              },
-            );
-          },
-        );
-      },
-    );
+  /// 성장하기 → 3탭으로 전환
+  void _onStudy() {
+    widget.onNavigateToGrowth?.call();
   }
 
+  /// 재우기
+  Future<void> _onSleep() async {
+    await CaringStateService.sleep();
+    if (!mounted) return;
+
+    _dimController.forward();
+    setState(() => _isSleeping = true);
+  }
+
+  /// 오라 원 탭
   void _onCircleTap() {
+    _tapTrigger?.fire(); // 🔥 Rive 트리거 발동
     _showFeedback(
       _neutralPhrases[Random().nextInt(_neutralPhrases.length)],
     );
   }
 
-  /// 길게 누르기 → 상태 요약 오버레이
-  void _onCircleLongPress() {
-    showDialog(
-      context: context,
-      barrierColor: Colors.black12,
-      builder: (_) => Center(
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 48),
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                '결 ${_bondScore.toInt()}',
-                style: const TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w300,
-                  color: Color(0xFF1E88E5),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                BondScoreService.scoreLabel(_bondScore),
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[500],
-                ),
-              ),
-              if (_partnerGroupId != null) ...[
-                const SizedBox(height: 12),
-                Text(
-                  '파트너 그룹 활성',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[400],
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
+  /// 피드백 표시 (3초 후 해제)
+  void _showFeedback(String text) {
+    setState(() => _feedbackText = text);
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) setState(() => _feedbackText = null);
+    });
   }
 
   // ═══════════════════════════════════════════════
@@ -248,48 +224,123 @@ class _CaringPageState extends State<CaringPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Container(
-        // 배경: 흰색 → 아주 연한 블루 그라데이션
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFFCFCFF),
-              Color(0xFFF4F6FB),
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // ── 상단 바: 설정 아이콘만 ──
-              _buildTopBar(),
+      backgroundColor: const Color(0xFFF1F7F7), // 메인 배경
+      body: Stack(
+        children: [
+          // ── 메인 콘텐츠 (dog.riv 전체화면 + 버튼들) ──
+          _buildMainContent(),
 
-              // ── 세그먼트 컨트롤: 오늘 / 함께 ──
-              _buildSegmentControl(),
-
-              const SizedBox(height: 8),
-
-              // ── 콘텐츠 ──
-              Expanded(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 300),
-                  child: _segmentIndex == 0
-                      ? _buildTodaySegment()
-                      : _buildTogetherSegment(),
-                ),
-              ),
-            ],
-          ),
-        ),
+          // ── 디밍 오버레이 (재우기 시) ──
+          _buildDimOverlay(),
+        ],
       ),
     );
   }
 
-  // ── 상단 바 ──
+  // ── 디자인 컬러 팔레트 ──
+  static const _colorAccent = Color(0xFFF7CBCA);    // 미술적 포인트
+  static const _colorText = Color(0xFF5D6B6B);       // 텍스트/메시지
+  static const _colorBg = Color(0xFFF1F7F7);         // 메인 배경
+  static const _colorShadow1 = Color(0xFFDDD3D8);    // 흐린 명암1
+  static const _colorShadow2 = Color(0xFFD5E5E5);    // 흐린 명암2
+
+  Widget _buildMainContent() {
+    return Stack(
+      children: [
+        // ── 1. dog.riv 전체 화면 (캐릭터 영역) ──
+        Positioned.fill(
+          child: GestureDetector(
+            onTap: _onCircleTap,
+            child: _dogArtboard != null
+                ? Rive(
+                    artboard: _dogArtboard!,
+                    fit: BoxFit.cover,
+                    alignment: Alignment.center,
+                  )
+                : Container(
+                    color: _colorBg,
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        color: _colorAccent,
+                        strokeWidth: 1.5, // 가느다란 라인
+                      ),
+                    ),
+                  ),
+          ),
+        ),
+
+        // ── 2. 상단 바 (설정) ──
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: SafeArea(
+            bottom: false,
+            child: _buildTopBar(),
+          ),
+        ),
+
+        // ── 3. 캐릭터 아래 텍스트 ──
+        Positioned(
+          bottom: 140,
+          left: 0,
+          right: 0,
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _feedbackText ?? _displayText,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w400,
+                    color: _colorText,
+                    letterSpacing: 0.3,
+                    height: 1.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                if (_feedbackText != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    '결 ${_bondScore.toInt()}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w300,
+                      color: _colorText.withOpacity(0.5),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+
+        // ── 4. 하단 버튼들 ──
+        Positioned(
+          bottom: 0,
+          left: 0,
+          right: 0,
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 28),
+              child: _buildBottomSection(),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 상단 바
   Widget _buildTopBar() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -298,13 +349,9 @@ class _CaringPageState extends State<CaringPage> {
         children: [
           IconButton(
             icon: Icon(Icons.settings_outlined,
-                color: Colors.grey[400], size: 22),
+                color: _colorText.withOpacity(0.4), size: 20),
             onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => const CommunionProfilePage()),
-              );
+              // 설정 화면은 기존 유지 (프로필 등)
             },
           ),
         ],
@@ -312,236 +359,182 @@ class _CaringPageState extends State<CaringPage> {
     );
   }
 
-  // ── 세그먼트 컨트롤 ──
-  Widget _buildSegmentControl() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 60),
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF0F0F5),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        children: [
-          _buildSegmentButton(0, '오늘'),
-          _buildSegmentButton(1, '함께'),
-        ],
-      ),
-    );
+  /// 하단 섹션: 아침 인사 or 4 아이콘
+  Widget _buildBottomSection() {
+    // 아직 오늘 인사 안 했으면 → 아침 인사 버튼만
+    if (!_hasGreetedToday) {
+      return _buildGreetingButton();
+    }
+
+    // 인사 완료 → 4 아이콘
+    return _buildFourActions();
   }
 
-  Widget _buildSegmentButton(int index, String label) {
-    final isSelected = _segmentIndex == index;
-    return Expanded(
+  /// 아침 인사 버튼 (단독)
+  Widget _buildGreetingButton() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 60),
       child: GestureDetector(
-        onTap: () => setState(() => _segmentIndex = index),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 8),
+        onTap: _onGreeting,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 16),
           decoration: BoxDecoration(
-            color: isSelected ? Colors.white : Colors.transparent,
-            borderRadius: BorderRadius.circular(17),
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-              color: isSelected ? const Color(0xFF424242) : Colors.grey[400],
+            color: Colors.white.withOpacity(0.85),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: _colorShadow2.withOpacity(0.4),
+              width: 0.5, // 가느다란 라인
             ),
+            boxShadow: [
+              BoxShadow(
+                color: _colorShadow1.withOpacity(0.15),
+                blurRadius: 20,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-        ),
-      ),
-    );
-  }
-
-  // ═══════════════════════════════════════════════
-  // "오늘" 세그먼트 (원래 그대로)
-  // ═══════════════════════════════════════════════
-
-  Widget _buildTodaySegment() {
-    final displayText = _feedbackText ?? _ambientLine ?? _defaultText;
-
-    return Column(
-      key: const ValueKey('today'),
-      children: [
-        // ── 중앙 오라 원 ──
-        Expanded(
-          child: Center(
-            child: AuraCircleWidget(
-              bondScore: _bondScore,
-              mainText: displayText,
-              subText: '결 ${_bondScore.toInt()}',
-              onTap: _onCircleTap,
-              onLongPress: _onCircleLongPress,
-            ),
-          ),
-        ),
-
-        // ── 액션 버튼 (축소/모노톤) ──
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 40),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          child: const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _buildMiniAction(Icons.edit_note_outlined, '응원', _onCheerUp),
-              _buildMiniAction(Icons.local_dining_outlined, '기록', _onFeed),
-              _buildMiniAction(
-                  Icons.check_circle_outline, '출석', _onCheckIn),
-              _buildMiniAction(Icons.palette_outlined, '꾸미기', _onDressUp),
+              Text('👋', style: TextStyle(fontSize: 20)),
+              SizedBox(width: 8),
+              Text(
+                '아침 인사',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  color: _colorText,
+                ),
+              ),
             ],
           ),
         ),
-        const SizedBox(height: 28),
-      ],
+      ),
     );
   }
 
-  /// 미니 액션 버튼 (축소 + 모노톤)
-  Widget _buildMiniAction(IconData icon, String label, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+  /// 4개 아이콘 버튼 (텍스트/멘트 없음, 아이콘만)
+  Widget _buildFourActions() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 40),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: const BoxDecoration(
-              color: Color(0xFFF5F5F8),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: Colors.grey[500], size: 20),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              color: Colors.grey[400],
-              fontWeight: FontWeight.w500,
-            ),
-          ),
+          _buildIconAction(Icons.restaurant_outlined, _onFeed),
+          _buildIconAction(Icons.chat_bubble_outline, _onTalk), // 이야기나누기로 변경
+          _buildIconAction(Icons.menu_book_outlined, _onStudy),
+          _buildIconAction(Icons.nights_stay_outlined, _onSleep),
         ],
       ),
     );
   }
 
+  /// 아이콘 전용 버튼 (가느다란 라인 + 팔레트 적용)
+  Widget _buildIconAction(IconData icon, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 52,
+        height: 52,
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.7),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: _colorShadow2.withOpacity(0.5),
+            width: 0.5, // 가느다란 라인
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: _colorShadow1.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Icon(icon, color: _colorText.withOpacity(0.6), size: 22),
+      ),
+    );
+  }
+
   // ═══════════════════════════════════════════════
-  // "함께" 세그먼트 → 결 탭으로 안내
+  // 디밍 오버레이 (재우기 상태)
   // ═══════════════════════════════════════════════
 
-  Widget _buildTogetherSegment() {
-    return Center(
-      key: const ValueKey('together'),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // 일러스트 대용 아이콘
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    const Color(0xFF00E5FF).withOpacity(0.12),
-                    const Color(0xFF1E88E5).withOpacity(0.10),
-                  ],
-                ),
-              ),
-              child: Icon(
-                Icons.all_inclusive,
-                size: 32,
-                color: const Color(0xFF1E88E5).withOpacity(0.5),
-              ),
-            ),
-            const SizedBox(height: 24),
+  Widget _buildDimOverlay() {
+    return AnimatedBuilder(
+      animation: _dimAnimation,
+      builder: (context, _) {
+        if (_dimAnimation.value <= 0.01) {
+          return const SizedBox.shrink();
+        }
 
-            const Text(
-              '함께하는 공간',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w500,
-                color: Color(0xFF424242),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '한 줄 멘트, 파트너, 공감 등\n교류 기능은 결 탭에서 만나보세요.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey[450],
-                height: 1.6,
-              ),
-            ),
-            const SizedBox(height: 32),
-
-            // 결 탭으로 이동 버튼
-            GestureDetector(
-              onTap: widget.onNavigateToBond,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF9E9EBE).withOpacity(0.08),
-                      blurRadius: 16,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
+        return Container(
+          color: Color.fromRGBO(93, 107, 107, 0.6 * _dimAnimation.value),
+          child: SafeArea(
+            child: Center(
+              child: Opacity(
+                opacity: _dimAnimation.value,
+                child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF00E5FF), Color(0xFF1E88E5)],
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF00BCD4).withOpacity(0.15),
-                            blurRadius: 6,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 10),
+                    // 달 아이콘
+                    const Text('🌙', style: TextStyle(fontSize: 48)),
+                    const SizedBox(height: 24),
+
+                    // 잠자는 중 텍스트
                     const Text(
-                      '결 탭으로 이동',
+                      '쉬고 있어요.',
                       style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: Color(0xFF555566),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w300,
+                        color: Colors.white70,
+                        letterSpacing: 0.5,
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    Icon(Icons.arrow_forward_ios,
-                        size: 12, color: Colors.grey[400]),
+                    const SizedBox(height: 48),
+
+                    // 깨우기 / 아침 인사 버튼
+                    _buildWakeButton(),
                   ],
                 ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// 깨우기/아침 인사 버튼 (디밍 위 표시)
+  Widget _buildWakeButton() {
+    final isNewDay = !_hasGreetedToday;
+    final label = isNewDay ? '아침 인사' : '깨우기';
+    final icon = isNewDay ? '👋' : '☀️';
+
+    return GestureDetector(
+      onTap: isNewDay ? _onGreeting : _onWake,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: Colors.white.withOpacity(0.2),
+            width: 0.5, // 가느다란 라인
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(icon, style: const TextStyle(fontSize: 18)),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w400,
+                color: Colors.white70,
               ),
             ),
           ],

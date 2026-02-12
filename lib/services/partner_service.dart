@@ -5,6 +5,9 @@ import 'package:flutter/foundation.dart';
 import '../models/partner_group.dart';
 import '../models/daily_slot.dart';
 import '../models/activity_log.dart';
+import '../models/slot_status.dart';
+import '../models/slot_message.dart';
+import '../models/inbox_card.dart';
 import 'bond_score_service.dart';
 import 'user_profile_service.dart';
 
@@ -306,6 +309,128 @@ class PartnerService {
     } catch (e) {
       return null;
     }
+  }
+
+  // ═══════════════════════ 새로운 슬롯 시스템 (서버 기준) ═══════════════════════
+
+  /// 서버 시간 기준 슬롯 상태 가져오기
+  static Future<SlotStatus?> getSlotStatus(String groupId) async {
+    try {
+      final callable = FirebaseFunctions.instanceFor(
+        region: 'asia-northeast3',
+      ).httpsCallable('getSlotStatus');
+
+      final result = await callable.call<Map<String, dynamic>>({'groupId': groupId});
+      return SlotStatus.fromMap(result.data);
+    } on FirebaseFunctionsException catch (e) {
+      debugPrint('⚠️ getSlotStatus error: ${e.code} ${e.message}');
+      return null;
+    } catch (e) {
+      debugPrint('⚠️ getSlotStatus error: $e');
+      return null;
+    }
+  }
+
+  /// 슬롯 한마디 작성 (서버 검증)
+  static Future<bool> submitSlotMessage({
+    required String groupId,
+    required String message,
+  }) async {
+    try {
+      final callable = FirebaseFunctions.instanceFor(
+        region: 'asia-northeast3',
+      ).httpsCallable('submitSlotMessage');
+
+      await callable.call<Map<String, dynamic>>({
+        'groupId': groupId,
+        'message': message,
+      });
+      return true;
+    } on FirebaseFunctionsException catch (e) {
+      debugPrint('⚠️ submitSlotMessage error: ${e.code} ${e.message}');
+      return false;
+    } catch (e) {
+      debugPrint('⚠️ submitSlotMessage error: $e');
+      return false;
+    }
+  }
+
+  /// 슬롯 리액션 작성 (서버 검증)
+  static Future<bool> submitSlotReaction({
+    required String groupId,
+    required String slotId,
+    required String emoji,
+    required String phraseId,
+    required String phraseText,
+  }) async {
+    try {
+      final callable = FirebaseFunctions.instanceFor(
+        region: 'asia-northeast3',
+      ).httpsCallable('submitSlotReaction');
+
+      await callable.call<Map<String, dynamic>>({
+        'groupId': groupId,
+        'slotId': slotId,
+        'emoji': emoji,
+        'phraseId': phraseId,
+        'phraseText': phraseText,
+      });
+      return true;
+    } on FirebaseFunctionsException catch (e) {
+      debugPrint('⚠️ submitSlotReaction error: ${e.code} ${e.message}');
+      return false;
+    } catch (e) {
+      debugPrint('⚠️ submitSlotReaction error: $e');
+      return false;
+    }
+  }
+
+  /// 인박스 읽음 처리
+  static Future<bool> markInboxRead(String inboxId) async {
+    try {
+      final callable = FirebaseFunctions.instanceFor(
+        region: 'asia-northeast3',
+      ).httpsCallable('markInboxRead');
+
+      await callable.call<Map<String, dynamic>>({'inboxId': inboxId});
+      return true;
+    } on FirebaseFunctionsException catch (e) {
+      debugPrint('⚠️ markInboxRead error: ${e.code} ${e.message}');
+      return false;
+    } catch (e) {
+      debugPrint('⚠️ markInboxRead error: $e');
+      return false;
+    }
+  }
+
+  /// 슬롯 메시지 스트림 (실시간 업데이트)
+  static Stream<SlotMessage?> streamSlotMessage(String groupId, String slotId) {
+    return _db
+        .collection('partnerGroups')
+        .doc(groupId)
+        .collection('slots')
+        .doc(slotId)
+        .snapshots()
+        .map((snap) {
+      if (!snap.exists) return null;
+      return SlotMessage.fromDoc(snap);
+    });
+  }
+
+  /// 인박스 카드 스트림 (읽지 않은 것만)
+  static Stream<List<InboxCard>> streamInboxCards() {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return Stream.value([]);
+
+    return _db
+        .collection('users')
+        .doc(uid)
+        .collection('partnerInbox')
+        .where('unread', isEqualTo: true)
+        .orderBy('createdAt', descending: true)
+        .limit(20)
+        .snapshots()
+        .map((snap) => snap.docs.map(InboxCard.fromDoc).toList());
   }
 
   // ═══════════════════════ 매칭풀 ═══════════════════════

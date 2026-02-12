@@ -3,19 +3,23 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:provider/provider.dart';
+import 'package:rive/rive.dart';
 
 import 'firebase_options.dart';
 import 'notifiers/job_filter_notifier.dart';
 import 'pages/bond_page.dart';
 import 'pages/caring_page.dart';
 import 'pages/job_page.dart';
-import 'pages/store/store_tab.dart';
+import 'pages/growth_page.dart';
 import 'services/ebook_service.dart';
 import 'services/job_service.dart';
 import 'services/store_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Rive 초기화
+  await RiveFile.initialize();
 
   // 중복 초기화 에러 무시
   try {
@@ -129,21 +133,21 @@ class MyHome extends StatefulWidget {
 class _MyHomeState extends State<MyHome> {
   int _selectedIndex = 0;
 
-  /// 결 탭 인덱스
-  static const int _bondTabIndex = 1;
+  /// 성장 탭 인덱스
+  static const int _growthTabIndex = 2;
 
   void _onTap(int idx) => setState(() => _selectedIndex = idx);
 
-  /// CaringPage에서 "결 탭으로 이동" 콜백
-  void _goToBondTab() => setState(() => _selectedIndex = _bondTabIndex);
+  /// CaringPage에서 "성장 탭으로 이동" 콜백
+  void _goToGrowthTab() => setState(() => _selectedIndex = _growthTabIndex);
 
   @override
   Widget build(BuildContext context) {
     // CaringPage에 탭 전환 콜백 주입
     final pages = <Widget>[
-      CaringPage(onNavigateToBond: _goToBondTab),
+      CaringPage(onNavigateToGrowth: _goToGrowthTab),
       const BondPage(),
-      const StoreTab(),
+      const GrowthPage(),
       const JobPage(),
     ];
 
@@ -176,7 +180,7 @@ class _MyHomeState extends State<MyHome> {
           BottomNavigationBarItem(
             icon: Icon(Icons.menu_book_outlined),
             activeIcon: Icon(Icons.menu_book),
-            label: '서재',
+            label: '성장',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.work_outline),
