@@ -6,6 +6,9 @@ import '../../services/job_service.dart';
 import '../../widgets/job_card.dart';
 import '../../widgets/filter_bar.dart';
 
+// ── 디자인 팔레트 (2탭과 통일) ──
+const _kText = Color(0xFF5D6B6B);
+
 class JobListScreen extends StatelessWidget {
   const JobListScreen({super.key});
 
@@ -31,15 +34,20 @@ class JobListScreen extends StatelessWidget {
                 return const Center(child: CircularProgressIndicator());
               }
               if (snapshot.hasError) {
-                return Center(child: Text('오류 발생: ${snapshot.error}'));
+                return Center(
+                  child: Text(
+                    '오류 발생: ${snapshot.error}',
+                    style: TextStyle(fontSize: 14, color: _kText.withOpacity(0.6)),
+                  ),
+                );
               }
               final jobs = snapshot.data ?? [];
 
               if (jobs.isEmpty) {
-                return const Center(
+                return Center(
                   child: Text(
                     '조건에 맞는 공고가 없습니다.',
-                    style: TextStyle(fontSize: 15, color: Colors.grey),
+                    style: TextStyle(fontSize: 14, color: _kText.withOpacity(0.5)),
                   ),
                 );
               }

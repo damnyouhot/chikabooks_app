@@ -5,6 +5,13 @@ import '../services/ebook_service.dart';
 import 'ebook/ebook_detail_page.dart';
 import 'quiz_today_page.dart';
 
+// ── 디자인 팔레트 (2탭과 통일) ──
+const _kText = Color(0xFF5D6B6B);
+const _kBg = Color(0xFFF1F7F7);
+const _kShadow1 = Color(0xFFDDD3D8);
+const _kShadow2 = Color(0xFFD5E5E5);
+const _kCardBg = Colors.white;
+
 /// 성장 탭 (3탭)
 ///
 /// 내부 소탭 3개:
@@ -37,7 +44,7 @@ class _GrowthPageState extends State<GrowthPage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFCFCFF),
+      backgroundColor: _kBg,
       body: SafeArea(
         child: Column(
           children: [
@@ -74,7 +81,7 @@ class _GrowthPageState extends State<GrowthPage>
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF424242),
+            color: _kText,
           ),
         ),
       ),
@@ -85,33 +92,34 @@ class _GrowthPageState extends State<GrowthPage>
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFFF0F0F5),
+        color: _kShadow2,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _kShadow1, width: 0.5),
       ),
       child: TabBar(
         controller: _tabCtrl,
         indicator: BoxDecoration(
-          color: Colors.white,
+          color: _kCardBg,
           borderRadius: BorderRadius.circular(10),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
+              color: _kShadow1.withOpacity(0.3),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
             ),
           ],
         ),
         indicatorSize: TabBarIndicatorSize.tab,
         indicatorPadding: const EdgeInsets.all(3),
         dividerColor: Colors.transparent,
-        labelColor: const Color(0xFF424242),
-        unselectedLabelColor: Colors.grey[400],
+        labelColor: _kText,
+        unselectedLabelColor: _kText.withOpacity(0.4),
         labelStyle: const TextStyle(
-          fontSize: 13,
+          fontSize: 14,
           fontWeight: FontWeight.w600,
         ),
         unselectedLabelStyle: const TextStyle(
-          fontSize: 13,
+          fontSize: 14,
           fontWeight: FontWeight.w400,
         ),
         tabs: const [
@@ -149,16 +157,16 @@ class _MyLibraryView extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(Icons.menu_book_outlined,
-                    size: 48, color: Colors.grey[300]),
+                    size: 48, color: _kShadow1),
                 const SizedBox(height: 12),
                 Text(
                   '구매한 도서가 없습니다.',
-                  style: TextStyle(color: Colors.grey[400], fontSize: 14),
+                  style: TextStyle(color: _kText.withOpacity(0.6), fontSize: 14),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   '치과책방에서 도서를 만나보세요.',
-                  style: TextStyle(color: Colors.grey[350], fontSize: 12),
+                  style: TextStyle(color: _kText.withOpacity(0.4), fontSize: 12),
                 ),
               ],
             ),
@@ -177,7 +185,12 @@ class _MyLibraryView extends StatelessWidget {
                 .toList();
 
             if (myBooks.isEmpty) {
-              return const Center(child: Text('도서 정보를 불러오는 중...'));
+              return Center(
+                child: Text(
+                  '도서 정보를 불러오는 중...',
+                  style: TextStyle(color: _kText.withOpacity(0.6), fontSize: 14),
+                ),
+              );
             }
 
             return ListView.separated(
@@ -210,8 +223,16 @@ class _MyBookTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: _kCardBg,
           borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: _kShadow2, width: 0.5),
+          boxShadow: [
+            BoxShadow(
+              color: _kShadow1.withOpacity(0.15),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
+            ),
+          ],
         ),
         child: Row(
           children: [
@@ -225,8 +246,8 @@ class _MyBookTile extends StatelessWidget {
                 errorBuilder: (_, __, ___) => Container(
                   width: 52,
                   height: 68,
-                  color: Colors.grey[200],
-                  child: const Icon(Icons.book, color: Colors.grey),
+                  color: _kShadow2,
+                  child: Icon(Icons.book, color: _kText.withOpacity(0.3)),
                 ),
               ),
             ),
@@ -242,18 +263,18 @@ class _MyBookTile extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF424242),
+                      color: _kText,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     book.author,
-                    style: TextStyle(fontSize: 12, color: Colors.grey[400]),
+                    style: TextStyle(fontSize: 12, color: _kText.withOpacity(0.5)),
                   ),
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, color: Colors.grey[300], size: 20),
+            Icon(Icons.chevron_right, color: _kText.withOpacity(0.3), size: 20),
           ],
         ),
       ),
@@ -280,7 +301,12 @@ class _BookStoreBrowseView extends StatelessWidget {
         }
         final books = snap.data ?? [];
         if (books.isEmpty) {
-          return const Center(child: Text('등록된 전자책이 없습니다.'));
+          return Center(
+            child: Text(
+              '등록된 전자책이 없습니다.',
+              style: TextStyle(color: _kText.withOpacity(0.6), fontSize: 14),
+            ),
+          );
         }
 
         return GridView.builder(
@@ -304,15 +330,28 @@ class _BookStoreBrowseView extends StatelessWidget {
               child: Column(
                 children: [
                   Expanded(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.network(
-                        b.coverUrl,
-                        fit: BoxFit.cover,
-                        width: double.infinity,
-                        errorBuilder: (_, __, ___) => Container(
-                          color: Colors.grey[200],
-                          child: const Icon(Icons.image, color: Colors.grey),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: _kShadow2, width: 0.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: _kShadow1.withOpacity(0.15),
+                            blurRadius: 4,
+                            offset: const Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.network(
+                          b.coverUrl,
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          errorBuilder: (_, __, ___) => Container(
+                            color: _kShadow2,
+                            child: Icon(Icons.image, color: _kText.withOpacity(0.3)),
+                          ),
                         ),
                       ),
                     ),
@@ -322,7 +361,12 @@ class _BookStoreBrowseView extends StatelessWidget {
                     b.title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodyMedium,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: _kText,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
                 ],
               ),

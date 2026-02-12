@@ -4,6 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../notifiers/job_filter_notifier.dart';
 
+// ── 디자인 팔레트 (2탭과 통일) ──
+const _kAccent = Color(0xFFF7CBCA);
+const _kText = Color(0xFF5D6B6B);
+const _kShadow2 = Color(0xFFD5E5E5);
+const _kCardBg = Colors.white;
+
 class FilterBar extends StatefulWidget {
   const FilterBar({super.key});
 
@@ -26,9 +32,13 @@ class _FilterBarState extends State<FilterBar> {
     final jobFilter = context.watch<JobFilterNotifier>();
 
     return Card(
-      elevation: 2,
+      elevation: 0,
       margin: const EdgeInsets.all(8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      color: _kCardBg,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: _kShadow2, width: 0.5),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
@@ -36,12 +46,14 @@ class _FilterBarState extends State<FilterBar> {
             // 검색바
             TextField(
               controller: _searchController,
+              style: const TextStyle(fontSize: 14, color: _kText),
               decoration: InputDecoration(
                 hintText: '병원명, 지역으로 검색',
-                prefixIcon: const Icon(Icons.search),
+                hintStyle: TextStyle(fontSize: 14, color: _kText.withOpacity(0.4)),
+                prefixIcon: Icon(Icons.search, color: _kText.withOpacity(0.5)),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.clear),
+                        icon: Icon(Icons.clear, color: _kText.withOpacity(0.5)),
                         onPressed: () {
                           _searchController.clear();
                           jobFilter.setSearchQuery('');
@@ -50,10 +62,18 @@ class _FilterBarState extends State<FilterBar> {
                     : null,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
+                  borderSide: BorderSide(color: _kShadow2, width: 0.5),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: _kShadow2, width: 0.5),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: _kAccent, width: 1.0),
                 ),
                 filled: true,
-                fillColor: Colors.grey[100],
+                fillColor: _kShadow2.withOpacity(0.2),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16),
               ),
               onChanged: (value) => jobFilter.setSearchQuery(value),
@@ -65,17 +85,39 @@ class _FilterBarState extends State<FilterBar> {
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  const Text('직종: ', style: TextStyle(fontWeight: FontWeight.w500)),
+                  Text(
+                    '직종: ',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      color: _kText,
+                    ),
+                  ),
                   const SizedBox(width: 8),
                   ...['전체', '치과위생사', '치과조무사', '치과의사', '기타'].map(
                     (position) => Padding(
                       padding: const EdgeInsets.only(right: 6),
                       child: FilterChip(
-                        label: Text(position, style: const TextStyle(fontSize: 13)),
+                        label: Text(
+                          position,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: jobFilter.positionFilter == position
+                                ? _kText
+                                : _kText.withOpacity(0.6),
+                          ),
+                        ),
                         selected: jobFilter.positionFilter == position,
                         onSelected: (_) => jobFilter.setPositionFilter(position),
                         showCheckmark: false,
-                        selectedColor: Theme.of(context).primaryColor.withAlpha(50),
+                        selectedColor: _kAccent.withOpacity(0.5),
+                        backgroundColor: _kShadow2.withOpacity(0.3),
+                        side: BorderSide(
+                          color: jobFilter.positionFilter == position
+                              ? _kAccent
+                              : _kShadow2,
+                          width: 0.5,
+                        ),
                       ),
                     ),
                   ),
@@ -93,11 +135,15 @@ class _FilterBarState extends State<FilterBar> {
                   children: [
                     Text(
                       '상세 필터',
-                      style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                      style: TextStyle(
+                        color: _kText.withOpacity(0.6),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                     Icon(
                       _showAdvancedFilters ? Icons.expand_less : Icons.expand_more,
-                      color: Colors.grey[600],
+                      color: _kText.withOpacity(0.6),
                     ),
                   ],
                 ),
@@ -106,20 +152,43 @@ class _FilterBarState extends State<FilterBar> {
 
             // 고급 필터 (접기/펼치기)
             if (_showAdvancedFilters) ...[
-              const Divider(),
+              Divider(color: _kShadow2, thickness: 0.5),
               // 경력 필터
               Row(
                 children: [
-                  const Text('경력: ', style: TextStyle(fontWeight: FontWeight.w500)),
+                  Text(
+                    '경력: ',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      color: _kText,
+                    ),
+                  ),
                   const SizedBox(width: 8),
                   ...['전체', '신입', '경력'].map(
                     (career) => Padding(
                       padding: const EdgeInsets.only(right: 6),
                       child: ChoiceChip(
-                        label: Text(career),
+                        label: Text(
+                          career,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: jobFilter.careerFilter == career
+                                ? _kText
+                                : _kText.withOpacity(0.6),
+                          ),
+                        ),
                         selected: jobFilter.careerFilter == career,
                         onSelected: (_) => jobFilter.setCareerFilter(career),
                         showCheckmark: false,
+                        selectedColor: _kAccent.withOpacity(0.5),
+                        backgroundColor: _kShadow2.withOpacity(0.3),
+                        side: BorderSide(
+                          color: jobFilter.careerFilter == career
+                              ? _kAccent
+                              : _kShadow2,
+                          width: 0.5,
+                        ),
                       ),
                     ),
                   ),
@@ -130,17 +199,32 @@ class _FilterBarState extends State<FilterBar> {
               // 지역 필터
               Row(
                 children: [
-                  const Text('지역: ', style: TextStyle(fontWeight: FontWeight.w500)),
+                  Text(
+                    '지역: ',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      color: _kText,
+                    ),
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: DropdownButtonFormField<String>(
                       value: jobFilter.regionFilter,
+                      style: const TextStyle(fontSize: 14, color: _kText),
                       decoration: InputDecoration(
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: _kShadow2, width: 0.5),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: _kShadow2, width: 0.5),
                         ),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                         isDense: true,
+                        filled: true,
+                        fillColor: _kShadow2.withOpacity(0.2),
                       ),
                       items: [
                         '전체', '서울', '경기', '인천', '부산', '대구',
@@ -166,7 +250,11 @@ class _FilterBarState extends State<FilterBar> {
                 children: [
                   Text(
                     '급여: ${jobFilter.salaryRange.start.round()}~${jobFilter.salaryRange.end.round() >= 10000 ? "협의" : "${jobFilter.salaryRange.end.round()}만"}',
-                    style: const TextStyle(fontWeight: FontWeight.w500),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      color: _kText,
+                    ),
                   ),
                 ],
               ),
@@ -175,6 +263,8 @@ class _FilterBarState extends State<FilterBar> {
                 min: 0,
                 max: 10000,
                 divisions: 20,
+                activeColor: _kAccent,
+                inactiveColor: _kShadow2,
                 labels: RangeLabels(
                   '${jobFilter.salaryRange.start.round()}만',
                   jobFilter.salaryRange.end.round() >= 10000 
@@ -192,8 +282,11 @@ class _FilterBarState extends State<FilterBar> {
                     jobFilter.resetFilters();
                     _searchController.clear();
                   },
-                  icon: const Icon(Icons.refresh, size: 18),
-                  label: const Text('필터 초기화'),
+                  icon: Icon(Icons.refresh, size: 18, color: _kText),
+                  label: Text(
+                    '필터 초기화',
+                    style: TextStyle(fontSize: 13, color: _kText),
+                  ),
                 ),
               ),
             ],

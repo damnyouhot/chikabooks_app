@@ -1,5 +1,12 @@
 import 'package:flutter/material.dart';
 
+// ── 디자인 팔레트 (2탭과 통일) ──
+const _kAccent = Color(0xFFF7CBCA);
+const _kText = Color(0xFF5D6B6B);
+const _kShadow1 = Color(0xFFDDD3D8);
+const _kShadow2 = Color(0xFFD5E5E5);
+const _kCardBg = Colors.white;
+
 /// 오늘의 퀴즈 (Placeholder)
 ///
 /// 매일 2문제 노출 예정. 현재는 뼈대/placeholder UI만.
@@ -16,15 +23,15 @@ class QuizTodayPage extends StatelessWidget {
         const Text(
           '오늘의 퀴즈',
           style: TextStyle(
-            fontSize: 20,
+            fontSize: 18,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF424242),
+            color: _kText,
           ),
         ),
         const SizedBox(height: 4),
         Text(
           '매일 2문제, 가볍게 풀어보세요.',
-          style: TextStyle(fontSize: 13, color: Colors.grey[400]),
+          style: TextStyle(fontSize: 13, color: _kText.withOpacity(0.5)),
         ),
         const SizedBox(height: 24),
 
@@ -49,7 +56,7 @@ class QuizTodayPage extends StatelessWidget {
         Center(
           child: Text(
             '퀴즈 콘텐츠는 곧 업데이트됩니다.',
-            style: TextStyle(fontSize: 12, color: Colors.grey[350]),
+            style: TextStyle(fontSize: 12, color: _kText.withOpacity(0.4)),
           ),
         ),
       ],
@@ -92,13 +99,14 @@ class _QuizCardState extends State<_QuizCard> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _kCardBg,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _kShadow2, width: 0.5),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF9E9EBE).withOpacity(0.06),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
+            color: _kShadow1.withOpacity(0.2),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -114,7 +122,8 @@ class _QuizCardState extends State<_QuizCard> {
                 height: 28,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: const Color(0xFF1E88E5).withOpacity(0.1),
+                  color: _kAccent.withOpacity(0.3),
+                  border: Border.all(color: _kAccent, width: 0.5),
                 ),
                 child: Center(
                   child: Text(
@@ -122,7 +131,7 @@ class _QuizCardState extends State<_QuizCard> {
                     style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF1E88E5),
+                      color: _kText,
                     ),
                   ),
                 ),
@@ -132,9 +141,9 @@ class _QuizCardState extends State<_QuizCard> {
                 child: Text(
                   widget.question,
                   style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFF424242),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: _kText,
                     height: 1.5,
                   ),
                 ),
@@ -148,8 +157,8 @@ class _QuizCardState extends State<_QuizCard> {
             final isCorrect = i == widget.correctIndex;
             final isSelected = i == _selectedIndex;
 
-            Color bgColor = const Color(0xFFF5F5F8);
-            Color textColor = const Color(0xFF555566);
+            Color bgColor = _kShadow2.withOpacity(0.3);
+            Color textColor = _kText;
             Color borderColor = Colors.transparent;
 
             if (_answered) {
@@ -176,7 +185,7 @@ class _QuizCardState extends State<_QuizCard> {
                   decoration: BoxDecoration(
                     color: bgColor,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: borderColor, width: 1.5),
+                    border: Border.all(color: borderColor, width: borderColor == Colors.transparent ? 0.5 : 1.0),
                   ),
                   child: Text(
                     widget.options[i],
@@ -204,7 +213,7 @@ class _QuizCardState extends State<_QuizCard> {
                   fontSize: 13,
                   color: _selectedIndex == widget.correctIndex
                       ? const Color(0xFF2E7D32)
-                      : Colors.grey[500],
+                      : _kText.withOpacity(0.6),
                   fontWeight: FontWeight.w500,
                 ),
               ),

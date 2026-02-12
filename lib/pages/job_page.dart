@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import '../screen/jobs/job_list_screen.dart';
 import '../screen/jobs/job_map_screen.dart';
 
+// ── 디자인 팔레트 (2탭과 통일) ──
+const _kText = Color(0xFF5D6B6B);
+const _kBg = Color(0xFFF1F7F7);
+
 class JobPage extends StatefulWidget {
   const JobPage({super.key});
 
@@ -15,13 +19,19 @@ class _JobPageState extends State<JobPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // JobPage에서 AppBar를 관리하여 뷰 전환 버튼을 제공
+      backgroundColor: _kBg,
       appBar: AppBar(
-        // main.dart의 AppBar와 중복되지 않도록 일부 속성 조정
-        title: Text(_isMapView ? '지도로 보기' : '목록으로 보기'),
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        elevation: 1,
-        titleTextStyle: Theme.of(context).textTheme.titleMedium,
+        title: Text(
+          _isMapView ? '지도로 보기' : '목록으로 보기',
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: _kText,
+          ),
+        ),
+        backgroundColor: _kBg,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
         actions: [
           IconButton(
             onPressed: () {
@@ -29,7 +39,10 @@ class _JobPageState extends State<JobPage> {
                 _isMapView = !_isMapView;
               });
             },
-            icon: Icon(_isMapView ? Icons.list_alt : Icons.map_outlined),
+            icon: Icon(
+              _isMapView ? Icons.list_alt : Icons.map_outlined,
+              color: _kText,
+            ),
           )
         ],
       ),
