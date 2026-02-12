@@ -128,10 +128,10 @@ class _CaringPageState extends State<CaringPage>
 
       final greeted = CaringStateService.hasGreetedToday(state);
 
-      setState(() {
+        setState(() {
         _isSleeping = state.isSleeping;
         _hasGreetedToday = greeted;
-        _bondScore = score;
+          _bondScore = score;
         _loading = false;
       });
 
@@ -173,7 +173,7 @@ class _CaringPageState extends State<CaringPage>
     _dimController.reverse();
     setState(() => _isSleeping = false);
     _showFeedback('좋은 아침.');
-  }
+    }
 
   /// 밥주기
   void _onFeed() async {
@@ -208,7 +208,7 @@ class _CaringPageState extends State<CaringPage>
     _showFeedback(
       _neutralPhrases[Random().nextInt(_neutralPhrases.length)],
     );
-  }
+    }
 
   /// 피드백 표시 (3초 후 해제)
   void _showFeedback(String text) {
@@ -272,8 +272,8 @@ class _CaringPageState extends State<CaringPage>
                         strokeWidth: 1.5, // 가느다란 라인
                       ),
                     ),
-                  ),
           ),
+        ),
         ),
 
         // ── 2. 상단 바 (설정) ──
@@ -281,7 +281,7 @@ class _CaringPageState extends State<CaringPage>
           top: 0,
           left: 0,
           right: 0,
-          child: SafeArea(
+        child: SafeArea(
             bottom: false,
             child: _buildTopBar(),
           ),
@@ -293,9 +293,9 @@ class _CaringPageState extends State<CaringPage>
           left: 0,
           right: 0,
           child: Center(
-            child: Column(
+          child: Column(
               mainAxisSize: MainAxisSize.min,
-              children: [
+            children: [
                 Text(
                   _feedbackText ?? _displayText,
                   style: const TextStyle(
@@ -315,13 +315,13 @@ class _CaringPageState extends State<CaringPage>
                       fontSize: 12,
                       fontWeight: FontWeight.w300,
                       color: _colorText.withOpacity(0.5),
-                    ),
                   ),
+                ),
                 ],
               ],
             ),
-          ),
         ),
+      ),
 
         // ── 4. 하단 버튼들 ──
         Positioned(
@@ -346,16 +346,16 @@ class _CaringPageState extends State<CaringPage>
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
-        children: [
+              children: [
           IconButton(
             icon: Icon(Icons.settings_outlined,
                 color: _colorText.withOpacity(0.4), size: 20),
             onPressed: () {
               // 설정 화면은 기존 유지 (프로필 등)
             },
-          ),
-        ],
-      ),
+                ),
+              ],
+            ),
     );
   }
 
@@ -387,11 +387,11 @@ class _CaringPageState extends State<CaringPage>
               width: 0.5, // 가느다란 라인
             ),
             boxShadow: [
-              BoxShadow(
+                    BoxShadow(
                 color: _colorShadow1.withOpacity(0.15),
                 blurRadius: 20,
                 offset: const Offset(0, 4),
-              ),
+                    ),
             ],
           ),
           child: const Row(
@@ -401,12 +401,12 @@ class _CaringPageState extends State<CaringPage>
               SizedBox(width: 8),
               Text(
                 '아침 인사',
-                style: TextStyle(
+            style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w500,
                   color: _colorText,
                 ),
-              ),
+            ),
             ],
           ),
         ),
@@ -417,16 +417,16 @@ class _CaringPageState extends State<CaringPage>
   /// 4개 아이콘 버튼 (텍스트/멘트 없음, 아이콘만)
   Widget _buildFourActions() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 40),
+          padding: const EdgeInsets.symmetric(horizontal: 40),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
           _buildIconAction(Icons.restaurant_outlined, _onFeed),
           _buildIconAction(Icons.chat_bubble_outline, _onTalk), // 이야기나누기로 변경
           _buildIconAction(Icons.menu_book_outlined, _onStudy),
           _buildIconAction(Icons.nights_stay_outlined, _onSleep),
-        ],
-      ),
+            ],
+          ),
     );
   }
 
@@ -439,7 +439,7 @@ class _CaringPageState extends State<CaringPage>
         height: 52,
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.7),
-          shape: BoxShape.circle,
+              shape: BoxShape.circle,
           border: Border.all(
             color: _colorShadow2.withOpacity(0.5),
             width: 0.5, // 가느다란 라인
@@ -451,7 +451,7 @@ class _CaringPageState extends State<CaringPage>
               offset: const Offset(0, 2),
             ),
           ],
-        ),
+            ),
         child: Icon(icon, color: _colorText.withOpacity(0.6), size: 22),
       ),
     );
@@ -475,7 +475,7 @@ class _CaringPageState extends State<CaringPage>
             child: Center(
               child: Opacity(
                 opacity: _dimAnimation.value,
-                child: Column(
+        child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     // 달 아이콘

@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/daily_wall_post.dart';
 import 'user_profile_service.dart';
+import 'weekly_stamp_service.dart';
 
 /// "오늘의 한 문장" Firestore 서비스
 class DailyWallService {
@@ -127,6 +128,9 @@ class DailyWallService {
     );
 
     await _postsRef.add(post.toMap());
+
+    // 스탬프 트리거 (D. 문장 작성)
+    _reportStampActivity('sentence_write');
   }
 
   /// 오늘 게시물 스트림
@@ -167,6 +171,9 @@ class DailyWallService {
             createdAt: DateTime.now(),
           ).toMap(),
         );
+
+    // 스탬프 트리거 (B. 한 문장 리액션)
+    _reportStampActivity('sentence_reaction');
   }
 
   /// 내가 이 게시물에 남긴 리액션 키 (없으면 null)
@@ -197,6 +204,22 @@ class DailyWallService {
   static String todayDateKey() {
     final kst = DateTime.now().toUtc().add(const Duration(hours: 9));
     return '${kst.year}-${kst.month.toString().padLeft(2, '0')}-${kst.day.toString().padLeft(2, '0')}';
+  }
+
+  // ───────────────────────── 스탬프 보조 ─────────────────────────
+
+  /// 파트너 그룹이 있으면 스탬프 활동 보고 (실패해도 무시)
+  static Future<void> _reportStampActivity(String activityType) async {
+    try {
+      final groupId = await UserProfileService.getPartnerGroupId();
+      if (groupId == null || groupId.isEmpty) return;
+      await WeeklyStampService.reportActivity(
+        groupId: groupId,
+        activityType: activityType,
+      );
+    } catch (_) {
+      // 스탬프는 보조 기능 — 실패해도 UX 차단 안 함
+    }
   }
 }
 

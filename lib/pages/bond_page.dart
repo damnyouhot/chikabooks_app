@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../models/weekly_goal.dart';
+import '../models/weekly_stamp.dart';
 import '../services/user_profile_service.dart';
 import '../services/weekly_goal_service.dart';
+import '../services/weekly_stamp_service.dart';
 import '../widgets/daily_wall_sheet.dart';
 import '../widgets/profile_gate_sheet.dart';
 import 'settings/communion_profile_page.dart';
@@ -112,6 +115,11 @@ class _BondPageState extends State<BondPage> {
 
             const SliverToBoxAdapter(child: SizedBox(height: 16)),
 
+            // ── 스탬프: 이번 주 우리 스탬프 ──
+            SliverToBoxAdapter(child: _buildStampSection()),
+
+            const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
             // ── 섹션 B: 오늘의 한 문장 (펼쳐진 카드) ──
             SliverToBoxAdapter(child: _buildSectionB()),
 
@@ -131,9 +139,9 @@ class _BondPageState extends State<BondPage> {
             SliverToBoxAdapter(child: _buildSectionE()),
 
             const SliverToBoxAdapter(child: SizedBox(height: 40)),
-          ],
+            ],
+          ),
         ),
-      ),
     );
   }
 
@@ -182,8 +190,8 @@ class _BondPageState extends State<BondPage> {
       margin: const EdgeInsets.symmetric(horizontal: 20),
       padding: const EdgeInsets.all(20),
       decoration: _cardDecoration(),
-      child: Column(
-        children: [
+          child: Column(
+            children: [
           // 결 점수 + 파트너 아바타
           Row(
             children: [
@@ -192,9 +200,9 @@ class _BondPageState extends State<BondPage> {
               const SizedBox(width: 16),
               // 결 점수 텍스트
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                     Text(
                       '결 ${_bondScore.toInt()}',
                       style: const TextStyle(
@@ -225,8 +233,8 @@ class _BondPageState extends State<BondPage> {
             width: double.infinity,
             height: 0.5,
             color: _kShadow2.withOpacity(0.6),
-          ),
-          const SizedBox(height: 12),
+                      ),
+                      const SizedBox(height: 12),
           _buildWeeklyGoalMini(),
         ],
       ),
@@ -397,17 +405,118 @@ class _BondPageState extends State<BondPage> {
               Navigator.pop(ctx);
               final msg = await WeeklyGoalService.addGoal(title);
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
+                          ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(msg),
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
               }
             },
             child: const Text('추가'),
           ),
         ],
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────
+  // [스탬프] 이번 주 우리 스탬프 (합산형)
+  // ─────────────────────────────────────────
+
+  Widget _buildStampSection() {
+    // 파트너 그룹이 없으면 숨김
+    if (_partnerGroupId == null || _partnerGroupId!.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return StreamBuilder<WeeklyStampState>(
+      stream: WeeklyStampService.watchThisWeek(_partnerGroupId!),
+      builder: (context, snap) {
+        final stamp = snap.data ?? WeeklyStampState.empty(
+          WeeklyStampService.currentWeekKey(),
+        );
+        final todayIdx = WeeklyStampService.todayDayOfWeek();
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: _cardDecoration(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 타이틀 + 안내 아이콘
+                Row(
+                  children: [
+                    const Text(
+                      '이번 주 우리 스탬프',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: _kText,
+                      ),
+                    ),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: () => _showStampInfo(),
+                      child: Icon(
+                        Icons.info_outline,
+                        size: 16,
+                        color: _kText.withValues(alpha: 0.35),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+
+                // 7개 스탬프 원 (월~일)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: List.generate(7, (i) {
+                    final isFilled = stamp.isFilled(i);
+                    final isToday = i == todayIdx;
+                    return _StampCircle(
+                      dayLabel: const ['월', '화', '수', '목', '금', '토', '일'][i],
+                      isFilled: isFilled,
+                      isToday: isToday,
+                    );
+                  }),
+                ),
+
+                const SizedBox(height: 14),
+
+                // 요약 텍스트
+                Center(
+                  child: Text(
+                    '이번 주 ${stamp.filledCount}/7 칸 채웠어요',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: _kText.withValues(alpha: 0.5),
+                    ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        );
+      },
+    );
+  }
+
+  void _showStampInfo() {
+    HapticFeedback.lightImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          '파트너 3명이 함께 투표/리액션/목표 체크를 하면\n'
+          '하루 1칸씩 채워져요.',
+          style: TextStyle(fontSize: 13, height: 1.4),
+        ),
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(seconds: 4),
       ),
     );
   }
@@ -425,15 +534,15 @@ class _BondPageState extends State<BondPage> {
           // 섹션 타이틀
           Row(
             children: [
-              const Text(
+          const Text(
                 '오늘의 한 문장',
-                style: TextStyle(
+            style: TextStyle(
                   fontSize: 15,
-                  fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w600,
                   color: _kText,
-                ),
-              ),
-              const Spacer(),
+            ),
+          ),
+          const Spacer(),
               // 슬롯 상태 배지
               Container(
                 padding:
@@ -509,7 +618,7 @@ class _BondPageState extends State<BondPage> {
     return GestureDetector(
       onTap: _openDailyWallWrite,
       child: Container(
-        width: double.infinity,
+      width: double.infinity,
         padding: const EdgeInsets.all(16),
         decoration: _cardDecoration(),
         child: Row(
@@ -517,7 +626,7 @@ class _BondPageState extends State<BondPage> {
             Container(
               width: 36,
               height: 36,
-              decoration: BoxDecoration(
+      decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: _kAccent.withOpacity(0.15),
               ),
@@ -559,11 +668,11 @@ class _BondPageState extends State<BondPage> {
           // 작성자
           Row(
             children: [
-              Container(
+          Container(
                 width: 28,
                 height: 28,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
                   color: _kShadow2.withOpacity(0.6),
                 ),
                 child: Center(
@@ -667,7 +776,7 @@ class _BondPageState extends State<BondPage> {
   Widget _buildSectionC() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Container(
+              child: Container(
         width: double.infinity,
         padding: const EdgeInsets.all(20),
         decoration: _cardDecoration(),
@@ -731,10 +840,10 @@ class _BondPageState extends State<BondPage> {
       children: [
         // 아바타
         Container(
-          width: 28,
-          height: 28,
+                width: 28,
+                height: 28,
           decoration: BoxDecoration(
-            shape: BoxShape.circle,
+                  shape: BoxShape.circle,
             color: _kShadow2.withOpacity(0.6),
           ),
           child: Center(
@@ -750,13 +859,13 @@ class _BondPageState extends State<BondPage> {
         ),
         const SizedBox(width: 12),
         // 이름 + 활동 리스트
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
                 name,
-                style: const TextStyle(
+                  style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: _kText,
@@ -776,15 +885,15 @@ class _BondPageState extends State<BondPage> {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Text(
+                Text(
                           a,
-                          style: TextStyle(
-                            fontSize: 12,
+                  style: TextStyle(
+                    fontSize: 12,
                             color: _kText.withOpacity(0.6),
-                          ),
-                        ),
-                      ],
-                    ),
+                  ),
+                ),
+              ],
+            ),
                   )),
             ],
           ),
@@ -870,7 +979,7 @@ class _BondPageState extends State<BondPage> {
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
+        decoration: BoxDecoration(
                       color: isSelected
                           ? _kAccent.withOpacity(0.12)
                           : _kBg,
@@ -881,9 +990,9 @@ class _BondPageState extends State<BondPage> {
                             : _kShadow2.withOpacity(0.5),
                         width: 0.5,
                       ),
-                    ),
-                    child: Row(
-                      children: [
+        ),
+        child: Row(
+          children: [
                         // 라디오 아이콘
                         Container(
                           width: 18,
@@ -1098,28 +1207,28 @@ class _BondPageState extends State<BondPage> {
           ),
         ),
         const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
                 name,
-                style: const TextStyle(
+                    style: const TextStyle(
                   fontSize: 13,
-                  fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w600,
                   color: _kText,
-                ),
-              ),
+                    ),
+                  ),
               if (goals.isEmpty) ...[
                 const SizedBox(height: 4),
-                Text(
+                  Text(
                   isMine ? '목표를 설정해보세요' : '아직 목표가 없어요',
-                  style: TextStyle(
-                    fontSize: 12,
+                    style: TextStyle(
+                      fontSize: 12,
                     color: _kText.withOpacity(0.35),
+                    ),
                   ),
-                ),
-              ],
+                ],
               ...goals.map((g) {
                 final ratio =
                     g.target > 0 ? (g.progress / g.target).clamp(0.0, 1.0) : 0.0;
@@ -1203,7 +1312,7 @@ class _BondPageState extends State<BondPage> {
   BoxDecoration _cardDecoration() {
     return BoxDecoration(
       color: _kCardBg,
-      borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(16),
       border: Border.all(
         color: _kShadow2.withOpacity(0.3),
         width: 0.5,
@@ -1218,3 +1327,114 @@ class _BondPageState extends State<BondPage> {
     );
   }
 }
+
+// ═══════════════════════════════════════════
+// 스탬프 원 위젯 (pop 애니메이션 포함)
+// ═══════════════════════════════════════════
+
+class _StampCircle extends StatefulWidget {
+  final String dayLabel;
+  final bool isFilled;
+  final bool isToday;
+
+  const _StampCircle({
+    required this.dayLabel,
+    required this.isFilled,
+    required this.isToday,
+  });
+
+  @override
+  State<_StampCircle> createState() => _StampCircleState();
+}
+
+class _StampCircleState extends State<_StampCircle>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _popCtrl;
+  late Animation<double> _popAnim;
+  bool _wasFilledBefore = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _wasFilledBefore = widget.isFilled;
+    _popCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+    _popAnim = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.25), weight: 40),
+      TweenSequenceItem(tween: Tween(begin: 1.25, end: 0.95), weight: 30),
+      TweenSequenceItem(tween: Tween(begin: 0.95, end: 1.0), weight: 30),
+    ]).animate(CurvedAnimation(parent: _popCtrl, curve: Curves.easeOut));
+  }
+
+  @override
+  void didUpdateWidget(covariant _StampCircle oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 채워지지 않았다가 → 채워짐으로 변경 시 pop 애니메이션 + 햅틱
+    if (!_wasFilledBefore && widget.isFilled) {
+      _popCtrl.forward(from: 0);
+      HapticFeedback.mediumImpact();
+    }
+    _wasFilledBefore = widget.isFilled;
+  }
+
+  @override
+  void dispose() {
+    _popCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _popAnim,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: _popAnim.value,
+          child: child,
+        );
+      },
+      child: Container(
+        width: 34,
+        height: 34,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: widget.isFilled
+              ? _kAccent.withValues(alpha: 0.75)
+              : _kShadow2.withValues(alpha: 0.3),
+          border: Border.all(
+            color: widget.isToday
+                ? _kAccent.withValues(alpha: 0.8)
+                : widget.isFilled
+                    ? _kAccent.withValues(alpha: 0.4)
+                    : _kShadow2.withValues(alpha: 0.4),
+            width: widget.isToday ? 1.5 : 0.5,
+          ),
+          boxShadow: widget.isFilled
+              ? [
+                  BoxShadow(
+                    color: _kAccent.withValues(alpha: 0.35),
+                    blurRadius: 8,
+                    spreadRadius: 1,
+                  ),
+                ]
+              : null,
+        ),
+        child: Center(
+      child: Text(
+            widget.dayLabel,
+        style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              color: widget.isFilled
+                  ? Colors.white
+                  : _kText.withValues(alpha: 0.5),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+

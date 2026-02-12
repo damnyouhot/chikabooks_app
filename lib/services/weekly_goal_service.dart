@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/weekly_goal.dart';
+import 'user_profile_service.dart';
+import 'weekly_stamp_service.dart';
 
 /// 주간 목표 서비스
 ///
@@ -143,8 +145,27 @@ class WeeklyGoalService {
         'goals': updated.map((g) => g.toMap()).toList(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
+
+      // 스탬프 트리거 (fire-and-forget)
+      _reportStampActivity('goal_check');
     } catch (e) {
       debugPrint('⚠️ WeeklyGoalService.checkIn error: $e');
+    }
+  }
+
+  // ─── 스탬프 보조 ───
+
+  /// 파트너 그룹이 있으면 스탬프 활동 보고 (실패해도 무시)
+  static Future<void> _reportStampActivity(String activityType) async {
+    try {
+      final groupId = await UserProfileService.getPartnerGroupId();
+      if (groupId == null || groupId.isEmpty) return;
+      await WeeklyStampService.reportActivity(
+        groupId: groupId,
+        activityType: activityType,
+      );
+    } catch (_) {
+      // 스탬프는 보조 기능 — 실패해도 UX 차단 안 함
     }
   }
 }

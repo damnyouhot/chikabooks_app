@@ -721,6 +721,181 @@ export const markInboxRead = onCall(
   }
 );
 
+// ═══════════════════════════════════════════════════════════
+// 이번 주 우리 스탬프 (합산형)
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * KST 기준 ISO weekKey 계산 ("2026-W07")
+ */
+function kstWeekKey(kst: DateTime): string {
+  return kst.toFormat("kkkk-'W'WW");
+}
+
+/**
+ * KST 기준 요일 인덱스 (0=월 ~ 6=일)
+ */
+function kstDayOfWeek(kst: DateTime): number {
+  return kst.weekday - 1; // luxon: 1=Mon ~ 7=Sun
+}
+
+/**
+ * onPartnerActivityForStamp
+ *
+ * 파트너 활동(투표/리액션/목표체크/문장작성) 보고 시
+ * Firestore Transaction으로 daily 로그에 기록 → 조건 충족 시 스탬프 채움.
+ *
+ * activityType: 'poll_vote' | 'sentence_reaction' | 'goal_check' | 'sentence_write'
+ */
+export const onPartnerActivityForStamp = onCall(
+  {region: "asia-northeast3"},
+  async (request) => {
+    const uid = request.auth?.uid;
+    if (!uid) {
+      throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+
+    const {groupId, activityType} = request.data;
+    if (!groupId || !activityType) {
+      throw new HttpsError(
+        "invalid-argument",
+        "groupId와 activityType이 필요합니다."
+      );
+    }
+
+    const validTypes = [
+      "poll_vote",
+      "sentence_reaction",
+      "goal_check",
+      "sentence_write",
+    ];
+    if (!validTypes.includes(activityType)) {
+      throw new HttpsError(
+        "invalid-argument",
+        `유효하지 않은 activityType: ${activityType}`
+      );
+    }
+
+    // 그룹 멤버 확인
+    const groupDoc = await db.collection("partnerGroups").doc(groupId).get();
+    if (!groupDoc.exists) {
+      throw new HttpsError("not-found", "그룹을 찾을 수 없습니다.");
+    }
+    const groupData = groupDoc.data()!;
+    if (!groupData.memberUids?.includes(uid)) {
+      throw new HttpsError(
+        "permission-denied",
+        "그룹 멤버만 스탬프 활동을 보고할 수 있습니다."
+      );
+    }
+
+    // KST 기준 날짜/주차 계산
+    const nowKst = DateTime.now().setZone("Asia/Seoul");
+    const dateKey = nowKst.toFormat("yyyy-MM-dd");
+    const weekKey = kstWeekKey(nowKst);
+    const dayIdx = kstDayOfWeek(nowKst);
+
+    // Firestore 참조
+    const stampRef = db
+      .collection("partnerGroups")
+      .doc(groupId)
+      .collection("weeklyStamps")
+      .doc(weekKey);
+
+    const dailyRef = stampRef.collection("daily").doc(dateKey);
+
+    // ── 트랜잭션: daily 로그 업데이트 + 스탬프 판정 ──
+    const result = await db.runTransaction(async (tx) => {
+      const dailySnap = await tx.get(dailyRef);
+      const stampSnap = await tx.get(stampRef);
+
+      // daily 로그 읽기 (없으면 초기값)
+      const dailyData = dailySnap.exists ? dailySnap.data()! : {
+        dateKey,
+        dayOfWeek: dayIdx,
+        pollVoters: [],
+        sentenceReactors: [],
+        goalCheckers: [],
+        sentenceWriters: [],
+        stampFilled: false,
+      };
+
+      // 활동 유형에 따라 uid 추가 (중복 방지)
+      const fieldMap: {[key: string]: string} = {
+        "poll_vote": "pollVoters",
+        "sentence_reaction": "sentenceReactors",
+        "goal_check": "goalCheckers",
+        "sentence_write": "sentenceWriters",
+      };
+
+      const field = fieldMap[activityType];
+      const currentList: string[] = dailyData[field] ?? [];
+      if (!currentList.includes(uid)) {
+        currentList.push(uid);
+        dailyData[field] = currentList;
+      }
+
+      // 스탬프 조건 판정: (A or B) + (C or D) — 그룹 합산
+      const hasAorB =
+        (dailyData.pollVoters?.length ?? 0) > 0 ||
+        (dailyData.sentenceReactors?.length ?? 0) > 0;
+      const hasCorD =
+        (dailyData.goalCheckers?.length ?? 0) > 0 ||
+        (dailyData.sentenceWriters?.length ?? 0) > 0;
+      const meetsCondition = hasAorB && hasCorD;
+
+      const wasAlreadyFilled = dailyData.stampFilled === true;
+      let justFilled = false;
+
+      if (meetsCondition && !wasAlreadyFilled) {
+        dailyData.stampFilled = true;
+        justFilled = true;
+      }
+
+      // daily 로그 저장
+      dailyData.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+      tx.set(dailyRef, dailyData, {merge: true});
+
+      // 스탬프가 방금 채워졌으면 주간 상태도 업데이트
+      if (justFilled) {
+        const stampData = stampSnap.exists ? stampSnap.data()! : {
+          weekKey,
+          filledDays: {},
+          filledCount: 0,
+        };
+
+        const filledDays = stampData.filledDays ?? {};
+        filledDays[`${dayIdx}`] = true;
+
+        // filledCount 재계산
+        let count = 0;
+        for (let i = 0; i < 7; i++) {
+          if (filledDays[`${i}`] === true) count++;
+        }
+
+        tx.set(stampRef, {
+          weekKey,
+          filledDays,
+          filledCount: count,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, {merge: true});
+      }
+
+      return {justFilled, meetsCondition};
+    });
+
+    logger.info(
+      `Stamp activity: ${activityType} by ${uid} in ${groupId}`,
+      {dateKey, weekKey, ...result}
+    );
+
+    return {
+      success: true,
+      stampFilled: result.justFilled,
+    };
+  }
+);
+
 /**
  * 인박스 요약 카드 업데이트 (내부 헬퍼)
  */
