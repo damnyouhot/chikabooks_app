@@ -53,6 +53,7 @@ class BillboardPost {
   final EnthroneStatus status;
   final String bondGroupName;
   final bool isAnonymous;
+  final String? authorId;  // 추가: 원작자 ID
 
   const BillboardPost({
     required this.id,
@@ -66,6 +67,7 @@ class BillboardPost {
     required this.status,
     required this.bondGroupName,
     this.isAnonymous = true,
+    this.authorId,  // 추가
   });
 
   /// 만료 여부
@@ -88,6 +90,7 @@ class BillboardPost {
       'status': status.name,
       'bondGroupName': bondGroupName,
       'isAnonymous': isAnonymous,
+      if (authorId != null) 'authorId': authorId,  // 추가
     };
   }
 
@@ -108,6 +111,7 @@ class BillboardPost {
       ),
       bondGroupName: data['bondGroupName'] as String? ?? '결',
       isAnonymous: data['isAnonymous'] as bool? ?? true,
+      authorId: data['authorId'] as String?,  // 추가
     );
   }
 
@@ -120,6 +124,7 @@ class BillboardPost {
     required int requiredCount,
     required String bondGroupName,
     bool isAnonymous = true,
+    String? authorId,  // 추가
   }) {
     final now = DateTime.now();
     return BillboardPost(
@@ -134,7 +139,9 @@ class BillboardPost {
       status: EnthroneStatus.confirmed,
       bondGroupName: bondGroupName,
       isAnonymous: isAnonymous,
+      authorId: authorId,  // 추가
     );
   }
 }
+
 

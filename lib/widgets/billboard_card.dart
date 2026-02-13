@@ -2,6 +2,12 @@ import 'package:flutter/material.dart';
 import '../models/enthrone.dart';
 import '../services/enthrone_service.dart';
 
+// ── 디자인 팔레트 (bond_page와 통일) ──
+const _kAccent = Color(0xFFF7CBCA);
+const _kText = Color(0xFF5D6B6B);
+const _kShadow2 = Color(0xFFD5E5E5);
+const _kCardBg = Colors.white;
+
 /// 전광판 카드 위젯
 class BillboardCard extends StatelessWidget {
   final BillboardPost post;
@@ -33,32 +39,26 @@ class BillboardCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              const Color(0xFF6A5ACD).withOpacity(0.1),
-              const Color(0xFFF7CBCA).withOpacity(0.1),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(20),
+          color: _kCardBg,
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: const Color(0xFF6A5ACD).withOpacity(0.3),
-            width: 1.5,
+            color: _kShadow2.withOpacity(0.5),
+            width: 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF6A5ACD).withOpacity(0.1),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
+              color: _kShadow2.withOpacity(0.2),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
         child: Column(
+          mainAxisSize: MainAxisSize.max,
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.start,
           children: [
             // 헤더
             Row(
@@ -67,42 +67,25 @@ class BillboardCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF6A5ACD).withOpacity(0.15),
+                    color: _kAccent.withOpacity(0.3),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.auto_awesome,
-                    color: Color(0xFF6A5ACD),
+                    color: _kText,
                     size: 16,
                   ),
                 ),
                 const SizedBox(width: 12),
                 
                 // 제목
-                const Expanded(
+                Expanded(
                   child: Text(
                     '✨ 오늘의 추대',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF6A5ACD),
-                    ),
-                  ),
-                ),
-
-                // 추대 수
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF6A5ACD).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    '${post.enthroneCount}/${post.requiredCount}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF6A5ACD),
+                      color: _kText,
                     ),
                   ),
                 ),
@@ -111,16 +94,19 @@ class BillboardCard extends StatelessWidget {
 
             const SizedBox(height: 16),
 
-            // 본문 (최대 2줄)
-            Text(
-              post.textSnapshot,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 15,
-                height: 1.6,
-                color: Color(0xFF333333),
-                fontWeight: FontWeight.w500,
+            // 본문 (고정 높이 2줄)
+            SizedBox(
+              height: 50,
+              child: Text(
+                post.textSnapshot,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 15,
+                  height: 1.6,
+                  color: Color(0xFF333333),
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
 
@@ -129,20 +115,20 @@ class BillboardCard extends StatelessWidget {
             // 하단 정보
             Row(
               children: [
-                // 출처
+                // 작성자 ID (authorId가 있으면 표시, 없으면 @익명)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.6),
+                    color: _kShadow2.withOpacity(0.5),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    post.isAnonymous 
-                        ? '${post.bondGroupName}에서'
-                        : post.bondGroupName,
+                    post.authorId != null && post.authorId!.isNotEmpty
+                        ? '@${post.authorId}'
+                        : '@익명',
                     style: TextStyle(
                       fontSize: 11,
-                      color: Colors.grey[700],
+                      color: _kText.withOpacity(0.7),
                     ),
                   ),
                 ),
@@ -154,7 +140,7 @@ class BillboardCard extends StatelessWidget {
                   _formatTimeRemaining(),
                   style: TextStyle(
                     fontSize: 11,
-                    color: Colors.grey[500],
+                    color: _kText.withOpacity(0.5),
                   ),
                 ),
 
@@ -164,7 +150,7 @@ class BillboardCard extends StatelessWidget {
                 Icon(
                   Icons.arrow_forward_ios,
                   size: 14,
-                  color: Colors.grey[400],
+                  color: _kText.withOpacity(0.3),
                 ),
               ],
             ),
