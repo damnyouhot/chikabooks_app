@@ -560,7 +560,7 @@ class _BondPageState extends State<BondPage> {
                     .doc(_partnerGroupId)
                     .collection('posts')
                     .where('isDeleted', isEqualTo: false)
-                    .orderBy('createdAt', descending: true)
+                .orderBy('createdAt', descending: true)
                     .limit(3)
                     .snapshots()
                 : Stream.value(null),
@@ -598,21 +598,21 @@ class _BondPageState extends State<BondPage> {
                   ),
                 );
               }
-              
+
               if (snap.connectionState == ConnectionState.waiting) {
                 return const Center(
                   child: Padding(
                     padding: EdgeInsets.all(20),
                     child: CircularProgressIndicator(),
-                  ),
-                );
-              }
+      ),
+    );
+  }
 
               if (snap.hasError) {
                 return Center(
                   child: Text(
                     '불러오는 중 문제가 생겼어요.',
-                    style: TextStyle(
+            style: TextStyle(
                       fontSize: 13,
                       color: _kText.withOpacity(0.5),
                     ),
@@ -625,32 +625,32 @@ class _BondPageState extends State<BondPage> {
                 return GestureDetector(
                   onTap: _openDailyWallWrite,
                   child: Container(
-                    width: double.infinity,
+                  width: double.infinity,
                     padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: _kCardBg,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: _kShadow2.withOpacity(0.3),
-                      ),
+                  decoration: BoxDecoration(
+                    color: _kCardBg,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: _kShadow2.withOpacity(0.3),
                     ),
-                    child: Column(
-                      children: [
-                        Icon(
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(
                           Icons.edit_note_outlined,
                           size: 40,
-                          color: _kText.withOpacity(0.3),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
+                        color: _kText.withOpacity(0.3),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
                           '첫 이야기를 나눠주세요',
-                          style: TextStyle(
+                        style: TextStyle(
                             fontSize: 14,
-                            color: _kText.withOpacity(0.5),
-                          ),
+                          color: _kText.withOpacity(0.5),
                         ),
+                      ),
                       ],
-                    ),
+                      ),
                   ),
                 );
               }
@@ -679,19 +679,19 @@ class _BondPageState extends State<BondPage> {
   Widget _buildBillboardSection() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
             '✨ 전광판',
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-              color: _kText,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: _kText,
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          
+            const SizedBox(height: 12),
+
           // 자동 순환 전광판
           const BillboardCarousel(),
         ],

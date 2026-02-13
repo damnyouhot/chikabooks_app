@@ -98,14 +98,14 @@ class BillboardCard extends StatelessWidget {
             SizedBox(
               height: 50,
               child: Text(
-                post.textSnapshot,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 15,
-                  height: 1.6,
-                  color: Color(0xFF333333),
-                  fontWeight: FontWeight.w500,
+              post.textSnapshot,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 15,
+                height: 1.6,
+                color: Color(0xFF333333),
+                fontWeight: FontWeight.w500,
                 ),
               ),
             ),

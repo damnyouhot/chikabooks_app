@@ -515,7 +515,7 @@ class _BondPostCardState extends State<BondPostCard> {
                       fontSize: 11,  // 작게
                       color: Colors.grey[600],
                     ),
-                  ),
+                ),
                 ),
 
               // 이모지 버튼 (아이콘만)
@@ -532,7 +532,7 @@ class _BondPostCardState extends State<BondPostCard> {
                     fontSize: 14,
                     color: Colors.grey[600],
                   ),
-                ),
+              ),
               ),
 
               const Spacer(),

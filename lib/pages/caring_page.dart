@@ -139,7 +139,7 @@ class _CaringPageState extends State<CaringPage>
       _hasGreetedToday = true;
     });
     _speak(msg); // ✨ 변경: _showFeedback → _speak
-  }
+    }
 
   /// 밥주기
   void _onFeed() async {
