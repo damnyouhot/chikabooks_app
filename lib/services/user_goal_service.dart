@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/user_goal.dart';
+import '../models/routine_check.dart';
 
 /// 사용자 목표 서비스
 /// 
@@ -147,7 +148,9 @@ class UserGoalService {
   /// 목표 추가
   static Future<bool> addGoal({
     required String title,
+    required GoalType type,
     required PeriodType periodType,
+    int weeklyTarget = 7,
   }) async {
     try {
       if (title.trim().isEmpty) {
@@ -164,8 +167,10 @@ class UserGoalService {
 
       final newGoal = UserGoal.create(
         title: title.trim(),
+        type: type,
         periodType: periodType,
         periodKey: getCurrentPeriodKey(periodType),
+        weeklyTarget: weeklyTarget,
       );
 
       final updatedItems = [...goals.items, newGoal];
@@ -251,6 +256,137 @@ class UserGoalService {
       }
       return UserGoals.fromMap(doc.data()!);
     });
+  }
+
+  // ─── 루틴 체크 관련 ───
+
+  /// 오늘 날짜 키
+  static String todayKey() {
+    final now = DateTime.now();
+    return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+  }
+
+  /// 오늘 루틴 체크 로드
+  static Future<RoutineCheck> loadTodayCheck() async {
+    try {
+      final uid = _auth.currentUser?.uid;
+      if (uid == null) return RoutineCheck.empty(todayKey());
+
+      final doc = await _db
+          .collection('users')
+          .doc(uid)
+          .collection('routineChecks')
+          .doc(todayKey())
+          .get();
+
+      if (!doc.exists || doc.data() == null) {
+        return RoutineCheck.empty(todayKey());
+      }
+
+      return RoutineCheck.fromMap(doc.data()!);
+    } catch (e) {
+      debugPrint('⚠️ loadTodayCheck error: $e');
+      return RoutineCheck.empty(todayKey());
+    }
+  }
+
+  /// 루틴 체크 토글 (오늘)
+  static Future<bool> toggleRoutineCheck(String goalId) async {
+    try {
+      final uid = _auth.currentUser?.uid;
+      if (uid == null) return false;
+
+      final today = todayKey();
+      final check = await loadTodayCheck();
+      final updated = check.toggleCheck(goalId);
+
+      await _db
+          .collection('users')
+          .doc(uid)
+          .collection('routineChecks')
+          .doc(today)
+          .set(updated.toMap(), SetOptions(merge: true));
+
+      debugPrint('✅ 루틴 체크 토글: $goalId (${updated.isChecked(goalId) ? "ON" : "OFF"})');
+      return true;
+    } catch (e) {
+      debugPrint('⚠️ toggleRoutineCheck error: $e');
+      return false;
+    }
+  }
+
+  /// 이번 주 특정 루틴의 체크 횟수
+  static Future<int> getWeeklyCheckCount(String goalId) async {
+    try {
+      final uid = _auth.currentUser?.uid;
+      if (uid == null) return 0;
+
+      final now = DateTime.now();
+      final monday = now.subtract(Duration(days: now.weekday - 1));
+      
+      int count = 0;
+      for (int i = 0; i < 7; i++) {
+        final date = monday.add(Duration(days: i));
+        final dateKey = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+        
+        final doc = await _db
+            .collection('users')
+            .doc(uid)
+            .collection('routineChecks')
+            .doc(dateKey)
+            .get();
+
+        if (doc.exists && doc.data() != null) {
+          final check = RoutineCheck.fromMap(doc.data()!);
+          if (check.isChecked(goalId)) count++;
+        }
+      }
+
+      return count;
+    } catch (e) {
+      debugPrint('⚠️ getWeeklyCheckCount error: $e');
+      return 0;
+    }
+  }
+
+  /// 연속 체크 일수 (스트릭)
+  static Future<int> getStreak(String goalId) async {
+    try {
+      final uid = _auth.currentUser?.uid;
+      if (uid == null) return 0;
+
+      int streak = 0;
+      final now = DateTime.now();
+
+      // 어제부터 역순으로 체크
+      for (int i = 1; i <= 30; i++) {  // 최대 30일 검사
+        final date = now.subtract(Duration(days: i));
+        final dateKey = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+        
+        final doc = await _db
+            .collection('users')
+            .doc(uid)
+            .collection('routineChecks')
+            .doc(dateKey)
+            .get();
+
+        if (doc.exists && doc.data() != null) {
+          final check = RoutineCheck.fromMap(doc.data()!);
+          if (check.isChecked(goalId)) {
+            streak++;
+          } else {
+            break;  // 연속이 끊김
+          }
+        } else {
+          break;
+        }
+      }
+
+      return streak;
+    } catch (e) {
+      debugPrint('⚠️ getStreak error: $e');
+      return 0;
+    }
   }
 }
 
