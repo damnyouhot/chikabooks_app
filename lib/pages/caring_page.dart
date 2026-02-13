@@ -4,8 +4,11 @@ import 'package:flutter/services.dart';
 import 'package:rive/rive.dart';
 import '../services/caring_state_service.dart';
 import '../services/user_action_service.dart';
-import '../services/user_profile_service.dart';
 import '../services/bond_score_service.dart';
+import '../services/speech_engine_service.dart';
+import '../widgets/speech_overlay.dart';
+import '../widgets/floating_delta.dart';
+import '../widgets/diary_input_sheet.dart';
 
 /// 돌보기(1탭) — 아침 인사 리추얼 + 4 아이콘 + 재우기/깨우기
 ///
@@ -30,11 +33,14 @@ class _CaringPageState extends State<CaringPage>
   bool _loading = true;
   bool _isSleeping = false;
   bool _hasGreetedToday = false;
-  double _bondScore = 50.0;
 
-  // ── 캐릭터 텍스트 ──
-  String _displayText = '';
-  String? _feedbackText;
+  // ── ✨ 새로운 말풍선 시스템 ──
+  String? _currentSpeech; // 현재 말풍선 텍스트
+  bool _isDismissingSpeech = false; // 말풍선 사라지는 중
+
+  // ── ✨ 떠오르는 수치들 ──
+  final List<Widget> _floatingDeltas = [];
+  final GlobalKey _characterKey = GlobalKey(); // 캐릭터 위치 추적용
 
   // ── 디밍 애니메이션 ──
   late AnimationController _dimController;
@@ -60,7 +66,6 @@ class _CaringPageState extends State<CaringPage>
   @override
   void initState() {
     super.initState();
-    _displayText = _neutralPhrases[Random().nextInt(_neutralPhrases.length)];
 
     _dimController = AnimationController(
       vsync: this,
@@ -121,7 +126,6 @@ class _CaringPageState extends State<CaringPage>
   Future<void> _loadState() async {
     try {
       final state = await CaringStateService.loadState();
-      final score = await UserProfileService.getBondScore();
       await BondScoreService.applyCenterGravity();
 
       if (!mounted) return;
@@ -131,7 +135,6 @@ class _CaringPageState extends State<CaringPage>
         setState(() {
         _isSleeping = state.isSleeping;
         _hasGreetedToday = greeted;
-          _bondScore = score;
         _loading = false;
       });
 
@@ -162,7 +165,7 @@ class _CaringPageState extends State<CaringPage>
       _isSleeping = false;
       _hasGreetedToday = true;
     });
-    _showFeedback(msg);
+    _speak(msg); // ✨ 변경: _showFeedback → _speak
   }
 
   /// 깨우기 (같은 날, 아침 인사 이미 완료)
@@ -172,25 +175,32 @@ class _CaringPageState extends State<CaringPage>
 
     _dimController.reverse();
     setState(() => _isSleeping = false);
-    _showFeedback('좋은 아침.');
+    _speak('좋은 아침.'); // ✨ 변경: _showFeedback → _speak
     }
 
   /// 밥주기
   void _onFeed() async {
     _tapTrigger?.fire(); // 🔥 Rive 트리거 발동
     final msg = await UserActionService.feed();
-    if (mounted) _showFeedback(msg);
+    if (mounted) {
+      _speak(msg); // ✨ 변경: _showFeedback → _speak
+      _showFloatingDelta(1); // ✨ 추가: 결 수치 상승 표시
+    }
   }
 
-  /// 이야기나누기 (추후 기능 추가 예정)
-  void _onTalk() {
-    // 트리거 작동 안 함 (사용자 요청)
-    _showFeedback('이야기나누기 기능은 곧 추가될 예정입니다.');
+  /// ✨ 소통하기 (기존 _onTalk 대체) - 유저 상태 기반 공감 멘트
+  void _onEmpathize() async {
+    final speech = await SpeechEngineService.pickSpeechForUser();
+    _speak(speech, durationMs: 2500);
   }
 
-  /// 성장하기 → 3탭으로 전환
-  void _onStudy() {
-    widget.onNavigateToGrowth?.call();
+  /// ✨ 대화하기 (새로운 기능) - 한 줄 기록 팝업
+  void _onDiary() {
+    DiaryInputSheet.show(context, (text) {
+      // 저장 완료 후 캐릭터 응답
+      final response = DiaryResponseService.getRandomResponse(text);
+      _speak(response, durationMs: 2200);
+    });
   }
 
   /// 재우기
@@ -205,16 +215,63 @@ class _CaringPageState extends State<CaringPage>
   /// 오라 원 탭
   void _onCircleTap() {
     _tapTrigger?.fire(); // 🔥 Rive 트리거 발동
-    _showFeedback(
+    _speak(
       _neutralPhrases[Random().nextInt(_neutralPhrases.length)],
-    );
+    ); // ✨ 변경: _showFeedback → _speak
     }
 
-  /// 피드백 표시 (3초 후 해제)
-  void _showFeedback(String text) {
-    setState(() => _feedbackText = text);
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) setState(() => _feedbackText = null);
+  // ═══════════════════════════════════════════════
+  // ✨ 새로운 말풍선 시스템
+  // ═══════════════════════════════════════════════
+
+  /// 말하기 - 말풍선을 일정 시간 동안 표시
+  void _speak(String text, {int durationMs = 2000}) {
+    setState(() {
+      _currentSpeech = text;
+      _isDismissingSpeech = false;
+    });
+
+    // 일정 시간 후 사라지기 시작
+    Future.delayed(Duration(milliseconds: durationMs), () {
+      if (mounted && _currentSpeech == text) {
+        setState(() => _isDismissingSpeech = true);
+        
+        // 바람 효과 애니메이션 후 완전 제거
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (mounted) {
+            setState(() {
+              _currentSpeech = null;
+              _isDismissingSpeech = false;
+            });
+          }
+        });
+      }
+    });
+  }
+
+  /// 떠오르는 수치 표시 (+1, +3 등)
+  void _showFloatingDelta(int value) {
+    // 캐릭터 위치 계산
+    final RenderBox? box = _characterKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null) return;
+    
+    final position = box.localToGlobal(Offset.zero);
+    final centerX = position.dx + (box.size.width / 2) - 20;
+    final topY = position.dy + 100; // 캐릭터 중간 부근
+
+    final deltaWidget = FloatingDelta(
+      key: ValueKey('delta_${DateTime.now().millisecondsSinceEpoch}'),
+      value: value,
+      startPosition: Offset(centerX, topY),
+    );
+
+    setState(() => _floatingDeltas.add(deltaWidget));
+
+    // 1초 후 제거
+    Future.delayed(const Duration(milliseconds: 1100), () {
+      if (mounted) {
+        setState(() => _floatingDeltas.remove(deltaWidget));
+      }
     });
   }
 
@@ -256,6 +313,7 @@ class _CaringPageState extends State<CaringPage>
       children: [
         // ── 1. dog.riv 전체 화면 (캐릭터 영역) ──
         Positioned.fill(
+          key: _characterKey, // ✨ 추가: 위치 추적용
           child: GestureDetector(
             onTap: _onCircleTap,
             child: _dogArtboard != null
@@ -287,41 +345,22 @@ class _CaringPageState extends State<CaringPage>
           ),
         ),
 
-        // ── 3. 캐릭터 아래 텍스트 ──
+        // ── 3. ✨ 캐릭터 아래 말풍선 (말할 때만 표시) ──
         Positioned(
           bottom: 140,
           left: 0,
           right: 0,
           child: Center(
-          child: Column(
-              mainAxisSize: MainAxisSize.min,
-            children: [
-                Text(
-                  _feedbackText ?? _displayText,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w400,
-                    color: _colorText,
-                    letterSpacing: 0.3,
-                    height: 1.5,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                if (_feedbackText != null) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    '결 ${_bondScore.toInt()}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w300,
-                      color: _colorText.withOpacity(0.5),
-                  ),
-                ),
-                ],
-              ],
+            child: SpeechOverlay(
+              text: _currentSpeech,
+              isDismissing: _isDismissingSpeech,
+              useWindEffect: true,
             ),
+          ),
         ),
-      ),
+
+        // ── 3-1. ✨ 떠오르는 수치들 ──
+        ..._floatingDeltas,
 
         // ── 4. 하단 버튼들 ──
         Positioned(
@@ -414,17 +453,17 @@ class _CaringPageState extends State<CaringPage>
     );
   }
 
-  /// 4개 아이콘 버튼 (텍스트/멘트 없음, 아이콘만)
+  /// 4개 아이콘 버튼 (✨ 수정: 소통하기, 대화하기 추가)
   Widget _buildFourActions() {
     return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 40),
       child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-          _buildIconAction(Icons.restaurant_outlined, _onFeed),
-          _buildIconAction(Icons.chat_bubble_outline, _onTalk), // 이야기나누기로 변경
-          _buildIconAction(Icons.menu_book_outlined, _onStudy),
-          _buildIconAction(Icons.nights_stay_outlined, _onSleep),
+          _buildIconAction(Icons.restaurant_outlined, _onFeed),              // 밥먹기
+          _buildIconAction(Icons.volunteer_activism, _onEmpathize),         // ✨ 소통하기
+          _buildIconAction(Icons.edit_note_outlined, _onDiary),             // ✨ 대화하기 (한 줄 기록)
+          _buildIconAction(Icons.nights_stay_outlined, _onSleep),           // 잠자기
             ],
           ),
     );

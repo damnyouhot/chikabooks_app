@@ -51,6 +51,12 @@ service cloud.firestore {
         allow read: if request.auth != null && request.auth.uid == uid;
         allow write: if false; // 서버만
       }
+
+      // ── 📝 나만 보는 한 줄 기록 (notes) ──
+      match /notes/{noteId} {
+        allow read: if request.auth != null && request.auth.uid == uid;
+        allow write: if request.auth != null && request.auth.uid == uid;
+      }
     }
 
     // ══════════════════════════════════════════════════
