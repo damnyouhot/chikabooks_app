@@ -18,7 +18,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 ///
 /// 섹션 순서:
 ///   A) 요약 헤더 (결 점수 + 파트너 아바타 + 이번 주 목표 한 줄)
-///   B) 결을 같이하기 + 리액션 (펼쳐진 카드)
+///   B) 오늘을 나누기 + 리액션 (펼쳐진 카드)
 ///   C) 파트너 활동 요약 (사람별)
 ///   D) 공감 투표 (펼쳐진 질문 + 선택지)
 ///   E) 이번 주 목표 진행률 (나 + 파트너)
@@ -121,13 +121,13 @@ class _BondPageState extends State<BondPage> {
 
             const SliverToBoxAdapter(child: SizedBox(height: 16)),
 
-            // ── 스탬프: 이번 주 우리 스탬프 (축약 시에만) ──
-            if (!_isBondExpanded)
+            // ── 스탬프: 이번 주 우리 스탬프 (확장 시에만) ──
+            if (_isBondExpanded)
               SliverToBoxAdapter(child: _buildStampSection()),
 
-            SliverToBoxAdapter(child: SizedBox(height: _isBondExpanded ? 0 : 16)),
+            SliverToBoxAdapter(child: SizedBox(height: _isBondExpanded ? 16 : 0)),
 
-            // ── 섹션 B: 결을 같이하기 (펼쳐진 카드) ──
+            // ── 섹션 B: 오늘을 나누기 (펼쳐진 카드) ──
             SliverToBoxAdapter(child: _buildSectionB()),
 
             const SliverToBoxAdapter(child: SizedBox(height: 16)),
@@ -247,14 +247,6 @@ class _BondPageState extends State<BondPage> {
               ),
               const SizedBox(height: 16),
               _buildExpandedPartnerDetails(),
-              const SizedBox(height: 16),
-              Container(
-                width: double.infinity,
-                height: 0.5,
-                color: _kShadow2.withOpacity(0.6),
-              ),
-              const SizedBox(height: 16),
-              _buildStampSectionInline(),
             ],
 
             // 축약 시 이번 주 목표 미니 요약
@@ -706,83 +698,8 @@ class _BondPageState extends State<BondPage> {
     );
   }
 
-  // ── 스탬프 인라인 (확장 시 사용) ──
-  Widget _buildStampSectionInline() {
-    // 파트너 그룹이 없으면 숨김
-    if (_partnerGroupId == null || _partnerGroupId!.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return StreamBuilder<WeeklyStampState>(
-      stream: WeeklyStampService.watchThisWeek(_partnerGroupId!),
-      builder: (context, snap) {
-        final stamp = snap.data ?? WeeklyStampState.empty(
-          WeeklyStampService.currentWeekKey(),
-        );
-        final todayIdx = WeeklyStampService.todayDayOfWeek();
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 타이틀
-            Row(
-              children: [
-                const Text(
-                  '이번 주 우리 스탬프',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: _kText,
-                  ),
-                ),
-                const Spacer(),
-                GestureDetector(
-                  onTap: () => _showStampInfo(),
-                  child: Icon(
-                    Icons.info_outline,
-                    size: 14,
-                    color: _kText.withValues(alpha: 0.35),
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 12),
-
-            // 7개 스탬프 원 (월~일)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: List.generate(7, (i) {
-                final isFilled = stamp.isFilled(i);
-                final isToday = i == todayIdx;
-                return _StampCircle(
-                  dayLabel: const ['월', '화', '수', '목', '금', '토', '일'][i],
-                  isFilled: isFilled,
-                  isToday: isToday,
-                );
-              }),
-            ),
-
-            const SizedBox(height: 10),
-
-            // 요약 텍스트
-            Center(
-              child: Text(
-                '이번 주 ${stamp.filledCount}/7 칸 채웠어요',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: _kText.withValues(alpha: 0.5),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   // ─────────────────────────────────────────
-  // [섹션 B] 결을 같이하기 (펼쳐진 카드)
+  // [섹션 B] 오늘을 나누기 (펼쳐진 카드)
   // ─────────────────────────────────────────
 
   Widget _buildSectionB() {
@@ -795,7 +712,7 @@ class _BondPageState extends State<BondPage> {
           Row(
             children: [
               const Text(
-                '결을 같이하기',
+                '오늘을 나누기',
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
@@ -899,173 +816,6 @@ class _BondPageState extends State<BondPage> {
                 }).toList(),
               );
             },
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _getSlotStatus() {
-    final now = TimeOfDay.now();
-    if (now.hour < 12 || (now.hour == 12 && now.minute < 30)) {
-      return '다음 작성 12:30';
-    } else if (now.hour < 19) {
-      return '작성 가능 ✍️';
-    } else {
-      return '오늘 마감';
-    }
-  }
-
-  Widget _buildMySentenceCard() {
-    // 더미: 내 문장이 없을 때 → 작성 유도
-    return GestureDetector(
-      onTap: _openDailyWallWrite,
-      child: Container(
-      width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: _cardDecoration(),
-        child: Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-      decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: _kAccent.withOpacity(0.15),
-              ),
-              child: const Center(
-                child: Text('나', style: TextStyle(fontSize: 12, color: _kText)),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                '오늘의 기분을 남겨보세요.',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: _kText.withOpacity(0.4),
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-            ),
-            Icon(Icons.edit_outlined, size: 16, color: _kText.withOpacity(0.3)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPartnerSentenceCard({
-    required String name,
-    required String badge,
-    required String text,
-    required Map<String, int> reactions,
-  }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: _cardDecoration(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 작성자
-          Row(
-            children: [
-          Container(
-                width: 28,
-                height: 28,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-                  color: _kShadow2.withOpacity(0.6),
-                ),
-                child: Center(
-                  child: Text(
-                    name[0],
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: _kText.withOpacity(0.6),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    name,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: _kText,
-                    ),
-                  ),
-                  Text(
-                    badge,
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: _kText.withOpacity(0.4),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-
-          // 문장 텍스트
-          Text(
-            text,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w400,
-              color: _kText,
-              height: 1.5,
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // 리액션 버튼들
-          Row(
-            children: reactions.entries.map((entry) {
-              return Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: GestureDetector(
-                  onTap: () {
-                    // TODO: 리액션 보내기 구현
-                  },
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: _kBg,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: _kShadow2.withOpacity(0.5),
-                        width: 0.5,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(entry.key, style: const TextStyle(fontSize: 14)),
-                        if (entry.value > 0) ...[
-                          const SizedBox(width: 4),
-                          Text(
-                            '${entry.value}',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: _kText.withOpacity(0.5),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
           ),
         ],
       ),
@@ -1205,77 +955,6 @@ class _BondPageState extends State<BondPage> {
                   color: _kText.withOpacity(0.6),
                 ),
               ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPersonActivity({
-    required String name,
-    required List<String> activities,
-  }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // 아바타
-        Container(
-                width: 28,
-                height: 28,
-          decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-            color: _kShadow2.withOpacity(0.6),
-          ),
-          child: Center(
-            child: Text(
-              name[0],
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: _kText.withOpacity(0.6),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        // 이름 + 활동 리스트
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                name,
-                  style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: _kText,
-                ),
-              ),
-              const SizedBox(height: 4),
-              ...activities.map((a) => Padding(
-                    padding: const EdgeInsets.only(bottom: 2),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 3,
-                          height: 3,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: _kText.withOpacity(0.3),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                Text(
-                          a,
-                  style: TextStyle(
-                    fontSize: 12,
-                            color: _kText.withOpacity(0.6),
-                  ),
-                ),
-              ],
-            ),
-                  )),
             ],
           ),
         ),
@@ -1458,231 +1137,6 @@ class _BondPageState extends State<BondPage> {
           ],
         ),
       ),
-    );
-  }
-
-  // ─────────────────────────────────────────
-  // [섹션 E] 이번 주 목표 진행률
-  // ─────────────────────────────────────────
-
-  Widget _buildSectionE() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(20),
-        decoration: _cardDecoration(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Text(
-                  '이번 주 목표 진행률',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: _kText,
-                  ),
-                ),
-                const Spacer(),
-                GestureDetector(
-                  onTap: _showAddGoalDialog,
-                  child: Text(
-                    '+ 추가',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: _kAccent.withOpacity(0.8),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // 나의 목표 (실제 데이터)
-            StreamBuilder<WeeklyGoals?>(
-              stream: WeeklyGoalService.watchThisWeek(),
-              builder: (context, snap) {
-                final goals = snap.data?.goals ?? [];
-                if (goals.isEmpty) {
-                  return _buildGoalProgressRow(
-                    name: '나',
-                    isMine: true,
-                    goals: [],
-                  );
-                }
-                return _buildGoalProgressRow(
-                  name: '나',
-                  isMine: true,
-                  goals: goals,
-                );
-              },
-            ),
-
-            const SizedBox(height: 12),
-            Container(height: 0.5, color: _kShadow2.withOpacity(0.4)),
-            const SizedBox(height: 12),
-
-            // 파트너 목표 (더미 → 실제 연결 시 교체)
-            _buildGoalProgressRow(
-              name: '민지님',
-              isMine: false,
-              goals: [
-                GoalItem(id: 'd1', title: '매일 스트레칭', createdAt: DateTime.now(), progress: 5, target: 7),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Container(height: 0.5, color: _kShadow2.withOpacity(0.4)),
-            const SizedBox(height: 12),
-            _buildGoalProgressRow(
-              name: '지은님',
-              isMine: false,
-              goals: [
-                GoalItem(id: 'd2', title: '일찍 퇴근하기', createdAt: DateTime.now(), progress: 2, target: 5),
-                GoalItem(id: 'd3', title: '물 2L 마시기', createdAt: DateTime.now(), progress: 4, target: 7),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Container(height: 0.5, color: _kShadow2.withOpacity(0.4)),
-            const SizedBox(height: 12),
-            _buildGoalProgressRow(
-              name: '현수님',
-              isMine: false,
-              goals: [],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGoalProgressRow({
-    required String name,
-    required bool isMine,
-    required List<GoalItem> goals,
-  }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // 아바타
-        Container(
-          width: 28,
-          height: 28,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: isMine
-                ? _kAccent.withOpacity(0.2)
-                : _kShadow2.withOpacity(0.6),
-          ),
-          child: Center(
-            child: Text(
-              name[0],
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: _kText.withOpacity(0.6),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                name,
-                    style: const TextStyle(
-                  fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                  color: _kText,
-                    ),
-                  ),
-              if (goals.isEmpty) ...[
-                const SizedBox(height: 4),
-                  Text(
-                  isMine ? '목표를 설정해보세요' : '아직 목표가 없어요',
-                    style: TextStyle(
-                      fontSize: 12,
-                    color: _kText.withOpacity(0.35),
-                    ),
-                  ),
-                ],
-              ...goals.map((g) {
-                final ratio =
-                    g.target > 0 ? (g.progress / g.target).clamp(0.0, 1.0) : 0.0;
-                return Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              g.title,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: _kText.withOpacity(0.7),
-                              ),
-                            ),
-                          ),
-                          // 체크인 버튼 (나만)
-                          if (isMine)
-                            GestureDetector(
-                              onTap: () => WeeklyGoalService.checkIn(g.id),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: _kAccent.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  '+1',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
-                                    color: _kText.withOpacity(0.5),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          const SizedBox(width: 8),
-                          Text(
-                            '${g.progress}/${g.target}',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: _kText.withOpacity(0.4),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      // 프로그레스 바
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(2),
-                        child: LinearProgressIndicator(
-                          value: ratio,
-                          minHeight: 3,
-                          backgroundColor: _kShadow2.withOpacity(0.4),
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            g.progress >= g.target
-                                ? const Color(0xFF8BC6A0)
-                                : _kAccent.withOpacity(0.6),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }),
-            ],
-          ),
-        ),
-      ],
     );
   }
 

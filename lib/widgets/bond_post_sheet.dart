@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/bond_post_service.dart';
 
-/// "결을 같이하기" BottomSheet
+/// "오늘을 나누기" BottomSheet
 /// 완전 자유 입력 (최대 200자)
 class BondPostSheet extends StatefulWidget {
   const BondPostSheet({super.key});
@@ -15,6 +16,7 @@ class _BondPostSheetState extends State<BondPostSheet> {
   final _controller = TextEditingController();
   final _db = FirebaseFirestore.instance;
   bool _posting = false;
+  int _remainingPosts = 2;
 
   // 욕설 필터링 (간단한 예시)
   final _badWords = [
@@ -35,10 +37,30 @@ class _BondPostSheetState extends State<BondPostSheet> {
     return _badWords.any((word) => lower.contains(word));
   }
 
+  @override
+  void initState() {
+    super.initState();
+    _checkRemainingPosts();
+  }
+
+  Future<void> _checkRemainingPosts() async {
+    final remaining = await BondPostService.getRemainingPostsToday();
+    if (mounted) {
+      setState(() => _remainingPosts = remaining);
+    }
+  }
+
   Future<void> _submit() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) {
       _showSnack('로그인이 필요합니다.');
+      return;
+    }
+
+    // 하루 2번 제한 체크
+    final canPost = await BondPostService.canPostToday();
+    if (!canPost) {
+      _showSnack('오늘은 이미 2번 나눴어요. 내일 다시 만나요 😊');
       return;
     }
 
@@ -99,12 +121,22 @@ class _BondPostSheetState extends State<BondPostSheet> {
           child: Column(
             children: [
               // 제목
-              const Text(
-                '✍️ 결을 같이하기',
+                          const Text(
+                            '✍️ 오늘을 나누기',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF6A5ACD),
+                            ),
+                          ),
+              const SizedBox(height: 4),
+              Text(
+                _remainingPosts > 0 
+                    ? '오늘 $_remainingPosts번 더 나눌 수 있어요'
+                    : '오늘은 이미 2번 나눴어요',
                 style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF6A5ACD),
+                  fontSize: 12,
+                  color: _remainingPosts > 0 ? Colors.grey[600] : Colors.red[400],
                 ),
               ),
               const SizedBox(height: 8),

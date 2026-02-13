@@ -507,45 +507,43 @@ class _CaringPageState extends State<CaringPage>
         }
 
         return Container(
-          color: Color.fromRGBO(40, 50, 50, 0.85 * _dimAnimation.value), // 더 어둡게 변경
+          color: Color.fromRGBO(40, 50, 50, 0.85 * _dimAnimation.value),
           child: SafeArea(
-            child: Column(
-              children: [
-                // 상단 여백
-                const SizedBox(height: 80),
-                
-                // 달 아이콘 + 쉬고 있어요 (상단 배치)
-                Opacity(
-                  opacity: _dimAnimation.value,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text('🌙', style: TextStyle(fontSize: 48)),
-                      const SizedBox(height: 16),
-                      const Text(
-                        '쉬고 있어요.',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w300,
-                          color: Colors.white70,
-                          letterSpacing: 0.5,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // 캐릭터 위: 달 + 쉬고 있어요
+                  Opacity(
+                    opacity: _dimAnimation.value,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('🌙', style: TextStyle(fontSize: 48)),
+                        const SizedBox(height: 16),
+                        const Text(
+                          '쉬고 있어요.',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w300,
+                            color: Colors.white70,
+                            letterSpacing: 0.5,
+                          ),
+                          textAlign: TextAlign.center,
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                
-                const Spacer(),
-                
-                // 깨우기 버튼 (하단 - 멘트 위치)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 150), // 멘트 위치와 동일
-                  child: Opacity(
+                  
+                  const SizedBox(height: 120),
+                  
+                  // 캐릭터 아래: 깨우기 버튼
+                  Opacity(
                     opacity: _dimAnimation.value,
                     child: _buildWakeButton(),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );
