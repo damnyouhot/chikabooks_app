@@ -88,6 +88,7 @@ class _BondPostSheetState extends State<BondPostSheet> {
         'text': text,
         'dateKey': BondPostService.todayDateKey(),
         'timeSlot': currentSlot.name,
+        'bondGroupId': 'default_group', // 임시: 나중에 실제 그룹 ID로 교체
         'createdAt': FieldValue.serverTimestamp(),
         'reports': 0,
       });

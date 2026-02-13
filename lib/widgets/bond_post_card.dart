@@ -2,17 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/report_service.dart';
+import '../services/enthrone_service.dart';
 
 /// "결을 같이하기" 게시물 카드
-/// 수정/삭제/신고 기능 포함
+/// 수정/삭제/신고/추대 기능 포함
 class BondPostCard extends StatefulWidget {
   final Map<String, dynamic> post;
   final String postId;
+  final String? bondGroupId; // 추가: 파트너 그룹 ID
 
   const BondPostCard({
     super.key,
     required this.post,
     required this.postId,
+    this.bondGroupId,
   });
 
   @override
@@ -22,14 +25,97 @@ class BondPostCard extends StatefulWidget {
 class _BondPostCardState extends State<BondPostCard> {
   final _db = FirebaseFirestore.instance;
   String? _currentUid;
+  bool _hasEnthroned = false;
+  int _enthroneCount = 0;
+  bool _loadingEnthrone = false;
 
   @override
   void initState() {
     super.initState();
     _currentUid = FirebaseAuth.instance.currentUser?.uid;
+    _loadEnthroneStatus();
   }
 
   bool get _isMyPost => widget.post['uid'] == _currentUid;
+
+  // 추대 상태 로드
+  Future<void> _loadEnthroneStatus() async {
+    // bondGroupId가 없으면 추대 기능 비활성화
+    final groupId = widget.bondGroupId ?? widget.post['bondGroupId'];
+    if (groupId == null) return;
+
+    try {
+      final hasEnthroned = await EnthroneService.hasEnthroned(
+        bondGroupId: groupId,
+        postId: widget.postId,
+      );
+      final count = await EnthroneService.getEnthroneCount(
+        bondGroupId: groupId,
+        postId: widget.postId,
+      );
+
+      if (mounted) {
+        setState(() {
+          _hasEnthroned = hasEnthroned;
+          _enthroneCount = count;
+        });
+      }
+    } catch (e) {
+      debugPrint('⚠️ _loadEnthroneStatus error: $e');
+    }
+  }
+
+  // 추대 토글
+  Future<void> _toggleEnthrone() async {
+    final groupId = widget.bondGroupId ?? widget.post['bondGroupId'];
+    if (groupId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('파트너 그룹에 가입해야 추대할 수 있어요.')),
+      );
+      return;
+    }
+
+    if (_loadingEnthrone) return;
+
+    setState(() => _loadingEnthrone = true);
+
+    try {
+      bool success;
+      if (_hasEnthroned) {
+        success = await EnthroneService.unenthronePost(
+          bondGroupId: groupId,
+          postId: widget.postId,
+        );
+        if (success && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('추대를 취소했어요.')),
+          );
+        }
+      } else {
+        success = await EnthroneService.enthronePost(
+          bondGroupId: groupId,
+          postId: widget.postId,
+        );
+        if (success && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('✨ 추대했어요!')),
+          );
+        } else if (!success && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('이미 추대했어요.')),
+          );
+        }
+      }
+
+      if (success) {
+        await _loadEnthroneStatus(); // 상태 새로고침
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _loadingEnthrone = false);
+      }
+    }
+  }
 
   void _showReportDialog() {
     showDialog(
@@ -212,11 +298,34 @@ class _BondPostCardState extends State<BondPostCard> {
           // 하단 액션
           Row(
             children: [
-              if (updatedAt != null)
+              // 추대 버튼 (모든 사용자에게 표시)
+              TextButton.icon(
+                onPressed: _loadingEnthrone ? null : _toggleEnthrone,
+                icon: Icon(
+                  _hasEnthroned ? Icons.auto_awesome : Icons.auto_awesome_outlined,
+                  size: 16,
+                  color: _hasEnthroned ? const Color(0xFF6A5ACD) : Colors.grey[600],
+                ),
+                label: Text(
+                  _enthroneCount > 0 ? '추대 $_enthroneCount' : '추대',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: _hasEnthroned ? const Color(0xFF6A5ACD) : Colors.grey[600],
+                    fontWeight: _hasEnthroned ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                ),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                ),
+              ),
+
+              if (updatedAt != null) ...[
+                const SizedBox(width: 8),
                 Text(
                   '(수정됨)',
                   style: TextStyle(fontSize: 11, color: Colors.grey[500]),
                 ),
+              ],
               const SizedBox(width: 4),
               Text(
                 timeStr,

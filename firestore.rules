@@ -113,6 +113,7 @@ service cloud.firestore {
         request.resource.data.text.size() <= 200 &&
         request.resource.data.dateKey is string &&
         request.resource.data.timeSlot is string &&
+        request.resource.data.bondGroupId is string &&
         request.resource.data.reports == 0;
       
       // 수정: 본인 게시물만

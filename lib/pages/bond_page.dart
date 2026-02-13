@@ -8,6 +8,8 @@ import '../services/weekly_stamp_service.dart';
 import '../widgets/bond_post_sheet.dart';
 import '../widgets/bond_post_card.dart';
 import '../widgets/profile_gate_sheet.dart';
+import '../widgets/billboard_card.dart';
+import '../models/enthrone.dart';
 import '../data/goal_suggestions.dart';
 import 'settings/communion_profile_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -129,6 +131,11 @@ class _BondPageState extends State<BondPage> {
 
             // ── 섹션 B: 오늘을 나누기 (펼쳐진 카드) ──
             SliverToBoxAdapter(child: _buildSectionB()),
+
+            const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+            // ── 전광판 섹션 ──
+            SliverToBoxAdapter(child: _buildBillboardSection()),
 
             const SliverToBoxAdapter(child: SizedBox(height: 16)),
 
@@ -812,6 +819,99 @@ class _BondPageState extends State<BondPage> {
                   return BondPostCard(
                     post: data,
                     postId: doc.id,
+                    bondGroupId: data['bondGroupId'] as String?, // 추가
+                  );
+                }).toList(),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────
+  // [전광판 섹션] 추대된 게시물
+  // ─────────────────────────────────────────
+
+  Widget _buildBillboardSection() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '✨ 전광판',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: _kText,
+            ),
+          ),
+          const SizedBox(height: 12),
+          
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('billboardPosts')
+                .where('status', isEqualTo: 'active')
+                .orderBy('createdAt', descending: true)
+                .limit(3)
+                .snapshots(),
+            builder: (context, snap) {
+              if (snap.connectionState == ConnectionState.waiting) {
+                return const SizedBox.shrink();
+              }
+
+              if (snap.hasError) {
+                return const SizedBox.shrink();
+              }
+
+              final docs = snap.data?.docs ?? [];
+              if (docs.isEmpty) {
+                return Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: _kCardBg,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: _kShadow2.withOpacity(0.3),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.auto_awesome_outlined,
+                        size: 32,
+                        color: _kText.withOpacity(0.3),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '아직 추대된 글이 없어요',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: _kText.withOpacity(0.5),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '좋은 글에 추대 버튼을 눌러보세요',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: _kText.withOpacity(0.4),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              return Column(
+                children: docs.map((doc) {
+                  return BillboardCard(
+                    post: BillboardPost.fromDoc(
+                      doc as DocumentSnapshot<Map<String, dynamic>>
+                    ),
                   );
                 }).toList(),
               );
