@@ -28,43 +28,49 @@ class SpeechOverlay extends StatefulWidget {
 class _SpeechOverlayState extends State<SpeechOverlay>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  late Animation<double> _opacity;
-  late Animation<Offset> _position;
-  late Animation<double> _rotation;
-  late Animation<double> _blur;
+  late Animation<double> _fadeIn;
+  late Animation<double> _fadeOut;
+  late Animation<Offset> _windPosition;
+  late Animation<double> _windRotation;
+  late Animation<double> _windBlur;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 250),
+      duration: const Duration(milliseconds: 300),
+    );
+
+    // 페이드 인 애니메이션 (0.0 → 1.0)
+    _fadeIn = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    );
+
+    // 페이드 아웃 애니메이션 (1.0 → 0.0)
+    _fadeOut = Tween<double>(begin: 1.0, end: 0.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeIn),
     );
 
     if (widget.useWindEffect) {
-      // 바람 효과: 투명도 + 이동 + 회전 + 블러
-      _opacity = Tween<double>(begin: 0.0, end: 1.0).animate(
-        CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-      );
-      _position = Tween<Offset>(
+      // 바람 효과: 0에서 시작해서 움직임
+      _windPosition = Tween<Offset>(
         begin: Offset.zero,
         end: const Offset(14, -6), // 오른쪽 위로 살짝
       ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
-      _rotation = Tween<double>(begin: 0.0, end: 0.05).animate(
+      
+      _windRotation = Tween<double>(begin: 0.0, end: 0.05).animate(
         CurvedAnimation(parent: _controller, curve: Curves.easeOut),
       ); // 약 3도
-      _blur = Tween<double>(begin: 0.0, end: 3.0).animate(
+      
+      _windBlur = Tween<double>(begin: 0.0, end: 3.0).animate(
         CurvedAnimation(parent: _controller, curve: Curves.easeOut),
       );
     } else {
-      // 단순 페이드
-      _opacity = Tween<double>(begin: 0.0, end: 1.0).animate(
-        CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-      );
-      _position = Tween<Offset>(begin: Offset.zero, end: Offset.zero)
+      _windPosition = Tween<Offset>(begin: Offset.zero, end: Offset.zero)
           .animate(_controller);
-      _rotation = Tween<double>(begin: 0.0, end: 0.0).animate(_controller);
-      _blur = Tween<double>(begin: 0.0, end: 0.0).animate(_controller);
+      _windRotation = Tween<double>(begin: 0.0, end: 0.0).animate(_controller);
+      _windBlur = Tween<double>(begin: 0.0, end: 0.0).animate(_controller);
     }
 
     // 나타날 때
@@ -78,9 +84,9 @@ class _SpeechOverlayState extends State<SpeechOverlay>
     super.didUpdateWidget(oldWidget);
     
     if (widget.isDismissing && !oldWidget.isDismissing) {
-      // 사라질 때
-      _controller.reverse();
-    } else if (widget.text != null && widget.text != oldWidget.text) {
+      // 사라질 때: forward로 진행 (바람 효과 적용)
+      _controller.forward(from: 0.0);
+    } else if (widget.text != null && widget.text != oldWidget.text && !widget.isDismissing) {
       // 새 텍스트 등장
       _controller.forward(from: 0.0);
     }
@@ -101,25 +107,29 @@ class _SpeechOverlayState extends State<SpeechOverlay>
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
+        // 사라질 때와 나타날 때 구분
+        final opacity = widget.isDismissing ? _fadeOut.value : _fadeIn.value;
+        final offset = widget.isDismissing && widget.useWindEffect 
+            ? _windPosition.value 
+            : Offset.zero;
+        final rotation = widget.isDismissing && widget.useWindEffect 
+            ? _windRotation.value 
+            : 0.0;
+        final blur = widget.isDismissing && widget.useWindEffect 
+            ? _windBlur.value 
+            : 0.0;
+
         return Transform.translate(
-          offset: widget.useWindEffect && widget.isDismissing 
-              ? _position.value 
-              : Offset.zero,
+          offset: offset,
           child: Transform.rotate(
-            angle: widget.useWindEffect && widget.isDismissing 
-                ? _rotation.value 
-                : 0.0,
+            angle: rotation,
             child: Opacity(
-              opacity: widget.isDismissing 
-                  ? 1.0 - _opacity.value 
-                  : _opacity.value,
+              opacity: opacity,
               child: ImageFiltered(
-                imageFilter: widget.useWindEffect && widget.isDismissing
-                    ? ImageFilter.blur(
-                        sigmaX: _blur.value,
-                        sigmaY: _blur.value,
-                      )
-                    : ImageFilter.blur(sigmaX: 0, sigmaY: 0),
+                imageFilter: ImageFilter.blur(
+                  sigmaX: blur,
+                  sigmaY: blur,
+                ),
                 child: child,
               ),
             ),

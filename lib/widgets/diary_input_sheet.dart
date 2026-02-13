@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:math';
+import '../pages/diary_timeline_page.dart';
 
 /// 나만 보는 한 줄 기록 (BottomSheet)
 /// 
@@ -92,14 +93,56 @@ class _DiaryInputSheetState extends State<DiaryInputSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 제목
-            const Text(
-              '오늘 한마디',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF5D6B6B),
-              ),
+            // 제목 + 기록 보기 버튼
+            Row(
+              children: [
+                const Text(
+                  '오늘, 지금',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF5D6B6B),
+                  ),
+                ),
+                const Spacer(),
+                // 기록 보기 버튼
+                GestureDetector(
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const DiaryTimelinePage(),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF7BA5A5).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.history,
+                          size: 16,
+                          color: const Color(0xFF7BA5A5),
+                        ),
+                        const SizedBox(width: 4),
+                        const Text(
+                          '기록 보기',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF7BA5A5),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 6),
             // 서브타이틀

@@ -251,13 +251,12 @@ class _CaringPageState extends State<CaringPage>
 
   /// 떠오르는 수치 표시 (+1, +3 등)
   void _showFloatingDelta(int value) {
-    // 캐릭터 위치 계산
-    final RenderBox? box = _characterKey.currentContext?.findRenderObject() as RenderBox?;
-    if (box == null) return;
+    // 화면 크기 가져오기
+    final size = MediaQuery.of(context).size;
     
-    final position = box.localToGlobal(Offset.zero);
-    final centerX = position.dx + (box.size.width / 2) - 20;
-    final topY = position.dy + 100; // 캐릭터 중간 부근
+    // 화면 중앙 상단 (캐릭터 머리 예상 위치)
+    final centerX = size.width / 2 - 10; // 중앙에서 살짝 왼쪽
+    final topY = size.height * 0.35; // 상단 35% 지점
 
     final deltaWidget = FloatingDelta(
       key: ValueKey('delta_${DateTime.now().millisecondsSinceEpoch}'),
