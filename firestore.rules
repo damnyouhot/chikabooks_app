@@ -60,7 +60,47 @@ service cloud.firestore {
     }
 
     // ══════════════════════════════════════════════════
-    // 기타 컬렉션 (임시로 전체 허용)
+    // 주간 목표 (Weekly Goals)
+    // ══════════════════════════════════════════════════
+    match /weeklyGoals/{docId} {
+      // docId 형식: {uid}_{weekKey} (예: abc123_2026-W07)
+      allow read, write: if request.auth != null && 
+        docId.matches('^' + request.auth.uid + '_.*');
+    }
+
+    // ══════════════════════════════════════════════════
+    // 결을 같이하기 게시물 (Bond Posts)
+    // ══════════════════════════════════════════════════
+    match /bondPosts/{postId} {
+      // 읽기: 로그인한 모든 유저
+      allow read: if request.auth != null;
+      
+      // 쓰기: 로그인한 유저, 자신의 uid로만 작성
+      allow create: if request.auth != null && 
+        request.resource.data.uid == request.auth.uid &&
+        request.resource.data.text is string &&
+        request.resource.data.text.size() <= 200;
+      
+      // 수정: 본인 게시물만
+      allow update: if request.auth != null && 
+        resource.data.uid == request.auth.uid;
+      
+      // 삭제: 본인 게시물만
+      allow delete: if request.auth != null && 
+        resource.data.uid == request.auth.uid;
+    }
+
+    // ══════════════════════════════════════════════════
+    // 파트너 그룹 내 주간 스탬프
+    // ══════════════════════════════════════════════════
+    match /partnerGroups/{groupId}/weeklyStamps/{stampId} {
+      allow read: if request.auth != null && 
+        request.auth.uid in get(/databases/$(database)/documents/partnerGroups/$(groupId)).data.memberUids;
+      allow write: if false; // 서버만
+    }
+
+    // ══════════════════════════════════════════════════
+    // 기타 컬렉션 (임시로 전체 허용 - 나중에 세분화 필요)
     // ══════════════════════════════════════════════════
     match /{document=**} {
       allow read, write: if true;
