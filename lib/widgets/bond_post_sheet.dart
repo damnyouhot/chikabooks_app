@@ -134,7 +134,7 @@ class _BondPostSheetState extends State<BondPostSheet> {
                   children: [
                     // 제목
                                 const Text(
-                                  '✍️ 오늘을 나누기',
+                                  '오늘을 나누기',
                                   style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
@@ -187,18 +187,21 @@ class _BondPostSheetState extends State<BondPostSheet> {
                       child: ElevatedButton(
                         onPressed: _posting ? null : _submit,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF6A5ACD),
+                          backgroundColor: const Color(0xFFF7CBCA), // _kAccent
+                          foregroundColor: const Color(0xFF5D6B6B), // _kText
+                          disabledBackgroundColor: Colors.grey[300],
+                          disabledForegroundColor: Colors.grey[600],
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
                           ),
                         ),
                         child: _posting
-                            ? const SizedBox(
+                            ? SizedBox(
                                 width: 20,
                                 height: 20,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  color: Colors.white,
+                                  color: const Color(0xFF5D6B6B), // _kText
                                 ),
                               )
                             : const Text(

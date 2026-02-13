@@ -6,12 +6,10 @@ import '../services/caring_state_service.dart';
 import '../services/user_action_service.dart';
 import '../services/bond_score_service.dart';
 import '../services/speech_engine_service.dart';
-import '../services/weekly_goal_service.dart';
-import '../models/weekly_goal.dart';
-import '../data/goal_suggestions.dart';
 import '../widgets/speech_overlay.dart';
 import '../widgets/floating_delta.dart';
 import '../widgets/diary_input_sheet.dart';
+import '../widgets/user_goal_sheet.dart';
 
 /// 돌보기(1탭) — 아침 인사 리추얼 + 4 아이콘 + 재우기/깨우기
 ///
@@ -34,7 +32,6 @@ class _CaringPageState extends State<CaringPage>
     with SingleTickerProviderStateMixin {
   // ── 상태 ──
   bool _loading = true;
-  bool _isSleeping = false;
   bool _hasGreetedToday = false;
 
   // ── ✨ 새로운 말풍선 시스템 ──
@@ -44,10 +41,6 @@ class _CaringPageState extends State<CaringPage>
   // ── ✨ 떠오르는 수치들 ──
   final List<Widget> _floatingDeltas = [];
   final GlobalKey _characterKey = GlobalKey(); // 캐릭터 위치 추적용
-
-  // ── 디밍 애니메이션 ──
-  late AnimationController _dimController;
-  late Animation<double> _dimAnimation;
 
   // ── Rive 관련 ──
   Artboard? _dogArtboard;
@@ -69,16 +62,6 @@ class _CaringPageState extends State<CaringPage>
   @override
   void initState() {
     super.initState();
-
-    _dimController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-    _dimAnimation = CurvedAnimation(
-      parent: _dimController,
-      curve: Curves.easeInOut,
-    );
-
     _loadRiveFile();
     _loadState();
   }
@@ -121,7 +104,6 @@ class _CaringPageState extends State<CaringPage>
   @override
   void dispose() {
     _dogStateMachine?.dispose();
-    _dimController.dispose();
     super.dispose();
   }
 
@@ -136,15 +118,9 @@ class _CaringPageState extends State<CaringPage>
       final greeted = CaringStateService.hasGreetedToday(state);
 
         setState(() {
-        _isSleeping = state.isSleeping;
         _hasGreetedToday = greeted;
         _loading = false;
       });
-
-      // 디밍 상태 반영
-      if (_isSleeping) {
-        _dimController.value = 1.0;
-      }
     } catch (_) {
       if (mounted) setState(() => _loading = false);
     }
@@ -159,27 +135,11 @@ class _CaringPageState extends State<CaringPage>
     final msg = await CaringStateService.completeGreeting();
     if (!mounted) return;
 
-    // 디밍 해제 (자고있었으면)
-    if (_isSleeping) {
-      _dimController.reverse();
-    }
-
     setState(() {
-      _isSleeping = false;
       _hasGreetedToday = true;
     });
     _speak(msg); // ✨ 변경: _showFeedback → _speak
   }
-
-  /// 깨우기 (같은 날, 아침 인사 이미 완료)
-  Future<void> _onWake() async {
-    await CaringStateService.wake();
-    if (!mounted) return;
-
-    _dimController.reverse();
-    setState(() => _isSleeping = false);
-    _speak('좋은 아침.'); // ✨ 변경: _showFeedback → _speak
-    }
 
   /// 밥주기
   void _onFeed() async {
@@ -201,18 +161,13 @@ class _CaringPageState extends State<CaringPage>
   void _onDiary() {
     DiaryInputSheet.show(context, (text) {
       // 저장 완료 후 캐릭터 응답
-      final response = DiaryResponseService.getRandomResponse(text);
-      _speak(response, durationMs: 2200);
+      _speak('들었어.', durationMs: 2200);
     });
   }
 
-  /// 재우기
-  Future<void> _onSleep() async {
-    await CaringStateService.sleep();
-    if (!mounted) return;
-
-    _dimController.forward();
-    setState(() => _isSleeping = true);
+  /// ✨ 목표설정 (새로운 기능) - 목표 관리 팝업
+  void _onGoalSetting() {
+    UserGoalSheet.show(context);
   }
 
   /// 오라 원 탭
@@ -295,9 +250,6 @@ class _CaringPageState extends State<CaringPage>
         children: [
           // ── 메인 콘텐츠 (dog.riv 전체화면 + 버튼들) ──
           _buildMainContent(),
-
-          // ── 디밍 오버레이 (재우기 시) ──
-          _buildDimOverlay(),
         ],
       ),
     );
@@ -406,17 +358,8 @@ class _CaringPageState extends State<CaringPage>
       return _buildGreetingButton();
     }
 
-    // 인사 완료 → 목표 섹션 + 4 아이콘
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // 목표 섹션
-        _buildWeeklyGoalSection(),
-        const SizedBox(height: 12),
-        // 4 아이콘
-        _buildFourActions(),
-      ],
-    );
+    // 인사 완료 → 4 아이콘만
+    return _buildFourActions();
   }
 
   /// 아침 인사 버튼 (단독)
@@ -463,7 +406,7 @@ class _CaringPageState extends State<CaringPage>
     );
   }
 
-  /// 4개 아이콘 버튼 (✨ 수정: 소통하기, 대화하기 추가)
+  /// 4개 아이콘 버튼 (✨ 수정: 소통하기, 대화하기, 목표설정 추가)
   Widget _buildFourActions() {
     return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 40),
@@ -473,7 +416,7 @@ class _CaringPageState extends State<CaringPage>
           _buildIconAction(Icons.restaurant_outlined, _onFeed),              // 밥먹기
           _buildIconAction(Icons.volunteer_activism, _onEmpathize),         // ✨ 소통하기
           _buildIconAction(Icons.edit_note_outlined, _onDiary),             // ✨ 대화하기 (한 줄 기록)
-          _buildIconAction(Icons.nights_stay_outlined, _onSleep),           // 잠자기
+          _buildIconAction(Icons.flag_outlined, _onGoalSetting),            // ✨ 목표설정
             ],
           ),
     );
@@ -503,317 +446,6 @@ class _CaringPageState extends State<CaringPage>
             ),
         child: Icon(icon, color: _colorText.withOpacity(0.6), size: 22),
       ),
-    );
-  }
-
-  // ═══════════════════════════════════════════════
-  // 디밍 오버레이 (재우기 상태)
-  // ═══════════════════════════════════════════════
-
-  Widget _buildDimOverlay() {
-    return AnimatedBuilder(
-      animation: _dimAnimation,
-      builder: (context, _) {
-        if (_dimAnimation.value <= 0.01) {
-          return const SizedBox.shrink();
-        }
-
-        return Container(
-          color: Color.fromRGBO(40, 50, 50, 0.85 * _dimAnimation.value),
-          child: SafeArea(
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // 캐릭터 위: 달 + 쉬고 있어요
-                  Opacity(
-                    opacity: _dimAnimation.value,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text('🌙', style: TextStyle(fontSize: 48)),
-                        const SizedBox(height: 16),
-                        const Text(
-                          '쉬고 있어요.',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w300,
-                            color: Colors.white70,
-                            letterSpacing: 0.5,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 120),
-                  
-                  // 캐릭터 아래: 깨우기 버튼
-                  Opacity(
-                    opacity: _dimAnimation.value,
-                    child: _buildWakeButton(),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  /// 깨우기/아침 인사 버튼 (디밍 위 표시)
-  Widget _buildWakeButton() {
-    final isNewDay = !_hasGreetedToday;
-    final label = isNewDay ? '아침 인사' : '깨우기';
-    final icon = isNewDay ? '👋' : '☀️';
-
-    return GestureDetector(
-      onTap: isNewDay ? _onGreeting : _onWake,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.12),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: Colors.white.withOpacity(0.2),
-            width: 0.5, // 가느다란 라인
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(icon, style: const TextStyle(fontSize: 18)),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w400,
-                color: Colors.white70,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ═══════════════════════════════════════════════
-  // 주간 목표 섹션 (bond_page에서 이동)
-  // ═══════════════════════════════════════════════
-
-  Widget _buildWeeklyGoalSection() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 40),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.85),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: _colorShadow2.withOpacity(0.4),
-            width: 0.5,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: _colorShadow1.withOpacity(0.15),
-              blurRadius: 20,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: _buildWeeklyGoalMini(),
-      ),
-    );
-  }
-
-  Widget _buildWeeklyGoalMini() {
-    return StreamBuilder<WeeklyGoals?>(
-      stream: WeeklyGoalService.watchThisWeek(),
-      builder: (context, snap) {
-        final goals = snap.data?.goals ?? [];
-        if (goals.isEmpty) {
-          return Row(
-            children: [
-              const Text('🎯', style: TextStyle(fontSize: 14)),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  '이번 주 목표를 설정해보세요',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: _colorText.withOpacity(0.4),
-                  ),
-                ),
-              ),
-              GestureDetector(
-                onTap: () => _showAddGoalDialog(),
-                child: Text(
-                  '+ 추가',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: _colorAccent.withOpacity(0.8),
-                  ),
-                ),
-              ),
-            ],
-          );
-        }
-        return Column(
-          children: goals.map((g) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Row(
-                children: [
-                  const Text('🎯', style: TextStyle(fontSize: 13)),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      g.title,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: Color(0xFF5D6B6B),
-                      ),
-                    ),
-                  ),
-                  Text(
-                    '${g.progress}/${g.target}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: _colorText.withOpacity(0.4),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }).toList(),
-        );
-      },
-    );
-  }
-
-  void _showAddGoalDialog() {
-    final ctrl = TextEditingController();
-    final suggestions = GoalSuggestions.getRandomThree();
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(ctx).viewInsets.bottom,
-          ),
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  '이번 주 목표 추가',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF5D6B6B),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // 추천 3개
-                const Text(
-                  '💡 이런 건 어떠세요?',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF5D6B6B),
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: suggestions.map((s) {
-                    return ActionChip(
-                      label: Text(
-                        s.length > 30 ? '${s.substring(0, 30)}...' : s,
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                      onPressed: () => ctrl.text = s,
-                      backgroundColor: _colorAccent.withOpacity(0.2),
-                    );
-                  }).toList(),
-                ),
-
-                const SizedBox(height: 16),
-
-                // 직접 입력
-                TextField(
-                  controller: ctrl,
-                  maxLength: 50,
-                  maxLines: 2,
-                  decoration: InputDecoration(
-                    hintText: '목표를 입력하세요',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: _colorAccent, width: 2),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
-                // 저장 버튼
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      final title = ctrl.text.trim();
-                      if (title.isEmpty) return;
-                      Navigator.pop(ctx);
-                      final msg = await WeeklyGoalService.addGoal(title);
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(msg),
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _colorAccent,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      '추가하기',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
     );
   }
 }

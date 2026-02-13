@@ -53,3 +53,4 @@ class StampLimits {
   static const int reactionsPerStamp = 3;
 }
 
+
