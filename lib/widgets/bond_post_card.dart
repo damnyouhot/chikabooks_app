@@ -4,6 +4,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/report_service.dart';
 import '../services/enthrone_service.dart';
 
+// ── 디자인 팔레트 ──
+const _kAccent = Color(0xFFF7CBCA);
+const _kText = Color(0xFF5D6B6B);
+const _kShadow2 = Color(0xFFD5E5E5);
+
 /// "결을 같이하기" 게시물 카드
 /// 수정/삭제/신고/추대 기능 포함
 class BondPostCard extends StatefulWidget {
@@ -28,15 +33,129 @@ class _BondPostCardState extends State<BondPostCard> {
   bool _hasEnthroned = false;
   int _enthroneCount = 0;
   bool _loadingEnthrone = false;
+  
+  // 리플 관련
+  Map<String, String> _replies = {}; // uid -> reply text
+  
+  // 이모지 리액션
+  Map<String, String> _reactions = {}; // uid -> emoji
 
   @override
   void initState() {
     super.initState();
     _currentUid = FirebaseAuth.instance.currentUser?.uid;
     _loadEnthroneStatus();
+    _loadReplies();
+    _loadReactions();
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
   }
 
   bool get _isMyPost => widget.post['uid'] == _currentUid;
+
+  // 리플 로드
+  Future<void> _loadReplies() async {
+    final groupId = widget.bondGroupId ?? widget.post['bondGroupId'];
+    if (groupId == null) return;
+
+    try {
+      final snapshot = await _db
+          .collection('bondGroups')
+          .doc(groupId)
+          .collection('posts')
+          .doc(widget.postId)
+          .collection('replies')
+          .get();
+
+      if (mounted) {
+        setState(() {
+          _replies = {
+            for (var doc in snapshot.docs)
+              doc.id: doc.data()['text'] as String? ?? ''
+          };
+        });
+      }
+    } catch (e) {
+      debugPrint('⚠️ _loadReplies error: $e');
+    }
+  }
+
+  // 이모지 리액션 로드
+  Future<void> _loadReactions() async{
+    final groupId = widget.bondGroupId ?? widget.post['bondGroupId'];
+    if (groupId == null) return;
+
+    try {
+      final snapshot = await _db
+          .collection('bondGroups')
+          .doc(groupId)
+          .collection('posts')
+          .doc(widget.postId)
+          .collection('reactions')
+          .get();
+
+      if (mounted) {
+        setState(() {
+          _reactions = {
+            for (var doc in snapshot.docs)
+              doc.id: doc.data()['emoji'] as String? ?? ''
+          };
+        });
+      }
+    } catch (e) {
+      debugPrint('⚠️ _loadReactions error: $e');
+    }
+  }
+
+  // 이모지 추가/변경
+  Future<void> _toggleReaction(String emoji) async {
+    final groupId = widget.bondGroupId ?? widget.post['bondGroupId'];
+    if (groupId == null || _currentUid == null) return;
+
+    try {
+      // 같은 이모지면 삭제
+      if (_reactions[_currentUid] == emoji) {
+        await _db
+            .collection('bondGroups')
+            .doc(groupId)
+            .collection('posts')
+            .doc(widget.postId)
+            .collection('reactions')
+            .doc(_currentUid)
+            .delete();
+
+        if (mounted) {
+          setState(() {
+            _reactions.remove(_currentUid);
+          });
+        }
+      } else {
+        // 추가/변경
+        await _db
+            .collection('bondGroups')
+            .doc(groupId)
+            .collection('posts')
+            .doc(widget.postId)
+            .collection('reactions')
+            .doc(_currentUid)
+            .set({
+          'emoji': emoji,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+
+        if (mounted) {
+          setState(() {
+            _reactions[_currentUid!] = emoji;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ _toggleReaction error: $e');
+    }
+  }
 
   // 추대 상태 로드
   Future<void> _loadEnthroneStatus() async {
@@ -265,105 +384,231 @@ class _BondPostCardState extends State<BondPostCard> {
     final updatedAt = widget.post['updatedAt'];
     final createdAt = widget.post['createdAt'];
     final timeStr = _formatTimestamp(updatedAt ?? createdAt);
+    
+    // 작성자 정보
+    final testAuthorName = widget.post['_testAuthorName'] as String?;
+    final authorName = testAuthorName ?? '익명';
 
     return Container(
-      padding: const EdgeInsets.all(16),
-      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),  // 16 → 12
+      margin: const EdgeInsets.only(bottom: 8),  // 12 → 8
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),  // 16 → 12
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: Colors.grey.withOpacity(0.08),  // 0.1 → 0.08
+            blurRadius: 6,  // 8 → 6
+            offset: const Offset(0, 1),  // (0,2) → (0,1)
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 본문
+          // 헤더: 작성자 + 시간
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),  // (10,4) → (8,2)
+                decoration: BoxDecoration(
+                  color: _kShadow2.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(10),  // 12 → 10
+                ),
+                child: Text(
+                  authorName,
+                  style: const TextStyle(
+                    fontSize: 11,  // 12 → 11
+                    fontWeight: FontWeight.w600,
+                    color: _kText,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),  // 8 → 6
+              Text(
+                timeStr,
+                style: TextStyle(fontSize: 10, color: Colors.grey[400]),  // 11 → 10
+              ),
+              if (updatedAt != null) ...[
+                const SizedBox(width: 3),  // 4 → 3
+                Text(
+                  '(수정됨)',
+                  style: TextStyle(fontSize: 10, color: Colors.grey[500]),  // 11 → 10
+                ),
+              ],
+            ],
+          ),
+
+          const SizedBox(height: 8),  // 12 → 8
+
+          // 본문 (2줄 제한)
           Text(
             widget.post['text'] ?? '',
+            maxLines: 2,  // 추가
+            overflow: TextOverflow.ellipsis,  // 추가
             style: const TextStyle(
-              fontSize: 15,
-              height: 1.5,
+              fontSize: 14,  // 15 → 14
+              height: 1.4,  // 1.5 → 1.4
               color: Color(0xFF333333),
             ),
           ),
 
-          const SizedBox(height: 12),
+          const SizedBox(height: 6),  // 12 → 6
 
-          // 하단 액션
+          // 이모지 리액션 (간단하게)
+          if (_reactions.isNotEmpty)
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: _reactions.entries.take(5).map((entry) {  // 최대 5개만
+                  return Container(
+                    margin: const EdgeInsets.only(right: 4),  // 간격 축소
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),  // (8,4) → (6,2)
+                    decoration: BoxDecoration(
+                      color: _kAccent.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(10),  // 12 → 10
+                    ),
+                    child: Text(
+                      entry.value,
+                      style: const TextStyle(fontSize: 14),  // 16 → 14
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+
+          if (_reactions.isNotEmpty) const SizedBox(height: 4),  // 8 → 4
+
+          // 하단 액션 (간결하게)
           Row(
             children: [
-              // 추대 버튼 (모든 사용자에게 표시)
+              // 추대 버튼
               TextButton.icon(
                 onPressed: _loadingEnthrone ? null : _toggleEnthrone,
                 icon: Icon(
                   _hasEnthroned ? Icons.auto_awesome : Icons.auto_awesome_outlined,
-                  size: 16,
+                  size: 14,  // 16 → 14
                   color: _hasEnthroned ? const Color(0xFF6A5ACD) : Colors.grey[600],
                 ),
                 label: Text(
-                  _enthroneCount > 0 ? '추대 $_enthroneCount' : '추대',
+                  _enthroneCount > 0 ? '$_enthroneCount' : '추대',  // 간결하게
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 11,  // 12 → 11
                     color: _hasEnthroned ? const Color(0xFF6A5ACD) : Colors.grey[600],
                     fontWeight: _hasEnthroned ? FontWeight.w600 : FontWeight.normal,
                   ),
                 ),
                 style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),  // (8,4) → (6,2)
+                  minimumSize: const Size(0, 0),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
               ),
 
-              if (updatedAt != null) ...[
-                const SizedBox(width: 8),
-                Text(
-                  '(수정됨)',
-                  style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+              // 리플 개수만 표시
+              if (_replies.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(left: 4),
+                  child: Text(
+                    '💬 ${_replies.length}',
+                    style: TextStyle(
+                      fontSize: 11,  // 작게
+                      color: Colors.grey[600],
+                    ),
+                  ),
                 ),
-              ],
-              const SizedBox(width: 4),
-              Text(
-                timeStr,
-                style: TextStyle(fontSize: 11, color: Colors.grey[400]),
+
+              // 이모지 버튼 (아이콘만)
+              TextButton(
+                onPressed: _showEmojiPicker,
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  minimumSize: const Size(0, 0),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(
+                  '😊',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                  ),
+                ),
               ),
+
               const Spacer(),
 
               if (_isMyPost) ...[
-                TextButton.icon(
+                IconButton(
                   onPressed: _showEditDialog,
-                  icon: const Icon(Icons.edit, size: 14),
-                  label: const Text('수정', style: TextStyle(fontSize: 12)),
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                  ),
+                  icon: const Icon(Icons.edit, size: 14),  // 16 → 14
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  color: Colors.grey[600],
                 ),
-                TextButton.icon(
+                IconButton(
                   onPressed: _confirmDelete,
-                  icon: const Icon(Icons.delete, size: 14),
-                  label: const Text('삭제', style: TextStyle(fontSize: 12)),
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                  ),
+                  icon: const Icon(Icons.delete, size: 14),  // 16 → 14
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  color: Colors.grey[600],
                 ),
               ] else ...[
-                TextButton.icon(
+                IconButton(
                   onPressed: _showReportDialog,
-                  icon: const Icon(Icons.report, size: 14),
-                  label: const Text('신고', style: TextStyle(fontSize: 12)),
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                  ),
+                  icon: const Icon(Icons.report, size: 14),  // 16 → 14
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  color: Colors.grey[600],
                 ),
               ],
             ],
           ),
         ],
       ),
+    );
+  }
+
+  // 이모지 선택 다이얼로그
+  void _showEmojiPicker() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('이모지 선택', style: TextStyle(fontSize: 14)),
+          content: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              '👍',
+              '❤️',
+              '😊',
+              '💪',
+              '🎉'
+            ].map((emoji) {
+              final isSelected = _reactions[_currentUid] == emoji;
+              return GestureDetector(
+                onTap: () {
+                  _toggleReaction(emoji);
+                  Navigator.pop(context);
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? _kAccent.withOpacity(0.4)
+                        : Colors.grey[100],
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    emoji,
+                    style: const TextStyle(fontSize: 20),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        );
+      },
     );
   }
 }
