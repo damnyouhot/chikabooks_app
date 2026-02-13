@@ -37,6 +37,31 @@ service cloud.firestore {
                        request.auth.uid in get(/databases/$(database)/documents/partnerGroups/$(groupId)).data.memberUids;
         allow write: if false;
       }
+
+      // ── 게시물 (bondGroups 내부) ──
+      match /posts/{postId} {
+        allow read: if request.auth != null && 
+                       request.auth.uid in get(/databases/$(database)/documents/partnerGroups/$(groupId)).data.memberUids;
+        allow write: if request.auth != null && 
+                        request.auth.uid in get(/databases/$(database)/documents/partnerGroups/$(groupId)).data.memberUids;
+
+        // ── 추대 서브컬렉션 ──
+        match /enthrones/{enthUID} {
+          allow read: if request.auth != null && 
+                         request.auth.uid in get(/databases/$(database)/documents/partnerGroups/$(groupId)).data.memberUids;
+          allow create: if request.auth != null && 
+                           request.auth.uid == enthUID &&
+                           request.auth.uid in get(/databases/$(database)/documents/partnerGroups/$(groupId)).data.memberUids;
+          allow delete: if request.auth != null && request.auth.uid == enthUID;
+        }
+      }
+
+      // ── 일일 요약 ──
+      match /dailySummaries/{dateKey} {
+        allow read: if request.auth != null && 
+                       request.auth.uid in get(/databases/$(database)/documents/partnerGroups/$(groupId)).data.memberUids;
+        allow write: if false; // 서버만 (Cloud Functions)
+      }
     }
 
     // ══════════════════════════════════════════════════
@@ -87,6 +112,7 @@ service cloud.firestore {
         request.resource.data.text is string &&
         request.resource.data.text.size() <= 200 &&
         request.resource.data.dateKey is string &&
+        request.resource.data.timeSlot is string &&
         request.resource.data.reports == 0;
       
       // 수정: 본인 게시물만
@@ -107,6 +133,16 @@ service cloud.firestore {
           request.resource.data.reporterUid == request.auth.uid;
         allow update, delete: if false; // 신고는 생성만 가능
       }
+    }
+
+    // ══════════════════════════════════════════════════
+    // 전광판 게시물 (Billboard Posts)
+    // ══════════════════════════════════════════════════
+    match /billboardPosts/{postId} {
+      // 읽기: 로그인한 모든 유저
+      allow read: if request.auth != null;
+      // 쓰기: 서버만 (Cloud Functions)
+      allow write: if false;
     }
 
     // ══════════════════════════════════════════════════

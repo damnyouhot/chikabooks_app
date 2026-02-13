@@ -40,13 +40,15 @@ class _BondPostSheetState extends State<BondPostSheet> {
   @override
   void initState() {
     super.initState();
-    _checkRemainingPosts();
+    _checkPostingStatus();
   }
 
-  Future<void> _checkRemainingPosts() async {
-    final remaining = await BondPostService.getRemainingPostsToday();
+  Future<void> _checkPostingStatus() async {
+    final status = await BondPostService.getPostingStatus();
     if (mounted) {
-      setState(() => _remainingPosts = remaining);
+      setState(() {
+        _remainingPosts = status['remainingToday'] as int;
+      });
     }
   }
 
@@ -57,10 +59,10 @@ class _BondPostSheetState extends State<BondPostSheet> {
       return;
     }
 
-    // 하루 2번 제한 체크
-    final canPost = await BondPostService.canPostToday();
-    if (!canPost) {
-      _showSnack('오늘은 이미 2번 나눴어요. 내일 다시 만나요 😊');
+    // 시간대별 제한 체크
+    final status = await BondPostService.getPostingStatus();
+    if (!(status['canPostNow'] as bool)) {
+      _showSnack(status['message'] as String);
       return;
     }
 
@@ -80,10 +82,12 @@ class _BondPostSheetState extends State<BondPostSheet> {
 
     setState(() => _posting = true);
     try {
+      final currentSlot = BondPostService.getCurrentTimeSlot();
       await _db.collection('bondPosts').add({
         'uid': uid,
         'text': text,
         'dateKey': BondPostService.todayDateKey(),
+        'timeSlot': currentSlot.name,
         'createdAt': FieldValue.serverTimestamp(),
         'reports': 0,
       });
@@ -108,101 +112,110 @@ class _BondPostSheetState extends State<BondPostSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.6,
-      minChildSize: 0.4,
-      maxChildSize: 0.9,
-      builder: (context, scrollCtrl) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            children: [
-              // 제목
-                          const Text(
-                            '✍️ 오늘을 나누기',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF6A5ACD),
-                            ),
-                          ),
-              const SizedBox(height: 4),
-              Text(
-                _remainingPosts > 0 
-                    ? '오늘 $_remainingPosts번 더 나눌 수 있어요'
-                    : '오늘은 이미 2번 나눴어요',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: _remainingPosts > 0 ? Colors.grey[600] : Colors.red[400],
+    return GestureDetector(
+      onTap: () => Navigator.pop(context), // 팝업 바깥 터치 시 닫기
+      child: Container(
+        color: Colors.transparent,
+        child: DraggableScrollableSheet(
+          initialChildSize: 0.6,
+          minChildSize: 0.4,
+          maxChildSize: 0.9,
+          builder: (context, scrollCtrl) {
+            return GestureDetector(
+              onTap: () {}, // 팝업 내부 터치는 이벤트 전파 중단
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '기분을 나누면 더 기쁘고 덜 힘들어요',
-                style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-              ),
-              const SizedBox(height: 20),
-
-              // 입력창
-              TextField(
-                controller: _controller,
-                maxLength: 200,
-                maxLines: 5,
-                decoration: InputDecoration(
-                  hintText: '오늘 느낀 감정, 고민, 기쁨을 편하게 나눠주세요.',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: const BorderSide(
-                      color: Color(0xFF6A5ACD),
-                      width: 2,
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  children: [
+                    // 제목
+                                const Text(
+                                  '✍️ 오늘을 나누기',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF6A5ACD),
+                                  ),
+                                ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _remainingPosts > 0 
+                          ? '오늘 $_remainingPosts번 더 나눌 수 있어요'
+                          : '오늘은 이미 2번 나눴어요',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: _remainingPosts > 0 ? Colors.grey[600] : Colors.red[400],
+                      ),
                     ),
-                  ),
-                ),
-              ),
-
-              const Spacer(),
-
-              // 버튼
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: _posting ? null : _submit,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF6A5ACD),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                    const SizedBox(height: 8),
+                    Text(
+                      '기분을 나누면 더 기쁘고 덜 힘들어요',
+                      style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                     ),
-                  ),
-                  child: _posting
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text(
-                          '남기기',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
+                    const SizedBox(height: 20),
+
+                    // 입력창
+                    TextField(
+                      controller: _controller,
+                      maxLength: 200,
+                      maxLines: 5,
+                      decoration: InputDecoration(
+                        hintText: '오늘 느낀 감정, 고민, 기쁨을 편하게 나눠주세요.',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF6A5ACD),
+                            width: 2,
                           ),
                         ),
+                      ),
+                    ),
+
+                    const Spacer(),
+
+                    // 버튼
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: _posting ? null : _submit,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF6A5ACD),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: _posting
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                '남기기',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
-        );
-      },
+            );
+          },
+        ),
+      ),
     );
   }
 }
