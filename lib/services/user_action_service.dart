@@ -18,7 +18,7 @@ class UserActionService {
     await _db.collection('users').doc(uid).update({
       'emotionPoints': FieldValue.increment(RewardPolicy.feed),
     });
-    return '기록했어요. +${RewardPolicy.feed}P';
+    return '기록했어요.';
   }
 
   /// 쓰다듬기(응원) → 포인트 적립
@@ -28,7 +28,7 @@ class UserActionService {
     await _db.collection('users').doc(uid).update({
       'emotionPoints': FieldValue.increment(RewardPolicy.petCharacter),
     });
-    return '따뜻한 마음. +${RewardPolicy.petCharacter}P';
+    return '따뜻한 마음.';
   }
 
   // ─── 출석 체크 ───
@@ -56,7 +56,7 @@ class UserActionService {
       'lastCheckIn': Timestamp.fromDate(now),
     }, SetOptions(merge: true));
 
-    return '출석 완료! +${RewardPolicy.attendance}P';
+    return '출석 완료!';
   }
 
   // ─── 스킨/오라 장착 ───

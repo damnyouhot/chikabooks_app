@@ -78,7 +78,7 @@ class _FloatingDeltaState extends State<FloatingDelta>
           child: Opacity(
             opacity: _opacity.value,
             child: Text(
-              '+${widget.value}',
+              '결 +${widget.value}',
               style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,

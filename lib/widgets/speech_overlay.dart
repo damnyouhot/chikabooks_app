@@ -104,6 +104,9 @@ class _SpeechOverlayState extends State<SpeechOverlay>
       return const SizedBox.shrink();
     }
 
+    // 화면 너비의 2/3로 제한
+    final maxWidth = MediaQuery.of(context).size.width * 2 / 3;
+
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
@@ -130,7 +133,10 @@ class _SpeechOverlayState extends State<SpeechOverlay>
                   sigmaX: blur,
                   sigmaY: blur,
                 ),
-                child: child,
+                child: Container(
+                  constraints: BoxConstraints(maxWidth: maxWidth),
+                  child: child,
+                ),
               ),
             ),
           ),
@@ -146,6 +152,8 @@ class _SpeechOverlayState extends State<SpeechOverlay>
           height: 1.5,
         ),
         textAlign: TextAlign.center,
+        maxLines: null, // 자동 줄바꿈 허용
+        softWrap: true, // 자연스러운 줄바꿈
       ),
     );
   }

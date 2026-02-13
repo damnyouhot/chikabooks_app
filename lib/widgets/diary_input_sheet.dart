@@ -131,7 +131,7 @@ class _DiaryInputSheetState extends State<DiaryInputSheet> {
                         ),
                         const SizedBox(width: 4),
                         const Text(
-                          '기록 보기',
+                          '어제',
                           style: TextStyle(
                             fontSize: 12,
                             color: Color(0xFF7BA5A5),
