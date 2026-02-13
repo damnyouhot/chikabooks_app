@@ -75,6 +75,11 @@ class WeeklyGoalService {
       final uid = _auth.currentUser?.uid;
       if (uid == null) return '로그인이 필요합니다.';
 
+      // 입력 검증
+      final trimmed = title.trim();
+      if (trimmed.isEmpty) return '목표를 입력해 주세요.';
+      if (trimmed.length > 50) return '목표는 50자 이내로 입력해 주세요.';
+
       final docRef = _db.collection('weeklyGoals').doc(_docId());
       final doc = await docRef.get();
 
@@ -88,7 +93,7 @@ class WeeklyGoalService {
 
       final newGoal = GoalItem(
         id: 'g${DateTime.now().millisecondsSinceEpoch}',
-        title: title.trim(),
+        title: trimmed,
         createdAt: DateTime.now(),
       );
       goals.add(newGoal);
@@ -103,7 +108,7 @@ class WeeklyGoalService {
       return '목표가 추가되었어요.';
     } catch (e) {
       debugPrint('⚠️ WeeklyGoalService.addGoal error: $e');
-      return '오류가 발생했어요.';
+      return '저장 중 오류가 발생했어요: ${e.toString()}';
     }
   }
 

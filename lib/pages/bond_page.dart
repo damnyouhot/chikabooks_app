@@ -5,9 +5,12 @@ import '../models/weekly_stamp.dart';
 import '../services/user_profile_service.dart';
 import '../services/weekly_goal_service.dart';
 import '../services/weekly_stamp_service.dart';
-import '../widgets/daily_wall_sheet.dart';
+import '../widgets/bond_post_sheet.dart';
+import '../widgets/bond_post_card.dart';
 import '../widgets/profile_gate_sheet.dart';
+import '../data/goal_suggestions.dart';
 import 'settings/communion_profile_page.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// ─────────────────────────────────────────────────
 /// 결 탭 — 피드형 (펼쳐진 콘텐츠 스크롤)
@@ -15,7 +18,7 @@ import 'settings/communion_profile_page.dart';
 ///
 /// 섹션 순서:
 ///   A) 요약 헤더 (결 점수 + 파트너 아바타 + 이번 주 목표 한 줄)
-///   B) 오늘의 한 문장 + 리액션 (펼쳐진 카드)
+///   B) 결을 같이하기 + 리액션 (펼쳐진 카드)
 ///   C) 파트너 활동 요약 (사람별)
 ///   D) 공감 투표 (펼쳐진 질문 + 선택지)
 ///   E) 이번 주 목표 진행률 (나 + 파트너)
@@ -42,6 +45,9 @@ class _BondPageState extends State<BondPage> {
 
   // ── 공감 투표 (더미) ──
   int? _selectedPollOption;
+
+  // ── 결 파트 확장 ──
+  bool _isBondExpanded = false;
 
   @override
   void initState() {
@@ -80,7 +86,7 @@ class _BondPageState extends State<BondPage> {
                 context: context,
                 isScrollControlled: true,
                 backgroundColor: Colors.transparent,
-                builder: (_) => const DailyWallSheet(),
+                builder: (_) => const BondPostSheet(),
               ).then((_) => _loadData());
             }
           },
@@ -91,7 +97,7 @@ class _BondPageState extends State<BondPage> {
         context: context,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
-        builder: (_) => const DailyWallSheet(),
+        builder: (_) => const BondPostSheet(),
       ).then((_) => _loadData());
     }
   }
@@ -115,12 +121,13 @@ class _BondPageState extends State<BondPage> {
 
             const SliverToBoxAdapter(child: SizedBox(height: 16)),
 
-            // ── 스탬프: 이번 주 우리 스탬프 ──
-            SliverToBoxAdapter(child: _buildStampSection()),
+            // ── 스탬프: 이번 주 우리 스탬프 (축약 시에만) ──
+            if (!_isBondExpanded)
+              SliverToBoxAdapter(child: _buildStampSection()),
 
-            const SliverToBoxAdapter(child: SizedBox(height: 16)),
+            SliverToBoxAdapter(child: SizedBox(height: _isBondExpanded ? 0 : 16)),
 
-            // ── 섹션 B: 오늘의 한 문장 (펼쳐진 카드) ──
+            // ── 섹션 B: 결을 같이하기 (펼쳐진 카드) ──
             SliverToBoxAdapter(child: _buildSectionB()),
 
             const SliverToBoxAdapter(child: SizedBox(height: 16)),
@@ -132,11 +139,6 @@ class _BondPageState extends State<BondPage> {
 
             // ── 섹션 D: 공감 투표 ──
             SliverToBoxAdapter(child: _buildSectionD()),
-
-            const SliverToBoxAdapter(child: SizedBox(height: 16)),
-
-            // ── 섹션 E: 이번 주 목표 진행률 ──
-            SliverToBoxAdapter(child: _buildSectionE()),
 
             const SliverToBoxAdapter(child: SizedBox(height: 40)),
             ],
@@ -186,58 +188,166 @@ class _BondPageState extends State<BondPage> {
   // ─────────────────────────────────────────
 
   Widget _buildSectionA() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.all(20),
-      decoration: _cardDecoration(),
-          child: Column(
-            children: [
-          // 결 점수 + 파트너 아바타
-          Row(
-            children: [
-              // 결 점수 링
-              _buildBondRing(),
-              const SizedBox(width: 16),
-              // 결 점수 텍스트
-              Expanded(
+    return GestureDetector(
+      onTap: () => setState(() => _isBondExpanded = !_isBondExpanded),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+        margin: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.all(20),
+        decoration: _cardDecoration(),
+        child: Column(
+          children: [
+            // 결 점수 + 파트너 아바타
+            Row(
+              children: [
+                // 결 점수 링
+                _buildBondRing(),
+                const SizedBox(width: 16),
+                // 결 점수 텍스트
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                    Text(
-                      '결 ${_bondScore.toInt()}',
+                      Text(
+                        '결 ${_bondScore.toInt()}',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w300,
+                          color: _kText,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '함께 쌓아가는 교감',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: _kText.withOpacity(0.5),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // 파트너 아바타 3명
+                _buildPartnerAvatars(),
+                Icon(
+                  _isBondExpanded ? Icons.expand_less : Icons.expand_more,
+                  color: _kText.withOpacity(0.5),
+                ),
+              ],
+            ),
+
+            // 확장 시 파트너 상세 + 스탬프
+            if (_isBondExpanded) ...[
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                height: 0.5,
+                color: _kShadow2.withOpacity(0.6),
+              ),
+              const SizedBox(height: 16),
+              _buildExpandedPartnerDetails(),
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                height: 0.5,
+                color: _kShadow2.withOpacity(0.6),
+              ),
+              const SizedBox(height: 16),
+              _buildStampSectionInline(),
+            ],
+
+            // 축약 시 이번 주 목표 미니 요약
+            if (!_isBondExpanded) ...[
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                height: 0.5,
+                color: _kShadow2.withOpacity(0.6),
+              ),
+              const SizedBox(height: 12),
+              _buildWeeklyGoalMini(),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExpandedPartnerDetails() {
+    // 더미 파트너 (실제 연결 시 교체)
+    final partners = [
+      {'name': '민지', 'activity': '3', 'goals': '5/7'},
+      {'name': '지은', 'activity': '1', 'goals': '2/5'},
+      {'name': '현수', 'activity': '0', 'goals': '아직 없음'},
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          '파트너 상세',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: _kText,
+          ),
+        ),
+        const SizedBox(height: 12),
+        ...partners.map((p) {
+          final name = p['name'] as String;
+          final activity = p['activity'] as String;
+          final goals = p['goals'] as String;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _kShadow2,
+                  ),
+                  child: Center(
+                    child: Text(
+                      name[0],
                       style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w300,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
                         color: _kText,
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '함께 쌓아가는 교감',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: _kText.withOpacity(0.5),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-              // 파트너 아바타 3명
-              _buildPartnerAvatars(),
-            ],
-          ),
-
-          // 이번 주 목표 미니 요약
-          const SizedBox(height: 16),
-          Container(
-            width: double.infinity,
-            height: 0.5,
-            color: _kShadow2.withOpacity(0.6),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${name}님',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: _kText,
+                        ),
                       ),
-                      const SizedBox(height: 12),
-          _buildWeeklyGoalMini(),
-        ],
-      ),
+                      Text(
+                        '활동 ${activity}회 · 목표 $goals',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: _kText.withOpacity(0.6),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ],
     );
   }
 
@@ -376,47 +486,122 @@ class _BondPageState extends State<BondPage> {
 
   void _showAddGoalDialog() {
     final ctrl = TextEditingController();
-    showDialog(
+    final suggestions = GoalSuggestions.getRandomThree();
+
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          '이번 주 목표',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-        ),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          maxLength: 30,
-          decoration: const InputDecoration(
-            hintText: '예: 지각하지 않기',
-            border: OutlineInputBorder(),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom,
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('취소'),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '이번 주 목표 추가',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: _kText,
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // 추천 3개
+                const Text(
+                  '💡 이런 건 어떠세요?',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: _kText,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: suggestions.map((s) {
+                    return ActionChip(
+                      label: Text(
+                        s.length > 30 ? '${s.substring(0, 30)}...' : s,
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      onPressed: () => ctrl.text = s,
+                      backgroundColor: _kAccent.withOpacity(0.2),
+                    );
+                  }).toList(),
+                ),
+
+                const SizedBox(height: 16),
+
+                // 직접 입력
+                TextField(
+                  controller: ctrl,
+                  maxLength: 50,
+                  maxLines: 2,
+                  decoration: InputDecoration(
+                    hintText: '목표를 입력하세요',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: _kAccent, width: 2),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // 저장 버튼
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      final title = ctrl.text.trim();
+                      if (title.isEmpty) return;
+                      Navigator.pop(ctx);
+                      final msg = await WeeklyGoalService.addGoal(title);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(msg),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _kAccent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      '추가하기',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-          FilledButton(
-            onPressed: () async {
-              final title = ctrl.text.trim();
-              if (title.isEmpty) return;
-              Navigator.pop(ctx);
-              final msg = await WeeklyGoalService.addGoal(title);
-              if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(msg),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-              }
-            },
-            child: const Text('추가'),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -521,8 +706,83 @@ class _BondPageState extends State<BondPage> {
     );
   }
 
+  // ── 스탬프 인라인 (확장 시 사용) ──
+  Widget _buildStampSectionInline() {
+    // 파트너 그룹이 없으면 숨김
+    if (_partnerGroupId == null || _partnerGroupId!.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return StreamBuilder<WeeklyStampState>(
+      stream: WeeklyStampService.watchThisWeek(_partnerGroupId!),
+      builder: (context, snap) {
+        final stamp = snap.data ?? WeeklyStampState.empty(
+          WeeklyStampService.currentWeekKey(),
+        );
+        final todayIdx = WeeklyStampService.todayDayOfWeek();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 타이틀
+            Row(
+              children: [
+                const Text(
+                  '이번 주 우리 스탬프',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: _kText,
+                  ),
+                ),
+                const Spacer(),
+                GestureDetector(
+                  onTap: () => _showStampInfo(),
+                  child: Icon(
+                    Icons.info_outline,
+                    size: 14,
+                    color: _kText.withValues(alpha: 0.35),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 12),
+
+            // 7개 스탬프 원 (월~일)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: List.generate(7, (i) {
+                final isFilled = stamp.isFilled(i);
+                final isToday = i == todayIdx;
+                return _StampCircle(
+                  dayLabel: const ['월', '화', '수', '목', '금', '토', '일'][i],
+                  isFilled: isFilled,
+                  isToday: isToday,
+                );
+              }),
+            ),
+
+            const SizedBox(height: 10),
+
+            // 요약 텍스트
+            Center(
+              child: Text(
+                '이번 주 ${stamp.filledCount}/7 칸 채웠어요',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: _kText.withValues(alpha: 0.5),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   // ─────────────────────────────────────────
-  // [섹션 B] 오늘의 한 문장 (펼쳐진 카드)
+  // [섹션 B] 결을 같이하기 (펼쳐진 카드)
   // ─────────────────────────────────────────
 
   Widget _buildSectionB() {
@@ -531,32 +791,33 @@ class _BondPageState extends State<BondPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 섹션 타이틀
+          // 섹션 타이틀 + 작성 버튼
           Row(
             children: [
-          const Text(
-                '오늘의 한 문장',
-            style: TextStyle(
+              const Text(
+                '결을 같이하기',
+                style: TextStyle(
                   fontSize: 15,
-              fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w600,
                   color: _kText,
-            ),
-          ),
-          const Spacer(),
-              // 슬롯 상태 배지
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: _kAccent.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: Text(
-                  _getSlotStatus(),
-                  style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w500,
-                    color: _kText,
+              ),
+              const Spacer(),
+              GestureDetector(
+                onTap: _openDailyWallWrite,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _kAccent.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    '+ 나누기',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: _kText,
+                    ),
                   ),
                 ),
               ),
@@ -564,38 +825,80 @@ class _BondPageState extends State<BondPage> {
           ),
           const SizedBox(height: 12),
 
-          // 내 문장 작성 또는 표시
-          _buildMySentenceCard(),
-          const SizedBox(height: 8),
+          // 게시물 피드
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('bondPosts')
+                .orderBy('createdAt', descending: true)
+                .limit(5)
+                .snapshots(),
+            builder: (context, snap) {
+              if (snap.connectionState == ConnectionState.waiting) {
+                return const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(20),
+                    child: CircularProgressIndicator(),
+                  ),
+                );
+              }
 
-          // 파트너 문장 카드들 (더미 → 실제 데이터 연결 시 교체)
-          _buildPartnerSentenceCard(
-            name: '민지님',
-            badge: '3~5년차 · 서울',
-            text: '오늘은 조용한 하루였으면 좋겠다.',
-            reactions: {'😊': 2, '💪': 1, '🤗': 0},
-          ),
-          const SizedBox(height: 8),
-          _buildPartnerSentenceCard(
-            name: '지은님',
-            badge: '6년차+ · 경기',
-            text: '환자분이 고맙다고 해주셔서 뿌듯.',
-            reactions: {'😊': 1, '💪': 0, '🤗': 2},
-          ),
+              if (snap.hasError) {
+                return Center(
+                  child: Text(
+                    '불러오는 중 문제가 생겼어요.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: _kText.withOpacity(0.5),
+                    ),
+                  ),
+                );
+              }
 
-          // 더보기
-          const SizedBox(height: 8),
-          Center(
-            child: GestureDetector(
-              onTap: _openDailyWallWrite,
-              child: Text(
-                '더보기',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: _kText.withOpacity(0.35),
-                ),
-              ),
-            ),
+              final docs = snap.data?.docs ?? [];
+              if (docs.isEmpty) {
+                return GestureDetector(
+                  onTap: _openDailyWallWrite,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: _kCardBg,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: _kShadow2.withOpacity(0.3),
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.edit_note_outlined,
+                          size: 40,
+                          color: _kText.withOpacity(0.3),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '첫 이야기를 나눠주세요',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: _kText.withOpacity(0.5),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              return Column(
+                children: docs.map((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  return BondPostCard(
+                    post: data,
+                    postId: doc.id,
+                  );
+                }).toList(),
+              );
+            },
           ),
         ],
       ),
@@ -770,13 +1073,13 @@ class _BondPageState extends State<BondPage> {
   }
 
   // ─────────────────────────────────────────
-  // [섹션 C] 파트너 활동 요약 (사람별)
+  // [섹션 C] 파트너 활동 요약 (사람별) + 목표 통합
   // ─────────────────────────────────────────
 
   Widget _buildSectionC() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Container(
+      child: Container(
         width: double.infinity,
         padding: const EdgeInsets.all(20),
         decoration: _cardDecoration(),
@@ -784,7 +1087,7 @@ class _BondPageState extends State<BondPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              '함께 흐름',
+              '이번 주 우리의 흐름',
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
@@ -793,14 +1096,11 @@ class _BondPageState extends State<BondPage> {
             ),
             const SizedBox(height: 14),
 
-            // 사람별 활동 (더미 → 실제 연결 시 교체)
-            _buildPersonActivity(
-              name: '민지님',
-              activities: [
-                '이번 주 목표 +1',
-                '한 문장 작성',
-                '응원하기 리액션 남김',
-              ],
+            // 파트너 1
+            _buildUnifiedPartnerRow(
+              name: '민지',
+              activityCount: 3,
+              goalProgress: '5/7',
             ),
             const SizedBox(height: 12),
             Container(
@@ -808,12 +1108,12 @@ class _BondPageState extends State<BondPage> {
               color: _kShadow2.withOpacity(0.4),
             ),
             const SizedBox(height: 12),
-            _buildPersonActivity(
-              name: '지은님',
-              activities: [
-                '공감투표 참여',
-                '한 문장 작성',
-              ],
+
+            // 파트너 2
+            _buildUnifiedPartnerRow(
+              name: '지은',
+              activityCount: 1,
+              goalProgress: '2/5',
             ),
             const SizedBox(height: 12),
             Container(
@@ -821,13 +1121,94 @@ class _BondPageState extends State<BondPage> {
               color: _kShadow2.withOpacity(0.4),
             ),
             const SizedBox(height: 12),
-            _buildPersonActivity(
-              name: '현수님',
-              activities: ['아직 활동 없음'],
+
+            // 파트너 3
+            _buildUnifiedPartnerRow(
+              name: '현수',
+              activityCount: 0,
+              goalProgress: '아직 없음',
+            ),
+            const SizedBox(height: 12),
+            Container(
+              height: 0.5,
+              color: _kShadow2.withOpacity(0.4),
+            ),
+            const SizedBox(height: 12),
+
+            // 나
+            StreamBuilder<WeeklyGoals?>(
+              stream: WeeklyGoalService.watchThisWeek(),
+              builder: (context, snap) {
+                final myGoals = snap.data?.goals ?? [];
+                String goalText = '목표 없음';
+                if (myGoals.isNotEmpty) {
+                  final g = myGoals[0];
+                  goalText = '${g.progress}/${g.target}';
+                }
+                return _buildUnifiedPartnerRow(
+                  name: '나',
+                  activityCount: 5,
+                  goalProgress: goalText,
+                  isMe: true,
+                );
+              },
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildUnifiedPartnerRow({
+    required String name,
+    required int activityCount,
+    required String goalProgress,
+    bool isMe = false,
+  }) {
+    return Row(
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: isMe ? _kAccent : _kShadow2,
+          ),
+          child: Center(
+            child: Text(
+              name[0],
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: _kText,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${name}${!isMe ? "님" : ""}',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: isMe ? FontWeight.w700 : FontWeight.w600,
+                  color: _kText,
+                ),
+              ),
+              Text(
+                '활동 ${activityCount}회 · 목표 $goalProgress',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: _kText.withOpacity(0.6),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
