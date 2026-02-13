@@ -19,12 +19,12 @@ class BondPostService {
   /// 오늘 게시물 수 확인
   static Future<int> getTodayPostCount(String uid) async {
     try {
-      final kst = DateTime.now().toUtc().add(const Duration(hours: 9));
-      final start = DateTime(kst.year, kst.month, kst.day);
+      final dateKey = todayDateKey();
       
+      // dateKey를 기준으로 조회 (서버 타임스탬프 문제 회피)
       final snap = await _postsRef
           .where('uid', isEqualTo: uid)
-          .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
+          .where('dateKey', isEqualTo: dateKey)
           .get();
       
       return snap.docs.length;

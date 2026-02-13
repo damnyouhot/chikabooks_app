@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/report_service.dart';
 
 /// "결을 같이하기" 게시물 카드
 /// 수정/삭제/신고 기능 포함
@@ -31,13 +32,6 @@ class _BondPostCardState extends State<BondPostCard> {
   bool get _isMyPost => widget.post['uid'] == _currentUid;
 
   void _showReportDialog() {
-    final reasons = [
-      '욕설/비방',
-      '부적절한 내용',
-      '스팸/광고',
-      '기타',
-    ];
-
     showDialog(
       context: context,
       builder: (context) {
@@ -45,19 +39,27 @@ class _BondPostCardState extends State<BondPostCard> {
           title: const Text('신고하기'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
-            children: reasons.map((r) {
+            children: ReportReason.values.map((reason) {
               return ListTile(
-                title: Text(r),
+                title: Text(reason.displayName),
                 onTap: () async {
-                  await _db.collection('bondPosts').doc(widget.postId).update({
-                    'reports': FieldValue.increment(1),
-                    'lastReportReason': r,
-                    'lastReportAt': FieldValue.serverTimestamp(),
-                  });
+                  Navigator.pop(context);
+                  
+                  final success = await ReportService.reportPost(
+                    collection: 'bondPosts',
+                    postId: widget.postId,
+                    reason: reason,
+                  );
+                  
                   if (context.mounted) {
-                    Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('신고가 접수되었습니다.')),
+                      SnackBar(
+                        content: Text(
+                          success 
+                              ? '신고가 접수되었습니다.' 
+                              : '이미 신고한 게시물입니다.',
+                        ),
+                      ),
                     );
                   }
                 },

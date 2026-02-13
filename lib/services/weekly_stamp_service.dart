@@ -104,6 +104,35 @@ class WeeklyStampService {
     }
   }
 
+  /// 오늘 내가 기여한 스탬프 수 확인 (일일 상한 2칸 체크용)
+  static Future<int> getTodayMyStampCount(String groupId) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return 0;
+
+    try {
+      final todayLog = await getTodayLog(groupId);
+      if (todayLog == null) return 0;
+
+      // 내 uid가 포함된 활동 종류 수 카운트
+      int count = 0;
+      if (todayLog.pollVoters.contains(uid)) count++;
+      if (todayLog.sentenceReactors.contains(uid)) count++;
+      if (todayLog.goalCheckers.contains(uid)) count++;
+      if (todayLog.sentenceWriters.contains(uid)) count++;
+      
+      return count;
+    } catch (e) {
+      debugPrint('⚠️ WeeklyStampService.getTodayMyStampCount error: $e');
+      return 0;
+    }
+  }
+
+  /// 오늘 스탬프 기여 가능 여부 (일일 상한 2칸)
+  static Future<bool> canAddStampToday(String groupId) async {
+    final count = await getTodayMyStampCount(groupId);
+    return count < 2;
+  }
+
   // ─── 트리거 (Flutter → Cloud Function) ───
 
   /// 파트너 활동 보고 → Cloud Function이 스탬프 판정

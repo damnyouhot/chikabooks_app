@@ -83,6 +83,7 @@ class _BondPostSheetState extends State<BondPostSheet> {
       await _db.collection('bondPosts').add({
         'uid': uid,
         'text': text,
+        'dateKey': BondPostService.todayDateKey(),
         'createdAt': FieldValue.serverTimestamp(),
         'reports': 0,
       });

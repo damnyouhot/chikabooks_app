@@ -1,156 +1,169 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// 파트너 그룹 (3명 고정, 1주 기간)
+/// 파트너 그룹 멤버 상태
+enum PartnerMemberStatus {
+  /// 현재 활동 중
+  active,
+  
+  /// 초대 대기 중
+  invited,
+  
+  /// 자진 탈퇴
+  left,
+  
+  /// 강제 퇴출
+  removed,
+}
+
+/// 파트너 그룹 멤버 정보
+class PartnerMember {
+  final String uid;
+  final PartnerMemberStatus status;
+  final DateTime joinedAt;
+  final DateTime? leftAt;
+  final String? leftReason;
+
+  const PartnerMember({
+    required this.uid,
+    required this.status,
+    required this.joinedAt,
+    this.leftAt,
+    this.leftReason,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'uid': uid,
+      'status': status.name,
+      'joinedAt': Timestamp.fromDate(joinedAt),
+      if (leftAt != null) 'leftAt': Timestamp.fromDate(leftAt!),
+      if (leftReason != null) 'leftReason': leftReason,
+    };
+  }
+
+  factory PartnerMember.fromMap(Map<String, dynamic> map) {
+    return PartnerMember(
+      uid: map['uid'] as String,
+      status: PartnerMemberStatus.values.firstWhere(
+        (e) => e.name == map['status'],
+        orElse: () => PartnerMemberStatus.active,
+      ),
+      joinedAt: (map['joinedAt'] as Timestamp).toDate(),
+      leftAt: map['leftAt'] != null 
+          ? (map['leftAt'] as Timestamp).toDate() 
+          : null,
+      leftReason: map['leftReason'] as String?,
+    );
+  }
+}
+
+/// 파트너 그룹 (최대 3명)
 class PartnerGroup {
   final String id;
+  final String ownerId;
+  final String title; // 예: "결 40"
+  final List<PartnerMember> members;
   final DateTime createdAt;
-  final DateTime startedAt;
-  final DateTime endsAt;
-  final String status; // "active" | "ended"
-  final List<String> memberUids;
-  final MatchingMeta? matchingMeta;
-  final Map<String, bool?> extensionVotes; // uid → 연장 동의 여부
+  final int maxMembers;
+  final int minMembers;
 
   const PartnerGroup({
     required this.id,
+    required this.ownerId,
+    required this.title,
+    required this.members,
     required this.createdAt,
-    required this.startedAt,
-    required this.endsAt,
-    this.status = 'active',
-    required this.memberUids,
-    this.matchingMeta,
-    this.extensionVotes = const {},
+    this.maxMembers = 3,
+    this.minMembers = 1,
   });
 
-  bool get isActive =>
-      status == 'active' && endsAt.isAfter(DateTime.now());
-
-  /// D-day 남은 일수
-  int get daysLeft {
-    final diff = endsAt.difference(DateTime.now()).inDays;
-    return diff < 0 ? 0 : diff;
+  /// 현재 활동 중인 멤버 uid 목록
+  List<String> get activeMemberUids {
+    return members
+        .where((m) => m.status == PartnerMemberStatus.active)
+        .map((m) => m.uid)
+        .toList();
   }
 
-  factory PartnerGroup.fromDoc(DocumentSnapshot doc) {
-    final d = doc.data() as Map<String, dynamic>? ?? {};
+  /// 초대 대기 중인 멤버 uid 목록
+  List<String> get invitedMemberUids {
+    return members
+        .where((m) => m.status == PartnerMemberStatus.invited)
+        .map((m) => m.uid)
+        .toList();
+  }
+
+  /// 탈퇴한 멤버 목록
+  List<PartnerMember> get leftMembers {
+    return members
+        .where((m) => 
+            m.status == PartnerMemberStatus.left || 
+            m.status == PartnerMemberStatus.removed)
+        .toList();
+  }
+
+  /// 빈 슬롯 수
+  int get availableSlots {
+    return maxMembers - activeMemberUids.length;
+  }
+
+  /// 그룹이 활성 상태인지 (최소 인원 충족)
+  bool get isActive {
+    return activeMemberUids.length >= minMembers;
+  }
+
+  /// 멤버 추가 가능 여부
+  bool get canAddMember {
+    return availableSlots > 0;
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'ownerId': ownerId,
+      'title': title,
+      'members': members.map((m) => m.toMap()).toList(),
+      'createdAt': Timestamp.fromDate(createdAt),
+      'maxMembers': maxMembers,
+      'minMembers': minMembers,
+      // 빠른 쿼리를 위한 중복 필드
+      'activeMemberUids': activeMemberUids,
+      'invitedMemberUids': invitedMemberUids,
+    };
+  }
+
+  factory PartnerGroup.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data()!;
     return PartnerGroup(
       id: doc.id,
-      createdAt: _toDateTime(d['createdAt']),
-      startedAt: _toDateTime(d['startedAt']),
-      endsAt: _toDateTime(d['endsAt']),
-      status: d['status'] ?? 'active',
-      memberUids: List<String>.from(d['memberUids'] ?? []),
-      matchingMeta: d['matchingMeta'] != null
-          ? MatchingMeta.fromMap(d['matchingMeta'])
-          : null,
-      extensionVotes: Map<String, bool?>.from(d['extensionVotes'] ?? {}),
+      ownerId: data['ownerId'] as String,
+      title: data['title'] as String? ?? '결',
+      members: (data['members'] as List<dynamic>?)
+              ?.map((m) => PartnerMember.fromMap(m as Map<String, dynamic>))
+              .toList() ??
+          [],
+      createdAt: (data['createdAt'] as Timestamp).toDate(),
+      maxMembers: data['maxMembers'] as int? ?? 3,
+      minMembers: data['minMembers'] as int? ?? 1,
     );
   }
 
-  Map<String, dynamic> toMap() => {
-        'createdAt': Timestamp.fromDate(createdAt),
-        'startedAt': Timestamp.fromDate(startedAt),
-        'endsAt': Timestamp.fromDate(endsAt),
-        'status': status,
-        'memberUids': memberUids,
-        'matchingMeta': matchingMeta?.toMap(),
-        'extensionVotes': extensionVotes,
-      };
-
-  static DateTime _toDateTime(dynamic v) {
-    if (v is Timestamp) return v.toDate();
-    if (v is DateTime) return v;
-    return DateTime.now();
-  }
-}
-
-/// 매칭 시 사용한 메타 정보
-class MatchingMeta {
-  final String? mainConcern;
-  final List<String>? regionMix;
-  final List<String>? careerMix;
-
-  const MatchingMeta({this.mainConcern, this.regionMix, this.careerMix});
-
-  factory MatchingMeta.fromMap(Map<String, dynamic> m) {
-    // regionMix와 careerMix는 배열 또는 문자열일 수 있음 (안전 파싱)
-    List<String>? parseStringList(dynamic value) {
-      if (value == null) return null;
-      if (value is List) return value.map((e) => e.toString()).toList();
-      if (value is String) return [value];
-      return null;
-    }
-
-    return MatchingMeta(
-      mainConcern: m['mainConcern'] as String?,
-      regionMix: parseStringList(m['regionMix']),
-      careerMix: parseStringList(m['careerMix']),
+  /// 새 그룹 생성 (소유자만 포함)
+  factory PartnerGroup.create({
+    required String ownerId,
+    required String title,
+  }) {
+    return PartnerGroup(
+      id: '',
+      ownerId: ownerId,
+      title: title,
+      members: [
+        PartnerMember(
+          uid: ownerId,
+          status: PartnerMemberStatus.active,
+          joinedAt: DateTime.now(),
+        ),
+      ],
+      createdAt: DateTime.now(),
     );
   }
-
-  Map<String, dynamic> toMap() => {
-        'mainConcern': mainConcern,
-        'regionMix': regionMix,
-        'careerMix': careerMix,
-      };
 }
-
-/// 그룹 내 멤버 메타 (partnerGroups/{groupId}/memberMeta/{uid})
-/// 닉네임/사진/병원 정보 저장 금지
-class GroupMemberMeta {
-  final String uid;
-  final String region;
-  final String careerBucket;
-  final String? mainConcernShown; // 대표 고민 1개만 표시
-  final String? workplaceType;
-  final DateTime joinedAt;
-
-  const GroupMemberMeta({
-    required this.uid,
-    required this.region,
-    required this.careerBucket,
-    this.mainConcernShown,
-    this.workplaceType,
-    required this.joinedAt,
-  });
-
-  /// 표시용 라벨 ("3~5년차 · 경기 · (업무량)")
-  String get displayLabel {
-    final parts = <String>[];
-    if (careerBucket.isNotEmpty) {
-      parts.add('${careerBucket.replaceAll('-', '~')}년차');
-    }
-    if (region.isNotEmpty) parts.add(region);
-    if (mainConcernShown != null && mainConcernShown!.isNotEmpty) {
-      parts.add('($mainConcernShown)');
-    }
-    return parts.isEmpty ? '익명' : parts.join(' · ');
-  }
-
-  factory GroupMemberMeta.fromDoc(DocumentSnapshot doc) {
-    final d = doc.data() as Map<String, dynamic>? ?? {};
-    return GroupMemberMeta(
-      uid: doc.id,
-      region: d['region'] ?? '',
-      careerBucket: d['careerBucket'] ?? '',
-      mainConcernShown: d['mainConcernShown'],
-      workplaceType: d['workplaceType'],
-      joinedAt: _ts(d['joinedAt']),
-    );
-  }
-
-  Map<String, dynamic> toMap() => {
-        'region': region,
-        'careerBucket': careerBucket,
-        'mainConcernShown': mainConcernShown,
-        'workplaceType': workplaceType,
-        'joinedAt': Timestamp.fromDate(joinedAt),
-      };
-
-  static DateTime _ts(dynamic v) {
-    if (v is Timestamp) return v.toDate();
-    if (v is DateTime) return v;
-    return DateTime.now();
-  }
-}
-

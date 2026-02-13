@@ -57,6 +57,12 @@ service cloud.firestore {
         allow read: if request.auth != null && request.auth.uid == uid;
         allow write: if request.auth != null && request.auth.uid == uid;
       }
+
+      // ── 차단한 사용자 목록 (blockedUsers) ──
+      match /blockedUsers/{blockedUid} {
+        allow read: if request.auth != null && request.auth.uid == uid;
+        allow write: if request.auth != null && request.auth.uid == uid;
+      }
     }
 
     // ══════════════════════════════════════════════════
@@ -72,14 +78,16 @@ service cloud.firestore {
     // 결을 같이하기 게시물 (Bond Posts)
     // ══════════════════════════════════════════════════
     match /bondPosts/{postId} {
-      // 읽기: 로그인한 모든 유저
+      // 읽기: 로그인한 모든 유저 (단, 숨김 처리된 글 제외)
       allow read: if request.auth != null;
       
       // 쓰기: 로그인한 유저, 자신의 uid로만 작성
       allow create: if request.auth != null && 
         request.resource.data.uid == request.auth.uid &&
         request.resource.data.text is string &&
-        request.resource.data.text.size() <= 200;
+        request.resource.data.text.size() <= 200 &&
+        request.resource.data.dateKey is string &&
+        request.resource.data.reports == 0;
       
       // 수정: 본인 게시물만
       allow update: if request.auth != null && 
@@ -88,6 +96,17 @@ service cloud.firestore {
       // 삭제: 본인 게시물만
       allow delete: if request.auth != null && 
         resource.data.uid == request.auth.uid;
+
+      // ── 신고 서브컬렉션 ──
+      match /reports/{reportId} {
+        // 읽기: 본인이 신고한 기록만 확인 가능
+        allow read: if request.auth != null && 
+          reportId == request.auth.uid;
+        // 쓰기: 로그인한 유저만 (중복 신고는 서비스 로직에서 처리)
+        allow create: if request.auth != null && 
+          request.resource.data.reporterUid == request.auth.uid;
+        allow update, delete: if false; // 신고는 생성만 가능
+      }
     }
 
     // ══════════════════════════════════════════════════
