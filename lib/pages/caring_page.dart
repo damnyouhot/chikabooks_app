@@ -6,6 +6,9 @@ import '../services/caring_state_service.dart';
 import '../services/user_action_service.dart';
 import '../services/bond_score_service.dart';
 import '../services/speech_engine_service.dart';
+import '../services/weekly_goal_service.dart';
+import '../models/weekly_goal.dart';
+import '../data/goal_suggestions.dart';
 import '../widgets/speech_overlay.dart';
 import '../widgets/floating_delta.dart';
 import '../widgets/diary_input_sheet.dart';
@@ -396,15 +399,24 @@ class _CaringPageState extends State<CaringPage>
     );
   }
 
-  /// 하단 섹션: 아침 인사 or 4 아이콘
+  /// 하단 섹션: (목표 섹션) + 아침 인사 or 4 아이콘
   Widget _buildBottomSection() {
     // 아직 오늘 인사 안 했으면 → 아침 인사 버튼만
     if (!_hasGreetedToday) {
       return _buildGreetingButton();
     }
 
-    // 인사 완료 → 4 아이콘
-    return _buildFourActions();
+    // 인사 완료 → 목표 섹션 + 4 아이콘
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // 목표 섹션
+        _buildWeeklyGoalSection(),
+        const SizedBox(height: 12),
+        // 4 아이콘
+        _buildFourActions(),
+      ],
+    );
   }
 
   /// 아침 인사 버튼 (단독)
@@ -585,6 +597,223 @@ class _CaringPageState extends State<CaringPage>
           ],
         ),
       ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════
+  // 주간 목표 섹션 (bond_page에서 이동)
+  // ═══════════════════════════════════════════════
+
+  Widget _buildWeeklyGoalSection() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 40),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.85),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: _colorShadow2.withOpacity(0.4),
+            width: 0.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: _colorShadow1.withOpacity(0.15),
+              blurRadius: 20,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: _buildWeeklyGoalMini(),
+      ),
+    );
+  }
+
+  Widget _buildWeeklyGoalMini() {
+    return StreamBuilder<WeeklyGoals?>(
+      stream: WeeklyGoalService.watchThisWeek(),
+      builder: (context, snap) {
+        final goals = snap.data?.goals ?? [];
+        if (goals.isEmpty) {
+          return Row(
+            children: [
+              const Text('🎯', style: TextStyle(fontSize: 14)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '이번 주 목표를 설정해보세요',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: _colorText.withOpacity(0.4),
+                  ),
+                ),
+              ),
+              GestureDetector(
+                onTap: () => _showAddGoalDialog(),
+                child: Text(
+                  '+ 추가',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: _colorAccent.withOpacity(0.8),
+                  ),
+                ),
+              ),
+            ],
+          );
+        }
+        return Column(
+          children: goals.map((g) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                children: [
+                  const Text('🎯', style: TextStyle(fontSize: 13)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      g.title,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF5D6B6B),
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '${g.progress}/${g.target}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: _colorText.withOpacity(0.4),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
+
+  void _showAddGoalDialog() {
+    final ctrl = TextEditingController();
+    final suggestions = GoalSuggestions.getRandomThree();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom,
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '이번 주 목표 추가',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF5D6B6B),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // 추천 3개
+                const Text(
+                  '💡 이런 건 어떠세요?',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF5D6B6B),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: suggestions.map((s) {
+                    return ActionChip(
+                      label: Text(
+                        s.length > 30 ? '${s.substring(0, 30)}...' : s,
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      onPressed: () => ctrl.text = s,
+                      backgroundColor: _colorAccent.withOpacity(0.2),
+                    );
+                  }).toList(),
+                ),
+
+                const SizedBox(height: 16),
+
+                // 직접 입력
+                TextField(
+                  controller: ctrl,
+                  maxLength: 50,
+                  maxLines: 2,
+                  decoration: InputDecoration(
+                    hintText: '목표를 입력하세요',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: _colorAccent, width: 2),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // 저장 버튼
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      final title = ctrl.text.trim();
+                      if (title.isEmpty) return;
+                      Navigator.pop(ctx);
+                      final msg = await WeeklyGoalService.addGoal(title);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(msg),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _colorAccent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      '추가하기',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
