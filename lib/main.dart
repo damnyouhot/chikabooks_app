@@ -1,49 +1,14 @@
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:google_sign_in/google_sign_in.dart';
-import 'package:provider/provider.dart';
-import 'package:rive/rive.dart';
-
-import 'firebase_options.dart';
-import 'notifiers/job_filter_notifier.dart';
-import 'pages/bond_page.dart';
-import 'pages/caring_page.dart';
-import 'pages/job_page.dart';
-import 'pages/growth_page.dart';
-import 'services/ebook_service.dart';
-import 'services/job_service.dart';
-import 'services/store_service.dart';
+import 'core/config/app_initializer.dart';
+import 'core/config/app_providers.dart';
+import 'core/theme/app_theme.dart';
+import 'pages/auth/auth_gate.dart';
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  // Rive 초기화
-  await RiveFile.initialize();
-
-  // 중복 초기화 에러 무시
-  try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-  } on FirebaseException catch (e) {
-    if (e.code != 'duplicate-app') {
-      rethrow;
-    }
-  }
+  await AppInitializer.initialize();
 
   runApp(
-    MultiProvider(
-      providers: [
-        StreamProvider<User?>.value(
-          value: FirebaseAuth.instance.authStateChanges(),
-          initialData: null,
-        ),
-        ChangeNotifierProvider(create: (_) => JobFilterNotifier()),
-        Provider(create: (_) => JobService()),
-        Provider(create: (_) => EbookService()),
-        Provider(create: (_) => StoreService()),
-      ],
+    AppProviders(
       child: const ChikabooksApp(),
     ),
   );
@@ -57,138 +22,8 @@ class ChikabooksApp extends StatelessWidget {
     return MaterialApp(
       title: '치과책방',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        // 미니멀 컬러: 시안/블루 계열 포인트
-        colorSchemeSeed: const Color(0xFF1E88E5),
-        brightness: Brightness.light,
-        useMaterial3: true,
-        fontFamily: 'NotoSansKR',
-        fontFamilyFallback: const ['Apple SD Gothic Neo', 'Roboto'],
-        scaffoldBackgroundColor: const Color(0xFFFCFCFF),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          scrolledUnderElevation: 0,
-        ),
-      ),
+      theme: AppTheme.light,
       home: const AuthGate(),
-    );
-  }
-}
-
-class AuthGate extends StatelessWidget {
-  const AuthGate({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final user = context.watch<User?>();
-    if (user == null) return const SignInPage();
-
-    // 유저 문서 존재 여부만 확인 (Character 초기화 제거)
-    return const MyHome();
-  }
-}
-
-class SignInPage extends StatelessWidget {
-  const SignInPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final googleSignIn = GoogleSignIn(scopes: ['email']);
-
-    return Scaffold(
-      body: Center(
-        child: ElevatedButton.icon(
-          icon: const Icon(Icons.login),
-          label: const Text('Google로 로그인'),
-          onPressed: () async {
-            try {
-              final googleUser = await googleSignIn.signIn();
-              if (googleUser == null) return;
-
-              final googleAuth = await googleUser.authentication;
-              if (googleAuth.idToken == null) return;
-
-              final credential = GoogleAuthProvider.credential(
-                accessToken: googleAuth.accessToken,
-                idToken: googleAuth.idToken,
-              );
-              await FirebaseAuth.instance.signInWithCredential(credential);
-            } catch (e) {
-              debugPrint('로그인 실패: $e');
-            }
-          },
-        ),
-      ),
-    );
-  }
-}
-
-class MyHome extends StatefulWidget {
-  const MyHome({super.key});
-  @override
-  State<MyHome> createState() => _MyHomeState();
-}
-
-class _MyHomeState extends State<MyHome> {
-  int _selectedIndex = 0;
-
-  /// 성장 탭 인덱스
-  static const int _growthTabIndex = 2;
-
-  void _onTap(int idx) => setState(() => _selectedIndex = idx);
-
-  /// CaringPage에서 "성장 탭으로 이동" 콜백
-  void _goToGrowthTab() => setState(() => _selectedIndex = _growthTabIndex);
-
-  @override
-  Widget build(BuildContext context) {
-    // CaringPage에 탭 전환 콜백 주입
-    final pages = <Widget>[
-      CaringPage(onNavigateToGrowth: _goToGrowthTab),
-      const BondPage(),
-      const GrowthPage(),
-      const JobPage(),
-    ];
-
-    return Scaffold(
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: pages,
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: _onTap,
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: Colors.white,
-        selectedItemColor: const Color(0xFF1E88E5),
-        unselectedItemColor: Colors.grey[350],
-        selectedFontSize: 11,
-        unselectedFontSize: 11,
-        elevation: 0,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.spa_outlined),
-            activeIcon: Icon(Icons.spa),
-            label: '돌보기',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.all_inclusive_outlined),
-            activeIcon: Icon(Icons.all_inclusive),
-            label: '결',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.menu_book_outlined),
-            activeIcon: Icon(Icons.menu_book),
-            label: '성장',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.work_outline),
-            activeIcon: Icon(Icons.work),
-            label: '나아가기',
-          ),
-        ],
-      ),
     );
   }
 }
