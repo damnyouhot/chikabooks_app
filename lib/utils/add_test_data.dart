@@ -145,16 +145,22 @@ class TestDataHelper {
   /// 특정 전광판 게시물 삭제 (테스트 후 정리용)
   static Future<void> clearTestBillboardPosts() async {
     try {
-      final snapshot = await _db
-          .collection('billboardPosts')
-          .where('sourceBondId', isEqualTo: 'test-bond-group')
-          .get();
-
+      // sourceBondId가 test-bond-group으로 시작하는 모든 문서 찾기
+      final snapshot = await _db.collection('billboardPosts').get();
+      
+      int deletedCount = 0;
       for (final doc in snapshot.docs) {
-        await doc.reference.delete();
+        final data = doc.data();
+        final sourceBondId = data['sourceBondId'] as String?;
+        
+        // test-bond-group으로 시작하는 문서만 삭제
+        if (sourceBondId != null && sourceBondId.startsWith('test-bond-group')) {
+          await doc.reference.delete();
+          deletedCount++;
+        }
       }
 
-      debugPrint('✅ 전광판 테스트 게시물 삭제 완료 (${snapshot.docs.length}개)');
+      debugPrint('✅ 전광판 테스트 게시물 삭제 완료 ($deletedCount개)');
     } catch (e) {
       debugPrint('⚠️ 전광판 테스트 게시물 삭제 실패: $e');
     }
@@ -170,18 +176,26 @@ class TestDataHelper {
       final partnerGroupId = userDoc.data()?['partnerGroupId'] as String?;
       if (partnerGroupId == null) return;
 
+      // bondGroups/{partnerGroupId}/posts 컬렉션의 모든 문서 가져오기
       final snapshot = await _db
           .collection('bondGroups')
           .doc(partnerGroupId)
           .collection('posts')
-          .where('uid', whereIn: ['test_partner_민지', 'test_partner_지은', 'test_partner_현수'])
           .get();
 
+      int deletedCount = 0;
       for (final doc in snapshot.docs) {
-        await doc.reference.delete();
+        final data = doc.data();
+        final docUid = data['uid'] as String?;
+        
+        // test_partner로 시작하는 uid이거나 _testAuthorName 필드가 있는 문서 삭제
+        if (docUid != null && (docUid.startsWith('test_partner_') || data.containsKey('_testAuthorName'))) {
+          await doc.reference.delete();
+          deletedCount++;
+        }
       }
 
-      debugPrint('✅ 오늘을 나누기 테스트 게시물 삭제 완료 (${snapshot.docs.length}개)');
+      debugPrint('✅ 오늘을 나누기 테스트 게시물 삭제 완료 ($deletedCount개)');
     } catch (e) {
       debugPrint('⚠️ 오늘을 나누기 테스트 게시물 삭제 실패: $e');
     }

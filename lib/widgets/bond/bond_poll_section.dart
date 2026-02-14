@@ -22,8 +22,8 @@ class _BondPollSectionState extends State<BondPollSection> {
       '동료와 의견이 다를 때',
       '체력이 바닥날 때',
     ];
-    // 더미 결과 (선택 후에만 표시)
-    final results = [35, 25, 15, 25]; // %
+    // 더미 결과 (선택 후에만 표시) - 소수점 표시
+    final results = [35.2, 24.8, 15.3, 24.7]; // int → double
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -46,7 +46,7 @@ class _BondPollSectionState extends State<BondPollSection> {
                 ),
                 const Spacer(),
                 Text(
-                  '오늘의 질문',
+                  '다들 어떤지 궁금해서.',
                   style: TextStyle(
                     fontSize: 11,
                     color: BondColors.kText.withOpacity(0.4),
@@ -141,10 +141,10 @@ class _BondPollSectionState extends State<BondPollSection> {
                             ),
                           ),
                         ),
-                        // 결과 (투표 후에만 표시)
+                        // 결과 (투표 후에만 표시) - 소수점 1자리
                         if (hasVoted)
                           Text(
-                            '${results[i]}%',
+                            '${results[i].toStringAsFixed(1)}%',
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w500,
@@ -187,4 +187,6 @@ class _BondPollSectionState extends State<BondPollSection> {
     );
   }
 }
+
+
 

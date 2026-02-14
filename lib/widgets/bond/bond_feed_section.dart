@@ -25,7 +25,7 @@ class BondFeedSection extends StatelessWidget {
           Row(
             children: [
               const Text(
-                '오늘을 나누기',
+                '여기선 괜찮아, 털어놔도',
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
@@ -161,4 +161,6 @@ class BondFeedSection extends StatelessWidget {
     );
   }
 }
+
+
 

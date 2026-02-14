@@ -38,7 +38,7 @@ class BondSummarySection extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '결 ${bondScore.toInt()}',
+                        '결 ${bondScore.toStringAsFixed(1)}',
                         style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w300,
@@ -101,16 +101,16 @@ class BondSummarySection extends StatelessWidget {
             shape: BoxShape.circle,
             color: BondColors.kAccent.withOpacity(0.15),
           ),
-          child: Center(
-            child: Text(
-              '${bondScore.toInt()}',
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: BondColors.kText,
-              ),
+        child: Center(
+          child: Text(
+            bondScore.toStringAsFixed(1),
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: BondColors.kText,
             ),
           ),
+        ),
         ),
       ),
     );
@@ -225,4 +225,6 @@ class BondSummarySection extends StatelessWidget {
     );
   }
 }
+
+
 

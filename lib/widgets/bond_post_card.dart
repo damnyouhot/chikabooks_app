@@ -491,7 +491,7 @@ class _BondPostCardState extends State<BondPostCard> {
                   color: _hasEnthroned ? const Color(0xFF6A5ACD) : Colors.grey[600],
                 ),
                 label: Text(
-                  _enthroneCount > 0 ? '$_enthroneCount' : '추대',  // 간결하게
+                  _enthroneCount > 0 ? '$_enthroneCount' : '추대합니다',  // '추대' → '추대합니다'
                   style: TextStyle(
                     fontSize: 11,  // 12 → 11
                     color: _hasEnthroned ? const Color(0xFF6A5ACD) : Colors.grey[600],
@@ -533,6 +533,21 @@ class _BondPostCardState extends State<BondPostCard> {
                     color: Colors.grey[600],
                   ),
               ),
+              ),
+
+              // 답글 버튼 추가
+              TextButton(
+                onPressed: _showReplyInput,
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  minimumSize: const Size(0, 0),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Icon(
+                  Icons.comment_outlined,
+                  size: 14,
+                  color: Colors.grey[600],
+                ),
               ),
 
               const Spacer(),
@@ -610,6 +625,96 @@ class _BondPostCardState extends State<BondPostCard> {
         );
       },
     );
+  }
+
+  // 답글 입력 다이얼로그
+  void _showReplyInput() async {
+    if (_currentUid == null) return;
+    
+    // 이미 답글을 달았는지 확인
+    if (_replies.containsKey(_currentUid)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('이미 답글을 달았어요. (1인 1답글)')),
+      );
+      return;
+    }
+
+    final controller = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('답글 달기', style: TextStyle(fontSize: 14)),
+          content: TextField(
+            controller: controller,
+            maxLength: 100,
+            maxLines: 3,
+            autofocus: true,
+            decoration: const InputDecoration(
+              hintText: '따뜻한 답글을 남겨보세요',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('취소'),
+            ),
+            TextButton(
+              onPressed: () async {
+                final text = controller.text.trim();
+                if (text.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('내용을 입력해주세요.')),
+                  );
+                  return;
+                }
+                await _saveReply(text);
+                if (context.mounted) {
+                  Navigator.pop(context);
+                }
+              },
+              child: const Text('등록'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _saveReply(String text) async {
+    final groupId = widget.bondGroupId ?? widget.post['bondGroupId'];
+    if (groupId == null || _currentUid == null) return;
+
+    try {
+      await _db
+          .collection('bondGroups')
+          .doc(groupId)
+          .collection('posts')
+          .doc(widget.postId)
+          .collection('replies')
+          .doc(_currentUid)
+          .set({
+        'text': text,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      await _loadReplies();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('답글이 등록되었어요')),
+        );
+      }
+    } catch (e) {
+      debugPrint('⚠️ _saveReply error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('답글 등록에 실패했어요')),
+        );
+      }
+    }
   }
 }
 

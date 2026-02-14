@@ -49,28 +49,30 @@ class _HomeShellState extends State<HomeShell> {
         elevation: 0,
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.spa_outlined),
-            activeIcon: Icon(Icons.spa),
-            label: '돌보기',
+            icon: Icon(Icons.person_outline),
+            activeIcon: Icon(Icons.person),
+            label: '나',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.all_inclusive_outlined),
-            activeIcon: Icon(Icons.all_inclusive),
-            label: '결',
+            icon: Icon(Icons.people_outline),
+            activeIcon: Icon(Icons.people),
+            label: '같이',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.menu_book_outlined),
             activeIcon: Icon(Icons.menu_book),
-            label: '성장',
+            label: '성장하기',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.work_outline),
             activeIcon: Icon(Icons.work),
-            label: '나아가기',
+            label: '도전하기',
           ),
         ],
       ),
     );
   }
 }
+
+
 

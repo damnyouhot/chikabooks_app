@@ -82,16 +82,35 @@ class _BondPostSheetState extends State<BondPostSheet> {
 
     setState(() => _posting = true);
     try {
+      // 현재 사용자의 파트너 그룹 ID 가져오기
+      final userDoc = await _db.collection('users').doc(uid).get();
+      final partnerGroupId = userDoc.data()?['partnerGroupId'] as String?;
+      
+      if (partnerGroupId == null || partnerGroupId.isEmpty) {
+        _showSnack('파트너 그룹에 가입해야 글을 쓸 수 있어요.');
+        setState(() => _posting = false);
+        return;
+      }
+      
       final currentSlot = BondPostService.getCurrentTimeSlot();
-      await _db.collection('bondPosts').add({
+      
+      // bondGroups/{partnerGroupId}/posts에 저장
+      await _db
+          .collection('bondGroups')
+          .doc(partnerGroupId)
+          .collection('posts')
+          .add({
         'uid': uid,
         'text': text,
+        'bondGroupId': partnerGroupId,
         'dateKey': BondPostService.todayDateKey(),
         'timeSlot': currentSlot.name,
-        'bondGroupId': 'default_group', // 임시: 나중에 실제 그룹 ID로 교체
         'createdAt': FieldValue.serverTimestamp(),
+        'isDeleted': false,
+        'publicEligible': true,
         'reports': 0,
       });
+      
       if (mounted) {
         Navigator.pop(context);
         _showSnack('기록되었어요 ✨');
