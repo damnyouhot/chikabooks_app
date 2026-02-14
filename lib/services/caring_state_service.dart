@@ -120,11 +120,29 @@ class CaringState {
   final DateTime? sleepStartedAt;
   final DateTime? lastWakeAt;
 
+  // ✨ 밥주기 관련
+  final List<String> lastFedSlots; // ['morning', 'lunch', 'dinner', 'night']
+  final int fedCountToday; // 오늘 먹인 횟수
+  final int skipDaysStreak; // 연속 미급여 일수
+
+  // ✨ 교감/글 관련
+  final int touchCountToday; // 오늘 교감 횟수 (상한 3)
+  final int diaryCountToday; // 오늘 글쓰기 횟수 (상한 2)
+
+  // ✨ 날짜 체크용
+  final String? lastActionDate; // "YYYY-MM-DD"
+
   const CaringState({
     this.isSleeping = false,
     this.hasGreetedDate,
     this.sleepStartedAt,
     this.lastWakeAt,
+    this.lastFedSlots = const [],
+    this.fedCountToday = 0,
+    this.skipDaysStreak = 0,
+    this.touchCountToday = 0,
+    this.diaryCountToday = 0,
+    this.lastActionDate,
   });
 
   factory CaringState.initial() => const CaringState();
@@ -135,6 +153,53 @@ class CaringState {
       hasGreetedDate: m['hasGreetedDate'],
       sleepStartedAt: (m['sleepStartedAt'] as Timestamp?)?.toDate(),
       lastWakeAt: (m['lastWakeAt'] as Timestamp?)?.toDate(),
+      lastFedSlots: (m['lastFedSlots'] as List?)?.cast<String>() ?? [],
+      fedCountToday: m['fedCountToday'] ?? 0,
+      skipDaysStreak: m['skipDaysStreak'] ?? 0,
+      touchCountToday: m['touchCountToday'] ?? 0,
+      diaryCountToday: m['diaryCountToday'] ?? 0,
+      lastActionDate: m['lastActionDate'],
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'isSleeping': isSleeping,
+      'hasGreetedDate': hasGreetedDate,
+      'sleepStartedAt': sleepStartedAt != null ? Timestamp.fromDate(sleepStartedAt!) : null,
+      'lastWakeAt': lastWakeAt != null ? Timestamp.fromDate(lastWakeAt!) : null,
+      'lastFedSlots': lastFedSlots,
+      'fedCountToday': fedCountToday,
+      'skipDaysStreak': skipDaysStreak,
+      'touchCountToday': touchCountToday,
+      'diaryCountToday': diaryCountToday,
+      'lastActionDate': lastActionDate,
+    };
+  }
+
+  CaringState copyWith({
+    bool? isSleeping,
+    String? hasGreetedDate,
+    DateTime? sleepStartedAt,
+    DateTime? lastWakeAt,
+    List<String>? lastFedSlots,
+    int? fedCountToday,
+    int? skipDaysStreak,
+    int? touchCountToday,
+    int? diaryCountToday,
+    String? lastActionDate,
+  }) {
+    return CaringState(
+      isSleeping: isSleeping ?? this.isSleeping,
+      hasGreetedDate: hasGreetedDate ?? this.hasGreetedDate,
+      sleepStartedAt: sleepStartedAt ?? this.sleepStartedAt,
+      lastWakeAt: lastWakeAt ?? this.lastWakeAt,
+      lastFedSlots: lastFedSlots ?? this.lastFedSlots,
+      fedCountToday: fedCountToday ?? this.fedCountToday,
+      skipDaysStreak: skipDaysStreak ?? this.skipDaysStreak,
+      touchCountToday: touchCountToday ?? this.touchCountToday,
+      diaryCountToday: diaryCountToday ?? this.diaryCountToday,
+      lastActionDate: lastActionDate ?? this.lastActionDate,
     );
   }
 }

@@ -3,11 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:rive/rive.dart';
 import '../services/caring_state_service.dart';
-import '../services/user_action_service.dart';
 import '../services/bond_score_service.dart';
-import '../services/speech_engine_service.dart';
+import '../services/caring_action_service.dart';
 import '../widgets/speech_overlay.dart';
-import '../widgets/floating_delta.dart';
 import '../widgets/diary_input_sheet.dart';
 import '../widgets/user_goal_sheet.dart';
 
@@ -64,6 +62,8 @@ class _CaringPageState extends State<CaringPage>
     super.initState();
     _loadRiveFile();
     _loadState();
+    // ✨ 앱 시작 시 하루 정산
+    CaringActionService.dailySettle();
   }
 
   /// Rive 파일 로드 및 State Machine 연결
@@ -144,24 +144,40 @@ class _CaringPageState extends State<CaringPage>
   /// 밥주기
   void _onFeed() async {
     _tapTrigger?.fire(); // 🔥 Rive 트리거 발동
-    final msg = await UserActionService.feed();
-    if (mounted) {
-      _speak(msg); // ✨ 변경: _showFeedback → _speak
-      _showFloatingDelta(1); // ✨ 추가: 결 수치 상승 표시
+
+    final result = await CaringActionService.tryFeed();
+
+    if (result.success) {
+      // 성공: 멘트 + 결 팝업
+      _speak(result.ment ?? '잘 먹었어.', durationMs: 2500);
+      if (result.bondDelta > 0) {
+        _showBondFloatingDelta(result.bondDelta);
+      }
+    } else {
+      // 거절: 시간대 중복
+      _speak(result.rejectMent ?? '지금은 방금 지나간 자리라서.', durationMs: 2200);
     }
   }
 
-  /// ✨ 소통하기 (기존 _onTalk 대체) - 유저 상태 기반 공감 멘트
+  /// ✨ 교감하기 (개선)
   void _onEmpathize() async {
-    final speech = await SpeechEngineService.pickSpeechForUser();
-    _speak(speech, durationMs: 2500);
+    final result = await CaringActionService.tryTouch();
+
+    _speak(result.ment, durationMs: 2500);
+    if (result.bondDelta > 0) {
+      _showBondFloatingDelta(result.bondDelta);
+    }
   }
 
-  /// ✨ 대화하기 (새로운 기능) - 한 줄 기록 팝업
+  /// ✨ 대화하기 (글쓰기 - 개선)
   void _onDiary() {
-    DiaryInputSheet.show(context, (text) {
-      // 저장 완료 후 캐릭터 응답
-      _speak('들었어.', durationMs: 2200);
+    DiaryInputSheet.show(context, (text) async {
+      // 저장 완료 후 멘트 + 결
+      final result = await CaringActionService.completeDiary();
+      _speak(result.ment, durationMs: 2500);
+      if (result.bondDelta > 0) {
+        _showBondFloatingDelta(result.bondDelta);
+      }
     });
   }
 
@@ -207,25 +223,51 @@ class _CaringPageState extends State<CaringPage>
     });
   }
 
-  /// 떠오르는 수치 표시 (+1, +3 등)
-  void _showFloatingDelta(int value) {
+  /// ✨ 떠오르는 결 수치 표시 (+결 0.1, +결 0.05 등)
+  void _showBondFloatingDelta(double value) {
     // 화면 크기 가져오기
     final size = MediaQuery.of(context).size;
     
     // 화면 중앙 상단 (캐릭터 머리 예상 위치)
-    final centerX = size.width / 2 - 10; // 중앙에서 살짝 왼쪽
+    final centerX = size.width / 2 - 20; // 중앙에서 살짝 왼쪽
     final topY = size.height * 0.35; // 상단 35% 지점
 
-    final deltaWidget = FloatingDelta(
+    final deltaWidget = Positioned(
       key: ValueKey('delta_${DateTime.now().millisecondsSinceEpoch}'),
-      value: value,
-      startPosition: Offset(centerX, topY),
+      left: centerX,
+      top: topY,
+      child: TweenAnimationBuilder<double>(
+        duration: const Duration(milliseconds: 1200),
+        tween: Tween(begin: 0.0, end: -40.0), // 위로 40 이동
+        builder: (context, offset, child) {
+          return Transform.translate(
+            offset: Offset(0, offset),
+            child: Opacity(
+              opacity: 1.0 - (offset.abs() / 40.0),
+              child: Text(
+                '+결 ${value.toStringAsFixed(2)}',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: _colorAccent,
+                  shadows: [
+                    Shadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 4,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
     );
 
     setState(() => _floatingDeltas.add(deltaWidget));
 
-    // 1초 후 제거
-    Future.delayed(const Duration(milliseconds: 1100), () {
+    // 1.2초 후 제거
+    Future.delayed(const Duration(milliseconds: 1200), () {
       if (mounted) {
         setState(() => _floatingDeltas.remove(deltaWidget));
       }
