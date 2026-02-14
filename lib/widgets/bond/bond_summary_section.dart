@@ -38,7 +38,7 @@ class BondSummarySection extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '결 ${bondScore.toStringAsFixed(1)}',
+                        '결',
                         style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w300,

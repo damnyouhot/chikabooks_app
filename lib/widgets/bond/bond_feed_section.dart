@@ -32,25 +32,9 @@ class BondFeedSection extends StatelessWidget {
                   color: BondColors.kText,
                 ),
               ),
+
               const Spacer(),
-              GestureDetector(
-                onTap: onOpenWrite,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: BondColors.kAccent,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Text(
-                    '+ 나누기',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: BondColors.kText,
-                    ),
-                  ),
-                ),
-              ),
+
             ],
           ),
           const SizedBox(height: 12),

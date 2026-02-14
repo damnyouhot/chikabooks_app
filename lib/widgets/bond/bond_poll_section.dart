@@ -44,7 +44,7 @@ class _BondPollSectionState extends State<BondPollSection> {
                     color: BondColors.kText,
                   ),
                 ),
-                const Spacer(),
+                const SizedBox(width: 6),
                 Text(
                   '다들 어떤지 궁금해서.',
                   style: TextStyle(
@@ -52,6 +52,7 @@ class _BondPollSectionState extends State<BondPollSection> {
                     color: BondColors.kText.withOpacity(0.4),
                   ),
                 ),
+                const Spacer(),
               ],
             ),
             const SizedBox(height: 14),
