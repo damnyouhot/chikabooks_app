@@ -237,7 +237,7 @@ class _CaringPageState extends State<CaringPage>
       left: centerX,
       top: topY,
       child: TweenAnimationBuilder<double>(
-        duration: const Duration(milliseconds: 1200),
+        duration: const Duration(milliseconds: 2400), // 1200ms → 2400ms (2배)
         tween: Tween(begin: 0.0, end: -40.0), // 위로 40 이동
         builder: (context, offset, child) {
           return Transform.translate(
@@ -266,8 +266,8 @@ class _CaringPageState extends State<CaringPage>
 
     setState(() => _floatingDeltas.add(deltaWidget));
 
-    // 1.2초 후 제거
-    Future.delayed(const Duration(milliseconds: 1200), () {
+    // 2.4초 후 제거 (1.2초 → 2.4초)
+    Future.delayed(const Duration(milliseconds: 2400), () {
       if (mounted) {
         setState(() => _floatingDeltas.remove(deltaWidget));
       }

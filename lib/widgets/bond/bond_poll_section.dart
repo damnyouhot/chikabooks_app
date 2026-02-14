@@ -27,57 +27,62 @@ class _BondPollSectionState extends State<BondPollSection> {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(20),
-        decoration: BondColors.cardDecoration(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Text(
-                  '공감 투표',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: BondColors.kText,
-                  ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 섹션 타이틀 (Container 밖으로 이동)
+          Row(
+            children: [
+              const Text(
+                '공감 투표',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: BondColors.kText,
                 ),
-                const SizedBox(width: 6),
-                Text(
-                  '다들 어떤지 궁금해서.',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: BondColors.kText.withOpacity(0.4),
-                  ),
-                ),
-                const Spacer(),
-              ],
-            ),
-            const SizedBox(height: 14),
-
-            // 질문
-            const Text(
-              question,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                color: BondColors.kText,
-                height: 1.4,
               ),
-            ),
-            const SizedBox(height: 16),
+              const SizedBox(width: 6),
+              Text(
+                '다들 어떤지 궁금해서.',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: BondColors.kText.withOpacity(0.4),
+                ),
+              ),
+              const Spacer(),
+            ],
+          ),
+          const SizedBox(height: 12),
 
-            // 선택지
-            ...options.asMap().entries.map((entry) {
-              final i = entry.key;
-              final option = entry.value;
-              final isSelected = _selectedPollOption == i;
-              final hasVoted = _selectedPollOption != null;
+          // 투표 카드
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BondColors.cardDecoration(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 질문
+                const Text(
+                  question,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: BondColors.kText,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 16),
 
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
+                // 선택지
+                ...options.asMap().entries.map((entry) {
+                  final i = entry.key;
+                  final option = entry.value;
+                  final isSelected = _selectedPollOption == i;
+                  final hasVoted = _selectedPollOption != null;
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
                 child: GestureDetector(
                   onTap: hasVoted
                       ? null
@@ -184,6 +189,8 @@ class _BondPollSectionState extends State<BondPollSection> {
             ),
           ],
         ),
+      ),
+    ],
       ),
     );
   }

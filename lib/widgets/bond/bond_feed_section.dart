@@ -21,20 +21,32 @@ class BondFeedSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 섹션 타이틀 + 작성 버튼
+          // 섹션 타이틀 (다른 항목들처럼)
           Row(
             children: [
+              Icon(
+                Icons.chat_bubble_outline,
+                size: 16,
+                color: BondColors.kText.withOpacity(0.6),
+              ),
+              const SizedBox(width: 6),
               const Text(
-                '여기선 괜찮아, 털어놔도',
+                '털어놔',
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
                   color: BondColors.kText,
                 ),
               ),
-
+              const SizedBox(width: 6),
+              Text(
+                '여기선 괜찮아',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: BondColors.kText.withOpacity(0.4),
+                ),
+              ),
               const Spacer(),
-
             ],
           ),
           const SizedBox(height: 12),
