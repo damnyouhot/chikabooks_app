@@ -14,6 +14,9 @@ class BondFeedSection extends StatelessWidget {
     required this.onOpenWrite,
   });
 
+  // 파트너 그룹 가입 여부
+  bool get _hasPartnerGroup => partnerGroupId != null && partnerGroupId!.isNotEmpty;
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -64,11 +67,11 @@ class BondFeedSection extends StatelessWidget {
                     .snapshots()
                 : Stream.value(null),
             builder: (context, snap) {
-              if (partnerGroupId == null || partnerGroupId!.isEmpty) {
+              if (!_hasPartnerGroup) {
                 return _buildEmptyState(
                   icon: Icons.people_outline,
-                  text: '파트너 그룹에 가입하면 볼 수 있어요',
-                  onTap: onOpenWrite,
+                  text: '파트너 그룹에 가입하면 사용할 수 있어요',
+                  onTap: null, // 가입 전에는 터치 불가
                 );
               }
 
@@ -122,10 +125,10 @@ class BondFeedSection extends StatelessWidget {
   Widget _buildEmptyState({
     required IconData icon,
     required String text,
-    required VoidCallback onTap,
+    required VoidCallback? onTap, // nullable로 변경
   }) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: onTap, // null이면 터치 불가
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.all(24),

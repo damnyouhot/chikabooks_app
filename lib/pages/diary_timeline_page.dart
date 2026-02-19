@@ -139,20 +139,28 @@ class _NoteCard extends StatelessWidget {
     final date = timestamp.toDate();
     final now = DateTime.now();
     final diff = now.difference(date);
+    
+    // 요일 배열
+    final weekday = ['월', '화', '수', '목', '금', '토', '일'][date.weekday - 1];
 
     if (diff.inDays == 0) {
       // 오늘
-      return '오늘 ${DateFormat('HH:mm').format(date)}';
+      return '오늘 ${DateFormat('HH시 mm분').format(date)}';
     } else if (diff.inDays == 1) {
       // 어제
-      return '어제 ${DateFormat('HH:mm').format(date)}';
-    } else if (diff.inDays < 7) {
-      // 일주일 이내
-      final weekday = ['월', '화', '수', '목', '금', '토', '일'][date.weekday - 1];
-      return '$weekday요일 ${DateFormat('HH:mm').format(date)}';
+      return '어제 ${DateFormat('HH시 mm분').format(date)}';
     } else {
-      // 그 이상
-      return DateFormat('MM월 dd일 HH:mm').format(date);
+      // 과거 (어제보다 이전)
+      final isThisYear = date.year == now.year;
+      
+      if (isThisYear) {
+        // 올해: 연도 제외
+        return '${date.month}월 ${date.day}일, $weekday요일 ${DateFormat('HH시 mm분').format(date)}';
+      } else {
+        // 지난 해 이상: 연도 포함 (YY년 형식)
+        final yearShort = date.year % 100; // 2025 → 25
+        return '${yearShort}년 ${date.month}월 ${date.day}일, $weekday요일 ${DateFormat('HH시 mm분').format(date)}';
+      }
     }
   }
 
@@ -262,6 +270,8 @@ class _NoteCard extends StatelessWidget {
     );
   }
 }
+
+
 
 
 

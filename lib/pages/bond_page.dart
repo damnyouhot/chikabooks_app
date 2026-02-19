@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../services/user_profile_service.dart';
 import '../widgets/bond_post_sheet.dart';
 import '../widgets/profile_gate_sheet.dart';
@@ -31,7 +33,6 @@ class BondPage extends StatefulWidget {
 
 class _BondPageState extends State<BondPage> {
   // ── 데이터 ──
-  double _bondScore = 50.0;
   String? _partnerGroupId; // 추후 파트너 데이터 연결용
 
   // ── 결 파트 확장 ──
@@ -45,11 +46,9 @@ class _BondPageState extends State<BondPage> {
 
   Future<void> _loadData() async {
     try {
-      final score = await UserProfileService.getBondScore();
       final groupId = await UserProfileService.getPartnerGroupId();
       if (mounted) {
         setState(() {
-          _bondScore = score;
           _partnerGroupId = groupId;
         });
       }
@@ -106,6 +105,8 @@ class _BondPageState extends State<BondPage> {
 
   @override
   Widget build(BuildContext context) {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    
     return Scaffold(
       backgroundColor: BondColors.kBg,
       body: SafeArea(
@@ -118,13 +119,32 @@ class _BondPageState extends State<BondPage> {
               ),
             ),
 
-            // ── 섹션 A: 요약 헤더 ──
+            // ── 섹션 A: 요약 헤더 (실시간 결 점수) ──
             SliverToBoxAdapter(
-              child: BondSummarySection(
-                bondScore: _bondScore,
-                isExpanded: _isBondExpanded,
-                onToggleExpand: () => setState(() => _isBondExpanded = !_isBondExpanded),
-              ),
+              child: uid != null
+                  ? StreamBuilder<DocumentSnapshot>(
+                      stream: FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(uid)
+                          .snapshots(),
+                      builder: (context, snapshot) {
+                        double bondScore = 50.0;
+                        if (snapshot.hasData && snapshot.data?.data() != null) {
+                          final data = snapshot.data!.data() as Map<String, dynamic>;
+                          bondScore = (data['bondScore'] as num?)?.toDouble() ?? 50.0;
+                        }
+                        return BondSummarySection(
+                          bondScore: bondScore,
+                          isExpanded: _isBondExpanded,
+                          onToggleExpand: () => setState(() => _isBondExpanded = !_isBondExpanded),
+                        );
+                      },
+                    )
+                  : BondSummarySection(
+                      bondScore: 50.0,
+                      isExpanded: _isBondExpanded,
+                      onToggleExpand: () => setState(() => _isBondExpanded = !_isBondExpanded),
+                    ),
             ),
 
             const SliverToBoxAdapter(child: SizedBox(height: 16)),
