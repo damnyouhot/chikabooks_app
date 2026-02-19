@@ -60,8 +60,8 @@ class _GrowthPageState extends State<GrowthPage>
                 controller: _tabCtrl,
                 children: const [
                   QuizTodayPage(),
-                  _MyLibraryView(),
                   _BookStoreBrowseView(),
+                  _MyLibraryView(),
                 ],
               ),
             ),
@@ -124,8 +124,8 @@ class _GrowthPageState extends State<GrowthPage>
         ),
         tabs: const [
           Tab(text: '퀴즈'),
-          Tab(text: '내 서재'),
           Tab(text: '치과책방'),
+          Tab(text: '내 서재'),
         ],
       ),
     );

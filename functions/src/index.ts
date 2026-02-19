@@ -1,5 +1,8 @@
-import * as functions from "firebase-functions";
+import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
+import axios from "axios";
+import {parseStringPromise} from "xml2js";
+import * as crypto from "crypto";
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -9,10 +12,12 @@ const db = admin.firestore();
  * 조건 충족 시 billboardPosts에 등재
  */
 export const onEnthroneCreated = functions
-  .region("asia-northeast3")
   .firestore.document("bondGroups/{bondId}/posts/{postId}/enthrones/{uid}")
   .onCreate(async (snap, context) => {
-    const {bondId, postId} = context.params;
+    const {bondId, postId} = context.params as {
+      bondId: string;
+      postId: string;
+    };
 
     try {
       // 1. 현재 추대 수 집계
@@ -73,10 +78,9 @@ export const onEnthroneCreated = functions
  * 일일 요약 생성: 매일 19:00 KST에 실행
  */
 export const generateDailySummary = functions
-  .region("asia-northeast3")
   .pubsub.schedule("0 19 * * *") // 매일 19:00 (UTC+0 기준이므로 실제로는 10:00 UTC)
   .timeZone("Asia/Seoul")
-  .onRun(async (context) => {
+  .onRun(async () => {
     try {
       const dateKey = getCurrentDateKey();
 
@@ -128,10 +132,9 @@ export const generateDailySummary = functions
  * 전광판 만료 처리: 매시간 실행
  */
 export const expireBillboardPosts = functions
-  .region("asia-northeast3")
   .pubsub.schedule("0 * * * *") // 매시간 0분
   .timeZone("Asia/Seoul")
-  .onRun(async (context) => {
+  .onRun(async () => {
     try {
       const now = admin.firestore.Timestamp.now();
 
@@ -183,4 +186,239 @@ function generateSummaryMessage(
   default:
     return "오늘은 조용한 날 (내일 한 칸만 채워도 충분해)";
   }
+}
+
+// ────────────────────────────────────────
+// HIRA RSS 수집 + Digest 생성
+// ────────────────────────────────────────
+
+interface HiraUpdate {
+  title: string;
+  link: string;
+  publishedAt: admin.firestore.Timestamp;
+  topic: string;
+  impactScore: number;
+  impactLevel: string;
+  keywords: string[];
+  actionHints: string[];
+  fetchedAt: admin.firestore.Timestamp;
+}
+
+/**
+ * HIRA RSS 수집 (6시간마다)
+ */
+export const syncHiraUpdates = functions
+  .pubsub.schedule("0 */6 * * *")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    try {
+      const rssUrls = [
+        {
+          url: "https://www.hira.or.kr/rc/rss/rss_hira_act.xml",
+          topic: "act",
+        },
+        {
+          url: "https://www.hira.or.kr/rc/rss/rss_hira_notice.xml",
+          topic: "notice",
+        },
+      ];
+
+      let totalProcessed = 0;
+
+      for (const {url, topic} of rssUrls) {
+        try {
+          const response = await axios.get(url, {timeout: 10000});
+          const parsed = await parseStringPromise(response.data);
+          const items = parsed.rss?.channel?.[0]?.item || [];
+
+          for (const item of items) {
+            const title = item.title?.[0] || "";
+            const link = item.link?.[0] || "";
+            const pubDate = item.pubDate?.[0] || "";
+
+            if (!title || !link) continue;
+
+            // docId = SHA-1(link)
+            const docId = crypto
+              .createHash("sha1")
+              .update(link)
+              .digest("hex");
+
+            // 이미 존재하는지 확인
+            const docRef = db.collection("content_hira_updates").doc(docId);
+            const docSnap = await docRef.get();
+
+            if (docSnap.exists) continue; // 이미 있으면 스킵
+
+            // impactScore 계산
+            const {score, keywords} = calculateImpactScore(title);
+            const impactLevel = getImpactLevel(score);
+            const actionHints = generateActionHints(title);
+
+            // publishedAt 변환
+            let publishedAt: admin.firestore.Timestamp;
+            try {
+              publishedAt = admin.firestore.Timestamp.fromDate(
+                new Date(pubDate)
+              );
+            } catch {
+              publishedAt = admin.firestore.Timestamp.now();
+            }
+
+            const updateData: HiraUpdate = {
+              title,
+              link,
+              publishedAt,
+              topic,
+              impactScore: score,
+              impactLevel,
+              keywords,
+              actionHints,
+              fetchedAt: admin.firestore.Timestamp.now(),
+            };
+
+            await docRef.set(updateData);
+            totalProcessed++;
+          }
+        } catch (error) {
+          console.error(`⚠️ Error fetching RSS ${url}:`, error);
+        }
+      }
+
+      console.log(`✅ syncHiraUpdates: ${totalProcessed} new items processed`);
+    } catch (error) {
+      console.error("⚠️ syncHiraUpdates error:", error);
+    }
+  });
+
+/**
+ * HIRA Digest 생성 (매일 07:00 KST)
+ */
+export const buildHiraDigest = functions
+  .pubsub.schedule("0 7 * * *")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    try {
+      const dateKey = getCurrentDateKey();
+      const fourteenDaysAgo = admin.firestore.Timestamp.fromMillis(
+        Date.now() - 14 * 24 * 60 * 60 * 1000
+      );
+
+      // 최근 14일 내 impactScore 높은 순 3개
+      const snapshot = await db
+        .collection("content_hira_updates")
+        .where("publishedAt", ">=", fourteenDaysAgo)
+        .orderBy("publishedAt", "desc")
+        .orderBy("impactScore", "desc")
+        .limit(3)
+        .get();
+
+      const topIds = snapshot.docs.map((doc) => doc.id);
+
+      await db
+        .collection("content_hira_digest")
+        .doc(dateKey)
+        .set({
+          topIds,
+          generatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+      console.log(
+        `✅ buildHiraDigest: ${dateKey} with ${topIds.length} items`
+      );
+    } catch (error) {
+      console.error("⚠️ buildHiraDigest error:", error);
+    }
+  });
+
+/**
+ * impactScore 계산
+ */
+function calculateImpactScore(title: string): {
+  score: number;
+  keywords: string[];
+} {
+  const strongKeywords = [
+    "치과",
+    "구강",
+    "치주",
+    "임플란트",
+    "교정",
+    "보철",
+    "근관",
+    "스케일링",
+    "치석",
+    "마취",
+  ];
+  const mediumKeywords = [
+    "수가",
+    "급여",
+    "행위",
+    "청구",
+    "기준",
+    "고시",
+    "산정",
+    "인정",
+    "심사",
+  ];
+  const weakKeywords = ["보험", "평가", "공단", "제도", "개정"];
+
+  let score = 0;
+  const foundKeywords: string[] = [];
+
+  for (const kw of strongKeywords) {
+    if (title.includes(kw)) {
+      score += 30;
+      foundKeywords.push(kw);
+    }
+  }
+  for (const kw of mediumKeywords) {
+    if (title.includes(kw)) {
+      score += 15;
+      foundKeywords.push(kw);
+    }
+  }
+  for (const kw of weakKeywords) {
+    if (title.includes(kw)) {
+      score += 5;
+      foundKeywords.push(kw);
+    }
+  }
+
+  return {score: Math.min(score, 100), keywords: foundKeywords};
+}
+
+/**
+ * impactLevel 산출
+ */
+function getImpactLevel(score: number): string {
+  if (score >= 70) return "HIGH";
+  if (score >= 40) return "MID";
+  return "LOW";
+}
+
+/**
+ * actionHints 생성
+ */
+function generateActionHints(title: string): string[] {
+  const hints: string[] = [];
+
+  if (/청구|산정|행위|코드|수가/.test(title)) {
+    hints.push("청구팀 확인 필요");
+  }
+  if (/기준|인정|산정기준/.test(title)) {
+    hints.push("차트/기록 방식 변경 여부 확인");
+  }
+  if (/서식|양식|제출/.test(title)) {
+    hints.push("서식 업데이트 필요");
+  }
+  if (/치과|구강|스케일링|치주/.test(title)) {
+    hints.push("치과 항목 영향 가능 (진료/상담 멘트 점검)");
+  }
+
+  if (hints.length === 0) {
+    hints.push("원문 링크로 핵심 문단만 확인");
+  }
+
+  return hints.slice(0, 3); // 최대 3개
 }
