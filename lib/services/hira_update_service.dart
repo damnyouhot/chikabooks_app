@@ -37,6 +37,25 @@ class HiraUpdateService {
     }
   }
 
+  /// 전체 업데이트 목록 실시간 감시 (3개월, 최신순)
+  static Stream<List<HiraUpdate>> watchAllUpdates() {
+    final threeMonthsAgo = DateTime.now().subtract(const Duration(days: 90));
+    
+    debugPrint('🔍 HIRA: Watching all updates since ${threeMonthsAgo.toString()}');
+    
+    return _db
+        .collection('content_hira_updates')
+        .where('publishedAt', isGreaterThanOrEqualTo: Timestamp.fromDate(threeMonthsAgo))
+        .orderBy('publishedAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      debugPrint('✅ HIRA: Stream update - ${snapshot.docs.length} total updates');
+      return snapshot.docs
+          .map((doc) => HiraUpdate.fromMap(doc.id, doc.data()))
+          .toList();
+    });
+  }
+
   /// 전체 업데이트 목록 가져오기 (3개월, 최신순)
   static Future<List<HiraUpdate>> getAllUpdates() async {
     try {

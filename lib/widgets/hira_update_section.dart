@@ -16,8 +16,8 @@ class HiraUpdateSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     debugPrint('🔍 HIRA: HiraUpdateSection building...');
-    return FutureBuilder<List<HiraUpdate>>(
-      future: HiraUpdateService.getAllUpdates(),
+    return StreamBuilder<List<HiraUpdate>>(
+      stream: HiraUpdateService.watchAllUpdates(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
