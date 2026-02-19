@@ -7,6 +7,9 @@ import 'hira_update_detail_sheet.dart';
 const _kText = Color(0xFF5D6B6B);
 const _kShadow2 = Color(0xFFD5E5E5);
 const _kCardBg = Colors.white;
+const _kHighRed = Color(0xFFE57373);
+const _kMidOrange = Color(0xFFFFB74D);
+const _kLowGray = Color(0xFFBDBDBD);
 
 /// HIRA 업데이트 간단 리스트 아이템 (4번째 이후)
 class HiraUpdateCompactItem extends StatelessWidget {
@@ -23,7 +26,7 @@ class HiraUpdateCompactItem extends StatelessWidget {
       onTap: () => _showDetail(context),
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           color: _kCardBg,
           borderRadius: BorderRadius.circular(12),
@@ -33,20 +36,12 @@ class HiraUpdateCompactItem extends StatelessWidget {
           ),
         ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // 날짜
-            Container(
-              width: 60,
-              child: Text(
-                _formatDate(update.publishedAt),
-                style: TextStyle(
-                  fontSize: 11,
-                  color: _kText.withOpacity(0.5),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
+            // 배지
+            _buildImpactBadge(),
+            const SizedBox(width: 10),
+            
             // 제목
             Expanded(
               child: Text(
@@ -60,14 +55,66 @@ class HiraUpdateCompactItem extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 10),
+            
+            // 날짜
+            Text(
+              _formatDate(update.publishedAt),
+              style: TextStyle(
+                fontSize: 11,
+                color: _kText.withOpacity(0.5),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(width: 4),
+            
             // 화살표
             Icon(
               Icons.chevron_right,
-              size: 18,
+              size: 16,
               color: _kText.withOpacity(0.3),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  /// 배지
+  Widget _buildImpactBadge() {
+    Color badgeColor;
+    String badgeText;
+
+    switch (update.impactLevel) {
+      case 'HIGH':
+        badgeColor = _kHighRed;
+        badgeText = '중요';
+        break;
+      case 'MID':
+        badgeColor = _kMidOrange;
+        badgeText = '보통';
+        break;
+      default:
+        badgeColor = _kLowGray;
+        badgeText = '참고만';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: badgeColor.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: badgeColor.withOpacity(0.3),
+          width: 0.5,
+        ),
+      ),
+      child: Text(
+        badgeText,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: badgeColor,
         ),
       ),
     );
