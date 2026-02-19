@@ -428,7 +428,7 @@ function generateActionHints(title: string): string[] {
  * 수동 실행용 - Firebase Console에서 1회만 실행
  */
 export const syncHiraUpdatesHistorical = functions
-  .https.onRequest(async (req, res) => {
+  .https.onRequest(async (req, res): Promise<void> => {
     try {
       const rssUrls = [
         {
@@ -517,21 +517,51 @@ export const syncHiraUpdatesHistorical = functions
       );
 
       // 처리 후 바로 Digest 생성
-      await buildHiraDigestManually();
+      try {
+        await buildHiraDigestManually();
+        res.status(200).json({
+          success: true,
+          processed: totalProcessed,
+          message: `과거 데이터 ${totalProcessed}건 수집 완료`,
+        });
+      } catch (digestError: any) {
+        console.error("⚠️ buildHiraDigestManually error:", digestError);
 
-      res.status(200).json({
-        success: true,
-        processed: totalProcessed,
-        message: "과거 데이터 수집 완료",
-      });
-    } catch (error) {
+        // 인덱스 에러인지 확인
+        if (digestError.code === 9 || digestError.message?.includes("index")) {
+          res.status(400).json({
+            success: false,
+            processed: totalProcessed,
+            error: "Firestore 복합 인덱스가 필요합니다",
+            details: digestError.message,
+            indexUrl: extractIndexUrl(digestError.message),
+          });
+          return;
+        }
+
+        res.status(500).json({
+          success: false,
+          processed: totalProcessed,
+          error: digestError.message || String(digestError),
+        });
+      }
+    } catch (error: any) {
       console.error("⚠️ syncHiraUpdatesHistorical error:", error);
       res.status(500).json({
         success: false,
-        error: String(error),
+        processed: 0,
+        error: error.message || String(error),
       });
     }
   });
+
+/**
+ * 인덱스 URL 추출 헬퍼
+ */
+function extractIndexUrl(errorMessage: string): string | undefined {
+  const match = errorMessage.match(/https:\/\/console\.firebase\.google\.com[^\s]+/);
+  return match ? match[0] : undefined;
+}
 
 /**
  * Digest 수동 생성 헬퍼

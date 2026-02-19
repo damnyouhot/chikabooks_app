@@ -12,6 +12,7 @@ class HiraUpdate {
   final List<String> keywords;
   final List<String> actionHints;
   final DateTime fetchedAt;
+  final int commentCount; // 댓글 수 추가
 
   HiraUpdate({
     required this.id,
@@ -24,6 +25,7 @@ class HiraUpdate {
     required this.keywords,
     required this.actionHints,
     required this.fetchedAt,
+    this.commentCount = 0, // 기본값 0
   });
 
   factory HiraUpdate.fromMap(String id, Map<String, dynamic> map) {
@@ -38,6 +40,7 @@ class HiraUpdate {
       keywords: List<String>.from(map['keywords'] ?? []),
       actionHints: List<String>.from(map['actionHints'] ?? []),
       fetchedAt: (map['fetchedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      commentCount: map['commentCount'] as int? ?? 0, // 댓글 수 추가
     );
   }
 
@@ -52,6 +55,7 @@ class HiraUpdate {
       'keywords': keywords,
       'actionHints': actionHints,
       'fetchedAt': Timestamp.fromDate(fetchedAt),
+      'commentCount': commentCount, // 댓글 수 추가
     };
   }
 }
@@ -80,6 +84,43 @@ class HiraDigest {
     return {
       'topIds': topIds,
       'generatedAt': Timestamp.fromDate(generatedAt),
+    };
+  }
+}
+
+/// HIRA 댓글
+class HiraComment {
+  final String id;
+  final String uid;
+  final String userName;
+  final String text;
+  final DateTime createdAt;
+
+  HiraComment({
+    required this.id,
+    required this.uid,
+    required this.userName,
+    required this.text,
+    required this.createdAt,
+  });
+
+  factory HiraComment.fromMap(String id, Map<String, dynamic> map) {
+    return HiraComment(
+      id: id,
+      uid: map['uid'] as String? ?? '',
+      userName: map['userName'] as String? ?? '익명',
+      text: map['text'] as String? ?? '',
+      createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'uid': uid,
+      'userName': userName,
+      'text': text,
+      'createdAt': Timestamp.fromDate(createdAt),
+      'isDeleted': false,
     };
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/hira_update.dart';
 import '../services/hira_update_service.dart';
+import 'hira_comment_sheet.dart';
 
 // ── 디자인 팔레트 (성장 탭과 통일) ──
 const _kText = Color(0xFF5D6B6B);
@@ -94,14 +95,19 @@ class HiraUpdateCard extends StatelessWidget {
 
           const SizedBox(height: 12),
 
-          // 하단: 원문 보기 + 저장 버튼
+          // 하단: 원문 보기 + 저장 + 댓글 버튼
           Row(
             children: [
               Expanded(
+                flex: 2,
                 child: _buildLinkButton(context),
               ),
               const SizedBox(width: 8),
-              _buildSaveButton(context),
+              Expanded(
+                child: _buildSaveButton(context),
+              ),
+              const SizedBox(width: 8),
+              _buildCommentButton(context),
             ],
           ),
         ],
@@ -198,7 +204,7 @@ class HiraUpdateCard extends StatelessWidget {
         return GestureDetector(
           onTap: () => _toggleSave(context, isSaved),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
               color: isSaved
                   ? const Color(0xFFF7CBCA).withOpacity(0.3)
@@ -213,17 +219,18 @@ class HiraUpdateCard extends StatelessWidget {
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
                   isSaved ? Icons.bookmark : Icons.bookmark_border,
-                  size: 16,
+                  size: 14,
                   color: _kText.withOpacity(0.6),
                 ),
-                const SizedBox(width: 4),
+                const SizedBox(width: 3),
                 Text(
                   isSaved ? '저장됨' : '저장',
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: FontWeight.w500,
                     color: _kText.withOpacity(0.7),
                   ),
@@ -233,6 +240,45 @@ class HiraUpdateCard extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  /// 댓글 버튼
+  Widget _buildCommentButton(BuildContext context) {
+    return GestureDetector(
+      onTap: () => _openCommentSheet(context),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: _kShadow2.withOpacity(0.3),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: _kShadow2.withOpacity(0.5),
+            width: 0.5,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.mode_comment_outlined,
+              size: 14,
+              color: _kText.withOpacity(0.6),
+            ),
+            if (update.commentCount > 0) ...[
+              const SizedBox(width: 3),
+              Text(
+                '${update.commentCount}',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: _kText.withOpacity(0.7),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 
@@ -272,6 +318,16 @@ class HiraUpdateCard extends StatelessWidget {
         ),
       );
     }
+  }
+
+  /// 댓글 BottomSheet 열기
+  void _openCommentSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => HiraCommentSheet(update: update),
+    );
   }
 }
 
