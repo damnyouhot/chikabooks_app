@@ -11,8 +11,15 @@ class HiraCommentService {
   /// 댓글 추가
   static Future<bool> addComment(String updateId, String text) async {
     try {
+      debugPrint('🔍 addComment 시작: updateId=$updateId, text=$text');
+      
       final uid = _auth.currentUser?.uid;
-      if (uid == null || text.trim().isEmpty) return false;
+      debugPrint('🔍 현재 유저 UID: $uid');
+      
+      if (uid == null || text.trim().isEmpty) {
+        debugPrint('⚠️ UID가 없거나 텍스트가 비어있음');
+        return false;
+      }
 
       final commentRef = _db
           .collection('content_hira_updates')
@@ -20,6 +27,7 @@ class HiraCommentService {
           .collection('comments')
           .doc();
 
+      debugPrint('🔍 Firestore에 댓글 저장 중...');
       await commentRef.set({
         'uid': uid,
         'userName': '치과인', // 익명 처리
@@ -28,16 +36,18 @@ class HiraCommentService {
         'isDeleted': false,
       });
 
+      debugPrint('🔍 댓글 수 증가 중...');
       // 댓글 수 증가
       await _db
           .collection('content_hira_updates')
           .doc(updateId)
           .update({'commentCount': FieldValue.increment(1)});
 
-      debugPrint('✅ 댓글 추가 완료: $updateId');
+      debugPrint('✅ 댓글 추가 완료: ${commentRef.id}');
       return true;
-    } catch (e) {
-      debugPrint('⚠️ HiraCommentService.addComment error: $e');
+    } catch (e, stackTrace) {
+      debugPrint('❌ HiraCommentService.addComment error: $e');
+      debugPrint('Stack trace: $stackTrace');
       return false;
     }
   }

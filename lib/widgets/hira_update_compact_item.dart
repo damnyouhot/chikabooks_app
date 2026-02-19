@@ -7,9 +7,10 @@ import 'hira_update_detail_sheet.dart';
 const _kText = Color(0xFF5D6B6B);
 const _kShadow2 = Color(0xFFD5E5E5);
 const _kCardBg = Colors.white;
-const _kHighRed = Color(0xFFE57373);
-const _kMidOrange = Color(0xFFFFB74D);
-const _kLowGray = Color(0xFFBDBDBD);
+const _kActiveRed = Color(0xFFE57373); // 🔴 시행 중
+const _kSoonOrange = Color(0xFFFFB74D); // 🟠 30일 이내
+const _kUpcomingYellow = Color(0xFFFDD835); // 🟡 90일 이내
+const _kNoticeGray = Color(0xFFBDBDBD); // ⚪ 사전공지
 
 /// HIRA 업데이트 간단 리스트 아이템 (4번째 이후)
 class HiraUpdateCompactItem extends StatelessWidget {
@@ -82,21 +83,22 @@ class HiraUpdateCompactItem extends StatelessWidget {
 
   /// 배지
   Widget _buildImpactBadge() {
+    final badgeLevel = update.getBadgeLevel();
+    final badgeText = update.getBadgeText();
+    
     Color badgeColor;
-    String badgeText;
-
-    switch (update.impactLevel) {
-      case 'HIGH':
-        badgeColor = _kHighRed;
-        badgeText = '중요';
+    switch (badgeLevel) {
+      case 'ACTIVE':
+        badgeColor = _kActiveRed; // 🔴 시행 중
         break;
-      case 'MID':
-        badgeColor = _kMidOrange;
-        badgeText = '보통';
+      case 'SOON':
+        badgeColor = _kSoonOrange; // 🟠 30일 이내
+        break;
+      case 'UPCOMING':
+        badgeColor = _kUpcomingYellow; // 🟡 90일 이내
         break;
       default:
-        badgeColor = _kLowGray;
-        badgeText = '참고만';
+        badgeColor = _kNoticeGray; // ⚪ 사전공지
     }
 
     return Container(

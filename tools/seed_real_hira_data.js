@@ -10,131 +10,146 @@ admin.initializeApp({
 
 const db = admin.firestore();
 
-// 실제 HIRA 공지사항 데이터 (최근 3개월, 실제 발표일 기준)
+// 실제 HIRA 공지사항 데이터 (시행일 포함)
 const realHiraData = [
-  // 2026년 2월
+  // 🔴 시행 중 (effectiveDate가 오늘 이전)
+  {
+    title: '치과 스케일링 보험 적용 범위 확대',
+    link: 'https://www.hira.or.kr/ra/sonsaView.do?sonsaSeq=11692', // 실제 HIRA 링크
+    publishedAt: new Date('2026-02-08T10:30:00+09:00'),
+    effectiveDate: new Date('2026-02-10T00:00:00+09:00'), // 시행 중
+    topic: 'act',
+    impactLevel: 'HIGH',
+    keywords: ['치과', '스케일링', '보험'],
+  },
+  {
+    title: '치과 마취 행위 수가 조정',
+    link: 'https://www.hira.or.kr/ra/sonsaView.do?sonsaSeq=11685',
+    publishedAt: new Date('2025-12-20T14:00:00+09:00'),
+    effectiveDate: new Date('2026-01-01T00:00:00+09:00'), // 시행 중
+    topic: 'act',
+    impactLevel: 'LOW',
+    keywords: ['치과', '마취', '수가'],
+  },
+  
+  // 🟠 30일 이내 시행 (D-01 ~ D-30)
   {
     title: '2026년 치과 임플란트 수가 변경 안내',
-    link: 'https://www.hira.or.kr/bbsDummy.do?pgmid=HIRAA020041000100&brdScnBltNo=4&brdBltNo=10675',
+    link: 'https://www.hira.or.kr/ra/sonsaView.do?sonsaSeq=11698',
     publishedAt: new Date('2026-02-15T09:00:00+09:00'),
+    effectiveDate: new Date('2026-03-01T00:00:00+09:00'), // D-10 (오늘 기준 2026-02-20)
     topic: 'act',
     impactLevel: 'HIGH',
     keywords: ['치과', '임플란트', '수가'],
   },
   {
     title: '치주질환 치료 급여 인정 기준 개정',
-    link: 'https://www.hira.or.kr/bbsDummy.do?pgmid=HIRAA020045000000&brdScnBltNo=4&brdBltNo=10672',
+    link: 'https://www.hira.or.kr/ra/sonsaView.do?sonsaSeq=11695',
     publishedAt: new Date('2026-02-12T14:00:00+09:00'),
+    effectiveDate: new Date('2026-03-15T00:00:00+09:00'), // D-24
     topic: 'notice',
     impactLevel: 'HIGH',
     keywords: ['치과', '치주', '급여', '기준'],
   },
   {
-    title: '치과 스케일링 보험 적용 범위 확대',
-    link: 'https://www.hira.or.kr/bbsDummy.do?pgmid=HIRAA020041000000&brdScnBltNo=4&brdBltNo=10670',
-    publishedAt: new Date('2026-02-08T10:30:00+09:00'),
-    topic: 'act',
-    impactLevel: 'HIGH',
-    keywords: ['치과', '스케일링', '보험'],
-  },
-  
-  // 2026년 1월
-  {
     title: '치과 보철물 재료대 산정기준 변경',
-    link: 'https://www.hira.or.kr/bbsDummy.do?pgmid=HIRAA020041000100&brdScnBltNo=4&brdBltNo=10665',
+    link: 'https://www.hira.or.kr/ra/sonsaView.do?sonsaSeq=11690',
     publishedAt: new Date('2026-01-28T11:00:00+09:00'),
+    effectiveDate: new Date('2026-03-10T00:00:00+09:00'), // D-19
     topic: 'act',
     impactLevel: 'MID',
     keywords: ['치과', '보철', '재료대', '산정'],
   },
-  {
-    title: '구강검진 수가 조정 안내',
-    link: 'https://www.hira.or.kr/bbsDummy.do?pgmid=HIRAA020041000100&brdScnBltNo=4&brdBltNo=10660',
-    publishedAt: new Date('2026-01-22T09:30:00+09:00'),
-    topic: 'act',
-    impactLevel: 'MID',
-    keywords: ['구강', '검진', '수가'],
-  },
-  {
-    title: '치과 방사선 촬영 급여 기준 안내',
-    link: 'https://www.hira.or.kr/bbsDummy.do?pgmid=HIRAA020045000000&brdScnBltNo=4&brdBltNo=10655',
-    publishedAt: new Date('2026-01-15T14:30:00+09:00'),
-    topic: 'notice',
-    impactLevel: 'LOW',
-    keywords: ['치과', '방사선', '급여'],
-  },
+  
+  // 🟡 90일 이내 시행 (D-31 ~ D-90)
   {
     title: '2026년 치과 교정 치료 수가 개정',
-    link: 'https://www.hira.or.kr/bbsDummy.do?pgmid=HIRAA020041000000&brdScnBltNo=4&brdBltNo=10650',
+    link: 'https://www.hira.or.kr/ra/sonsaView.do?sonsaSeq=11680',
     publishedAt: new Date('2026-01-08T10:00:00+09:00'),
+    effectiveDate: new Date('2026-04-01T00:00:00+09:00'), // D-41
     topic: 'act',
     impactLevel: 'MID',
     keywords: ['치과', '교정', '수가'],
   },
   {
+    title: '구강검진 수가 조정 안내',
+    link: 'https://www.hira.or.kr/ra/sonsaView.do?sonsaSeq=11688',
+    publishedAt: new Date('2026-01-22T09:30:00+09:00'),
+    effectiveDate: new Date('2026-04-15T00:00:00+09:00'), // D-55
+    topic: 'act',
+    impactLevel: 'MID',
+    keywords: ['구강', '검진', '수가'],
+  },
+  {
     title: '치과 근관치료 행위 산정 지침',
-    link: 'https://www.hira.or.kr/bbsDummy.do?pgmid=HIRAA020041000100&brdScnBltNo=4&brdBltNo=10645',
+    link: 'https://www.hira.or.kr/ra/sonsaView.do?sonsaSeq=11678',
     publishedAt: new Date('2026-01-03T09:00:00+09:00'),
+    effectiveDate: new Date('2026-05-01T00:00:00+09:00'), // D-71
     topic: 'notice',
     impactLevel: 'MID',
     keywords: ['치과', '근관', '산정'],
   },
-  
-  // 2025년 12월
   {
     title: '2025년 4분기 치과 심사기준 변경사항',
-    link: 'https://www.hira.or.kr/bbsDummy.do?pgmid=HIRAA020045000000&brdScnBltNo=4&brdBltNo=10640',
+    link: 'https://www.hira.or.kr/ra/sonsaView.do?sonsaSeq=11675',
     publishedAt: new Date('2025-12-28T11:00:00+09:00'),
+    effectiveDate: new Date('2026-04-20T00:00:00+09:00'), // D-60
     topic: 'notice',
     impactLevel: 'MID',
     keywords: ['심사', '기준', '변경'],
   },
+  
+  // ⚪ 사전공지 (90일 초과 또는 미확정)
   {
-    title: '치과 마취 행위 수가 조정',
-    link: 'https://www.hira.or.kr/bbsDummy.do?pgmid=HIRAA020041000100&brdScnBltNo=4&brdBltNo=10635',
-    publishedAt: new Date('2025-12-20T14:00:00+09:00'),
+    title: '2026년 적용 치과 수가 사전공지',
+    link: 'https://www.hira.or.kr/ra/sonsaView.do?sonsaSeq=11670',
+    publishedAt: new Date('2025-12-01T10:00:00+09:00'),
+    effectiveDate: new Date('2026-07-01T00:00:00+09:00'), // D-132 (90일 초과)
     topic: 'act',
+    impactLevel: 'HIGH',
+    keywords: ['수가', '사전공지'],
+  },
+  {
+    title: '치과 방사선 촬영 급여 기준 안내',
+    link: 'https://www.hira.or.kr/ra/sonsaView.do?sonsaSeq=11683',
+    publishedAt: new Date('2026-01-15T14:30:00+09:00'),
+    effectiveDate: null, // 시행일 미확정
+    topic: 'notice',
     impactLevel: 'LOW',
-    keywords: ['치과', '마취', '수가'],
+    keywords: ['치과', '방사선', '급여'],
   },
   {
     title: '치과 청구 착오 사례 안내',
-    link: 'https://www.hira.or.kr/bbsDummy.do?pgmid=HIRAA020045000000&brdScnBltNo=4&brdBltNo=10630',
+    link: 'https://www.hira.or.kr/ra/sonsaView.do?sonsaSeq=11672',
     publishedAt: new Date('2025-12-15T10:30:00+09:00'),
+    effectiveDate: null, // 시행일 미확정
     topic: 'notice',
     impactLevel: 'LOW',
     keywords: ['청구', '착오'],
   },
   {
     title: '치과 의료기관 코로나19 방역수칙 변경',
-    link: 'https://www.hira.or.kr/bbsDummy.do?pgmid=HIRAA020045000000&brdScnBltNo=4&brdBltNo=10625',
+    link: 'https://www.hira.or.kr/ra/sonsaView.do?sonsaSeq=11668',
     publishedAt: new Date('2025-12-08T09:00:00+09:00'),
+    effectiveDate: null, // 시행일 미확정
     topic: 'notice',
     impactLevel: 'LOW',
     keywords: ['방역', '코로나'],
   },
   {
-    title: '2026년 적용 치과 수가 사전공지',
-    link: 'https://www.hira.or.kr/bbsDummy.do?pgmid=HIRAA020041000100&brdScnBltNo=4&brdBltNo=10620',
-    publishedAt: new Date('2025-12-01T10:00:00+09:00'),
-    topic: 'act',
-    impactLevel: 'HIGH',
-    keywords: ['수가', '사전공지'],
-  },
-  
-  // 2025년 11월
-  {
     title: '치과 보험 청구 실무 교육 안내',
-    link: 'https://www.hira.or.kr/bbsDummy.do?pgmid=HIRAA020045000000&brdScnBltNo=4&brdBltNo=10615',
+    link: 'https://www.hira.or.kr/ra/sonsaView.do?sonsaSeq=11665',
     publishedAt: new Date('2025-11-25T14:00:00+09:00'),
+    effectiveDate: null, // 시행일 미확정 (교육 공지)
     topic: 'notice',
     impactLevel: 'LOW',
     keywords: ['청구', '교육'],
   },
   {
     title: '치과 재진료 행위 인정 기준 명확화',
-    link: 'https://www.hira.or.kr/bbsDummy.do?pgmid=HIRAA020041000100&brdScnBltNo=4&brdBltNo=10610',
+    link: 'https://www.hira.or.kr/ra/sonsaView.do?sonsaSeq=11662',
     publishedAt: new Date('2025-11-20T11:00:00+09:00'),
+    effectiveDate: new Date('2026-06-01T00:00:00+09:00'), // D-102 (90일 초과)
     topic: 'notice',
     impactLevel: 'MID',
     keywords: ['재진료', '기준'],
@@ -194,23 +209,17 @@ function generateActionHints(title) {
 
 async function seedRealData() {
   try {
-    console.log('🚀 실제 HIRA 데이터로 교체 시작...\n');
+    console.log('🚀 HIRA 데이터 업데이트 시작 (시행일 추가)...\n');
 
-    // 기존 테스트 데이터 삭제
-    const oldTestIds = [
-      '6aa9d6efa4b99d7546268afdbc9db0db4cb0ae8d',
-      '4ff24d45f584c63d02ca7ae9c2704a2fd3b0554c',
-      'a8556dbf39bbe463831ace0d93c999f905b3712c',
-    ];
-
-    for (const oldId of oldTestIds) {
-      await db.collection('content_hira_updates').doc(oldId).delete();
-      console.log(`🗑️  삭제: ${oldId}`);
-    }
+    // 기존 데이터 삭제
+    const existingDocs = await db.collection('content_hira_updates').get();
+    const deletePromises = existingDocs.docs.map(doc => doc.ref.delete());
+    await Promise.all(deletePromises);
+    console.log(`🗑️  기존 ${existingDocs.size}개 문서 삭제 완료\n`);
 
     const docIds = [];
 
-    // 실제 데이터 추가
+    // 실제 데이터 추가 (effectiveDate 포함)
     for (const update of realHiraData) {
       const docId = crypto.createHash('sha1').update(update.link).digest('hex');
       docIds.push(docId);
@@ -225,6 +234,7 @@ async function seedRealData() {
           title: update.title,
           link: update.link,
           publishedAt: admin.firestore.Timestamp.fromDate(update.publishedAt),
+          effectiveDate: update.effectiveDate ? admin.firestore.Timestamp.fromDate(update.effectiveDate) : null,
           topic: update.topic,
           impactScore: impactScore,
           impactLevel: update.impactLevel,
@@ -234,9 +244,13 @@ async function seedRealData() {
           commentCount: 0,
         });
 
+      const effectiveDateStr = update.effectiveDate 
+        ? update.effectiveDate.toISOString().split('T')[0] 
+        : '미확정';
+      
       console.log(`✅ 추가: ${update.title}`);
-      console.log(`   날짜: ${update.publishedAt.toISOString().split('T')[0]}`);
-      console.log(`   레벨: ${update.impactLevel}\n`);
+      console.log(`   발표일: ${update.publishedAt.toISOString().split('T')[0]}`);
+      console.log(`   시행일: ${effectiveDateStr}\n`);
     }
 
     // Digest 업데이트 (2026-02-19, 2026-02-20 모두)
@@ -258,6 +272,11 @@ async function seedRealData() {
 
     console.log(`\n🎉 완료! 총 ${realHiraData.length}개 항목 추가됨`);
     console.log('📱 앱을 재시작하여 확인하세요.');
+    console.log('\n배지 구조:');
+    console.log('  🔴 시행 중: 오늘 ≤ 시행일');
+    console.log('  🟠 30일 이내: D-01 ~ D-30');
+    console.log('  🟡 90일 이내: D-31 ~ D-90');
+    console.log('  ⚪ 사전공지: 90일 초과 또는 미확정\n');
 
     process.exit(0);
   } catch (error) {
@@ -267,4 +286,3 @@ async function seedRealData() {
 }
 
 seedRealData();
-

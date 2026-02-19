@@ -10,9 +10,10 @@ const _kText = Color(0xFF5D6B6B);
 const _kShadow1 = Color(0xFFDDD3D8);
 const _kShadow2 = Color(0xFFD5E5E5);
 const _kCardBg = Colors.white;
-const _kHighRed = Color(0xFFE57373);
-const _kMidOrange = Color(0xFFFFB74D);
-const _kLowGray = Color(0xFFBDBDBD);
+const _kActiveRed = Color(0xFFE57373); // 🔴 시행 중
+const _kSoonOrange = Color(0xFFFFB74D); // 🟠 30일 이내
+const _kUpcomingYellow = Color(0xFFFDD835); // 🟡 90일 이내
+const _kNoticeGray = Color(0xFFBDBDBD); // ⚪ 사전공지
 
 /// HIRA 업데이트 카드
 class HiraUpdateCard extends StatelessWidget {
@@ -129,23 +130,24 @@ class HiraUpdateCard extends StatelessWidget {
     );
   }
 
-  /// 치과 영향도 배지
+  /// 시행일 기준 배지
   Widget _buildImpactBadge() {
+    final badgeLevel = update.getBadgeLevel();
+    final badgeText = update.getBadgeText();
+    
     Color badgeColor;
-    String badgeText;
-
-    switch (update.impactLevel) {
-      case 'HIGH':
-        badgeColor = _kHighRed;
-        badgeText = '중요';
+    switch (badgeLevel) {
+      case 'ACTIVE':
+        badgeColor = _kActiveRed; // 🔴 시행 중
         break;
-      case 'MID':
-        badgeColor = _kMidOrange;
-        badgeText = '보통';
+      case 'SOON':
+        badgeColor = _kSoonOrange; // 🟠 30일 이내
+        break;
+      case 'UPCOMING':
+        badgeColor = _kUpcomingYellow; // 🟡 90일 이내
         break;
       default:
-        badgeColor = _kLowGray;
-        badgeText = '참고만';
+        badgeColor = _kNoticeGray; // ⚪ 사전공지
     }
 
     return Container(
@@ -299,17 +301,35 @@ class HiraUpdateCard extends StatelessWidget {
   /// 원문 링크 열기
   Future<void> _openLink(BuildContext context) async {
     try {
+      debugPrint('🔗 Opening URL: ${update.link}');
       final uri = Uri.parse(update.link);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      
+      final canLaunch = await canLaunchUrl(uri);
+      debugPrint('🔗 canLaunchUrl: $canLaunch');
+      
+      if (canLaunch) {
+        final launched = await launchUrl(
+          uri,
+          mode: LaunchMode.externalApplication,
+        );
+        debugPrint('🔗 launchUrl result: $launched');
+        
+        if (!launched && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('브라우저를 열 수 없습니다')),
+          );
+        }
       } else {
+        debugPrint('⚠️ Cannot launch URL: ${update.link}');
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('링크를 열 수 없습니다')),
           );
         }
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('❌ URL launch error: $e');
+      debugPrint('Stack trace: $stackTrace');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('오류: $e')),

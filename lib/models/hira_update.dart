@@ -6,9 +6,10 @@ class HiraUpdate {
   final String title;
   final String link;
   final DateTime publishedAt;
+  final DateTime? effectiveDate; // 시행일 (null이면 미확정)
   final String topic; // 'act' or 'notice'
   final int impactScore;
-  final String impactLevel; // 'HIGH', 'MID', 'LOW'
+  final String impactLevel; // 'HIGH', 'MID', 'LOW' (deprecated, 시행일 기준으로 변경)
   final List<String> keywords;
   final List<String> actionHints;
   final DateTime fetchedAt;
@@ -19,6 +20,7 @@ class HiraUpdate {
     required this.title,
     required this.link,
     required this.publishedAt,
+    this.effectiveDate,
     required this.topic,
     required this.impactScore,
     required this.impactLevel,
@@ -34,6 +36,7 @@ class HiraUpdate {
       title: map['title'] as String? ?? '',
       link: map['link'] as String? ?? '',
       publishedAt: (map['publishedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      effectiveDate: (map['effectiveDate'] as Timestamp?)?.toDate(),
       topic: map['topic'] as String? ?? 'notice',
       impactScore: map['impactScore'] as int? ?? 0,
       impactLevel: map['impactLevel'] as String? ?? 'LOW',
@@ -49,6 +52,7 @@ class HiraUpdate {
       'title': title,
       'link': link,
       'publishedAt': Timestamp.fromDate(publishedAt),
+      'effectiveDate': effectiveDate != null ? Timestamp.fromDate(effectiveDate!) : null,
       'topic': topic,
       'impactScore': impactScore,
       'impactLevel': impactLevel,
@@ -57,6 +61,32 @@ class HiraUpdate {
       'fetchedAt': Timestamp.fromDate(fetchedAt),
       'commentCount': commentCount, // 댓글 수 추가
     };
+  }
+
+  /// 시행일 기준 배지 레벨 계산
+  String getBadgeLevel() {
+    if (effectiveDate == null) return 'NOTICE'; // 사전공지
+    
+    final today = DateTime.now();
+    final effectiveDay = DateTime(effectiveDate!.year, effectiveDate!.month, effectiveDate!.day);
+    final daysUntil = effectiveDay.difference(DateTime(today.year, today.month, today.day)).inDays;
+    
+    if (daysUntil <= 0) return 'ACTIVE'; // 시행 중
+    if (daysUntil <= 30) return 'SOON'; // 30일 이내
+    if (daysUntil <= 90) return 'UPCOMING'; // 90일 이내
+    return 'NOTICE'; // 사전공지
+  }
+
+  /// 배지 텍스트 계산
+  String getBadgeText() {
+    final level = getBadgeLevel();
+    if (level == 'ACTIVE') return '시행 중';
+    if (level == 'NOTICE') return '사전공지';
+    
+    final today = DateTime.now();
+    final effectiveDay = DateTime(effectiveDate!.year, effectiveDate!.month, effectiveDate!.day);
+    final daysUntil = effectiveDay.difference(DateTime(today.year, today.month, today.day)).inDays;
+    return 'D-${daysUntil.toString().padLeft(2, '0')}';
   }
 }
 

@@ -33,14 +33,23 @@ class _HiraCommentSheetState extends State<HiraCommentSheet> {
   }
 
   Future<void> _sendComment() async {
-    if (_controller.text.trim().isEmpty || _isSending) return;
+    final text = _controller.text.trim();
+    debugPrint('🔍 _sendComment 시작: text="$text", isSending=$_isSending');
+    
+    if (text.isEmpty || _isSending) {
+      debugPrint('⚠️ 텍스트가 비어있거나 이미 전송 중');
+      return;
+    }
 
     setState(() => _isSending = true);
+    debugPrint('🔍 HiraCommentService.addComment 호출...');
 
     final success = await HiraCommentService.addComment(
       widget.update.id,
-      _controller.text,
+      text,
     );
+
+    debugPrint('🔍 addComment 결과: success=$success');
 
     if (mounted) {
       setState(() => _isSending = false);
