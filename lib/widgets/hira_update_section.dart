@@ -49,7 +49,7 @@ class HiraUpdateSection extends StatelessWidget {
                   const SizedBox(width: 6),
                   const Expanded(
                     child: Text(
-                      '수가·급여 변경 포인트 리스트\n(건강보험심사평가원)',
+                      '수가, 급여 변경 리스트(건강보험심사평가원)',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
