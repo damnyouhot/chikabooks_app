@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:intl/intl.dart';
 import '../models/hira_update.dart';
 import '../services/hira_update_service.dart';
 import 'hira_comment_sheet.dart';
@@ -45,23 +46,36 @@ class HiraUpdateCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 상단: 배지 + 제목
+          // 상단: 배지 + 제목 + 날짜
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildImpactBadge(),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  update.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: _kText,
-                    height: 1.4,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      update.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: _kText,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _formatDate(update.publishedAt),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: _kText.withOpacity(0.5),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -123,7 +137,7 @@ class HiraUpdateCard extends StatelessWidget {
     switch (update.impactLevel) {
       case 'HIGH':
         badgeColor = _kHighRed;
-        badgeText = '높음';
+        badgeText = '중요';
         break;
       case 'MID':
         badgeColor = _kMidOrange;
@@ -131,7 +145,7 @@ class HiraUpdateCard extends StatelessWidget {
         break;
       default:
         badgeColor = _kLowGray;
-        badgeText = '낮음';
+        badgeText = '참고만';
     }
 
     return Container(
@@ -328,6 +342,22 @@ class HiraUpdateCard extends StatelessWidget {
       backgroundColor: Colors.transparent,
       builder: (context) => HiraCommentSheet(update: update),
     );
+  }
+
+  /// 날짜 포맷
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final diff = now.difference(date);
+
+    if (diff.inDays == 0) {
+      return '오늘 ${DateFormat('HH:mm').format(date)}';
+    } else if (diff.inDays == 1) {
+      return '어제 ${DateFormat('HH:mm').format(date)}';
+    } else if (diff.inDays < 7) {
+      return '${diff.inDays}일 전';
+    } else {
+      return DateFormat('yyyy.MM.dd').format(date);
+    }
   }
 }
 

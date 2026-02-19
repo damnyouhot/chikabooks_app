@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../models/hira_update.dart';
 import '../services/hira_update_service.dart';
 import 'hira_update_card.dart';
+import 'hira_update_compact_item.dart';
 
 // ── 디자인 팔레트 (성장 탭과 통일) ──
 const _kText = Color(0xFF5D6B6B);
@@ -15,10 +16,10 @@ class HiraUpdateSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     debugPrint('🔍 HIRA: HiraUpdateSection building...');
-    return FutureBuilder<HiraDigest?>(
-      future: HiraUpdateService.getTodayDigest(),
-      builder: (context, digestSnap) {
-        if (digestSnap.connectionState == ConnectionState.waiting) {
+    return FutureBuilder<List<HiraUpdate>>(
+      future: HiraUpdateService.getAllUpdates(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
             child: Padding(
               padding: EdgeInsets.all(20),
@@ -27,91 +28,89 @@ class HiraUpdateSection extends StatelessWidget {
           );
         }
 
-        final digest = digestSnap.data;
-        if (digest == null || digest.topIds.isEmpty) {
+        final updates = snapshot.data ?? [];
+        if (updates.isEmpty) {
           return _buildEmptyState();
         }
 
-        return FutureBuilder<List<HiraUpdate>>(
-          future: HiraUpdateService.getUpdates(digest.topIds),
-          builder: (context, updatesSnap) {
-            if (updatesSnap.connectionState == ConnectionState.waiting) {
-              return const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(20),
-                  child: CircularProgressIndicator(),
-                ),
-              );
-            }
-
-            final updates = updatesSnap.data ?? [];
-            if (updates.isEmpty) {
-              return _buildEmptyState();
-            }
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 섹션 타이틀
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 4),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.info_outline,
-                        size: 20,
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 섹션 타이틀
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 4),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.info_outline,
+                    size: 20,
+                    color: _kText,
+                  ),
+                  const SizedBox(width: 6),
+                  const Expanded(
+                    child: Text(
+                      '수가·급여 변경 포인트 리스트\n(건강보험심사평가원)',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
                         color: _kText,
-                      ),
-                      const SizedBox(width: 6),
-                      const Text(
-                        '오늘의 수가·급여 변경 포인트',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: _kText,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-                  child: Text(
-                    '건강보험심사평가원의 최신 변경사항을 확인하세요.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: _kText.withOpacity(0.5),
-                    ),
-                  ),
-                ),
-
-                // 업데이트 카드들
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Column(
-                    children: updates
-                        .map((update) => HiraUpdateCard(update: update))
-                        .toList(),
-                  ),
-                ),
-
-                // 더보기 안내 (선택사항)
-                if (updates.length >= 3)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Center(
-                      child: Text(
-                        '최근 14일 내 주요 변경사항 ${updates.length}건',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: _kText.withOpacity(0.4),
-                        ),
+                        height: 1.3,
                       ),
                     ),
                   ),
-              ],
-            );
-          },
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+              child: Text(
+                '최근 3개월 간 ${updates.length}건의 변경사항',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: _kText.withOpacity(0.5),
+                ),
+              ),
+            ),
+
+            // 상위 3건: 전체 카드
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                children: updates
+                    .take(3)
+                    .map((update) => HiraUpdateCard(update: update))
+                    .toList(),
+              ),
+            ),
+
+            // 4건 이후: 간단한 리스트
+            if (updates.length > 3) ...[
+              const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Text(
+                  '이전 항목',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: _kText.withOpacity(0.6),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  children: updates
+                      .skip(3)
+                      .map((update) => HiraUpdateCompactItem(update: update))
+                      .toList(),
+                ),
+              ),
+            ],
+
+            const SizedBox(height: 20),
+          ],
         );
       },
     );

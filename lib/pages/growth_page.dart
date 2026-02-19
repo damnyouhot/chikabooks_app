@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/ebook.dart';
+import '../models/hira_update.dart';
 import '../services/ebook_service.dart';
+import '../services/hira_update_service.dart';
+import '../widgets/hira_update_detail_sheet.dart';
 import 'ebook/ebook_detail_page.dart';
 import 'quiz_today_page.dart';
 import 'hira_update_page.dart';
@@ -137,11 +140,86 @@ class _GrowthPageState extends State<GrowthPage>
 }
 
 // ═══════════════════════════════════════════════════
-// 내 서재 (구매한 e-Book 목록)
+// 내 서재 (구매한 e-Book + 저장한 HIRA 목록)
 // ═══════════════════════════════════════════════════
 
-class _MyLibraryView extends StatelessWidget {
+class _MyLibraryView extends StatefulWidget {
   const _MyLibraryView();
+
+  @override
+  State<_MyLibraryView> createState() => _MyLibraryViewState();
+}
+
+class _MyLibraryViewState extends State<_MyLibraryView>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabCtrl = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // 서브 탭바
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: _kShadow2.withOpacity(0.3),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: TabBar(
+            controller: _tabCtrl,
+            indicator: BoxDecoration(
+              color: _kCardBg,
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: [
+                BoxShadow(
+                  color: _kShadow1.withOpacity(0.1),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+            ),
+            indicatorSize: TabBarIndicatorSize.tab,
+            labelColor: _kText,
+            unselectedLabelColor: _kText.withOpacity(0.5),
+            labelStyle: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+            tabs: const [
+              Tab(text: '전자책'),
+              Tab(text: '저장한 변경사항'),
+            ],
+          ),
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _tabCtrl,
+            children: const [
+              _MyBooksTab(),
+              _SavedHiraTab(),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MyBooksTab extends StatelessWidget {
+  const _MyBooksTab();
 
   @override
   Widget build(BuildContext context) {
@@ -209,6 +287,123 @@ class _MyLibraryView extends StatelessWidget {
           },
         );
       },
+    );
+  }
+}
+
+class _SavedHiraTab extends StatelessWidget {
+  const _SavedHiraTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<HiraUpdate>>(
+      stream: HiraUpdateService.watchSavedUpdates(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final savedUpdates = snapshot.data ?? [];
+        if (savedUpdates.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.bookmark_border,
+                    size: 48, color: _kShadow1),
+                const SizedBox(height: 12),
+                Text(
+                  '저장한 변경사항이 없습니다',
+                  style: TextStyle(fontSize: 14, color: _kText.withOpacity(0.6)),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '급여변경 탭에서 항목을 저장하세요.',
+                  style: TextStyle(fontSize: 12, color: _kText.withOpacity(0.4)),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView.separated(
+          padding: const EdgeInsets.all(20),
+          itemCount: savedUpdates.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 12),
+          itemBuilder: (context, i) {
+            final update = savedUpdates[i];
+            return _SavedHiraTile(update: update);
+          },
+        );
+      },
+    );
+  }
+}
+
+class _SavedHiraTile extends StatelessWidget {
+  final HiraUpdate update;
+  const _SavedHiraTile({required this.update});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (context) => HiraUpdateDetailSheet(update: update),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: _kCardBg,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: _kShadow2, width: 0.5),
+          boxShadow: [
+            BoxShadow(
+              color: _kShadow1.withOpacity(0.15),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.info_outline,
+              size: 20,
+              color: _kText.withOpacity(0.5),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    update.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: _kText,
+                      height: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${update.publishedAt.year}.${update.publishedAt.month.toString().padLeft(2, '0')}.${update.publishedAt.day.toString().padLeft(2, '0')}',
+                    style: TextStyle(fontSize: 11, color: _kText.withOpacity(0.5)),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, color: _kText.withOpacity(0.3), size: 20),
+          ],
+        ),
+      ),
     );
   }
 }
