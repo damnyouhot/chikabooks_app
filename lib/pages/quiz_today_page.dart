@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../widgets/hira_update_section.dart';
 
 // ── 디자인 팔레트 (2탭과 통일) ──
 const _kAccent = Color(0xFFF7CBCA);
@@ -52,11 +51,6 @@ class QuizTodayPage extends StatelessWidget {
           options: const ['스케일링', '루트 플레이닝', '폴리싱', '불소 도포'],
           correctIndex: 1,
         ),
-
-        const SizedBox(height: 32),
-
-        // HIRA 수가/급여 변경 포인트 섹션
-        const HiraUpdateSection(),
 
         const SizedBox(height: 32),
         Center(

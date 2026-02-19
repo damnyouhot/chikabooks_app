@@ -422,3 +422,149 @@ function generateActionHints(title: string): string[] {
 
   return hints.slice(0, 3); // 최대 3개
 }
+
+/**
+ * HIRA 과거 데이터 수집 (최근 3개월)
+ * 수동 실행용 - Firebase Console에서 1회만 실행
+ */
+export const syncHiraUpdatesHistorical = functions
+  .https.onRequest(async (req, res) => {
+    try {
+      const rssUrls = [
+        {
+          url: "https://www.hira.or.kr/rc/rss/rss_hira_act.xml",
+          topic: "act",
+        },
+        {
+          url: "https://www.hira.or.kr/rc/rss/rss_hira_notice.xml",
+          topic: "notice",
+        },
+      ];
+
+      let totalProcessed = 0;
+      const threeMonthsAgo = new Date();
+      threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+
+      console.log(`📅 수집 시작: ${threeMonthsAgo.toISOString()} 이후 데이터`);
+
+      for (const {url, topic} of rssUrls) {
+        try {
+          const response = await axios.get(url, {timeout: 15000});
+          const parsed = await parseStringPromise(response.data);
+          const items = parsed.rss?.channel?.[0]?.item || [];
+
+          console.log(`📥 ${topic}: ${items.length}개 아이템 수신`);
+
+          for (const item of items) {
+            const title = item.title?.[0] || "";
+            const link = item.link?.[0] || "";
+            const pubDate = item.pubDate?.[0] || "";
+
+            if (!title || !link) continue;
+
+            // 3개월 이내 데이터만
+            let publishedDate: Date;
+            try {
+              publishedDate = new Date(pubDate);
+              if (publishedDate < threeMonthsAgo) continue;
+            } catch {
+              continue;
+            }
+
+            // docId = SHA-1(link)
+            const docId = crypto
+              .createHash("sha1")
+              .update(link)
+              .digest("hex");
+
+            // 이미 존재하는지 확인
+            const docRef = db.collection("content_hira_updates").doc(docId);
+            const docSnap = await docRef.get();
+
+            if (docSnap.exists) continue;
+
+            // impactScore 계산
+            const {score, keywords} = calculateImpactScore(title);
+            const impactLevel = getImpactLevel(score);
+            const actionHints = generateActionHints(title);
+
+            const publishedAt = admin.firestore.Timestamp.fromDate(
+              publishedDate
+            );
+
+            const updateData: HiraUpdate = {
+              title,
+              link,
+              publishedAt,
+              topic,
+              impactScore: score,
+              impactLevel,
+              keywords,
+              actionHints,
+              fetchedAt: admin.firestore.Timestamp.now(),
+            };
+
+            await docRef.set(updateData);
+            totalProcessed++;
+          }
+        } catch (error) {
+          console.error(`⚠️ Error fetching RSS ${url}:`, error);
+        }
+      }
+
+      console.log(
+        `✅ syncHiraUpdatesHistorical 완료: ${totalProcessed}개 처리`
+      );
+
+      // 처리 후 바로 Digest 생성
+      await buildHiraDigestManually();
+
+      res.status(200).json({
+        success: true,
+        processed: totalProcessed,
+        message: "과거 데이터 수집 완료",
+      });
+    } catch (error) {
+      console.error("⚠️ syncHiraUpdatesHistorical error:", error);
+      res.status(500).json({
+        success: false,
+        error: String(error),
+      });
+    }
+  });
+
+/**
+ * Digest 수동 생성 헬퍼
+ */
+async function buildHiraDigestManually() {
+  try {
+    const dateKey = getCurrentDateKey();
+    const fourteenDaysAgo = admin.firestore.Timestamp.fromMillis(
+      Date.now() - 14 * 24 * 60 * 60 * 1000
+    );
+
+    const snapshot = await db
+      .collection("content_hira_updates")
+      .where("publishedAt", ">=", fourteenDaysAgo)
+      .orderBy("publishedAt", "desc")
+      .orderBy("impactScore", "desc")
+      .limit(3)
+      .get();
+
+    const topIds = snapshot.docs.map((doc) => doc.id);
+
+    await db
+      .collection("content_hira_digest")
+      .doc(dateKey)
+      .set({
+        topIds,
+        generatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+    console.log(
+      `✅ buildHiraDigestManually: ${dateKey}, ${topIds.length}개 항목`
+    );
+  } catch (error) {
+    console.error("⚠️ buildHiraDigestManually error:", error);
+  }
+}

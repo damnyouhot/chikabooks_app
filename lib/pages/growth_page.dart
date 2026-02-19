@@ -4,6 +4,7 @@ import '../models/ebook.dart';
 import '../services/ebook_service.dart';
 import 'ebook/ebook_detail_page.dart';
 import 'quiz_today_page.dart';
+import 'hira_update_page.dart';
 
 // ── 디자인 팔레트 (2탭과 통일) ──
 const _kText = Color(0xFF5D6B6B);
@@ -14,10 +15,11 @@ const _kCardBg = Colors.white;
 
 /// 성장 탭 (3탭)
 ///
-/// 내부 소탭 3개:
+/// 내부 소탭 4개:
 /// 1. 오늘의 퀴즈 — 매일 2문제
-/// 2. 내 서재 — 구매한 e-Book 목록
+/// 2. 급여변경 — HIRA 수가/급여 변경 포인트
 /// 3. 치과책방 — e-Book 스토어
+/// 4. 내 서재 — 구매한 e-Book 목록
 class GrowthPage extends StatefulWidget {
   const GrowthPage({super.key});
 
@@ -32,7 +34,7 @@ class _GrowthPageState extends State<GrowthPage>
   @override
   void initState() {
     super.initState();
-    _tabCtrl = TabController(length: 3, vsync: this);
+    _tabCtrl = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -60,6 +62,7 @@ class _GrowthPageState extends State<GrowthPage>
                 controller: _tabCtrl,
                 children: const [
                   QuizTodayPage(),
+                  HiraUpdatePage(),
                   _BookStoreBrowseView(),
                   _MyLibraryView(),
                 ],
@@ -124,6 +127,7 @@ class _GrowthPageState extends State<GrowthPage>
         ),
         tabs: const [
           Tab(text: '퀴즈'),
+          Tab(text: '급여변경'),
           Tab(text: '치과책방'),
           Tab(text: '내 서재'),
         ],
