@@ -13,10 +13,17 @@ class HiraUpdateService {
   static Future<HiraDigest?> getTodayDigest() async {
     try {
       final dateKey = _getCurrentDateKey();
+      debugPrint('🔍 HIRA: Looking for digest with dateKey: $dateKey');
+      
       final doc = await _db
           .collection('content_hira_digest')
           .doc(dateKey)
           .get();
+
+      debugPrint('🔍 HIRA: Document exists: ${doc.exists}');
+      if (doc.exists) {
+        debugPrint('🔍 HIRA: Document data: ${doc.data()}');
+      }
 
       if (!doc.exists || doc.data() == null) {
         debugPrint('⚠️ No digest found for $dateKey');
@@ -32,9 +39,13 @@ class HiraUpdateService {
 
   /// 여러 업데이트 가져오기
   static Future<List<HiraUpdate>> getUpdates(List<String> docIds) async {
-    if (docIds.isEmpty) return [];
+    if (docIds.isEmpty) {
+      debugPrint('⚠️ HIRA: docIds is empty');
+      return [];
+    }
 
     try {
+      debugPrint('🔍 HIRA: Fetching ${docIds.length} updates: $docIds');
       final updates = <HiraUpdate>[];
       
       for (final id in docIds) {
@@ -43,11 +54,13 @@ class HiraUpdateService {
             .doc(id)
             .get();
 
+        debugPrint('🔍 HIRA: Doc $id exists: ${doc.exists}');
         if (doc.exists && doc.data() != null) {
           updates.add(HiraUpdate.fromMap(id, doc.data()!));
         }
       }
 
+      debugPrint('✅ HIRA: Successfully loaded ${updates.length} updates');
       return updates;
     } catch (e) {
       debugPrint('⚠️ HiraUpdateService.getUpdates error: $e');
@@ -136,7 +149,10 @@ class HiraUpdateService {
 
   /// 현재 날짜 키 (YYYY-MM-DD)
   static String _getCurrentDateKey() {
-    return DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final now = DateTime.now();
+    final dateKey = DateFormat('yyyy-MM-dd').format(now);
+    debugPrint('🔍 HIRA: Current DateTime: $now → dateKey: $dateKey');
+    return dateKey;
   }
 }
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../models/hira_update.dart';
 import '../services/hira_update_service.dart';
 import 'hira_update_card.dart';
@@ -13,6 +14,7 @@ class HiraUpdateSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('🔍 HIRA: HiraUpdateSection building...');
     return FutureBuilder<HiraDigest?>(
       future: HiraUpdateService.getTodayDigest(),
       builder: (context, digestSnap) {
