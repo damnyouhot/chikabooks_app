@@ -29,6 +29,15 @@ android {
         targetSdk = 36 // SDK 36으로 통일
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        
+        // 🔐 Google Maps API Key를 local.properties에서 읽어서 AndroidManifest에 전달
+        val localProperties = java.util.Properties()
+        val localPropertiesFile = rootProject.file("local.properties")
+        if (localPropertiesFile.exists()) {
+            localPropertiesFile.inputStream().use { localProperties.load(it) }
+        }
+        val mapsApiKey = localProperties.getProperty("MAPS_API_KEY") ?: ""
+        manifestPlaceholders["mapsApiKey"] = mapsApiKey
     }
 
     buildTypes {

@@ -156,6 +156,50 @@ service cloud.firestore {
     }
 
     // ══════════════════════════════════════════════════
+    // 🔐 API 키 (로그인한 사용자만 읽기, 쓰기는 금지)
+    // ══════════════════════════════════════════════════
+    match /api_keys/{keyDoc} {
+      allow read: if request.auth != null;
+      allow write: if false; // 콘솔 또는 서버에서만 수정
+    }
+
+    // ══════════════════════════════════════════════════
+    // 📋 HIRA 업데이트 (급여/수가 변경)
+    // ══════════════════════════════════════════════════
+    match /content_hira_updates/{updateId} {
+      allow read: if request.auth != null;
+      allow write: if false; // Cloud Functions만
+      
+      // ── 댓글 서브컬렉션 ──
+      match /comments/{commentId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null && 
+          request.resource.data.uid == request.auth.uid &&
+          request.resource.data.text is string &&
+          request.resource.data.text.size() > 0 &&
+          request.resource.data.text.size() <= 500;
+        allow delete: if request.auth != null && 
+          resource.data.uid == request.auth.uid;
+        allow update: if false; // 댓글 수정 불가
+      }
+    }
+
+    match /content_hira_digest/{dateKey} {
+      allow read: if request.auth != null;
+      allow write: if false; // Cloud Functions만
+    }
+
+    // ══════════════════════════════════════════════════
+    // 💾 HIRA 저장 목록 (사용자별)
+    // ══════════════════════════════════════════════════
+    match /users/{uid}/saved_hira_updates/{updateId} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create: if request.auth != null && request.auth.uid == uid;
+      allow delete: if request.auth != null && request.auth.uid == uid;
+      allow update: if false; // 생성/삭제만, 수정 불필요
+    }
+
+    // ══════════════════════════════════════════════════
     // 기타 컬렉션 (임시로 전체 허용 - 나중에 세분화 필요)
     // ══════════════════════════════════════════════════
     match /{document=**} {

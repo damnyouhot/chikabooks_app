@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/reaction_kind.dart';
+import '../services/bond_score_service.dart';
 import '../services/report_service.dart';
 import '../services/enthrone_service.dart';
 
@@ -112,49 +114,93 @@ class _BondPostCardState extends State<BondPostCard> {
 
   // 이모지 추가/변경
   Future<void> _toggleReaction(String emoji) async {
-    final groupId = widget.bondGroupId ?? widget.post['bondGroupId'];
-    if (groupId == null || _currentUid == null) return;
+    final groupId = widget.bondGroupId ?? widget.post['bondGroupId'] as String?;
+    final authorUid = widget.post['uid'] as String?;
+    if (groupId == null || _currentUid == null || authorUid == null) return;
+    if (authorUid == _currentUid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('자기 글은 리액션을 줄 수 없어요')),
+      );
+      return;
+    }
+
+    final reactionRef = _db
+        .collection('bondGroups')
+        .doc(groupId)
+        .collection('posts')
+        .doc(widget.postId)
+        .collection('reactions')
+        .doc(_currentUid);
 
     try {
-      // 같은 이모지면 삭제
-      if (_reactions[_currentUid] == emoji) {
-        await _db
-            .collection('bondGroups')
-            .doc(groupId)
-            .collection('posts')
-            .doc(widget.postId)
-            .collection('reactions')
-            .doc(_currentUid)
-            .delete();
+      final existing = await reactionRef.get();
+      final existingEmoji = existing.data()?['reactionKey'] as String?;
+      final lastScoredAt = (existing.data()?['lastScoredAt'] as Timestamp?)?.toDate();
+      final now = DateTime.now();
+      final hasScoredToday = lastScoredAt != null && now.difference(lastScoredAt) < const Duration(days: 1);
 
+      if (existingEmoji == emoji) {
+        await reactionRef.delete();
         if (mounted) {
-          setState(() {
-            _reactions.remove(_currentUid);
-          });
+          setState(() => _reactions.remove(_currentUid));
         }
-      } else {
-        // 추가/변경
-        await _db
-            .collection('bondGroups')
-            .doc(groupId)
-            .collection('posts')
-            .doc(widget.postId)
-            .collection('reactions')
-            .doc(_currentUid)
-            .set({
-          'emoji': emoji,
-          'createdAt': FieldValue.serverTimestamp(),
-        });
+        return;
+      }
 
-        if (mounted) {
-          setState(() {
-            _reactions[_currentUid!] = emoji;
-          });
-        }
+      final kind = reactionKindFromEmoji(emoji);
+      final shouldScore = !hasScoredToday && kind.isScoring;
+
+      await reactionRef.set({
+        'reactionKey': emoji,
+        'emoji': emoji,
+        'kind': kind.name,
+        'updatedAt': FieldValue.serverTimestamp(),
+        if (shouldScore) 'lastScoredAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      if (mounted) {
+        setState(() => _reactions[_currentUid!] = emoji);
+      }
+
+      if (shouldScore) {
+        final heartBonus = await _tryGrantHeartBonus(groupId, authorUid, kind);
+        await BondScoreService.applyReactionScore(
+          targetUid: authorUid,
+          kind: kind,
+          extraBonus: heartBonus,
+        );
       }
     } catch (e) {
       debugPrint('⚠️ _toggleReaction error: $e');
     }
+  }
+
+  Future<double> _tryGrantHeartBonus(
+    String groupId,
+    String authorUid,
+    ReactionKind kind,
+  ) async {
+    if (kind != ReactionKind.heart) return 0.0;
+    final postRef = _db
+        .collection('bondGroups')
+        .doc(groupId)
+        .collection('posts')
+        .doc(widget.postId);
+
+    final postSnap = await postRef.get();
+    final alreadyBonus = postSnap.data()?['heartBonusApplied'] as bool? ?? false;
+    if (alreadyBonus) return 0.0;
+
+    final hearts = await postRef
+        .collection('reactions')
+        .where('kind', isEqualTo: ReactionKind.heart.name)
+        .get();
+
+    if (hearts.docs.length >= 5) {
+      await postRef.set({'heartBonusApplied': true}, SetOptions(merge: true));
+      return 0.1;
+    }
+    return 0.0;
   }
 
   // 추대 상태 로드
@@ -219,6 +265,11 @@ class _BondPostCardState extends State<BondPostCard> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('✨ 추대했어요!')),
           );
+          final groupId = widget.bondGroupId ?? widget.post['bondGroupId'] as String?;
+          final authorUid = widget.post['uid'] as String?;
+          if (groupId != null && authorUid != null) {
+            await _applyEnthroneScore(groupId, authorUid);
+          }
         } else if (!success && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('이미 추대했어요.')),
@@ -249,10 +300,14 @@ class _BondPostCardState extends State<BondPostCard> {
                 title: Text(reason.displayName),
                 onTap: () async {
                   Navigator.pop(context);
+
+                  final groupId = widget.bondGroupId ?? widget.post['bondGroupId'];
+                  final collectionPath = groupId == null
+                      ? 'bondPosts'
+                      : 'bondGroups/$groupId/posts';
                   
                   final success = await ReportService.reportPost(
-                    collection: 'bondPosts',
-                    postId: widget.postId,
+                    documentPath: '$collectionPath/${widget.postId}',
                     reason: reason,
                   );
                   
@@ -279,6 +334,31 @@ class _BondPostCardState extends State<BondPostCard> {
           ],
         );
       },
+    );
+  }
+
+  Future<void> _applyEnthroneScore(String groupId, String authorUid) async {
+    final postRef = _db
+        .collection('bondGroups')
+        .doc(groupId)
+        .collection('posts')
+        .doc(widget.postId);
+    final postSnap = await postRef.get();
+    final alreadyBonus = postSnap.data()?['enthroneBonusApplied'] as bool? ?? false;
+    final count = await EnthroneService.getEnthroneCount(
+      bondGroupId: groupId,
+      postId: widget.postId,
+    );
+    double extraBonus = 0;
+    if (count >= 3 && !alreadyBonus) {
+      extraBonus = 0.5;
+      await postRef.set({'enthroneBonusApplied': true}, SetOptions(merge: true));
+    }
+
+    await BondScoreService.applyReactionScore(
+      targetUid: authorUid,
+      kind: ReactionKind.enthrone,
+      extraBonus: extraBonus,
     );
   }
 

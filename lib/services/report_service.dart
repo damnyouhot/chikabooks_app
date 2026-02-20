@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
+import '../services/bond_score_service.dart';
+
 /// 신고 사유
 enum ReportReason {
   /// 욕설/비방
@@ -36,13 +38,11 @@ class ReportService {
 
   /// 게시물 신고하기
   /// 
-  /// [collection]: 'bondPosts', 'dailyWallPosts' 등
-  /// [postId]: 게시물 ID
+  /// [documentPath]: 'bondGroups/{groupId}/posts/{postId}' 또는 'bondPosts/{postId}' 등의 전체 경로
   /// [reason]: 신고 사유
   /// [additionalInfo]: 추가 설명 (선택)
   static Future<bool> reportPost({
-    required String collection,
-    required String postId,
+    required String documentPath,
     required ReportReason reason,
     String? additionalInfo,
   }) async {
@@ -53,10 +53,10 @@ class ReportService {
     }
 
     try {
+      final postRef = _db.doc(documentPath);
+
       // 중복 신고 방지: 이미 신고했는지 확인
-      final existingReport = await _db
-          .collection(collection)
-          .doc(postId)
+      final existingReport = await postRef
           .collection('reports')
           .doc(uid)
           .get();
@@ -67,12 +67,7 @@ class ReportService {
       }
 
       // 신고 기록 저장
-      await _db
-          .collection(collection)
-          .doc(postId)
-          .collection('reports')
-          .doc(uid)
-          .set({
+      await postRef.collection('reports').doc(uid).set({
         'reporterUid': uid,
         'reason': reason.name,
         'reasonDisplay': reason.displayName,
@@ -81,23 +76,34 @@ class ReportService {
       });
 
       // 게시물의 총 신고 수 증가
-      await _db.collection(collection).doc(postId).update({
+      await postRef.update({
         'reports': FieldValue.increment(1),
         'lastReportReason': reason.displayName,
         'lastReportedAt': FieldValue.serverTimestamp(),
       });
 
       // 신고 수가 임계값 이상이면 자동 비노출 처리
-      final postDoc = await _db.collection(collection).doc(postId).get();
+      final postDoc = await postRef.get();
       final reportCount = postDoc.data()?['reports'] as int? ?? 0;
 
+      final authorUid = postDoc.data()?['uid'] as String?;
+      if (authorUid != null) {
+        await BondScoreService.applyReportPenalty(authorUid);
+        final enthronePenaltyApplied =
+            postDoc.data()?['enthroneBonusApplied'] as bool? ?? false;
+        if (enthronePenaltyApplied) {
+          await BondScoreService.applyEnthroneBonusPenalty(authorUid);
+          await postRef.update({'enthroneBonusApplied': false});
+        }
+      }
+
       if (reportCount >= autoHideThreshold) {
-        await _db.collection(collection).doc(postId).update({
+        await postRef.update({
           'isHidden': true,
           'hiddenReason': 'auto_hide_by_reports',
           'hiddenAt': FieldValue.serverTimestamp(),
         });
-        debugPrint('✅ Post auto-hidden due to reports: $postId');
+        debugPrint('✅ Post auto-hidden due to reports: $documentPath');
       }
 
       debugPrint('✅ reportPost: Success');
@@ -110,19 +116,13 @@ class ReportService {
 
   /// 내가 이 게시물을 신고했는지 확인
   static Future<bool> hasReported({
-    required String collection,
-    required String postId,
+    required String documentPath,
   }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return false;
 
     try {
-      final doc = await _db
-          .collection(collection)
-          .doc(postId)
-          .collection('reports')
-          .doc(uid)
-          .get();
+      final doc = await _db.doc(documentPath).collection('reports').doc(uid).get();
       return doc.exists;
     } catch (e) {
       debugPrint('⚠️ hasReported error: $e');
@@ -217,6 +217,9 @@ class ReportService {
     }
   }
 }
+
+
+
 
 
 
