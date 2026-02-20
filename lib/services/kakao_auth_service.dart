@@ -28,7 +28,7 @@ class KakaoAuthService {
     try {
       debugPrint('🧪 테스트 2: httpsCallableFromUrl로 호출');
       final callable2 = _functions.httpsCallableFromUrl(
-        Uri.parse('https://us-central1-chikabooks3rd.cloudfunctions.net/createCustomToken'),
+        'https://us-central1-chikabooks3rd.cloudfunctions.net/createCustomToken',
       );
       final result2 = await callable2.call({
         'provider': 'kakao',
