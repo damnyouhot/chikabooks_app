@@ -15,7 +15,7 @@ class AppInitializer {
     // 카카오 SDK 초기화 (네이티브 앱 키 필요)
     // TODO: 카카오 개발자 콘솔에서 네이티브 앱 키를 발급받아 여기에 입력하세요
     KakaoSdk.init(
-      nativeAppKey: 'YOUR_KAKAO_NATIVE_APP_KEY',
+      nativeAppKey: '683c7dcddbf93a77a45f0e1fe771c0ce',
       // javaScriptAppKey: 'YOUR_KAKAO_JAVASCRIPT_APP_KEY', // 웹용 (선택)
     );
 
@@ -31,10 +31,3 @@ class AppInitializer {
     }
   }
 }
-
-
-
-
-
-
-

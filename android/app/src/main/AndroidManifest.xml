@@ -11,7 +11,7 @@
         <!-- 카카오 네이티브 앱 키 (여기에 실제 키를 입력하세요) -->
         <meta-data
             android:name="com.kakao.sdk.AppKey"
-            android:value="YOUR_KAKAO_NATIVE_APP_KEY"/>
+            android:value="683c7dcddbf93a77a45f0e1fe771c0ce"/>
         
         <activity
             android:name=".MainActivity"
@@ -47,7 +47,7 @@
                 
                 <!-- Redirect URI: kakao{NATIVE_APP_KEY}://oauth -->
                 <data android:host="oauth"
-                      android:scheme="kakaoYOUR_KAKAO_NATIVE_APP_KEY" />
+                      android:scheme="683c7dcddbf93a77a45f0e1fe771c0ce" />
             </intent-filter>
         </activity>
         

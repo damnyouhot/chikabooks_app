@@ -8,6 +8,7 @@ import '../services/caring_action_service.dart';
 import '../widgets/speech_overlay.dart';
 import '../widgets/diary_input_sheet.dart';
 import '../widgets/user_goal_sheet.dart';
+import 'settings/settings_page.dart';
 
 /// 돌보기(1탭) — 아침 인사 리추얼 + 4 아이콘 + 재우기/깨우기
 ///
@@ -385,7 +386,9 @@ class _CaringPageState extends State<CaringPage>
             icon: Icon(Icons.settings_outlined,
                 color: _colorText.withOpacity(0.4), size: 20),
             onPressed: () {
-              // 설정 화면은 기존 유지 (프로필 등)
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const SettingsPage()),
+              );
             },
                 ),
               ],
