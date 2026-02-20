@@ -20,13 +20,18 @@ class AppleAuthService {
         ],
       );
 
-      final String providerId = appleCredential.userIdentifier;
+      final String? providerId = appleCredential.userIdentifier;
       final String? email = appleCredential.email;
       final String? givenName = appleCredential.givenName;
       final String? familyName = appleCredential.familyName;
       final String? displayName = givenName != null && familyName != null
           ? '$givenName $familyName'
           : null;
+
+      if (providerId == null) {
+        debugPrint('⚠️ Apple 사용자 ID를 가져올 수 없습니다');
+        return null;
+      }
 
       debugPrint('✅ Apple 로그인 성공: $providerId ($email)');
 
