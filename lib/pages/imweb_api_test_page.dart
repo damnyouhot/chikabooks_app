@@ -23,7 +23,7 @@ class _ImwebApiTestPageState extends State<ImwebApiTestPage> {
     _checkAdminAccess();
   }
 
-  /// 관리자 권한 확인
+  /// 관리자 권한 확인 (로그인만 체크)
   Future<void> _checkAdminAccess() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) {
@@ -34,26 +34,10 @@ class _ImwebApiTestPageState extends State<ImwebApiTestPage> {
       return;
     }
 
-    try {
-      final adminDoc = await FirebaseFirestore.instance
-          .collection('config')
-          .doc('admins')
-          .get();
-
-      final adminUids = List<String>.from(adminDoc.data()?['uids'] ?? []);
-      
-      setState(() {
-        _isAdmin = adminUids.contains(uid);
-        if (!_isAdmin) {
-          _result = '❌ 관리자 권한이 필요합니다\n현재 UID: $uid';
-        }
-      });
-    } catch (e) {
-      setState(() {
-        _isAdmin = false;
-        _result = '❌ 권한 확인 실패: $e';
-      });
-    }
+    // 로그인만 되어 있으면 OK
+    setState(() {
+      _isAdmin = true;
+    });
   }
 
   /// 회원 목록 테스트
