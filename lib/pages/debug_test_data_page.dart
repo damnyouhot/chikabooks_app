@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/services.dart';
 import '../utils/add_test_data.dart';
+import 'imweb_api_test_page.dart';
 
 /// 디버그용 테스트 데이터 추가 페이지
 class DebugTestDataPage extends StatefulWidget {
@@ -121,6 +124,82 @@ class _DebugTestDataPageState extends State<DebugTestDataPage> {
                   ),
                 ),
               ),
+            
+            const SizedBox(height: 20),
+            
+            const Divider(),
+
+            const SizedBox(height: 20),
+
+            const Text(
+              'API 테스트',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            // 현재 UID 표시
+            FutureBuilder<String?>(
+              future: Future.value(FirebaseAuth.instance.currentUser?.uid),
+              builder: (context, snapshot) {
+                final uid = snapshot.data ?? '로그인 필요';
+                return Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade200,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.person, size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '내 UID: $uid',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.copy, size: 16),
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: uid));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('UID 복사됨')),
+                          );
+                        },
+                        tooltip: 'UID 복사',
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+
+            const SizedBox(height: 12),
+
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ImwebApiTestPage(),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.api),
+              label: const Text('아임웹 API 테스트 (관리자 전용)'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.all(16),
+                backgroundColor: const Color(0xFF5D6B6B),
+                foregroundColor: Colors.white,
+              ),
+            ),
             
             const SizedBox(height: 20),
             
