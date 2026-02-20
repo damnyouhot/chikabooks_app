@@ -33,14 +33,26 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         
-        // 🔐 Google Maps API Key를 local.properties에서 읽어서 AndroidManifest에 전달
+        // 🔐 local.properties에서 API 키들 읽어오기
         val localProperties = Properties()
         val localPropertiesFile = rootProject.file("local.properties")
         if (localPropertiesFile.exists()) {
             FileInputStream(localPropertiesFile).use { localProperties.load(it) }
         }
+        
+        // Google Maps API Key
         val mapsApiKey = localProperties.getProperty("MAPS_API_KEY") ?: ""
         manifestPlaceholders["mapsApiKey"] = mapsApiKey
+        
+        // Kakao Native App Key (선택사항: build.gradle에서 주입하려면)
+        // val kakaoAppKey = localProperties.getProperty("KAKAO_NATIVE_APP_KEY") ?: ""
+        // manifestPlaceholders["kakaoAppKey"] = kakaoAppKey
+        
+        // Naver Client ID/Secret (선택사항)
+        // val naverClientId = localProperties.getProperty("NAVER_CLIENT_ID") ?: ""
+        // val naverClientSecret = localProperties.getProperty("NAVER_CLIENT_SECRET") ?: ""
+        // buildConfigField("String", "NAVER_CLIENT_ID", "\"$naverClientId\"")
+        // buildConfigField("String", "NAVER_CLIENT_SECRET", "\"$naverClientSecret\"")
     }
 
     buildTypes {

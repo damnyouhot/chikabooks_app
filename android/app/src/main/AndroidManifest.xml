@@ -1,11 +1,18 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- 인터넷 권한 추가 (url_launcher를 위해 필수) -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     
     <application
         android:label="chikabooks_app"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        
+        <!-- 카카오 네이티브 앱 키 (여기에 실제 키를 입력하세요) -->
+        <meta-data
+            android:name="com.kakao.sdk.AppKey"
+            android:value="YOUR_KAKAO_NATIVE_APP_KEY"/>
+        
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -28,6 +35,22 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        
+        <!-- 카카오 리다이렉트 활동 -->
+        <activity
+            android:name="com.kakao.sdk.flutter.AuthCodeCustomTabsActivity"
+            android:exported="true">
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                
+                <!-- Redirect URI: kakao{NATIVE_APP_KEY}://oauth -->
+                <data android:host="oauth"
+                      android:scheme="kakaoYOUR_KAKAO_NATIVE_APP_KEY" />
+            </intent-filter>
+        </activity>
+        
         <!-- Google Maps API Key (local.properties에서 주입됨) -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"

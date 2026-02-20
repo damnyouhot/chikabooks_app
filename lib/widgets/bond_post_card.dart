@@ -35,10 +35,10 @@ class _BondPostCardState extends State<BondPostCard> {
   bool _hasEnthroned = false;
   int _enthroneCount = 0;
   bool _loadingEnthrone = false;
-  
+
   // 리플 관련
   Map<String, String> _replies = {}; // uid -> reply text
-  
+
   // 이모지 리액션
   Map<String, String> _reactions = {}; // uid -> emoji
 
@@ -64,19 +64,20 @@ class _BondPostCardState extends State<BondPostCard> {
     if (groupId == null) return;
 
     try {
-      final snapshot = await _db
-          .collection('bondGroups')
-          .doc(groupId)
-          .collection('posts')
-          .doc(widget.postId)
-          .collection('replies')
-          .get();
+      final snapshot =
+          await _db
+              .collection('bondGroups')
+              .doc(groupId)
+              .collection('posts')
+              .doc(widget.postId)
+              .collection('replies')
+              .get();
 
       if (mounted) {
         setState(() {
           _replies = {
             for (var doc in snapshot.docs)
-              doc.id: doc.data()['text'] as String? ?? ''
+              doc.id: doc.data()['text'] as String? ?? '',
           };
         });
       }
@@ -86,24 +87,25 @@ class _BondPostCardState extends State<BondPostCard> {
   }
 
   // 이모지 리액션 로드
-  Future<void> _loadReactions() async{
+  Future<void> _loadReactions() async {
     final groupId = widget.bondGroupId ?? widget.post['bondGroupId'];
     if (groupId == null) return;
 
     try {
-      final snapshot = await _db
-          .collection('bondGroups')
-          .doc(groupId)
-          .collection('posts')
-          .doc(widget.postId)
-          .collection('reactions')
-          .get();
+      final snapshot =
+          await _db
+              .collection('bondGroups')
+              .doc(groupId)
+              .collection('posts')
+              .doc(widget.postId)
+              .collection('reactions')
+              .get();
 
       if (mounted) {
         setState(() {
           _reactions = {
             for (var doc in snapshot.docs)
-              doc.id: doc.data()['emoji'] as String? ?? ''
+              doc.id: doc.data()['emoji'] as String? ?? '',
           };
         });
       }
@@ -118,9 +120,9 @@ class _BondPostCardState extends State<BondPostCard> {
     final authorUid = widget.post['uid'] as String?;
     if (groupId == null || _currentUid == null || authorUid == null) return;
     if (authorUid == _currentUid) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('자기 글은 리액션을 줄 수 없어요')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('자기 글은 리액션을 줄 수 없어요')));
       return;
     }
 
@@ -135,9 +137,12 @@ class _BondPostCardState extends State<BondPostCard> {
     try {
       final existing = await reactionRef.get();
       final existingEmoji = existing.data()?['reactionKey'] as String?;
-      final lastScoredAt = (existing.data()?['lastScoredAt'] as Timestamp?)?.toDate();
+      final lastScoredAt =
+          (existing.data()?['lastScoredAt'] as Timestamp?)?.toDate();
       final now = DateTime.now();
-      final hasScoredToday = lastScoredAt != null && now.difference(lastScoredAt) < const Duration(days: 1);
+      final hasScoredToday =
+          lastScoredAt != null &&
+          now.difference(lastScoredAt) < const Duration(days: 1);
 
       if (existingEmoji == emoji) {
         await reactionRef.delete();
@@ -190,13 +195,15 @@ class _BondPostCardState extends State<BondPostCard> {
         .doc(widget.postId);
 
     final postSnap = await postRef.get();
-    final alreadyBonus = postSnap.data()?['heartBonusApplied'] as bool? ?? false;
+    final alreadyBonus =
+        postSnap.data()?['heartBonusApplied'] as bool? ?? false;
     if (alreadyBonus) return 0.0;
 
-    final hearts = await postRef
-        .collection('reactions')
-        .where('kind', isEqualTo: ReactionKind.heart.name)
-        .get();
+    final hearts =
+        await postRef
+            .collection('reactions')
+            .where('kind', isEqualTo: ReactionKind.heart.name)
+            .get();
 
     if (hearts.docs.length >= 5) {
       await postRef.set({'heartBonusApplied': true}, SetOptions(merge: true));
@@ -236,9 +243,9 @@ class _BondPostCardState extends State<BondPostCard> {
   Future<void> _toggleEnthrone() async {
     final groupId = widget.bondGroupId ?? widget.post['bondGroupId'];
     if (groupId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('파트너 그룹에 가입해야 추대할 수 있어요.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('파트너 그룹에 가입해야 추대할 수 있어요.')));
       return;
     }
 
@@ -254,9 +261,9 @@ class _BondPostCardState extends State<BondPostCard> {
           postId: widget.postId,
         );
         if (success && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('추대를 취소했어요.')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('추대를 취소했어요.')));
         }
       } else {
         success = await EnthroneService.enthronePost(
@@ -264,18 +271,19 @@ class _BondPostCardState extends State<BondPostCard> {
           postId: widget.postId,
         );
         if (success && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('✨ 추대했어요!')),
-          );
-          final groupId = widget.bondGroupId ?? widget.post['bondGroupId'] as String?;
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('✨ 추대했어요!')));
+          final groupId =
+              widget.bondGroupId ?? widget.post['bondGroupId'] as String?;
           final authorUid = widget.post['uid'] as String?;
           if (groupId != null && authorUid != null) {
             await _applyEnthroneScore(groupId, authorUid);
           }
         } else if (!success && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('이미 추대했어요.')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('이미 추대했어요.')));
         }
       }
 
@@ -297,36 +305,37 @@ class _BondPostCardState extends State<BondPostCard> {
           title: const Text('신고하기'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
-            children: ReportReason.values.map((reason) {
-              return ListTile(
-                title: Text(reason.displayName),
-                onTap: () async {
-                  Navigator.pop(context);
+            children:
+                ReportReason.values.map((reason) {
+                  return ListTile(
+                    title: Text(reason.displayName),
+                    onTap: () async {
+                      Navigator.pop(context);
 
-                  final groupId = widget.bondGroupId ?? widget.post['bondGroupId'];
-                  final collectionPath = groupId == null
-                      ? 'bondPosts'
-                      : 'bondGroups/$groupId/posts';
-                  
-                  final success = await ReportService.reportPost(
-                    documentPath: '$collectionPath/${widget.postId}',
-                    reason: reason,
+                      final groupId =
+                          widget.bondGroupId ?? widget.post['bondGroupId'];
+                      final collectionPath =
+                          groupId == null
+                              ? 'bondPosts'
+                              : 'bondGroups/$groupId/posts';
+
+                      final success = await ReportService.reportPost(
+                        documentPath: '$collectionPath/${widget.postId}',
+                        reason: reason,
+                      );
+
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              success ? '신고가 접수되었습니다.' : '이미 신고한 게시물입니다.',
+                            ),
+                          ),
+                        );
+                      }
+                    },
                   );
-                  
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          success 
-                              ? '신고가 접수되었습니다.' 
-                              : '이미 신고한 게시물입니다.',
-                        ),
-                      ),
-                    );
-                  }
-                },
-              );
-            }).toList(),
+                }).toList(),
           ),
           actions: [
             TextButton(
@@ -346,7 +355,8 @@ class _BondPostCardState extends State<BondPostCard> {
         .collection('posts')
         .doc(widget.postId);
     final postSnap = await postRef.get();
-    final alreadyBonus = postSnap.data()?['enthroneBonusApplied'] as bool? ?? false;
+    final alreadyBonus =
+        postSnap.data()?['enthroneBonusApplied'] as bool? ?? false;
     final count = await EnthroneService.getEnthroneCount(
       bondGroupId: groupId,
       postId: widget.postId,
@@ -354,7 +364,9 @@ class _BondPostCardState extends State<BondPostCard> {
     double extraBonus = 0;
     if (count >= 3 && !alreadyBonus) {
       extraBonus = 0.5;
-      await postRef.set({'enthroneBonusApplied': true}, SetOptions(merge: true));
+      await postRef.set({
+        'enthroneBonusApplied': true,
+      }, SetOptions(merge: true));
     }
 
     // BondScoreService 메서드가 없으므로 주석 처리
@@ -377,9 +389,7 @@ class _BondPostCardState extends State<BondPostCard> {
             controller: controller,
             maxLength: 200,
             maxLines: 5,
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
-            ),
+            decoration: const InputDecoration(border: OutlineInputBorder()),
           ),
           actions: [
             TextButton(
@@ -390,9 +400,9 @@ class _BondPostCardState extends State<BondPostCard> {
               onPressed: () async {
                 final text = controller.text.trim();
                 if (text.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('내용을 입력해 주세요.')),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(const SnackBar(content: Text('내용을 입력해 주세요.')));
                   return;
                 }
                 await _db.collection('bondPosts').doc(widget.postId).update({
@@ -401,9 +411,9 @@ class _BondPostCardState extends State<BondPostCard> {
                 });
                 if (context.mounted) {
                   Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('수정되었습니다.')),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(const SnackBar(content: Text('수정되었습니다.')));
                 }
               },
               child: const Text('저장'),
@@ -431,9 +441,9 @@ class _BondPostCardState extends State<BondPostCard> {
                 await _db.collection('bondPosts').doc(widget.postId).delete();
                 if (context.mounted) {
                   Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('삭제되었습니다.')),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(const SnackBar(content: Text('삭제되었습니다.')));
                 }
               },
               style: TextButton.styleFrom(foregroundColor: Colors.red),
@@ -451,7 +461,7 @@ class _BondPostCardState extends State<BondPostCard> {
       final dt = (timestamp as Timestamp).toDate();
       final now = DateTime.now();
       final diff = now.difference(dt);
-      
+
       if (diff.inMinutes < 1) return '방금 전';
       if (diff.inHours < 1) return '${diff.inMinutes}분 전';
       if (diff.inDays < 1) return '${diff.inHours}시간 전';
@@ -467,22 +477,22 @@ class _BondPostCardState extends State<BondPostCard> {
     final updatedAt = widget.post['updatedAt'];
     final createdAt = widget.post['createdAt'];
     final timeStr = _formatTimestamp(updatedAt ?? createdAt);
-    
+
     // 작성자 정보
     final testAuthorName = widget.post['_testAuthorName'] as String?;
     final authorName = testAuthorName ?? '익명';
 
     return Container(
-      padding: const EdgeInsets.all(12),  // 16 → 12
-      margin: const EdgeInsets.only(bottom: 8),  // 12 → 8
+      padding: const EdgeInsets.all(12), // 16 → 12
+      margin: const EdgeInsets.only(bottom: 8), // 12 → 8
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),  // 16 → 12
+        borderRadius: BorderRadius.circular(12), // 16 → 12
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.08),  // 0.1 → 0.08
-            blurRadius: 6,  // 8 → 6
-            offset: const Offset(0, 1),  // (0,2) → (0,1)
+            color: Colors.grey.withOpacity(0.08), // 0.1 → 0.08
+            blurRadius: 6, // 8 → 6
+            offset: const Offset(0, 1), // (0,2) → (0,1)
           ),
         ],
       ),
@@ -493,75 +503,86 @@ class _BondPostCardState extends State<BondPostCard> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),  // (10,4) → (8,2)
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 2,
+                ), // (10,4) → (8,2)
                 decoration: BoxDecoration(
                   color: _kShadow2.withOpacity(0.5),
-                  borderRadius: BorderRadius.circular(10),  // 12 → 10
+                  borderRadius: BorderRadius.circular(10), // 12 → 10
                 ),
                 child: Text(
                   authorName,
                   style: const TextStyle(
-                    fontSize: 11,  // 12 → 11
+                    fontSize: 11, // 12 → 11
                     fontWeight: FontWeight.w600,
                     color: _kText,
                   ),
                 ),
               ),
-              const SizedBox(width: 6),  // 8 → 6
+              const SizedBox(width: 6), // 8 → 6
               Text(
                 timeStr,
-                style: TextStyle(fontSize: 10, color: Colors.grey[400]),  // 11 → 10
+                style: TextStyle(
+                  fontSize: 10,
+                  color: Colors.grey[400],
+                ), // 11 → 10
               ),
               if (updatedAt != null) ...[
-                const SizedBox(width: 3),  // 4 → 3
+                const SizedBox(width: 3), // 4 → 3
                 Text(
                   '(수정됨)',
-                  style: TextStyle(fontSize: 10, color: Colors.grey[500]),  // 11 → 10
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.grey[500],
+                  ), // 11 → 10
                 ),
               ],
             ],
           ),
 
-          const SizedBox(height: 8),  // 12 → 8
-
+          const SizedBox(height: 8), // 12 → 8
           // 본문 (2줄 제한)
           Text(
             widget.post['text'] ?? '',
-            maxLines: 2,  // 추가
-            overflow: TextOverflow.ellipsis,  // 추가
+            maxLines: 2, // 추가
+            overflow: TextOverflow.ellipsis, // 추가
             style: const TextStyle(
-              fontSize: 14,  // 15 → 14
-              height: 1.4,  // 1.5 → 1.4
+              fontSize: 14, // 15 → 14
+              height: 1.4, // 1.5 → 1.4
               color: Color(0xFF333333),
             ),
           ),
 
-          const SizedBox(height: 6),  // 12 → 6
-
+          const SizedBox(height: 6), // 12 → 6
           // 이모지 리액션 (간단하게)
           if (_reactions.isNotEmpty)
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
-                children: _reactions.entries.take(5).map((entry) {  // 최대 5개만
-                  return Container(
-                    margin: const EdgeInsets.only(right: 4),  // 간격 축소
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),  // (8,4) → (6,2)
-                    decoration: BoxDecoration(
-                      color: _kAccent.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(10),  // 12 → 10
-                    ),
-                    child: Text(
-                      entry.value,
-                      style: const TextStyle(fontSize: 14),  // 16 → 14
-                    ),
-                  );
-                }).toList(),
+                children:
+                    _reactions.entries.take(5).map((entry) {
+                      // 최대 5개만
+                      return Container(
+                        margin: const EdgeInsets.only(right: 4), // 간격 축소
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ), // (8,4) → (6,2)
+                        decoration: BoxDecoration(
+                          color: _kAccent.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(10), // 12 → 10
+                        ),
+                        child: Text(
+                          entry.value,
+                          style: const TextStyle(fontSize: 14), // 16 → 14
+                        ),
+                      );
+                    }).toList(),
               ),
             ),
 
-          if (_reactions.isNotEmpty) const SizedBox(height: 4),  // 8 → 4
-
+          if (_reactions.isNotEmpty) const SizedBox(height: 4), // 8 → 4
           // 하단 액션 (간결하게)
           Row(
             children: [
@@ -569,20 +590,34 @@ class _BondPostCardState extends State<BondPostCard> {
               TextButton.icon(
                 onPressed: _loadingEnthrone ? null : _toggleEnthrone,
                 icon: Icon(
-                  _hasEnthroned ? Icons.auto_awesome : Icons.auto_awesome_outlined,
-                  size: 14,  // 16 → 14
-                  color: _hasEnthroned ? const Color(0xFF6A5ACD) : Colors.grey[600],
+                  _hasEnthroned
+                      ? Icons.auto_awesome
+                      : Icons.auto_awesome_outlined,
+                  size: 14, // 16 → 14
+                  color:
+                      _hasEnthroned
+                          ? const Color(0xFF6A5ACD)
+                          : Colors.grey[600],
                 ),
                 label: Text(
-                  _enthroneCount > 0 ? '$_enthroneCount' : '추대합니다',  // '추대' → '추대합니다'
+                  _enthroneCount > 0
+                      ? '$_enthroneCount'
+                      : '추대합니다', // '추대' → '추대합니다'
                   style: TextStyle(
-                    fontSize: 11,  // 12 → 11
-                    color: _hasEnthroned ? const Color(0xFF6A5ACD) : Colors.grey[600],
-                    fontWeight: _hasEnthroned ? FontWeight.w600 : FontWeight.normal,
+                    fontSize: 11, // 12 → 11
+                    color:
+                        _hasEnthroned
+                            ? const Color(0xFF6A5ACD)
+                            : Colors.grey[600],
+                    fontWeight:
+                        _hasEnthroned ? FontWeight.w600 : FontWeight.normal,
                   ),
                 ),
                 style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),  // (8,4) → (6,2)
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ), // (8,4) → (6,2)
                   minimumSize: const Size(0, 0),
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
@@ -595,34 +630,37 @@ class _BondPostCardState extends State<BondPostCard> {
                   child: Text(
                     '💬 ${_replies.length}',
                     style: TextStyle(
-                      fontSize: 11,  // 작게
+                      fontSize: 11, // 작게
                       color: Colors.grey[600],
                     ),
-                ),
+                  ),
                 ),
 
               // 이모지 버튼 (아이콘만)
               TextButton(
                 onPressed: _showEmojiPicker,
                 style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   minimumSize: const Size(0, 0),
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
                 child: Text(
                   '😊',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                  ),
-              ),
+                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                ),
               ),
 
               // 답글 버튼 추가
               TextButton(
                 onPressed: _showReplyInput,
                 style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   minimumSize: const Size(0, 0),
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
@@ -638,14 +676,14 @@ class _BondPostCardState extends State<BondPostCard> {
               if (_isMyPost) ...[
                 IconButton(
                   onPressed: _showEditDialog,
-                  icon: const Icon(Icons.edit, size: 14),  // 16 → 14
+                  icon: const Icon(Icons.edit, size: 14), // 16 → 14
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                   color: Colors.grey[600],
                 ),
                 IconButton(
                   onPressed: _confirmDelete,
-                  icon: const Icon(Icons.delete, size: 14),  // 16 → 14
+                  icon: const Icon(Icons.delete, size: 14), // 16 → 14
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                   color: Colors.grey[600],
@@ -653,7 +691,7 @@ class _BondPostCardState extends State<BondPostCard> {
               ] else ...[
                 IconButton(
                   onPressed: _showReportDialog,
-                  icon: const Icon(Icons.report, size: 14),  // 16 → 14
+                  icon: const Icon(Icons.report, size: 14), // 16 → 14
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                   color: Colors.grey[600],
@@ -676,34 +714,27 @@ class _BondPostCardState extends State<BondPostCard> {
           content: Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: [
-              '👍',
-              '❤️',
-              '😊',
-              '💪',
-              '🎉'
-            ].map((emoji) {
-              final isSelected = _reactions[_currentUid] == emoji;
-              return GestureDetector(
-                onTap: () {
-                  _toggleReaction(emoji);
-                  Navigator.pop(context);
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? _kAccent.withOpacity(0.4)
-                        : Colors.grey[100],
-                    shape: BoxShape.circle,
-                  ),
-                  child: Text(
-                    emoji,
-                    style: const TextStyle(fontSize: 20),
-                  ),
-                ),
-              );
-            }).toList(),
+            children:
+                ['👍', '❤️', '😊', '💪', '🎉'].map((emoji) {
+                  final isSelected = _reactions[_currentUid] == emoji;
+                  return GestureDetector(
+                    onTap: () {
+                      _toggleReaction(emoji);
+                      Navigator.pop(context);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color:
+                            isSelected
+                                ? _kAccent.withOpacity(0.4)
+                                : Colors.grey[100],
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(emoji, style: const TextStyle(fontSize: 20)),
+                    ),
+                  );
+                }).toList(),
           ),
         );
       },
@@ -713,12 +744,12 @@ class _BondPostCardState extends State<BondPostCard> {
   // 답글 입력 다이얼로그
   void _showReplyInput() async {
     if (_currentUid == null) return;
-    
+
     // 이미 답글을 달았는지 확인
     if (_replies.containsKey(_currentUid)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('이미 답글을 달았어요. (1인 1답글)')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('이미 답글을 달았어요. (1인 1답글)')));
       return;
     }
 
@@ -748,9 +779,9 @@ class _BondPostCardState extends State<BondPostCard> {
               onPressed: () async {
                 final text = controller.text.trim();
                 if (text.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('내용을 입력해주세요.')),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(const SnackBar(content: Text('내용을 입력해주세요.')));
                   return;
                 }
                 await _saveReply(text);
@@ -778,26 +809,22 @@ class _BondPostCardState extends State<BondPostCard> {
           .doc(widget.postId)
           .collection('replies')
           .doc(_currentUid)
-          .set({
-        'text': text,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+          .set({'text': text, 'createdAt': FieldValue.serverTimestamp()});
 
       await _loadReplies();
-      
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('답글이 등록되었어요')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('답글이 등록되었어요')));
       }
     } catch (e) {
       debugPrint('⚠️ _saveReply error: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('답글 등록에 실패했어요')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('답글 등록에 실패했어요')));
       }
     }
   }
 }
-

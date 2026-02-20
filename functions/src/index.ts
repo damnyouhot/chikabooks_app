@@ -598,3 +598,74 @@ async function buildHiraDigestManually() {
     console.error("⚠️ buildHiraDigestManually error:", error);
   }
 }
+
+/**
+ * Custom Token 발급 함수
+ * 카카오/네이버 로그인 후 Firebase Auth 연동용
+ */
+export const createCustomToken = functions.https.onCall(
+  async (data, context) => {
+    const {provider, providerId, email, displayName} = data;
+
+    // 입력 검증
+    if (!provider || !providerId) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "provider와 providerId는 필수입니다."
+      );
+    }
+
+    // 지원하는 provider 확인
+    const allowedProviders = ["kakao", "naver", "apple"];
+    if (!allowedProviders.includes(provider)) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        `지원하지 않는 provider: ${provider}`
+      );
+    }
+
+    try {
+      // Firebase UID 생성 (provider + providerId 조합)
+      const uid = `${provider}_${providerId}`;
+
+      // 사용자 정보 업데이트 (없으면 생성)
+      await admin.auth().updateUser(uid, {
+        displayName: displayName || null,
+        email: email || null,
+      }).catch(async () => {
+        // 사용자가 없으면 새로 생성
+        await admin.auth().createUser({
+          uid,
+          displayName: displayName || null,
+          email: email || null,
+        });
+      });
+
+      // Firestore users 컬렉션에도 기본 정보 저장
+      await db.collection("users").doc(uid).set({
+        email: email || null,
+        displayName: displayName || null,
+        provider,
+        providerId,
+        lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, {merge: true});
+
+      // Custom Token 발급
+      const customToken = await admin.auth().createCustomToken(uid);
+
+      console.log(`✅ Custom Token created for ${provider}: ${providerId}`);
+
+      return {
+        success: true,
+        customToken,
+        uid,
+      };
+    } catch (error) {
+      console.error("⚠️ createCustomToken error:", error);
+      throw new functions.https.HttpsError(
+        "internal",
+        `Custom Token 발급 실패: ${error}`
+      );
+    }
+  }
+);

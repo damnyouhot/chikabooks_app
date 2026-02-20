@@ -8,19 +8,19 @@ import '../services/bond_score_service.dart';
 enum ReportReason {
   /// 욕설/비방
   profanity('욕설/비방'),
-  
+
   /// 괴롭힘
   harassment('괴롭힘'),
-  
+
   /// 성희롱
   sexualHarassment('성희롱'),
-  
+
   /// 개인정보 노출
   privacyViolation('개인정보 노출'),
-  
+
   /// 스팸/광고
   spam('스팸/광고'),
-  
+
   /// 기타
   other('기타');
 
@@ -37,7 +37,7 @@ class ReportService {
   static const int autoHideThreshold = 3;
 
   /// 게시물 신고하기
-  /// 
+  ///
   /// [documentPath]: 'bondGroups/{groupId}/posts/{postId}' 또는 'bondPosts/{postId}' 등의 전체 경로
   /// [reason]: 신고 사유
   /// [additionalInfo]: 추가 설명 (선택)
@@ -56,10 +56,7 @@ class ReportService {
       final postRef = _db.doc(documentPath);
 
       // 중복 신고 방지: 이미 신고했는지 확인
-      final existingReport = await postRef
-          .collection('reports')
-          .doc(uid)
-          .get();
+      final existingReport = await postRef.collection('reports').doc(uid).get();
 
       if (existingReport.exists) {
         debugPrint('⚠️ reportPost: Already reported');
@@ -116,14 +113,13 @@ class ReportService {
   }
 
   /// 내가 이 게시물을 신고했는지 확인
-  static Future<bool> hasReported({
-    required String documentPath,
-  }) async {
+  static Future<bool> hasReported({required String documentPath}) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return false;
 
     try {
-      final doc = await _db.doc(documentPath).collection('reports').doc(uid).get();
+      final doc =
+          await _db.doc(documentPath).collection('reports').doc(uid).get();
       return doc.exists;
     } catch (e) {
       debugPrint('⚠️ hasReported error: $e');
@@ -132,7 +128,7 @@ class ReportService {
   }
 
   /// 사용자 차단하기
-  /// 
+  ///
   /// 차단한 사용자의 글/리액션이 내 화면에서 숨겨집니다.
   static Future<bool> blockUser(String targetUid) async {
     final uid = _auth.currentUser?.uid;
@@ -145,9 +141,9 @@ class ReportService {
           .collection('blockedUsers')
           .doc(targetUid)
           .set({
-        'blockedUid': targetUid,
-        'blockedAt': FieldValue.serverTimestamp(),
-      });
+            'blockedUid': targetUid,
+            'blockedAt': FieldValue.serverTimestamp(),
+          });
 
       debugPrint('✅ blockUser: $targetUid');
       return true;
@@ -184,11 +180,12 @@ class ReportService {
     if (uid == null) return [];
 
     try {
-      final snapshot = await _db
-          .collection('users')
-          .doc(uid)
-          .collection('blockedUsers')
-          .get();
+      final snapshot =
+          await _db
+              .collection('users')
+              .doc(uid)
+              .collection('blockedUsers')
+              .get();
 
       return snapshot.docs
           .map((doc) => doc.data()['blockedUid'] as String)
@@ -205,12 +202,13 @@ class ReportService {
     if (uid == null) return false;
 
     try {
-      final doc = await _db
-          .collection('users')
-          .doc(uid)
-          .collection('blockedUsers')
-          .doc(targetUid)
-          .get();
+      final doc =
+          await _db
+              .collection('users')
+              .doc(uid)
+              .collection('blockedUsers')
+              .doc(targetUid)
+              .get();
       return doc.exists;
     } catch (e) {
       debugPrint('⚠️ isBlocked error: $e');
@@ -218,11 +216,3 @@ class ReportService {
     }
   }
 }
-
-
-
-
-
-
-
-
