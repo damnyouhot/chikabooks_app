@@ -6,7 +6,7 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 /// Apple 로그인 서비스
 /// Custom Token 방식으로 Firebase Auth 연동
 class AppleAuthService {
-  static final _functions = FirebaseFunctions.instance;
+  static final _functions = FirebaseFunctions.instanceFor(region: 'us-central1');
   static final _auth = FirebaseAuth.instance;
 
   /// Apple 로그인 실행

@@ -9,7 +9,7 @@ import 'package:flutter/foundation.dart';
 /// 네이버 개발자 콘솔에서 Client ID/Secret을 발급받아야 합니다.
 /// 현재는 기본 구조만 작성되어 있으며, 실제 테스트 시 수정이 필요합니다.
 class NaverAuthService {
-  static final _functions = FirebaseFunctions.instance;
+  static final _functions = FirebaseFunctions.instanceFor(region: 'us-central1');
   static final _auth = FirebaseAuth.instance;
 
   /// 네이버 로그인 실행

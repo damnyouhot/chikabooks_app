@@ -6,7 +6,7 @@ import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart' as kakao;
 /// 카카오 로그인 서비스
 /// Custom Token 방식으로 Firebase Auth 연동
 class KakaoAuthService {
-  static final _functions = FirebaseFunctions.instance;
+  static final _functions = FirebaseFunctions.instanceFor(region: 'us-central1');
   static final _auth = FirebaseAuth.instance;
 
   /// 카카오 로그인 실행
