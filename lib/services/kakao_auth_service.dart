@@ -4,47 +4,16 @@ import 'package:flutter/foundation.dart';
 import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart' as kakao;
 
 /// 카카오 로그인 서비스
-/// Custom Token 방식으로 Firebase Auth 연동
+/// 서버 기반 토큰 검증 방식으로 Firebase Auth 연동
 class KakaoAuthService {
   static final _functions = FirebaseFunctions.instanceFor(region: 'us-central1');
   static final _auth = FirebaseAuth.instance;
 
-  /// 🧪 임시 테스트: 직접 URL 호출
-  static Future<void> testDirectCall() async {
-    try {
-      debugPrint('🧪 테스트 1: httpsCallable로 호출');
-      final callable1 = _functions.httpsCallable('createCustomToken');
-      final result1 = await callable1.call({
-        'provider': 'kakao',
-        'providerId': '4759907051',
-        'email': null,
-        'displayName': 'test',
-      });
-      debugPrint('✅ 테스트 1 성공: ${result1.data}');
-    } catch (e) {
-      debugPrint('❌ 테스트 1 실패: $e');
-    }
-
-    try {
-      debugPrint('🧪 테스트 2: httpsCallableFromUrl로 호출');
-      final callable2 = _functions.httpsCallableFromUrl(
-        'https://us-central1-chikabooks3rd.cloudfunctions.net/createCustomToken',
-      );
-      final result2 = await callable2.call({
-        'provider': 'kakao',
-        'providerId': '4759907051',
-        'email': null,
-        'displayName': 'test',
-      });
-      debugPrint('✅ 테스트 2 성공: ${result2.data}');
-    } catch (e) {
-      debugPrint('❌ 테스트 2 실패: $e');
-    }
-  }
-
-  /// 카카오 로그인 실행
+  /// 카카오 로그인 실행 (서버 검증)
   static Future<User?> signInWithKakao() async {
     try {
+      debugPrint('🔑 카카오 로그인 시작');
+
       // 🔐 디버그: 현재 앱의 키 해시 출력
       try {
         final keyHash = await kakao.KakaoSdk.origin;
@@ -53,7 +22,7 @@ class KakaoAuthService {
         debugPrint('⚠️ KeyHash 확인 실패: $e');
       }
 
-      // 1. 카카오 로그인 (SDK)
+      // 1. 카카오 SDK로 로그인
       kakao.OAuthToken token;
       if (await kakao.isKakaoTalkInstalled()) {
         // 카카오톡으로 로그인
@@ -69,32 +38,45 @@ class KakaoAuthService {
         token = await kakao.UserApi.instance.loginWithKakaoAccount();
       }
 
-      // 2. 카카오 사용자 정보 가져오기
-      final kakao.User user = await kakao.UserApi.instance.me();
-      final String providerId = user.id.toString();
-      final String? email = user.kakaoAccount?.email;
-      final String? displayName = user.kakaoAccount?.profile?.nickname;
+      debugPrint('✅ 카카오 SDK 로그인 성공');
+      debugPrint('✅ Access Token: ${token.accessToken.substring(0, 20)}...');
 
-      debugPrint('✅ 카카오 로그인 성공: $providerId ($email)');
-
-      // 3. Firebase Custom Token 발급 요청
-      final result = await _functions.httpsCallable('createCustomToken').call({
-        'provider': 'kakao',
-        'providerId': providerId,
-        'email': email,
-        'displayName': displayName,
+      // 2. 서버로 Access Token 전송하여 검증 및 Custom Token 발급
+      debugPrint('🔧 서버로 토큰 검증 요청...');
+      final callable = _functions.httpsCallable('verifyKakaoToken');
+      final response = await callable.call({
+        'accessToken': token.accessToken,
       });
 
-      final String customToken = result.data['customToken'];
+      debugPrint('✅ 서버 검증 완료: ${response.data}');
 
-      // 4. Firebase Auth에 Custom Token으로 로그인
-      final credential = await _auth.signInWithCustomToken(customToken);
+      final String customToken = response.data['customToken'];
 
-      debugPrint('✅ Firebase 로그인 완료: ${credential.user?.uid}');
+      // 3. Firebase Auth 로그인
+      debugPrint('🔧 Firebase signInWithCustomToken 시작...');
+      await _auth.signInWithCustomToken(customToken);
 
-      return credential.user;
-    } catch (e) {
-      debugPrint('⚠️ 카카오 로그인 실패: $e');
+      debugPrint('✅ signInWithCustomToken 완료');
+
+      // currentUser는 authStateChanges를 통해 비동기로 업데이트됨
+      // 짧은 대기 후 재확인 (타이밍 이슈 해결)
+      await Future.delayed(const Duration(milliseconds: 200));
+
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) {
+        debugPrint('❌ Firebase Auth currentUser가 null (비정상)');
+        return null;
+      }
+
+      debugPrint('✅✅✅ 카카오 로그인 완전 성공!');
+      debugPrint('✅ UID: ${currentUser.uid}');
+      debugPrint('✅ Email: ${currentUser.email}');
+
+      return currentUser;
+    } catch (e, stackTrace) {
+      debugPrint('❌ 카카오 로그인 예외 발생');
+      debugPrint('❌ Error: $e');
+      debugPrint('❌ StackTrace: $stackTrace');
       return null;
     }
   }

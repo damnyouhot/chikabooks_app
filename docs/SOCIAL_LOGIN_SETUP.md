@@ -173,43 +173,73 @@ KakaoSdk.init(
    - ✅ **iOS**: URL Scheme `com.chikabooks.tenth`
 
 ### 4-3. Client ID / Client Secret 복사
-- **Client ID**: 예) `ljqo60a7xp`
-- **Client Secret**: 예) `AbCdEfGhIj`
+- **Client ID**: `EKvvbgJMV6rAx5L6Rybn`
+- **Client Secret**: `ZQ9vUktdbW`
 
 ### 4-4. 코드에 키 입력
 
 #### ✅ android/local.properties (보안 저장)
 ```properties
-NAVER_CLIENT_ID=ljqo60a7xp
-NAVER_CLIENT_SECRET=AbCdEfGhIj
+NAVER_CLIENT_ID=EKvvbgJMV6rAx5L6Rybn
+NAVER_CLIENT_SECRET=ZQ9vUktdbW
 ```
 
-#### ✅ iOS 설정
-`ios/Runner/Info.plist`:
+#### ✅ android/app/build.gradle.kts (키 주입 설정)
+```kotlin
+// Naver Client ID/Secret
+val naverClientId = localProperties.getProperty("NAVER_CLIENT_ID") ?: ""
+val naverClientSecret = localProperties.getProperty("NAVER_CLIENT_SECRET") ?: ""
+manifestPlaceholders["naverClientId"] = naverClientId
+manifestPlaceholders["naverClientSecret"] = naverClientSecret
+```
+
+#### ✅ android/app/src/main/AndroidManifest.xml
 ```xml
-<key>NAVER_CLIENT_ID</key>
-<string>ljqo60a7xp</string>
+<!-- 네이버 로그인 클라이언트 ID/Secret (local.properties에서 주입됨) -->
+<meta-data
+    android:name="com.naver.nid.client_id"
+    android:value="${naverClientId}"/>
+<meta-data
+    android:name="com.naver.nid.client_secret"
+    android:value="${naverClientSecret}"/>
+<meta-data
+    android:name="com.naver.nid.client_name"
+    android:value="@string/app_name"/>
+```
 
-<key>NAVER_CLIENT_SECRET</key>
-<string>AbCdEfGhIj</string>
-
+#### ✅ ios/Runner/Info.plist
+```xml
+<!-- 네이버 로그인 URL Scheme -->
 <key>CFBundleURLTypes</key>
 <array>
     <dict>
         <key>CFBundleTypeRole</key>
         <string>Editor</string>
+        <key>CFBundleURLName</key>
+        <string>com.chikabooks.tenth</string>
         <key>CFBundleURLSchemes</key>
         <array>
-            <string>naverljqo60a7xp</string> <!-- naver{CLIENT_ID} -->
+            <string>com.chikabooks.tenth</string>
         </array>
     </dict>
 </array>
 
+<!-- LSApplicationQueriesSchemes: 네이버 앱 호출 허용 -->
 <key>LSApplicationQueriesSchemes</key>
 <array>
     <string>naversearchapp</string>
     <string>naversearchthirdlogin</string>
 </array>
+
+<!-- 네이버 로그인 Consumer Key/Secret -->
+<key>NaverConsumerKey</key>
+<string>EKvvbgJMV6rAx5L6Rybn</string>
+<key>NaverConsumerSecret</key>
+<string>ZQ9vUktdbW</string>
+<key>NaverServiceAppName</key>
+<string>치과책방</string>
+<key>NaverServiceUrlScheme</key>
+<string>com.chikabooks.tenth</string>
 ```
 
 ---

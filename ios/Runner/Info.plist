@@ -45,5 +45,39 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	
+	<!-- 네이버 로그인 설정 (flutter_naver_login 2.1.0+) -->
+	<key>NidClientID</key>
+	<string>EKvvbgJMV6rAx5L6Rybn</string>
+	<!-- 네이버 SDK 초기화에 필요 (실제 토큰 검증은 서버에서) -->
+	<key>NidClientSecret</key>
+	<string>ZQ9vUktdbW</string>
+	<key>NidAppName</key>
+	<string>치과책방</string>
+	<key>NidUrlScheme</key>
+	<string>com.chikabooks.tenth</string>
+	
+	<!-- 네이버 로그인 URL Scheme -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.chikabooks.tenth</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.chikabooks.tenth</string>
+			</array>
+		</dict>
+	</array>
+	
+	<!-- LSApplicationQueriesSchemes: 네이버 앱 호출 허용 -->
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>naversearchapp</string>
+		<string>naversearchthirdlogin</string>
+	</array>
+
 </dict>
 </plist>

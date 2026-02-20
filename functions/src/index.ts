@@ -7,6 +7,78 @@ import * as crypto from "crypto";
 admin.initializeApp();
 const db = admin.firestore();
 
+// ========== 소셜 로그인 에러 코드 정의 ==========
+enum SocialLoginError {
+  RATE_LIMIT = "RATE_LIMIT",
+  TOKEN_EXPIRED = "TOKEN_EXPIRED",
+  TOKEN_INVALID = "TOKEN_INVALID",
+  PROVIDER_DOWN = "PROVIDER_DOWN",
+  APP_CHECK_REQUIRED = "APP_CHECK_REQUIRED",
+  INVALID_INPUT = "INVALID_INPUT",
+  INTERNAL_ERROR = "INTERNAL_ERROR",
+}
+
+/**
+ * Firestore 기반 레이트 리미팅 체크
+ * @param key 레이트 리밋 키 (예: kakao_ip_192.168.1.1)
+ * @param maxRequests 최대 요청 수
+ * @param windowMs 윈도우 기간 (밀리초)
+ */
+async function checkRateLimitFirestore(
+  key: string,
+  maxRequests: number,
+  windowMs: number
+): Promise<void> {
+  const now = Date.now();
+  const docRef = db.collection("rate_limits").doc(key);
+
+  await db.runTransaction(async (transaction) => {
+    const doc = await transaction.get(docRef);
+
+    if (!doc.exists) {
+      // 첫 요청
+      transaction.set(docRef, {
+        count: 1,
+        resetAt: now + windowMs,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      return;
+    }
+
+    const data = doc.data()!;
+    const resetAt = data.resetAt;
+
+    if (now < resetAt) {
+      // 윈도우 내
+      if (data.count >= maxRequests) {
+        throw new functions.https.HttpsError(
+          "resource-exhausted",
+          "너무 많은 요청이 발생했습니다. 잠시 후 다시 시도해주세요.",
+          {errorCode: SocialLoginError.RATE_LIMIT}
+        );
+      }
+      transaction.update(docRef, {
+        count: admin.firestore.FieldValue.increment(1),
+      });
+    } else {
+      // 윈도우 만료, 리셋
+      transaction.set(docRef, {
+        count: 1,
+        resetAt: now + windowMs,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+  });
+}
+
+/**
+ * Access Token 마스킹 헬퍼 함수
+ */
+function maskToken(token: string): string {
+  if (token.length <= 20) return "***";
+  return `${token.substring(0, 10)}...${token.substring(token.length - 10)}`;
+}
+
 /**
  * 추대 트리거: enthrone 서브컬렉션에 문서 생성 시
  * 조건 충족 시 billboardPosts에 등재
@@ -629,16 +701,24 @@ export const createCustomToken = functions.https.onCall(
       const uid = `${provider}_${providerId}`;
 
       // 사용자 정보 업데이트 (없으면 생성)
-      await admin.auth().updateUser(uid, {
-        displayName: displayName || null,
-        email: email || null,
-      }).catch(async () => {
+      const updateData: admin.auth.UpdateRequest = {};
+      if (displayName) {
+        updateData.displayName = displayName;
+      }
+      if (email && email.trim().length > 0) {
+        updateData.email = email;
+      }
+
+      await admin.auth().updateUser(uid, updateData).catch(async () => {
         // 사용자가 없으면 새로 생성
-        await admin.auth().createUser({
-          uid,
-          displayName: displayName || null,
-          email: email || null,
-        });
+        const createData: admin.auth.CreateRequest = {uid};
+        if (displayName) {
+          createData.displayName = displayName;
+        }
+        if (email && email.trim().length > 0) {
+          createData.email = email;
+        }
+        await admin.auth().createUser(createData);
       });
 
       // Firestore users 컬렉션에도 기본 정보 저장
@@ -665,6 +745,451 @@ export const createCustomToken = functions.https.onCall(
       throw new functions.https.HttpsError(
         "internal",
         `Custom Token 발급 실패: ${error}`
+      );
+    }
+  }
+);
+
+/**
+ * 네이버 로그인 (서버 기반 인증) - 보안 강화 버전
+ * 네이버 Access Token을 검증하고 Custom Token 발급
+ */
+export const verifyNaverToken = functions.https.onCall(
+  async (data, context) => {
+    // ========== 0. App Check 검증 (개발 중에는 경고만) ==========
+    if (!context.app) {
+      console.warn("⚠️ App Check 미적용: 프로덕션 배포 시 활성화 필요");
+      // 개발 환경에서는 통과, 프로덕션에서는 주석 해제
+      // throw new functions.https.HttpsError(
+      //   "failed-precondition",
+      //   "App Check 인증이 필요합니다.",
+      //   {errorCode: SocialLoginError.APP_CHECK_REQUIRED}
+      // );
+    }
+
+    // ========== 1. 입력 검증 ==========
+    const {accessToken} = data;
+
+    // 1-1. 필수값 체크
+    if (!accessToken) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "accessToken은 필수입니다.",
+        {errorCode: SocialLoginError.INVALID_INPUT}
+      );
+    }
+
+    // 1-2. 타입 검증
+    if (typeof accessToken !== "string") {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "accessToken은 문자열이어야 합니다.",
+        {errorCode: SocialLoginError.INVALID_INPUT}
+      );
+    }
+
+    // 1-3. 길이 검증
+    if (accessToken.length < 20 || accessToken.length > 2000) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "accessToken 길이가 유효하지 않습니다.",
+        {errorCode: SocialLoginError.INVALID_INPUT}
+      );
+    }
+
+    // 1-4. 빈값/공백 검증
+    if (accessToken.trim().length === 0) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "accessToken이 비어있습니다.",
+        {errorCode: SocialLoginError.INVALID_INPUT}
+      );
+    }
+
+    // ========== 2. 레이트 리미팅 (IP 기준, Firestore) ==========
+    const clientIp = context.rawRequest?.ip || "unknown";
+    const rateLimitKey = `naver_ip_${clientIp}`;
+    
+    try {
+      await checkRateLimitFirestore(rateLimitKey, 10, 60 * 1000); // 1분당 10회
+    } catch (error) {
+      // 레이트 리밋 에러는 그대로 throw
+      throw error;
+    }
+
+    // ========== 3. 토큰 마스킹 로깅 ==========
+    const maskedToken = maskToken(accessToken);
+    console.log(`🔐 네이버 토큰 검증 시작 (토큰: ${maskedToken}, IP: ${clientIp})`);
+
+    try {
+      // ========== 4. 네이버 API 호출 (토큰 검증) ==========
+      const response = await axios.get(
+        "https://openapi.naver.com/v1/nid/me",
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+          timeout: 10000, // 10초 타임아웃
+        }
+      );
+
+      const userData = response.data;
+
+      // ========== 5. 응답 검증 ==========
+      if (!userData.response || userData.resultcode !== "00") {
+        throw new functions.https.HttpsError(
+          "unauthenticated",
+          "네이버 토큰 검증 실패",
+          {errorCode: SocialLoginError.TOKEN_INVALID}
+        );
+      }
+
+      const naverUser = userData.response;
+      const naverId = naverUser.id;
+      const email = naverUser.email || null;
+      const displayName = naverUser.name || null;
+
+      console.log(`✅ 네이버 토큰 검증 성공 (네이버ID: ${naverId})`);
+
+      // ========== 6. Firebase UID 생성 (prefix로 충돌 방지) ==========
+      const uid = `naver:${naverId}`;
+      const legacyUid = `naver_${naverId}`; // 기존 형식
+
+      // ========== 6-1. 기존 사용자 마이그레이션 체크 ==========
+      try {
+        const legacyUser = await admin.auth().getUser(legacyUid);
+        if (legacyUser) {
+          console.log(`⚠️ 기존 사용자 발견 (${legacyUid}), 하위 호환 유지`);
+          // 기존 UID로 토큰 발급 (하위 호환성 유지)
+          const customToken = await admin.auth().createCustomToken(legacyUid);
+          
+          // Firestore 업데이트
+          await db.collection("users").doc(legacyUid).set({
+            email: email || null,
+            displayName: displayName || null,
+            provider: "naver",
+            providerId: naverId,
+            lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
+          }, {merge: true});
+
+          console.log(`✅ 기존 사용자 로그인 완료 (UID: ${legacyUid})`);
+
+          return {
+            success: true,
+            customToken,
+            uid: legacyUid,
+          };
+        }
+      } catch (error: any) {
+        // 기존 사용자가 없으면 새 형식으로 생성
+        console.log(`✅ 신규 사용자, 새 UID 형식 사용: ${uid}`);
+      }
+
+      // ========== 7. Firebase Auth 사용자 생성/업데이트 ==========
+      const updateData: admin.auth.UpdateRequest = {};
+      if (displayName) {
+        updateData.displayName = displayName;
+      }
+      if (email && email.trim().length > 0) {
+        updateData.email = email;
+      }
+
+      await admin.auth().updateUser(uid, updateData).catch(async () => {
+        const createData: admin.auth.CreateRequest = {uid};
+        if (displayName) {
+          createData.displayName = displayName;
+        }
+        if (email && email.trim().length > 0) {
+          createData.email = email;
+        }
+        await admin.auth().createUser(createData);
+      });
+
+      // ========== 8. Firestore users 컬렉션에 저장 ==========
+      await db.collection("users").doc(uid).set({
+        email: email || null,
+        displayName: displayName || null,
+        provider: "naver",
+        providerId: naverId,
+        lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, {merge: true});
+
+      // ========== 9. Custom Token 발급 ==========
+      const customToken = await admin.auth().createCustomToken(uid);
+
+      console.log(`✅ 네이버 Custom Token 발급 완료 (UID: ${uid})`);
+
+      return {
+        success: true,
+        customToken,
+        uid,
+      };
+    } catch (error: any) {
+      console.error("⚠️ verifyNaverToken error:", error.message);
+
+      // ========== 10. 에러 분류 및 전달 ==========
+      if (axios.isAxiosError(error)) {
+        if (error.response) {
+          const status = error.response.status;
+          const naverError = error.response.data;
+
+          console.error(`네이버 API 에러 (status: ${status}):`, naverError);
+
+          // 네이버 에러코드 분류
+          if (status === 401) {
+            throw new functions.https.HttpsError(
+              "unauthenticated",
+              "유효하지 않거나 만료된 Access Token입니다. 다시 로그인해주세요.",
+              {errorCode: SocialLoginError.TOKEN_EXPIRED}
+            );
+          } else if (status === 400) {
+            throw new functions.https.HttpsError(
+              "invalid-argument",
+              "잘못된 요청입니다. Access Token을 확인해주세요.",
+              {errorCode: SocialLoginError.TOKEN_INVALID}
+            );
+          } else if (status >= 500) {
+            throw new functions.https.HttpsError(
+              "unavailable",
+              "네이버 서버에 일시적인 문제가 발생했습니다. 잠시 후 다시 시도해주세요.",
+              {errorCode: SocialLoginError.PROVIDER_DOWN}
+            );
+          }
+        } else if (error.code === "ECONNABORTED") {
+          throw new functions.https.HttpsError(
+            "deadline-exceeded",
+            "네이버 서버 응답 시간 초과. 네트워크를 확인해주세요.",
+            {errorCode: SocialLoginError.PROVIDER_DOWN}
+          );
+        }
+      }
+
+      throw new functions.https.HttpsError(
+        "internal",
+        "네이버 로그인 처리 중 오류가 발생했습니다.",
+        {errorCode: SocialLoginError.INTERNAL_ERROR}
+      );
+    }
+  }
+);
+
+/**
+ * 카카오 로그인 (서버 기반 인증) - 보안 강화 버전
+ * 카카오 Access Token을 검증하고 Custom Token 발급
+ */
+export const verifyKakaoToken = functions.https.onCall(
+  async (data, context) => {
+    // ========== 0. App Check 검증 (개발 중에는 경고만) ==========
+    if (!context.app) {
+      console.warn("⚠️ App Check 미적용: 프로덕션 배포 시 활성화 필요");
+      // 개발 환경에서는 통과, 프로덕션에서는 주석 해제
+      // throw new functions.https.HttpsError(
+      //   "failed-precondition",
+      //   "App Check 인증이 필요합니다.",
+      //   {errorCode: SocialLoginError.APP_CHECK_REQUIRED}
+      // );
+    }
+
+    // ========== 1. 입력 검증 ==========
+    const {accessToken} = data;
+
+    // 1-1. 필수값 체크
+    if (!accessToken) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "accessToken은 필수입니다.",
+        {errorCode: SocialLoginError.INVALID_INPUT}
+      );
+    }
+
+    // 1-2. 타입 검증
+    if (typeof accessToken !== "string") {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "accessToken은 문자열이어야 합니다.",
+        {errorCode: SocialLoginError.INVALID_INPUT}
+      );
+    }
+
+    // 1-3. 길이 검증 (카카오 Access Token은 보통 100~500자)
+    if (accessToken.length < 20 || accessToken.length > 2000) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "accessToken 길이가 유효하지 않습니다.",
+        {errorCode: SocialLoginError.INVALID_INPUT}
+      );
+    }
+
+    // 1-4. 빈값/공백 검증
+    if (accessToken.trim().length === 0) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "accessToken이 비어있습니다.",
+        {errorCode: SocialLoginError.INVALID_INPUT}
+      );
+    }
+
+    // ========== 2. 레이트 리미팅 (IP 기준, Firestore) ==========
+    const clientIp = context.rawRequest?.ip || "unknown";
+    const rateLimitKey = `kakao_ip_${clientIp}`;
+    
+    try {
+      await checkRateLimitFirestore(rateLimitKey, 10, 60 * 1000); // 1분당 10회
+    } catch (error) {
+      // 레이트 리밋 에러는 그대로 throw
+      throw error;
+    }
+
+    // ========== 3. 토큰 마스킹 로깅 ==========
+    const maskedToken = maskToken(accessToken);
+    console.log(`🔐 카카오 토큰 검증 시작 (토큰: ${maskedToken}, IP: ${clientIp})`);
+
+    try {
+      // ========== 4. 카카오 API 호출 (토큰 검증) ==========
+      const response = await axios.get(
+        "https://kapi.kakao.com/v2/user/me",
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+          timeout: 10000, // 10초 타임아웃
+        }
+      );
+
+      const kakaoUser = response.data;
+
+      // ========== 5. 응답 검증 ==========
+      if (!kakaoUser.id) {
+        throw new functions.https.HttpsError(
+          "unauthenticated",
+          "카카오 사용자 ID를 가져올 수 없습니다.",
+          {errorCode: SocialLoginError.TOKEN_INVALID}
+        );
+      }
+
+      const kakaoId = kakaoUser.id.toString();
+      const email = kakaoUser.kakao_account?.email || null;
+      const displayName = kakaoUser.kakao_account?.profile?.nickname || null;
+
+      console.log(`✅ 카카오 토큰 검증 성공 (카카오ID: ${kakaoId})`);
+
+      // ========== 6. Firebase UID 생성 (prefix로 충돌 방지) ==========
+      const uid = `kakao:${kakaoId}`;
+      const legacyUid = `kakao_${kakaoId}`; // 기존 형식
+
+      // ========== 6-1. 기존 사용자 마이그레이션 체크 ==========
+      try {
+        const legacyUser = await admin.auth().getUser(legacyUid);
+        if (legacyUser) {
+          console.log(`⚠️ 기존 사용자 발견 (${legacyUid}), 하위 호환 유지`);
+          // 기존 UID로 토큰 발급 (하위 호환성 유지)
+          const customToken = await admin.auth().createCustomToken(legacyUid);
+          
+          // Firestore 업데이트
+          await db.collection("users").doc(legacyUid).set({
+            email: email || null,
+            displayName: displayName || null,
+            provider: "kakao",
+            providerId: kakaoId,
+            lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
+          }, {merge: true});
+
+          console.log(`✅ 기존 사용자 로그인 완료 (UID: ${legacyUid})`);
+
+          return {
+            success: true,
+            customToken,
+            uid: legacyUid,
+          };
+        }
+      } catch (error: any) {
+        // 기존 사용자가 없으면 새 형식으로 생성
+        console.log(`✅ 신규 사용자, 새 UID 형식 사용: ${uid}`);
+      }
+
+      // ========== 7. Firebase Auth 사용자 생성/업데이트 ==========
+      const updateData: admin.auth.UpdateRequest = {};
+      if (displayName) {
+        updateData.displayName = displayName;
+      }
+      if (email && email.trim().length > 0) {
+        updateData.email = email;
+      }
+
+      await admin.auth().updateUser(uid, updateData).catch(async () => {
+        const createData: admin.auth.CreateRequest = {uid};
+        if (displayName) {
+          createData.displayName = displayName;
+        }
+        if (email && email.trim().length > 0) {
+          createData.email = email;
+        }
+        await admin.auth().createUser(createData);
+      });
+
+      // ========== 8. Firestore users 컬렉션에 저장 ==========
+      await db.collection("users").doc(uid).set({
+        email: email || null,
+        displayName: displayName || null,
+        provider: "kakao",
+        providerId: kakaoId,
+        lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, {merge: true});
+
+      // ========== 9. Custom Token 발급 ==========
+      const customToken = await admin.auth().createCustomToken(uid);
+
+      console.log(`✅ 카카오 Custom Token 발급 완료 (UID: ${uid})`);
+
+      return {
+        success: true,
+        customToken,
+        uid,
+      };
+    } catch (error: any) {
+      console.error("⚠️ verifyKakaoToken error:", error.message);
+
+      // ========== 10. 에러 분류 및 전달 ==========
+      if (axios.isAxiosError(error)) {
+        if (error.response) {
+          const status = error.response.status;
+          const kakaoError = error.response.data;
+
+          console.error(`카카오 API 에러 (status: ${status}):`, kakaoError);
+
+          // 카카오 에러코드 분류
+          if (status === 401) {
+            throw new functions.https.HttpsError(
+              "unauthenticated",
+              "유효하지 않거나 만료된 Access Token입니다. 다시 로그인해주세요.",
+              {errorCode: SocialLoginError.TOKEN_EXPIRED}
+            );
+          } else if (status === 400) {
+            throw new functions.https.HttpsError(
+              "invalid-argument",
+              "잘못된 요청입니다. Access Token을 확인해주세요.",
+              {errorCode: SocialLoginError.TOKEN_INVALID}
+            );
+          } else if (status >= 500) {
+            throw new functions.https.HttpsError(
+              "unavailable",
+              "카카오 서버에 일시적인 문제가 발생했습니다. 잠시 후 다시 시도해주세요.",
+              {errorCode: SocialLoginError.PROVIDER_DOWN}
+            );
+          }
+        } else if (error.code === "ECONNABORTED") {
+          throw new functions.https.HttpsError(
+            "deadline-exceeded",
+            "카카오 서버 응답 시간 초과. 네트워크를 확인해주세요.",
+            {errorCode: SocialLoginError.PROVIDER_DOWN}
+          );
+        }
+      }
+
+      throw new functions.https.HttpsError(
+        "internal",
+        "카카오 로그인 처리 중 오류가 발생했습니다.",
+        {errorCode: SocialLoginError.INTERNAL_ERROR}
       );
     }
   }

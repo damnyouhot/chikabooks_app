@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -15,6 +16,7 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   final _auth = FirebaseAuth.instance;
+  final _firestore = FirebaseFirestore.instance;
   PackageInfo? _pkg;
 
   @override
@@ -31,17 +33,49 @@ class _SettingsPageState extends State<SettingsPage> {
 
   User? get _user => _auth.currentUser;
 
-  String _providerLabel(User user) {
-    // providerData는 여러 개일 수 있음 (예: Apple + Email 연동 등)
+  /// ✅ Firestore에서 사용자 프로필 읽기
+  Future<Map<String, dynamic>?> _loadUserProfile() async {
+    final user = _user;
+    if (user == null) return null;
+
+    try {
+      final snap = await _firestore.collection('users').doc(user.uid).get();
+      return snap.data();
+    } catch (e) {
+      debugPrint('⚠️ 사용자 프로필 로드 실패: $e');
+      return null;
+    }
+  }
+
+  /// ✅ Provider 라벨 (Firestore 기반)
+  String _providerLabelFromFirestore(Map<String, dynamic>? data) {
+    if (data == null) return '알 수 없음';
+    
+    final provider = data['provider'] as String?;
+    
+    return switch (provider) {
+      'kakao' => '카카오',
+      'naver' => '네이버',
+      'apple' => 'Apple',
+      'google' => 'Google',
+      'password' => '이메일',
+      _ => provider != null ? '기타($provider)' : '알 수 없음',
+    };
+  }
+
+  /// ⚠️ 백업: providerData 기반 (Firestore 실패 시)
+  String _providerLabelFromAuth(User user) {
     final providers = user.providerData.map((e) => e.providerId).toSet();
 
-    // 가장 흔한 케이스 우선 표시
     if (providers.contains('password')) return '이메일';
     if (providers.contains('google.com')) return 'Google';
     if (providers.contains('apple.com')) return 'Apple';
 
-    // 카카오/네이버는 Firebase Custom Token으로 구현되었으므로
-    // providerId가 다를 수 있음 (예: custom, oidc.kakao 등)
+    // UID 기반 추측
+    if (user.uid.startsWith('kakao_')) return '카카오';
+    if (user.uid.startsWith('naver_')) return '네이버';
+    if (user.uid.startsWith('apple_')) return 'Apple';
+
     if (providers.isNotEmpty) {
       final first = providers.first;
       if (first.contains('kakao')) return '카카오';
@@ -121,6 +155,11 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget build(BuildContext context) {
     final user = _user;
 
+    // 🧩 디버그: 현재 로그인 상태 확인
+    debugPrint('🧩 SETTINGS currentUser = ${user?.uid}');
+    debugPrint('🧩 SETTINGS email = ${user?.email}');
+    debugPrint('🧩 SETTINGS providerData = ${user?.providerData.map((e) => e.providerId).toList()}');
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('설정'),
@@ -137,13 +176,39 @@ class _SettingsPageState extends State<SettingsPage> {
               subtitle: '로그인이 필요합니다.',
             )
           else
-            _AccountCard(
-              email: user.email ?? '이메일 정보 없음',
-              displayName: (user.displayName == null || user.displayName!.trim().isEmpty)
-                  ? '닉네임 없음'
-                  : user.displayName!.trim(),
-              provider: _providerLabel(user),
-              uid: user.uid,
+            // ✅ FutureBuilder로 Firestore 프로필 읽기
+            FutureBuilder<Map<String, dynamic>?>(
+              future: _loadUserProfile(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    child: Card(
+                      child: Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+                    ),
+                  );
+                }
+
+                final data = snapshot.data;
+                final provider = _providerLabelFromFirestore(data);
+                
+                // 백업: Firestore에 없으면 providerData/UID 기반으로 추측
+                final displayProvider = (data == null || data['provider'] == null)
+                    ? _providerLabelFromAuth(user)
+                    : provider;
+
+                return _AccountCard(
+                  email: user.email ?? data?['email'] as String? ?? '이메일 정보 없음',
+                  displayName: user.displayName ?? 
+                      data?['displayName'] as String? ?? 
+                      '닉네임 없음',
+                  provider: displayProvider,
+                  uid: user.uid,
+                );
+              },
             ),
 
           const SizedBox(height: 12),

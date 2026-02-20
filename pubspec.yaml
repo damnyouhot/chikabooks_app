@@ -10,20 +10,20 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # ▼▼▼ 모든 Firebase 패키지를 충돌 없던 이전 버전으로 되돌립니다 ▼▼▼
-  firebase_core: ^2.16.2
-  cloud_firestore: ^4.17.5
-  firebase_auth: ^4.6.5
-  firebase_storage: ^11.6.5
-  cloud_functions: ^4.7.6
-  # ▲▲▲ 모든 Firebase 패키지를 충돌 없던 이전 버전으로 되돌립니다 ▲▲▲
+  # ▼▼▼ Firebase 패키지 안정 버전 (Pigeon 이슈 해결) ▼▼▼
+  firebase_core: 2.24.2
+  cloud_firestore: 4.14.0
+  firebase_auth: 4.15.0
+  firebase_storage: 11.5.0
+  cloud_functions: 4.6.0
+  firebase_messaging: 14.7.0
+  # ▲▲▲ Firebase 패키지 안정 버전 (Pigeon 이슈 해결) ▲▲▲
 
   google_sign_in: ^6.3.0
-  sign_in_with_apple: ^6.1.1
+  sign_in_with_apple: ^6.1.2
   kakao_flutter_sdk_user: 1.9.5
   flutter_naver_login: ^2.0.1
   shimmer: ^3.0.0
-  firebase_messaging: ^14.7.10
   badges: ^3.1.2    
 
   epubx: ^4.0.0

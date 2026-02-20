@@ -12,12 +12,12 @@ class AppInitializer {
     // Rive 초기화
     await RiveFile.initialize();
 
-    // 카카오 SDK 초기화 (네이티브 앱 키 필요)
-    // TODO: 카카오 개발자 콘솔에서 네이티브 앱 키를 발급받아 여기에 입력하세요
-    KakaoSdk.init(
-      nativeAppKey: '683c7dcddbf93a77a45f0e1fe771c0ce',
-      // javaScriptAppKey: 'YOUR_KAKAO_JAVASCRIPT_APP_KEY', // 웹용 (선택)
-    );
+    // 카카오 SDK 초기화
+    KakaoSdk.init(nativeAppKey: '683c7dcddbf93a77a45f0e1fe771c0ce');
+
+    // ✅ 네이버 SDK는 AndroidManifest.xml과 Info.plist 설정으로 자동 초기화됨
+    // flutter_naver_login 패키지는 별도의 initSdk() 호출이 필요 없음
+    debugPrint('✅ 네이버 SDK: AndroidManifest.xml/Info.plist 설정 기반 자동 초기화');
 
     // Firebase 초기화 (중복 에러 무시)
     try {

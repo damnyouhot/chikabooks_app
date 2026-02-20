@@ -25,24 +25,63 @@ class _SignInPageState extends State<SignInPage> {
   Future<void> _signInWithGoogle() async {
     setState(() => _isLoading = true);
     try {
+      debugPrint('🔑 Google 로그인 시작');
+      
       final googleUser = await googleSignIn.signIn();
-      if (googleUser == null) return;
+      if (googleUser == null) {
+        debugPrint('⚠️ Google 로그인 취소됨 (사용자가 취소)');
+        return; // 사용자가 취소한 경우 - 스낵바 표시 안 함
+      }
 
       final googleAuth = await googleUser.authentication;
-      if (googleAuth.idToken == null) return;
+      if (googleAuth.idToken == null) {
+        debugPrint('❌ Google idToken이 null');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Google 로그인 실패. 다시 시도해주세요.')),
+          );
+        }
+        return; // ← 여기서 종료!
+      }
 
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
+      
       await FirebaseAuth.instance.signInWithCredential(credential);
+      
+      debugPrint('✅ Firebase Auth signInWithCredential 성공');
+      
+      // currentUser는 authStateChanges를 통해 비동기로 업데이트됨
+      // 짧은 대기 후 재확인
+      await Future.delayed(const Duration(milliseconds: 200));
+      
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        debugPrint('❌ Firebase Auth currentUser가 여전히 null (비정상)');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Google 로그인 실패. 다시 시도해주세요.')),
+          );
+        }
+        return; // ← 여기서 종료!
+      }
+      
+      // ✅ 성공 시에만 이 줄까지 도달
+      debugPrint('✅ Google 로그인 성공: ${currentUser.uid} (${currentUser.email})');
+      debugPrint('✅ Provider data: ${currentUser.providerData.map((e) => e.providerId).toList()}');
+      
+      // AuthGate가 자동으로 홈으로 보내므로 추가 라우팅 불필요
+      
     } catch (e) {
-      debugPrint('Google 로그인 실패: $e');
+      debugPrint('❌ Google 로그인 에러: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Google 로그인 실패: $e')),
+          SnackBar(content: Text('Google 로그인 오류: $e')),
         );
       }
+      return; // ← 에러 시 종료!
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -67,19 +106,32 @@ class _SignInPageState extends State<SignInPage> {
   Future<void> _signInWithKakao() async {
     setState(() => _isLoading = true);
     try {
-      // 🧪 임시 테스트: 직접 URL 호출
-      debugPrint('🧪 === 카카오 Functions 테스트 시작 ===');
-      await KakaoAuthService.testDirectCall();
-      debugPrint('🧪 === 테스트 종료, 실제 로그인은 스킵 ===');
-      return;
-
-      // ignore: dead_code
+      debugPrint('🔑 카카오 로그인 시작');
       final user = await KakaoAuthService.signInWithKakao();
-      if (user == null && mounted) {
+      
+      if (user == null) {
+        // ✅ 실패 시 명시적으로 return (절대 홈으로 이동하지 않음)
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('카카오 로그인 실패. 다시 시도해주세요.')),
+          );
+        }
+        return; // ← 여기서 종료!
+      }
+      
+      // ✅ 성공 시에만 이 줄까지 도달
+      debugPrint('✅ 카카오 로그인 성공: ${user.uid} (${user.email})');
+      
+      // AuthGate가 자동으로 홈으로 보내므로 추가 라우팅 불필요
+      
+    } catch (e) {
+      debugPrint('❌ 카카오 로그인 에러: $e');
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('카카오 로그인 실패')),
+          SnackBar(content: Text('카카오 로그인 오류: $e')),
         );
       }
+      return; // ← 에러 시 종료!
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -89,12 +141,33 @@ class _SignInPageState extends State<SignInPage> {
   Future<void> _signInWithNaver() async {
     setState(() => _isLoading = true);
     try {
+      debugPrint('🔑 네이버 로그인 시작');
       final user = await NaverAuthService.signInWithNaver();
-      if (user == null && mounted) {
+      
+      if (user == null) {
+        // ✅ 실패 시 명시적으로 return (절대 홈으로 이동하지 않음)
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('네이버 로그인 실패. 다시 시도해주세요.')),
+          );
+        }
+        return; // ← 여기서 종료!
+      }
+      
+      // ✅ 성공 시에만 이 줄까지 도달
+      debugPrint('✅ 네이버 로그인 성공: ${user.uid} (${user.email})');
+      debugPrint('✅ Provider data: ${user.providerData.map((e) => e.providerId).toList()}');
+      
+      // AuthGate가 자동으로 홈으로 보내므로 추가 라우팅 불필요
+      
+    } catch (e) {
+      debugPrint('❌ 네이버 로그인 에러: $e');
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('네이버 로그인 실패')),
+          SnackBar(content: Text('네이버 로그인 오류: $e')),
         );
       }
+      return; // ← 에러 시 종료!
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

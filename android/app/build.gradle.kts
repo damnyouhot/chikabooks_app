@@ -44,15 +44,11 @@ android {
         val mapsApiKey = localProperties.getProperty("MAPS_API_KEY") ?: ""
         manifestPlaceholders["mapsApiKey"] = mapsApiKey
         
-        // Kakao Native App Key (선택사항: build.gradle에서 주입하려면)
-        // val kakaoAppKey = localProperties.getProperty("KAKAO_NATIVE_APP_KEY") ?: ""
-        // manifestPlaceholders["kakaoAppKey"] = kakaoAppKey
-        
-        // Naver Client ID/Secret (선택사항)
-        // val naverClientId = localProperties.getProperty("NAVER_CLIENT_ID") ?: ""
-        // val naverClientSecret = localProperties.getProperty("NAVER_CLIENT_SECRET") ?: ""
-        // buildConfigField("String", "NAVER_CLIENT_ID", "\"$naverClientId\"")
-        // buildConfigField("String", "NAVER_CLIENT_SECRET", "\"$naverClientSecret\"")
+        // Naver Client ID/Secret
+        val naverClientId = localProperties.getProperty("NAVER_CLIENT_ID") ?: ""
+        val naverClientSecret = localProperties.getProperty("NAVER_CLIENT_SECRET") ?: ""
+        manifestPlaceholders["naverClientId"] = naverClientId
+        manifestPlaceholders["naverClientSecret"] = naverClientSecret
     }
 
     buildTypes {
