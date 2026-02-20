@@ -5,6 +5,12 @@ enum ReactionKind {
   clap,
   fire,
   thinking,
+  enthrone, // 추대
+}
+
+extension ReactionKindExtension on ReactionKind {
+  /// 점수 적용 대상 여부
+  bool get isScoring => this == ReactionKind.heart;
 }
 
 /// 이모지를 ReactionKind로 변환
@@ -20,6 +26,8 @@ ReactionKind? reactionKindFromEmoji(String emoji) {
       return ReactionKind.fire;
     case '🤔':
       return ReactionKind.thinking;
+    case '👑':
+      return ReactionKind.enthrone;
     default:
       return null;
   }
@@ -38,5 +46,7 @@ String reactionKindToEmoji(ReactionKind kind) {
       return '🔥';
     case ReactionKind.thinking:
       return '🤔';
+    case ReactionKind.enthrone:
+      return '👑';
   }
 }

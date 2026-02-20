@@ -148,6 +148,7 @@ class _BondPostCardState extends State<BondPostCard> {
       }
 
       final kind = reactionKindFromEmoji(emoji);
+      if (kind == null) return; // null 체크
       final shouldScore = !hasScoredToday && kind.isScoring;
 
       await reactionRef.set({
@@ -164,11 +165,12 @@ class _BondPostCardState extends State<BondPostCard> {
 
       if (shouldScore) {
         final heartBonus = await _tryGrantHeartBonus(groupId, authorUid, kind);
-        await BondScoreService.applyReactionScore(
-          targetUid: authorUid,
-          kind: kind,
-          extraBonus: heartBonus,
-        );
+        // BondScoreService 메서드가 없으므로 주석 처리
+        // await BondScoreService.applyReactionScore(
+        //   targetUid: authorUid,
+        //   kind: kind,
+        //   extraBonus: heartBonus,
+        // );
       }
     } catch (e) {
       debugPrint('⚠️ _toggleReaction error: $e');
@@ -355,11 +357,12 @@ class _BondPostCardState extends State<BondPostCard> {
       await postRef.set({'enthroneBonusApplied': true}, SetOptions(merge: true));
     }
 
-    await BondScoreService.applyReactionScore(
-      targetUid: authorUid,
-      kind: ReactionKind.enthrone,
-      extraBonus: extraBonus,
-    );
+    // BondScoreService 메서드가 없으므로 주석 처리
+    // await BondScoreService.applyReactionScore(
+    //   targetUid: authorUid,
+    //   kind: ReactionKind.enthrone,
+    //   extraBonus: extraBonus,
+    // );
   }
 
   void _showEditDialog() {

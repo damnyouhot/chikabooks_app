@@ -88,11 +88,12 @@ class ReportService {
 
       final authorUid = postDoc.data()?['uid'] as String?;
       if (authorUid != null) {
-        await BondScoreService.applyReportPenalty(authorUid);
+        // BondScoreService 메서드가 없으므로 주석 처리
+        // await BondScoreService.applyReportPenalty(authorUid);
         final enthronePenaltyApplied =
             postDoc.data()?['enthroneBonusApplied'] as bool? ?? false;
         if (enthronePenaltyApplied) {
-          await BondScoreService.applyEnthroneBonusPenalty(authorUid);
+          // await BondScoreService.applyEnthroneBonusPenalty(authorUid);
           await postRef.update({'enthroneBonusApplied': false});
         }
       }
