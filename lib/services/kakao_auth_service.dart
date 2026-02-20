@@ -9,6 +9,39 @@ class KakaoAuthService {
   static final _functions = FirebaseFunctions.instanceFor(region: 'us-central1');
   static final _auth = FirebaseAuth.instance;
 
+  /// 🧪 임시 테스트: 직접 URL 호출
+  static Future<void> testDirectCall() async {
+    try {
+      debugPrint('🧪 테스트 1: httpsCallable로 호출');
+      final callable1 = _functions.httpsCallable('createCustomToken');
+      final result1 = await callable1.call({
+        'provider': 'kakao',
+        'providerId': '4759907051',
+        'email': null,
+        'displayName': 'test',
+      });
+      debugPrint('✅ 테스트 1 성공: ${result1.data}');
+    } catch (e) {
+      debugPrint('❌ 테스트 1 실패: $e');
+    }
+
+    try {
+      debugPrint('🧪 테스트 2: httpsCallableFromUrl로 호출');
+      final callable2 = _functions.httpsCallableFromUrl(
+        Uri.parse('https://us-central1-chikabooks3rd.cloudfunctions.net/createCustomToken'),
+      );
+      final result2 = await callable2.call({
+        'provider': 'kakao',
+        'providerId': '4759907051',
+        'email': null,
+        'displayName': 'test',
+      });
+      debugPrint('✅ 테스트 2 성공: ${result2.data}');
+    } catch (e) {
+      debugPrint('❌ 테스트 2 실패: $e');
+    }
+  }
+
   /// 카카오 로그인 실행
   static Future<User?> signInWithKakao() async {
     try {

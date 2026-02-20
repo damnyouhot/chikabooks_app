@@ -67,6 +67,13 @@ class _SignInPageState extends State<SignInPage> {
   Future<void> _signInWithKakao() async {
     setState(() => _isLoading = true);
     try {
+      // 🧪 임시 테스트: 직접 URL 호출
+      debugPrint('🧪 === 카카오 Functions 테스트 시작 ===');
+      await KakaoAuthService.testDirectCall();
+      debugPrint('🧪 === 테스트 종료, 실제 로그인은 스킵 ===');
+      return;
+
+      // ignore: dead_code
       final user = await KakaoAuthService.signInWithKakao();
       if (user == null && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
