@@ -1,3 +1,4 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'core/config/app_initializer.dart';
 import 'core/config/app_providers.dart';
@@ -6,6 +7,10 @@ import 'pages/auth/auth_gate.dart';
 
 Future<void> main() async {
   await AppInitializer.initialize();
+
+  // 🔥 Firebase 프로젝트 확인 (디버깅용)
+  print('🔥 Firebase projectId = ${Firebase.app().options.projectId}');
+  print('🔥 Firebase appId     = ${Firebase.app().options.appId}');
 
   runApp(
     AppProviders(
