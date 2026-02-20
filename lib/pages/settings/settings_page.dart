@@ -107,10 +107,13 @@ class _SettingsPageState extends State<SettingsPage> {
       await _auth.signOut();
       
       if (!mounted) return;
+      
+      // 설정 페이지 닫기 (AuthGate로 돌아가서 자동으로 로그인 페이지로 이동)
+      Navigator.of(context).pop();
+      
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('로그아웃 되었어요.')),
       );
-      // AuthGate가 자동으로 로그인 페이지로 이동시킴
     }
   }
 

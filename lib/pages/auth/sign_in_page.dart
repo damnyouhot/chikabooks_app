@@ -97,6 +97,7 @@ class _SignInPageState extends State<SignInPage> {
   Future<void> _showEmailSignInDialog() async {
     final emailController = TextEditingController();
     final passwordController = TextEditingController();
+    final passwordConfirmController = TextEditingController();
     bool isSignUp = false;
 
     await showDialog(
@@ -104,21 +105,35 @@ class _SignInPageState extends State<SignInPage> {
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: Text(isSignUp ? '이메일 회원가입' : '이메일 로그인'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: emailController,
-                decoration: const InputDecoration(labelText: '이메일'),
-                keyboardType: TextInputType.emailAddress,
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: passwordController,
-                decoration: const InputDecoration(labelText: '비밀번호'),
-                obscureText: true,
-              ),
-            ],
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: emailController,
+                  decoration: const InputDecoration(labelText: '이메일'),
+                  keyboardType: TextInputType.emailAddress,
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: passwordController,
+                  decoration: InputDecoration(
+                    labelText: '비밀번호',
+                    hintText: isSignUp ? '8~20자, 영문·숫자·특수문자 조합' : null,
+                  ),
+                  obscureText: true,
+                ),
+                // 회원가입 시에만 비밀번호 확인 필드 표시
+                if (isSignUp) ...[
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: passwordConfirmController,
+                    decoration: const InputDecoration(labelText: '비밀번호 확인'),
+                    obscureText: true,
+                  ),
+                ],
+              ],
+            ),
           ),
           actions: [
             TextButton(
@@ -135,12 +150,46 @@ class _SignInPageState extends State<SignInPage> {
               onPressed: () async {
                 final email = emailController.text.trim();
                 final password = passwordController.text.trim();
+                final passwordConfirm = passwordConfirmController.text.trim();
 
                 if (email.isEmpty || password.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('이메일과 비밀번호를 입력하세요')),
                   );
                   return;
+                }
+
+                // 회원가입 시 비밀번호 검증
+                if (isSignUp) {
+                  // 비밀번호 확인 일치 여부
+                  if (password != passwordConfirm) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('비밀번호가 일치하지 않습니다')),
+                    );
+                    return;
+                  }
+
+                  // 비밀번호 길이 검증 (8~20자)
+                  if (password.length < 8 || password.length > 20) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('비밀번호는 8~20자여야 합니다')),
+                    );
+                    return;
+                  }
+
+                  // 비밀번호 조합 검증 (영문, 숫자, 특수문자 포함)
+                  final hasLetter = RegExp(r'[a-zA-Z]').hasMatch(password);
+                  final hasDigit = RegExp(r'[0-9]').hasMatch(password);
+                  final hasSpecial = RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(password);
+
+                  if (!hasLetter || !hasDigit || !hasSpecial) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('비밀번호는 영문, 숫자, 특수문자를 포함해야 합니다'),
+                      ),
+                    );
+                    return;
+                  }
                 }
 
                 User? user;
