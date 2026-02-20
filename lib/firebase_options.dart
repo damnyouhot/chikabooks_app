@@ -42,50 +42,50 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyCW9j-dsh6dFSWh9NWzJ7OPRPYasvgO0E0',
-    appId: '1:1022322314972:web:1de7a492567244842bee19',
-    messagingSenderId: '1022322314972',
-    projectId: 'chikabooks-app',
-    authDomain: 'chikabooks-app.firebaseapp.com',
-    storageBucket: 'chikabooks-app.firebasestorage.app',
+    apiKey: 'AIzaSyAFSsIsl1dtspv1l7r8v6zNHo28TfGwZwM',
+    appId: '1:215876124758:web:1de7a492567244842bee19',
+    messagingSenderId: '215876124758',
+    projectId: 'chikabooks3rd',
+    authDomain: 'chikabooks3rd.firebaseapp.com',
+    storageBucket: 'chikabooks3rd.firebasestorage.app',
     measurementId: 'G-WNLEHLVTB2',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyD57iT3qghJek-CrNoPKoWKybuTTsPixkk',
-    appId: '1:1022322314972:android:699c2c36ebbc30462bee19',
-    messagingSenderId: '1022322314972',
-    projectId: 'chikabooks-app',
-    storageBucket: 'chikabooks-app.firebasestorage.app',
+    apiKey: 'AIzaSyAFSsIsl1dtspv1l7r8v6zNHo28TfGwZwM',
+    appId: '1:215876124758:android:348adb3bac7ac6c7723bf7',
+    messagingSenderId: '215876124758',
+    projectId: 'chikabooks3rd',
+    storageBucket: 'chikabooks3rd.firebasestorage.app',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyCW9j-dsh6dFSWh9NWzJ7OPRPYasvgO0E0',
-    appId: '1:1022322314972:web:cf277512da9f5b842bee19',
-    messagingSenderId: '1022322314972',
-    projectId: 'chikabooks-app',
-    authDomain: 'chikabooks-app.firebaseapp.com',
-    storageBucket: 'chikabooks-app.firebasestorage.app',
+    apiKey: 'AIzaSyAFSsIsl1dtspv1l7r8v6zNHo28TfGwZwM',
+    appId: '1:215876124758:web:cf277512da9f5b842bee19',
+    messagingSenderId: '215876124758',
+    projectId: 'chikabooks3rd',
+    authDomain: 'chikabooks3rd.firebaseapp.com',
+    storageBucket: 'chikabooks3rd.firebasestorage.app',
     measurementId: 'G-GYVF2JVZ1H',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyDOgB-gSurY2JKxumN1bsAV6t5bcVrscA4',
-    appId: '1:1022322314972:ios:1623d705fd4073912bee19',
-    messagingSenderId: '1022322314972',
-    projectId: 'chikabooks-app',
-    storageBucket: 'chikabooks-app.firebasestorage.app',
-    iosClientId: '1022322314972-aise0ql6la51arel1m0ou6csb80bsrda.apps.googleusercontent.com',
+    apiKey: 'AIzaSyAFSsIsl1dtspv1l7r8v6zNHo28TfGwZwM',
+    appId: '1:215876124758:ios:1623d705fd4073912bee19',
+    messagingSenderId: '215876124758',
+    projectId: 'chikabooks3rd',
+    storageBucket: 'chikabooks3rd.firebasestorage.app',
+    iosClientId: '215876124758-aise0ql6la51arel1m0ou6csb80bsrda.apps.googleusercontent.com',
     iosBundleId: 'com.example.chikabooksApp',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyDOgB-gSurY2JKxumN1bsAV6t5bcVrscA4',
-    appId: '1:1022322314972:ios:1623d705fd4073912bee19',
-    messagingSenderId: '1022322314972',
-    projectId: 'chikabooks-app',
-    storageBucket: 'chikabooks-app.firebasestorage.app',
-    iosClientId: '1022322314972-aise0ql6la51arel1m0ou6csb80bsrda.apps.googleusercontent.com',
+    apiKey: 'AIzaSyAFSsIsl1dtspv1l7r8v6zNHo28TfGwZwM',
+    appId: '1:215876124758:ios:1623d705fd4073912bee19',
+    messagingSenderId: '215876124758',
+    projectId: 'chikabooks3rd',
+    storageBucket: 'chikabooks3rd.firebasestorage.app',
+    iosClientId: '215876124758-aise0ql6la51arel1m0ou6csb80bsrda.apps.googleusercontent.com',
     iosBundleId: 'com.example.chikabooksApp',
   );
 
