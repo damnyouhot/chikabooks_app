@@ -126,6 +126,89 @@ class _DebugTestDataPageState extends State<DebugTestDataPage> {
     }
   }
 
+  /// 모든 파트너 데이터 강제 삭제 (관리자용)
+  Future<void> _forceDeleteAllPartnerData() async {
+    setState(() {
+      _loading = true;
+      _message = '모든 파트너 데이터 강제 삭제 중...';
+    });
+
+    try {
+      final db = FirebaseFirestore.instance;
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      
+      if (uid == null) {
+        throw Exception('로그인이 필요합니다.');
+      }
+
+      // 1. 모든 partnerGroups 삭제
+      final groupsSnapshot = await db.collection('partnerGroups').get();
+      debugPrint('🔍 삭제할 그룹 수: ${groupsSnapshot.docs.length}');
+      
+      for (final groupDoc in groupsSnapshot.docs) {
+        // 서브컬렉션 memberMeta 삭제
+        final memberMetaSnapshot = await groupDoc.reference
+            .collection('memberMeta')
+            .get();
+        
+        for (final metaDoc in memberMetaSnapshot.docs) {
+          await metaDoc.reference.delete();
+        }
+        
+        // 그룹 문서 삭제
+        await groupDoc.reference.delete();
+        debugPrint('✅ 그룹 삭제: ${groupDoc.id}');
+      }
+
+      // 2. 모든 users에서 파트너 정보 제거
+      final usersSnapshot = await db.collection('users').get();
+      debugPrint('🔍 업데이트할 사용자 수: ${usersSnapshot.docs.length}');
+      
+      final batch = db.batch();
+      for (final userDoc in usersSnapshot.docs) {
+        batch.update(userDoc.reference, {
+          'partnerGroupId': FieldValue.delete(),
+          'partnerGroupEndsAt': FieldValue.delete(),
+          'partnerStatus': 'active',
+          'willMatchNextWeek': false,
+          'continueWithPartner': FieldValue.delete(),
+        });
+      }
+      await batch.commit();
+      debugPrint('✅ 모든 사용자 업데이트 완료');
+
+      // 3. 모든 매칭풀 삭제
+      final poolSnapshot = await db.collection('partnerMatchingPool').get();
+      debugPrint('🔍 삭제할 매칭풀 수: ${poolSnapshot.docs.length}');
+      
+      for (final poolDoc in poolSnapshot.docs) {
+        await poolDoc.reference.delete();
+      }
+      debugPrint('✅ 모든 매칭풀 삭제 완료');
+
+      // 4. 모든 continuePairs 삭제
+      final pairsSnapshot = await db.collection('partnerContinuePairs').get();
+      debugPrint('🔍 삭제할 페어 수: ${pairsSnapshot.docs.length}');
+      
+      for (final pairDoc in pairsSnapshot.docs) {
+        await pairDoc.reference.delete();
+      }
+      debugPrint('✅ 모든 페어 삭제 완료');
+      
+      setState(() {
+        _loading = false;
+        _message = '✅ 모든 파트너 데이터가 강제 삭제되었습니다!';
+      });
+    } catch (e, stackTrace) {
+      debugPrint('⚠️ 강제 삭제 오류: $e');
+      debugPrint('⚠️ 스택: $stackTrace');
+      setState(() {
+        _loading = false;
+        _message = '⚠️ 오류 발생: $e';
+      });
+    }
+  }
+
   /// 테스트 매칭 시작
   Future<void> _startTestMatching() async {
     setState(() {
@@ -246,6 +329,19 @@ class _DebugTestDataPageState extends State<DebugTestDataPage> {
             ),
             
             const SizedBox(height: 16),
+            
+            ElevatedButton.icon(
+              onPressed: _loading ? null : _forceDeleteAllPartnerData,
+              icon: const Icon(Icons.delete_forever),
+              label: const Text('🔥 모든 파트너 데이터 강제 삭제'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.all(16),
+                backgroundColor: Colors.deepOrange,
+                foregroundColor: Colors.white,
+              ),
+            ),
+            
+            const SizedBox(height: 12),
             
             ElevatedButton.icon(
               onPressed: _loading ? null : _clearPartnerData,
