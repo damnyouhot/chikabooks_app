@@ -2,7 +2,7 @@
   "indexes": [
     {
       "collectionGroup": "posts",
-      "queryScope": "COLLECTION",
+      "queryScope": "COLLECTION_GROUP",
       "fields": [
         {
           "fieldPath": "isDeleted",
