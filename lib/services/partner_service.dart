@@ -462,34 +462,49 @@ class PartnerService {
   /// - `MatchingResult.waiting(message)` — 풀에 등록, 대기 중
   /// - `MatchingResult.error(message)` — 에러
   static Future<MatchingResult> requestMatching() async {
+    debugPrint('🚀 [requestMatching] 시작');
+    
     try {
+      final uid = _auth.currentUser?.uid;
+      debugPrint('🔍 [requestMatching] UID: $uid');
+      
       final callable = FirebaseFunctions.instanceFor(
         region: 'asia-northeast3',
       ).httpsCallable('requestPartnerMatching');
 
+      debugPrint('🔍 [requestMatching] Cloud Function 호출 중...');
       final result = await callable.call<Map<String, dynamic>>();
+      debugPrint('🔍 [requestMatching] Cloud Function 응답 받음');
+      
       final data = result.data;
+      debugPrint('🔍 [requestMatching] 응답 데이터: $data');
 
       final status = data['status'] as String? ?? '';
       final groupId = data['groupId'] as String?;
       final message = data['message'] as String?;
 
+      debugPrint('🔍 [requestMatching] status: $status, groupId: $groupId, message: $message');
+
       if (status == 'matched' && groupId != null) {
+        debugPrint('✅ [requestMatching] 매칭 성공! 그룹 ID: $groupId');
         // 캐시 갱신 — 새 그룹 반영
         UserProfileService.clearCache();
         return MatchingResult.matched(groupId);
       }
 
+      debugPrint('⏳ [requestMatching] 대기 중: $message');
       return MatchingResult.waiting(
         message ?? '아직 함께할 사람이 부족해요.',
       );
     } on FirebaseFunctionsException catch (e) {
-      debugPrint('⚠️ requestMatching FunctionsError: ${e.code} ${e.message}');
+      debugPrint('⚠️ [requestMatching] FunctionsError - code: ${e.code}, message: ${e.message}');
+      debugPrint('⚠️ [requestMatching] FunctionsError - details: ${e.details}');
       return MatchingResult.error(
         e.message ?? '매칭 요청 중 문제가 생겼어요.',
       );
-    } catch (e) {
-      debugPrint('⚠️ requestMatching error: $e');
+    } catch (e, stackTrace) {
+      debugPrint('⚠️ [requestMatching] 예외 발생: $e');
+      debugPrint('⚠️ [requestMatching] 스택트레이스:\n$stackTrace');
       return MatchingResult.error('매칭 요청 중 문제가 생겼어요.');
     }
   }

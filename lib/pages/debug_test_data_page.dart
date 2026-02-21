@@ -217,7 +217,48 @@ class _DebugTestDataPageState extends State<DebugTestDataPage> {
     });
 
     try {
+      // ✅ 디버깅: 현재 사용자 프로필 확인
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      debugPrint('🔍 [매칭] 현재 UID: $uid');
+      
+      if (uid != null) {
+        final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+        final userData = userDoc.data();
+        
+        if (userData != null) {
+          debugPrint('🔍 [매칭] ━━━ 프로필 필드 확인 ━━━');
+          debugPrint('🔍 [매칭] isProfileCompleted: ${userData['isProfileCompleted']}');
+          debugPrint('🔍 [매칭] nickname: ${userData['nickname']}');
+          debugPrint('🔍 [매칭] careerGroup: ${userData['careerGroup']}');
+          debugPrint('🔍 [매칭] region: ${userData['region']}');
+          debugPrint('🔍 [매칭] mainConcerns: ${userData['mainConcerns']}');
+          debugPrint('🔍 [매칭] partnerStatus: ${userData['partnerStatus']}');
+          debugPrint('🔍 [매칭] partnerGroupId: ${userData['partnerGroupId']}');
+          debugPrint('🔍 [매칭] willMatchNextWeek: ${userData['willMatchNextWeek']}');
+          
+          // 필수 필드 검증
+          final missingFields = <String>[];
+          if (userData['isProfileCompleted'] != true) missingFields.add('isProfileCompleted');
+          if (userData['nickname'] == null || userData['nickname'] == '') missingFields.add('nickname');
+          if (userData['careerGroup'] == null || userData['careerGroup'] == '') missingFields.add('careerGroup');
+          if (userData['region'] == null || userData['region'] == '') missingFields.add('region');
+          if (userData['mainConcerns'] == null || (userData['mainConcerns'] as List).isEmpty) missingFields.add('mainConcerns');
+          
+          if (missingFields.isNotEmpty) {
+            debugPrint('⚠️ [매칭] 누락된 필수 필드: ${missingFields.join(", ")}');
+          } else {
+            debugPrint('✅ [매칭] 필수 필드 모두 존재');
+          }
+        } else {
+          debugPrint('⚠️ [매칭] 사용자 프로필 문서 없음!');
+        }
+      }
+      
+      debugPrint('🔍 [매칭] PartnerService.requestMatching() 호출 시작...');
       final result = await PartnerService.requestMatching();
+      debugPrint('🔍 [매칭] 결과 status: ${result.status}');
+      debugPrint('🔍 [매칭] 결과 message: ${result.message}');
+      debugPrint('🔍 [매칭] 결과 groupId: ${result.groupId}');
       
       setState(() {
         _loading = false;
@@ -229,7 +270,9 @@ class _DebugTestDataPageState extends State<DebugTestDataPage> {
           _message = '⚠️ ${result.message}';
         }
       });
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('⚠️ [매칭] 오류 발생: $e');
+      debugPrint('⚠️ [매칭] 스택트레이스:\n$stackTrace');
       setState(() {
         _loading = false;
         _message = '⚠️ 오류 발생: $e';

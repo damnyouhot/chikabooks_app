@@ -21,8 +21,11 @@ const db = admin.firestore();
 export const requestPartnerMatching = functions
   .region("asia-northeast3")
   .https.onCall(async (data, context) => {
+    console.log("🚀 [requestPartnerMatching] 함수 시작");
+
     // 1. 인증 체크
     if (!context.auth) {
+      console.warn("⚠️ [requestPartnerMatching] 인증 실패");
       throw new functions.https.HttpsError(
         "unauthenticated",
         "로그인이 필요합니다."
@@ -30,11 +33,14 @@ export const requestPartnerMatching = functions
     }
 
     const uid = context.auth.uid;
+    console.log(`🔍 [requestPartnerMatching] UID: ${uid}`);
 
     try {
       // 2. 사용자 프로필 확인
+      console.log(`🔍 [requestPartnerMatching] 사용자 프로필 조회 중...`);
       const userDoc = await db.collection("users").doc(uid).get();
       if (!userDoc.exists) {
+        console.warn(`⚠️ [requestPartnerMatching] 사용자 문서 없음: ${uid}`);
         throw new functions.https.HttpsError(
           "not-found",
           "사용자 프로필을 찾을 수 없습니다."
@@ -42,11 +48,21 @@ export const requestPartnerMatching = functions
       }
 
       const userData = userDoc.data()!;
+      console.log(`🔍 [requestPartnerMatching] 프로필 필드:`, {
+        isProfileCompleted: userData.isProfileCompleted,
+        nickname: userData.nickname,
+        careerGroup: userData.careerGroup,
+        region: userData.region,
+        mainConcerns: userData.mainConcerns?.length,
+        partnerStatus: userData.partnerStatus,
+        partnerGroupId: userData.partnerGroupId,
+      });
 
       // 3. 이미 활성 그룹이 있는지 확인
       if (userData.partnerGroupId && userData.partnerGroupEndsAt) {
         const endsAt = userData.partnerGroupEndsAt.toDate();
         if (endsAt > new Date()) {
+          console.log(`ℹ️ [requestPartnerMatching] 이미 활성 그룹 있음: ${userData.partnerGroupId}`);
           return {
             status: "already_in_group",
             message: "이미 활성 파트너 그룹이 있습니다.",
@@ -56,10 +72,12 @@ export const requestPartnerMatching = functions
       }
 
       // 4. 매칭 가능한 사용자 목록 조회 (본인 제외)
+      console.log(`🔍 [requestPartnerMatching] 매칭 가능 사용자 조회 중...`);
       const allUsers = await getMatchableUsers();
       const otherUsers = allUsers.filter((u) => u.uid !== uid);
 
-      console.log(`🔍 매칭 가능 사용자: ${otherUsers.length + 1}명 (본인 포함)`);
+      console.log(`🔍 [requestPartnerMatching] 매칭 가능 사용자: ${otherUsers.length + 1}명 (본인 포함)`);
+      console.log(`🔍 [requestPartnerMatching] 매칭 가능 사용자 UID 목록:`, [uid, ...otherUsers.map((u) => u.uid)]);
 
       // 5. 매칭 시도
       if (otherUsers.length >= 2) {
