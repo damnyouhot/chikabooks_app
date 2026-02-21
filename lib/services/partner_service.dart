@@ -505,6 +505,13 @@ class PartnerService {
       final groupRef = _db.collection('partnerGroups').doc();
       final group = PartnerGroup(
         id: groupRef.id,
+        ownerId: memberUids.first,
+        title: '결 ${DateTime.now().millisecondsSinceEpoch % 100}',
+        members: memberUids.map((uid) => PartnerMember(
+          uid: uid,
+          status: PartnerMemberStatus.active,
+          joinedAt: now,
+        )).toList(),
         createdAt: now,
         startedAt: now,
         endsAt: endsAt,
@@ -527,6 +534,7 @@ class PartnerService {
           uid: uid,
           region: userData['region'] ?? '',
           careerBucket: userData['careerBucket'] ?? '',
+          careerGroup: userData['careerGroup'] ?? '',
           mainConcernShown: (userData['mainConcerns'] as List?)?.isNotEmpty == true
               ? (userData['mainConcerns'] as List).first as String
               : null,
