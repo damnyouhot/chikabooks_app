@@ -44,7 +44,16 @@ class _BondPostSheetState extends State<BondPostSheet> {
   }
 
   Future<void> _checkPostingStatus() async {
-    final status = await BondPostService.getPostingStatus();
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    
+    // 현재 사용자의 파트너 그룹 ID 가져오기
+    final userDoc = await _db.collection('users').doc(uid).get();
+    final partnerGroupId = userDoc.data()?['partnerGroupId'] as String?;
+    
+    if (partnerGroupId == null || partnerGroupId.isEmpty) return;
+    
+    final status = await BondPostService.getPostingStatus(partnerGroupId);
     if (mounted) {
       setState(() {
         _remainingPosts = status['remainingToday'] as int;
@@ -59,9 +68,27 @@ class _BondPostSheetState extends State<BondPostSheet> {
       return;
     }
 
+    debugPrint('🔍 [글쓰기] 1단계: 쿨타임 체크 시작');
+    
+    // 현재 사용자의 파트너 그룹 ID 가져오기
+    final userDoc = await _db.collection('users').doc(uid).get();
+    final partnerGroupId = userDoc.data()?['partnerGroupId'] as String?;
+    
+    if (partnerGroupId == null || partnerGroupId.isEmpty) {
+      _showSnack('파트너 그룹에 가입해야 글을 쓸 수 있어요.');
+      return;
+    }
+    
+    debugPrint('🔍 [글쓰기] partnerGroupId: $partnerGroupId');
+
     // 시간대별 제한 체크
-    final status = await BondPostService.getPostingStatus();
+    final status = await BondPostService.getPostingStatus(partnerGroupId);
+    
+    debugPrint('🔍 [글쓰기] 2단계: 쿨타임 결과 = ${status['canPostNow']}');
+    debugPrint('🔍 [글쓰기] 메시지 = ${status['message']}');
+    
     if (!(status['canPostNow'] as bool)) {
+      debugPrint('❌ [글쓰기] 쿨타임으로 리턴됨');
       _showSnack(status['message'] as String);
       return;
     }
@@ -82,18 +109,11 @@ class _BondPostSheetState extends State<BondPostSheet> {
 
     setState(() => _posting = true);
     try {
-      // 현재 사용자의 파트너 그룹 ID 가져오기
-      final userDoc = await _db.collection('users').doc(uid).get();
-      final partnerGroupId = userDoc.data()?['partnerGroupId'] as String?;
-      
-      if (partnerGroupId == null || partnerGroupId.isEmpty) {
-        _showSnack('파트너 그룹에 가입해야 글을 쓸 수 있어요.');
-        setState(() => _posting = false);
-        return;
-      }
-      
       final currentSlot = BondPostService.getCurrentTimeSlot();
       final now = DateTime.now(); // 클라이언트 타임스탬프
+      
+      debugPrint('🔍 [글쓰기] 3단계: Firestore 저장 시작');
+      debugPrint('🔍 [글쓰기] 경로: partnerGroups/$partnerGroupId/posts');
       
       // partnerGroups/{partnerGroupId}/posts에 저장
       await _db
@@ -113,11 +133,14 @@ class _BondPostSheetState extends State<BondPostSheet> {
         'reports': 0,
       });
       
+      debugPrint('✅ [글쓰기] 4단계: Firestore 저장 성공!');
+      
       if (mounted) {
         Navigator.pop(context);
         _showSnack('기록되었어요 ✨');
       }
     } catch (e) {
+      debugPrint('❌ [글쓰기] Firestore 저장 실패: $e');
       _showSnack('오류가 발생했어요: $e');
     } finally {
       if (mounted) setState(() => _posting = false);

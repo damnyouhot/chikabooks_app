@@ -8,13 +8,14 @@ enum TimeSlot {
   afternoon // 12:00 ~ 23:59
 }
 
-/// 오늘을 나누기 게시물 서비스
+/// 오늘을 나누기 게시물 서비스 (파트너 그룹 기반)
 class BondPostService {
   static final _db = FirebaseFirestore.instance;
   static final _auth = FirebaseAuth.instance;
 
-  static CollectionReference<Map<String, dynamic>> get _postsRef =>
-      _db.collection('bondPosts');
+  /// 파트너 그룹의 posts 컬렉션 참조
+  static CollectionReference<Map<String, dynamic>> _groupPostsRef(String groupId) =>
+      _db.collection('partnerGroups').doc(groupId).collection('posts');
 
   /// KST 기준 오늘 dateKey (YYYY-MM-DD)
   static String todayDateKey() {
@@ -31,16 +32,23 @@ class BondPostService {
   /// 오늘 특정 시간대의 게시물 수 확인
   static Future<int> getTodayPostCountByTimeSlot({
     required String uid,
+    required String groupId,
     required TimeSlot timeSlot,
   }) async {
     try {
       final dateKey = todayDateKey();
       
-      final snap = await _postsRef
+      debugPrint('🔍 [쿨타임] 조회 경로: partnerGroups/$groupId/posts');
+      debugPrint('🔍 [쿨타임] uid: $uid, dateKey: $dateKey, timeSlot: ${timeSlot.name}');
+      
+      final snap = await _groupPostsRef(groupId)
           .where('uid', isEqualTo: uid)
           .where('dateKey', isEqualTo: dateKey)
           .where('timeSlot', isEqualTo: timeSlot.name)
+          .where('isDeleted', isEqualTo: false)
           .get();
+      
+      debugPrint('🔍 [쿨타임] 조회 결과: ${snap.docs.length}건');
       
       return snap.docs.length;
     } catch (e) {
@@ -50,15 +58,21 @@ class BondPostService {
   }
 
   /// 오늘 전체 게시물 수 확인
-  static Future<int> getTodayPostCount(String uid) async {
+  static Future<int> getTodayPostCount(String uid, String groupId) async {
     try {
       final dateKey = todayDateKey();
       
+      debugPrint('🔍 [쿨타임] 조회 경로: partnerGroups/$groupId/posts');
+      debugPrint('🔍 [쿨타임] uid: $uid, dateKey: $dateKey');
+      
       // dateKey를 기준으로 조회 (서버 타임스탬프 문제 회피)
-      final snap = await _postsRef
+      final snap = await _groupPostsRef(groupId)
           .where('uid', isEqualTo: uid)
           .where('dateKey', isEqualTo: dateKey)
+          .where('isDeleted', isEqualTo: false)
           .get();
+      
+      debugPrint('🔍 [쿨타임] 조회 결과: ${snap.docs.length}건');
       
       return snap.docs.length;
     } catch (e) {
@@ -68,7 +82,7 @@ class BondPostService {
   }
 
   /// 현재 시간대에 게시 가능 여부 확인
-  static Future<bool> canPostNow() async {
+  static Future<bool> canPostNow(String groupId) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return false;
 
@@ -82,6 +96,7 @@ class BondPostService {
     final currentSlot = getCurrentTimeSlot();
     final count = await getTodayPostCountByTimeSlot(
       uid: uid,
+      groupId: groupId,
       timeSlot: currentSlot,
     );
     
@@ -89,16 +104,16 @@ class BondPostService {
   }
 
   /// 오늘 게시 가능 여부 확인 (하루 2번 제한)
-  static Future<bool> canPostToday() async {
+  static Future<bool> canPostToday(String groupId) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return false;
     
-    final count = await getTodayPostCount(uid);
+    final count = await getTodayPostCount(uid, groupId);
     return count < 2;
   }
 
   /// 현재 시간대의 남은 게시 횟수와 다음 시간대 정보
-  static Future<Map<String, dynamic>> getPostingStatus() async {
+  static Future<Map<String, dynamic>> getPostingStatus(String groupId) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) {
       return {
@@ -124,9 +139,10 @@ class BondPostService {
     final currentSlot = getCurrentTimeSlot();
     final currentSlotCount = await getTodayPostCountByTimeSlot(
       uid: uid,
+      groupId: groupId,
       timeSlot: currentSlot,
     );
-    final totalCount = await getTodayPostCount(uid);
+    final totalCount = await getTodayPostCount(uid, groupId);
 
     if (totalCount >= 2) {
       return {
@@ -166,11 +182,11 @@ class BondPostService {
   }
 
   /// 오늘 남은 게시 횟수
-  static Future<int> getRemainingPostsToday() async {
+  static Future<int> getRemainingPostsToday(String groupId) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return 0;
     
-    final count = await getTodayPostCount(uid);
+    final count = await getTodayPostCount(uid, groupId);
     return (2 - count).clamp(0, 2);
   }
 }
