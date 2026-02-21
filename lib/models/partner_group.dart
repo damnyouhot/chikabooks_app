@@ -75,6 +75,8 @@ class PartnerGroup {
   final int weekNumber;          // 몇 주차 그룹인지 (연속 추적용)
   final Map<String, String>? continueSelections; // 이어가기 선택 {uidA: uidB}
   final List<String>? previousMemberUids;         // 이전 주 멤버 (이어가기 추적용)
+  final List<String>? previousPair;               // 이어가기 페어 (UI용)
+  final bool needsSupplementation;                 // 주중 보충 필요 여부
 
   const PartnerGroup({
     required this.id,
@@ -91,6 +93,8 @@ class PartnerGroup {
     this.weekNumber = 1,
     this.continueSelections,
     this.previousMemberUids,
+    this.previousPair,
+    this.needsSupplementation = false,
   });
 
   /// 현재 활동 중인 멤버 uid 목록
@@ -149,6 +153,8 @@ class PartnerGroup {
       'weekNumber': weekNumber,
       if (continueSelections != null) 'continueSelections': continueSelections,
       if (previousMemberUids != null) 'previousMemberUids': previousMemberUids,
+      if (previousPair != null) 'previousPair': previousPair,
+      'needsSupplementation': needsSupplementation,
       // 빠른 쿼리를 위한 중복 필드
       'activeMemberUids': activeMemberUids,
       'invitedMemberUids': invitedMemberUids,
@@ -189,6 +195,10 @@ class PartnerGroup {
       previousMemberUids: data['previousMemberUids'] != null
           ? List<String>.from(data['previousMemberUids'])
           : null,
+      previousPair: data['previousPair'] != null
+          ? List<String>.from(data['previousPair'])
+          : null,
+      needsSupplementation: data['needsSupplementation'] as bool? ?? false,
     );
   }
 
@@ -224,17 +234,21 @@ class GroupMemberMeta {
   final String uid;
   final String region;
   final String careerBucket;
+  final String careerGroup;
   final String? mainConcernShown;
   final String? workplaceType;
   final DateTime joinedAt;
+  final bool isSupplemented; // 보충 멤버 여부
 
   const GroupMemberMeta({
     required this.uid,
     required this.region,
     required this.careerBucket,
+    required this.careerGroup,
     this.mainConcernShown,
     this.workplaceType,
     required this.joinedAt,
+    this.isSupplemented = false,
   });
 
   Map<String, dynamic> toMap() {
@@ -242,9 +256,11 @@ class GroupMemberMeta {
       'uid': uid,
       'region': region,
       'careerBucket': careerBucket,
+      'careerGroup': careerGroup,
       'mainConcernShown': mainConcernShown,
       'workplaceType': workplaceType,
       'joinedAt': Timestamp.fromDate(joinedAt),
+      'isSupplemented': isSupplemented,
     };
   }
 
@@ -254,9 +270,11 @@ class GroupMemberMeta {
       uid: data['uid'] as String,
       region: data['region'] as String? ?? '',
       careerBucket: data['careerBucket'] as String? ?? '',
+      careerGroup: data['careerGroup'] as String? ?? '',
       mainConcernShown: data['mainConcernShown'] as String?,
       workplaceType: data['workplaceType'] as String?,
       joinedAt: (data['joinedAt'] as Timestamp).toDate(),
+      isSupplemented: data['isSupplemented'] as bool? ?? false,
     );
   }
 }

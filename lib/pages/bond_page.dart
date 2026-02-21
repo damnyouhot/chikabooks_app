@@ -17,6 +17,9 @@ import '../widgets/bond/bond_poll_section.dart';
 import '../widgets/bond/bond_pause_card.dart';
 import '../widgets/bond/bond_continue_section.dart';
 import '../widgets/bond/bond_notification_toast.dart';
+import '../widgets/bond/bond_member_card.dart';
+import '../widgets/bond/bond_supplementation_listener.dart';
+import '../widgets/bond/bond_empty_state_widget.dart';
 import 'debug_test_data_page.dart';
 
 /// ─────────────────────────────────────────────────
@@ -42,6 +45,7 @@ class _BondPageState extends State<BondPage> {
   String? _partnerGroupId; // 추후 파트너 데이터 연결용
   PartnerGroup? _partnerGroup; // 파트너 그룹 정보
   List<GroupMemberMeta> _groupMembers = []; // 그룹 멤버 목록
+  String _partnerStatus = 'active'; // 파트너 상태
 
   // ── 결 파트 확장 ──
   bool _isBondExpanded = false;
@@ -55,10 +59,14 @@ class _BondPageState extends State<BondPage> {
 
   Future<void> _loadData() async {
     try {
-      final groupId = await UserProfileService.getPartnerGroupId();
+      // 프로필 및 그룹 정보 조회
+      final profile = await UserProfileService.getMyProfile(forceRefresh: true);
+      final groupId = profile?.partnerGroupId;
+      
       if (mounted) {
         setState(() {
           _partnerGroupId = groupId;
+          _partnerStatus = profile?.partnerStatus ?? 'active';
         });
         
         if (groupId != null) {
@@ -83,6 +91,12 @@ class _BondPageState extends State<BondPage> {
     } catch (e) {
       debugPrint('⚠️ _loadData error: $e');
     }
+  }
+
+  void _onMemberJoined() {
+    // 보충 멤버 합류 시 토스트 표시
+    BondNotificationToast.showMemberJoined(context);
+    _loadData(); // 데이터 재조회
   }
 
   Future<void> _checkAndShowNewWeekToast() async {
@@ -180,6 +194,7 @@ class _BondPageState extends State<BondPage> {
   @override
   Widget build(BuildContext context) {
     final uid = FirebaseAuth.instance.currentUser?.uid;
+    final groupState = BondStateHelper.getGroupStateString(_partnerGroup, _partnerStatus);
     
     return Scaffold(
       backgroundColor: BondColors.kBg,
@@ -198,8 +213,40 @@ class _BondPageState extends State<BondPage> {
               child: BondPauseCard(),
             ),
 
-            // ━━━ 추가: 이어가기 섹션 (조건부) ━━━
+            // ━━━ 추가: 보충 알림 리스너 ━━━
+            SliverToBoxAdapter(
+              child: BondSupplementationListener(
+                groupId: _partnerGroupId,
+                onMemberJoined: _onMemberJoined,
+              ),
+            ),
+
+            // ━━━ 추가: 상태별 엣지케이스 UI ━━━
+            if (groupState == 'no_group' || groupState == 'pause')
+              SliverToBoxAdapter(
+                child: BondEmptyStateWidget(state: groupState),
+              ),
+
+            if (groupState == 'expiring_soon')
+              const SliverToBoxAdapter(
+                child: BondEmptyStateWidget(state: 'expiring_soon'),
+              ),
+
+            // ━━━ 추가: 그룹 멤버 목록 ━━━
             if (_partnerGroup != null && _groupMembers.isNotEmpty)
+              SliverToBoxAdapter(
+                child: BondMemberListSection(
+                  myUid: uid,
+                  members: _groupMembers,
+                  previousPair: _partnerGroup!.previousPair,
+                  needsSupplementation: _partnerGroup!.needsSupplementation,
+                ),
+              ),
+
+            // ━━━ 추가: 이어가기 섹션 (조건부) ━━━
+            if (_partnerGroup != null && 
+                _groupMembers.isNotEmpty &&
+                BondStateHelper.canSelectContinue(_partnerGroup))
               SliverToBoxAdapter(
                 child: BondContinueSection(
                   groupId: _partnerGroup!.id,
