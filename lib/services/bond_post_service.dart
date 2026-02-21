@@ -50,6 +50,18 @@ class BondPostService {
       
       debugPrint('🔍 [쿨타임] 조회 결과: ${snap.docs.length}건');
       
+      // ✅ 실제 데이터 출력
+      if (snap.docs.isNotEmpty) {
+        for (var doc in snap.docs) {
+          final data = doc.data();
+          final text = data['text'] as String? ?? '';
+          final preview = text.length > 20 ? '${text.substring(0, 20)}...' : text;
+          debugPrint('  - 문서ID: ${doc.id}');
+          debugPrint('    내용: $preview');
+          debugPrint('    작성시간: ${data['createdAt']}');
+        }
+      }
+      
       return snap.docs.length;
     } catch (e) {
       debugPrint('⚠️ getTodayPostCountByTimeSlot error: $e');
@@ -73,6 +85,18 @@ class BondPostService {
           .get();
       
       debugPrint('🔍 [쿨타임] 조회 결과: ${snap.docs.length}건');
+      
+      // ✅ 실제 데이터 출력
+      if (snap.docs.isNotEmpty) {
+        for (var doc in snap.docs) {
+          final data = doc.data();
+          final text = data['text'] as String? ?? '';
+          final preview = text.length > 20 ? '${text.substring(0, 20)}...' : text;
+          debugPrint('  - 문서ID: ${doc.id}');
+          debugPrint('    내용: $preview');
+          debugPrint('    시간대: ${data['timeSlot']}');
+        }
+      }
       
       return snap.docs.length;
     } catch (e) {
@@ -126,8 +150,13 @@ class BondPostService {
 
     final kst = DateTime.now().toUtc().add(const Duration(hours: 9));
     
+    debugPrint('🔍 [쿨타임] 현재 시간 체크');
+    debugPrint('🔍 [쿨타임] UTC: ${DateTime.now().toUtc()}');
+    debugPrint('🔍 [쿨타임] KST: $kst (${kst.hour}시 ${kst.minute}분)');
+    
     // 새벽 시간 체크
     if (kst.hour < 6) {
+      debugPrint('❌ [쿨타임] 새벽 시간대 (${kst.hour}시) - 06시 이후 작성 가능');
       return {
         'canPostNow': false,
         'remainingToday': 2,
@@ -135,16 +164,24 @@ class BondPostService {
         'message': '아침 6시 이후에 작성할 수 있어요.',
       };
     }
+    
+    debugPrint('✅ [쿨타임] 새벽 시간 체크 통과');
 
     final currentSlot = getCurrentTimeSlot();
+    debugPrint('🔍 [쿨타임] 현재 시간대: ${currentSlot.name}');
+    
     final currentSlotCount = await getTodayPostCountByTimeSlot(
       uid: uid,
       groupId: groupId,
       timeSlot: currentSlot,
     );
     final totalCount = await getTodayPostCount(uid, groupId);
+    
+    debugPrint('🔍 [쿨타임] 현재 시간대 작성 횟수: $currentSlotCount');
+    debugPrint('🔍 [쿨타임] 오늘 총 작성 횟수: $totalCount');
 
     if (totalCount >= 2) {
+      debugPrint('❌ [쿨타임] 오늘 2번 모두 작성 완료');
       return {
         'canPostNow': false,
         'remainingToday': 0,
@@ -155,6 +192,7 @@ class BondPostService {
 
     if (currentSlotCount >= 1) {
       if (currentSlot == TimeSlot.morning) {
+        debugPrint('❌ [쿨타임] 오전 시간대 이미 작성 완료 - 12시 이후 가능');
         return {
           'canPostNow': false,
           'remainingToday': 1,
@@ -162,6 +200,7 @@ class BondPostService {
           'message': '낮 12시 이후에 한 번 더 나눌 수 있어요.',
         };
       } else {
+        debugPrint('❌ [쿨타임] 오후 시간대 이미 작성 완료');
         return {
           'canPostNow': false,
           'remainingToday': 0,
@@ -171,6 +210,7 @@ class BondPostService {
       }
     }
 
+    debugPrint('✅ [쿨타임] 작성 가능!');
     return {
       'canPostNow': true,
       'remainingToday': 2 - totalCount,
