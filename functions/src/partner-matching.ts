@@ -221,6 +221,7 @@ async function createPartnerGroup(
       partnerGroupId: groupId,
       partnerGroupEndsAt: admin.firestore.Timestamp.fromDate(endsAt),
       partnerStatus: "active", // 그룹 생성 시 active로 변경
+      willMatchNextWeek: false, // 그룹에 속하면 이 설정은 무시됨
       continueWithPartner: null, // 이어가기 초기화
       bondScore: admin.firestore.FieldValue.increment(0), // 없으면 생성
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),

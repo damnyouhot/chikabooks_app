@@ -89,6 +89,9 @@ class _DebugTestDataPageState extends State<DebugTestDataPage> {
           batch.update(db.collection('users').doc(memberUid), {
             'partnerGroupId': FieldValue.delete(),
             'partnerGroupEndsAt': FieldValue.delete(),
+            'partnerStatus': 'active', // active로 초기화
+            'willMatchNextWeek': false, // false로 초기화
+            'continueWithPartner': FieldValue.delete(),
           });
         }
         await batch.commit();
