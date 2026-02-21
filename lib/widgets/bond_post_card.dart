@@ -66,7 +66,7 @@ class _BondPostCardState extends State<BondPostCard> {
     try {
       final snapshot =
           await _db
-              .collection('bondGroups')
+              .collection('partnerGroups')
               .doc(groupId)
               .collection('posts')
               .doc(widget.postId)
@@ -94,7 +94,7 @@ class _BondPostCardState extends State<BondPostCard> {
     try {
       final snapshot =
           await _db
-              .collection('bondGroups')
+              .collection('partnerGroups')
               .doc(groupId)
               .collection('posts')
               .doc(widget.postId)
@@ -317,7 +317,7 @@ class _BondPostCardState extends State<BondPostCard> {
                       final collectionPath =
                           groupId == null
                               ? 'bondPosts'
-                              : 'bondGroups/$groupId/posts';
+                              : 'partnerGroups/$groupId/posts';
 
                       final success = await ReportService.reportPost(
                         documentPath: '$collectionPath/${widget.postId}',

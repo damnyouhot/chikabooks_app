@@ -38,7 +38,7 @@ class ReportService {
 
   /// 게시물 신고하기
   ///
-  /// [documentPath]: 'bondGroups/{groupId}/posts/{postId}' 또는 'bondPosts/{postId}' 등의 전체 경로
+  /// [documentPath]: 'partnerGroups/{groupId}/posts/{postId}' 또는 'bondPosts/{postId}' 등의 전체 경로
   /// [reason]: 신고 사유
   /// [additionalInfo]: 추가 설명 (선택)
   static Future<bool> reportPost({

@@ -94,9 +94,9 @@ class _BondPostSheetState extends State<BondPostSheet> {
       
       final currentSlot = BondPostService.getCurrentTimeSlot();
       
-      // bondGroups/{partnerGroupId}/posts에 저장
+      // partnerGroups/{partnerGroupId}/posts에 저장
       await _db
-          .collection('bondGroups')
+          .collection('partnerGroups')
           .doc(partnerGroupId)
           .collection('posts')
           .add({

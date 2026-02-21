@@ -58,7 +58,7 @@ class BondFeedSection extends StatelessWidget {
           StreamBuilder<QuerySnapshot?>(
             stream: partnerGroupId != null && partnerGroupId!.isNotEmpty
                 ? FirebaseFirestore.instance
-                    .collection('bondGroups')
+                    .collection('partnerGroups')
                     .doc(partnerGroupId)
                     .collection('posts')
                     .where('isDeleted', isEqualTo: false)

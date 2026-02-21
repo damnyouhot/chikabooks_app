@@ -25,7 +25,7 @@ class EnthroneService {
     try {
       // 중복 추대 방지: 이미 추대했는지 확인
       final existingEnthrone = await _db
-          .collection('bondGroups')
+          .collection('partnerGroups')
           .doc(bondGroupId)
           .collection('posts')
           .doc(postId)
@@ -45,7 +45,7 @@ class EnthroneService {
       );
 
       await _db
-          .collection('bondGroups')
+          .collection('partnerGroups')
           .doc(bondGroupId)
           .collection('posts')
           .doc(postId)
@@ -71,7 +71,7 @@ class EnthroneService {
 
     try {
       await _db
-          .collection('bondGroups')
+          .collection('partnerGroups')
           .doc(bondGroupId)
           .collection('posts')
           .doc(postId)
@@ -97,7 +97,7 @@ class EnthroneService {
 
     try {
       final doc = await _db
-          .collection('bondGroups')
+          .collection('partnerGroups')
           .doc(bondGroupId)
           .collection('posts')
           .doc(postId)
@@ -118,7 +118,7 @@ class EnthroneService {
   }) async {
     try {
       final snapshot = await _db
-          .collection('bondGroups')
+          .collection('partnerGroups')
           .doc(bondGroupId)
           .collection('posts')
           .doc(postId)
