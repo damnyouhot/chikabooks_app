@@ -154,16 +154,17 @@ class BondPostService {
     debugPrint('🔍 [쿨타임] UTC: ${DateTime.now().toUtc()}');
     debugPrint('🔍 [쿨타임] KST: $kst (${kst.hour}시 ${kst.minute}분)');
     
-    // 새벽 시간 체크
-    if (kst.hour < 6) {
-      debugPrint('❌ [쿨타임] 새벽 시간대 (${kst.hour}시) - 06시 이후 작성 가능');
-      return {
-        'canPostNow': false,
-        'remainingToday': 2,
-        'currentSlot': TimeSlot.morning,
-        'message': '아침 6시 이후에 작성할 수 있어요.',
-      };
-    }
+    // ✅ 새벽 시간 체크 제거 (에뮬레이터 시간 동기화 문제로 인해)
+    // 실제 배포 시에는 다시 활성화할 수 있습니다.
+    // if (kst.hour < 6) {
+    //   debugPrint('❌ [쿨타임] 새벽 시간대 (${kst.hour}시) - 06시 이후 작성 가능');
+    //   return {
+    //     'canPostNow': false,
+    //     'remainingToday': 2,
+    //     'currentSlot': TimeSlot.morning,
+    //     'message': '아침 6시 이후에 작성할 수 있어요.',
+    //   };
+    // }
     
     debugPrint('✅ [쿨타임] 새벽 시간 체크 통과');
 
