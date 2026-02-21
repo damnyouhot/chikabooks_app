@@ -142,3 +142,4 @@ firebase functions:list
 
 **마지막 업데이트**: 2026-02-21
 
+

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/user_profile_service.dart';
+import '../services/partner_service.dart';
+import '../models/partner_group.dart';
 import '../widgets/bond_post_sheet.dart';
 import '../widgets/profile_gate_sheet.dart';
 import '../widgets/bond/bond_colors.dart';
@@ -11,6 +14,9 @@ import '../widgets/bond/bond_stamp_section.dart';
 import '../widgets/bond/bond_feed_section.dart';
 import '../widgets/bond/bond_billboard_section.dart';
 import '../widgets/bond/bond_poll_section.dart';
+import '../widgets/bond/bond_pause_card.dart';
+import '../widgets/bond/bond_continue_section.dart';
+import '../widgets/bond/bond_notification_toast.dart';
 import 'debug_test_data_page.dart';
 
 /// ─────────────────────────────────────────────────
@@ -34,6 +40,8 @@ class BondPage extends StatefulWidget {
 class _BondPageState extends State<BondPage> {
   // ── 데이터 ──
   String? _partnerGroupId; // 추후 파트너 데이터 연결용
+  PartnerGroup? _partnerGroup; // 파트너 그룹 정보
+  List<GroupMemberMeta> _groupMembers = []; // 그룹 멤버 목록
 
   // ── 결 파트 확장 ──
   bool _isBondExpanded = false;
@@ -42,6 +50,7 @@ class _BondPageState extends State<BondPage> {
   void initState() {
     super.initState();
     _loadData();
+    _checkAndShowNewWeekToast();
   }
 
   Future<void> _loadData() async {
@@ -51,8 +60,73 @@ class _BondPageState extends State<BondPage> {
         setState(() {
           _partnerGroupId = groupId;
         });
+        
+        if (groupId != null) {
+          final group = await PartnerService.getMyGroup();
+          final members = await PartnerService.getGroupMembers(groupId);
+          
+          if (mounted) {
+            setState(() {
+              _partnerGroup = group;
+              _groupMembers = members;
+            });
+            
+            // 2인 시작 토스트
+            if (group != null && 
+                group.memberUids.length == 2 && 
+                group.weekNumber == 1) {
+              _showTwoPersonStartToast();
+            }
+          }
+        }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('⚠️ _loadData error: $e');
+    }
+  }
+
+  Future<void> _checkAndShowNewWeekToast() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final lastShownWeek = prefs.getString('lastNewWeekToast');
+      final currentWeek = _getCurrentWeekKey();
+
+      if (lastShownWeek != currentWeek && _partnerGroupId != null) {
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (mounted) {
+          BondNotificationToast.showNewWeek(context);
+          prefs.setString('lastNewWeekToast', currentWeek);
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ _checkAndShowNewWeekToast error: $e');
+    }
+  }
+
+  void _showTwoPersonStartToast() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final shown = prefs.getBool('shown2PersonToast_${_partnerGroupId}');
+      
+      if (shown != true) {
+        await Future.delayed(const Duration(milliseconds: 800));
+        if (mounted) {
+          BondNotificationToast.showTwoPersonStart(context);
+          prefs.setBool('shown2PersonToast_${_partnerGroupId}', true);
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ _showTwoPersonStartToast error: $e');
+    }
+  }
+
+  String _getCurrentWeekKey() {
+    final kst = DateTime.now().toUtc().add(const Duration(hours: 9));
+    final year = kst.year;
+    final startOfYear = DateTime(year, 1, 1);
+    final days = kst.difference(startOfYear).inDays;
+    final weekNumber = ((days + 1) / 7).ceil();
+    return '$year-W${weekNumber.toString().padLeft(2, '0')}';
   }
 
   // ── 한줄 멘트 작성 ──
@@ -118,6 +192,20 @@ class _BondPageState extends State<BondPage> {
                 onSettingsLongPress: _showTestDataDialog,
               ),
             ),
+
+            // ━━━ 추가: 쉬기 카드 ━━━
+            const SliverToBoxAdapter(
+              child: BondPauseCard(),
+            ),
+
+            // ━━━ 추가: 이어가기 섹션 (조건부) ━━━
+            if (_partnerGroup != null && _groupMembers.isNotEmpty)
+              SliverToBoxAdapter(
+                child: BondContinueSection(
+                  groupId: _partnerGroup!.id,
+                  members: _groupMembers,
+                ),
+              ),
 
             // ── 섹션 A: 요약 헤더 (실시간 결 점수) ──
             SliverToBoxAdapter(

@@ -136,3 +136,4 @@ class KakaoAuthService {
 
 카카오 로그인은 **서버 기반 토큰 검증**을 통해 보안을 강화하였습니다. 앱에서는 카카오 SDK를 통해 얻은 Access Token을 Cloud Functions로 전달하고, 서버에서 카카오 API를 통해 토큰을 재검증한 후 Firebase Custom Token을 발급하는 다층 보안 구조로 구현되었습니다. Release 빌드 시 Google Play App Signing Key에 대한 KeyHash 등록만 추가로 확인하면 됩니다.
 
+

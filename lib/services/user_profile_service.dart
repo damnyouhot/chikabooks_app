@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/user_public_profile.dart';
+import '../models/partner_preferences.dart';
 
 /// 교감 프로필 서비스 (캐시 포함)
 ///
@@ -126,6 +127,152 @@ class UserProfileService {
       return profile!.partnerGroupId;
     }
     return null;
+  }
+
+  /// 온보딩 프로필 완료 (닉네임 + 연차 + 관심사)
+  /// 최초 로그인 후 1회만 실행
+  static Future<void> completeOnboarding({
+    required String nickname,
+    required String careerGroup,
+    required List<String> concernTags,
+  }) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) throw Exception('로그인이 필요합니다.');
+
+    final data = {
+      'nickname': nickname.trim(),
+      'careerGroup': careerGroup,
+      'mainConcerns': concernTags,
+      'isProfileCompleted': true,
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+
+    await _db.collection('users').doc(uid).set(data, SetOptions(merge: true));
+    
+    // 캐시 갱신
+    _cache = await getMyProfile(forceRefresh: true);
+  }
+
+  /// 온보딩 완료 여부 체크
+  static Future<bool> isOnboardingCompleted() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return false;
+
+    try {
+      final doc = await _db.collection('users').doc(uid).get();
+      if (!doc.exists) return false;
+      
+      final data = doc.data();
+      return data?['isProfileCompleted'] == true;
+    } catch (e) {
+      debugPrint('⚠️ isOnboardingCompleted error: $e');
+      return false;
+    }
+  }
+
+  // ═══════════════════════ 파트너 선호도 (v1 설계) ═══════════════════════
+
+  /// 파트너 매칭 선호도 가져오기
+  static Future<PartnerPreferences> getPartnerPreferences() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return PartnerPreferences.defaultPreset();
+
+    try {
+      final doc = await _db.collection('users').doc(uid).get();
+      if (!doc.exists) return PartnerPreferences.defaultPreset();
+
+      final data = doc.data();
+      if (data?['partnerPreferences'] != null) {
+        return PartnerPreferences.fromMap(
+          data!['partnerPreferences'] as Map<String, dynamic>,
+        );
+      }
+      return PartnerPreferences.defaultPreset();
+    } catch (e) {
+      debugPrint('⚠️ getPartnerPreferences error: $e');
+      return PartnerPreferences.defaultPreset();
+    }
+  }
+
+  /// 파트너 매칭 선호도 저장
+  static Future<void> updatePartnerPreferences(
+    PartnerPreferences preferences,
+  ) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) throw Exception('로그인이 필요합니다.');
+
+    try {
+      await _db.collection('users').doc(uid).update({
+        'partnerPreferences': preferences.toMap(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      _cache = null; // 캐시 초기화
+    } catch (e) {
+      debugPrint('⚠️ updatePartnerPreferences error: $e');
+      rethrow;
+    }
+  }
+
+  /// 파트너 상태 업데이트 ('active' | 'pause')
+  static Future<void> updatePartnerStatus(String status) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) throw Exception('로그인이 필요합니다.');
+
+    if (status != 'active' && status != 'pause') {
+      throw Exception('유효하지 않은 상태값입니다: $status');
+    }
+
+    try {
+      await _db.collection('users').doc(uid).update({
+        'partnerStatus': status,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      _cache = null;
+    } catch (e) {
+      debugPrint('⚠️ updatePartnerStatus error: $e');
+      rethrow;
+    }
+  }
+
+  /// 다음 주 매칭 여부 업데이트 (pause 상태에서만 의미 있음)
+  static Future<void> updateWillMatchNextWeek(bool willMatch) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) throw Exception('로그인이 필요합니다.');
+
+    // pause 상태 확인 - active는 항상 매칭 대상이므로 변경 불가
+    final profile = await getMyProfile(forceRefresh: true);
+    if (profile?.partnerStatus != 'pause') {
+      debugPrint('⚠️ active 상태에서는 willMatchNextWeek 변경 불가 (항상 매칭 대상)');
+      return;
+    }
+
+    try {
+      await _db.collection('users').doc(uid).update({
+        'willMatchNextWeek': willMatch,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      _cache = null;
+    } catch (e) {
+      debugPrint('⚠️ updateWillMatchNextWeek error: $e');
+      rethrow;
+    }
+  }
+
+  /// 이어가기 파트너 선택
+  static Future<void> selectContinuePartner(String? partnerUid) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) throw Exception('로그인이 필요합니다.');
+
+    try {
+      await _db.collection('users').doc(uid).update({
+        'continueWithPartner': partnerUid,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      _cache = null;
+    } catch (e) {
+      debugPrint('⚠️ selectContinuePartner error: $e');
+      rethrow;
+    }
   }
 }
 

@@ -240,3 +240,4 @@ I/flutter: 🧩 SETTINGS providerData = [firebase]
 
 마지막 1% (`credential.user` 타입 에러)만 수정하면 완벽하게 작동합니다!
 
+

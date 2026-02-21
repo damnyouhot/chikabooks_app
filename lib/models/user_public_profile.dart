@@ -14,6 +14,11 @@ class UserPublicProfile {
   final int bondScoreVersion;      // 1=구버전(35~85), 2=신버전(0~100)
   final String? partnerGroupId;    // 현재 속한 파트너 그룹 ID
   final DateTime? partnerGroupEndsAt; // 그룹 종료일
+  
+  // ─── 매칭 설정 필드 (v1 설계) ───
+  final String partnerStatus;      // 'active' | 'pause' (기본값: 'active')
+  final bool willMatchNextWeek;    // 쉬는 중 매칭 되기 스위치 (기본값: true)
+  final String? continueWithPartner; // 이어가기 선택한 상대 UID
 
   const UserPublicProfile({
     this.nickname = '',
@@ -25,6 +30,9 @@ class UserPublicProfile {
     this.bondScoreVersion = 2,
     this.partnerGroupId,
     this.partnerGroupEndsAt,
+    this.partnerStatus = 'active',
+    this.willMatchNextWeek = true,
+    this.continueWithPartner,
   });
 
   /// Step A(기본 프로필) 완료 여부
@@ -63,6 +71,9 @@ class UserPublicProfile {
       bondScoreVersion: (m['bondScoreVersion'] ?? 1) as int,
       partnerGroupId: m['partnerGroupId'],
       partnerGroupEndsAt: endsAt,
+      partnerStatus: m['partnerStatus'] ?? 'active',
+      willMatchNextWeek: m['willMatchNextWeek'] ?? true,
+      continueWithPartner: m['continueWithPartner'],
     );
   }
 
@@ -99,15 +110,35 @@ class UserPublicProfile {
     '6+': '6년 이상',
   };
 
+  // 온보딩용 세분화된 연차 구간
+  static const List<String> careerGroups = [
+    '학생',
+    '1년차',
+    '2년차',
+    '3년차',
+    '4년차',
+    '5년차',
+    '6~10년차',
+    '11~15년차',
+    '15년차 이상',
+  ];
+
   static const List<String> concernOptions = [
     '환자 응대',
     '원장/상사 관계',
-    '동료 관계/팀 분위기',
-    '업무량/동선/체력',
-    '보험청구/실무 숙련',
-    '술기 성장(교정/임플란트 등)',
-    '이직/커리어/연봉',
-    '번아웃/감정 소진',
+    '동료 스트레스',
+    '이직/퇴사 고민',
+    '공부/시험',
+    '돈/연봉',
+    '번아웃',
+    '인간관계',
+    '업무량',
+    '출퇴근',
+    '보험청구/실무',
+    '술기 성장',
+    '그냥 막연함',
+    '딱히 없음',
+    '비밀로 할래요',
   ];
 
   static const List<String> workplaceTypes = [

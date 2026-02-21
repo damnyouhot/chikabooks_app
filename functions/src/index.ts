@@ -1194,3 +1194,16 @@ export const verifyKakaoToken = functions.https.onCall(
     }
   }
 );
+
+// ========== 파트너 매칭 시스템 ==========
+export {
+  requestPartnerMatching,
+  weeklyPartnerMatching,
+  expirePartnerGroups,
+} from "./partner-matching";
+
+// ========== 주중 보충 매칭 ==========
+export {
+  onGroupMemberChanged,
+  scheduledSupplementation,
+} from "./partner-supplementation";

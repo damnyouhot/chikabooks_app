@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'partner_preferences_page.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -210,6 +211,24 @@ class _SettingsPageState extends State<SettingsPage> {
                 );
               },
             ),
+
+          const SizedBox(height: 12),
+
+          // ━━━━━ 파트너 섹션 추가 ━━━━━
+          const _SectionTitle(title: '파트너'),
+          ListTile(
+            leading: const Icon(Icons.tune),
+            title: const Text('파트너 선정 기준'),
+            subtitle: const Text('매칭 우선순위 설정'),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const PartnerPreferencesPage(),
+                ),
+              );
+            },
+          ),
 
           const SizedBox(height: 12),
 
