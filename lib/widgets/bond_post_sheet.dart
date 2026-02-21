@@ -132,6 +132,9 @@ class _BondPostSheetState extends State<BondPostSheet> {
 
   @override
   Widget build(BuildContext context) {
+    // 키보드 높이 가져오기
+    final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
+    
     return GestureDetector(
       onTap: () => Navigator.pop(context), // 팝업 바깥 터치 시 닫기
       child: Container(
@@ -141,25 +144,31 @@ class _BondPostSheetState extends State<BondPostSheet> {
           minChildSize: 0.4,
           maxChildSize: 0.9,
           builder: (context, scrollCtrl) {
-            return GestureDetector(
-              onTap: () {}, // 팝업 내부 터치는 이벤트 전파 중단
-              child: Container(
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-                ),
-                padding: const EdgeInsets.all(24),
+            return Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              padding: EdgeInsets.only(
+                left: 24,
+                right: 24,
+                top: 24,
+                bottom: 24 + keyboardHeight, // 키보드 높이만큼 하단 패딩 추가
+              ),
+              child: SingleChildScrollView(
+                controller: scrollCtrl,
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     // 제목
-                                const Text(
-                                  '오늘을 나누기',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF6A5ACD),
-                                  ),
-                                ),
+                    const Text(
+                      '오늘을 나누기',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF6A5ACD),
+                      ),
+                    ),
                     const SizedBox(height: 4),
                     Text(
                       _remainingPosts > 0 
@@ -182,6 +191,7 @@ class _BondPostSheetState extends State<BondPostSheet> {
                       controller: _controller,
                       maxLength: 200,
                       maxLines: 5,
+                      autofocus: true, // 자동 포커스
                       decoration: InputDecoration(
                         hintText: '오늘 느낀 감정, 고민, 기쁨을 편하게 나눠주세요.',
                         border: OutlineInputBorder(
@@ -197,7 +207,7 @@ class _BondPostSheetState extends State<BondPostSheet> {
                       ),
                     ),
 
-                    const Spacer(),
+                    const SizedBox(height: 20),
 
                     // 버튼
                     SizedBox(
