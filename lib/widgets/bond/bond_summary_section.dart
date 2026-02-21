@@ -9,6 +9,7 @@ class BondSummarySection extends StatelessWidget {
   final VoidCallback onToggleExpand;
   final List<GroupMemberMeta>? members; // 실제 멤버 데이터
   final String? myUid; // 내 UID
+  final Map<String, String>? memberNicknames; // ✅ 멤버 닉네임 맵 {uid: nickname}
 
   const BondSummarySection({
     super.key,
@@ -17,6 +18,7 @@ class BondSummarySection extends StatelessWidget {
     required this.onToggleExpand,
     this.members,
     this.myUid,
+    this.memberNicknames, // ✅ 추가
   });
 
   @override
@@ -178,7 +180,9 @@ class BondSummarySection extends StatelessWidget {
         const SizedBox(height: 12),
         ...members!.map((member) {
           final isMe = member.uid == myUid;
-          final displayName = isMe ? '나' : '파트너';
+          // ✅ 닉네임 표시: memberNicknames에서 가져오기
+          final nickname = memberNicknames?[member.uid] ?? '파트너';
+          final displayName = isMe ? '나 ($nickname)' : nickname;
           
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),

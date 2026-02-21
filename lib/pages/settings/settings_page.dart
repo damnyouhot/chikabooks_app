@@ -204,7 +204,8 @@ class _SettingsPageState extends State<SettingsPage> {
 
                 return _AccountCard(
                   email: user.email ?? data?['email'] as String? ?? '이메일 정보 없음',
-                  displayName: user.displayName ?? 
+                  displayName: data?['nickname'] as String? ??  // ✅ nickname 필드 우선
+                      user.displayName ?? 
                       data?['displayName'] as String? ?? 
                       '닉네임 없음',
                   provider: displayProvider,

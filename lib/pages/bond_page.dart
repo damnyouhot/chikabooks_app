@@ -45,6 +45,7 @@ class _BondPageState extends State<BondPage> {
   String? _partnerGroupId; // 추후 파트너 데이터 연결용
   PartnerGroup? _partnerGroup; // 파트너 그룹 정보
   List<GroupMemberMeta> _groupMembers = []; // 그룹 멤버 목록
+  Map<String, String> _memberNicknames = {}; // ✅ 멤버 닉네임 맵 {uid: nickname}
   String _partnerStatus = 'active'; // 파트너 상태
 
   // ── 결 파트 확장 ──
@@ -73,10 +74,29 @@ class _BondPageState extends State<BondPage> {
           final group = await PartnerService.getMyGroup();
           final members = await PartnerService.getGroupMembers(groupId);
           
+          // ✅ 멤버 닉네임 조회
+          final nicknames = <String, String>{};
+          for (final member in members) {
+            try {
+              final userDoc = await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(member.uid)
+                  .get();
+              if (userDoc.exists) {
+                final data = userDoc.data();
+                nicknames[member.uid] = data?['nickname'] as String? ?? '파트너';
+              }
+            } catch (e) {
+              debugPrint('⚠️ 닉네임 조회 실패 (${member.uid}): $e');
+              nicknames[member.uid] = '파트너';
+            }
+          }
+          
           if (mounted) {
             setState(() {
               _partnerGroup = group;
               _groupMembers = members;
+              _memberNicknames = nicknames; // ✅ 닉네임 맵 저장
             });
             
             // 2인 시작 토스트
@@ -274,6 +294,7 @@ class _BondPageState extends State<BondPage> {
                           onToggleExpand: () => setState(() => _isBondExpanded = !_isBondExpanded),
                           members: _groupMembers,
                           myUid: uid,
+                          memberNicknames: _memberNicknames, // ✅ 추가
                         );
                       },
                     )
@@ -283,6 +304,7 @@ class _BondPageState extends State<BondPage> {
                       onToggleExpand: () => setState(() => _isBondExpanded = !_isBondExpanded),
                       members: _groupMembers,
                       myUid: uid,
+                      memberNicknames: _memberNicknames, // ✅ 추가
                     ),
             ),
 
