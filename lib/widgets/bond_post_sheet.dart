@@ -93,6 +93,7 @@ class _BondPostSheetState extends State<BondPostSheet> {
       }
       
       final currentSlot = BondPostService.getCurrentTimeSlot();
+      final now = DateTime.now(); // 클라이언트 타임스탬프
       
       // partnerGroups/{partnerGroupId}/posts에 저장
       await _db
@@ -105,7 +106,8 @@ class _BondPostSheetState extends State<BondPostSheet> {
         'bondGroupId': partnerGroupId,
         'dateKey': BondPostService.todayDateKey(),
         'timeSlot': currentSlot.name,
-        'createdAt': FieldValue.serverTimestamp(),
+        'createdAt': FieldValue.serverTimestamp(), // 서버 타임스탬프 (정확도)
+        'createdAtClient': Timestamp.fromDate(now), // 클라이언트 타임스탬프 (즉시 정렬 가능)
         'isDeleted': false,
         'publicEligible': true,
         'reports': 0,

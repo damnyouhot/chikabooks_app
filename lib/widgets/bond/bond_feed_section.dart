@@ -62,7 +62,7 @@ class BondFeedSection extends StatelessWidget {
                     .doc(partnerGroupId)
                     .collection('posts')
                     .where('isDeleted', isEqualTo: false)
-                    .orderBy('createdAt', descending: true)
+                    .orderBy('createdAtClient', descending: true)
                     .limit(3)
                     .snapshots()
                 : Stream.value(null),
