@@ -140,19 +140,40 @@ class UserProfileService {
     final uid = _auth.currentUser?.uid;
     if (uid == null) throw Exception('로그인이 필요합니다.');
 
+    debugPrint('🔍 [completeOnboarding] UID: $uid');
+    debugPrint('🔍 [completeOnboarding] nickname: $nickname');
+    debugPrint('🔍 [completeOnboarding] region: $region');
+    debugPrint('🔍 [completeOnboarding] careerGroup: $careerGroup');
+    debugPrint('🔍 [completeOnboarding] concernTags: $concernTags');
+
+    // ✅ careerGroup → careerBucket 변환
+    String careerBucket;
+    if (careerGroup == '학생' || careerGroup == '1년차' || careerGroup == '2년차') {
+      careerBucket = '0-2';
+    } else if (careerGroup == '3년차' || careerGroup == '4년차' || careerGroup == '5년차') {
+      careerBucket = '3-5';
+    } else {
+      careerBucket = '6+';
+    }
+
     final data = {
       'nickname': nickname.trim(),
       'region': region,
-      'careerGroup': careerGroup,
+      'careerGroup': careerGroup, // 원본도 저장
+      'careerBucket': careerBucket, // 매칭용 버킷도 저장
       'mainConcerns': concernTags,
       'isProfileCompleted': true,
       'updatedAt': FieldValue.serverTimestamp(),
     };
 
+    debugPrint('🔍 [completeOnboarding] Firestore 업데이트 시작...');
     await _db.collection('users').doc(uid).set(data, SetOptions(merge: true));
+    debugPrint('✅ [completeOnboarding] Firestore 업데이트 완료');
     
     // 캐시 갱신
+    debugPrint('🔍 [completeOnboarding] 캐시 갱신 중...');
     _cache = await getMyProfile(forceRefresh: true);
+    debugPrint('✅ [completeOnboarding] 캐시 갱신 완료');
   }
 
   /// 온보딩 완료 여부 체크

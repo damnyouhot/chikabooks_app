@@ -623,12 +623,57 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
   String? _selectedRegion;
   final Set<String> _selectedConcerns = {};
   bool _saving = false;
+  bool _isLoading = true; // ✅ 로딩 상태 추가
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadExistingProfile(); // ✅ 기존 프로필 로드
+  }
 
   @override
   void dispose() {
     _nicknameCtrl.dispose();
     super.dispose();
+  }
+
+  /// ✅ 기존 프로필 데이터 로드
+  Future<void> _loadExistingProfile() async {
+    try {
+      final profile = await UserProfileService.getMyProfile(forceRefresh: true);
+      
+      if (profile != null && mounted) {
+        setState(() {
+          // 기존 데이터가 있으면 필드에 채우기
+          if (profile.nickname.isNotEmpty) {
+            _nicknameCtrl.text = profile.nickname;
+          }
+          if (profile.careerGroup.isNotEmpty) {
+            _selectedCareer = profile.careerGroup;
+          }
+          if (profile.region.isNotEmpty) {
+            _selectedRegion = profile.region;
+          }
+          if (profile.mainConcerns.isNotEmpty) {
+            _selectedConcerns.addAll(profile.mainConcerns);
+          }
+          _isLoading = false;
+        });
+        
+        debugPrint('✅ 기존 프로필 로드 완료: ${profile.nickname}');
+      } else {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+        debugPrint('ℹ️ 신규 프로필 설정 모드');
+      }
+    } catch (e) {
+      debugPrint('⚠️ 프로필 로드 오류: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   void _generateRandomNickname() {
@@ -669,6 +714,12 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
     });
 
     try {
+      debugPrint('🔍 [OnboardingProfile] 저장 시작...');
+      debugPrint('🔍 [OnboardingProfile] nickname: ${_nicknameCtrl.text.trim()}');
+      debugPrint('🔍 [OnboardingProfile] region: $_selectedRegion');
+      debugPrint('🔍 [OnboardingProfile] careerGroup: $_selectedCareer');
+      debugPrint('🔍 [OnboardingProfile] concernTags: ${_selectedConcerns.toList()}');
+      
       await UserProfileService.completeOnboarding(
         nickname: _nicknameCtrl.text.trim(),
         region: _selectedRegion!,
@@ -676,10 +727,14 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
         concernTags: _selectedConcerns.toList(),
       );
 
+      debugPrint('✅ [OnboardingProfile] 저장 완료!');
+
       if (mounted) {
         Navigator.of(context).pop(true); // 성공 시 true 반환
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('⚠️ [OnboardingProfile] 저장 실패: $e');
+      debugPrint('⚠️ [OnboardingProfile] 스택트레이스:\n$stackTrace');
       if (mounted) {
         setState(() => _error = '저장 실패: $e');
       }
@@ -690,6 +745,18 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 로딩 중일 때 표시
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: CircularProgressIndicator(
+            color: Color(0xFF6A5ACD),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(

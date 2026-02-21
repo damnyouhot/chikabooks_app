@@ -5,7 +5,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class UserPublicProfile {
   final String nickname;
   final String region;        // "서울" | "부산" | ... (광역 단위)
-  final String careerBucket;  // "0-2" | "3-5" | "6+"
+  final String careerBucket;  // "0-2" | "3-5" | "6+" (매칭용)
+  final String careerGroup;   // "1년차" | "2년차" | ... (표시용)
   final List<String> mainConcerns; // 최대 2개
   final String? workplaceType;     // "개인치과" | "네트워크" | "대학병원" | "기타"
 
@@ -24,6 +25,7 @@ class UserPublicProfile {
     this.nickname = '',
     this.region = '',
     this.careerBucket = '',
+    this.careerGroup = '',
     this.mainConcerns = const [],
     this.workplaceType,
     this.bondScore = 50.0,
@@ -65,6 +67,7 @@ class UserPublicProfile {
       nickname: m['nickname'] ?? '',
       region: m['region'] ?? '',
       careerBucket: m['careerBucket'] ?? '',
+      careerGroup: m['careerGroup'] ?? '', // ✅ 추가
       mainConcerns: List<String>.from(m['mainConcerns'] ?? []),
       workplaceType: m['workplaceType'],
       bondScore: (m['bondScore'] ?? 50.0).toDouble(),
