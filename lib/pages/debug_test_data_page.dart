@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../utils/add_test_data.dart';
+import '../services/partner_service.dart';
 import 'imweb_api_test_page.dart';
 
 /// 디버그용 테스트 데이터 추가 페이지
@@ -57,13 +59,105 @@ class _DebugTestDataPageState extends State<DebugTestDataPage> {
     }
   }
 
+  /// 파트너 데이터 삭제 (내 그룹 + 매칭풀)
+  Future<void> _clearPartnerData() async {
+    setState(() {
+      _loading = true;
+      _message = '파트너 데이터 삭제 중...';
+    });
+
+    try {
+      final db = FirebaseFirestore.instance;
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      
+      if (uid == null) {
+        throw Exception('로그인이 필요합니다.');
+      }
+
+      // 1. 내 그룹 ID 가져오기
+      final userDoc = await db.collection('users').doc(uid).get();
+      final groupId = userDoc.data()?['partnerGroupId'] as String?;
+      
+      if (groupId != null) {
+        // 2. 그룹의 모든 멤버 가져오기
+        final groupDoc = await db.collection('partnerGroups').doc(groupId).get();
+        final memberUids = List<String>.from(groupDoc.data()?['memberUids'] ?? []);
+        
+        // 3. 모든 멤버의 users 문서에서 파트너 정보 제거
+        final batch = db.batch();
+        for (final memberUid in memberUids) {
+          batch.update(db.collection('users').doc(memberUid), {
+            'partnerGroupId': FieldValue.delete(),
+            'partnerGroupEndsAt': FieldValue.delete(),
+          });
+        }
+        await batch.commit();
+        
+        // 4. 그룹 멤버 메타 삭제
+        final memberMetaSnapshot = await db
+            .collection('partnerGroups')
+            .doc(groupId)
+            .collection('memberMeta')
+            .get();
+        
+        for (final doc in memberMetaSnapshot.docs) {
+          await doc.reference.delete();
+        }
+        
+        // 5. 그룹 문서 삭제
+        await db.collection('partnerGroups').doc(groupId).delete();
+      }
+      
+      // 6. 매칭풀에서 제거
+      await db.collection('partnerMatchingPool').doc(uid).delete();
+      
+      setState(() {
+        _loading = false;
+        _message = '✅ 파트너 데이터가 삭제되었습니다!';
+      });
+    } catch (e) {
+      setState(() {
+        _loading = false;
+        _message = '⚠️ 오류 발생: $e';
+      });
+    }
+  }
+
+  /// 테스트 매칭 시작
+  Future<void> _startTestMatching() async {
+    setState(() {
+      _loading = true;
+      _message = '매칭 요청 중...';
+    });
+
+    try {
+      final result = await PartnerService.requestMatching();
+      
+      setState(() {
+        _loading = false;
+        if (result.status == MatchingStatus.matched) {
+          _message = '✅ ${result.message}\n그룹 ID: ${result.groupId}';
+        } else if (result.status == MatchingStatus.waiting) {
+          _message = '⏳ ${result.message}';
+        } else {
+          _message = '⚠️ ${result.message}';
+        }
+      });
+    } catch (e) {
+      setState(() {
+        _loading = false;
+        _message = '⚠️ 오류 발생: $e';
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('🔧 개발자 도구'),
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -102,6 +196,79 @@ class _DebugTestDataPageState extends State<DebugTestDataPage> {
             ),
             
             const SizedBox(height: 20),
+            const Divider(),
+            const SizedBox(height: 20),
+
+            // ━━━ 파트너 시스템 테스트 섹션 추가 ━━━
+            const Text(
+              '파트너 시스템 테스트',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '💡 테스트 방법',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '1. 현재 계정에서 "파트너 데이터 삭제" 클릭\n'
+                    '2. 다른 SNS로 2개 계정 더 만들기\n'
+                    '3. 각 계정에서 프로필 완성 후 "매칭 시작" 클릭\n'
+                    '4. 3명이 모이면 자동으로 그룹 생성!',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey[700],
+                      height: 1.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            const SizedBox(height: 16),
+            
+            ElevatedButton.icon(
+              onPressed: _loading ? null : _clearPartnerData,
+              icon: const Icon(Icons.group_remove),
+              label: const Text('내 파트너 데이터 삭제'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.all(16),
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
+              ),
+            ),
+            
+            const SizedBox(height: 12),
+            
+            ElevatedButton.icon(
+              onPressed: _loading ? null : _startTestMatching,
+              icon: const Icon(Icons.group_add),
+              label: const Text('테스트 매칭 시작'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.all(16),
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+              ),
+            ),
+            
+            const SizedBox(height: 20),
             
             if (_loading)
               const Center(child: CircularProgressIndicator()),
@@ -112,7 +279,9 @@ class _DebugTestDataPageState extends State<DebugTestDataPage> {
                 decoration: BoxDecoration(
                   color: _message.contains('✅') 
                       ? Colors.green.shade50 
-                      : Colors.red.shade50,
+                      : _message.contains('⏳')
+                          ? Colors.orange.shade50
+                          : Colors.red.shade50,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -120,7 +289,9 @@ class _DebugTestDataPageState extends State<DebugTestDataPage> {
                   style: TextStyle(
                     color: _message.contains('✅') 
                         ? Colors.green.shade900 
-                        : Colors.red.shade900,
+                        : _message.contains('⏳')
+                            ? Colors.orange.shade900
+                            : Colors.red.shade900,
                   ),
                 ),
               ),
@@ -217,6 +388,8 @@ class _DebugTestDataPageState extends State<DebugTestDataPage> {
             const SizedBox(height: 12),
             const Text('• 전광판 게시물 3개 (다양한 파트너 그룹)'),
             const Text('• 오늘을 나누기 게시물 3개 (민지, 지은, 나)'),
+            
+            const SizedBox(height: 40),
           ],
         ),
       ),
