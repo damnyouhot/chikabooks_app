@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../models/partner_group.dart';
 import 'bond_colors.dart';
 
 /// 결 점수 + 파트너 아바타 요약 섹션
@@ -6,16 +7,25 @@ class BondSummarySection extends StatelessWidget {
   final double bondScore;
   final bool isExpanded;
   final VoidCallback onToggleExpand;
+  final List<GroupMemberMeta>? members; // 실제 멤버 데이터
+  final String? myUid; // 내 UID
 
   const BondSummarySection({
     super.key,
     required this.bondScore,
     required this.isExpanded,
     required this.onToggleExpand,
+    this.members,
+    this.myUid,
   });
 
   @override
   Widget build(BuildContext context) {
+    // 멤버가 없으면 렌더링하지 않음
+    if (members == null || members!.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
     return GestureDetector(
       onTap: onToggleExpand,
       child: AnimatedContainer(
@@ -117,11 +127,15 @@ class BondSummarySection extends StatelessWidget {
   }
 
   Widget _buildPartnerAvatars() {
-    // 더미 파트너 (실제 연결 시 교체)
-    final partners = ['P1', 'P2', 'P3'];
+    // 실제 멤버 데이터 사용
+    final displayMembers = members!.take(3).toList();
+    
     return Row(
-      children: partners.asMap().entries.map((e) {
+      children: displayMembers.asMap().entries.map((e) {
         final i = e.key;
+        final member = e.value;
+        final isMe = member.uid == myUid;
+        
         return Transform.translate(
           offset: Offset(-8.0 * i, 0),
           child: Container(
@@ -129,12 +143,12 @@ class BondSummarySection extends StatelessWidget {
             height: 32,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: BondColors.kShadow2,
+              color: isMe ? BondColors.kAccent.withOpacity(0.3) : BondColors.kShadow2,
               border: Border.all(color: BondColors.kCardBg, width: 1.5),
             ),
             child: Center(
               child: Text(
-                e.value,
+                isMe ? '나' : 'P${i + 1}',
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
@@ -149,13 +163,7 @@ class BondSummarySection extends StatelessWidget {
   }
 
   Widget _buildExpandedPartnerDetails() {
-    // 더미 파트너 (실제 연결 시 교체)
-    final partners = [
-      {'name': '민지', 'activity': '3', 'goals': '5/7'},
-      {'name': '지은', 'activity': '1', 'goals': '2/5'},
-      {'name': '현수', 'activity': '0', 'goals': '아직 없음'},
-    ];
-
+    // 실제 멤버 데이터 사용
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -168,10 +176,10 @@ class BondSummarySection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        ...partners.map((p) {
-          final name = p['name'] as String;
-          final activity = p['activity'] as String;
-          final goals = p['goals'] as String;
+        ...members!.map((member) {
+          final isMe = member.uid == myUid;
+          final displayName = isMe ? '나' : '파트너';
+          
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: Row(
@@ -179,13 +187,15 @@ class BondSummarySection extends StatelessWidget {
                 Container(
                   width: 40,
                   height: 40,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: BondColors.kShadow2,
+                    color: isMe 
+                        ? BondColors.kAccent.withOpacity(0.2) 
+                        : BondColors.kShadow2,
                   ),
                   child: Center(
                     child: Text(
-                      name[0],
+                      isMe ? '나' : 'P',
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -200,7 +210,7 @@ class BondSummarySection extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '${name}님',
+                        displayName,
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
@@ -208,7 +218,7 @@ class BondSummarySection extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        '활동 ${activity}회 · 목표 $goals',
+                        '${member.careerGroup} · ${member.region}',
                         style: TextStyle(
                           fontSize: 12,
                           color: BondColors.kText.withOpacity(0.6),

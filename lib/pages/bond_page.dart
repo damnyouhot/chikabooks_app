@@ -272,6 +272,8 @@ class _BondPageState extends State<BondPage> {
                           bondScore: bondScore,
                           isExpanded: _isBondExpanded,
                           onToggleExpand: () => setState(() => _isBondExpanded = !_isBondExpanded),
+                          members: _groupMembers,
+                          myUid: uid,
                         );
                       },
                     )
@@ -279,6 +281,8 @@ class _BondPageState extends State<BondPage> {
                       bondScore: 50.0,
                       isExpanded: _isBondExpanded,
                       onToggleExpand: () => setState(() => _isBondExpanded = !_isBondExpanded),
+                      members: _groupMembers,
+                      myUid: uid,
                     ),
             ),
 
