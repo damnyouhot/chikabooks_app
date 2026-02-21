@@ -7,6 +7,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'partner_preferences_page.dart';
+import '../onboarding/onboarding_profile_screen.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -214,8 +215,21 @@ class _SettingsPageState extends State<SettingsPage> {
 
           const SizedBox(height: 12),
 
-          // ━━━━━ 파트너 섹션 추가 ━━━━━
-          const _SectionTitle(title: '파트너'),
+          // ━━━━━ 파트너와 나 섹션 추가 ━━━━━
+          const _SectionTitle(title: '파트너와 나'),
+          ListTile(
+            leading: const Icon(Icons.person_outline),
+            title: const Text('내 캐릭터 설정'),
+            subtitle: const Text('닉네임, 연차, 지역군, 관심사 설정'),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const OnboardingProfileScreen(),
+                ),
+              );
+            },
+          ),
           ListTile(
             leading: const Icon(Icons.tune),
             title: const Text('파트너 선정 기준'),

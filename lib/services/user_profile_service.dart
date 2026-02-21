@@ -129,10 +129,11 @@ class UserProfileService {
     return null;
   }
 
-  /// 온보딩 프로필 완료 (닉네임 + 연차 + 관심사)
+  /// 온보딩 프로필 완료 (닉네임 + 지역군 + 연차 + 관심사)
   /// 최초 로그인 후 1회만 실행
   static Future<void> completeOnboarding({
     required String nickname,
+    required String region,
     required String careerGroup,
     required List<String> concernTags,
   }) async {
@@ -141,6 +142,7 @@ class UserProfileService {
 
     final data = {
       'nickname': nickname.trim(),
+      'region': region,
       'careerGroup': careerGroup,
       'mainConcerns': concernTags,
       'isProfileCompleted': true,

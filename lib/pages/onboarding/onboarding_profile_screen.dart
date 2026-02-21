@@ -620,6 +620,7 @@ class OnboardingProfileScreen extends StatefulWidget {
 class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
   final _nicknameCtrl = TextEditingController();
   String? _selectedCareer;
+  String? _selectedRegion;
   final Set<String> _selectedConcerns = {};
   bool _saving = false;
   String? _error;
@@ -655,6 +656,7 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
     return trimmed.isNotEmpty &&
         trimmed.length <= 7 &&
         _selectedCareer != null &&
+        _selectedRegion != null &&
         !_saving;
   }
 
@@ -669,6 +671,7 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
     try {
       await UserProfileService.completeOnboarding(
         nickname: _nicknameCtrl.text.trim(),
+        region: _selectedRegion!,
         careerGroup: _selectedCareer!,
         concernTags: _selectedConcerns.toList(),
       );
@@ -827,7 +830,49 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
                     ),
                     const SizedBox(height: 24),
 
-                    // ━━━━━━━━━━ 3단계: 관심사 ━━━━━━━━━━
+                    // ━━━━━━━━━━ 3단계: 지역군 ━━━━━━━━━━
+                    _buildSectionTitle('지역군'),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: UserPublicProfile.regionList.map((region) {
+                        final selected = _selectedRegion == region;
+                        return GestureDetector(
+                          onTap: () => setState(() => _selectedRegion = region),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 7,
+                            ),
+                            decoration: BoxDecoration(
+                              color: selected
+                                  ? const Color(0xFF6A5ACD)
+                                  : Colors.grey[100],
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: selected
+                                    ? const Color(0xFF6A5ACD)
+                                    : Colors.grey[300]!,
+                                width: 1,
+                              ),
+                            ),
+                            child: Text(
+                              region,
+                              style: TextStyle(
+                                color: selected ? Colors.white : Colors.grey[700],
+                                fontSize: 12,
+                                fontWeight:
+                                    selected ? FontWeight.w600 : FontWeight.normal,
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // ━━━━━━━━━━ 4단계: 관심사 ━━━━━━━━━━
                     _buildSectionTitle('관심사 (최대 3개)'),
                     const SizedBox(height: 8),
                     Wrap(

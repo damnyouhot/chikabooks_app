@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../pages/settings/communion_profile_page.dart';
+import '../../pages/settings/settings_page.dart';
 import 'bond_colors.dart';
 
 /// 결 탭 상단 타이틀 바
@@ -34,7 +34,7 @@ class BondTopBar extends StatelessWidget {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => const CommunionProfilePage(),
+                builder: (_) => const SettingsPage(),
               ),
             ),
             onLongPress: onSettingsLongPress,
