@@ -12,10 +12,7 @@ import '../models/ebook.dart';
 import '../widgets/speech_overlay.dart';
 import '../widgets/diary_input_sheet.dart';
 import '../widgets/user_goal_sheet.dart';
-import '../pages/hira_update_page.dart';
-import '../pages/ebook/ebook_list_page.dart';
-import '../pages/quiz_today_page.dart';
-import '../pages/job_page.dart';
+import '../pages/ebook/ebook_detail_page.dart';
 import 'settings/settings_page.dart';
 
 // ── 디자인 컬러 팔레트 ──
@@ -148,8 +145,7 @@ class _CaringPageState extends State<CaringPage>
       }
 
       setState(() {
-        _jobsSummary =
-            jobCount > 0 ? '오늘 새로 올라온 $jobCount건' : '새로운 구인 공고가 없어요';
+        _jobsSummary = jobCount > 0 ? '오늘 새로 올라온 $jobCount건' : '새로운 구인 공고가 없어요';
         _jobsSub = jobCount > 0 && clinicName.isNotEmpty ? clinicName : '';
         _upcomingPolicies = policies;
         _weeklyBook = featuredBook;
@@ -195,18 +191,15 @@ class _CaringPageState extends State<CaringPage>
     }
   }
 
-  /// 페이지 이동: Scaffold로 감싸서 Material ancestor 보장
-  void _goPage(Widget page) {
+  /// 이주의 책 상세 페이지 이동
+  void _goBookDetail() {
+    if (_weeklyBook == null) {
+      widget.onTabRequested?.call(2); // 책 없으면 성장하기 탭
+      return;
+    }
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => Scaffold(
-          appBar: AppBar(
-            backgroundColor: Colors.white,
-            elevation: 0,
-            iconTheme: const IconThemeData(color: Colors.black87),
-          ),
-          body: page,
-        ),
+        builder: (_) => EbookDetailPage(ebook: _weeklyBook!),
       ),
     );
   }
@@ -249,30 +242,31 @@ class _CaringPageState extends State<CaringPage>
     final offsetY = (size.height * 0.65) + (Random().nextDouble() * 30 - 15);
 
     final entry = OverlayEntry(
-      builder: (ctx) => Positioned(
-        left: offsetX,
-        top: offsetY,
-        child: TweenAnimationBuilder<double>(
-          tween: Tween(begin: 0.0, end: 1.0),
-          duration: const Duration(milliseconds: 1500),
-          builder: (_, value, child) {
-            return Transform.translate(
-              offset: Offset(0, -value * 50),
-              child: Opacity(
-                opacity: 1.0 - value,
-                child: Text(
-                  '+$delta',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: _colorAccent.withOpacity(1.0 - value),
+      builder:
+          (ctx) => Positioned(
+            left: offsetX,
+            top: offsetY,
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0.0, end: 1.0),
+              duration: const Duration(milliseconds: 1500),
+              builder: (_, value, child) {
+                return Transform.translate(
+                  offset: Offset(0, -value * 50),
+                  child: Opacity(
+                    opacity: 1.0 - value,
+                    child: Text(
+                      '+$delta',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: _colorAccent.withOpacity(1.0 - value),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            );
-          },
-        ),
-      ),
+                );
+              },
+            ),
+          ),
     );
 
     overlay.insert(entry);
@@ -314,8 +308,8 @@ class _CaringPageState extends State<CaringPage>
               child: _dogArtboard != null
                   ? Rive(
                       artboard: _dogArtboard!,
-                      fit: BoxFit.cover, // ✅ cover로 크기 복원
-                      alignment: Alignment.topCenter,
+                      fit: BoxFit.contain,
+                      alignment: Alignment.center,
                     )
                   : const SizedBox.shrink(),
             ),
@@ -368,32 +362,32 @@ class _CaringPageState extends State<CaringPage>
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     _buildTopBar(),
-                    // ① 구인
+                    // ① 구인 → 도전하기 탭(3)
                     _TapCard(
                       title: '📍 내 주변 신규 구인',
                       bigText: _jobsSummary,
                       subtitle: _jobsSub,
-                      onTap: () => _goPage(const JobPage()),
+                      onTap: () => widget.onTabRequested?.call(3),
                     ),
-                    // ② 임박 제도 변경 (타이틀 고정, 내용만 롤링)
+                    // ② 임박 제도 변경 → 성장하기 탭(2)
                     _PolicyRollingCard(
                       policies: _upcomingPolicies,
                       index: _policyIndex,
-                      onTap: () => _goPage(const HiraUpdatePage()),
+                      onTap: () => widget.onTabRequested?.call(2),
                     ),
-                    // ③ 이주의 책
+                    // ③ 이주의 책 → 책 상세 페이지 (유일하게 새 화면)
                     _TapCard(
                       title: '📖 이주의 책',
                       bigText: _weeklyBook?.title ?? '이번 주 추천 책이 없어요',
                       subtitle: _weeklyBook?.author ?? '',
-                      onTap: () => _goPage(const EbookListPage()),
+                      onTap: _goBookDetail,
                     ),
-                    // ④ 오늘의 1문제
+                    // ④ 오늘의 1문제 → 성장하기 탭(2)
                     _TapCard(
                       title: '🧠 오늘의 1문제',
                       bigText: _quizSummary,
                       subtitle: '터치해서 풀기',
-                      onTap: () => _goPage(const QuizTodayPage()),
+                      onTap: () => widget.onTabRequested?.call(2),
                     ),
                   ],
                 ),
@@ -427,9 +421,9 @@ class _CaringPageState extends State<CaringPage>
               size: 20,
             ),
             onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const SettingsPage()),
-              );
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const SettingsPage()));
             },
           ),
         ],
@@ -447,21 +441,9 @@ class _CaringPageState extends State<CaringPage>
           label: '밥먹기',
           onTap: _onFeed,
         ),
-        _ActionBtn(
-          icon: Icons.favorite_outline,
-          label: '사랑하기',
-          onTap: _onLove,
-        ),
-        _ActionBtn(
-          icon: Icons.edit_outlined,
-          label: '기록하기',
-          onTap: _onDiary,
-        ),
-        _ActionBtn(
-          icon: Icons.flag_outlined,
-          label: '목표',
-          onTap: _onGoal,
-        ),
+        _ActionBtn(icon: Icons.favorite_outline, label: '사랑하기', onTap: _onLove),
+        _ActionBtn(icon: Icons.edit_outlined, label: '기록하기', onTap: _onDiary),
+        _ActionBtn(icon: Icons.flag_outlined, label: '목표', onTap: _onGoal),
       ],
     );
   }
@@ -469,12 +451,13 @@ class _CaringPageState extends State<CaringPage>
   void _onFeed() async {
     final result = await CaringActionService.tryFeed();
     if (mounted) {
-      final message = result.success
-          ? (result.ment ?? '밥을 줬어요')
-          : (result.rejectMent ?? '나중에 다시 시도하세요');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
+      final message =
+          result.success
+              ? (result.ment ?? '밥을 줬어요')
+              : (result.rejectMent ?? '나중에 다시 시도하세요');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
       if (result.success) _bootstrap();
     }
   }
@@ -494,36 +477,37 @@ class _CaringPageState extends State<CaringPage>
   void _showConceptDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text(
-          "'나' 탭에 대해서",
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-        ),
-        content: const SingleChildScrollView(
-          child: Text(
-            "📱 캐릭터\n"
-            "• 터치하면 작은 교감이 쌓입니다.\n\n"
-            "🍚 밥먹기\n"
-            "• 하루 한 번, 캐릭터에게 밥을 줄 수 있습니다.\n\n"
-            "💕 사랑하기\n"
-            "• 캐릭터에게 사랑을 주는 것은 터치면 충분합니다.\n\n"
-            "📝 기록하기\n"
-            "• 오늘 하루를 한 줄로 기록합니다.\n\n"
-            "🎯 목표달성하기\n"
-            "• 주간 목표를 설정하고 체크합니다.\n\n"
-            "💖 결 점수\n"
-            "• 결은 당신과 앱(또는 파트너)과의 깊이를 나타냅니다.\n"
-            "• 교감이 쌓일수록 결이 깊어져요.",
-            style: TextStyle(fontSize: 13, height: 1.6),
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text(
+              "'나' 탭에 대해서",
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            content: const SingleChildScrollView(
+              child: Text(
+                "📱 캐릭터\n"
+                "• 터치하면 작은 교감이 쌓입니다.\n\n"
+                "🍚 밥먹기\n"
+                "• 하루 한 번, 캐릭터에게 밥을 줄 수 있습니다.\n\n"
+                "💕 사랑하기\n"
+                "• 캐릭터에게 사랑을 주는 것은 터치면 충분합니다.\n\n"
+                "📝 기록하기\n"
+                "• 오늘 하루를 한 줄로 기록합니다.\n\n"
+                "🎯 목표달성하기\n"
+                "• 주간 목표를 설정하고 체크합니다.\n\n"
+                "💖 결 점수\n"
+                "• 결은 당신과 앱(또는 파트너)과의 깊이를 나타냅니다.\n"
+                "• 교감이 쌓일수록 결이 깊어져요.",
+                style: TextStyle(fontSize: 13, height: 1.6),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('닫기'),
+              ),
+            ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('닫기'),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -599,7 +583,11 @@ class _TapCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right, color: Colors.black45, size: 20),
+                const Icon(
+                  Icons.chevron_right,
+                  color: Colors.black45,
+                  size: 20,
+                ),
               ],
             ),
           ),
@@ -662,65 +650,82 @@ class _PolicyRollingCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      // ✅ 내용만 롤링 (좌측 정렬 보장)
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 400),
-                        switchInCurve: Curves.easeIn,
-                        switchOutCurve: Curves.easeOut,
-                        layoutBuilder: (current, previous) => Stack(
-                          alignment: Alignment.centerLeft, // ✅ 좌측 정렬
-                          children: [
-                            ...previous,
-                            if (current != null) current,
-                          ],
-                        ),
-                        transitionBuilder: (child, animation) {
-                          return SlideTransition(
-                            position: Tween<Offset>(
-                              begin: const Offset(0, 0.5),
-                              end: Offset.zero,
-                            ).animate(animation),
-                            child: FadeTransition(
-                              opacity: animation,
-                              child: child,
-                            ),
-                          );
-                        },
-                        child: SizedBox(
-                          key: ValueKey(big),
-                          width: double.infinity,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                      // 내용만 롤링 (이전: 위로 나감 / 새것: 아래에서 올라옴)
+                      ClipRect(
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 350),
+                          layoutBuilder: (current, previous) => Stack(
+                            alignment: Alignment.centerLeft,
                             children: [
-                              Text(
-                                big,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
+                              ...previous,
+                              if (current != null) current,
+                            ],
+                          ),
+                          transitionBuilder: (child, animation) {
+                            // animation: 진입 시 0→1, 퇴장 시 1→0
+                            // 퇴장(reverse) → 위로 나감, 진입(forward) → 아래에서 올라옴
+                            final isLeaving =
+                                animation.status == AnimationStatus.reverse ||
+                                animation.status == AnimationStatus.dismissed;
+                            final offsetTween = Tween<Offset>(
+                              begin: isLeaving
+                                  ? const Offset(0, -1.0) // 퇴장: 위로
+                                  : const Offset(0, 1.0),  // 진입: 아래에서
+                              end: Offset.zero,
+                            );
+                            return SlideTransition(
+                              position: offsetTween.animate(
+                                CurvedAnimation(
+                                  parent: animation,
+                                  curve: Curves.easeInOut,
                                 ),
                               ),
-                              if (sub.isNotEmpty) ...[
-                                const SizedBox(height: 2),
+                              child: FadeTransition(
+                                opacity: animation,
+                                child: child,
+                              ),
+                            );
+                          },
+                          child: SizedBox(
+                            key: ValueKey(big),
+                            width: double.infinity,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
                                 Text(
-                                  sub,
+                                  big,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.black54,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
                                   ),
                                 ),
+                                if (sub.isNotEmpty) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    sub,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.black54,
+                                    ),
+                                  ),
+                                ],
                               ],
-                            ],
+                            ),
                           ),
                         ),
                       ),
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right, color: Colors.black45, size: 20),
+                const Icon(
+                  Icons.chevron_right,
+                  color: Colors.black45,
+                  size: 20,
+                ),
               ],
             ),
           ),
