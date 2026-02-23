@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
 
-/// 📍 내 주변 신규 구인 카드 (더미 데이터)
+/// 📍 내 주변 신규 구인 카드
 class JobsInfoCard extends StatelessWidget {
+  final Map<String, dynamic>? data;
   final VoidCallback? onTap;
 
-  const JobsInfoCard({super.key, this.onTap});
+  const JobsInfoCard({super.key, this.data, this.onTap});
 
   @override
   Widget build(BuildContext context) {
+    final count = data?['count'] ?? 0;
+    final clinicName = data?['clinicName'] ?? '';
+    final otherCount = count > 1 ? count - 1 : 0;
+
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 1),
       elevation: 1,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       child: InkWell(
@@ -36,9 +41,13 @@ class JobsInfoCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 4),
-              // 메인 텍스트 (가장 크게)
+              // 메인 텍스트
               Text(
-                '오늘 새로 올라온 3건',
+                data == null
+                    ? '로딩 중...'
+                    : count == 0
+                        ? '새로운 구인 공고가 없어요'
+                        : '오늘 새로 올라온 $count건',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
@@ -47,10 +56,11 @@ class JobsInfoCard extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               // 서브 텍스트
-              Text(
-                '서울대치과 외 2건',
-                style: TextStyle(fontSize: 10, color: Colors.black54),
-              ),
+              if (count > 0 && clinicName.isNotEmpty)
+                Text(
+                  otherCount > 0 ? '$clinicName 외 $otherCount건' : clinicName,
+                  style: TextStyle(fontSize: 10, color: Colors.black54),
+                ),
             ],
           ),
         ),

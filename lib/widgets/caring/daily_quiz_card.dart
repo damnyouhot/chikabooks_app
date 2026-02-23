@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
+import '../../models/daily_quiz.dart';
 
 /// 🧠 오늘의 1문제 카드
 class DailyQuizCard extends StatelessWidget {
+  final DailyQuiz? quiz;
   final VoidCallback? onStart;
 
-  const DailyQuizCard({super.key, this.onStart});
+  const DailyQuizCard({super.key, this.quiz, this.onStart});
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 1),
       elevation: 1,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       child: Padding(
@@ -33,9 +35,13 @@ class DailyQuizCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 4),
-            // 질문 (1줄만)
+            // 질문
             Text(
-              '치주낭 측정 시 올바른 탐침 방향은?',
+              quiz == null
+                  ? '로딩 중...'
+                  : quiz!.question.isEmpty
+                      ? '오늘의 퀴즈가 준비되지 않았어요'
+                      : quiz!.question,
               style: TextStyle(fontSize: 11, color: Colors.black87),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -45,7 +51,9 @@ class DailyQuizCard extends StatelessWidget {
             Align(
               alignment: Alignment.centerLeft,
               child: ElevatedButton(
-                onPressed: onStart,
+                onPressed: quiz != null && quiz!.question.isNotEmpty
+                    ? onStart
+                    : null,
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,

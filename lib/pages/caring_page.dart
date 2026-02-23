@@ -5,6 +5,12 @@ import 'package:rive/rive.dart';
 import '../services/caring_state_service.dart';
 import '../services/bond_score_service.dart';
 import '../services/caring_action_service.dart';
+import '../services/job_service.dart';
+import '../services/policy_update_service.dart';
+import '../services/featured_book_service.dart';
+import '../services/daily_quiz_service.dart';
+import '../models/policy_update.dart';
+import '../models/daily_quiz.dart';
 import '../widgets/speech_overlay.dart';
 import '../widgets/diary_input_sheet.dart';
 import '../widgets/user_goal_sheet.dart';
@@ -36,6 +42,12 @@ class _CaringPageState extends State<CaringPage>
   // ── 상태 ──
   bool _loading = true;
   bool _hasGreetedToday = false;
+
+  // ── ✨ 카드 데이터 상태 ──
+  Map<String, dynamic>? _jobData;
+  List<PolicyUpdate>? _policyUpdates;
+  Map<String, dynamic>? _featuredBook;
+  DailyQuiz? _dailyQuiz;
 
   // ── ✨ 새로운 말풍선 시스템 ──
   String? _currentSpeech; // 현재 말풍선 텍스트
@@ -111,11 +123,20 @@ class _CaringPageState extends State<CaringPage>
     super.dispose();
   }
 
-  /// Firestore에서 상태 로드
+  /// Firestore에서 상태 로드 + 4개 카드 데이터 병렬 로드
   Future<void> _loadState() async {
     try {
+      // 1. 기존 상태 로드 및 결 점수 중력
       final state = await CaringStateService.loadState();
       await BondScoreService.applyCenterGravity();
+
+      // 2. 4개 카드 데이터 병렬 로드
+      final results = await Future.wait([
+        JobService.getRecentJobsSummary(), // ① 구인
+        PolicyUpdateService.getUpcomingUpdates(limit: 3), // ② 실무
+        FeaturedBookService.getCurrentFeaturedBook(), // ③ 이주의 책
+        DailyQuizService.getTodayQuiz(), // ④ 퀴즈
+      ]);
 
       if (!mounted) return;
 
@@ -123,9 +144,14 @@ class _CaringPageState extends State<CaringPage>
 
       setState(() {
         _hasGreetedToday = greeted;
+        _jobData = results[0] as Map<String, dynamic>?;
+        _policyUpdates = results[1] as List<PolicyUpdate>?;
+        _featuredBook = results[2] as Map<String, dynamic>?;
+        _dailyQuiz = results[3] as DailyQuiz?;
         _loading = false;
       });
-    } catch (_) {
+    } catch (e) {
+      debugPrint('❌ 데이터 로드 실패: $e');
       if (mounted) setState(() => _loading = false);
     }
   }
@@ -351,35 +377,41 @@ class _CaringPageState extends State<CaringPage>
                 children: [
                   // 상단 바 (설정)
                   _buildTopBar(),
-                  // 카드 영역 (스크롤 제거, Column으로 고정)
+                  // 카드 영역 (스크롤 제거, 빽빽하게 배치)
                   Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        // ① 구인 카드
-                        JobsInfoCard(
-                          onTap: () {
-                            // TODO: 4번째 탭(도전하기)으로 이동
-                            debugPrint('구인 카드 탭');
-                          },
-                        ),
-                        // ② 실무(급여 변경) 카드
-                        const SalaryUpdateCard(),
-                        // ③ 이주의 책 카드
-                        WeeklyBookCard(
-                          onPreview: () {
-                            // TODO: 책 미리보기
-                            debugPrint('1분 미리보기 탭');
-                          },
-                        ),
-                        // ④ 퀴즈 카드
-                        DailyQuizCard(
-                          onStart: () {
-                            // TODO: 퀴즈 풀기
-                            debugPrint('바로 풀기 탭');
-                          },
-                        ),
-                      ],
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        children: [
+                          // ① 구인 카드
+                          JobsInfoCard(
+                            data: _jobData,
+                            onTap: () {
+                              // TODO: 4번째 탭(도전하기)으로 이동
+                              debugPrint('구인 카드 탭');
+                            },
+                          ),
+                          // ② 실무(급여 변경) 카드
+                          SalaryUpdateCard(updates: _policyUpdates),
+                          // ③ 이주의 책 카드
+                          WeeklyBookCard(
+                            data: _featuredBook,
+                            onPreview: () {
+                              // TODO: 책 미리보기
+                              debugPrint('1분 미리보기 탭');
+                            },
+                          ),
+                          // ④ 퀴즈 카드
+                          DailyQuizCard(
+                            quiz: _dailyQuiz,
+                            onStart: () {
+                              // TODO: 퀴즈 풀기
+                              debugPrint('바로 풀기 탭');
+                            },
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
