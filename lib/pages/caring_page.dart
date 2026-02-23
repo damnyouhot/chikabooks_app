@@ -372,9 +372,13 @@ class _CaringPageState extends State<CaringPage>
     final available = screenHeight - characterTop - characterBottom;
     final minCharacterSpace = 140.0;
     final safeTop = characterTop;
-    final safeBottom = available < minCharacterSpace
-        ? (screenHeight - safeTop - minCharacterSpace).clamp(0.0, screenHeight)
-        : characterBottom;
+    final safeBottom =
+        available < minCharacterSpace
+            ? (screenHeight - safeTop - minCharacterSpace).clamp(
+              0.0,
+              screenHeight,
+            )
+            : characterBottom;
 
     return Stack(
       children: [

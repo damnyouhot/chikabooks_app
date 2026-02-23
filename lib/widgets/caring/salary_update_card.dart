@@ -130,64 +130,65 @@ class _SalaryUpdateCardState extends State<SalaryUpdateCard> {
         onTap: widget.onTap,
         child: Padding(
           padding: const EdgeInsets.all(8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 타이틀
-            Row(
-              children: [
-                Text('🏥', style: TextStyle(fontSize: 13)),
-                const SizedBox(width: 3),
-                Text(
-                  '임박 제도 변경',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 타이틀
+              Row(
+                children: [
+                  Text('🏥', style: TextStyle(fontSize: 13)),
+                  const SizedBox(width: 3),
+                  Text(
+                    '임박 제도 변경',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              // 슬라이드 애니메이션 (위로 밀려나기)
+              ClipRect(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 400),
+                  transitionBuilder: (Widget child, Animation<double> animation) {
+                    return SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0, 1),
+                        end: Offset.zero,
+                      ).animate(animation),
+                      child: child,
+                    );
+                  },
+                  child: Column(
+                    key: ValueKey(_currentIndex),
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 제목
+                      Text(
+                        update.title,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      // 시행일 + D-day
+                      Text(
+                        '시행일: ${update.effectiveDate?.month ?? '?'}월 ${update.effectiveDate?.day ?? '?'}일 (${update.ddayString})',
+                        style: TextStyle(fontSize: 10, color: Colors.black54),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            // 슬라이드 애니메이션 (위로 밀려나기)
-            ClipRect(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 400),
-                transitionBuilder: (Widget child, Animation<double> animation) {
-                  return SlideTransition(
-                    position: Tween<Offset>(
-                      begin: const Offset(0, 1),
-                      end: Offset.zero,
-                    ).animate(animation),
-                    child: child,
-                  );
-                },
-                child: Column(
-                  key: ValueKey(_currentIndex),
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // 제목
-                    Text(
-                      update.title,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    // 시행일 + D-day
-                    Text(
-                      '시행일: ${update.effectiveDate?.month ?? '?'}월 ${update.effectiveDate?.day ?? '?'}일 (${update.ddayString})',
-                      style: TextStyle(fontSize: 10, color: Colors.black54),
-                    ),
-                  ],
-                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

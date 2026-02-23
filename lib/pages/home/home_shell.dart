@@ -26,15 +26,13 @@ class _HomeShellState extends State<HomeShell> {
     // Bond 탭(2번 탭) 클릭 시 프로필 체크
     if (idx == _bondTabIndex) {
       final isCompleted = await UserProfileService.isOnboardingCompleted();
-      
+
       if (!isCompleted && mounted) {
         // 온보딩 화면 표시 (하단 탭 바 보이게)
         final result = await Navigator.of(context).push<bool>(
-          MaterialPageRoute(
-            builder: (_) => const OnboardingProfileScreen(),
-          ),
+          MaterialPageRoute(builder: (_) => const OnboardingProfileScreen()),
         );
-        
+
         // 온보딩 완료 후에만 탭 이동
         if (result == true && mounted) {
           setState(() => _selectedIndex = idx);
@@ -42,7 +40,7 @@ class _HomeShellState extends State<HomeShell> {
         return;
       }
     }
-    
+
     setState(() => _selectedIndex = idx);
   }
 
@@ -60,10 +58,7 @@ class _HomeShellState extends State<HomeShell> {
     ];
 
     return Scaffold(
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: pages,
-      ),
+      body: IndexedStack(index: _selectedIndex, children: pages),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: _onTap,
@@ -100,6 +95,3 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 }
-
-
-
