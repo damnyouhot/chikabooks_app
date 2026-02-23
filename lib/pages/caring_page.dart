@@ -342,7 +342,7 @@ class _CaringPageState extends State<CaringPage>
 
         // ── 1. dog.riv 캐릭터 영역 (배경 위에, 카드 아래) ──
         Positioned(
-          top: MediaQuery.of(context).size.height * 0.35, // 상단 35% 공간 확보
+          top: MediaQuery.of(context).size.height * 0.40, // 상단 40% 공간 확보
           left: 0,
           right: 0,
           bottom: 0,
@@ -369,7 +369,7 @@ class _CaringPageState extends State<CaringPage>
           top: 0,
           left: 0,
           right: 0,
-          height: MediaQuery.of(context).size.height * 0.35,
+          height: MediaQuery.of(context).size.height * 0.40, // 35% → 40%로 증가
           child: Container(
             color: _colorBg.withOpacity(0.95), // 반투명 배경
             child: SafeArea(
@@ -381,7 +381,7 @@ class _CaringPageState extends State<CaringPage>
                   // 카드 영역 (스크롤 제거, 빽빽하게 배치)
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.only(top: 4),
+                      padding: const EdgeInsets.only(top: 2),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.start,
                         children: [

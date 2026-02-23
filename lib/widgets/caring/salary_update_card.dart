@@ -47,11 +47,11 @@ class _SalaryUpdateCardState extends State<SalaryUpdateCard> {
     // 로딩 상태
     if (updates == null) {
       return Card(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 1),
+        margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 1),
         elevation: 1,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         child: Padding(
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.all(8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -80,11 +80,11 @@ class _SalaryUpdateCardState extends State<SalaryUpdateCard> {
     // 데이터 없음
     if (updates.isEmpty) {
       return Card(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 1),
+        margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 1),
         elevation: 1,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         child: Padding(
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.all(8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

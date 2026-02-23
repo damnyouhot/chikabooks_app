@@ -14,14 +14,14 @@ class JobsInfoCard extends StatelessWidget {
     final otherCount = count > 1 ? count - 1 : 0;
 
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 1),
+      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 1),
       elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
         child: Padding(
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.all(8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
