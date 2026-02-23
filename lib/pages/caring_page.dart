@@ -317,27 +317,28 @@ class _CaringPageState extends State<CaringPage>
             bottom: safeBottom,
             child: GestureDetector(
               onTap: _onCircleTap,
-              child: _dogArtboard != null
-                  ? LayoutBuilder(
-                      builder: (ctx, constraints) {
-                        const scale = 2.112;
-                        return OverflowBox(
-                          maxWidth: constraints.maxWidth * scale,
-                          maxHeight: constraints.maxHeight * scale,
-                          alignment: Alignment.center,
-                          child: SizedBox(
-                            width: constraints.maxWidth * scale,
-                            height: constraints.maxHeight * scale,
-                            child: Rive(
-                              artboard: _dogArtboard!,
-                              fit: BoxFit.contain,
-                              alignment: Alignment.center,
+              child:
+                  _dogArtboard != null
+                      ? LayoutBuilder(
+                        builder: (ctx, constraints) {
+                          const scale = 2.112;
+                          return OverflowBox(
+                            maxWidth: constraints.maxWidth * scale,
+                            maxHeight: constraints.maxHeight * scale,
+                            alignment: Alignment.center,
+                            child: SizedBox(
+                              width: constraints.maxWidth * scale,
+                              height: constraints.maxHeight * scale,
+                              child: Rive(
+                                artboard: _dogArtboard!,
+                                fit: BoxFit.contain,
+                                alignment: Alignment.center,
+                              ),
                             ),
-                          ),
-                        );
-                      },
-                    )
-                  : const SizedBox.shrink(),
+                          );
+                        },
+                      )
+                      : const SizedBox.shrink(),
             ),
           ),
 
@@ -390,7 +391,7 @@ class _CaringPageState extends State<CaringPage>
                     _buildTopBar(),
                     // ① 구인 → 도전하기 탭(3)
                     _TapCard(
-                      title: '📍 내 주변 신규 구인',
+                      title: '📍 내 주변 구인 치과',
                       bigText: _jobsSummary,
                       subtitle: _jobsSub,
                       onTap: () => widget.onTabRequested?.call(3),
@@ -742,27 +743,30 @@ class _PolicyRollingCard extends StatelessWidget {
                           child: SizedBox(
                             key: ValueKey(big),
                             width: double.infinity,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.baseline,
+                              textBaseline: TextBaseline.alphabetic,
                               children: [
-                                Text(
-                                  big,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
+                                Expanded(
+                                  child: Text(
+                                    big,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
                                 if (sub.isNotEmpty) ...[
-                                  const SizedBox(height: 2),
+                                  const SizedBox(width: 6),
                                   Text(
                                     sub,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
                                       fontSize: 10,
-                                      color: Colors.black54,
+                                      color: Colors.black45,
                                     ),
                                   ),
                                 ],
