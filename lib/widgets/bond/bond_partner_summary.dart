@@ -42,7 +42,7 @@ class BondPartnerSummary extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            '이번 주 함께한 사람들',
+            '이번 주 함께하는 사람들',
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w600,
@@ -95,14 +95,30 @@ class BondPartnerSummary extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 닉네임
-                Text(
-                  nickname,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: BondColors.kText,
-                  ),
+                // 닉네임 + 관심사
+                Row(
+                  children: [
+                    Text(
+                      nickname,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: BondColors.kText,
+                      ),
+                    ),
+                    if (partner.mainConcernShown != null &&
+                        partner.mainConcernShown!.isNotEmpty) ...[
+                      const SizedBox(width: 6),
+                      Text(
+                        '· ${partner.mainConcernShown}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: BondColors.kText.withOpacity(0.4),
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
                 const SizedBox(height: 4),
                 // 활동 설명

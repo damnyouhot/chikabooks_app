@@ -149,30 +149,35 @@ class JobService {
   }) async {
     try {
       // 전체 공고 조회 (기간 필터 없음)
-      final snapshot = await _db
-          .collection('jobs')
-          .orderBy('postedAt', descending: true)
-          .limit(100)
-          .get();
+      final snapshot =
+          await _db
+              .collection('jobs')
+              .orderBy('postedAt', descending: true)
+              .limit(100)
+              .get();
 
       List<Job> jobs = snapshot.docs.map((d) => Job.fromDoc(d)).toList();
 
       // 위치 기반 필터링 (옵션)
       if (userLocation != null) {
-        jobs = jobs.where((job) {
-          if (job.lat == 0 && job.lng == 0) return false;
-          final distance = calculateDistance(
-            userLocation,
-            LatLng(job.lat, job.lng),
-          );
-          return distance <= radiusKm;
-        }).toList();
+        jobs =
+            jobs.where((job) {
+              if (job.lat == 0 && job.lng == 0) return false;
+              final distance = calculateDistance(
+                userLocation,
+                LatLng(job.lat, job.lng),
+              );
+              return distance <= radiusKm;
+            }).toList();
       }
 
       final count = jobs.length;
-      final clinicName = jobs.isNotEmpty
-          ? (jobs.first.clinicName.isNotEmpty ? jobs.first.clinicName : '치과')
-          : '치과';
+      final clinicName =
+          jobs.isNotEmpty
+              ? (jobs.first.clinicName.isNotEmpty
+                  ? jobs.first.clinicName
+                  : '치과')
+              : '치과';
 
       return {'count': count, 'clinicName': clinicName};
     } catch (e) {
