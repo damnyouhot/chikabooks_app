@@ -1,16 +1,17 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 /// 파트너 그룹 멤버 상태
 enum PartnerMemberStatus {
   /// 현재 활동 중
   active,
-  
+
   /// 초대 대기 중
   invited,
-  
+
   /// 자진 탈퇴
   left,
-  
+
   /// 강제 퇴출
   removed,
 }
@@ -49,9 +50,8 @@ class PartnerMember {
         orElse: () => PartnerMemberStatus.active,
       ),
       joinedAt: (map['joinedAt'] as Timestamp).toDate(),
-      leftAt: map['leftAt'] != null 
-          ? (map['leftAt'] as Timestamp).toDate() 
-          : null,
+      leftAt:
+          map['leftAt'] != null ? (map['leftAt'] as Timestamp).toDate() : null,
       leftReason: map['leftReason'] as String?,
     );
   }
@@ -66,17 +66,17 @@ class PartnerGroup {
   final DateTime createdAt;
   final int maxMembers;
   final int minMembers;
-  
+
   // ─── v1 설계 추가 필드 ───
-  final DateTime startedAt;      // 그룹 시작 시각
-  final DateTime endsAt;         // 그룹 종료 시각 (7일 후)
+  final DateTime startedAt; // 그룹 시작 시각
+  final DateTime endsAt; // 그룹 종료 시각 (7일 후)
   final List<String> memberUids; // 빠른 조회용 UID 리스트
-  final bool isActiveGroup;      // 활성 상태 (필드로 저장)
-  final int weekNumber;          // 몇 주차 그룹인지 (연속 추적용)
+  final bool isActiveGroup; // 활성 상태 (필드로 저장)
+  final int weekNumber; // 몇 주차 그룹인지 (연속 추적용)
   final Map<String, String>? continueSelections; // 이어가기 선택 {uidA: uidB}
-  final List<String>? previousMemberUids;         // 이전 주 멤버 (이어가기 추적용)
-  final List<String>? previousPair;               // 이어가기 페어 (UI용)
-  final bool needsSupplementation;                 // 주중 보충 필요 여부
+  final List<String>? previousMemberUids; // 이전 주 멤버 (이어가기 추적용)
+  final List<String>? previousPair; // 이어가기 페어 (UI용)
+  final bool needsSupplementation; // 주중 보충 필요 여부
 
   const PartnerGroup({
     required this.id,
@@ -116,9 +116,11 @@ class PartnerGroup {
   /// 탈퇴한 멤버 목록
   List<PartnerMember> get leftMembers {
     return members
-        .where((m) => 
-            m.status == PartnerMemberStatus.left || 
-            m.status == PartnerMemberStatus.removed)
+        .where(
+          (m) =>
+              m.status == PartnerMemberStatus.left ||
+              m.status == PartnerMemberStatus.removed,
+        )
         .toList();
   }
 
@@ -127,8 +129,13 @@ class PartnerGroup {
     return maxMembers - activeMemberUids.length;
   }
 
-  /// 그룹이 활성 상태인지 (최소 인원 충족)
+  /// 그룹이 활성 상태인지
+  /// Firestore 필드(isActiveGroup)를 우선하되,
+  /// 없으면 최소 인원 충족 여부로 판단
   bool get isActive {
+    // Firestore 필드가 false면 무조건 false
+    if (!isActiveGroup) return false;
+    // Firestore 필드가 true면 최소 인원도 체크
     return activeMemberUids.length >= minMembers;
   }
 
@@ -163,43 +170,116 @@ class PartnerGroup {
 
   factory PartnerGroup.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data()!;
-    
-    // 타임스탬프 파싱
-    final createdAt = (data['createdAt'] as Timestamp).toDate();
-    final startedAt = data['startedAt'] != null
-        ? (data['startedAt'] as Timestamp).toDate()
-        : createdAt;
-    final endsAt = data['endsAt'] != null
-        ? (data['endsAt'] as Timestamp).toDate()
-        : startedAt.add(Duration(days: 7));
-    
-    return PartnerGroup(
+
+    debugPrint('🔍 [PartnerGroup.fromDoc] 파싱 시작: ${doc.id}');
+
+    // 타임스탬프 파싱 (안전하게 처리)
+    DateTime createdAt;
+    try {
+      createdAt = (data['createdAt'] as Timestamp).toDate();
+    } catch (e) {
+      debugPrint('⚠️ [PartnerGroup.fromDoc] createdAt 파싱 실패, 현재 시간 사용: $e');
+      createdAt = DateTime.now();
+    }
+
+    DateTime startedAt;
+    try {
+      startedAt =
+          data['startedAt'] != null
+              ? (data['startedAt'] as Timestamp).toDate()
+              : createdAt;
+    } catch (e) {
+      debugPrint('⚠️ [PartnerGroup.fromDoc] startedAt 파싱 실패: $e');
+      startedAt = createdAt;
+    }
+
+    DateTime endsAt;
+    try {
+      endsAt =
+          data['endsAt'] != null
+              ? (data['endsAt'] as Timestamp).toDate()
+              : startedAt.add(Duration(days: 7));
+    } catch (e) {
+      debugPrint('⚠️ [PartnerGroup.fromDoc] endsAt 파싱 실패: $e');
+      endsAt = startedAt.add(Duration(days: 7));
+    }
+
+    debugPrint('✅ [PartnerGroup.fromDoc] 타임스탬프 파싱 완료');
+
+    // ━━━ 스키마 호환 처리: members 자동 생성 ━━━
+    List<PartnerMember> members;
+    final rawMembers = data['members'] as List<dynamic>?;
+    final memberUids = List<String>.from(
+      data['memberUids'] ?? data['activeMemberUids'] ?? [],
+    );
+
+    if (rawMembers == null || rawMembers.isEmpty) {
+      if (memberUids.isNotEmpty) {
+        // members가 없지만 memberUids가 있으면 자동 생성
+        debugPrint(
+          '🔧 [PartnerGroup.fromDoc] members 없음 → memberUids 기반 자동 생성',
+        );
+        members =
+            memberUids
+                .map(
+                  (uid) => PartnerMember(
+                    uid: uid,
+                    status: PartnerMemberStatus.active,
+                    joinedAt: createdAt,
+                  ),
+                )
+                .toList();
+        debugPrint(
+          '✅ [PartnerGroup.fromDoc] members 자동 생성 완료: ${members.length}명',
+        );
+      } else {
+        debugPrint('⚠️ [PartnerGroup.fromDoc] members와 memberUids 모두 없음');
+        members = [];
+      }
+    } else {
+      members =
+          rawMembers
+              .map((m) => PartnerMember.fromMap(m as Map<String, dynamic>))
+              .toList();
+      debugPrint('✅ [PartnerGroup.fromDoc] members 파싱: ${members.length}명');
+    }
+
+    final group = PartnerGroup(
       id: doc.id,
       ownerId: data['ownerId'] as String,
       title: data['title'] as String? ?? '결',
-      members: (data['members'] as List<dynamic>?)
-              ?.map((m) => PartnerMember.fromMap(m as Map<String, dynamic>))
-              .toList() ??
-          [],
+      members: members,
       createdAt: createdAt,
       maxMembers: data['maxMembers'] as int? ?? 3,
       minMembers: data['minMembers'] as int? ?? 1,
       startedAt: startedAt,
       endsAt: endsAt,
-      memberUids: List<String>.from(data['memberUids'] ?? data['activeMemberUids'] ?? []),
+      memberUids: memberUids,
       isActiveGroup: data['isActive'] as bool? ?? true,
       weekNumber: data['weekNumber'] as int? ?? 1,
-      continueSelections: data['continueSelections'] != null
-          ? Map<String, String>.from(data['continueSelections'])
-          : null,
-      previousMemberUids: data['previousMemberUids'] != null
-          ? List<String>.from(data['previousMemberUids'])
-          : null,
-      previousPair: data['previousPair'] != null
-          ? List<String>.from(data['previousPair'])
-          : null,
+      continueSelections:
+          data['continueSelections'] != null
+              ? Map<String, String>.from(data['continueSelections'])
+              : null,
+      previousMemberUids:
+          data['previousMemberUids'] != null
+              ? List<String>.from(data['previousMemberUids'])
+              : null,
+      previousPair:
+          data['previousPair'] != null
+              ? List<String>.from(data['previousPair'])
+              : null,
       needsSupplementation: data['needsSupplementation'] as bool? ?? false,
     );
+
+    // 진단 로그
+    debugPrint('📊 [PartnerGroup.fromDoc] 최종 상태:');
+    debugPrint('  - members.length: ${group.members.length}');
+    debugPrint('  - activeMemberUids.length: ${group.activeMemberUids.length}');
+    debugPrint('  - isActiveGroup(필드): ${group.isActiveGroup}');
+    debugPrint('  - isActive(computed): ${group.isActive}');
+
+    return group;
   }
 
   /// 새 그룹 생성 (소유자만 포함)
@@ -239,6 +319,7 @@ class GroupMemberMeta {
   final String? workplaceType;
   final DateTime joinedAt;
   final bool isSupplemented; // 보충 멤버 여부
+  final String? nickname; // 닉네임 추가
 
   const GroupMemberMeta({
     required this.uid,
@@ -249,6 +330,7 @@ class GroupMemberMeta {
     this.workplaceType,
     required this.joinedAt,
     this.isSupplemented = false,
+    this.nickname,
   });
 
   Map<String, dynamic> toMap() {
@@ -261,6 +343,7 @@ class GroupMemberMeta {
       'workplaceType': workplaceType,
       'joinedAt': Timestamp.fromDate(joinedAt),
       'isSupplemented': isSupplemented,
+      'nickname': nickname,
     };
   }
 
@@ -275,6 +358,15 @@ class GroupMemberMeta {
       workplaceType: data['workplaceType'] as String?,
       joinedAt: (data['joinedAt'] as Timestamp).toDate(),
       isSupplemented: data['isSupplemented'] as bool? ?? false,
+      nickname: data['nickname'] as String?,
     );
+  }
+
+  /// 표시용 라벨 (닉네임 우선, 없으면 연차·지역)
+  String get displayLabel {
+    if (nickname != null && nickname!.isNotEmpty) {
+      return nickname!;
+    }
+    return '$careerBucket · $region';
   }
 }

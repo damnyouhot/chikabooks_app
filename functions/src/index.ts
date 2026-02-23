@@ -81,68 +81,108 @@ function maskToken(token: string): string {
 
 /**
  * 추대 트리거: enthrone 서브컬렉션에 문서 생성 시
- * 조건 충족 시 billboardPosts에 등재
+ * 3개 달성 시 billboardPosts에 자동 등록
  */
 export const onEnthroneCreated = functions
-  .firestore.document("bondGroups/{bondId}/posts/{postId}/enthrones/{uid}")
+  .region("asia-northeast3")
+  .firestore.document("partnerGroups/{groupId}/posts/{postId}/enthrones/{uid}")
   .onCreate(async (snap, context) => {
-    const {bondId, postId} = context.params as {
-      bondId: string;
+    const {groupId, postId} = context.params as {
+      groupId: string;
       postId: string;
     };
 
     try {
+      console.log(`🔍 [onEnthroneCreated] groupId: ${groupId}, postId: ${postId}`);
+
       // 1. 현재 추대 수 집계
       const enthronesSnap = await snap.ref.parent.get();
       const enthroneCount = enthronesSnap.size;
+      console.log(`🔍 [onEnthroneCreated] 현재 추대 수: ${enthroneCount}`);
 
-      // 2. Bond 그룹 멤버 수 확인
-      const bondDoc = await db.doc(`bondGroups/${bondId}`).get();
-      const bondData = bondDoc.data();
-      const activeMemberUids = bondData?.activeMemberUids || [];
-      const activeMemberCount = activeMemberUids.length;
+      // 2. 3개 달성 체크
+      if (enthroneCount >= 3) {
+        console.log("✅ [onEnthroneCreated] 3개 달성! 전광판 등록 시작...");
 
-      // 3. 필요 추대 수 (최소 2, 최대 3)
-      const requiredCount = Math.max(2, activeMemberCount);
-
-      // 4. 조건 충족 확인
-      if (enthroneCount >= requiredCount) {
-        // 5. 원본 게시물 가져오기
+        // 3. 게시물 정보 가져오기
         const postDoc = await db
-          .doc(`bondGroups/${bondId}/posts/${postId}`)
+          .collection("partnerGroups")
+          .doc(groupId)
+          .collection("posts")
+          .doc(postId)
           .get();
-        const postData = postDoc.data();
+
+        if (!postDoc.exists) {
+          console.error("⚠️ [onEnthroneCreated] 게시물 없음");
+          return;
+        }
+
+        const postData = postDoc.data()!;
+
+        // 4. 이미 전광판에 등록되었는지 확인 (중복 방지)
+        const existingBillboard = await db
+          .collection("billboardPosts")
+          .where("sourceBondId", "==", groupId)
+          .where("sourcePostId", "==", postId)
+          .limit(1)
+          .get();
+
+        if (!existingBillboard.empty) {
+          console.log("⚠️ [onEnthroneCreated] 이미 전광판에 등록됨");
+          return;
+        }
+
+        // 5. 그룹 정보 가져오기 (그룹명)
+        const groupDoc = await db.collection("partnerGroups").doc(groupId).get();
+        const groupName = groupDoc.exists
+          ? (groupDoc.data()?.title || "익명의 결")
+          : "익명의 결";
 
         // 6. 게시 조건 확인
         if (
-          postData &&
           postData.publicEligible !== false &&
           !postData.isDeleted &&
           (postData.reports || 0) < 3
         ) {
-          // 7. 전광판에 등재
+          // 7. 전광판에 등록
+          const now = admin.firestore.Timestamp.now();
+          const expiresAt = admin.firestore.Timestamp.fromMillis(
+            Date.now() + 48 * 60 * 60 * 1000 // 48시간 후
+          );
+
           await db.collection("billboardPosts").add({
-            sourceBondId: bondId,
+            sourceBondId: groupId,
             sourcePostId: postId,
-            textSnapshot: postData.text || "",
+            textSnapshot: postData.text || postData.body || "",
             enthroneCount: enthroneCount,
-            requiredCount: requiredCount,
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            expiresAt: admin.firestore.Timestamp.fromMillis(
-              Date.now() + 48 * 60 * 60 * 1000 // 48시간
-            ),
+            requiredCount: 3,
+            createdAt: now,
+            expiresAt: expiresAt,
             status: "confirmed",
-            bondGroupName: bondData?.title || "결",
+            bondGroupName: groupName,
             isAnonymous: true,
           });
 
-          console.log(
-            `✅ Billboard post created: ${bondId}/${postId}`
-          );
+          console.log(`✅ [onEnthroneCreated] 전광판 등록 완료! (${groupId}/${postId})`);
+
+          // 8. 게시물에 전광판 등록 플래그 추가
+          await db
+            .collection("partnerGroups")
+            .doc(groupId)
+            .collection("posts")
+            .doc(postId)
+            .update({
+              onBillboard: true,
+              billboardedAt: now,
+            });
+        } else {
+          console.log("⚠️ [onEnthroneCreated] 게시 조건 불충족 (삭제/신고/비공개)");
         }
+      } else {
+        console.log(`⏳ [onEnthroneCreated] 아직 ${3 - enthroneCount}개 더 필요`);
       }
     } catch (error) {
-      console.error("⚠️ onEnthroneCreated error:", error);
+      console.error("❌ [onEnthroneCreated] 에러:", error);
     }
   });
 
@@ -1207,3 +1247,6 @@ export {
   onGroupMemberChanged,
   scheduledSupplementation,
 } from "./partner-supplementation";
+
+// ========== 계정 삭제 ==========
+export { deleteMyAccount } from "./account-deletion";

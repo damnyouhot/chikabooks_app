@@ -11,6 +11,18 @@ enum ReactionKind {
 extension ReactionKindExtension on ReactionKind {
   /// 점수 적용 대상 여부
   bool get isScoring => this == ReactionKind.heart;
+  
+  /// 기본 점수 변화량
+  double get baseDelta {
+    switch (this) {
+      case ReactionKind.heart:
+        return 0.3;
+      case ReactionKind.enthrone:
+        return 0.2;
+      default:
+        return 0.0;
+    }
+  }
 }
 
 /// 이모지를 ReactionKind로 변환

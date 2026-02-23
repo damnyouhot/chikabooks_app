@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/activity_log.dart';
+import '../models/reaction_kind.dart';
 
 /// 결 점수 서비스 (0~100 범위)
 ///
@@ -18,13 +19,18 @@ class BondScoreService {
 
   // ─── 이벤트별 baseDelta ───
   static const Map<ActivityType, double> _baseDelta = {
-    ActivityType.slotPost: 1.2,
-    ActivityType.slotReaction: 0.6,
-    ActivityType.cheerReaction: 0.8,
-    ActivityType.ebookRead: 0.8,
-    ActivityType.quizComplete: 0.8,
-    ActivityType.wallPost: 0.5,
-    ActivityType.pollVote: 0.4,
+    ActivityType.slotPost: 0.2,
+    ActivityType.slotReaction: 0.0,
+    ActivityType.cheerReaction: 0.0,
+    ActivityType.ebookRead: 0.2,
+    ActivityType.quizComplete: 0.2,
+    ActivityType.wallPost: 0.2,
+    ActivityType.pollVote: 0.2,
+    // ★ 구직 활동 포인트
+    ActivityType.jobView: 0.1, // 공고 상세 보기 (하루 최대 3회)
+    ActivityType.jobBookmark: 0.3, // 관심 치과 저장
+    ActivityType.jobApply: 1.0, // 지원 완료 (큰 보상)
+    ActivityType.jobPost: 1.5, // 공고 등록 (병원 측)
   };
 
   /// 중심(50)에서 멀어질수록 둔화되는 damping 함수
@@ -44,6 +50,9 @@ class BondScoreService {
     double? customDelta,
   }) async {
     try {
+      // 주간 점수 초기화 확인
+      await ensureWeeklyScoreInitialized(uid);
+
       final userRef = _db.collection('users').doc(uid);
       await _db.runTransaction((tx) async {
         final snap = await tx.get(userRef);
@@ -52,14 +61,32 @@ class BondScoreService {
         final base = customDelta ?? _baseDelta[type] ?? 0.0;
         final delta = damp(current, base);
         final newScore = (current + delta).clamp(_min, _max);
-        tx.update(userRef, {
-          'bondScore': newScore,
-          'bondScoreVersion': 2,
-        });
+        tx.update(userRef, {'bondScore': newScore, 'bondScoreVersion': 2});
       });
     } catch (e) {
       debugPrint('⚠️ BondScoreService.applyEvent error: $e');
     }
+  }
+
+  /// 리액션 기반 점수 적용
+  static Future<void> applyReactionScore({
+    required String targetUid,
+    required ReactionKind kind,
+    double extraBonus = 0.0,
+  }) async {
+    final delta = kind.baseDelta + extraBonus;
+    if (delta == 0.0) return;
+    await applyEvent(targetUid, ActivityType.slotReaction, customDelta: delta);
+  }
+
+  /// 추대 보너스 회수 (예: 신고 발생 시)
+  static Future<void> applyEnthroneBonusPenalty(String uid) async {
+    await applyEvent(uid, ActivityType.slotReaction, customDelta: -0.5);
+  }
+
+  /// 신고 감점
+  static Future<void> applyReportPenalty(String uid) async {
+    await applyEvent(uid, ActivityType.slotReaction, customDelta: -0.3);
   }
 
   /// 슬롯 포스트: 작성자 +0.8, 그룹 멤버 각 +0.2
@@ -78,8 +105,7 @@ class BondScoreService {
   /// 응원 리액션: 준 사람 +0.4, 받은 사람 +0.4
   static Future<void> applyCheer(String giverUid, String receiverUid) async {
     await applyEvent(giverUid, ActivityType.cheerReaction, customDelta: 0.4);
-    await applyEvent(
-        receiverUid, ActivityType.cheerReaction, customDelta: 0.4);
+    await applyEvent(receiverUid, ActivityType.cheerReaction, customDelta: 0.4);
   }
 
   /// 중심 회귀: 하루 1회 앱 실행 시 미세 조정
@@ -103,10 +129,7 @@ class BondScoreService {
 
       if (adjustment != 0.0) {
         final newScore = (current + adjustment).clamp(_min, _max);
-        await userRef.update({
-          'bondScore': newScore,
-          'bondScoreVersion': 2,
-        });
+        await userRef.update({'bondScore': newScore, 'bondScoreVersion': 2});
       }
     } catch (e) {
       debugPrint('⚠️ BondScoreService.applyCenterGravity error: $e');
@@ -156,16 +179,92 @@ class BondScoreService {
 
       // 구버전이면 변환 후 DB에 1회 저장
       if (version < 2 && raw != null) {
-        await userRef.update({
-          'bondScore': score,
-          'bondScoreVersion': 2,
-        });
+        await userRef.update({'bondScore': score, 'bondScoreVersion': 2});
       }
 
       return score;
     } catch (e) {
       debugPrint('⚠️ BondScoreService.readAndMigrate error: $e');
       return _initialScore;
+    }
+  }
+
+  // ═══════════════════════════════════════════
+  // 주간 결점수 증감 관리
+  // ═══════════════════════════════════════════
+
+  /// 이번 주 결점수 증감 계산
+  static Future<int> getWeeklyScoreIncrease(String uid) async {
+    try {
+      final userDoc = await _db.collection('users').doc(uid).get();
+      final data = userDoc.data();
+      if (data == null) return 0;
+
+      final currentScore = _migrateIfNeeded(data['bondScore'], data);
+      final weekStart = (data['weeklyBondScoreStart'] as num?)?.toDouble();
+
+      if (weekStart == null) {
+        // 주간 시작 점수가 없으면 현재 점수로 초기화 후 0 반환
+        await initializeWeeklyScore(uid, currentScore);
+        return 0;
+      }
+
+      return (currentScore - weekStart).round();
+    } catch (e) {
+      debugPrint('⚠️ BondScoreService.getWeeklyScoreIncrease error: $e');
+      return 0;
+    }
+  }
+
+  /// 주간 시작 점수 초기화
+  static Future<void> initializeWeeklyScore(
+    String uid,
+    double currentScore,
+  ) async {
+    try {
+      await _db.collection('users').doc(uid).update({
+        'weeklyBondScoreStart': currentScore,
+        'lastWeekReset': FieldValue.serverTimestamp(),
+      });
+      debugPrint('✅ 주간 결점수 초기화: $uid → $currentScore');
+    } catch (e) {
+      debugPrint('⚠️ BondScoreService.initializeWeeklyScore error: $e');
+    }
+  }
+
+  /// 새로운 주가 시작될 때 호출 (월요일 오전 9시)
+  static Future<void> resetWeeklyScore(String uid) async {
+    try {
+      final userDoc = await _db.collection('users').doc(uid).get();
+      final data = userDoc.data();
+      if (data == null) return;
+
+      final currentScore = _migrateIfNeeded(data['bondScore'], data);
+
+      await _db.collection('users').doc(uid).update({
+        'weeklyBondScoreStart': currentScore,
+        'lastWeekReset': FieldValue.serverTimestamp(),
+      });
+
+      debugPrint('✅ 주간 결점수 리셋: $uid → $currentScore');
+    } catch (e) {
+      debugPrint('⚠️ BondScoreService.resetWeeklyScore error: $e');
+    }
+  }
+
+  /// 점수 변동 시 주간 시작 점수가 없으면 자동 초기화
+  /// (기존 applyEvent에 통합)
+  static Future<void> ensureWeeklyScoreInitialized(String uid) async {
+    try {
+      final userDoc = await _db.collection('users').doc(uid).get();
+      final data = userDoc.data();
+
+      if (data?['weeklyBondScoreStart'] == null) {
+        final currentScore = _migrateIfNeeded(data?['bondScore'], data);
+        await initializeWeeklyScore(uid, currentScore);
+      }
+    } catch (e) {
+      debugPrint('⚠️ BondScoreService.ensureWeeklyScoreInitialized error: $e');
     }
   }
 }

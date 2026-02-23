@@ -3,6 +3,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import '../../models/job.dart';
 import '../../services/job_service.dart';
+import '../../widgets/job/quick_apply_sheet.dart';
 
 class JobDetailScreen extends StatefulWidget {
   final String jobId;
@@ -33,46 +34,15 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
 
     if (widget.autoOpenApply) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _openApplyModal(context, job);
+        if (mounted && _job != null) {
+          QuickApplySheet.show(context, _job!);
+        }
       });
     }
   }
 
   void _openApplyModal(BuildContext context, Job job) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (_) => Padding(
-        padding: EdgeInsets.fromLTRB(
-            16, 24, 16, MediaQuery.of(context).viewInsets.bottom + 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('${job.clinicName} 지원서',
-                style:
-                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            const TextField(decoration: InputDecoration(labelText: '이름')),
-            const TextField(decoration: InputDecoration(labelText: '연락처')),
-            const TextField(
-                decoration: InputDecoration(labelText: '경력/포트폴리오 링크')),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('지원서가 제출되었습니다!')),
-                );
-              },
-              child: const Text('제출하기'),
-            ),
-          ],
-        ),
-      ),
-    );
+    QuickApplySheet.show(context, job);
   }
 
   @override
@@ -146,25 +116,35 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                   padding: const EdgeInsets.only(top: 8),
                   child: Row(
                     children: [
-                      Icon(Icons.location_on,
-                          size: 16, color: Colors.grey[500]),
+                      Icon(
+                        Icons.location_on,
+                        size: 16,
+                        color: Colors.grey[500],
+                      ),
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
                           job.address,
                           style: TextStyle(
-                              fontSize: 13, color: Colors.grey[600]),
+                            fontSize: 13,
+                            color: Colors.grey[600],
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
               const SizedBox(height: 12),
-              Text(job.title,
-                  style: const TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.bold)),
               Text(
-                  '${job.type} · ${job.career} · ${job.salaryRange[0]}~${job.salaryRange[1]}만원'),
+                job.title,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                '${job.type} · ${job.career} · ${job.salaryRange[0]}~${job.salaryRange[1]}만원',
+              ),
               const Divider(height: 24),
               Text('업무 내용', style: Theme.of(context).textTheme.titleMedium),
               Text(job.details),
@@ -183,14 +163,18 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                   child: ListView.builder(
                     scrollDirection: Axis.horizontal,
                     itemCount: job.images.length,
-                    itemBuilder: (_, i) => Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Image.network(job.images[i],
-                            width: 200, fit: BoxFit.cover),
-                      ),
-                    ),
+                    itemBuilder:
+                        (_, i) => Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Image.network(
+                              job.images[i],
+                              width: 200,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
                   ),
                 ),
             ],

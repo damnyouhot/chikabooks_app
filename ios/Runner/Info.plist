@@ -78,6 +78,12 @@
 		<string>naversearchapp</string>
 		<string>naversearchthirdlogin</string>
 	</array>
+	
+	<!-- 위치 권한 (geolocator 필수 - 주변 치과 구인 검색) -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>주변 치과 구인 정보를 제공하기 위해 위치 권한이 필요합니다.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>백그라운드에서 주변 구인 알림을 받기 위해 위치 권한이 필요합니다.</string>
 
 </dict>
 </plist>

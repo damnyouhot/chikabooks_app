@@ -35,32 +35,67 @@ class PartnerService {
     if (uid == null) return null;
 
     try {
+      debugPrint('🔍 [getMyGroup] 시작');
+
       // 항상 최신 프로필을 읽어야 매칭 직후에도 groupId 반영됨
       final profile = await UserProfileService.getMyProfile(forceRefresh: true);
       final groupId = profile?.partnerGroupId;
-      if (groupId == null || groupId.isEmpty) return null;
 
-      final doc =
-          await _db.collection('partnerGroups').doc(groupId).get();
-      if (!doc.exists) return null;
+      debugPrint('🔍 [getMyGroup] profile.partnerGroupId: $groupId');
 
-      final group = PartnerGroup.fromDoc(doc);
-      return group.isActive ? group : null;
-    } catch (e) {
-      debugPrint('⚠️ getMyGroup error: $e');
+      if (groupId == null || groupId.isEmpty) {
+        debugPrint('⚠️ [getMyGroup] groupId 없음');
+        return null;
+      }
+
+      debugPrint('🔍 [getMyGroup] Firestore 조회: partnerGroups/$groupId');
+      final doc = await _db.collection('partnerGroups').doc(groupId).get();
+
+      debugPrint('🔍 [getMyGroup] doc.exists: ${doc.exists}');
+      if (!doc.exists) {
+        debugPrint('⚠️ [getMyGroup] 문서 존재하지 않음');
+        return null;
+      }
+
+      final data = doc.data();
+      debugPrint('🔍 [getMyGroup] 문서 필드:');
+      debugPrint('  - isActive: ${data?['isActive']}');
+      debugPrint('  - endsAt: ${data?['endsAt']}');
+      debugPrint('  - memberUids: ${data?['memberUids']}');
+      debugPrint('  - createdAt: ${data?['createdAt']}');
+      debugPrint('  - ownerId: ${data?['ownerId']}');
+
+      try {
+        final group = PartnerGroup.fromDoc(doc);
+        debugPrint('✅ [getMyGroup] PartnerGroup 파싱 성공');
+        debugPrint('🔍 [getMyGroup] group.isActive: ${group.isActive}');
+
+        // 닉네임 자동 보정 (memberMeta에 nickname 없으면 users에서 가져와서 저장)
+        if (group.isActive) {
+          await _supplementMemberNicknamesIfMissing(groupId);
+        }
+
+        return group.isActive ? group : null;
+      } catch (parseError) {
+        debugPrint('❌ [getMyGroup] PartnerGroup.fromDoc 파싱 실패: $parseError');
+        return null;
+      }
+    } catch (e, stackTrace) {
+      debugPrint('⚠️ [getMyGroup] 에러: $e');
+      debugPrint('⚠️ [getMyGroup] 스택트레이스: $stackTrace');
       return null;
     }
   }
 
   /// 그룹 멤버 메타 목록
-  static Future<List<GroupMemberMeta>> getGroupMembers(
-      String groupId) async {
+  static Future<List<GroupMemberMeta>> getGroupMembers(String groupId) async {
     try {
-      final snap = await _db
-          .collection('partnerGroups')
-          .doc(groupId)
-          .collection('memberMeta')
-          .get();
+      final snap =
+          await _db
+              .collection('partnerGroups')
+              .doc(groupId)
+              .collection('memberMeta')
+              .get();
       return snap.docs.map(GroupMemberMeta.fromDoc).toList();
     } catch (e) {
       debugPrint('⚠️ getGroupMembers error: $e');
@@ -107,7 +142,10 @@ class PartnerService {
 
   /// 슬롯 가져오기 (없으면 open 상태로 반환)
   static Future<DailySlot> getSlot(
-      String groupId, String dateKey, String slotKey) async {
+    String groupId,
+    String dateKey,
+    String slotKey,
+  ) async {
     final docId = slotDocId(groupId, dateKey, slotKey);
     try {
       final doc = await _db.collection('dailySlots').doc(docId).get();
@@ -127,13 +165,12 @@ class PartnerService {
 
   /// 슬롯 스트림 (실시간 UI 업데이트)
   static Stream<DailySlot> streamSlot(
-      String groupId, String dateKey, String slotKey) {
+    String groupId,
+    String dateKey,
+    String slotKey,
+  ) {
     final docId = slotDocId(groupId, dateKey, slotKey);
-    return _db
-        .collection('dailySlots')
-        .doc(docId)
-        .snapshots()
-        .map((snap) {
+    return _db.collection('dailySlots').doc(docId).snapshots().map((snap) {
       if (snap.exists) return DailySlot.fromDoc(snap);
       return DailySlot(
         id: docId,
@@ -148,7 +185,10 @@ class PartnerService {
   /// 선착순 claim (트랜잭션 — 핵심!)
   /// 성공 시 true, 이미 누군가 claim했으면 false
   static Future<bool> claimSlot(
-      String groupId, String dateKey, String slotKey) async {
+    String groupId,
+    String dateKey,
+    String slotKey,
+  ) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return false;
 
@@ -244,13 +284,12 @@ class PartnerService {
           .collection('reactions')
           .doc(uid)
           .set({
-        'reactionKey': reactionKey,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+            'reactionKey': reactionKey,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
 
       // 슬롯에서 작성자 uid 읽어서 결 점수 적용
-      final slotSnap =
-          await _db.collection('dailySlots').doc(slotDocId).get();
+      final slotSnap = await _db.collection('dailySlots').doc(slotDocId).get();
       final authorUid = slotSnap.data()?['claimedByUid'] as String?;
       final groupId = slotSnap.data()?['groupId'] as String?;
 
@@ -274,13 +313,15 @@ class PartnerService {
 
   /// 슬롯 리액션 요약 (key → count)
   static Future<Map<String, int>> getSlotReactionSummary(
-      String slotDocId) async {
+    String slotDocId,
+  ) async {
     try {
-      final snap = await _db
-          .collection('dailySlots')
-          .doc(slotDocId)
-          .collection('reactions')
-          .get();
+      final snap =
+          await _db
+              .collection('dailySlots')
+              .doc(slotDocId)
+              .collection('reactions')
+              .get();
       final summary = <String, int>{};
       for (final doc in snap.docs) {
         final key = doc.data()['reactionKey'] as String? ?? '';
@@ -298,12 +339,13 @@ class PartnerService {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return null;
     try {
-      final doc = await _db
-          .collection('dailySlots')
-          .doc(slotDocId)
-          .collection('reactions')
-          .doc(uid)
-          .get();
+      final doc =
+          await _db
+              .collection('dailySlots')
+              .doc(slotDocId)
+              .collection('reactions')
+              .doc(uid)
+              .get();
       if (!doc.exists) return null;
       return doc.data()?['reactionKey'] as String?;
     } catch (e) {
@@ -320,7 +362,9 @@ class PartnerService {
         region: 'asia-northeast3',
       ).httpsCallable('getSlotStatus');
 
-      final result = await callable.call<Map<String, dynamic>>({'groupId': groupId});
+      final result = await callable.call<Map<String, dynamic>>({
+        'groupId': groupId,
+      });
       return SlotStatus.fromMap(result.data);
     } on FirebaseFunctionsException catch (e) {
       debugPrint('⚠️ getSlotStatus error: ${e.code} ${e.message}');
@@ -412,9 +456,9 @@ class PartnerService {
         .doc(slotId)
         .snapshots()
         .map((snap) {
-      if (!snap.exists) return null;
-      return SlotMessage.fromDoc(snap);
-    });
+          if (!snap.exists) return null;
+          return SlotMessage.fromDoc(snap);
+        });
   }
 
   /// 인박스 카드 스트림 (읽지 않은 것만)
@@ -463,11 +507,11 @@ class PartnerService {
   /// - `MatchingResult.error(message)` — 에러
   static Future<MatchingResult> requestMatching() async {
     debugPrint('🚀 [requestMatching] 시작');
-    
+
     try {
       final uid = _auth.currentUser?.uid;
       debugPrint('🔍 [requestMatching] UID: $uid');
-      
+
       final callable = FirebaseFunctions.instanceFor(
         region: 'asia-northeast3',
       ).httpsCallable('requestPartnerMatching');
@@ -475,7 +519,7 @@ class PartnerService {
       debugPrint('🔍 [requestMatching] Cloud Function 호출 중...');
       final result = await callable.call<Map<String, dynamic>>();
       debugPrint('🔍 [requestMatching] Cloud Function 응답 받음');
-      
+
       final data = result.data;
       debugPrint('🔍 [requestMatching] 응답 데이터: $data');
 
@@ -483,7 +527,9 @@ class PartnerService {
       final groupId = data['groupId'] as String?;
       final message = data['message'] as String?;
 
-      debugPrint('🔍 [requestMatching] status: $status, groupId: $groupId, message: $message');
+      debugPrint(
+        '🔍 [requestMatching] status: $status, groupId: $groupId, message: $message',
+      );
 
       if (status == 'matched' && groupId != null) {
         debugPrint('✅ [requestMatching] 매칭 성공! 그룹 ID: $groupId');
@@ -493,18 +539,24 @@ class PartnerService {
       }
 
       debugPrint('⏳ [requestMatching] 대기 중: $message');
-      return MatchingResult.waiting(
-        message ?? '아직 함께할 사람이 부족해요.',
-      );
+      return MatchingResult.waiting(message ?? '아직 함께할 사람이 부족해요.');
     } on FirebaseFunctionsException catch (e) {
-      debugPrint('⚠️ [requestMatching] FunctionsError - code: ${e.code}, message: ${e.message}');
-      debugPrint('⚠️ [requestMatching] FunctionsError - details: ${e.details}');
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      debugPrint('⚠️ [requestMatching] FirebaseFunctionsException 발생!');
+      debugPrint('  - code: ${e.code}');
+      debugPrint('  - message: ${e.message}');
+      debugPrint('  - details: ${e.details}');
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       return MatchingResult.error(
         e.message ?? '매칭 요청 중 문제가 생겼어요.',
+        code: e.code,
+        details: e.details,
       );
     } catch (e, stackTrace) {
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       debugPrint('⚠️ [requestMatching] 예외 발생: $e');
       debugPrint('⚠️ [requestMatching] 스택트레이스:\n$stackTrace');
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       return MatchingResult.error('매칭 요청 중 문제가 생겼어요.');
     }
   }
@@ -522,11 +574,16 @@ class PartnerService {
         id: groupRef.id,
         ownerId: memberUids.first,
         title: '결 ${DateTime.now().millisecondsSinceEpoch % 100}',
-        members: memberUids.map((uid) => PartnerMember(
-          uid: uid,
-          status: PartnerMemberStatus.active,
-          joinedAt: now,
-        )).toList(),
+        members:
+            memberUids
+                .map(
+                  (uid) => PartnerMember(
+                    uid: uid,
+                    status: PartnerMemberStatus.active,
+                    joinedAt: now,
+                  ),
+                )
+                .toList(),
         createdAt: now,
         startedAt: now,
         endsAt: endsAt,
@@ -543,19 +600,23 @@ class PartnerService {
         final userDoc = await _db.collection('users').doc(uid).get();
         final userData = userDoc.data() ?? {};
 
-        final memberRef =
-            groupRef.collection('memberMeta').doc(uid);
-        batch.set(memberRef, GroupMemberMeta(
-          uid: uid,
-          region: userData['region'] ?? '',
-          careerBucket: userData['careerBucket'] ?? '',
-          careerGroup: userData['careerGroup'] ?? '',
-          mainConcernShown: (userData['mainConcerns'] as List?)?.isNotEmpty == true
-              ? (userData['mainConcerns'] as List).first as String
-              : null,
-          workplaceType: userData['workplaceType'] as String?,
-          joinedAt: now,
-        ).toMap());
+        final memberRef = groupRef.collection('memberMeta').doc(uid);
+        batch.set(
+          memberRef,
+          GroupMemberMeta(
+            uid: uid,
+            nickname: userData['nickname'] as String?,
+            region: userData['region'] ?? '',
+            careerBucket: userData['careerBucket'] ?? '',
+            careerGroup: userData['careerGroup'] ?? '',
+            mainConcernShown:
+                (userData['mainConcerns'] as List?)?.isNotEmpty == true
+                    ? (userData['mainConcerns'] as List).first as String
+                    : null,
+            workplaceType: userData['workplaceType'] as String?,
+            joinedAt: now,
+          ).toMap(),
+        );
 
         // users/{uid} 업데이트
         batch.update(_db.collection('users').doc(uid), {
@@ -583,8 +644,7 @@ class PartnerService {
 
   static Future<PartnerGroup?> _getGroup(String groupId) async {
     try {
-      final doc =
-          await _db.collection('partnerGroups').doc(groupId).get();
+      final doc = await _db.collection('partnerGroups').doc(groupId).get();
       if (!doc.exists) return null;
       return PartnerGroup.fromDoc(doc);
     } catch (e) {
@@ -603,15 +663,85 @@ class PartnerService {
           .collection('partnerGroups')
           .doc(groupId)
           .collection('activityLogs')
-          .add(ActivityLog(
-            id: '',
-            createdAt: DateTime.now(),
-            actorUid: actorUid,
-            type: type,
-            meta: meta,
-          ).toMap());
+          .add(
+            ActivityLog(
+              id: '',
+              createdAt: DateTime.now(),
+              actorUid: actorUid,
+              type: type,
+              meta: meta,
+            ).toMap(),
+          );
     } catch (e) {
       debugPrint('⚠️ _logActivity error: $e');
+    }
+  }
+
+  /// memberMeta에 nickname이 없으면 users에서 가져와서 자동 보정
+  static Future<void> _supplementMemberNicknamesIfMissing(
+    String groupId,
+  ) async {
+    try {
+      debugPrint('🔍 [보정] 닉네임 자동 보정 시작: $groupId');
+
+      final metaSnap =
+          await _db
+              .collection('partnerGroups')
+              .doc(groupId)
+              .collection('memberMeta')
+              .get();
+
+      debugPrint('🔍 [보정] memberMeta 문서 수: ${metaSnap.docs.length}');
+
+      // nickname 없는 멤버만 추림
+      final missing = <String>[];
+      for (final doc in metaSnap.docs) {
+        final data = doc.data();
+        final nickname = (data['nickname'] as String?)?.trim();
+        if (nickname == null || nickname.isEmpty) {
+          missing.add(doc.id); // doc.id가 uid
+          debugPrint('🔍 [보정] 닉네임 없음: ${doc.id}');
+        } else {
+          debugPrint('✅ [보정] 닉네임 있음: ${doc.id} → $nickname');
+        }
+      }
+
+      if (missing.isEmpty) {
+        debugPrint('✅ [보정] 모든 멤버 닉네임 존재, 보정 불필요');
+        return;
+      }
+
+      debugPrint('🔧 [보정] 닉네임 보정 대상: ${missing.length}명');
+
+      // users에서 닉네임 가져와서 memberMeta에 merge 업데이트
+      final batch = _db.batch();
+
+      for (final uid in missing) {
+        final userDoc = await _db.collection('users').doc(uid).get();
+        final userData = userDoc.data();
+        final nick = (userData?['nickname'] as String?)?.trim();
+
+        debugPrint('🔍 [보정] users/$uid → nickname: $nick');
+
+        if (nick != null && nick.isNotEmpty) {
+          final metaRef = _db
+              .collection('partnerGroups')
+              .doc(groupId)
+              .collection('memberMeta')
+              .doc(uid);
+
+          batch.set(metaRef, {'nickname': nick}, SetOptions(merge: true));
+          debugPrint('✅ [보정] $uid 닉네임 저장: $nick');
+        } else {
+          debugPrint('⚠️ [보정] $uid users에도 닉네임 없음');
+        }
+      }
+
+      await batch.commit();
+      debugPrint('✅ [보정] 닉네임 자동 보정 완료');
+    } catch (e, stackTrace) {
+      debugPrint('⚠️ [보정] 닉네임 보정 실패: $e');
+      debugPrint('⚠️ [보정] 스택트레이스: $stackTrace');
     }
   }
 }
@@ -628,11 +758,15 @@ class MatchingResult {
   final MatchingStatus status;
   final String? groupId;
   final String? message;
+  final String? errorCode; // ✅ 에러 코드
+  final dynamic errorDetails; // ✅ 에러 상세 정보
 
   const MatchingResult._({
     required this.status,
     this.groupId,
     this.message,
+    this.errorCode,
+    this.errorDetails,
   });
 
   factory MatchingResult.matched(String groupId) =>
@@ -641,9 +775,16 @@ class MatchingResult {
   factory MatchingResult.waiting(String message) =>
       MatchingResult._(status: MatchingStatus.waiting, message: message);
 
-  factory MatchingResult.error(String message) =>
-      MatchingResult._(status: MatchingStatus.error, message: message);
+  factory MatchingResult.error(
+    String message, {
+    String? code,
+    dynamic details,
+  }) => MatchingResult._(
+    status: MatchingStatus.error,
+    message: message,
+    errorCode: code,
+    errorDetails: details,
+  );
 }
 
 enum MatchingStatus { matched, waiting, error }
-

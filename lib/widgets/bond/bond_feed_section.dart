@@ -14,23 +14,26 @@ class BondFeedSection extends StatelessWidget {
     required this.onOpenWrite,
   });
 
-  // 파트너 그룹 가입 여부
   bool get _hasPartnerGroup => partnerGroupId != null && partnerGroupId!.isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
+    final isPersonalMode = !_hasPartnerGroup;
+    
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 섹션 타이틀 (다른 항목들처럼)
+          // 섹션 타이틀
           Row(
             children: [
               Icon(
                 Icons.chat_bubble_outline,
                 size: 16,
-                color: BondColors.kText.withOpacity(0.6),
+                color: isPersonalMode 
+                    ? BondColors.kText.withOpacity(0.4)
+                    : BondColors.kText.withOpacity(0.6),
               ),
               const SizedBox(width: 6),
               const Text(
@@ -49,14 +52,13 @@ class BondFeedSection extends StatelessWidget {
                   color: BondColors.kText.withOpacity(0.4),
                 ),
               ),
-              const Spacer(),
             ],
           ),
           const SizedBox(height: 12),
 
           // 게시물 피드
-          StreamBuilder<QuerySnapshot?>(
-            stream: partnerGroupId != null && partnerGroupId!.isNotEmpty
+          StreamBuilder<QuerySnapshot>(
+            stream: _hasPartnerGroup
                 ? FirebaseFirestore.instance
                     .collection('partnerGroups')
                     .doc(partnerGroupId)
@@ -65,16 +67,8 @@ class BondFeedSection extends StatelessWidget {
                     .orderBy('createdAtClient', descending: true)
                     .limit(3)
                     .snapshots()
-                : Stream.value(null),
+                : const Stream<QuerySnapshot>.empty(),  // ✅ 개인 모드는 빈 스트림
             builder: (context, snap) {
-              if (!_hasPartnerGroup) {
-                return _buildEmptyState(
-                  icon: Icons.people_outline,
-                  text: '파트너 그룹에 가입하면 사용할 수 있어요',
-                  onTap: null, // 가입 전에는 터치 불가
-                );
-              }
-
               if (snap.connectionState == ConnectionState.waiting) {
                 return const Center(
                   child: Padding(
@@ -85,14 +79,49 @@ class BondFeedSection extends StatelessWidget {
               }
 
               if (snap.hasError) {
-                return Center(
-                  child: Text(
-                    '불러오는 중 문제가 생겼어요.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: BondColors.kText.withOpacity(0.5),
-                    ),
+                debugPrint('⚠️ [BondFeedSection] 에러: ${snap.error}');
+                return Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.red.shade200),
                   ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            '데이터 조회 오류',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.red.shade700,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '${snap.error}',
+                        style: TextStyle(fontSize: 12, color: Colors.red.shade900),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              // ✅ 개인 모드: 파트너 필요 안내
+              if (!_hasPartnerGroup) {
+                return _buildEmptyState(
+                  icon: Icons.group_outlined,
+                  text: '파트너와 함께할 때만\n기록할 수 있어요',
+                  subtitle: '매칭을 시작해보세요',
+                  onTap: null,  // 터치 비활성화
+                  isPersonalMode: true,
                 );
               }
 
@@ -101,19 +130,23 @@ class BondFeedSection extends StatelessWidget {
                 return _buildEmptyState(
                   icon: Icons.edit_note_outlined,
                   text: '첫 이야기를 나눠주세요',
+                  subtitle: null,
                   onTap: onOpenWrite,
+                  isPersonalMode: false,
                 );
               }
 
               return Column(
-                children: docs.map((doc) {
-                  final data = doc.data() as Map<String, dynamic>;
-                  return BondPostCard(
-                    post: data,
-                    postId: doc.id,
-                    bondGroupId: partnerGroupId,
-                  );
-                }).toList(),
+                children: [
+                  ...docs.map((doc) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    return BondPostCard(
+                      post: data,
+                      postId: doc.id,
+                      bondGroupId: partnerGroupId,
+                    );
+                  }),
+                ],
               );
             },
           ),
@@ -125,18 +158,24 @@ class BondFeedSection extends StatelessWidget {
   Widget _buildEmptyState({
     required IconData icon,
     required String text,
-    required VoidCallback? onTap, // nullable로 변경
+    String? subtitle,
+    required VoidCallback? onTap,
+    required bool isPersonalMode,
   }) {
     return GestureDetector(
-      onTap: onTap, // null이면 터치 불가
+      onTap: onTap,  // null이면 터치 비활성화
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: BondColors.kCardBg,
+          color: isPersonalMode 
+              ? Colors.grey[100]
+              : BondColors.kCardBg,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: BondColors.kShadow2.withOpacity(0.3),
+            color: isPersonalMode
+                ? Colors.grey[300]!
+                : BondColors.kShadow2.withOpacity(0.3),
           ),
         ),
         child: Column(
@@ -144,22 +183,37 @@ class BondFeedSection extends StatelessWidget {
             Icon(
               icon,
               size: 40,
-              color: BondColors.kText.withOpacity(0.3),
+              color: isPersonalMode
+                  ? Colors.grey[400]
+                  : BondColors.kText.withOpacity(0.3),
             ),
             const SizedBox(height: 8),
             Text(
               text,
+              textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
-                color: BondColors.kText.withOpacity(0.5),
+                color: isPersonalMode
+                    ? Colors.grey[600]
+                    : BondColors.kText.withOpacity(0.5),
+                height: 1.4,
               ),
             ),
+            if (subtitle != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[500],
+                ),
+              ),
+            ],
           ],
         ),
       ),
     );
   }
 }
-
-
 

@@ -193,3 +193,8 @@ async function addMemberToGroup(
   console.log(`✅ 멤버 추가 완료: ${newUid} → ${groupId}`);
 }
 
+
+
+
+
+

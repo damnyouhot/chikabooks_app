@@ -43,16 +43,41 @@ class _BondPostSheetState extends State<BondPostSheet> {
     _checkPostingStatus();
   }
 
+  String? _activeGroupId; // 유효한(만료 안 된) 그룹 ID
+  bool _isPersonalMode = false;
+
   Future<void> _checkPostingStatus() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
-    
-    // 현재 사용자의 파트너 그룹 ID 가져오기
+
     final userDoc = await _db.collection('users').doc(uid).get();
     final partnerGroupId = userDoc.data()?['partnerGroupId'] as String?;
-    
-    if (partnerGroupId == null || partnerGroupId.isEmpty) return;
-    
+
+    if (partnerGroupId == null || partnerGroupId.isEmpty) {
+      if (mounted) setState(() => _isPersonalMode = true);
+      return;
+    }
+
+    // 그룹이 실제로 유효한지 확인
+    final groupDoc =
+        await _db.collection('partnerGroups').doc(partnerGroupId).get();
+    if (!groupDoc.exists) {
+      if (mounted) setState(() => _isPersonalMode = true);
+      return;
+    }
+
+    final endsAtTimestamp = groupDoc.data()?['endsAt'] as Timestamp?;
+    final endsAt = endsAtTimestamp?.toDate().toUtc(); // UTC로 변환
+    final now = DateTime.now().toUtc(); // UTC 기준 현재 시간
+
+    if (endsAt == null || endsAt.isBefore(now)) {
+      debugPrint('⚠️ [BondPostSheet] 그룹 만료됨 → 개인 모드');
+      if (mounted) setState(() => _isPersonalMode = true);
+      return;
+    }
+
+    _activeGroupId = partnerGroupId;
+
     final status = await BondPostService.getPostingStatus(partnerGroupId);
     if (mounted) {
       setState(() {
@@ -68,28 +93,10 @@ class _BondPostSheetState extends State<BondPostSheet> {
       return;
     }
 
-    debugPrint('🔍 [글쓰기] 1단계: 쿨타임 체크 시작');
-    
-    // 현재 사용자의 파트너 그룹 ID 가져오기
-    final userDoc = await _db.collection('users').doc(uid).get();
-    final partnerGroupId = userDoc.data()?['partnerGroupId'] as String?;
-    
-    if (partnerGroupId == null || partnerGroupId.isEmpty) {
-      _showSnack('파트너 그룹에 가입해야 글을 쓸 수 있어요.');
-      return;
-    }
-    
-    debugPrint('🔍 [글쓰기] partnerGroupId: $partnerGroupId');
-
-    // 시간대별 제한 체크
-    final status = await BondPostService.getPostingStatus(partnerGroupId);
-    
-    debugPrint('🔍 [글쓰기] 2단계: 쿨타임 결과 = ${status['canPostNow']}');
-    debugPrint('🔍 [글쓰기] 메시지 = ${status['message']}');
-    
-    if (!(status['canPostNow'] as bool)) {
-      debugPrint('❌ [글쓰기] 쿨타임으로 리턴됨');
-      _showSnack(status['message'] as String);
+    // ✅ 개인 모드 차단: 여기까지 왔다면 이상하지만 안전장치
+    if (_isPersonalMode || _activeGroupId == null) {
+      _showSnack('파트너와 함께할 때만 기록할 수 있어요.');
+      if (mounted) Navigator.pop(context);
       return;
     }
 
@@ -109,32 +116,30 @@ class _BondPostSheetState extends State<BondPostSheet> {
 
     setState(() => _posting = true);
     try {
+      final now = DateTime.now();
+
+      // ✅ 파트너 모드: partnerGroups/{groupId}/posts 에만 저장
       final currentSlot = BondPostService.getCurrentTimeSlot();
-      final now = DateTime.now(); // 클라이언트 타임스탬프
-      
-      debugPrint('🔍 [글쓰기] 3단계: Firestore 저장 시작');
-      debugPrint('🔍 [글쓰기] 경로: partnerGroups/$partnerGroupId/posts');
-      
-      // partnerGroups/{partnerGroupId}/posts에 저장
+      debugPrint('🔍 [글쓰기] 파트너 모드 저장: partnerGroups/$_activeGroupId/posts');
+
       await _db
           .collection('partnerGroups')
-          .doc(partnerGroupId)
+          .doc(_activeGroupId)
           .collection('posts')
           .add({
-        'uid': uid,
-        'text': text,
-        'bondGroupId': partnerGroupId,
-        'dateKey': BondPostService.todayDateKey(),
-        'timeSlot': currentSlot.name,
-        'createdAt': FieldValue.serverTimestamp(), // 서버 타임스탬프 (정확도)
-        'createdAtClient': Timestamp.fromDate(now), // 클라이언트 타임스탬프 (즉시 정렬 가능)
-        'isDeleted': false,
-        'publicEligible': true,
-        'reports': 0,
-      });
-      
-      debugPrint('✅ [글쓰기] 4단계: Firestore 저장 성공!');
-      
+            'uid': uid,
+            'text': text,
+            'bondGroupId': _activeGroupId,
+            'dateKey': BondPostService.todayDateKey(),
+            'timeSlot': currentSlot.name,
+            'createdAt': FieldValue.serverTimestamp(),
+            'createdAtClient': Timestamp.fromDate(now),
+            'isDeleted': false,
+            'publicEligible': true,
+            'reports': 0,
+          });
+      debugPrint('✅ [글쓰기] 파트너 모드 저장 성공!');
+
       if (mounted) {
         Navigator.pop(context);
         _showSnack('기록되었어요 ✨');
@@ -149,9 +154,7 @@ class _BondPostSheetState extends State<BondPostSheet> {
 
   void _showSnack(String msg) {
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(msg)),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     }
   }
 
@@ -159,7 +162,7 @@ class _BondPostSheetState extends State<BondPostSheet> {
   Widget build(BuildContext context) {
     // 키보드 높이 가져오기
     final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
-    
+
     return GestureDetector(
       onTap: () => Navigator.pop(context), // 팝업 바깥 터치 시 닫기
       child: Container(
@@ -196,12 +199,15 @@ class _BondPostSheetState extends State<BondPostSheet> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      _remainingPosts > 0 
+                      _remainingPosts > 0
                           ? '오늘 $_remainingPosts번 더 나눌 수 있어요'
                           : '오늘은 이미 2번 나눴어요',
                       style: TextStyle(
                         fontSize: 12,
-                        color: _remainingPosts > 0 ? Colors.grey[600] : Colors.red[400],
+                        color:
+                            _remainingPosts > 0
+                                ? Colors.grey[600]
+                                : Colors.red[400],
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -249,22 +255,23 @@ class _BondPostSheetState extends State<BondPostSheet> {
                             borderRadius: BorderRadius.circular(14),
                           ),
                         ),
-                        child: _posting
-                            ? SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: const Color(0xFF5D6B6B), // _kText
+                        child:
+                            _posting
+                                ? SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: const Color(0xFF5D6B6B), // _kText
+                                  ),
+                                )
+                                : const Text(
+                                  '남기기',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
-                              )
-                            : const Text(
-                                '남기기',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
                       ),
                     ),
                   ],
@@ -277,4 +284,3 @@ class _BondPostSheetState extends State<BondPostSheet> {
     );
   }
 }
-

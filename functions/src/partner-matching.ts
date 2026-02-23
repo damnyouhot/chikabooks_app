@@ -223,6 +223,7 @@ async function createPartnerGroup(
     const memberRef = groupRef.collection("memberMeta").doc(uid);
     batch.set(memberRef, {
       uid,
+      nickname: userData.nickname || null,
       region: userData.region || "",
       careerBucket: userData.careerBucket || mapCareerGroupToBucket(userData.careerGroup || ""),
       careerGroup: userData.careerGroup || "",

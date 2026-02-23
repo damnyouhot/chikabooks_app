@@ -127,7 +127,7 @@ class _BondPostCardState extends State<BondPostCard> {
     }
 
     final reactionRef = _db
-        .collection('bondGroups')
+        .collection('partnerGroups')
         .doc(groupId)
         .collection('posts')
         .doc(widget.postId)
@@ -189,7 +189,7 @@ class _BondPostCardState extends State<BondPostCard> {
   ) async {
     if (kind != ReactionKind.heart) return 0.0;
     final postRef = _db
-        .collection('bondGroups')
+        .collection('partnerGroups')
         .doc(groupId)
         .collection('posts')
         .doc(widget.postId);
@@ -350,7 +350,7 @@ class _BondPostCardState extends State<BondPostCard> {
 
   Future<void> _applyEnthroneScore(String groupId, String authorUid) async {
     final postRef = _db
-        .collection('bondGroups')
+        .collection('partnerGroups')
         .doc(groupId)
         .collection('posts')
         .doc(widget.postId);
@@ -636,22 +636,23 @@ class _BondPostCardState extends State<BondPostCard> {
                   ),
                 ),
 
-              // 이모지 버튼 (아이콘만)
-              TextButton(
-                onPressed: _showEmojiPicker,
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
+              // 이모지 버튼 (아이콘만) - 자신의 글에는 표시하지 않음
+              if (!_isMyPost)
+                TextButton(
+                  onPressed: _showEmojiPicker,
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    minimumSize: const Size(0, 0),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                  minimumSize: const Size(0, 0),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  child: Text(
+                    '😊',
+                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                  ),
                 ),
-                child: Text(
-                  '😊',
-                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                ),
-              ),
 
               // 답글 버튼 추가
               TextButton(
@@ -803,7 +804,7 @@ class _BondPostCardState extends State<BondPostCard> {
 
     try {
       await _db
-          .collection('bondGroups')
+          .collection('partnerGroups')
           .doc(groupId)
           .collection('posts')
           .doc(widget.postId)

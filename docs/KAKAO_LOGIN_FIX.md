@@ -257,3 +257,8 @@ Cloud Functions의 `createCustomToken`에서 이미 Firestore에 provider 정보
 4. 설정 페이지에서 올바른 provider 표시 확인
 
 
+
+
+
+
+

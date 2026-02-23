@@ -1,0 +1,255 @@
+import 'package:flutter/material.dart';
+
+// ── 디자인 팔레트 ──
+const _kAccent = Color(0xFFF7CBCA);
+const _kText = Color(0xFF5D6B6B);
+const _kShadow2 = Color(0xFFD5E5E5);
+const _kCardBg = Colors.white;
+
+/// 도전하기 탭 메인 타이틀 카드
+///
+/// 내 주변 구인 현황을 한눈에 보여주는 대시보드 카드
+class MainTitleCard extends StatelessWidget {
+  final int nearbyJobCount; // 반경 내 공고 수
+  final double currentRadius; // 현재 반경 (km)
+  final int newJobsCount; // 24시간 신규 공고 수
+  final bool notificationEnabled; // 알림 ON/OFF
+  final int watchedClinicsCount; // 관심 치과 수
+  final int weeklyJobPoints; // ★ 이번 주 구직 활동 포인트
+  final VoidCallback onRadiusChange; // 반경 변경 콜백
+  final Function(bool) onNotificationToggle; // 알림 토글 콜백
+  final VoidCallback onWatchedClinicsPressed; // 관심 치과 보기
+
+  const MainTitleCard({
+    super.key,
+    required this.nearbyJobCount,
+    required this.currentRadius,
+    required this.newJobsCount,
+    required this.notificationEnabled,
+    required this.watchedClinicsCount,
+    this.weeklyJobPoints = 0, // 기본값 0
+    required this.onRadiusChange,
+    required this.onNotificationToggle,
+    required this.onWatchedClinicsPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _kCardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _kShadow2, width: 0.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 타이틀
+          const Text(
+            '내 주변 치과 구인 현황',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: _kText,
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // 1행: 반경 내 공고 수 + 반경 변경 버튼
+          Row(
+            children: [
+              Icon(
+                Icons.location_on_outlined,
+                size: 16,
+                color: _kText.withOpacity(0.6),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                '반경 ${currentRadius.toStringAsFixed(0)}km',
+                style: TextStyle(fontSize: 13, color: _kText.withOpacity(0.7)),
+              ),
+              const SizedBox(width: 2),
+              Text(
+                '· $nearbyJobCount건',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: _kText,
+                ),
+              ),
+              const Spacer(),
+              TextButton(
+                onPressed: onRadiusChange,
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(
+                  '반경 변경',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: _kAccent.withOpacity(0.9),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          // 2행: 최근 24시간 신규 공고
+          if (newJobsCount > 0) ...[
+            Row(
+              children: [
+                Icon(
+                  Icons.fiber_new,
+                  size: 16,
+                  color: _kAccent.withOpacity(0.8),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '새 공고 ${newJobsCount}건',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: _kAccent.withOpacity(0.9),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '(24시간)',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: _kText.withOpacity(0.5),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+          ] else
+            const SizedBox(height: 4),
+
+          // 구분선
+          Divider(color: _kShadow2.withOpacity(0.5), height: 1),
+          const SizedBox(height: 12),
+
+          // 3행: 알림 토글 + 관심 치과
+          Row(
+            children: [
+              // 알림 토글
+              Expanded(
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.notifications_outlined,
+                      size: 16,
+                      color: _kText.withOpacity(0.6),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '주변 구인 알림',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: _kText.withOpacity(0.7),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Transform.scale(
+                      scale: 0.8,
+                      child: Switch(
+                        value: notificationEnabled,
+                        onChanged: onNotificationToggle,
+                        activeColor: _kAccent,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // 관심 치과
+              InkWell(
+                onTap: onWatchedClinicsPressed,
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.favorite_border,
+                        size: 14,
+                        color: _kText.withOpacity(0.6),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '관심 치과 $watchedClinicsCount',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: _kText.withOpacity(0.7),
+                        ),
+                      ),
+                      Icon(
+                        Icons.chevron_right,
+                        size: 14,
+                        color: _kText.withOpacity(0.4),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          // ★ 이번 주 구직 활동 포인트 (있을 경우만 표시)
+          if (weeklyJobPoints > 0) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              decoration: BoxDecoration(
+                color: _kAccent.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.star_outline,
+                    size: 12,
+                    color: _kAccent.withOpacity(0.9),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '이번 주 구직 활동으로 +${weeklyJobPoints.toStringAsFixed(1)}P 적립',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: _kText.withOpacity(0.7),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+
+

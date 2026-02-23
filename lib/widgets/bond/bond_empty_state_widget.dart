@@ -9,11 +9,7 @@ class BondEmptyStateWidget extends StatelessWidget {
   final String state; // 'no_group', 'pause', 'expiring_soon'
   final VoidCallback? onAction;
 
-  const BondEmptyStateWidget({
-    super.key,
-    required this.state,
-    this.onAction,
-  });
+  const BondEmptyStateWidget({super.key, required this.state, this.onAction});
 
   @override
   Widget build(BuildContext context) {
@@ -50,14 +46,14 @@ class BondEmptyStateWidget extends StatelessWidget {
               color: const Color(0xFF1E88E5).withOpacity(0.1),
             ),
             child: const Icon(
-              Icons.people_outline,
+              Icons.auto_stories_outlined,
               size: 40,
               color: Color(0xFF1E88E5),
             ),
           ),
           const SizedBox(height: 20),
           const Text(
-            '아직 파트너가 없어요',
+            '조용한 페이지',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
@@ -66,12 +62,12 @@ class BondEmptyStateWidget extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            '매주 월요일 오전 9시에\n자동으로 매칭돼요',
+            '이번 주는 아직 페이지가 열리지 않았어.\n월요일 오전 9시,\n새로운 동행이 자동으로 이어져.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 14,
               color: Colors.grey[600],
-              height: 1.5,
+              height: 1.6,
             ),
           ),
           const SizedBox(height: 24),
@@ -84,14 +80,11 @@ class BondEmptyStateWidget extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.info_outline, size: 16, color: Colors.grey[600]),
+                Icon(Icons.edit_note, size: 16, color: Colors.grey[600]),
                 const SizedBox(width: 8),
                 Text(
-                  '파트너 없이도 기록은 남길 수 있어요',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[700],
-                  ),
+                  '파트너가 없어도 오늘을 남길 수 있어',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[700]),
                 ),
               ],
             ),
@@ -163,11 +156,7 @@ class BondEmptyStateWidget extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.access_time,
-            size: 22,
-            color: Color(0xFFF57C00),
-          ),
+          const Icon(Icons.access_time, size: 22, color: Color(0xFFF57C00)),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -184,10 +173,7 @@ class BondEmptyStateWidget extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   '월요일 오전 9시에 새 파트너와 함께해요',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[700],
-                  ),
+                  style: TextStyle(fontSize: 12, color: Colors.grey[700]),
                 ),
               ],
             ),
@@ -200,10 +186,35 @@ class BondEmptyStateWidget extends StatelessWidget {
 
 /// 파트너 그룹 상태 체크 헬퍼
 class BondStateHelper {
+  /// ✅ 핵심: 그룹이 진짜 유효한지 확인 (endsAt > now)
+  static bool isGroupActive(PartnerGroup? group) {
+    if (group == null) return false;
+
+    final now = DateTime.now().toUtc(); // UTC 기준
+    final endsAt = group.endsAt.toUtc(); // UTC로 변환
+
+    // 1. endsAt이 현재보다 미래여야 함
+    if (endsAt.isBefore(now)) {
+      return false;
+    }
+
+    // 2. isActiveGroup 필드도 체크
+    if (!group.isActiveGroup) {
+      return false;
+    }
+
+    // 3. 멤버가 1명 이상이어야 함
+    if (group.memberUids.isEmpty) {
+      return false;
+    }
+
+    return true;
+  }
+
   /// 그룹 만료 임박 여부 (일요일 18:00 이후)
   static bool isExpiringSoon(PartnerGroup? group) {
-    if (group == null) return false;
-    
+    if (group == null || !isGroupActive(group)) return false;
+
     final kst = DateTime.now().toUtc().add(const Duration(hours: 9));
     final dayOfWeek = kst.weekday; // 1=월, 7=일
     final hour = kst.hour;
@@ -223,8 +234,10 @@ class BondStateHelper {
 
   /// 이어가기 선택 가능 시간대 여부
   static bool canSelectContinue(PartnerGroup? group) {
-    if (group == null || group.memberUids.length < 2) return false;
-    
+    if (group == null || !isGroupActive(group) || group.memberUids.length < 2) {
+      return false;
+    }
+
     return isExpiringSoon(group);
   }
 
@@ -233,24 +246,34 @@ class BondStateHelper {
     return partnerStatus == 'pause';
   }
 
-  /// 그룹 상태 문자열 반환
-  static String getGroupStateString(
-    PartnerGroup? group,
-    String partnerStatus,
-  ) {
+  /// ✅ 핵심: 그룹 상태 문자열 반환 (단일 진실 소스)
+  /// - partnerGroupId 존재
+  /// - 그룹 문서 존재
+  /// - endsAt > now
+  /// → 이 조건을 만족할 때만 "파트너 있음"
+  static String getGroupStateString(PartnerGroup? group, String partnerStatus) {
+    // 1. Pause 상태는 최우선
     if (isPaused(partnerStatus)) {
       return 'pause';
     }
 
-    if (group == null) {
+    // 2. 그룹이 없거나 만료됨
+    if (group == null || !isGroupActive(group)) {
       return 'no_group';
     }
 
+    // 3. 그룹은 유효하지만 만료 임박
     if (isExpiringSoon(group)) {
       return 'expiring_soon';
     }
 
+    // 4. 정상 활동 중
     return 'active';
   }
-}
 
+  /// 파트너가 있는 상태인지 (파트너 UI 렌더링 가능 여부)
+  static bool hasActivePartner(PartnerGroup? group, String partnerStatus) {
+    final state = getGroupStateString(group, partnerStatus);
+    return state == 'active' || state == 'expiring_soon';
+  }
+}

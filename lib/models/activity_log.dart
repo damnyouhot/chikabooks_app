@@ -29,11 +29,11 @@ class ActivityLog {
   }
 
   Map<String, dynamic> toMap() => {
-        'createdAt': Timestamp.fromDate(createdAt),
-        'actorUid': actorUid,
-        'type': type.value,
-        'meta': meta,
-      };
+    'createdAt': Timestamp.fromDate(createdAt),
+    'actorUid': actorUid,
+    'type': type.value,
+    'meta': meta,
+  };
 
   /// 요약 카드용 아이콘
   String get summaryIcon {
@@ -52,6 +52,14 @@ class ActivityLog {
         return '🫧';
       case ActivityType.pollVote:
         return '🗳️';
+      case ActivityType.jobView:
+        return '👀';
+      case ActivityType.jobBookmark:
+        return '🔖';
+      case ActivityType.jobApply:
+        return '🎯';
+      case ActivityType.jobPost:
+        return '📢';
       default:
         return '·';
     }
@@ -73,6 +81,11 @@ enum ActivityType {
   quizComplete('QUIZ_1'),
   wallPost('WALL_POST'),
   pollVote('POLL_VOTE'),
+  // ★ 구직 탭 활동
+  jobView('JOB_VIEW'), // 공고 상세 보기
+  jobBookmark('JOB_BOOKMARK'), // 공고 관심 등록
+  jobApply('JOB_APPLY'), // 공고 지원 완료
+  jobPost('JOB_POST'), // 공고 등록 완료 (병원 측)
   unknown('UNKNOWN');
 
   final String value;
@@ -85,6 +98,3 @@ enum ActivityType {
     );
   }
 }
-
-
-

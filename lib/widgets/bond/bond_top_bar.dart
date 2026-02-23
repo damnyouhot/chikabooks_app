@@ -6,10 +6,7 @@ import 'bond_colors.dart';
 class BondTopBar extends StatelessWidget {
   final VoidCallback onSettingsLongPress;
 
-  const BondTopBar({
-    super.key,
-    required this.onSettingsLongPress,
-  });
+  const BondTopBar({super.key, required this.onSettingsLongPress});
 
   @override
   Widget build(BuildContext context) {
@@ -31,12 +28,11 @@ class BondTopBar extends StatelessWidget {
           ),
           const Spacer(),
           GestureDetector(
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const SettingsPage(),
-              ),
-            ),
+            onTap:
+                () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SettingsPage()),
+                ),
             onLongPress: onSettingsLongPress,
             child: Icon(
               Icons.settings_outlined,
@@ -53,82 +49,132 @@ class BondTopBar extends StatelessWidget {
   void _showConceptDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text(
-          '같이 탭에 대해서',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-        ),
-        content: const SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                '결(結): 함께 엮어가는 관계',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: BondColors.kText,
-                ),
+      builder:
+          (context) => AlertDialog(
+            title: const Text(
+              '같이 탭에 대해서',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            content: const SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '결(結):',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: BondColors.kText,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    '나를 단단하게 만드는 결이 같은 동료들과 연결',
+                    style: TextStyle(fontSize: 13, height: 1.5),
+                  ),
+                  SizedBox(height: 12),
+                  Text(
+                    '치과생활에서의 고민, 감정, 일상을\n파트너들과 나누고, 스스로를 돌보며\n조용히 쌓아가는 공간입니다.',
+                    style: TextStyle(fontSize: 13, height: 1.5),
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    '💛 결 점수',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    '결은, 나를 방치하지 않은 시간의 축적입니다.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.5,
+                      color: Color(0xFF666666),
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    '캐릭터와의 교감,\n파트너와의 이야기,\n하루를 기록하고 목표를 세우는 작은 실천들이\n함께 반영되어 올라갑니다.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.5,
+                      color: Color(0xFF666666),
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    '경쟁이나 순위는 없습니다.\n결은 오직 쌓이는 기록입니다.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.5,
+                      color: Color(0xFF666666),
+                    ),
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    '🤝 파트너 매칭',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    '파트너는 7일 동안 함께 걷는 동행입니다.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.5,
+                      color: Color(0xFF666666),
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    '비슷한 고민과 결을 가진 사람들과 연결되어\n한 주를 함께 버티게 됩니다.\n성과보다 안전과 지속을 우선합니다.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.5,
+                      color: Color(0xFF666666),
+                    ),
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    '🔁 파트너 연장',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    '한 주가 끝나면,\n서로 원할 경우 조용히 이어집니다.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.5,
+                      color: Color(0xFF666666),
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    '억지로 붙잡지 않아도 되고,\n떠난다고 실패가 아닙니다.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.5,
+                      color: Color(0xFF666666),
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    '이 탭은 경쟁이 아니라\n리듬을 맞추는 공간입니다.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.5,
+                      color: Color(0xFF666666),
+                    ),
+                  ),
+                ],
               ),
-              SizedBox(height: 12),
-              Text(
-                '치과위생사로서의 고민, 감정, 일상을 파트너들과 나누고 교감을 쌓아가는 공간입니다.',
-                style: TextStyle(fontSize: 13, height: 1.5),
-              ),
-              SizedBox(height: 16),
-              Text(
-                '🧵 결 점수',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-              ),
-              SizedBox(height: 4),
-              Text(
-                '파트너와 함께 활동할수록 쌓이는 관계의 깊이. 이야기를 나누고, 공감하고, 응원할 때마다 올라갑니다.',
-                style: TextStyle(fontSize: 12, height: 1.4, color: Color(0xFF666666)),
-              ),
-              SizedBox(height: 12),
-              Text(
-                '💬 오늘을 나누기',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-              ),
-              SizedBox(height: 4),
-              Text(
-                '파트너들에게만 보이는 하루 한 줄. 업무 고민, 소소한 일상, 속내 모두 환영합니다. 이모지와 댓글로 서로 위로하고 공감해요.',
-                style: TextStyle(fontSize: 12, height: 1.4, color: Color(0xFF666666)),
-              ),
-              SizedBox(height: 12),
-              Text(
-                '✨ 전광판',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-              ),
-              SizedBox(height: 4),
-              Text(
-                '파트너들이 추대한 이야기가 전광판에 올라갑니다. 많은 공감을 받은 글이 다른 그룹에도 공유되어 더 많은 사람들에게 위로와 힘이 됩니다.',
-                style: TextStyle(fontSize: 12, height: 1.4, color: Color(0xFF666666)),
-              ),
-              SizedBox(height: 12),
-              Text(
-                '📊 공감 투표',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-              ),
-              SizedBox(height: 4),
-              Text(
-                '매일 바뀌는 질문에 답하며 동료들의 생각과 감정을 엿봅니다. 나만 그런 게 아니구나 싶을 때, 조금 더 가벼운 마음이 될 수 있어요.',
-                style: TextStyle(fontSize: 12, height: 1.4, color: Color(0xFF666666)),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('닫기'),
               ),
             ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('닫기'),
-          ),
-        ],
-      ),
     );
   }
 }
-
-
-

@@ -86,7 +86,7 @@ class _CaringPageState extends State<CaringPage>
 
         // 'tap' 트리거 찾기
         _tapTrigger = controller.findInput<bool>('tap') as SMITrigger?;
-        
+
         if (_tapTrigger != null) {
           debugPrint('✅ dog.riv tap 트리거 연결 성공');
         } else {
@@ -118,7 +118,7 @@ class _CaringPageState extends State<CaringPage>
 
       final greeted = CaringStateService.hasGreetedToday(state);
 
-        setState(() {
+      setState(() {
         _hasGreetedToday = greeted;
         _loading = false;
       });
@@ -140,7 +140,7 @@ class _CaringPageState extends State<CaringPage>
       _hasGreetedToday = true;
     });
     _speak(msg); // ✨ 변경: _showFeedback → _speak
-    }
+  }
 
   /// 밥주기
   void _onFeed() async {
@@ -193,7 +193,7 @@ class _CaringPageState extends State<CaringPage>
     _speak(
       _neutralPhrases[Random().nextInt(_neutralPhrases.length)],
     ); // ✨ 변경: _showFeedback → _speak
-    }
+  }
 
   // ═══════════════════════════════════════════════
   // ✨ 새로운 말풍선 시스템
@@ -210,7 +210,7 @@ class _CaringPageState extends State<CaringPage>
     Future.delayed(Duration(milliseconds: durationMs), () {
       if (mounted && _currentSpeech == text) {
         setState(() => _isDismissingSpeech = true);
-        
+
         // 바람 효과 애니메이션 후 완전 제거
         Future.delayed(const Duration(milliseconds: 300), () {
           if (mounted) {
@@ -228,7 +228,7 @@ class _CaringPageState extends State<CaringPage>
   void _showBondFloatingDelta(double value) {
     // 화면 크기 가져오기
     final size = MediaQuery.of(context).size;
-    
+
     // 화면 중앙 상단 (캐릭터 머리 예상 위치)
     final centerX = size.width / 2 - 20; // 중앙에서 살짝 왼쪽
     final topY = size.height * 0.35; // 상단 35% 지점
@@ -252,10 +252,7 @@ class _CaringPageState extends State<CaringPage>
                   fontWeight: FontWeight.w600,
                   color: _colorAccent,
                   shadows: [
-                    Shadow(
-                      color: Colors.black.withOpacity(0.2),
-                      blurRadius: 4,
-                    ),
+                    Shadow(color: Colors.black.withOpacity(0.2), blurRadius: 4),
                   ],
                 ),
               ),
@@ -282,9 +279,7 @@ class _CaringPageState extends State<CaringPage>
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return Scaffold(
@@ -299,11 +294,11 @@ class _CaringPageState extends State<CaringPage>
   }
 
   // ── 디자인 컬러 팔레트 ──
-  static const _colorAccent = Color(0xFFF7CBCA);    // 미술적 포인트
-  static const _colorText = Color(0xFF5D6B6B);       // 텍스트/메시지
-  static const _colorBg = Color(0xFFF1F7F7);         // 메인 배경
-  static const _colorShadow1 = Color(0xFFDDD3D8);    // 흐린 명암1
-  static const _colorShadow2 = Color(0xFFD5E5E5);    // 흐린 명암2
+  static const _colorAccent = Color(0xFFF7CBCA); // 미술적 포인트
+  static const _colorText = Color(0xFF5D6B6B); // 텍스트/메시지
+  static const _colorBg = Color(0xFFF1F7F7); // 메인 배경
+  static const _colorShadow1 = Color(0xFFDDD3D8); // 흐린 명암1
+  static const _colorShadow2 = Color(0xFFD5E5E5); // 흐린 명암2
 
   Widget _buildMainContent() {
     return Stack(
@@ -313,22 +308,23 @@ class _CaringPageState extends State<CaringPage>
           key: _characterKey, // ✨ 추가: 위치 추적용
           child: GestureDetector(
             onTap: _onCircleTap,
-            child: _dogArtboard != null
-                ? Rive(
-                    artboard: _dogArtboard!,
-                    fit: BoxFit.cover,
-                    alignment: Alignment.center,
-                  )
-                : Container(
-                    color: _colorBg,
-                    child: Center(
-                      child: CircularProgressIndicator(
-                        color: _colorAccent,
-                        strokeWidth: 1.5, // 가느다란 라인
+            child:
+                _dogArtboard != null
+                    ? Rive(
+                      artboard: _dogArtboard!,
+                      fit: BoxFit.cover,
+                      alignment: Alignment.center,
+                    )
+                    : Container(
+                      color: _colorBg,
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          color: _colorAccent,
+                          strokeWidth: 1.5, // 가느다란 라인
+                        ),
                       ),
                     ),
           ),
-        ),
         ),
 
         // ── 2. 상단 바 (설정) ──
@@ -336,10 +332,7 @@ class _CaringPageState extends State<CaringPage>
           top: 0,
           left: 0,
           right: 0,
-        child: SafeArea(
-            bottom: false,
-            child: _buildTopBar(),
-          ),
+          child: SafeArea(bottom: false, child: _buildTopBar()),
         ),
 
         // ── 3. ✨ 캐릭터 아래 말풍선 (말할 때만 표시) ──
@@ -380,19 +373,175 @@ class _CaringPageState extends State<CaringPage>
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-              children: [
+        children: [
+          // 좌측 설명 버튼
           IconButton(
-            icon: Icon(Icons.settings_outlined,
-                color: _colorText.withOpacity(0.4), size: 20),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const SettingsPage()),
-              );
-            },
-                ),
-              ],
+            icon: Icon(
+              Icons.info_outline,
+              color: _colorText.withOpacity(0.5),
+              size: 18,
             ),
+            onPressed: () => _showConceptDialog(context),
+          ),
+          const Spacer(),
+          // 우측 설정 버튼
+          IconButton(
+            icon: Icon(
+              Icons.settings_outlined,
+              color: _colorText.withOpacity(0.4),
+              size: 20,
+            ),
+            onPressed: () {
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const SettingsPage()));
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 설명 다이얼로그
+  void _showConceptDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text(
+              '나 탭에 대해서',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    '나와 캐릭터가 머무는 공간',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: _colorText,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    '이곳은 나를 방치하지 않기 위한 자리입니다.\n감정을 나누고, 하루를 정리하고,\n작은 목표를 세우는 공간입니다.',
+                    style: TextStyle(fontSize: 13, height: 1.5),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    '🐣 캐릭터',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '캐릭터는 당신의 감정을 비추는 존재입니다.\n조언보다 곁에 머무는 역할을 합니다.\n자주 올수록 조금씩 더 반응합니다.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.5,
+                      color: _colorText.withOpacity(0.7),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    '🍚 밥먹기',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '시간대별로 캐릭터에게 밥을 줍니다.\n아침, 점심, 저녁, 밤 각 한 번씩 가능합니다.\n하루를 4번 다 채우면 다음 날 보너스가 있어요.\n건너뛴 날이 쌓이면 조금씩 멀어집니다.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.5,
+                      color: _colorText.withOpacity(0.7),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    '💗 사랑하기',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '캐릭터에게 사랑을 주는 것은 터치면 충분합니다.\n하루 3번까지 가능합니다.\n상황에 따라 다른 반응을 보여줍니다.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.5,
+                      color: _colorText.withOpacity(0.7),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    '📝 기록하기',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '오늘 있었던 일을 짧게 적습니다.\n길게 쓰지 않아도 괜찮습니다.\n하루에 두 번까지 기록할 수 있어요.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.5,
+                      color: _colorText.withOpacity(0.7),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    '🎯 목표달성하기',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '이번 주 작은 다짐을 세우고 체크합니다.\n완수하지 못해도 감점은 없습니다.\n시도하는 것만으로도 의미가 있어요.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.5,
+                      color: _colorText.withOpacity(0.7),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '루틴 목표: 주 7일 동안 반복하는 작은 습관\n프로젝트 목표: 한 주 동안 달성할 구체적인 목표',
+                    style: TextStyle(
+                      fontSize: 11,
+                      height: 1.5,
+                      color: _colorText.withOpacity(0.6),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    '💛 결 점수',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '나를 방치하지 않은 시간의 축적입니다.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.5,
+                      color: _colorText.withOpacity(0.7),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '높을수록 좋은 게 아니라,\n꾸준히 돌보는 것이 중요합니다.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.5,
+                      color: _colorText.withOpacity(0.7),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('닫기'),
+              ),
+            ],
+          ),
     );
   }
 
@@ -424,11 +573,11 @@ class _CaringPageState extends State<CaringPage>
               width: 0.5, // 가느다란 라인
             ),
             boxShadow: [
-                    BoxShadow(
+              BoxShadow(
                 color: _colorShadow1.withOpacity(0.15),
                 blurRadius: 20,
                 offset: const Offset(0, 4),
-                    ),
+              ),
             ],
           ),
           child: const Row(
@@ -438,12 +587,12 @@ class _CaringPageState extends State<CaringPage>
               SizedBox(width: 8),
               Text(
                 '아침 인사',
-            style: TextStyle(
+                style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w500,
                   color: _colorText,
                 ),
-            ),
+              ),
             ],
           ),
         ),
@@ -454,16 +603,19 @@ class _CaringPageState extends State<CaringPage>
   /// 4개 아이콘 버튼 (✨ 수정: 소통하기, 대화하기, 목표설정 추가)
   Widget _buildFourActions() {
     return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 40),
+      padding: const EdgeInsets.symmetric(horizontal: 40),
       child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-          _buildIconAction(Icons.restaurant_outlined, _onFeed),              // 밥먹기
-          _buildIconAction(Icons.volunteer_activism, _onEmpathize),         // ✨ 소통하기
-          _buildIconAction(Icons.edit_note_outlined, _onDiary),             // ✨ 대화하기 (한 줄 기록)
-          _buildIconAction(Icons.flag_outlined, _onGoalSetting),            // ✨ 목표설정
-            ],
-          ),
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _buildIconAction(Icons.restaurant_outlined, _onFeed), // 밥먹기
+          _buildIconAction(Icons.volunteer_activism, _onEmpathize), // ✨ 소통하기
+          _buildIconAction(
+            Icons.edit_note_outlined,
+            _onDiary,
+          ), // ✨ 대화하기 (한 줄 기록)
+          _buildIconAction(Icons.flag_outlined, _onGoalSetting), // ✨ 목표설정
+        ],
+      ),
     );
   }
 
@@ -476,7 +628,7 @@ class _CaringPageState extends State<CaringPage>
         height: 52,
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.7),
-              shape: BoxShape.circle,
+          shape: BoxShape.circle,
           border: Border.all(
             color: _colorShadow2.withOpacity(0.5),
             width: 0.5, // 가느다란 라인
@@ -488,7 +640,7 @@ class _CaringPageState extends State<CaringPage>
               offset: const Offset(0, 2),
             ),
           ],
-            ),
+        ),
         child: Icon(icon, color: _colorText.withOpacity(0.6), size: 22),
       ),
     );

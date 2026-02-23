@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/enthrone.dart';
@@ -34,22 +35,60 @@ class _BillboardCarouselState extends State<BillboardCarousel> {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('billboardPosts')
-          .where('status', isEqualTo: 'active')
-          .orderBy('createdAt', descending: true)
-          .limit(10)
+          .limit(5)
           .snapshots(),
       builder: (context, snap) {
-        // 로딩 중
-        if (!snap.hasData) {
-          return const SizedBox(
+        // 에러 표시
+        if (snap.hasError) {
+          if (kDebugMode) {
+            print('🔴 Billboard error: ${snap.error}');
+          }
+          return Container(
             height: 200,
-            child: Center(child: CircularProgressIndicator()),
+            padding: const EdgeInsets.all(20),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.red, size: 32),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Billboard error: ${snap.error}',
+                    style: const TextStyle(color: Colors.red, fontSize: 12),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
           );
         }
 
-        // 에러
-        if (snap.hasError) {
-          return _buildEmptyState();
+        // 개발 모드 상태 로깅
+        if (kDebugMode) {
+          print('🔍 Billboard state=${snap.connectionState}, hasData=${snap.hasData}, docs=${snap.data?.docs.length ?? 0}');
+        }
+
+        // 로딩 중
+        if (!snap.hasData) {
+          return SizedBox(
+            height: 200,
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircularProgressIndicator(),
+                  if (kDebugMode) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      'state=${snap.connectionState}\nhasData=${snap.hasData}',
+                      style: TextStyle(fontSize: 10, color: _kText.withOpacity(0.5)),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          );
         }
 
         // 데이터 변환

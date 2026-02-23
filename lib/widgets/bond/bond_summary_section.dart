@@ -2,23 +2,27 @@ import 'package:flutter/material.dart';
 import '../../models/partner_group.dart';
 import 'bond_colors.dart';
 
-/// 결 점수 + 파트너 아바타 요약 섹션
+/// 파트너 요약 섹션 (통합 버전)
+/// - 접힌 상태: 아바타 + 1줄 요약
+/// - 확장 상태: 파트너별 감정 해석 (MemberList + PartnerSummary 흡수)
 class BondSummarySection extends StatelessWidget {
-  final double bondScore;
   final bool isExpanded;
   final VoidCallback onToggleExpand;
-  final List<GroupMemberMeta>? members; // 실제 멤버 데이터
-  final String? myUid; // 내 UID
-  final Map<String, String>? memberNicknames; // ✅ 멤버 닉네임 맵 {uid: nickname}
+  final List<GroupMemberMeta>? members;
+  final String? myUid;
+  final Map<String, String>? memberNicknames;
+  final Map<String, int>? weeklyPostCounts; // 주간 활동 데이터
+  final Map<String, int>? weeklyReactionCounts;
 
   const BondSummarySection({
     super.key,
-    required this.bondScore,
     required this.isExpanded,
     required this.onToggleExpand,
     this.members,
     this.myUid,
-    this.memberNicknames, // ✅ 추가
+    this.memberNicknames,
+    this.weeklyPostCounts,
+    this.weeklyReactionCounts,
   });
 
   @override
@@ -37,39 +41,38 @@ class BondSummarySection extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         decoration: BondColors.cardDecoration(),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 결 점수 + 파트너 아바타
+            // 접힌 상태: 간결한 요약
             Row(
               children: [
-                // 결 점수 링
-                _buildBondRing(),
-                const SizedBox(width: 16),
-                // 결 점수 텍스트
+                // 파트너 아바타
+                _buildPartnerAvatars(),
+                const SizedBox(width: 12),
+                // 텍스트
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        '결',
+                        '동행 파트너',
                         style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w300,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
                           color: BondColors.kText,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '함께 쌓아가는 교감',
+                        '이번 주 함께하는 사람들',
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 11,
                           color: BondColors.kText.withOpacity(0.5),
                         ),
                       ),
                     ],
                   ),
                 ),
-                // 파트너 아바타 3명
-                _buildPartnerAvatars(),
                 Icon(
                   isExpanded ? Icons.expand_less : Icons.expand_more,
                   color: BondColors.kText.withOpacity(0.5),
@@ -77,7 +80,20 @@ class BondSummarySection extends StatelessWidget {
               ],
             ),
 
-            // 확장 시 파트너 상세
+            // 1줄 요약 (접힌 상태에서도 표시)
+            if (!isExpanded) ...[
+              const SizedBox(height: 12),
+              Text(
+                _getOneLinerSummary(),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: BondColors.kText.withOpacity(0.6),
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+
+            // 확장 시: 파트너별 감정 해석
             if (isExpanded) ...[
               const SizedBox(height: 16),
               Container(
@@ -94,83 +110,82 @@ class BondSummarySection extends StatelessWidget {
     );
   }
 
-  Widget _buildBondRing() {
-    return Container(
-      width: 48,
-      height: 48,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: BondColors.kAccent.withOpacity(0.6),
-          width: 1.5,
-        ),
-      ),
-      child: Center(
-        child: Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: BondColors.kAccent.withOpacity(0.15),
-          ),
-        child: Center(
-          child: Text(
-            bondScore.toStringAsFixed(1),
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: BondColors.kText,
-            ),
-          ),
-        ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildPartnerAvatars() {
-    // 실제 멤버 데이터 사용
     final displayMembers = members!.take(3).toList();
-    
+
     return Row(
-      children: displayMembers.asMap().entries.map((e) {
-        final i = e.key;
-        final member = e.value;
-        final isMe = member.uid == myUid;
-        
-        return Transform.translate(
-          offset: Offset(-8.0 * i, 0),
-          child: Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: isMe ? BondColors.kAccent.withOpacity(0.3) : BondColors.kShadow2,
-              border: Border.all(color: BondColors.kCardBg, width: 1.5),
-            ),
-            child: Center(
-              child: Text(
-                isMe ? '나' : 'P${i + 1}',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: BondColors.kText.withOpacity(0.6),
+      mainAxisSize: MainAxisSize.min,
+      children:
+          displayMembers.asMap().entries.map((e) {
+            final i = e.key;
+            final member = e.value;
+            final isMe = member.uid == myUid;
+            final nickname = memberNicknames?[member.uid] ?? '파트너';
+
+            return Transform.translate(
+              offset: Offset(-6.0 * i, 0),
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color:
+                      isMe
+                          ? BondColors.kAccent.withOpacity(0.3)
+                          : BondColors.kShadow2,
+                  border: Border.all(color: BondColors.kCardBg, width: 1.5),
+                ),
+                child: Center(
+                  child: Text(
+                    nickname.isNotEmpty ? nickname[0] : (isMe ? '나' : 'P'),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: BondColors.kText.withOpacity(0.7),
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
-        );
-      }).toList(),
+            );
+          }).toList(),
     );
   }
 
+  /// 1줄 요약 생성
+  String _getOneLinerSummary() {
+    final partners = members!.where((m) => m.uid != myUid).toList();
+
+    if (partners.isEmpty) {
+      return '이번 주는 나만의 시간';
+    }
+
+    // 전체 활동량 계산
+    int totalActivity = 0;
+    for (final partner in partners) {
+      final posts = weeklyPostCounts?[partner.uid] ?? 0;
+      final reactions = weeklyReactionCounts?[partner.uid] ?? 0;
+      totalActivity += posts + reactions;
+    }
+
+    if (totalActivity == 0) {
+      return '조용히 이어지고 있어요';
+    } else if (totalActivity <= 3) {
+      return '이번 주 함께 버티고 있어요';
+    } else {
+      return '이번 주 ${totalActivity}번 교감을 나눴어요';
+    }
+  }
+
+  /// 확장 상태: 파트너별 감정 해석
   Widget _buildExpandedPartnerDetails() {
-    // 실제 멤버 데이터 사용
+    // 나를 제외한 파트너들
+    final partners = members!.where((m) => m.uid != myUid).toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          '파트너 상세',
+          '이번 주 함께한 사람들',
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
@@ -178,67 +193,83 @@ class BondSummarySection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        ...members!.map((member) {
-          final isMe = member.uid == myUid;
-          // ✅ 닉네임 표시: memberNicknames에서 가져오기
-          final nickname = memberNicknames?[member.uid] ?? '파트너';
-          final displayName = isMe ? '나 ($nickname)' : nickname;
-          
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Row(
+        ...partners.map((partner) => _buildPartnerCard(partner)),
+      ],
+    );
+  }
+
+  Widget _buildPartnerCard(GroupMemberMeta partner) {
+    final nickname = memberNicknames?[partner.uid] ?? '파트너';
+    final postCount = weeklyPostCounts?[partner.uid] ?? 0;
+    final reactionCount = weeklyReactionCounts?[partner.uid] ?? 0;
+
+    final statusMessage = _generateStatusMessage(postCount, reactionCount);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 아바타
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: BondColors.kShadow2,
+            ),
+            child: Center(
+              child: Text(
+                nickname.isNotEmpty ? nickname[0] : 'P',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: BondColors.kText,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          // 내용
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: isMe 
-                        ? BondColors.kAccent.withOpacity(0.2) 
-                        : BondColors.kShadow2,
-                  ),
-                  child: Center(
-                    child: Text(
-                      isMe ? '나' : 'P',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: BondColors.kText,
-                      ),
-                    ),
+                Text(
+                  nickname,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: BondColors.kText,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        displayName,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: BondColors.kText,
-                        ),
-                      ),
-                      Text(
-                        '${member.careerGroup} · ${member.region}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: BondColors.kText.withOpacity(0.6),
-                        ),
-                      ),
-                    ],
+                const SizedBox(height: 4),
+                Text(
+                  statusMessage,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: BondColors.kText.withOpacity(0.65),
+                    height: 1.4,
                   ),
                 ),
               ],
             ),
-          );
-        }).toList(),
-      ],
+          ),
+        ],
+      ),
     );
   }
+
+  /// 파트너 상태 메시지 생성 (단일 문구)
+  String _generateStatusMessage(int postCount, int reactionCount) {
+    final totalActivity = postCount + reactionCount;
+
+    if (totalActivity == 0) {
+      return '조용히 이어지고 있어요';
+    } else if (totalActivity <= 2) {
+      return '이번 주 함께 버티고 있어요';
+    } else {
+      return '이번 주 ${totalActivity}번 대화를 나눴어요';
+    }
+  }
 }
-
-
-
