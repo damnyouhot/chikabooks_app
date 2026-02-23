@@ -149,15 +149,15 @@ class JobService {
   }) async {
     try {
       final now = DateTime.now();
-      final yesterday = now.subtract(const Duration(hours: 24));
+      final weekAgo = now.subtract(const Duration(days: 7));
 
-      // 최근 24시간 공고 조회
+      // 최근 7일 공고 조회
       final snapshot =
           await _db
               .collection('jobs')
               .where(
                 'postedAt',
-                isGreaterThanOrEqualTo: Timestamp.fromDate(yesterday),
+                isGreaterThanOrEqualTo: Timestamp.fromDate(weekAgo),
               )
               .orderBy('postedAt', descending: true)
               .limit(50)

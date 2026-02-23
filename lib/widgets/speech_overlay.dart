@@ -5,11 +5,7 @@ class SpeechOverlay extends StatefulWidget {
   final String? text;
   final bool isDismissing;
 
-  const SpeechOverlay({
-    super.key,
-    this.text,
-    this.isDismissing = false,
-  });
+  const SpeechOverlay({super.key, this.text, this.isDismissing = false});
 
   @override
   State<SpeechOverlay> createState() => _SpeechOverlayState();
@@ -29,9 +25,10 @@ class _SpeechOverlayState extends State<SpeechOverlay>
       duration: const Duration(milliseconds: 300),
     );
 
-    _opacity = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-    );
+    _opacity = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
     _slide = Tween<Offset>(
       begin: const Offset(0, 0.2),
       end: Offset.zero,

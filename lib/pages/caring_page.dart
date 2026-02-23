@@ -203,18 +203,27 @@ class _CaringPageState extends State<CaringPage>
   }
 
   /// 캐릭터 터치
-  void _onCircleTap() {
+  void _onCircleTap() async {
     _tapTrigger?.fire();
 
-    final score = Random().nextInt(3) + 1;
-    final phrase = _neutralPhrases[Random().nextInt(_neutralPhrases.length)];
+    // tryTouch 호출: 쿨타임(하루 3회) 체크
+    final result = await CaringActionService.tryTouch();
+    if (!mounted) return;
+
+    // 멘트: tryTouch 결과 또는 중립 문구
+    final phrase = result.ment.isNotEmpty
+        ? result.ment
+        : _neutralPhrases[Random().nextInt(_neutralPhrases.length)];
 
     setState(() {
       _currentSpeech = phrase;
       _isDismissingSpeech = false;
     });
 
-    _showFloatingDelta(score);
+    // 실제 점수가 있을 때만 플러스 텍스트 표시 (쿨타임 중이면 0.0)
+    if (result.bondDelta > 0) {
+      _showFloatingDelta(result.bondDelta);
+    }
 
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) setState(() => _isDismissingSpeech = true);
@@ -229,42 +238,45 @@ class _CaringPageState extends State<CaringPage>
     });
   }
 
-  void _showFloatingDelta(int delta) {
+  void _showFloatingDelta(double delta) {
     final overlay = Overlay.of(context);
     final renderBox = context.findRenderObject() as RenderBox?;
     if (renderBox == null) return;
 
     final size = renderBox.size;
-    // ✅ 결 점수 텍스트: 화면 하단 쪽으로 이동 (0.65)
     final offsetX = (size.width / 2) + (Random().nextDouble() * 60 - 30);
     final offsetY = (size.height * 0.65) + (Random().nextDouble() * 30 - 15);
+    final label = '결+${delta.toStringAsFixed(2)}';
 
     final entry = OverlayEntry(
-      builder:
-          (ctx) => Positioned(
-            left: offsetX,
-            top: offsetY,
-            child: TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0.0, end: 1.0),
-              duration: const Duration(milliseconds: 1500),
-              builder: (_, value, child) {
-                return Transform.translate(
-                  offset: Offset(0, -value * 50),
-                  child: Opacity(
-                    opacity: 1.0 - value,
-                    child: Text(
-                      '+$delta',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: _colorAccent.withOpacity(1.0 - value),
-                      ),
+      builder: (ctx) => Positioned(
+        left: offsetX,
+        top: offsetY,
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0.0, end: 1.0),
+          duration: const Duration(milliseconds: 1500),
+          builder: (_, value, child) {
+            return Transform.translate(
+              offset: Offset(0, -value * 50),
+              child: Opacity(
+                opacity: 1.0 - value,
+                child: Material(
+                  type: MaterialType.transparency,
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: _colorAccent.withOpacity(1.0 - value),
+                      decoration: TextDecoration.none,
                     ),
                   ),
-                );
-              },
-            ),
-          ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
     );
 
     overlay.insert(entry);
@@ -295,7 +307,7 @@ class _CaringPageState extends State<CaringPage>
           ),
 
           // ── 캐릭터 ──
-          // 4번째 카드 아래 ~ 하단 버튼 위 사이에 배치, 2.2배 확대
+          // 4번째 카드 아래 ~ 하단 버튼 위 사이에 배치, 4.4배 확대
           Positioned(
             top: _topH,
             left: 0,
@@ -306,13 +318,14 @@ class _CaringPageState extends State<CaringPage>
               child: _dogArtboard != null
                   ? LayoutBuilder(
                       builder: (ctx, constraints) {
+                        const scale = 4.4;
                         return OverflowBox(
-                          maxWidth: constraints.maxWidth * 2.2,
-                          maxHeight: constraints.maxHeight * 2.2,
+                          maxWidth: constraints.maxWidth * scale,
+                          maxHeight: constraints.maxHeight * scale,
                           alignment: Alignment.center,
                           child: SizedBox(
-                            width: constraints.maxWidth * 2.2,
-                            height: constraints.maxHeight * 2.2,
+                            width: constraints.maxWidth * scale,
+                            height: constraints.maxHeight * scale,
                             child: Rive(
                               artboard: _dogArtboard!,
                               fit: BoxFit.contain,
@@ -390,7 +403,7 @@ class _CaringPageState extends State<CaringPage>
                     _TapCard(
                       title: '📖 이주의 책',
                       bigText: _weeklyBook?.title ?? '이번 주 추천 책이 없어요',
-                      subtitle: _weeklyBook?.author ?? '',
+                      subtitle: '',
                       onTap: _goBookDetail,
                     ),
                     // ④ 오늘의 1문제 → 성장하기 탭(2)
@@ -462,9 +475,10 @@ class _CaringPageState extends State<CaringPage>
   void _onFeed() async {
     final result = await CaringActionService.tryFeed();
     if (mounted) {
-      final message = result.success
-          ? (result.ment ?? '밥을 줬어요')
-          : (result.rejectMent ?? '나중에 다시 시도하세요');
+      final message =
+          result.success
+              ? (result.ment ?? '밥을 줬어요')
+              : (result.rejectMent ?? '나중에 다시 시도하세요');
 
       // 스낵바 대신 기존 말풍선 형태로 표시
       setState(() {
@@ -575,6 +589,7 @@ class _TapCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // 타이틀
                       Text(
                         title,
                         style: const TextStyle(
@@ -584,27 +599,36 @@ class _TapCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        bigText,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      if (subtitle.isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          subtitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: Colors.black54,
+                      // 본문 + 세부설명 (같은 줄, 우측 정렬)
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              bigText,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
-                        ),
-                      ],
+                          if (subtitle.isNotEmpty) ...[
+                            const SizedBox(width: 6),
+                            Text(
+                              subtitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: Colors.black45,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     ],
                   ),
                 ),
