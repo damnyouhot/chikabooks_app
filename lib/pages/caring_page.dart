@@ -468,11 +468,18 @@ class _CaringPageState extends State<CaringPage>
 
   void _onFeed() async {
     final result = await CaringActionService.tryFeed();
-    if (result.success && mounted) {
+    if (mounted) {
+      final message = result.success 
+          ? (result.ment ?? '밥을 줬어요')
+          : (result.rejectMent ?? '나중에 다시 시도하세요');
+      
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result.message)),
+        SnackBar(content: Text(message)),
       );
-      _bootstrap();
+      
+      if (result.success) {
+        _bootstrap();
+      }
     }
   }
 
