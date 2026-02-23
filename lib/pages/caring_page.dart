@@ -198,9 +198,7 @@ class _CaringPageState extends State<CaringPage>
       return;
     }
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => EbookDetailPage(ebook: _weeklyBook!),
-      ),
+      MaterialPageRoute(builder: (_) => EbookDetailPage(ebook: _weeklyBook!)),
     );
   }
 
@@ -297,7 +295,7 @@ class _CaringPageState extends State<CaringPage>
           ),
 
           // ── 캐릭터 ──
-          // 카드 영역 바로 아래, 하단 버튼 위에 꽉 채워서 표시
+          // 4번째 카드 아래 ~ 하단 버튼 위 사이에 배치, 2.2배 확대
           Positioned(
             top: _topH,
             left: 0,
@@ -306,10 +304,23 @@ class _CaringPageState extends State<CaringPage>
             child: GestureDetector(
               onTap: _onCircleTap,
               child: _dogArtboard != null
-                  ? Rive(
-                      artboard: _dogArtboard!,
-                      fit: BoxFit.contain,
-                      alignment: Alignment.center,
+                  ? LayoutBuilder(
+                      builder: (ctx, constraints) {
+                        return OverflowBox(
+                          maxWidth: constraints.maxWidth * 2.2,
+                          maxHeight: constraints.maxHeight * 2.2,
+                          alignment: Alignment.center,
+                          child: SizedBox(
+                            width: constraints.maxWidth * 2.2,
+                            height: constraints.maxHeight * 2.2,
+                            child: Rive(
+                              artboard: _dogArtboard!,
+                              fit: BoxFit.contain,
+                              alignment: Alignment.center,
+                            ),
+                          ),
+                        );
+                      },
                     )
                   : const SizedBox.shrink(),
             ),
@@ -451,13 +462,27 @@ class _CaringPageState extends State<CaringPage>
   void _onFeed() async {
     final result = await CaringActionService.tryFeed();
     if (mounted) {
-      final message =
-          result.success
-              ? (result.ment ?? '밥을 줬어요')
-              : (result.rejectMent ?? '나중에 다시 시도하세요');
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      final message = result.success
+          ? (result.ment ?? '밥을 줬어요')
+          : (result.rejectMent ?? '나중에 다시 시도하세요');
+
+      // 스낵바 대신 기존 말풍선 형태로 표시
+      setState(() {
+        _currentSpeech = message;
+        _isDismissingSpeech = false;
+      });
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) setState(() => _isDismissingSpeech = true);
+      });
+      Future.delayed(const Duration(milliseconds: 2300), () {
+        if (mounted) {
+          setState(() {
+            _currentSpeech = null;
+            _isDismissingSpeech = false;
+          });
+        }
+      });
+
       if (result.success) _bootstrap();
     }
   }
@@ -654,13 +679,14 @@ class _PolicyRollingCard extends StatelessWidget {
                       ClipRect(
                         child: AnimatedSwitcher(
                           duration: const Duration(milliseconds: 350),
-                          layoutBuilder: (current, previous) => Stack(
-                            alignment: Alignment.centerLeft,
-                            children: [
-                              ...previous,
-                              if (current != null) current,
-                            ],
-                          ),
+                          layoutBuilder:
+                              (current, previous) => Stack(
+                                alignment: Alignment.centerLeft,
+                                children: [
+                                  ...previous,
+                                  if (current != null) current,
+                                ],
+                              ),
                           transitionBuilder: (child, animation) {
                             // animation: 진입 시 0→1, 퇴장 시 1→0
                             // 퇴장(reverse) → 위로 나감, 진입(forward) → 아래에서 올라옴
@@ -668,9 +694,10 @@ class _PolicyRollingCard extends StatelessWidget {
                                 animation.status == AnimationStatus.reverse ||
                                 animation.status == AnimationStatus.dismissed;
                             final offsetTween = Tween<Offset>(
-                              begin: isLeaving
-                                  ? const Offset(0, -1.0) // 퇴장: 위로
-                                  : const Offset(0, 1.0),  // 진입: 아래에서
+                              begin:
+                                  isLeaving
+                                      ? const Offset(0, -1.0) // 퇴장: 위로
+                                      : const Offset(0, 1.0), // 진입: 아래에서
                               end: Offset.zero,
                             );
                             return SlideTransition(

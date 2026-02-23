@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// 캐릭터 말풍선
-/// - 등장: 아래에서 페이드+슬라이드 인 (300ms)
-/// - 유지 후 페이드 아웃 (300ms)
+/// 캐릭터 말풍선 — 배경 없는 텍스트 (페이드+슬라이드 인/아웃)
 class SpeechOverlay extends StatefulWidget {
   final String? text;
   final bool isDismissing;
@@ -35,7 +33,7 @@ class _SpeechOverlayState extends State<SpeechOverlay>
       CurvedAnimation(parent: _controller, curve: Curves.easeOut),
     );
     _slide = Tween<Offset>(
-      begin: const Offset(0, 0.25),
+      begin: const Offset(0, 0.2),
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
 
@@ -76,26 +74,11 @@ class _SpeechOverlayState extends State<SpeechOverlay>
       builder: (context, child) {
         return Opacity(
           opacity: _opacity.value,
-          child: SlideTransition(
-            position: _slide,
-            child: child,
-          ),
+          child: SlideTransition(position: _slide, child: child),
         );
       },
-      child: Container(
+      child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: maxWidth),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.93),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
         child: Text(
           widget.text!,
           style: const TextStyle(
