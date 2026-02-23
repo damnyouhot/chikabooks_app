@@ -440,10 +440,11 @@ class _SettingsPageState extends State<SettingsPage> {
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (context) => const PolicyWebViewPage(
-                    url: 'https://www.chikabooks.com/?mode=policy',
-                    title: '이용약관',
-                  ),
+                  builder:
+                      (context) => const PolicyWebViewPage(
+                        url: 'https://www.chikabooks.com/?mode=policy',
+                        title: '이용약관',
+                      ),
                 ),
               );
             },
@@ -454,10 +455,11 @@ class _SettingsPageState extends State<SettingsPage> {
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (context) => const PolicyWebViewPage(
-                    url: 'https://www.chikabooks.com/?mode=privacy',
-                    title: '개인정보처리방침',
-                  ),
+                  builder:
+                      (context) => const PolicyWebViewPage(
+                        url: 'https://www.chikabooks.com/?mode=privacy',
+                        title: '개인정보처리방침',
+                      ),
                 ),
               );
             },
