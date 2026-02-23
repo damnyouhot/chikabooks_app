@@ -306,7 +306,14 @@ class _CaringPageState extends State<CaringPage>
   Widget _buildMainContent() {
     return Stack(
       children: [
-        // ── 1. dog.riv 전체 화면 (캐릭터 영역 - 아래로 이동) ──
+        // ── 0. 기존 배경 전체 유지 ──
+        Positioned.fill(
+          child: Container(
+            color: _colorBg, // 기존 배경색
+          ),
+        ),
+
+        // ── 1. dog.riv 캐릭터 영역 (배경 위에, 카드 아래) ──
         Positioned(
           top: MediaQuery.of(context).size.height * 0.35, // 상단 35% 공간 확보
           left: 0,
@@ -320,26 +327,23 @@ class _CaringPageState extends State<CaringPage>
                     fit: BoxFit.cover,
                     alignment: Alignment.center,
                   )
-                : Container(
-                    color: _colorBg,
-                    child: Center(
-                      child: CircularProgressIndicator(
-                        color: _colorAccent,
-                        strokeWidth: 1.5,
-                      ),
+                : Center(
+                    child: CircularProgressIndicator(
+                      color: _colorAccent,
+                      strokeWidth: 1.5,
                     ),
                   ),
           ),
         ),
 
-        // ── 2. 상단 정보 카드 영역 (스크롤 가능) ──
+        // ── 2. 상단 정보 카드 영역 (반투명 배경) ──
         Positioned(
           top: 0,
           left: 0,
           right: 0,
           height: MediaQuery.of(context).size.height * 0.35,
           child: Container(
-            color: Colors.white,
+            color: _colorBg.withOpacity(0.95), // 반투명 배경
             child: SafeArea(
               bottom: false,
               child: Column(
@@ -385,9 +389,9 @@ class _CaringPageState extends State<CaringPage>
           ),
         ),
 
-        // ── 3. ✨ 캐릭터 아래 말풍선 (말할 때만 표시) ──
+        // ── 3. ✨ 캐릭터 위쪽 말풍선 (캐릭터와 버튼 사이) ──
         Positioned(
-          bottom: 140,
+          top: MediaQuery.of(context).size.height * 0.45, // 캐릭터 위쪽
           left: 0,
           right: 0,
           child: Center(
@@ -422,7 +426,6 @@ class _CaringPageState extends State<CaringPage>
   Widget _buildTopBar() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      color: Colors.white,
       child: Row(
         children: [
           // 좌측 설명 버튼
@@ -443,8 +446,9 @@ class _CaringPageState extends State<CaringPage>
               size: 20,
             ),
             onPressed: () {
-              Navigator.of(context)
-                  .push(MaterialPageRoute(builder: (_) => const SettingsPage()));
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const SettingsPage()));
             },
           ),
         ],
