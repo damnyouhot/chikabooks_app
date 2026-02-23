@@ -180,12 +180,13 @@ class JobService {
 
       final count = jobs.length;
       final clinicName =
-          jobs.isNotEmpty ? (jobs.first.clinicName.isNotEmpty ? jobs.first.clinicName : '치과') : '치과';
+          jobs.isNotEmpty
+              ? (jobs.first.clinicName.isNotEmpty
+                  ? jobs.first.clinicName
+                  : '치과')
+              : '치과';
 
-      return {
-        'count': count,
-        'clinicName': clinicName,
-      };
+      return {'count': count, 'clinicName': clinicName};
     } catch (e) {
       debugPrint('❌ getRecentJobsSummary 에러: $e');
       return {'count': 0, 'representativeName': '치과', 'otherCount': 0};

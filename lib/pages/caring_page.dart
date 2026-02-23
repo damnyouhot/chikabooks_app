@@ -211,9 +211,10 @@ class _CaringPageState extends State<CaringPage>
     if (!mounted) return;
 
     // 멘트: tryTouch 결과 또는 중립 문구
-    final phrase = result.ment.isNotEmpty
-        ? result.ment
-        : _neutralPhrases[Random().nextInt(_neutralPhrases.length)];
+    final phrase =
+        result.ment.isNotEmpty
+            ? result.ment
+            : _neutralPhrases[Random().nextInt(_neutralPhrases.length)];
 
     setState(() {
       _currentSpeech = phrase;
@@ -249,34 +250,35 @@ class _CaringPageState extends State<CaringPage>
     final label = '결+${delta.toStringAsFixed(2)}';
 
     final entry = OverlayEntry(
-      builder: (ctx) => Positioned(
-        left: offsetX,
-        top: offsetY,
-        child: TweenAnimationBuilder<double>(
-          tween: Tween(begin: 0.0, end: 1.0),
-          duration: const Duration(milliseconds: 1500),
-          builder: (_, value, child) {
-            return Transform.translate(
-              offset: Offset(0, -value * 50),
-              child: Opacity(
-                opacity: 1.0 - value,
-                child: Material(
-                  type: MaterialType.transparency,
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: _colorAccent.withOpacity(1.0 - value),
-                      decoration: TextDecoration.none,
+      builder:
+          (ctx) => Positioned(
+            left: offsetX,
+            top: offsetY,
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0.0, end: 1.0),
+              duration: const Duration(milliseconds: 1500),
+              builder: (_, value, child) {
+                return Transform.translate(
+                  offset: Offset(0, -value * 50),
+                  child: Opacity(
+                    opacity: 1.0 - value,
+                    child: Material(
+                      type: MaterialType.transparency,
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: _colorAccent.withOpacity(1.0 - value),
+                          decoration: TextDecoration.none,
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-            );
-          },
-        ),
-      ),
+                );
+              },
+            ),
+          ),
     );
 
     overlay.insert(entry);
@@ -307,7 +309,7 @@ class _CaringPageState extends State<CaringPage>
           ),
 
           // ── 캐릭터 ──
-          // 4번째 카드 아래 ~ 하단 버튼 위 사이에 배치, 4.4배 확대
+          // 4번째 카드 아래 ~ 하단 버튼 위 사이에 배치, 2.64배 (4.4 × 60%)
           Positioned(
             top: _topH,
             left: 0,
@@ -318,7 +320,7 @@ class _CaringPageState extends State<CaringPage>
               child: _dogArtboard != null
                   ? LayoutBuilder(
                       builder: (ctx, constraints) {
-                        const scale = 4.4;
+                        const scale = 2.64;
                         return OverflowBox(
                           maxWidth: constraints.maxWidth * scale,
                           maxHeight: constraints.maxHeight * scale,
