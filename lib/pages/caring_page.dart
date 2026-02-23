@@ -309,7 +309,7 @@ class _CaringPageState extends State<CaringPage>
           ),
 
           // ── 캐릭터 ──
-          // 4번째 카드 아래 ~ 하단 버튼 위 사이에 배치, 2.64배 (4.4 × 60%)
+          // 4번째 카드 아래 ~ 하단 버튼 위 사이에 배치, 2.112배 (2.64 × 80%)
           Positioned(
             top: _topH,
             left: 0,
@@ -320,7 +320,7 @@ class _CaringPageState extends State<CaringPage>
               child: _dogArtboard != null
                   ? LayoutBuilder(
                       builder: (ctx, constraints) {
-                        const scale = 2.64;
+                        const scale = 2.112;
                         return OverflowBox(
                           maxWidth: constraints.maxWidth * scale,
                           maxHeight: constraints.maxHeight * scale,
