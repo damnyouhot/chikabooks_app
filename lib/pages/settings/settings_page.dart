@@ -8,7 +8,6 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'partner_preferences_page.dart';
-import 'policy_webview_page.dart';
 import '../onboarding/onboarding_profile_screen.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -87,6 +86,16 @@ class _SettingsPageState extends State<SettingsPage> {
       return '기타($first)';
     }
     return '알 수 없음';
+  }
+
+  Future<void> _openUrl(String url) async {
+    final uri = Uri.parse(url);
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('링크를 열 수 없어요. 잠시 후 다시 시도해 주세요.')),
+      );
+    }
   }
 
   Future<void> _sendEmail({
@@ -438,30 +447,16 @@ class _SettingsPageState extends State<SettingsPage> {
             leading: const Icon(Icons.description_outlined),
             title: const Text('이용약관'),
             onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder:
-                      (context) => const PolicyWebViewPage(
-                        url: 'https://www.chikabooks.com/?mode=policy',
-                        title: '이용약관',
-                      ),
-                ),
-              );
+              // TODO: Firebase Hosting URL로 변경 예정
+              _openUrl('https://chikabooks3rd.web.app/terms.html');
             },
           ),
           ListTile(
             leading: const Icon(Icons.privacy_tip_outlined),
             title: const Text('개인정보처리방침'),
             onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder:
-                      (context) => const PolicyWebViewPage(
-                        url: 'https://www.chikabooks.com/?mode=privacy',
-                        title: '개인정보처리방침',
-                      ),
-                ),
-              );
+              // TODO: Firebase Hosting URL로 변경 예정
+              _openUrl('https://chikabooks3rd.web.app/privacy.html');
             },
           ),
           ListTile(
