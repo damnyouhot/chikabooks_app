@@ -46,14 +46,14 @@ class _HomeShellState extends State<HomeShell> {
     setState(() => _selectedIndex = idx);
   }
 
-  /// CaringPage에서 "성장 탭으로 이동" 콜백
-  void _goToGrowthTab() => setState(() => _selectedIndex = _growthTabIndex);
+  /// CaringPage에서 다른 탭으로 이동하는 콜백
+  void _onTabRequested(int index) => setState(() => _selectedIndex = index);
 
   @override
   Widget build(BuildContext context) {
     // CaringPage에 탭 전환 콜백 주입
     final pages = <Widget>[
-      CaringPage(onNavigateToGrowth: _goToGrowthTab),
+      CaringPage(onTabRequested: _onTabRequested),
       const BondPage(),
       const GrowthPage(),
       const JobPage(),

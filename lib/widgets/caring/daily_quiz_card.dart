@@ -14,8 +14,11 @@ class DailyQuizCard extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 1),
       elevation: 1,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      child: Padding(
-        padding: const EdgeInsets.all(8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: quiz != null && quiz!.question.isNotEmpty ? onStart : null,
+        child: Padding(
+          padding: const EdgeInsets.all(8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

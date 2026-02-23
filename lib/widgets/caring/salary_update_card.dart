@@ -5,8 +5,9 @@ import '../../models/policy_update.dart';
 /// 🏥 급여 변경 임박 카드 (3초 간격 자동 로테이션)
 class SalaryUpdateCard extends StatefulWidget {
   final List<PolicyUpdate>? updates;
+  final VoidCallback? onTap;
 
-  const SalaryUpdateCard({super.key, this.updates});
+  const SalaryUpdateCard({super.key, this.updates, this.onTap});
 
   @override
   State<SalaryUpdateCard> createState() => _SalaryUpdateCardState();
@@ -50,28 +51,32 @@ class _SalaryUpdateCardState extends State<SalaryUpdateCard> {
         margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 1),
         elevation: 1,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text('🏥', style: TextStyle(fontSize: 13)),
-                  const SizedBox(width: 3),
-                  Text(
-                    '임박 제도 변경',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: widget.onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text('🏥', style: TextStyle(fontSize: 13)),
+                    const SizedBox(width: 3),
+                    Text(
+                      '임박 제도 변경',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text('로딩 중...', style: TextStyle(fontSize: 12)),
-            ],
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text('로딩 중...', style: TextStyle(fontSize: 12)),
+              ],
+            ),
           ),
         ),
       );
@@ -83,28 +88,32 @@ class _SalaryUpdateCardState extends State<SalaryUpdateCard> {
         margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 1),
         elevation: 1,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text('🏥', style: TextStyle(fontSize: 13)),
-                  const SizedBox(width: 3),
-                  Text(
-                    '임박 제도 변경',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: widget.onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text('🏥', style: TextStyle(fontSize: 13)),
+                    const SizedBox(width: 3),
+                    Text(
+                      '임박 제도 변경',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text('예정된 제도 변경 없음', style: TextStyle(fontSize: 12)),
-            ],
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text('예정된 제도 변경 없음', style: TextStyle(fontSize: 12)),
+              ],
+            ),
           ),
         ),
       );
@@ -113,11 +122,14 @@ class _SalaryUpdateCardState extends State<SalaryUpdateCard> {
     final update = updates[_currentIndex];
 
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 1),
+      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 1),
       elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      child: Padding(
-        padding: const EdgeInsets.all(10),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: widget.onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

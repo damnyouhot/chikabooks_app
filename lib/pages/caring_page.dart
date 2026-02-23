@@ -28,10 +28,10 @@ import 'settings/settings_page.dart';
 ///   같은 날 + 자고있음 → 디밍 + [깨우기] → 깨우기 → 4버튼
 ///   같은 날 + 인사완료 → 4버튼 정상
 class CaringPage extends StatefulWidget {
-  /// 성장(3탭)으로 이동하기 위한 콜백
-  final VoidCallback? onNavigateToGrowth;
+  /// 다른 탭으로 이동하기 위한 콜백 (0=나, 1=같이, 2=성장, 3=도전)
+  final ValueChanged<int>? onTabRequested;
 
-  const CaringPage({super.key, this.onNavigateToGrowth});
+  const CaringPage({super.key, this.onTabRequested});
 
   @override
   State<CaringPage> createState() => _CaringPageState();
@@ -55,6 +55,12 @@ class _CaringPageState extends State<CaringPage>
 
   // ── ✨ 떠오르는 수치들 ──
   final List<Widget> _floatingDeltas = [];
+
+  // ── ✨ 높이 측정용 GlobalKey ──
+  final GlobalKey _topCardsKey = GlobalKey();
+  final GlobalKey _bottomButtonsKey = GlobalKey();
+  double _topCardsHeight = 240; // 초기값 (측정 전)
+  double _bottomButtonsHeight = 120; // 초기값 (측정 전)
 
   // ── Rive 관련 ──
   Artboard? _dogArtboard;
@@ -80,6 +86,30 @@ class _CaringPageState extends State<CaringPage>
     _loadState();
     // ✨ 앱 시작 시 하루 정산
     CaringActionService.dailySettle();
+    // ✨ 첫 프레임 이후 실제 높이 측정
+    WidgetsBinding.instance.addPostFrameCallback((_) => _measureHeights());
+  }
+
+  /// 상단 카드 영역 / 하단 버튼 영역 실제 높이 측정
+  void _measureHeights() {
+    final topBox =
+        _topCardsKey.currentContext?.findRenderObject() as RenderBox?;
+    final bottomBox =
+        _bottomButtonsKey.currentContext?.findRenderObject() as RenderBox?;
+
+    if (topBox != null && bottomBox != null) {
+      final newTop = topBox.size.height;
+      final newBottom = bottomBox.size.height;
+
+      // 값이 유의미하게 바뀔 때만 setState
+      if ((newTop - _topCardsHeight).abs() > 2 ||
+          (newBottom - _bottomButtonsHeight).abs() > 2) {
+        setState(() {
+          _topCardsHeight = newTop;
+          _bottomButtonsHeight = newBottom;
+        });
+      }
+    }
   }
 
   /// Rive 파일 로드 및 State Machine 연결
@@ -331,24 +361,33 @@ class _CaringPageState extends State<CaringPage>
   static const _colorShadow2 = Color(0xFFD5E5E5); // 흐린 명암2
 
   Widget _buildMainContent() {
+    // 화면 높이
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    // 캐릭터가 들어갈 공간 계산: [상단 카드 끝 ~ 하단 버튼 시작] 사이
+    final characterTop = _topCardsHeight;
+    final characterBottom = _bottomButtonsHeight;
+
+    // 캐릭터 영역이 너무 좁아지는 경우 방지 (최소 140px 확보)
+    final available = screenHeight - characterTop - characterBottom;
+    final minCharacterSpace = 140.0;
+    final safeTop = characterTop;
+    final safeBottom = available < minCharacterSpace
+        ? (screenHeight - safeTop - minCharacterSpace).clamp(0.0, screenHeight)
+        : characterBottom;
+
     return Stack(
       children: [
         // ── 0. 배경: 터치 절대 가로채지 않게 ──
         IgnorePointer(
           ignoring: true,
-          child: Positioned.fill(
-            child: Container(
-              color: _colorBg,
-            ),
-          ),
+          child: Positioned.fill(child: Container(color: _colorBg)),
         ),
 
-        // ── 1. 캐릭터 영역: 카드 영역을 침범하지 않게 클립 ──
-        Positioned(
-          top: 280, // 카드 영역 높이만큼 아래로 (임시값, 카드가 실제로 차지하는 높이)
-          left: 0,
-          right: 0,
-          bottom: 0,
+        // ── 1. 캐릭터 영역: 카드와 버튼 사이에 자동 배치 ──
+        Positioned.fill(
+          top: safeTop,
+          bottom: safeBottom,
           child: ClipRect(
             child: GestureDetector(
               onTap: _onCircleTap,
@@ -369,13 +408,13 @@ class _CaringPageState extends State<CaringPage>
           ),
         ),
 
-        // ── 2. 말풍선: 카드 아래에 배치 (터치 간섭 방지) ──
+        // ── 2. 말풍선: 캐릭터 위에, 하단 버튼 위 ──
         Positioned(
-          bottom: 100,
+          bottom: _bottomButtonsHeight + 10,
           left: 0,
           right: 0,
           child: IgnorePointer(
-            ignoring: true, // 터치 이벤트 통과
+            ignoring: true,
             child: Center(
               child: SpeechOverlay(
                 text: _currentSpeech,
@@ -388,68 +427,74 @@ class _CaringPageState extends State<CaringPage>
         // ── 3. 떠오르는 수치들 ──
         ..._floatingDeltas,
 
-        // ── 4. 하단 버튼들 ──
+        // ── 4. 하단 버튼들 (높이 측정) ──
         Positioned(
           bottom: 0,
           left: 0,
           right: 0,
           child: SafeArea(
             top: false,
-            child: Padding(
+            child: Container(
+              key: _bottomButtonsKey,
               padding: const EdgeInsets.only(bottom: 28),
               child: _buildBottomSection(),
             ),
           ),
         ),
 
-        // ── 5. ✅ 카드 영역: Stack의 가장 마지막 (최상단 터치 보장) ──
+        // ── 5. ✅ 상단 카드 영역: Stack 최상단 (터치 최우선) + 높이 측정 ──
         Positioned(
           top: 0,
           left: 0,
           right: 0,
           child: SafeArea(
             bottom: false,
-            child: Column(
-              mainAxisSize: MainAxisSize.min, // 고정 height 제거, 내용에 맞게
-              children: [
-                // 상단 바 (설정)
-                _buildTopBar(),
-                // 카드 영역
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // ① 구인 카드
-                      JobsInfoCard(
-                        data: _jobData,
-                        onTap: () {
-                          // TODO: 4번째 탭(도전하기)으로 이동
-                          debugPrint('구인 카드 탭');
-                        },
-                      ),
-                      // ② 실무(급여 변경) 카드
-                      SalaryUpdateCard(updates: _policyUpdates),
-                      // ③ 이주의 책 카드
-                      WeeklyBookCard(
-                        data: _featuredBook,
-                        onPreview: () {
-                          // TODO: 책 미리보기
-                          debugPrint('1분 미리보기 탭');
-                        },
-                      ),
-                      // ④ 퀴즈 카드
-                      DailyQuizCard(
-                        quiz: _dailyQuiz,
-                        onStart: () {
-                          // TODO: 퀴즈 풀기
-                          debugPrint('바로 풀기 탭');
-                        },
-                      ),
-                    ],
+            child: Container(
+              key: _topCardsKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 상단 바 (설정)
+                  _buildTopBar(),
+                  // 카드 영역
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // ① 구인 카드
+                        JobsInfoCard(
+                          data: _jobData,
+                          onTap: () {
+                            widget.onTabRequested?.call(3); // 도전하기 탭
+                          },
+                        ),
+                        // ② 실무(급여 변경) 카드
+                        SalaryUpdateCard(
+                          updates: _policyUpdates,
+                          onTap: () {
+                            widget.onTabRequested?.call(2); // 성장하기 탭
+                          },
+                        ),
+                        // ③ 이주의 책 카드
+                        WeeklyBookCard(
+                          data: _featuredBook,
+                          onPreview: () {
+                            widget.onTabRequested?.call(2); // 성장하기 탭
+                          },
+                        ),
+                        // ④ 퀴즈 카드
+                        DailyQuizCard(
+                          quiz: _dailyQuiz,
+                          onStart: () {
+                            widget.onTabRequested?.call(2); // 성장하기 탭
+                          },
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
