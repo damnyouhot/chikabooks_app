@@ -8,6 +8,10 @@ import '../services/caring_action_service.dart';
 import '../widgets/speech_overlay.dart';
 import '../widgets/diary_input_sheet.dart';
 import '../widgets/user_goal_sheet.dart';
+import '../widgets/caring/jobs_info_card.dart';
+import '../widgets/caring/salary_update_card.dart';
+import '../widgets/caring/weekly_book_card.dart';
+import '../widgets/caring/daily_quiz_card.dart';
 import 'settings/settings_page.dart';
 
 /// 돌보기(1탭) — 아침 인사 리추얼 + 4 아이콘 + 재우기/깨우기
@@ -39,7 +43,6 @@ class _CaringPageState extends State<CaringPage>
 
   // ── ✨ 떠오르는 수치들 ──
   final List<Widget> _floatingDeltas = [];
-  final GlobalKey _characterKey = GlobalKey(); // 캐릭터 위치 추적용
 
   // ── Rive 관련 ──
   Artboard? _dogArtboard;
@@ -303,36 +306,83 @@ class _CaringPageState extends State<CaringPage>
   Widget _buildMainContent() {
     return Stack(
       children: [
-        // ── 1. dog.riv 전체 화면 (캐릭터 영역) ──
-        Positioned.fill(
-          key: _characterKey, // ✨ 추가: 위치 추적용
+        // ── 1. dog.riv 전체 화면 (캐릭터 영역 - 아래로 이동) ──
+        Positioned(
+          top: MediaQuery.of(context).size.height * 0.35, // 상단 35% 공간 확보
+          left: 0,
+          right: 0,
+          bottom: 0,
           child: GestureDetector(
             onTap: _onCircleTap,
-            child:
-                _dogArtboard != null
-                    ? Rive(
-                      artboard: _dogArtboard!,
-                      fit: BoxFit.cover,
-                      alignment: Alignment.center,
-                    )
-                    : Container(
-                      color: _colorBg,
-                      child: Center(
-                        child: CircularProgressIndicator(
-                          color: _colorAccent,
-                          strokeWidth: 1.5, // 가느다란 라인
-                        ),
+            child: _dogArtboard != null
+                ? Rive(
+                    artboard: _dogArtboard!,
+                    fit: BoxFit.cover,
+                    alignment: Alignment.center,
+                  )
+                : Container(
+                    color: _colorBg,
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        color: _colorAccent,
+                        strokeWidth: 1.5,
                       ),
                     ),
+                  ),
           ),
         ),
 
-        // ── 2. 상단 바 (설정) ──
+        // ── 2. 상단 정보 카드 영역 (스크롤 가능) ──
         Positioned(
           top: 0,
           left: 0,
           right: 0,
-          child: SafeArea(bottom: false, child: _buildTopBar()),
+          height: MediaQuery.of(context).size.height * 0.35,
+          child: Container(
+            color: Colors.white,
+            child: SafeArea(
+              bottom: false,
+              child: Column(
+                children: [
+                  // 상단 바 (설정)
+                  _buildTopBar(),
+                  // 카드 영역 (스크롤)
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Column(
+                        children: [
+                          // ① 구인 카드
+                          JobsInfoCard(
+                            onTap: () {
+                              // TODO: 4번째 탭(도전하기)으로 이동
+                              debugPrint('구인 카드 탭');
+                            },
+                          ),
+                          // ② 실무(급여 변경) 카드
+                          const SalaryUpdateCard(),
+                          // ③ 이주의 책 카드
+                          WeeklyBookCard(
+                            onPreview: () {
+                              // TODO: 책 미리보기
+                              debugPrint('1분 미리보기 탭');
+                            },
+                          ),
+                          // ④ 퀴즈 카드
+                          DailyQuizCard(
+                            onStart: () {
+                              // TODO: 퀴즈 풀기
+                              debugPrint('바로 풀기 탭');
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
 
         // ── 3. ✨ 캐릭터 아래 말풍선 (말할 때만 표시) ──
@@ -370,8 +420,9 @@ class _CaringPageState extends State<CaringPage>
 
   /// 상단 바
   Widget _buildTopBar() {
-    return Padding(
+    return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      color: Colors.white,
       child: Row(
         children: [
           // 좌측 설명 버튼
@@ -392,9 +443,8 @@ class _CaringPageState extends State<CaringPage>
               size: 20,
             ),
             onPressed: () {
-              Navigator.of(
-                context,
-              ).push(MaterialPageRoute(builder: (_) => const SettingsPage()));
+              Navigator.of(context)
+                  .push(MaterialPageRoute(builder: (_) => const SettingsPage()));
             },
           ),
         ],
