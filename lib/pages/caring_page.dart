@@ -321,18 +321,19 @@ class _CaringPageState extends State<CaringPage>
           bottom: 0,
           child: GestureDetector(
             onTap: _onCircleTap,
-            child: _dogArtboard != null
-                ? Rive(
-                    artboard: _dogArtboard!,
-                    fit: BoxFit.cover,
-                    alignment: Alignment.center,
-                  )
-                : Center(
-                    child: CircularProgressIndicator(
-                      color: _colorAccent,
-                      strokeWidth: 1.5,
+            child:
+                _dogArtboard != null
+                    ? Rive(
+                      artboard: _dogArtboard!,
+                      fit: BoxFit.cover,
+                      alignment: Alignment.center,
+                    )
+                    : Center(
+                      child: CircularProgressIndicator(
+                        color: _colorAccent,
+                        strokeWidth: 1.5,
+                      ),
                     ),
-                  ),
           ),
         ),
 
@@ -389,9 +390,9 @@ class _CaringPageState extends State<CaringPage>
           ),
         ),
 
-        // ── 3. ✨ 캐릭터 위쪽 말풍선 (캐릭터와 버튼 사이) ──
+        // ── 3. ✨ 말풍선 (4개 버튼 바로 위) ──
         Positioned(
-          top: MediaQuery.of(context).size.height * 0.45, // 캐릭터 위쪽
+          bottom: 100, // 버튼 영역(약 80px) + 여유(20px)
           left: 0,
           right: 0,
           child: Center(

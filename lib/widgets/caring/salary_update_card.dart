@@ -47,55 +47,66 @@ class _SalaryUpdateCardState extends State<SalaryUpdateCard> {
     final update = _updates[_currentIndex];
 
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // 타이틀
             Row(
               children: [
-                Text('🏥', style: TextStyle(fontSize: 14)),
-                const SizedBox(width: 4),
+                Text('🏥', style: TextStyle(fontSize: 13)),
+                const SizedBox(width: 3),
                 Text(
-                  '급여 변경 임박',
+                  '임박 제도 변경',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 11,
                     fontWeight: FontWeight.w600,
                     color: Colors.black87,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 6),
-            // 애니메이션 페이드
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 500),
-              child: Column(
-                key: ValueKey(_currentIndex),
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 제목 (24자 이내)
-                  Text(
-                    update['title']!,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
+            const SizedBox(height: 4),
+            // 슬라이드 애니메이션 (위로 밀려나기)
+            ClipRect(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 400),
+                transitionBuilder: (Widget child, Animation<double> animation) {
+                  return SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0, 1), // 아래에서
+                      end: Offset.zero, // 위로
+                    ).animate(animation),
+                    child: child,
+                  );
+                },
+                child: Column(
+                  key: ValueKey(_currentIndex),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 제목 (24자 이내)
+                    Text(
+                      update['title']!,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 3),
-                  // 시행일 + D-day
-                  Text(
-                    '시행일: ${update['date']} (${update['dday']})',
-                    style: TextStyle(fontSize: 11, color: Colors.black54),
-                  ),
-                ],
+                    const SizedBox(height: 2),
+                    // 시행일 + D-day
+                    Text(
+                      '시행일: ${update['date']} (${update['dday']})',
+                      style: TextStyle(fontSize: 10, color: Colors.black54),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
