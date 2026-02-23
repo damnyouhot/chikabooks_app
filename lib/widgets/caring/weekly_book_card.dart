@@ -56,16 +56,22 @@ class WeeklyBookCard extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: Colors.grey[300],
                       borderRadius: BorderRadius.circular(3),
-                      image: thumbnailUrl != null
-                          ? DecorationImage(
-                              image: NetworkImage(thumbnailUrl),
-                              fit: BoxFit.cover,
-                            )
-                          : null,
+                      image:
+                          thumbnailUrl != null
+                              ? DecorationImage(
+                                image: NetworkImage(thumbnailUrl),
+                                fit: BoxFit.cover,
+                              )
+                              : null,
                     ),
-                    child: thumbnailUrl == null
-                        ? Icon(Icons.book, size: 18, color: Colors.grey[600])
-                        : null,
+                    child:
+                        thumbnailUrl == null
+                            ? Icon(
+                              Icons.book,
+                              size: 18,
+                              color: Colors.grey[600],
+                            )
+                            : null,
                   ),
                   const SizedBox(width: 8),
                   // 우측 텍스트
@@ -89,7 +95,10 @@ class WeeklyBookCard extends StatelessWidget {
                           // 서브타이틀
                           Text(
                             '― $bookSubtitle',
-                            style: TextStyle(fontSize: 9, color: Colors.black54),
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: Colors.black54,
+                            ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),

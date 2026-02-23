@@ -46,8 +46,8 @@ class JobsInfoCard extends StatelessWidget {
                 data == null
                     ? '로딩 중...'
                     : count == 0
-                        ? '새로운 구인 공고가 없어요'
-                        : '오늘 새로 올라온 $count건',
+                    ? '새로운 구인 공고가 없어요'
+                    : '오늘 새로 올라온 $count건',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.bold,

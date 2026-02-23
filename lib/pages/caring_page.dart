@@ -131,8 +131,9 @@ class _CaringPageState extends State<CaringPage>
       await BondScoreService.applyCenterGravity();
 
       // 2. 4개 카드 데이터 병렬 로드
+      final jobService = JobService();
       final results = await Future.wait([
-        JobService.getRecentJobsSummary(), // ① 구인
+        jobService.getRecentJobsSummary(), // ① 구인
         PolicyUpdateService.getUpcomingUpdates(limit: 3), // ② 실무
         FeaturedBookService.getCurrentFeaturedBook(), // ③ 이주의 책
         DailyQuizService.getTodayQuiz(), // ④ 퀴즈

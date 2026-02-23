@@ -179,13 +179,12 @@ class JobService {
       }
 
       final count = jobs.length;
-      final representativeName =
-          jobs.isNotEmpty ? (jobs.first.companyName ?? '치과') : '치과';
+      final clinicName =
+          jobs.isNotEmpty ? (jobs.first.clinicName.isNotEmpty ? jobs.first.clinicName : '치과') : '치과';
 
       return {
         'count': count,
-        'representativeName': representativeName,
-        'otherCount': count > 1 ? count - 1 : 0,
+        'clinicName': clinicName,
       };
     } catch (e) {
       debugPrint('❌ getRecentJobsSummary 에러: $e');

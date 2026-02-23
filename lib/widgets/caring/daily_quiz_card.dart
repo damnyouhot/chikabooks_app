@@ -40,8 +40,8 @@ class DailyQuizCard extends StatelessWidget {
               quiz == null
                   ? '로딩 중...'
                   : quiz!.question.isEmpty
-                      ? '오늘의 퀴즈가 준비되지 않았어요'
-                      : quiz!.question,
+                  ? '오늘의 퀴즈가 준비되지 않았어요'
+                  : quiz!.question,
               style: TextStyle(fontSize: 11, color: Colors.black87),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -51,9 +51,8 @@ class DailyQuizCard extends StatelessWidget {
             Align(
               alignment: Alignment.centerLeft,
               child: ElevatedButton(
-                onPressed: quiz != null && quiz!.question.isNotEmpty
-                    ? onStart
-                    : null,
+                onPressed:
+                    quiz != null && quiz!.question.isNotEmpty ? onStart : null,
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,
