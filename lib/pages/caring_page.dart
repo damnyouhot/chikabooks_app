@@ -337,7 +337,7 @@ class _CaringPageState extends State<CaringPage>
           ),
         ),
 
-        // ── 2. 상단 정보 카드 영역 (반투명 배경) ──
+        // ── 2. 상단 정보 카드 영역 (고정, 스크롤 제거) ──
         Positioned(
           top: 0,
           left: 0,
@@ -351,37 +351,35 @@ class _CaringPageState extends State<CaringPage>
                 children: [
                   // 상단 바 (설정)
                   _buildTopBar(),
-                  // 카드 영역 (스크롤)
+                  // 카드 영역 (스크롤 제거, Column으로 고정)
                   Expanded(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Column(
-                        children: [
-                          // ① 구인 카드
-                          JobsInfoCard(
-                            onTap: () {
-                              // TODO: 4번째 탭(도전하기)으로 이동
-                              debugPrint('구인 카드 탭');
-                            },
-                          ),
-                          // ② 실무(급여 변경) 카드
-                          const SalaryUpdateCard(),
-                          // ③ 이주의 책 카드
-                          WeeklyBookCard(
-                            onPreview: () {
-                              // TODO: 책 미리보기
-                              debugPrint('1분 미리보기 탭');
-                            },
-                          ),
-                          // ④ 퀴즈 카드
-                          DailyQuizCard(
-                            onStart: () {
-                              // TODO: 퀴즈 풀기
-                              debugPrint('바로 풀기 탭');
-                            },
-                          ),
-                        ],
-                      ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        // ① 구인 카드
+                        JobsInfoCard(
+                          onTap: () {
+                            // TODO: 4번째 탭(도전하기)으로 이동
+                            debugPrint('구인 카드 탭');
+                          },
+                        ),
+                        // ② 실무(급여 변경) 카드
+                        const SalaryUpdateCard(),
+                        // ③ 이주의 책 카드
+                        WeeklyBookCard(
+                          onPreview: () {
+                            // TODO: 책 미리보기
+                            debugPrint('1분 미리보기 탭');
+                          },
+                        ),
+                        // ④ 퀴즈 카드
+                        DailyQuizCard(
+                          onStart: () {
+                            // TODO: 퀴즈 풀기
+                            debugPrint('바로 풀기 탭');
+                          },
+                        ),
+                      ],
                     ),
                   ),
                 ],
