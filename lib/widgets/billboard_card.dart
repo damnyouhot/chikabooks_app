@@ -19,18 +19,18 @@ class BillboardCard extends StatelessWidget {
     this.onTap,
   });
 
-  String _formatTimeRemaining() {
+  String _formatDate(DateTime date) {
     final now = DateTime.now();
-    final remaining = post.expiresAt.difference(now);
+    final diff = now.difference(date);
 
-    if (remaining.inHours > 24) {
-      return '${remaining.inHours ~/ 24}일 남음';
-    } else if (remaining.inHours > 0) {
-      return '${remaining.inHours}시간 남음';
-    } else if (remaining.inMinutes > 0) {
-      return '${remaining.inMinutes}분 남음';
+    if (diff.inDays > 0) {
+      return '${diff.inDays}일 전';
+    } else if (diff.inHours > 0) {
+      return '${diff.inHours}시간 전';
+    } else if (diff.inMinutes > 0) {
+      return '${diff.inMinutes}분 전';
     } else {
-      return '곧 만료';
+      return '방금';
     }
   }
 
@@ -60,33 +60,23 @@ class BillboardCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.start,
           children: [
-            // 헤더
+            // 헤더: 닉네임 + 작성일
             Row(
               children: [
-                // 추대 아이콘
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: _kAccent.withOpacity(0.3),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.auto_awesome,
+                Text(
+                  post.authorNickname ?? '익명',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
                     color: _kText,
-                    size: 16,
                   ),
                 ),
-                const SizedBox(width: 12),
-                
-                // 제목
-                Expanded(
-                  child: Text(
-                    '✨ 오늘의 추대',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: _kText,
-                    ),
+                const SizedBox(width: 8),
+                Text(
+                  _formatDate(post.createdAt),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: _kText.withOpacity(0.5),
                   ),
                 ),
               ],
@@ -112,50 +102,54 @@ class BillboardCard extends StatelessWidget {
 
             const SizedBox(height: 12),
 
-            // 하단 정보
-            Row(
+            // 이모지 반응
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
-                // 작성자 ID (authorId가 있으면 표시, 없으면 @익명)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: _kShadow2.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    post.authorId != null && post.authorId!.isNotEmpty
-                        ? '@${post.authorId}'
-                        : '@익명',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: _kText.withOpacity(0.7),
-                    ),
-                  ),
-                ),
-                
-                const SizedBox(width: 8),
-
-                // 남은 시간
-                Text(
-                  _formatTimeRemaining(),
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: _kText.withOpacity(0.5),
-                  ),
-                ),
-
-                const Spacer(),
-
-                // 더보기 아이콘
-                Icon(
-                  Icons.arrow_forward_ios,
-                  size: 14,
-                  color: _kText.withOpacity(0.3),
-                ),
+                _buildReactionChip('👏', post.reactions?['👏'] ?? 0),
+                _buildReactionChip('❤️', post.reactions?['❤️'] ?? 0),
+                _buildReactionChip('🔥', post.reactions?['🔥'] ?? 0),
+                _buildReactionChip('👀', post.reactions?['👀'] ?? 0),
               ],
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildReactionChip(String emoji, int count) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: count > 0
+            ? _kAccent.withOpacity(0.2)
+            : _kShadow2.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(16),
+        border: count > 0
+            ? Border.all(color: _kAccent.withOpacity(0.4), width: 1)
+            : null,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            emoji,
+            style: const TextStyle(fontSize: 16),
+          ),
+          if (count > 0) ...[
+            const SizedBox(width: 4),
+            Text(
+              '$count',
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: _kText,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

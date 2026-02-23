@@ -53,7 +53,9 @@ class BillboardPost {
   final EnthroneStatus status;
   final String bondGroupName;
   final bool isAnonymous;
-  final String? authorId;  // 추가: 원작자 ID
+  final String? authorId;
+  final String? authorNickname; // 작성자 닉네임
+  final Map<String, int>? reactions; // 이모지 반응 {'👏': 5, '❤️': 3}
 
   const BillboardPost({
     required this.id,
@@ -67,7 +69,9 @@ class BillboardPost {
     required this.status,
     required this.bondGroupName,
     this.isAnonymous = true,
-    this.authorId,  // 추가
+    this.authorId,
+    this.authorNickname,
+    this.reactions,
   });
 
   /// 만료 여부
@@ -90,7 +94,9 @@ class BillboardPost {
       'status': status.name,
       'bondGroupName': bondGroupName,
       'isAnonymous': isAnonymous,
-      if (authorId != null) 'authorId': authorId,  // 추가
+      if (authorId != null) 'authorId': authorId,
+      if (authorNickname != null) 'authorNickname': authorNickname,
+      if (reactions != null) 'reactions': reactions,
     };
   }
 
@@ -111,7 +117,11 @@ class BillboardPost {
       ),
       bondGroupName: data['bondGroupName'] as String? ?? '결',
       isAnonymous: data['isAnonymous'] as bool? ?? true,
-      authorId: data['authorId'] as String?,  // 추가
+      authorId: data['authorId'] as String?,
+      authorNickname: data['authorNickname'] as String?,
+      reactions: data['reactions'] != null
+          ? Map<String, int>.from(data['reactions'] as Map)
+          : null,
     );
   }
 
@@ -124,7 +134,8 @@ class BillboardPost {
     required int requiredCount,
     required String bondGroupName,
     bool isAnonymous = true,
-    String? authorId,  // 추가
+    String? authorId,
+    String? authorNickname,
   }) {
     final now = DateTime.now();
     return BillboardPost(
@@ -139,7 +150,8 @@ class BillboardPost {
       status: EnthroneStatus.confirmed,
       bondGroupName: bondGroupName,
       isAnonymous: isAnonymous,
-      authorId: authorId,  // 추가
+      authorId: authorId,
+      authorNickname: authorNickname,
     );
   }
 }

@@ -25,7 +25,7 @@ class BondPartnerSummary extends StatelessWidget {
   Widget build(BuildContext context) {
     // 나를 제외한 파트너들
     final partners = members.where((m) => m.uid != myUid).toList();
-    
+
     if (partners.isEmpty) {
       return const SizedBox.shrink();
     }
@@ -60,7 +60,7 @@ class BondPartnerSummary extends StatelessWidget {
     final nickname = memberNicknames?[partner.uid] ?? '파트너';
     final postCount = weeklyPostCounts?[partner.uid] ?? 0;
     final reactionCount = weeklyReactionCounts?[partner.uid] ?? 0;
-    
+
     // 감정 해석 메시지 생성
     final message = _generateEmotionalMessage(postCount, reactionCount);
     final activityText = _generateActivityText(postCount, reactionCount);
@@ -153,48 +153,42 @@ class BondPartnerSummary extends StatelessWidget {
     if (postCount == 0 && reactionCount == 0) {
       return '이번 주는 조용히 지나갔어';
     }
-    
+
     if (postCount > 0 && reactionCount > 0) {
       return '이번 주 ${postCount}번 다녀갔고, ${reactionCount}번 반응했어';
     }
-    
+
     if (postCount > 0) {
       return '이번 주 ${postCount}번 다녀갔어';
     }
-    
+
     return '${reactionCount}번 조용히 반응했어';
   }
 
   /// 감정 해석 메시지 생성
   String _generateEmotionalMessage(int postCount, int reactionCount) {
     final totalActivity = postCount + reactionCount;
-    
+
     if (totalActivity == 0) {
       return '조용함도 같이 있는 방식이야';
     }
-    
+
     if (totalActivity == 1) {
       return '한 번의 흔적도 소중해';
     }
-    
+
     if (totalActivity <= 3) {
       return '적당히 바쁜 주였나봐';
     }
-    
+
     if (totalActivity <= 5) {
       return '꾸준히 곁에 있었어';
     }
-    
+
     if (postCount > 5) {
       return '많이 바빴던 주 같아';
     }
-    
+
     return '이번 주 자주 마주쳤네';
   }
 }
-
-
-
-
-
-
