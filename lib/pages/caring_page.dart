@@ -37,7 +37,6 @@ class _CaringPageState extends State<CaringPage>
     with SingleTickerProviderStateMixin {
   // ── 상태 ──
   bool _loading = true;
-  bool _hasGreetedToday = false;
 
   // ── 카드 데이터 ──
   String _jobsSummary = '근처 신규 구인 확인 중...';
@@ -59,7 +58,6 @@ class _CaringPageState extends State<CaringPage>
   // ── 말풍선 ──
   String? _currentSpeech;
   bool _isDismissingSpeech = false;
-  final List<Widget> _floatingDeltas = [];
 
   // ── Rive ──
   Artboard? _dogArtboard;
@@ -124,10 +122,8 @@ class _CaringPageState extends State<CaringPage>
     setState(() => _loading = true);
 
     try {
-      final state = await CaringStateService.loadState();
+      await CaringStateService.loadState();
       await BondScoreService.applyCenterGravity();
-      final greeted = CaringStateService.hasGreetedToday(state);
-
       // 구인 요약
       final jobService = JobService();
       final jobData = await jobService.getRecentJobsSummary();
@@ -152,7 +148,6 @@ class _CaringPageState extends State<CaringPage>
       }
 
       setState(() {
-        _hasGreetedToday = greeted;
         _jobsSummary =
             jobCount > 0 ? '오늘 새로 올라온 $jobCount건' : '새로운 구인 공고가 없어요';
         _jobsSub = jobCount > 0 && clinicName.isNotEmpty ? clinicName : '';
@@ -292,8 +287,6 @@ class _CaringPageState extends State<CaringPage>
         body: Center(child: CircularProgressIndicator()),
       );
     }
-
-    final screenH = MediaQuery.of(context).size.height;
 
     // 캐릭터 영역: 카드 아래 ~ 버튼 위
     // safeBottom: BottomNavBar 포함 하단 여백 확보
