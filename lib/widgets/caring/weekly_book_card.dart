@@ -118,7 +118,10 @@ class WeeklyBookCard extends StatelessWidget {
                               minimumSize: Size.zero,
                               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             ),
-                            child: Text('1분 미리보기', style: TextStyle(fontSize: 9)),
+                            child: Text(
+                              '1분 미리보기',
+                              style: TextStyle(fontSize: 9),
+                            ),
                           ),
                         ],
                       ),

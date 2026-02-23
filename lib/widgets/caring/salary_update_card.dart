@@ -153,7 +153,10 @@ class _SalaryUpdateCardState extends State<SalaryUpdateCard> {
               ClipRect(
                 child: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 400),
-                  transitionBuilder: (Widget child, Animation<double> animation) {
+                  transitionBuilder: (
+                    Widget child,
+                    Animation<double> animation,
+                  ) {
                     return SlideTransition(
                       position: Tween<Offset>(
                         begin: const Offset(0, 1),

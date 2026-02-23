@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,29 +7,15 @@ import '../services/caring_state_service.dart';
 import '../services/bond_score_service.dart';
 import '../services/caring_action_service.dart';
 import '../services/job_service.dart';
-import '../services/policy_update_service.dart';
-import '../services/featured_book_service.dart';
-import '../services/daily_quiz_service.dart';
-import '../models/policy_update.dart';
-import '../models/daily_quiz.dart';
+import '../services/ebook_service.dart';
+import '../models/ebook.dart';
 import '../widgets/speech_overlay.dart';
 import '../widgets/diary_input_sheet.dart';
 import '../widgets/user_goal_sheet.dart';
-import '../widgets/caring/jobs_info_card.dart';
-import '../widgets/caring/salary_update_card.dart';
-import '../widgets/caring/weekly_book_card.dart';
-import '../widgets/caring/daily_quiz_card.dart';
 import 'settings/settings_page.dart';
 
-/// 돌보기(1탭) — 아침 인사 리추얼 + 4 아이콘 + 재우기/깨우기
-///
-/// 상태 흐름:
-///   새 날짜 + 자고있음 → 디밍 + [아침 인사] → 깨우기+인사+출석 → 4버튼
-///   새 날짜 + 깨어있음 → [아침 인사] 버튼만 → 인사+출석 → 4버튼
-///   같은 날 + 자고있음 → 디밍 + [깨우기] → 깨우기 → 4버튼
-///   같은 날 + 인사완료 → 4버튼 정상
+/// 돌보기(1탭) — 4개 정보 카드 + 캐릭터 + 4버튼
 class CaringPage extends StatefulWidget {
-  /// 다른 탭으로 이동하기 위한 콜백 (0=나, 1=같이, 2=성장, 3=도전)
   final ValueChanged<int>? onTabRequested;
 
   const CaringPage({super.key, this.onTabRequested});
@@ -43,31 +30,33 @@ class _CaringPageState extends State<CaringPage>
   bool _loading = true;
   bool _hasGreetedToday = false;
 
-  // ── ✨ 카드 데이터 상태 ──
-  Map<String, dynamic>? _jobData;
-  List<PolicyUpdate>? _policyUpdates;
-  Map<String, dynamic>? _featuredBook;
-  DailyQuiz? _dailyQuiz;
+  // ── 카드 데이터 ──
+  String _jobsSummary = '근처 신규 구인 확인 중...';
+  String _jobsSub = '';
 
-  // ── ✨ 새로운 말풍선 시스템 ──
-  String? _currentSpeech; // 현재 말풍선 텍스트
-  bool _isDismissingSpeech = false; // 말풍선 사라지는 중
+  List<Map<String, String>> _upcomingPolicies = [];
+  int _policyIndex = 0;
+  Timer? _policyTimer;
 
-  // ── ✨ 떠오르는 수치들 ──
+  Ebook? _weeklyBook;
+  String _quizSummary = '오늘의 퀴즈 확인 중...';
+
+  // ── 높이 측정 (캐릭터 자동 배치) ──
+  final GlobalKey _topKey = GlobalKey();
+  final GlobalKey _bottomKey = GlobalKey();
+  double _topH = 260;
+  double _bottomH = 140;
+
+  // ── 말풍선 ──
+  String? _currentSpeech;
+  bool _isDismissingSpeech = false;
   final List<Widget> _floatingDeltas = [];
 
-  // ── ✨ 높이 측정용 GlobalKey ──
-  final GlobalKey _topCardsKey = GlobalKey();
-  final GlobalKey _bottomButtonsKey = GlobalKey();
-  double _topCardsHeight = 240; // 초기값 (측정 전)
-  double _bottomButtonsHeight = 120; // 초기값 (측정 전)
-
-  // ── Rive 관련 ──
+  // ── Rive ──
   Artboard? _dogArtboard;
   StateMachineController? _dogStateMachine;
   SMITrigger? _tapTrigger;
 
-  // ── 정서 문장 풀 (죄책감 유발 멘트 금지) ──
   static const List<String> _neutralPhrases = [
     '오늘도 여기.',
     '천천히 해도 괜찮아.',
@@ -83,426 +72,365 @@ class _CaringPageState extends State<CaringPage>
   void initState() {
     super.initState();
     _loadRiveFile();
-    _loadState();
-    // ✨ 앱 시작 시 하루 정산
+    _bootstrap();
     CaringActionService.dailySettle();
-    // ✨ 첫 프레임 이후 실제 높이 측정
-    WidgetsBinding.instance.addPostFrameCallback((_) => _measureHeights());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _measure());
   }
 
-  /// 상단 카드 영역 / 하단 버튼 영역 실제 높이 측정
-  void _measureHeights() {
-    final topBox =
-        _topCardsKey.currentContext?.findRenderObject() as RenderBox?;
-    final bottomBox =
-        _bottomButtonsKey.currentContext?.findRenderObject() as RenderBox?;
-
-    if (topBox != null && bottomBox != null) {
-      final newTop = topBox.size.height;
-      final newBottom = bottomBox.size.height;
-
-      // 값이 유의미하게 바뀔 때만 setState
-      if ((newTop - _topCardsHeight).abs() > 2 ||
-          (newBottom - _bottomButtonsHeight).abs() > 2) {
-        setState(() {
-          _topCardsHeight = newTop;
-          _bottomButtonsHeight = newBottom;
-        });
-      }
-    }
+  @override
+  void dispose() {
+    _policyTimer?.cancel();
+    _dogStateMachine?.dispose();
+    super.dispose();
   }
 
-  /// Rive 파일 로드 및 State Machine 연결
+  /// Rive 파일 로드
   Future<void> _loadRiveFile() async {
     try {
       final data = await rootBundle.load('assets/dog.riv');
       final file = RiveFile.import(data);
       final artboard = file.mainArtboard.instance();
 
-      // State Machine 연결 (트리거 확인)
       final controller = StateMachineController.fromArtboard(
         artboard,
-        'State Machine 1', // dog.riv의 State Machine 이름
+        'State Machine 1',
       );
 
       if (controller != null) {
         artboard.addController(controller);
-        _dogStateMachine = controller;
-
-        // 'tap' 트리거 찾기
         _tapTrigger = controller.findInput<bool>('tap') as SMITrigger?;
-
-        if (_tapTrigger != null) {
-          debugPrint('✅ dog.riv tap 트리거 연결 성공');
-        } else {
-          debugPrint('⚠️ tap 트리거를 찾을 수 없습니다');
-        }
       }
 
-      if (mounted) {
-        setState(() => _dogArtboard = artboard);
-      }
+      setState(() {
+        _dogArtboard = artboard;
+        _dogStateMachine = controller;
+      });
     } catch (e) {
       debugPrint('❌ dog.riv 로드 실패: $e');
     }
   }
 
-  @override
-  void dispose() {
-    _dogStateMachine?.dispose();
-    super.dispose();
-  }
+  /// 데이터 로드
+  Future<void> _bootstrap() async {
+    setState(() => _loading = true);
 
-  /// Firestore에서 상태 로드 + 4개 카드 데이터 병렬 로드
-  Future<void> _loadState() async {
     try {
-      // 1. 기존 상태 로드 및 결 점수 중력
+      // 1. 기존 상태 로드
       final state = await CaringStateService.loadState();
       await BondScoreService.applyCenterGravity();
-
-      // 2. 4개 카드 데이터 병렬 로드
-      final jobService = JobService();
-      final results = await Future.wait([
-        jobService.getRecentJobsSummary(), // ① 구인
-        PolicyUpdateService.getUpcomingUpdates(limit: 3), // ② 실무
-        FeaturedBookService.getCurrentFeaturedBook(), // ③ 이주의 책
-        DailyQuizService.getTodayQuiz(), // ④ 퀴즈
-      ]);
-
-      if (!mounted) return;
-
       final greeted = CaringStateService.hasGreetedToday(state);
+
+      // 2. 구인 요약 (JobService 재사용)
+      final jobService = JobService();
+      final jobData = await jobService.getRecentJobsSummary();
+      final jobCount = jobData['count'] ?? 0;
+      final clinicName = jobData['clinicName'] ?? '';
+
+      // 3. 임박 제도 변경 (더미 데이터 - HiraUpdateService 연동 필요)
+      final policies = [
+        {
+          'title': '2026 스케일링 급여 개정',
+          'dday': 'D-12',
+          'date': '3월 1일'
+        },
+        {
+          'title': '치주질환 급여 인정 기준 변경',
+          'dday': 'D-21',
+          'date': '3월 10일'
+        },
+        {
+          'title': '근관치료 행위 산정 지침 개정',
+          'dday': 'D-26',
+          'date': '3월 15일'
+        },
+      ];
+
+      // 4. 이주의 책 (EbookService 재사용)
+      final ebookService = EbookService();
+      Ebook? featuredBook;
+      try {
+        final ebooks = await ebookService.watchEbooks().first;
+        if (ebooks.isNotEmpty) {
+          featuredBook = ebooks.first; // 첫 번째 책을 featured로
+        }
+      } catch (e) {
+        debugPrint('⚠️ 이주의 책 로드 실패: $e');
+      }
+
+      // 5. 오늘의 퀴즈 (더미 - QuizTodayPage 데이터 연동 필요)
+      final quizText = '치주낭 측정 시 올바른 탐침 방향은?';
 
       setState(() {
         _hasGreetedToday = greeted;
-        _jobData = results[0] as Map<String, dynamic>?;
-        _policyUpdates = results[1] as List<PolicyUpdate>?;
-        _featuredBook = results[2] as Map<String, dynamic>?;
-        _dailyQuiz = results[3] as DailyQuiz?;
+        _jobsSummary = jobCount > 0
+            ? '오늘 새로 올라온 $jobCount건'
+            : '새로운 구인 공고가 없어요';
+        _jobsSub =
+            jobCount > 0 && clinicName.isNotEmpty
+                ? clinicName
+                : '';
+        _upcomingPolicies = policies;
+        _weeklyBook = featuredBook;
+        _quizSummary = quizText;
         _loading = false;
       });
+
+      _startPolicyRolling();
+      WidgetsBinding.instance.addPostFrameCallback((_) => _measure());
     } catch (e) {
       debugPrint('❌ 데이터 로드 실패: $e');
-      if (mounted) setState(() => _loading = false);
+      setState(() => _loading = false);
     }
   }
 
-  // ═══════════════════════════════════════════════
-  // 핸들러
-  // ═══════════════════════════════════════════════
+  /// 제도 변경 3초 롤링
+  void _startPolicyRolling() {
+    _policyTimer?.cancel();
+    if (_upcomingPolicies.isEmpty) return;
 
-  /// 아침 인사 (출석 통합 + 깨우기 통합)
-  Future<void> _onGreeting() async {
-    final msg = await CaringStateService.completeGreeting();
-    if (!mounted) return;
-
-    setState(() {
-      _hasGreetedToday = true;
-    });
-    _speak(msg); // ✨ 변경: _showFeedback → _speak
-  }
-
-  /// 밥주기
-  void _onFeed() async {
-    _tapTrigger?.fire(); // 🔥 Rive 트리거 발동
-
-    final result = await CaringActionService.tryFeed();
-
-    if (result.success) {
-      // 성공: 멘트 + 결 팝업
-      _speak(result.ment ?? '잘 먹었어.', durationMs: 2500);
-      if (result.bondDelta > 0) {
-        _showBondFloatingDelta(result.bondDelta);
-      }
-    } else {
-      // 거절: 시간대 중복
-      _speak(result.rejectMent ?? '지금은 방금 지나간 자리라서.', durationMs: 2200);
-    }
-  }
-
-  /// ✨ 교감하기 (개선)
-  void _onEmpathize() async {
-    final result = await CaringActionService.tryTouch();
-
-    _speak(result.ment, durationMs: 2500);
-    if (result.bondDelta > 0) {
-      _showBondFloatingDelta(result.bondDelta);
-    }
-  }
-
-  /// ✨ 대화하기 (글쓰기 - 개선)
-  void _onDiary() {
-    DiaryInputSheet.show(context, (text) async {
-      // 저장 완료 후 멘트 + 결
-      final result = await CaringActionService.completeDiary();
-      _speak(result.ment, durationMs: 2500);
-      if (result.bondDelta > 0) {
-        _showBondFloatingDelta(result.bondDelta);
-      }
+    _policyIndex = 0;
+    _policyTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (!mounted) return;
+      setState(() {
+        _policyIndex = (_policyIndex + 1) % _upcomingPolicies.length;
+      });
     });
   }
 
-  /// ✨ 목표설정 (새로운 기능) - 목표 관리 팝업
-  void _onGoalSetting() {
-    UserGoalSheet.show(context);
+  /// 높이 측정
+  void _measure() {
+    final topBox = _topKey.currentContext?.findRenderObject() as RenderBox?;
+    final bottomBox =
+        _bottomKey.currentContext?.findRenderObject() as RenderBox?;
+
+    if (topBox != null && bottomBox != null) {
+      final newTop = topBox.size.height;
+      final newBottom = bottomBox.size.height;
+
+      if ((newTop - _topH).abs() > 2 || (newBottom - _bottomH).abs() > 2) {
+        setState(() {
+          _topH = newTop;
+          _bottomH = newBottom;
+        });
+      }
+    }
   }
 
-  /// 오라 원 탭
+  /// Route 이동
+  void _go(String route) {
+    Navigator.of(context).pushNamed(route);
+  }
+
+  /// 캐릭터 터치
   void _onCircleTap() {
-    _tapTrigger?.fire(); // 🔥 Rive 트리거 발동
-    _speak(
-      _neutralPhrases[Random().nextInt(_neutralPhrases.length)],
-    ); // ✨ 변경: _showFeedback → _speak
-  }
+    _tapTrigger?.fire();
 
-  // ═══════════════════════════════════════════════
-  // ✨ 새로운 말풍선 시스템
-  // ═══════════════════════════════════════════════
+    final score = Random().nextInt(3) + 1;
+    final phrase = _neutralPhrases[Random().nextInt(_neutralPhrases.length)];
 
-  /// 말하기 - 말풍선을 일정 시간 동안 표시
-  void _speak(String text, {int durationMs = 2000}) {
     setState(() {
-      _currentSpeech = text;
+      _currentSpeech = phrase;
       _isDismissingSpeech = false;
     });
 
-    // 일정 시간 후 사라지기 시작
-    Future.delayed(Duration(milliseconds: durationMs), () {
-      if (mounted && _currentSpeech == text) {
-        setState(() => _isDismissingSpeech = true);
+    _showFloatingDelta(score);
 
-        // 바람 효과 애니메이션 후 완전 제거
-        Future.delayed(const Duration(milliseconds: 300), () {
-          if (mounted) {
-            setState(() {
-              _currentSpeech = null;
-              _isDismissingSpeech = false;
-            });
-          }
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) {
+        setState(() {
+          _isDismissingSpeech = true;
+        });
+      }
+    });
+
+    Future.delayed(const Duration(milliseconds: 2300), () {
+      if (mounted) {
+        setState(() {
+          _currentSpeech = null;
+          _isDismissingSpeech = false;
         });
       }
     });
   }
 
-  /// ✨ 떠오르는 결 수치 표시 (+결 0.1, +결 0.05 등)
-  void _showBondFloatingDelta(double value) {
-    // 화면 크기 가져오기
-    final size = MediaQuery.of(context).size;
+  void _showFloatingDelta(int delta) {
+    final overlay = Overlay.of(context);
+    final renderBox = context.findRenderObject() as RenderBox?;
+    if (renderBox == null) return;
 
-    // 화면 중앙 상단 (캐릭터 머리 예상 위치)
-    final centerX = size.width / 2 - 20; // 중앙에서 살짝 왼쪽
-    final topY = size.height * 0.35; // 상단 35% 지점
+    final size = renderBox.size;
+    final offsetX = (size.width / 2) + (Random().nextDouble() * 60 - 30);
+    final offsetY = (size.height * 0.5) + (Random().nextDouble() * 40 - 20);
 
-    final deltaWidget = Positioned(
-      key: ValueKey('delta_${DateTime.now().millisecondsSinceEpoch}'),
-      left: centerX,
-      top: topY,
-      child: TweenAnimationBuilder<double>(
-        duration: const Duration(milliseconds: 2400), // 1200ms → 2400ms (2배)
-        tween: Tween(begin: 0.0, end: -40.0), // 위로 40 이동
-        builder: (context, offset, child) {
-          return Transform.translate(
-            offset: Offset(0, offset),
-            child: Opacity(
-              opacity: 1.0 - (offset.abs() / 40.0),
-              child: Text(
-                '+결 ${value.toStringAsFixed(2)}',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: _colorAccent,
-                  shadows: [
-                    Shadow(color: Colors.black.withOpacity(0.2), blurRadius: 4),
-                  ],
+    final entry = OverlayEntry(
+      builder: (ctx) => Positioned(
+        left: offsetX,
+        top: offsetY,
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0.0, end: 1.0),
+          duration: const Duration(milliseconds: 1500),
+          builder: (_, value, child) {
+            return Transform.translate(
+              offset: Offset(0, -value * 50),
+              child: Opacity(
+                opacity: 1.0 - value,
+                child: Text(
+                  '+$delta',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFFF7CBCA).withOpacity(1.0 - value),
+                  ),
                 ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
 
-    setState(() => _floatingDeltas.add(deltaWidget));
-
-    // 2.4초 후 제거 (1.2초 → 2.4초)
-    Future.delayed(const Duration(milliseconds: 2400), () {
-      if (mounted) {
-        setState(() => _floatingDeltas.remove(deltaWidget));
-      }
+    overlay.insert(entry);
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      entry.remove();
     });
   }
-
-  // ═══════════════════════════════════════════════
-  // BUILD
-  // ═══════════════════════════════════════════════
 
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
     }
 
+    final screenH = MediaQuery.of(context).size.height;
+    final top = _topH;
+    final bottom = _bottomH;
+
+    final available = screenH - top - bottom;
+    final minSpace = 180.0;
+    final safeBottom =
+        available < minSpace ? (screenH - top - minSpace).clamp(0.0, screenH) : bottom;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F7F7), // 메인 배경
+      backgroundColor: const Color(0xFFF1F7F7),
       body: Stack(
         children: [
-          // ── 메인 콘텐츠 (dog.riv 전체화면 + 버튼들) ──
-          _buildMainContent(),
+          // 배경
+          IgnorePointer(
+            ignoring: true,
+            child: Positioned.fill(
+              child: Container(color: const Color(0xFFF1F7F7)),
+            ),
+          ),
+
+          // 캐릭터 (contain으로 잘림 방지)
+          Positioned.fill(
+            top: top,
+            bottom: safeBottom,
+            child: Center(
+              child: GestureDetector(
+                onTap: _onCircleTap,
+                child: _dogArtboard != null
+                    ? Rive(
+                        artboard: _dogArtboard!,
+                        fit: BoxFit.contain,
+                        alignment: Alignment.center,
+                      )
+                    : const CircularProgressIndicator(),
+              ),
+            ),
+          ),
+
+          // 말풍선
+          Positioned(
+            bottom: _bottomH + 10,
+            left: 0,
+            right: 0,
+            child: IgnorePointer(
+              ignoring: true,
+              child: Center(
+                child: SpeechOverlay(
+                  text: _currentSpeech,
+                  isDismissing: _isDismissingSpeech,
+                ),
+              ),
+            ),
+          ),
+
+          // 떠오르는 수치들
+          ..._floatingDeltas,
+
+          // 상단 카드 4개
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              bottom: false,
+              child: Container(
+                key: _topKey,
+                padding: const EdgeInsets.only(top: 8, bottom: 8),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // 상단 바
+                    _buildTopBar(),
+
+                    const SizedBox(height: 4),
+
+                    // ① 구인 카드
+                    _TapCard(
+                      title: '📍 내 주변 신규 구인',
+                      bigText: _jobsSummary,
+                      subtitle: _jobsSub,
+                      onTap: () => _go('/jobs'),
+                    ),
+
+                    // ② 임박 제도 변경 (롤링)
+                    _PolicyRollingCard(
+                      policies: _upcomingPolicies,
+                      index: _policyIndex,
+                      onTap: () => _go('/policy'),
+                    ),
+
+                    // ③ 이주의 책
+                    _TapCard(
+                      title: '📖 이주의 책',
+                      bigText: _weeklyBook?.title ?? '이번 주 추천 책이 없어요',
+                      subtitle: _weeklyBook?.subtitle ?? '',
+                      onTap: () => _go('/books'),
+                    ),
+
+                    // ④ 오늘의 1문제
+                    _TapCard(
+                      title: '🧠 오늘의 1문제',
+                      bigText: _quizSummary,
+                      subtitle: '터치해서 풀기',
+                      onTap: () => _go('/quiz'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // 하단 버튼들
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: SafeArea(
+              top: false,
+              child: Container(
+                key: _bottomKey,
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                child: _buildBottomSection(),
+              ),
+            ),
+          ),
         ],
       ),
-    );
-  }
-
-  // ── 디자인 컬러 팔레트 ──
-  static const _colorAccent = Color(0xFFF7CBCA); // 미술적 포인트
-  static const _colorText = Color(0xFF5D6B6B); // 텍스트/메시지
-  static const _colorBg = Color(0xFFF1F7F7); // 메인 배경
-  static const _colorShadow1 = Color(0xFFDDD3D8); // 흐린 명암1
-  static const _colorShadow2 = Color(0xFFD5E5E5); // 흐린 명암2
-
-  Widget _buildMainContent() {
-    // 화면 높이
-    final screenHeight = MediaQuery.of(context).size.height;
-
-    // 캐릭터가 들어갈 공간 계산: [상단 카드 끝 ~ 하단 버튼 시작] 사이
-    final characterTop = _topCardsHeight;
-    final characterBottom = _bottomButtonsHeight;
-
-    // 캐릭터 영역이 너무 좁아지는 경우 방지 (최소 140px 확보)
-    final available = screenHeight - characterTop - characterBottom;
-    final minCharacterSpace = 140.0;
-    final safeTop = characterTop;
-    final safeBottom =
-        available < minCharacterSpace
-            ? (screenHeight - safeTop - minCharacterSpace).clamp(
-              0.0,
-              screenHeight,
-            )
-            : characterBottom;
-
-    return Stack(
-      children: [
-        // ── 0. 배경: 터치 절대 가로채지 않게 ──
-        IgnorePointer(
-          ignoring: true,
-          child: Positioned.fill(child: Container(color: _colorBg)),
-        ),
-
-        // ── 1. 캐릭터 영역: 카드와 버튼 사이에 자동 배치 ──
-        Positioned.fill(
-          top: safeTop,
-          bottom: safeBottom,
-          child: ClipRect(
-            child: GestureDetector(
-              onTap: _onCircleTap,
-              child:
-                  _dogArtboard != null
-                      ? Rive(
-                        artboard: _dogArtboard!,
-                        fit: BoxFit.cover,
-                        alignment: Alignment.topCenter,
-                      )
-                      : Center(
-                        child: CircularProgressIndicator(
-                          color: _colorAccent,
-                          strokeWidth: 1.5,
-                        ),
-                      ),
-            ),
-          ),
-        ),
-
-        // ── 2. 말풍선: 캐릭터 위에, 하단 버튼 위 ──
-        Positioned(
-          bottom: _bottomButtonsHeight + 10,
-          left: 0,
-          right: 0,
-          child: IgnorePointer(
-            ignoring: true,
-            child: Center(
-              child: SpeechOverlay(
-                text: _currentSpeech,
-                isDismissing: _isDismissingSpeech,
-              ),
-            ),
-          ),
-        ),
-
-        // ── 3. 떠오르는 수치들 ──
-        ..._floatingDeltas,
-
-        // ── 4. 하단 버튼들 (높이 측정) ──
-        Positioned(
-          bottom: 0,
-          left: 0,
-          right: 0,
-          child: SafeArea(
-            top: false,
-            child: Container(
-              key: _bottomButtonsKey,
-              padding: const EdgeInsets.only(bottom: 28),
-              child: _buildBottomSection(),
-            ),
-          ),
-        ),
-
-        // ── 5. ✅ 상단 카드 영역: Stack 최상단 (터치 최우선) + 높이 측정 ──
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          child: SafeArea(
-            bottom: false,
-            child: Container(
-              key: _topCardsKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // 상단 바 (설정)
-                  _buildTopBar(),
-                  // 카드 영역
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // ① 구인 카드
-                        JobsInfoCard(
-                          data: _jobData,
-                          onTap: () {
-                            widget.onTabRequested?.call(3); // 도전하기 탭
-                          },
-                        ),
-                        // ② 실무(급여 변경) 카드
-                        SalaryUpdateCard(
-                          updates: _policyUpdates,
-                          onTap: () {
-                            widget.onTabRequested?.call(2); // 성장하기 탭
-                          },
-                        ),
-                        // ③ 이주의 책 카드
-                        WeeklyBookCard(
-                          data: _featuredBook,
-                          onPreview: () {
-                            widget.onTabRequested?.call(2); // 성장하기 탭
-                          },
-                        ),
-                        // ④ 퀴즈 카드
-                        DailyQuizCard(
-                          quiz: _dailyQuiz,
-                          onStart: () {
-                            widget.onTabRequested?.call(2); // 성장하기 탭
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
     );
   }
 
@@ -512,27 +440,25 @@ class _CaringPageState extends State<CaringPage>
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: Row(
         children: [
-          // 좌측 설명 버튼
           IconButton(
             icon: Icon(
               Icons.info_outline,
-              color: _colorText.withOpacity(0.5),
+              color: const Color(0xFF5D6B6B).withOpacity(0.5),
               size: 18,
             ),
             onPressed: () => _showConceptDialog(context),
           ),
           const Spacer(),
-          // 우측 설정 버튼
           IconButton(
             icon: Icon(
               Icons.settings_outlined,
-              color: _colorText.withOpacity(0.4),
+              color: const Color(0xFF5D6B6B).withOpacity(0.4),
               size: 20,
             ),
             onPressed: () {
-              Navigator.of(
-                context,
-              ).push(MaterialPageRoute(builder: (_) => const SettingsPage()));
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const SettingsPage()),
+              );
             },
           ),
         ],
@@ -540,246 +466,297 @@ class _CaringPageState extends State<CaringPage>
     );
   }
 
-  /// 설명 다이얼로그
+  /// 하단 버튼 섹션
+  Widget _buildBottomSection() {
+    return Row(
+      children: [
+        Expanded(child: _BottomBtn('밥먹기', _onFeed)),
+        const SizedBox(width: 10),
+        Expanded(child: _BottomBtn('사랑하기', _onLove)),
+        const SizedBox(width: 10),
+        Expanded(child: _BottomBtn('기록하기', _onDiary)),
+        const SizedBox(width: 10),
+        Expanded(child: _BottomBtn('목표', _onGoal)),
+      ],
+    );
+  }
+
+  void _onFeed() async {
+    await CaringActionService.feed(context);
+    _bootstrap();
+  }
+
+  void _onLove() async {
+    await CaringActionService.love();
+    setState(() {});
+  }
+
+  void _onDiary() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const DiaryInputSheet(),
+    );
+  }
+
+  void _onGoal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const UserGoalSheet(),
+    );
+  }
+
   void _showConceptDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text(
-              '나 탭에 대해서',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    '나와 캐릭터가 머무는 공간',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: _colorText,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    '이곳은 나를 방치하지 않기 위한 자리입니다.\n감정을 나누고, 하루를 정리하고,\n작은 목표를 세우는 공간입니다.',
-                    style: TextStyle(fontSize: 13, height: 1.5),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    '🐣 캐릭터',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '캐릭터는 당신의 감정을 비추는 존재입니다.\n조언보다 곁에 머무는 역할을 합니다.\n자주 올수록 조금씩 더 반응합니다.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      height: 1.5,
-                      color: _colorText.withOpacity(0.7),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    '🍚 밥먹기',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '시간대별로 캐릭터에게 밥을 줍니다.\n아침, 점심, 저녁, 밤 각 한 번씩 가능합니다.\n하루를 4번 다 채우면 다음 날 보너스가 있어요.\n건너뛴 날이 쌓이면 조금씩 멀어집니다.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      height: 1.5,
-                      color: _colorText.withOpacity(0.7),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    '💗 사랑하기',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '캐릭터에게 사랑을 주는 것은 터치면 충분합니다.\n하루 3번까지 가능합니다.\n상황에 따라 다른 반응을 보여줍니다.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      height: 1.5,
-                      color: _colorText.withOpacity(0.7),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    '📝 기록하기',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '오늘 있었던 일을 짧게 적습니다.\n길게 쓰지 않아도 괜찮습니다.\n하루에 두 번까지 기록할 수 있어요.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      height: 1.5,
-                      color: _colorText.withOpacity(0.7),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    '🎯 목표달성하기',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '이번 주 작은 다짐을 세우고 체크합니다.\n완수하지 못해도 감점은 없습니다.\n시도하는 것만으로도 의미가 있어요.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      height: 1.5,
-                      color: _colorText.withOpacity(0.7),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '루틴 목표: 주 7일 동안 반복하는 작은 습관\n프로젝트 목표: 한 주 동안 달성할 구체적인 목표',
-                    style: TextStyle(
-                      fontSize: 11,
-                      height: 1.5,
-                      color: _colorText.withOpacity(0.6),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    '💛 결 점수',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '나를 방치하지 않은 시간의 축적입니다.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      height: 1.5,
-                      color: _colorText.withOpacity(0.7),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '높을수록 좋은 게 아니라,\n꾸준히 돌보는 것이 중요합니다.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      height: 1.5,
-                      color: _colorText.withOpacity(0.7),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('닫기'),
-              ),
-            ],
-          ),
-    );
-  }
-
-  /// 하단 섹션: (목표 섹션) + 아침 인사 or 4 아이콘
-  Widget _buildBottomSection() {
-    // 아직 오늘 인사 안 했으면 → 아침 인사 버튼만
-    if (!_hasGreetedToday) {
-      return _buildGreetingButton();
-    }
-
-    // 인사 완료 → 4 아이콘만
-    return _buildFourActions();
-  }
-
-  /// 아침 인사 버튼 (단독)
-  Widget _buildGreetingButton() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 60),
-      child: GestureDetector(
-        onTap: _onGreeting,
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.85),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: _colorShadow2.withOpacity(0.4),
-              width: 0.5, // 가느다란 라인
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: _colorShadow1.withOpacity(0.15),
-                blurRadius: 20,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text('👋', style: TextStyle(fontSize: 20)),
-              SizedBox(width: 8),
-              Text(
-                '아침 인사',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                  color: _colorText,
-                ),
-              ),
-            ],
+      builder: (ctx) => AlertDialog(
+        title: const Text(
+          "'나' 탭에 대해서",
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        ),
+        content: const SingleChildScrollView(
+          child: Text(
+            "📱 캐릭터\n"
+            "• 터치하면 작은 교감이 쌓입니다.\n"
+            "• 애정 수치가 너무 낮거나 높지 않게 조절하세요.\n\n"
+            "🍚 밥먹기\n"
+            "• 하루 한 번, 캐릭터에게 밥을 줄 수 있습니다.\n\n"
+            "💕 사랑하기\n"
+            "• 캐릭터에게 사랑을 주는 것은 터치면 충분합니다.\n\n"
+            "📝 기록하기\n"
+            "• 오늘 하루를 한 줄로 기록합니다.\n\n"
+            "🎯 목표달성하기\n"
+            "• 주간 목표를 설정하고 체크합니다.\n\n"
+            "💖 결 점수\n"
+            "• 결은 당신과 앱(또는 파트너)과의 깊이를 나타냅니다.\n"
+            "• 교감이 쌓일수록 결이 깊어져요.\n"
+            "• 결 점수는 앱 사용과 교감에 따라 자동으로 조정됩니다.",
+            style: TextStyle(fontSize: 13, height: 1.6),
           ),
         ),
-      ),
-    );
-  }
-
-  /// 4개 아이콘 버튼 (✨ 수정: 소통하기, 대화하기, 목표설정 추가)
-  Widget _buildFourActions() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 40),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _buildIconAction(Icons.restaurant_outlined, _onFeed), // 밥먹기
-          _buildIconAction(Icons.volunteer_activism, _onEmpathize), // ✨ 소통하기
-          _buildIconAction(
-            Icons.edit_note_outlined,
-            _onDiary,
-          ), // ✨ 대화하기 (한 줄 기록)
-          _buildIconAction(Icons.flag_outlined, _onGoalSetting), // ✨ 목표설정
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('닫기'),
+          ),
         ],
       ),
     );
   }
+}
 
-  /// 아이콘 전용 버튼 (가느다란 라인 + 팔레트 적용)
-  Widget _buildIconAction(IconData icon, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 52,
-        height: 52,
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.7),
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: _colorShadow2.withOpacity(0.5),
-            width: 0.5, // 가느다란 라인
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: _colorShadow1.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
+/// 일반 카드
+class _TapCard extends StatelessWidget {
+  const _TapCard({
+    required this.title,
+    required this.bigText,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final String title;
+  final String bigText;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(10);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 3),
+      child: Material(
+        color: Colors.white,
+        elevation: 1,
+        borderRadius: radius,
+        child: InkWell(
+          borderRadius: radius,
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        bigText,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (subtitle.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: Colors.black54,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right, color: Colors.black45, size: 20),
+              ],
             ),
-          ],
+          ),
         ),
-        child: Icon(icon, color: _colorText.withOpacity(0.6), size: 22),
+      ),
+    );
+  }
+}
+
+/// 임박 제도 변경 롤링 카드
+class _PolicyRollingCard extends StatelessWidget {
+  const _PolicyRollingCard({
+    required this.policies,
+    required this.index,
+    required this.onTap,
+  });
+
+  final List<Map<String, String>> policies;
+  final int index;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(10);
+
+    String title = '🏥 임박 제도 변경';
+    String big = '예정된 변경 없음';
+    String sub = '';
+
+    if (policies.isNotEmpty) {
+      final p = policies[index.clamp(0, policies.length - 1)];
+      big = p['title'] ?? '';
+      sub = '시행일: ${p['date']} (${p['dday']})';
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 3),
+      child: Material(
+        color: Colors.white,
+        elevation: 1,
+        borderRadius: radius,
+        child: InkWell(
+          borderRadius: radius,
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 400),
+                    transitionBuilder: (child, animation) {
+                      return SlideTransition(
+                        position: Tween<Offset>(
+                          begin: const Offset(0, 0.3),
+                          end: Offset.zero,
+                        ).animate(animation),
+                        child: FadeTransition(
+                          opacity: animation,
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: Column(
+                      key: ValueKey(big),
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          big,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        if (sub.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            sub,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Colors.black54,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+                const Icon(Icons.chevron_right, color: Colors.black45, size: 20),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 하단 버튼
+class _BottomBtn extends StatelessWidget {
+  const _BottomBtn(this.label, this.onTap);
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(12);
+    return Material(
+      color: Colors.white,
+      elevation: 1,
+      borderRadius: radius,
+      child: InkWell(
+        borderRadius: radius,
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Center(
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

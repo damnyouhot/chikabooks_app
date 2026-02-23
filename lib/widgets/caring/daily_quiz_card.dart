@@ -55,7 +55,9 @@ class DailyQuizCard extends StatelessWidget {
                 alignment: Alignment.centerLeft,
                 child: ElevatedButton(
                   onPressed:
-                      quiz != null && quiz!.question.isNotEmpty ? onStart : null,
+                      quiz != null && quiz!.question.isNotEmpty
+                          ? onStart
+                          : null,
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,

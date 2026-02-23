@@ -4,6 +4,10 @@ import 'core/config/app_initializer.dart';
 import 'core/config/app_providers.dart';
 import 'core/theme/app_theme.dart';
 import 'pages/auth/auth_gate.dart';
+import 'pages/job_page.dart';
+import 'pages/hira_update_page.dart';
+import 'pages/ebook/ebook_list_page.dart';
+import 'pages/quiz_today_page.dart';
 
 Future<void> main() async {
   await AppInitializer.initialize();
@@ -29,6 +33,12 @@ class ChikabooksApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       home: const AuthGate(),
+      routes: {
+        '/jobs': (_) => const JobPage(),
+        '/policy': (_) => const HiraUpdatePage(), // 급여/제도 변경 페이지
+        '/books': (_) => const EbookListPage(), // 치과책방 (전자책 목록)
+        '/quiz': (_) => const QuizTodayPage(), // 오늘의 퀴즈
+      },
     );
   }
 }
