@@ -13,11 +13,7 @@ class BillboardCard extends StatelessWidget {
   final BillboardPost post;
   final VoidCallback? onTap;
 
-  const BillboardCard({
-    super.key,
-    required this.post,
-    this.onTap,
-  });
+  const BillboardCard({super.key, required this.post, this.onTap});
 
   String _formatDate(DateTime date) {
     final now = DateTime.now();
@@ -39,14 +35,11 @@ class BillboardCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
           color: _kCardBg,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: _kShadow2.withOpacity(0.5),
-            width: 1,
-          ),
+          border: Border.all(color: _kShadow2.withOpacity(0.5), width: 1),
           boxShadow: [
             BoxShadow(
               color: _kShadow2.withOpacity(0.2),
@@ -82,35 +75,53 @@ class BillboardCard extends StatelessWidget {
               ],
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
 
             // 본문 (고정 높이 2줄)
             SizedBox(
-              height: 50,
+              height: 45,
               child: Text(
-              post.textSnapshot,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 15,
-                height: 1.6,
-                color: Color(0xFF333333),
-                fontWeight: FontWeight.w500,
+                post.textSnapshot,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 15,
+                  height: 1.6,
+                  color: Color(0xFF333333),
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
 
-            // 이모지 반응
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
+            // 이모지 반응 + 신고 아이콘
+            Row(
               children: [
-                _buildReactionChip('👏', post.reactions?['👏'] ?? 0),
-                _buildReactionChip('❤️', post.reactions?['❤️'] ?? 0),
-                _buildReactionChip('🔥', post.reactions?['🔥'] ?? 0),
-                _buildReactionChip('👀', post.reactions?['👀'] ?? 0),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _buildReactionChip('👏', post.reactions?['👏'] ?? 0),
+                    _buildReactionChip('❤️', post.reactions?['❤️'] ?? 0),
+                    _buildReactionChip('🔥', post.reactions?['🔥'] ?? 0),
+                    _buildReactionChip('😢', post.reactions?['😢'] ?? 0),
+                  ],
+                ),
+                const Spacer(),
+                GestureDetector(
+                  onTap: () {
+                    // TODO: 신고 처리
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    child: Icon(
+                      Icons.report_outlined,
+                      size: 18,
+                      color: _kText.withOpacity(0.3),
+                    ),
+                  ),
+                ),
               ],
             ),
           ],
@@ -127,17 +138,11 @@ class BillboardCard extends StatelessWidget {
             ? _kAccent.withOpacity(0.2)
             : _kShadow2.withOpacity(0.3),
         borderRadius: BorderRadius.circular(16),
-        border: count > 0
-            ? Border.all(color: _kAccent.withOpacity(0.4), width: 1)
-            : null,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            emoji,
-            style: const TextStyle(fontSize: 16),
-          ),
+          Text(emoji, style: const TextStyle(fontSize: 16)),
           if (count > 0) ...[
             const SizedBox(width: 4),
             Text(
@@ -184,10 +189,7 @@ class BillboardSection extends StatelessWidget {
                 },
                 child: Text(
                   '더보기',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[500],
-                  ),
+                  style: TextStyle(fontSize: 12, color: Colors.grey[500]),
                 ),
               ),
             ],
@@ -227,18 +229,12 @@ class BillboardSection extends StatelessWidget {
                       const SizedBox(height: 12),
                       Text(
                         '아직 추대된 글이 없어요',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[600],
-                        ),
+                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         '좋은 글에 추대를 보내보세요',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[500],
-                        ),
+                        style: TextStyle(fontSize: 12, color: Colors.grey[500]),
                       ),
                     ],
                   ),
@@ -246,14 +242,15 @@ class BillboardSection extends StatelessWidget {
               }
 
               return Column(
-                children: posts.map((post) {
-                  return BillboardCard(
-                    post: post,
-                    onTap: () {
-                      // TODO: 상세 보기
-                    },
-                  );
-                }).toList(),
+                children:
+                    posts.map((post) {
+                      return BillboardCard(
+                        post: post,
+                        onTap: () {
+                          // TODO: 상세 보기
+                        },
+                      );
+                    }).toList(),
               );
             },
           ),
@@ -262,4 +259,3 @@ class BillboardSection extends StatelessWidget {
     );
   }
 }
-

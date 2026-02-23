@@ -4,13 +4,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 enum EnthroneStatus {
   /// 2/3 추대 달성 (후보)
   candidate,
-  
+
   /// 3/3 추대 달성 (확정)
   confirmed,
-  
+
   /// 24시간 만료
   expired,
-  
+
   /// 신고로 제거
   removed,
 }
@@ -20,16 +20,10 @@ class Enthrone {
   final String uid;
   final DateTime createdAt;
 
-  const Enthrone({
-    required this.uid,
-    required this.createdAt,
-  });
+  const Enthrone({required this.uid, required this.createdAt});
 
   Map<String, dynamic> toMap() {
-    return {
-      'uid': uid,
-      'createdAt': Timestamp.fromDate(createdAt),
-    };
+    return {'uid': uid, 'createdAt': Timestamp.fromDate(createdAt)};
   }
 
   factory Enthrone.fromMap(Map<String, dynamic> map) {
@@ -78,9 +72,7 @@ class BillboardPost {
   bool get isExpired => DateTime.now().isAfter(expiresAt);
 
   /// 활성 상태 여부
-  bool get isActive => 
-      status == EnthroneStatus.confirmed && 
-      !isExpired;
+  bool get isActive => status == EnthroneStatus.confirmed && !isExpired;
 
   Map<String, dynamic> toMap() {
     return {
@@ -119,9 +111,10 @@ class BillboardPost {
       isAnonymous: data['isAnonymous'] as bool? ?? true,
       authorId: data['authorId'] as String?,
       authorNickname: data['authorNickname'] as String?,
-      reactions: data['reactions'] != null
-          ? Map<String, int>.from(data['reactions'] as Map)
-          : null,
+      reactions:
+          data['reactions'] != null
+              ? Map<String, int>.from(data['reactions'] as Map)
+              : null,
     );
   }
 
@@ -155,5 +148,3 @@ class BillboardPost {
     );
   }
 }
-
-
