@@ -333,108 +333,59 @@ class _CaringPageState extends State<CaringPage>
   Widget _buildMainContent() {
     return Stack(
       children: [
-        // ── 0. 기존 배경 전체 유지 ──
-        Positioned.fill(
-          child: Container(
-            color: _colorBg, // 기존 배경색
+        // ── 0. 배경: 터치 절대 가로채지 않게 ──
+        IgnorePointer(
+          ignoring: true,
+          child: Positioned.fill(
+            child: Container(
+              color: _colorBg,
+            ),
           ),
         ),
 
-        // ── 1. dog.riv 캐릭터 영역 (배경 위에, 카드 아래) ──
+        // ── 1. 캐릭터 영역: 카드 영역을 침범하지 않게 클립 ──
         Positioned(
-          top: MediaQuery.of(context).size.height * 0.40, // 상단 40% 공간 확보
+          top: 280, // 카드 영역 높이만큼 아래로 (임시값, 카드가 실제로 차지하는 높이)
           left: 0,
           right: 0,
           bottom: 0,
-          child: GestureDetector(
-            onTap: _onCircleTap,
-            child:
-                _dogArtboard != null
-                    ? Rive(
-                      artboard: _dogArtboard!,
-                      fit: BoxFit.cover,
-                      alignment: Alignment.center,
-                    )
-                    : Center(
-                      child: CircularProgressIndicator(
-                        color: _colorAccent,
-                        strokeWidth: 1.5,
+          child: ClipRect(
+            child: GestureDetector(
+              onTap: _onCircleTap,
+              child:
+                  _dogArtboard != null
+                      ? Rive(
+                        artboard: _dogArtboard!,
+                        fit: BoxFit.cover,
+                        alignment: Alignment.topCenter,
+                      )
+                      : Center(
+                        child: CircularProgressIndicator(
+                          color: _colorAccent,
+                          strokeWidth: 1.5,
+                        ),
                       ),
-                    ),
+            ),
           ),
         ),
 
-        // ── 2. 상단 정보 카드 영역 (고정, 스크롤 제거) ──
+        // ── 2. 말풍선: 카드 아래에 배치 (터치 간섭 방지) ──
         Positioned(
-          top: 0,
+          bottom: 100,
           left: 0,
           right: 0,
-          height: MediaQuery.of(context).size.height * 0.40, // 35% → 40%로 증가
-          child: Container(
-            color: _colorBg.withOpacity(0.95), // 반투명 배경
-            child: SafeArea(
-              bottom: false,
-              child: Column(
-                children: [
-                  // 상단 바 (설정)
-                  _buildTopBar(),
-                  // 카드 영역 (스크롤 제거, 빽빽하게 배치)
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        children: [
-                          // ① 구인 카드
-                          JobsInfoCard(
-                            data: _jobData,
-                            onTap: () {
-                              // TODO: 4번째 탭(도전하기)으로 이동
-                              debugPrint('구인 카드 탭');
-                            },
-                          ),
-                          // ② 실무(급여 변경) 카드
-                          SalaryUpdateCard(updates: _policyUpdates),
-                          // ③ 이주의 책 카드
-                          WeeklyBookCard(
-                            data: _featuredBook,
-                            onPreview: () {
-                              // TODO: 책 미리보기
-                              debugPrint('1분 미리보기 탭');
-                            },
-                          ),
-                          // ④ 퀴즈 카드
-                          DailyQuizCard(
-                            quiz: _dailyQuiz,
-                            onStart: () {
-                              // TODO: 퀴즈 풀기
-                              debugPrint('바로 풀기 탭');
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
+          child: IgnorePointer(
+            ignoring: true, // 터치 이벤트 통과
+            child: Center(
+              child: SpeechOverlay(
+                text: _currentSpeech,
+                isDismissing: _isDismissingSpeech,
               ),
             ),
           ),
         ),
 
-        // ── 3. ✨ 말풍선 (4개 버튼 바로 위) ──
-        Positioned(
-          bottom: 100, // 버튼 영역(약 80px) + 여유(20px)
-          left: 0,
-          right: 0,
-          child: Center(
-            child: SpeechOverlay(
-              text: _currentSpeech,
-              isDismissing: _isDismissingSpeech,
-            ),
-          ),
-        ),
-
-        // ── 3-1. ✨ 떠오르는 수치들 ──
+        // ── 3. 떠오르는 수치들 ──
         ..._floatingDeltas,
 
         // ── 4. 하단 버튼들 ──
@@ -447,6 +398,58 @@ class _CaringPageState extends State<CaringPage>
             child: Padding(
               padding: const EdgeInsets.only(bottom: 28),
               child: _buildBottomSection(),
+            ),
+          ),
+        ),
+
+        // ── 5. ✅ 카드 영역: Stack의 가장 마지막 (최상단 터치 보장) ──
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: SafeArea(
+            bottom: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min, // 고정 height 제거, 내용에 맞게
+              children: [
+                // 상단 바 (설정)
+                _buildTopBar(),
+                // 카드 영역
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // ① 구인 카드
+                      JobsInfoCard(
+                        data: _jobData,
+                        onTap: () {
+                          // TODO: 4번째 탭(도전하기)으로 이동
+                          debugPrint('구인 카드 탭');
+                        },
+                      ),
+                      // ② 실무(급여 변경) 카드
+                      SalaryUpdateCard(updates: _policyUpdates),
+                      // ③ 이주의 책 카드
+                      WeeklyBookCard(
+                        data: _featuredBook,
+                        onPreview: () {
+                          // TODO: 책 미리보기
+                          debugPrint('1분 미리보기 탭');
+                        },
+                      ),
+                      // ④ 퀴즈 카드
+                      DailyQuizCard(
+                        quiz: _dailyQuiz,
+                        onStart: () {
+                          // TODO: 퀴즈 풀기
+                          debugPrint('바로 풀기 탭');
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         ),
