@@ -128,21 +128,9 @@ class _CaringPageState extends State<CaringPage>
 
       // 3. 임박 제도 변경 (더미 데이터 - HiraUpdateService 연동 필요)
       final policies = [
-        {
-          'title': '2026 스케일링 급여 개정',
-          'dday': 'D-12',
-          'date': '3월 1일'
-        },
-        {
-          'title': '치주질환 급여 인정 기준 변경',
-          'dday': 'D-21',
-          'date': '3월 10일'
-        },
-        {
-          'title': '근관치료 행위 산정 지침 개정',
-          'dday': 'D-26',
-          'date': '3월 15일'
-        },
+        {'title': '2026 스케일링 급여 개정', 'dday': 'D-12', 'date': '3월 1일'},
+        {'title': '치주질환 급여 인정 기준 변경', 'dday': 'D-21', 'date': '3월 10일'},
+        {'title': '근관치료 행위 산정 지침 개정', 'dday': 'D-26', 'date': '3월 15일'},
       ];
 
       // 4. 이주의 책 (EbookService 재사용)
@@ -162,13 +150,8 @@ class _CaringPageState extends State<CaringPage>
 
       setState(() {
         _hasGreetedToday = greeted;
-        _jobsSummary = jobCount > 0
-            ? '오늘 새로 올라온 $jobCount건'
-            : '새로운 구인 공고가 없어요';
-        _jobsSub =
-            jobCount > 0 && clinicName.isNotEmpty
-                ? clinicName
-                : '';
+        _jobsSummary = jobCount > 0 ? '오늘 새로 올라온 $jobCount건' : '새로운 구인 공고가 없어요';
+        _jobsSub = jobCount > 0 && clinicName.isNotEmpty ? clinicName : '';
         _upcomingPolicies = policies;
         _weeklyBook = featuredBook;
         _quizSummary = quizText;
@@ -263,30 +246,31 @@ class _CaringPageState extends State<CaringPage>
     final offsetY = (size.height * 0.5) + (Random().nextDouble() * 40 - 20);
 
     final entry = OverlayEntry(
-      builder: (ctx) => Positioned(
-        left: offsetX,
-        top: offsetY,
-        child: TweenAnimationBuilder<double>(
-          tween: Tween(begin: 0.0, end: 1.0),
-          duration: const Duration(milliseconds: 1500),
-          builder: (_, value, child) {
-            return Transform.translate(
-              offset: Offset(0, -value * 50),
-              child: Opacity(
-                opacity: 1.0 - value,
-                child: Text(
-                  '+$delta',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: const Color(0xFFF7CBCA).withOpacity(1.0 - value),
+      builder:
+          (ctx) => Positioned(
+            left: offsetX,
+            top: offsetY,
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0.0, end: 1.0),
+              duration: const Duration(milliseconds: 1500),
+              builder: (_, value, child) {
+                return Transform.translate(
+                  offset: Offset(0, -value * 50),
+                  child: Opacity(
+                    opacity: 1.0 - value,
+                    child: Text(
+                      '+$delta',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFFF7CBCA).withOpacity(1.0 - value),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            );
-          },
-        ),
-      ),
+                );
+              },
+            ),
+          ),
     );
 
     overlay.insert(entry);
@@ -298,9 +282,7 @@ class _CaringPageState extends State<CaringPage>
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     final screenH = MediaQuery.of(context).size.height;
@@ -310,7 +292,9 @@ class _CaringPageState extends State<CaringPage>
     final available = screenH - top - bottom;
     final minSpace = 180.0;
     final safeBottom =
-        available < minSpace ? (screenH - top - minSpace).clamp(0.0, screenH) : bottom;
+        available < minSpace
+            ? (screenH - top - minSpace).clamp(0.0, screenH)
+            : bottom;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF1F7F7),
@@ -331,13 +315,14 @@ class _CaringPageState extends State<CaringPage>
             child: Center(
               child: GestureDetector(
                 onTap: _onCircleTap,
-                child: _dogArtboard != null
-                    ? Rive(
-                        artboard: _dogArtboard!,
-                        fit: BoxFit.contain,
-                        alignment: Alignment.center,
-                      )
-                    : const CircularProgressIndicator(),
+                child:
+                    _dogArtboard != null
+                        ? Rive(
+                          artboard: _dogArtboard!,
+                          fit: BoxFit.contain,
+                          alignment: Alignment.center,
+                        )
+                        : const CircularProgressIndicator(),
               ),
             ),
           ),
@@ -398,7 +383,7 @@ class _CaringPageState extends State<CaringPage>
                     _TapCard(
                       title: '📖 이주의 책',
                       bigText: _weeklyBook?.title ?? '이번 주 추천 책이 없어요',
-                      subtitle: _weeklyBook?.subtitle ?? '',
+                      subtitle: _weeklyBook?.author ?? '',
                       onTap: () => _go('/books'),
                     ),
 
@@ -456,9 +441,9 @@ class _CaringPageState extends State<CaringPage>
               size: 20,
             ),
             onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const SettingsPage()),
-              );
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const SettingsPage()));
             },
           ),
         ],
@@ -482,68 +467,66 @@ class _CaringPageState extends State<CaringPage>
   }
 
   void _onFeed() async {
-    await CaringActionService.feed(context);
-    _bootstrap();
+    final result = await CaringActionService.tryFeed();
+    if (result.success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result.message)),
+      );
+      _bootstrap();
+    }
   }
 
   void _onLove() async {
-    await CaringActionService.love();
-    setState(() {});
+    _onCircleTap(); // 터치와 동일
   }
 
   void _onDiary() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const DiaryInputSheet(),
-    );
+    DiaryInputSheet.show(context, (text) async {
+      // 일기 저장 후 리프레시
+      _bootstrap();
+    });
   }
 
   void _onGoal() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const UserGoalSheet(),
-    );
+    UserGoalSheet.show(context);
   }
 
   void _showConceptDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text(
-          "'나' 탭에 대해서",
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-        ),
-        content: const SingleChildScrollView(
-          child: Text(
-            "📱 캐릭터\n"
-            "• 터치하면 작은 교감이 쌓입니다.\n"
-            "• 애정 수치가 너무 낮거나 높지 않게 조절하세요.\n\n"
-            "🍚 밥먹기\n"
-            "• 하루 한 번, 캐릭터에게 밥을 줄 수 있습니다.\n\n"
-            "💕 사랑하기\n"
-            "• 캐릭터에게 사랑을 주는 것은 터치면 충분합니다.\n\n"
-            "📝 기록하기\n"
-            "• 오늘 하루를 한 줄로 기록합니다.\n\n"
-            "🎯 목표달성하기\n"
-            "• 주간 목표를 설정하고 체크합니다.\n\n"
-            "💖 결 점수\n"
-            "• 결은 당신과 앱(또는 파트너)과의 깊이를 나타냅니다.\n"
-            "• 교감이 쌓일수록 결이 깊어져요.\n"
-            "• 결 점수는 앱 사용과 교감에 따라 자동으로 조정됩니다.",
-            style: TextStyle(fontSize: 13, height: 1.6),
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text(
+              "'나' 탭에 대해서",
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            content: const SingleChildScrollView(
+              child: Text(
+                "📱 캐릭터\n"
+                "• 터치하면 작은 교감이 쌓입니다.\n"
+                "• 애정 수치가 너무 낮거나 높지 않게 조절하세요.\n\n"
+                "🍚 밥먹기\n"
+                "• 하루 한 번, 캐릭터에게 밥을 줄 수 있습니다.\n\n"
+                "💕 사랑하기\n"
+                "• 캐릭터에게 사랑을 주는 것은 터치면 충분합니다.\n\n"
+                "📝 기록하기\n"
+                "• 오늘 하루를 한 줄로 기록합니다.\n\n"
+                "🎯 목표달성하기\n"
+                "• 주간 목표를 설정하고 체크합니다.\n\n"
+                "💖 결 점수\n"
+                "• 결은 당신과 앱(또는 파트너)과의 깊이를 나타냅니다.\n"
+                "• 교감이 쌓일수록 결이 깊어져요.\n"
+                "• 결 점수는 앱 사용과 교감에 따라 자동으로 조정됩니다.",
+                style: TextStyle(fontSize: 13, height: 1.6),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('닫기'),
+              ),
+            ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('닫기'),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -616,7 +599,11 @@ class _TapCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right, color: Colors.black45, size: 20),
+                const Icon(
+                  Icons.chevron_right,
+                  color: Colors.black45,
+                  size: 20,
+                ),
               ],
             ),
           ),
@@ -674,10 +661,7 @@ class _PolicyRollingCard extends StatelessWidget {
                           begin: const Offset(0, 0.3),
                           end: Offset.zero,
                         ).animate(animation),
-                        child: FadeTransition(
-                          opacity: animation,
-                          child: child,
-                        ),
+                        child: FadeTransition(opacity: animation, child: child),
                       );
                     },
                     child: Column(
@@ -718,7 +702,11 @@ class _PolicyRollingCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                const Icon(Icons.chevron_right, color: Colors.black45, size: 20),
+                const Icon(
+                  Icons.chevron_right,
+                  color: Colors.black45,
+                  size: 20,
+                ),
               ],
             ),
           ),
@@ -750,10 +738,7 @@ class _BottomBtn extends StatelessWidget {
           child: Center(
             child: Text(
               label,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
             ),
           ),
         ),

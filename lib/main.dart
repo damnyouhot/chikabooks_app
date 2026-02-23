@@ -16,11 +16,7 @@ Future<void> main() async {
   print('🔥 Firebase projectId = ${Firebase.app().options.projectId}');
   print('🔥 Firebase appId     = ${Firebase.app().options.appId}');
 
-  runApp(
-    AppProviders(
-      child: const ChikabooksApp(),
-    ),
-  );
+  runApp(AppProviders(child: const ChikabooksApp()));
 }
 
 class ChikabooksApp extends StatelessWidget {
