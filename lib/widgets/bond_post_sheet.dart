@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/bond_post_service.dart';
+import '../services/user_profile_service.dart';
 
 /// "오늘을 나누기" BottomSheet
 /// 완전 자유 입력 (최대 200자)
@@ -117,6 +118,9 @@ class _BondPostSheetState extends State<BondPostSheet> {
     setState(() => _posting = true);
     try {
       final now = DateTime.now();
+      final profile = await UserProfileService.getMyProfile();
+      final nick = (profile?.nickname ?? '').trim();
+      final authorNickname = nick.isNotEmpty ? nick : uid;
 
       // ✅ 파트너 모드: partnerGroups/{groupId}/posts 에만 저장
       final currentSlot = BondPostService.getCurrentTimeSlot();
@@ -128,6 +132,7 @@ class _BondPostSheetState extends State<BondPostSheet> {
           .collection('posts')
           .add({
             'uid': uid,
+            'authorNickname': authorNickname,
             'text': text,
             'bondGroupId': _activeGroupId,
             'dateKey': BondPostService.todayDateKey(),
@@ -201,7 +206,7 @@ class _BondPostSheetState extends State<BondPostSheet> {
                     Text(
                       _remainingPosts > 0
                           ? '오늘 $_remainingPosts번 더 나눌 수 있어요'
-                          : '오늘은 이미 2번 나눴어요',
+                          : '오늘은 이미 4번 나눴어요',
                       style: TextStyle(
                         fontSize: 12,
                         color:

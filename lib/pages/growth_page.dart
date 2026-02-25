@@ -8,6 +8,7 @@ import '../widgets/hira_update_detail_sheet.dart';
 import 'ebook/ebook_detail_page.dart';
 import 'quiz_today_page.dart';
 import 'hira_update_page.dart';
+import 'settings/settings_page.dart';
 
 // ── 디자인 팔레트 (2탭과 통일) ──
 const _kText = Color(0xFF5D6B6B);
@@ -24,7 +25,9 @@ const _kCardBg = Colors.white;
 /// 3. 치과책방 — e-Book 스토어
 /// 4. 내 서재 — 구매한 e-Book 목록
 class GrowthPage extends StatefulWidget {
-  const GrowthPage({super.key});
+  final int jumpToSubTab;
+
+  const GrowthPage({super.key, this.jumpToSubTab = -1});
 
   @override
   State<GrowthPage> createState() => _GrowthPageState();
@@ -38,6 +41,15 @@ class _GrowthPageState extends State<GrowthPage>
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 4, vsync: this);
+  }
+
+  @override
+  void didUpdateWidget(GrowthPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.jumpToSubTab >= 0 &&
+        widget.jumpToSubTab != oldWidget.jumpToSubTab) {
+      _tabCtrl.animateTo(widget.jumpToSubTab);
+    }
   }
 
   @override
@@ -78,19 +90,80 @@ class _GrowthPageState extends State<GrowthPage>
   }
 
   Widget _buildHeader() {
-    return const Padding(
-      padding: EdgeInsets.fromLTRB(20, 12, 20, 0),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Text(
-          '성장',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-            color: _kText,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          child: Row(
+            children: [
+              IconButton(
+                icon: Icon(
+                  Icons.info_outline,
+                  color: _kText.withOpacity(0.5),
+                  size: 18,
+                ),
+                onPressed: () => _showConceptDialog(context),
+              ),
+              const Spacer(),
+              IconButton(
+                icon: Icon(
+                  Icons.settings_outlined,
+                  color: _kText.withOpacity(0.4),
+                  size: 20,
+                ),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const SettingsPage()),
+                  );
+                },
+              ),
+            ],
           ),
         ),
-      ),
+        const Padding(
+          padding: EdgeInsets.only(left: 20),
+          child: Text(
+            '성장하기',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: _kText,
+            ),
+          ),
+        ),
+        const SizedBox(height: 2),
+        Padding(
+          padding: const EdgeInsets.only(left: 20),
+          child: Text(
+            '오늘도 하나씩, 꾸준히 성장해요.',
+            style: TextStyle(fontSize: 12, color: _kText.withOpacity(0.55)),
+          ),
+        ),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+
+  void _showConceptDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text(
+              '성장하기 탭에 대해서',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            content: const SingleChildScrollView(
+              child: Text('', style: TextStyle(fontSize: 13, height: 1.6)),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('닫기'),
+              ),
+            ],
+          ),
     );
   }
 
@@ -120,16 +193,13 @@ class _GrowthPageState extends State<GrowthPage>
         dividerColor: Colors.transparent,
         labelColor: _kText,
         unselectedLabelColor: _kText.withOpacity(0.4),
-        labelStyle: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-        ),
+        labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
         unselectedLabelStyle: const TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w400,
         ),
         tabs: const [
-          Tab(text: '퀴즈'),
+          Tab(text: '오늘퀴즈'),
           Tab(text: '급여변경'),
           Tab(text: '치과책방'),
           Tab(text: '내 서재'),
@@ -198,19 +268,13 @@ class _MyLibraryViewState extends State<_MyLibraryView>
               fontSize: 13,
               fontWeight: FontWeight.w600,
             ),
-            tabs: const [
-              Tab(text: '전자책'),
-              Tab(text: '저장한 변경사항'),
-            ],
+            tabs: const [Tab(text: '전자책'), Tab(text: '저장한 변경사항')],
           ),
         ),
         Expanded(
           child: TabBarView(
             controller: _tabCtrl,
-            children: const [
-              _MyBooksTab(),
-              _SavedHiraTab(),
-            ],
+            children: const [_MyBooksTab(), _SavedHiraTab()],
           ),
         ),
       ],
@@ -238,17 +302,22 @@ class _MyBooksTab extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.menu_book_outlined,
-                    size: 48, color: _kShadow1),
+                Icon(Icons.menu_book_outlined, size: 48, color: _kShadow1),
                 const SizedBox(height: 12),
                 Text(
                   '구매한 도서가 없습니다.',
-                  style: TextStyle(color: _kText.withOpacity(0.6), fontSize: 14),
+                  style: TextStyle(
+                    color: _kText.withOpacity(0.6),
+                    fontSize: 14,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   '치과책방에서 도서를 만나보세요.',
-                  style: TextStyle(color: _kText.withOpacity(0.4), fontSize: 12),
+                  style: TextStyle(
+                    color: _kText.withOpacity(0.4),
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),
@@ -262,15 +331,19 @@ class _MyBooksTab extends StatelessWidget {
             if (!allSnap.hasData) {
               return const Center(child: CircularProgressIndicator());
             }
-            final myBooks = allSnap.data!
-                .where((b) => purchasedIds.contains(b.id))
-                .toList();
+            final myBooks =
+                allSnap.data!
+                    .where((b) => purchasedIds.contains(b.id))
+                    .toList();
 
             if (myBooks.isEmpty) {
               return Center(
                 child: Text(
                   '도서 정보를 불러오는 중...',
-                  style: TextStyle(color: _kText.withOpacity(0.6), fontSize: 14),
+                  style: TextStyle(
+                    color: _kText.withOpacity(0.6),
+                    fontSize: 14,
+                  ),
                 ),
               );
             }
@@ -309,17 +382,22 @@ class _SavedHiraTab extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.bookmark_border,
-                    size: 48, color: _kShadow1),
+                Icon(Icons.bookmark_border, size: 48, color: _kShadow1),
                 const SizedBox(height: 12),
                 Text(
                   '저장한 변경사항이 없습니다',
-                  style: TextStyle(fontSize: 14, color: _kText.withOpacity(0.6)),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: _kText.withOpacity(0.6),
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   '급여변경 탭에서 항목을 저장하세요.',
-                  style: TextStyle(fontSize: 12, color: _kText.withOpacity(0.4)),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: _kText.withOpacity(0.4),
+                  ),
                 ),
               ],
             ),
@@ -371,11 +449,7 @@ class _SavedHiraTile extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(
-              Icons.info_outline,
-              size: 20,
-              color: _kText.withOpacity(0.5),
-            ),
+            Icon(Icons.info_outline, size: 20, color: _kText.withOpacity(0.5)),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -395,7 +469,10 @@ class _SavedHiraTile extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     '${update.publishedAt.year}.${update.publishedAt.month.toString().padLeft(2, '0')}.${update.publishedAt.day.toString().padLeft(2, '0')}',
-                    style: TextStyle(fontSize: 11, color: _kText.withOpacity(0.5)),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: _kText.withOpacity(0.5),
+                    ),
                   ),
                 ],
               ),
@@ -415,10 +492,11 @@ class _MyBookTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => EbookDetailPage(ebook: book)),
-      ),
+      onTap:
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => EbookDetailPage(ebook: book)),
+          ),
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
@@ -442,12 +520,13 @@ class _MyBookTile extends StatelessWidget {
                 width: 52,
                 height: 68,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
-                  width: 52,
-                  height: 68,
-                  color: _kShadow2,
-                  child: Icon(Icons.book, color: _kText.withOpacity(0.3)),
-                ),
+                errorBuilder:
+                    (_, __, ___) => Container(
+                      width: 52,
+                      height: 68,
+                      color: _kShadow2,
+                      child: Icon(Icons.book, color: _kText.withOpacity(0.3)),
+                    ),
               ),
             ),
             const SizedBox(width: 14),
@@ -468,7 +547,10 @@ class _MyBookTile extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     book.author,
-                    style: TextStyle(fontSize: 12, color: _kText.withOpacity(0.5)),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: _kText.withOpacity(0.5),
+                    ),
                   ),
                 ],
               ),
@@ -520,12 +602,13 @@ class _BookStoreBrowseView extends StatelessWidget {
           itemBuilder: (context, i) {
             final b = books[i];
             return GestureDetector(
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => EbookDetailPage(ebook: b),
-                ),
-              ),
+              onTap:
+                  () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => EbookDetailPage(ebook: b),
+                    ),
+                  ),
               child: Column(
                 children: [
                   Expanded(
@@ -547,10 +630,14 @@ class _BookStoreBrowseView extends StatelessWidget {
                           b.coverUrl,
                           fit: BoxFit.cover,
                           width: double.infinity,
-                          errorBuilder: (_, __, ___) => Container(
-                            color: _kShadow2,
-                            child: Icon(Icons.image, color: _kText.withOpacity(0.3)),
-                          ),
+                          errorBuilder:
+                              (_, __, ___) => Container(
+                                color: _kShadow2,
+                                child: Icon(
+                                  Icons.image,
+                                  color: _kText.withOpacity(0.3),
+                                ),
+                              ),
                         ),
                       ),
                     ),
@@ -576,5 +663,3 @@ class _BookStoreBrowseView extends StatelessWidget {
     );
   }
 }
-
-

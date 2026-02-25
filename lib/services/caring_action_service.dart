@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -15,17 +16,46 @@ class CaringActionService {
   static final _auth = FirebaseAuth.instance;
   static final _random = Random();
 
+  static Future<void>? _dailySettleInFlight;
+
   static DocumentReference<Map<String, dynamic>>? get _userRef {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return null;
     return _db.collection('users').doc(uid);
   }
 
+  static Future<String?> _ensureUidReady({
+    Duration timeout = const Duration(seconds: 5),
+  }) async {
+    final current = _auth.currentUser?.uid;
+    if (current != null) return current;
+
+    try {
+      final user = await _auth
+          .authStateChanges()
+          .firstWhere((u) => u != null)
+          .timeout(timeout);
+      return user?.uid;
+    } catch (_) {
+      return null;
+    }
+  }
+
   // ═══════════════════════ 하루 정산 ═══════════════════════
 
   /// 앱 시작 시 호출: 날짜 변경 확인 및 정산
   static Future<void> dailySettle() async {
+    _dailySettleInFlight ??= _dailySettleInternal().whenComplete(() {
+      _dailySettleInFlight = null;
+    });
+    return _dailySettleInFlight!;
+  }
+
+  static Future<void> _dailySettleInternal() async {
     try {
+      final uid = await _ensureUidReady();
+      if (uid == null) return;
+
       final state = await CaringStateService.loadState();
       final todayKey = _dateKey(DateTime.now());
 
@@ -43,42 +73,48 @@ class CaringActionService {
         if (newStreak == 2) bondDelta -= 0.1; // 2일 연속
         if (newStreak >= 3) bondDelta -= 0.2; // 3일 이상
 
-        await _saveState(state.copyWith(
-          skipDaysStreak: newStreak,
-          lastFedSlots: [],
-          fedCountToday: 0,
-          touchCountToday: 0,
-          diaryCountToday: 0,
-          lastActionDate: todayKey,
-        ));
+        await _saveState(
+          state.copyWith(
+            skipDaysStreak: newStreak,
+            lastFedSlots: [],
+            fedCountToday: 0,
+            touchCountToday: 0,
+            diaryCountToday: 0,
+            lastActionDate: todayKey,
+          ),
+        );
       } else if (state.fedCountToday == 4) {
         // 어제 4회 올클 → 보너스
         bondDelta += 0.1;
 
-        await _saveState(state.copyWith(
-          skipDaysStreak: 0,
-          lastFedSlots: [],
-          fedCountToday: 0,
-          touchCountToday: 0,
-          diaryCountToday: 0,
-          lastActionDate: todayKey,
-        ));
+        await _saveState(
+          state.copyWith(
+            skipDaysStreak: 0,
+            lastFedSlots: [],
+            fedCountToday: 0,
+            touchCountToday: 0,
+            diaryCountToday: 0,
+            lastActionDate: todayKey,
+          ),
+        );
       } else {
         // 어제 1~3회 → 스트릭 리셋
-        await _saveState(state.copyWith(
-          skipDaysStreak: 0,
-          lastFedSlots: [],
-          fedCountToday: 0,
-          touchCountToday: 0,
-          diaryCountToday: 0,
-          lastActionDate: todayKey,
-        ));
+        await _saveState(
+          state.copyWith(
+            skipDaysStreak: 0,
+            lastFedSlots: [],
+            fedCountToday: 0,
+            touchCountToday: 0,
+            diaryCountToday: 0,
+            lastActionDate: todayKey,
+          ),
+        );
       }
 
       // 결 점수 적용
       if (bondDelta != 0.0) {
         await BondScoreService.applyEvent(
-          _auth.currentUser!.uid,
+          uid,
           ActivityType.slotPost,
           customDelta: bondDelta,
         );
@@ -95,6 +131,11 @@ class CaringActionService {
   /// 밥주기 시도
   static Future<FeedResult> tryFeed() async {
     try {
+      final uid = await _ensureUidReady();
+      if (uid == null) {
+        return FeedResult(success: false, rejectMent: '로그인이 필요합니다.');
+      }
+
       final state = await CaringStateService.loadState();
       final now = DateTime.now();
       final todayKey = _dateKey(now);
@@ -104,16 +145,13 @@ class CaringActionService {
         await dailySettle();
         // 정산 후 다시 로드
         final newState = await CaringStateService.loadState();
-        return _processFeed(newState, now, todayKey);
+        return _processFeed(newState, now, todayKey, uid);
       }
 
-      return _processFeed(state, now, todayKey);
+      return _processFeed(state, now, todayKey, uid);
     } catch (e) {
       debugPrint('⚠️ CaringActionService.tryFeed error: $e');
-      return FeedResult(
-        success: false,
-        rejectMent: '오류가 발생했어요.',
-      );
+      return FeedResult(success: false, rejectMent: '오류가 발생했어요.');
     }
   }
 
@@ -121,6 +159,7 @@ class CaringActionService {
     CaringState state,
     DateTime now,
     String todayKey,
+    String uid,
   ) async {
     // 현재 시간대 확인
     final slotId = _getTimeSlot(now);
@@ -135,16 +174,18 @@ class CaringActionService {
     final newSlots = [...state.lastFedSlots, slotId];
     final newCount = state.fedCountToday + 1;
 
-    await _saveState(state.copyWith(
-      lastFedSlots: newSlots,
-      fedCountToday: newCount,
-      skipDaysStreak: 0, // 밥 주면 스트릭 리셋
-      lastActionDate: todayKey,
-    ));
+    await _saveState(
+      state.copyWith(
+        lastFedSlots: newSlots,
+        fedCountToday: newCount,
+        skipDaysStreak: 0, // 밥 주면 스트릭 리셋
+        lastActionDate: todayKey,
+      ),
+    );
 
     // 결 점수 +0.1
     await BondScoreService.applyEvent(
-      _auth.currentUser!.uid,
+      uid,
       ActivityType.slotPost,
       customDelta: 0.1,
     );
@@ -152,11 +193,7 @@ class CaringActionService {
     // 멘트 선택 (skipStreak 반영)
     final ment = _pickFeedSuccessMent(state.skipDaysStreak);
 
-    return FeedResult(
-      success: true,
-      ment: ment,
-      bondDelta: 0.1,
-    );
+    return FeedResult(success: true, ment: ment, bondDelta: 0.1);
   }
 
   static String _pickFeedSuccessMent(int skipStreak) {
@@ -178,6 +215,11 @@ class CaringActionService {
   /// 교감 시도
   static Future<TouchResult> tryTouch() async {
     try {
+      final uid = await _ensureUidReady();
+      if (uid == null) {
+        return TouchResult(ment: '로그인이 필요합니다.', bondDelta: 0.0);
+      }
+
       final state = await CaringStateService.loadState();
       final now = DateTime.now();
       final todayKey = _dateKey(now);
@@ -186,10 +228,10 @@ class CaringActionService {
       if (state.lastActionDate != todayKey) {
         await dailySettle();
         final newState = await CaringStateService.loadState();
-        return _processTouch(newState, todayKey);
+        return _processTouch(newState, todayKey, uid);
       }
 
-      return _processTouch(state, todayKey);
+      return _processTouch(state, todayKey, uid);
     } catch (e) {
       debugPrint('⚠️ CaringActionService.tryTouch error: $e');
       return TouchResult(ment: '오류가 발생했어요.', bondDelta: 0.0);
@@ -199,6 +241,7 @@ class CaringActionService {
   static Future<TouchResult> _processTouch(
     CaringState state,
     String todayKey,
+    String uid,
   ) async {
     // 상한 체크 (하루 3회)
     if (state.touchCountToday >= 3) {
@@ -210,14 +253,13 @@ class CaringActionService {
 
     final newCount = state.touchCountToday + 1;
 
-    await _saveState(state.copyWith(
-      touchCountToday: newCount,
-      lastActionDate: todayKey,
-    ));
+    await _saveState(
+      state.copyWith(touchCountToday: newCount, lastActionDate: todayKey),
+    );
 
     // 결 점수 +0.05
     await BondScoreService.applyEvent(
-      _auth.currentUser!.uid,
+      uid,
       ActivityType.slotPost,
       customDelta: 0.05,
     );
@@ -258,6 +300,11 @@ class CaringActionService {
   /// 글쓰기 완료 (다이어리 저장 후 호출)
   static Future<DiaryResult> completeDiary() async {
     try {
+      final uid = await _ensureUidReady();
+      if (uid == null) {
+        return DiaryResult(ment: '로그인이 필요합니다.', bondDelta: 0.0);
+      }
+
       final state = await CaringStateService.loadState();
       final now = DateTime.now();
       final todayKey = _dateKey(now);
@@ -266,10 +313,10 @@ class CaringActionService {
       if (state.lastActionDate != todayKey) {
         await dailySettle();
         final newState = await CaringStateService.loadState();
-        return _processDiary(newState, todayKey);
+        return _processDiary(newState, todayKey, uid);
       }
 
-      return _processDiary(state, todayKey);
+      return _processDiary(state, todayKey, uid);
     } catch (e) {
       debugPrint('⚠️ CaringActionService.completeDiary error: $e');
       return DiaryResult(ment: '오류가 발생했어요.', bondDelta: 0.0);
@@ -279,6 +326,7 @@ class CaringActionService {
   static Future<DiaryResult> _processDiary(
     CaringState state,
     String todayKey,
+    String uid,
   ) async {
     // 상한 체크 (하루 2회)
     double bondDelta = 0.0;
@@ -291,14 +339,13 @@ class CaringActionService {
 
     final newCount = state.diaryCountToday + 1;
 
-    await _saveState(state.copyWith(
-      diaryCountToday: newCount,
-      lastActionDate: todayKey,
-    ));
+    await _saveState(
+      state.copyWith(diaryCountToday: newCount, lastActionDate: todayKey),
+    );
 
     if (bondDelta > 0.0) {
       await BondScoreService.applyEvent(
-        _auth.currentUser!.uid,
+        uid,
         ActivityType.slotPost,
         customDelta: bondDelta,
       );
@@ -315,6 +362,11 @@ class CaringActionService {
   /// 목표 액션별 멘트 + 결 점수
   static Future<GoalResult> handleGoalAction(GoalAction action) async {
     try {
+      final uid = await _ensureUidReady();
+      if (uid == null) {
+        return GoalResult(ment: '로그인이 필요합니다.', bondDelta: 0.0);
+      }
+
       double bondDelta = 0.0;
       List<String> mentPool;
 
@@ -343,7 +395,7 @@ class CaringActionService {
 
       if (bondDelta > 0.0) {
         await BondScoreService.applyEvent(
-          _auth.currentUser!.uid,
+          uid,
           ActivityType.slotPost,
           customDelta: bondDelta,
         );
@@ -380,9 +432,7 @@ class CaringActionService {
       final ref = _userRef;
       if (ref == null) return;
 
-      await ref.set({
-        'caringState': state.toMap(),
-      }, SetOptions(merge: true));
+      await ref.set({'caringState': state.toMap()}, SetOptions(merge: true));
     } catch (e) {
       debugPrint('⚠️ CaringActionService._saveState error: $e');
     }
@@ -426,11 +476,4 @@ class GoalResult {
   GoalResult({required this.ment, required this.bondDelta});
 }
 
-enum GoalAction {
-  created,
-  checked,
-  completed,
-  missed,
-  restarted,
-}
-
+enum GoalAction { created, checked, completed, missed, restarted }

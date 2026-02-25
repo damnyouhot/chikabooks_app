@@ -54,13 +54,13 @@ class _BondPageState extends State<BondPage> {
   List<GroupMemberMeta> _groupMembers = []; // 그룹 멤버 목록
   Map<String, String> _memberNicknames = {}; // ✅ 멤버 닉네임 맵 {uid: nickname}
   String _partnerStatus = 'active'; // 파트너 상태
-  
+
   // ── 주간 활동 데이터 ──
   Map<String, int> _weeklyPostCounts = {}; // {uid: postCount}
   Map<String, int> _weeklyReactionCounts = {}; // {uid: reactionCount}
 
   // ── 결 파트 확장 ──
-  bool _isBondExpanded = false;
+  // (파트너 있을 때는 항상 펼침으로 고정 — state로 관리하지 않음)
 
   @override
   void initState() {
@@ -72,29 +72,31 @@ class _BondPageState extends State<BondPage> {
   Future<void> _loadData() async {
     try {
       debugPrint('🔍 [BondPage] ━━━ 데이터 로딩 시작 ━━━');
-      
+
       // 프로필 및 그룹 정보 조회
       final profile = await UserProfileService.getMyProfile(forceRefresh: true);
       final groupId = profile?.partnerGroupId;
-      
+
       debugPrint('🔍 [BondPage] groupId: $groupId');
       debugPrint('🔍 [BondPage] partnerStatus: ${profile?.partnerStatus}');
-      
+
       if (mounted) {
         setState(() {
           _partnerGroupId = groupId;
           _partnerStatus = profile?.partnerStatus ?? 'active';
         });
-        
+
         if (groupId != null) {
           debugPrint('🔍 [BondPage] 그룹 정보 조회 시작...');
-          
+
           final group = await PartnerService.getMyGroup();
           debugPrint('🔍 [BondPage] group: ${group?.id}');
           debugPrint('🔍 [BondPage] group.endsAt: ${group?.endsAt}');
-          debugPrint('🔍 [BondPage] group.isActiveGroup: ${group?.isActiveGroup}');
+          debugPrint(
+            '🔍 [BondPage] group.isActiveGroup: ${group?.isActiveGroup}',
+          );
           debugPrint('🔍 [BondPage] group.memberUids: ${group?.memberUids}');
-          
+
           // ✅ 만료된 그룹 자동 정리
           if (group == null || !BondStateHelper.isGroupActive(group)) {
             debugPrint('⚠️ [BondPage] 그룹 만료됨 → partnerGroupId 정리');
@@ -104,9 +106,9 @@ class _BondPageState extends State<BondPage> {
                   .collection('users')
                   .doc(uid)
                   .update({
-                'partnerGroupId': FieldValue.delete(),
-                'partnerGroupEndsAt': FieldValue.delete(),
-              });
+                    'partnerGroupId': FieldValue.delete(),
+                    'partnerGroupEndsAt': FieldValue.delete(),
+                  });
             }
             if (mounted) {
               setState(() {
@@ -121,26 +123,36 @@ class _BondPageState extends State<BondPage> {
             // 정상 활성 그룹
             final members = await PartnerService.getGroupMembers(groupId);
             debugPrint('🔍 [BondPage] members.length: ${members.length}');
-            
+
             final nicknames = <String, String>{};
             for (final member in members) {
+              final metaNick = member.nickname?.trim();
+              if (metaNick != null && metaNick.isNotEmpty) {
+                nicknames[member.uid] = metaNick;
+                continue;
+              }
+
               try {
-                final userDoc = await FirebaseFirestore.instance
-                    .collection('users')
-                    .doc(member.uid)
-                    .get();
-                if (userDoc.exists) {
-                  final data = userDoc.data();
-                  nicknames[member.uid] = data?['nickname'] as String? ?? '파트너';
-                }
+                final publicDoc =
+                    await FirebaseFirestore.instance
+                        .collection('publicProfiles')
+                        .doc(member.uid)
+                        .get();
+                final data = publicDoc.data();
+                final pubNick = (data?['nickname'] as String?)?.trim();
+                nicknames[member.uid] =
+                    (pubNick != null && pubNick.isNotEmpty)
+                        ? pubNick
+                        : member.uid;
               } catch (e) {
                 debugPrint('⚠️ 닉네임 조회 실패 (${member.uid}): $e');
-                nicknames[member.uid] = '파트너';
+                nicknames[member.uid] = member.uid;
               }
             }
-            
-            final activityData = await WeeklyActivityService.getWeeklyActivityData(groupId);
-            
+
+            final activityData =
+                await WeeklyActivityService.getWeeklyActivityData(groupId);
+
             if (mounted) {
               setState(() {
                 _partnerGroup = group;
@@ -149,7 +161,7 @@ class _BondPageState extends State<BondPage> {
                 _weeklyPostCounts = activityData['posts'] ?? {};
                 _weeklyReactionCounts = activityData['reactions'] ?? {};
               });
-              
+
               if (group.memberUids.length == 2 && group.weekNumber == 1) {
                 _showTwoPersonStartToast();
               }
@@ -159,7 +171,7 @@ class _BondPageState extends State<BondPage> {
           debugPrint('⚠️ [BondPage] 파트너 그룹 없음');
         }
       }
-      
+
       debugPrint('✅ [BondPage] ━━━ 데이터 로딩 완료 ━━━');
     } catch (e) {
       debugPrint('⚠️ _loadData error: $e');
@@ -194,7 +206,7 @@ class _BondPageState extends State<BondPage> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final shown = prefs.getBool('shown2PersonToast_${_partnerGroupId}');
-      
+
       if (shown != true) {
         await Future.delayed(const Duration(milliseconds: 800));
         if (mounted) {
@@ -216,10 +228,29 @@ class _BondPageState extends State<BondPage> {
     return '$year-W${weekNumber.toString().padLeft(2, '0')}';
   }
 
+  /// "0월 0주차: 00~00일" 형태 (KST)
+  String _getWeekLabel() {
+    final kst = DateTime.now().toUtc().add(const Duration(hours: 9));
+    final month = kst.month;
+
+    final firstDayOfMonth = DateTime(kst.year, kst.month, 1);
+    final daysDiff = kst.difference(firstDayOfMonth).inDays;
+    final weekOfMonth = (daysDiff / 7).floor() + 1;
+
+    final weekday = kst.weekday; // 1=월, 7=일
+    final monday = kst.subtract(Duration(days: weekday - 1));
+    final sunday = monday.add(const Duration(days: 6));
+
+    return '$month월 ${weekOfMonth}주차: ${monday.day}~${sunday.day}일';
+  }
+
   // ── 한줄 멘트 작성 ──
   void _openDailyWallWrite() async {
-    final hasActivePartner = BondStateHelper.hasActivePartner(_partnerGroup, _partnerStatus);
-    
+    final hasActivePartner = BondStateHelper.hasActivePartner(
+      _partnerGroup,
+      _partnerStatus,
+    );
+
     // 개인 모드면 스낵바로 안내하고 차단
     if (!hasActivePartner) {
       if (mounted) {
@@ -233,7 +264,7 @@ class _BondPageState extends State<BondPage> {
       }
       return;
     }
-    
+
     // 1. 프로필 체크 (파트너 있을 때만)
     final hasProfile = await UserProfileService.hasBasicProfile();
     if (!mounted) return;
@@ -243,14 +274,15 @@ class _BondPageState extends State<BondPage> {
         context: context,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
-        builder: (_) => ProfileGateSheet(
-          onComplete: () {
-            Navigator.pop(context);
-            if (mounted) {
-              _openWriteSheetWithCooldownCheck();
-            }
-          },
-        ),
+        builder:
+            (_) => ProfileGateSheet(
+              onComplete: () {
+                Navigator.pop(context);
+                if (mounted) {
+                  _openWriteSheetWithCooldownCheck();
+                }
+              },
+            ),
       );
       return;
     }
@@ -262,10 +294,15 @@ class _BondPageState extends State<BondPage> {
   Future<void> _openWriteSheetWithCooldownCheck() async {
     if (!mounted) return;
 
-    final hasActivePartner = BondStateHelper.hasActivePartner(_partnerGroup, _partnerStatus);
+    final hasActivePartner = BondStateHelper.hasActivePartner(
+      _partnerGroup,
+      _partnerStatus,
+    );
 
     // 개인 모드: 여기까지 오면 안 되지만 안전장치
-    if (!hasActivePartner || _partnerGroupId == null || _partnerGroupId!.isEmpty) {
+    if (!hasActivePartner ||
+        _partnerGroupId == null ||
+        _partnerGroupId!.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -279,7 +316,7 @@ class _BondPageState extends State<BondPage> {
 
     // 파트너 모드: 쿨타임 체크
     final status = await BondPostService.getPostingStatus(_partnerGroupId!);
-    
+
     if (!(status['canPostNow'] as bool)) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -307,9 +344,7 @@ class _BondPageState extends State<BondPage> {
   void _showTestDataDialog() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => const DebugTestDataPage(),
-      ),
+      MaterialPageRoute(builder: (_) => const DebugTestDataPage()),
     );
   }
 
@@ -320,144 +355,136 @@ class _BondPageState extends State<BondPage> {
   @override
   Widget build(BuildContext context) {
     final uid = FirebaseAuth.instance.currentUser?.uid;
-    final hasActivePartner = BondStateHelper.hasActivePartner(_partnerGroup, _partnerStatus);
-    
-    return Scaffold(
-      backgroundColor: BondColors.kBg,
-      body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            // ━━━ 1. 공통 헤더 ━━━
-            SliverToBoxAdapter(
-              child: BondTopBar(
-                onSettingsLongPress: _showTestDataDialog,
-              ),
-            ),
+    final hasActivePartner = BondStateHelper.hasActivePartner(
+      _partnerGroup,
+      _partnerStatus,
+    );
+    final weekLabel = _getWeekLabel();
 
-            // 주간 페이지 통합 헤더 (3층 구조)
-            SliverToBoxAdapter(
-              child: uid != null
-                  ? StreamBuilder<DocumentSnapshot>(
-                      stream: FirebaseFirestore.instance
-                          .collection('users')
-                          .doc(uid)
-                          .snapshots(),
-                      builder: (context, snapshot) {
-                        double bondScore = 50.0;
-                        int weeklyIncrease = 0;
-                        
-                        if (snapshot.hasData && snapshot.data?.data() != null) {
-                          final data = snapshot.data!.data() as Map<String, dynamic>;
-                          bondScore = (data['bondScore'] as num?)?.toDouble() ?? 50.0;
-                          
-                          // 주간 증감 계산
-                          final weekStart = (data['weeklyBondScoreStart'] as num?)?.toDouble();
-                          if (weekStart != null) {
-                            weeklyIncrease = (bondScore - weekStart).round();
-                          }
-                        }
-                        
-                        return BondWeekHeader(
-                          bondScore: bondScore,
-                          weeklyIncrease: weeklyIncrease,
-                          partnerGroupId: hasActivePartner ? _partnerGroupId : null,
-                          onSettingsTap: null,
-                        );
-                      },
-                    )
-                  : BondWeekHeader(
-                      bondScore: 50.0,
-                      weeklyIncrease: 0,
-                      partnerGroupId: hasActivePartner ? _partnerGroupId : null,
-                      onSettingsTap: null,
+    final userStream =
+        (uid != null)
+            ? FirebaseFirestore.instance
+                .collection('users')
+                .doc(uid)
+                .snapshots()
+            : null;
+
+    return StreamBuilder<DocumentSnapshot>(
+      stream: userStream,
+      builder: (context, snapshot) {
+        double bondScore = 50.0;
+        if (snapshot.hasData && snapshot.data?.data() != null) {
+          final data = snapshot.data!.data() as Map<String, dynamic>;
+          bondScore = (data['bondScore'] as num?)?.toDouble() ?? 50.0;
+        }
+
+        return Scaffold(
+          backgroundColor: BondColors.kBg,
+          body: SafeArea(
+            child: CustomScrollView(
+              slivers: [
+                // ━━━ 1. 공통 헤더 ━━━
+                SliverToBoxAdapter(
+                  child: BondTopBar(
+                    onSettingsLongPress: _showTestDataDialog,
+                    weekLabel: weekLabel,
+                  ),
+                ),
+
+                // ━━━ 1.5 [파트너 없음] 상태 카드 ━━━
+                if (!hasActivePartner)
+                  SliverToBoxAdapter(
+                    child: BondNoPartnerCard(bondScore: bondScore),
+                  ),
+
+                // 보충 알림 리스너 (파트너 있을 때만
+                if (hasActivePartner)
+                  SliverToBoxAdapter(
+                    child: BondSupplementationListener(
+                      groupId: _partnerGroupId,
+                      onMemberJoined: _onMemberJoined,
                     ),
+                  ),
+
+                // ━━━ 2. [파트너 있음] 섹션 ━━━
+                if (hasActivePartner) ...[
+                  const SliverToBoxAdapter(child: SizedBox(height: 8)),
+
+                  // 파트너 요약 (통합 버전 - MemberList + PartnerSummary 흡수)
+                  if (_groupMembers.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: BondSummarySection(
+                        isExpanded: true,
+                        onToggleExpand: () {},
+                        enableToggle: false,
+                        members: _groupMembers,
+                        myUid: uid,
+                        memberNicknames: _memberNicknames,
+                        weeklyPostCounts: _weeklyPostCounts,
+                        weeklyReactionCounts: _weeklyReactionCounts,
+                        topRightOverlay: BondScoreGauge(bondScore: bondScore),
+                      ),
+                    ),
+
+                  const SliverToBoxAdapter(child: SizedBox(height: 8)),
+
+                  // 주간 스탬프 (파트너 있을 때 항상 표시)
+                  SliverToBoxAdapter(
+                    child: BondStampSection(partnerGroupId: _partnerGroupId),
+                  ),
+
+                  const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+                  // 이어가기 섹션 (주말만)
+                  if (_partnerGroup != null &&
+                      _groupMembers.isNotEmpty &&
+                      BondStateHelper.canSelectContinue(_partnerGroup))
+                    SliverToBoxAdapter(
+                      child: BondContinueSection(
+                        groupId: _partnerGroup!.id,
+                        members: _groupMembers,
+                      ),
+                    ),
+
+                  // 오늘을 나누기 (파트너 모드)
+                  SliverToBoxAdapter(
+                    child: BondFeedSection(
+                      partnerGroupId: _partnerGroupId,
+                      memberNicknames: _memberNicknames,
+                      onOpenWrite: _openDailyWallWrite,
+                    ),
+                  ),
+                ],
+
+                // ━━━ 3. [파트너 없음] 섹션 ━━━
+                if (!hasActivePartner) ...[
+                  const SliverToBoxAdapter(child: SizedBox(height: 8)),
+
+                  // 오늘을 나누기 (개인 모드)
+                  SliverToBoxAdapter(
+                    child: BondFeedSection(
+                      partnerGroupId: null,
+                      memberNicknames: null,
+                      onOpenWrite: _openDailyWallWrite,
+                    ),
+                  ),
+                ],
+
+                const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+                // ━━━ 4. 공통 섹션 ━━━
+                const SliverToBoxAdapter(child: BondBillboardSection()),
+
+                const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+                const SliverToBoxAdapter(child: BondPollSection()),
+
+                const SliverToBoxAdapter(child: SizedBox(height: 40)),
+              ],
             ),
-
-            // 보충 알림 리스너 (파트너 있을 때만
-            if (hasActivePartner)
-              SliverToBoxAdapter(
-                child: BondSupplementationListener(
-                  groupId: _partnerGroupId,
-                  onMemberJoined: _onMemberJoined,
-                ),
-              ),
-
-            // ━━━ 2. [파트너 있음] 섹션 ━━━
-            if (hasActivePartner) ...[
-              const SliverToBoxAdapter(child: SizedBox(height: 8)),
-
-              // 파트너 요약 (통합 버전 - MemberList + PartnerSummary 흡수)
-              if (_groupMembers.isNotEmpty)
-                SliverToBoxAdapter(
-                  child: BondSummarySection(
-                    isExpanded: _isBondExpanded,
-                    onToggleExpand: () => setState(() => _isBondExpanded = !_isBondExpanded),
-                    members: _groupMembers,
-                    myUid: uid,
-                    memberNicknames: _memberNicknames,
-                    weeklyPostCounts: _weeklyPostCounts,
-                    weeklyReactionCounts: _weeklyReactionCounts,
-                  ),
-                ),
-
-              const SliverToBoxAdapter(child: SizedBox(height: 8)),
-
-              // 주간 스탬프 (확장 시)
-              if (_isBondExpanded)
-                SliverToBoxAdapter(
-                  child: BondStampSection(
-                    partnerGroupId: _partnerGroupId,
-                  ),
-                ),
-
-              SliverToBoxAdapter(child: SizedBox(height: _isBondExpanded ? 16 : 8)),
-
-              // 이어가기 섹션 (주말만)
-              if (_partnerGroup != null &&
-                  _groupMembers.isNotEmpty &&
-                  BondStateHelper.canSelectContinue(_partnerGroup))
-                SliverToBoxAdapter(
-                  child: BondContinueSection(
-                    groupId: _partnerGroup!.id,
-                    members: _groupMembers,
-                  ),
-                ),
-
-              // 오늘을 나누기 (파트너 모드)
-              SliverToBoxAdapter(
-                child: BondFeedSection(
-                  partnerGroupId: _partnerGroupId,
-                  onOpenWrite: _openDailyWallWrite,
-                ),
-              ),
-            ],
-
-            // ━━━ 3. [파트너 없음] 섹션 ━━━
-            if (!hasActivePartner) ...[
-              const SliverToBoxAdapter(child: SizedBox(height: 8)),
-              
-              // 오늘을 나누기 (개인 모드)
-              SliverToBoxAdapter(
-                child: BondFeedSection(
-                  partnerGroupId: null,
-                  onOpenWrite: _openDailyWallWrite,
-                ),
-              ),
-            ],
-
-            const SliverToBoxAdapter(child: SizedBox(height: 16)),
-
-            // ━━━ 4. 공통 섹션 ━━━
-            const SliverToBoxAdapter(child: BondBillboardSection()),
-
-            const SliverToBoxAdapter(child: SizedBox(height: 16)),
-
-            const SliverToBoxAdapter(child: BondPollSection()),
-
-            const SliverToBoxAdapter(child: SizedBox(height: 40)),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }

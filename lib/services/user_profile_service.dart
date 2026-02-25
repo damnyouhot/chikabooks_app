@@ -31,10 +31,28 @@ class UserProfileService {
       final doc = await _db.collection('users').doc(uid).get();
       if (!doc.exists) return null;
       _cache = UserPublicProfile.fromMap(doc.data() ?? {});
+      await _ensurePublicProfile(uid, _cache);
       return _cache;
     } catch (e) {
       debugPrint('⚠️ getMyProfile error: $e');
       return null;
+    }
+  }
+
+  static Future<void> _ensurePublicProfile(
+    String uid,
+    UserPublicProfile? profile,
+  ) async {
+    try {
+      final nickname = profile?.nickname.trim() ?? '';
+      if (nickname.isEmpty) return;
+      await _db.collection('publicProfiles').doc(uid).set({
+        'uid': uid,
+        'nickname': nickname,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('⚠️ _ensurePublicProfile error: $e');
     }
   }
 
@@ -66,6 +84,7 @@ class UserProfileService {
     };
 
     await _db.collection('users').doc(uid).update(data);
+    await _ensurePublicProfile(uid, UserPublicProfile(nickname: nickname));
     // 캐시 갱신
     _cache = await getMyProfile(forceRefresh: true);
   }
@@ -93,6 +112,7 @@ class UserProfileService {
     if (uid == null) throw Exception('로그인이 필요합니다.');
 
     await _db.collection('users').doc(uid).update(profile.toMap());
+    await _ensurePublicProfile(uid, profile);
     _cache = profile;
   }
 
@@ -150,7 +170,9 @@ class UserProfileService {
     String careerBucket;
     if (careerGroup == '학생' || careerGroup == '1년차' || careerGroup == '2년차') {
       careerBucket = '0-2';
-    } else if (careerGroup == '3년차' || careerGroup == '4년차' || careerGroup == '5년차') {
+    } else if (careerGroup == '3년차' ||
+        careerGroup == '4년차' ||
+        careerGroup == '5년차') {
       careerBucket = '3-5';
     } else {
       careerBucket = '6+';
@@ -169,7 +191,7 @@ class UserProfileService {
     debugPrint('🔍 [completeOnboarding] Firestore 업데이트 시작...');
     await _db.collection('users').doc(uid).set(data, SetOptions(merge: true));
     debugPrint('✅ [completeOnboarding] Firestore 업데이트 완료');
-    
+
     // 캐시 갱신
     debugPrint('🔍 [completeOnboarding] 캐시 갱신 중...');
     _cache = await getMyProfile(forceRefresh: true);
@@ -184,7 +206,7 @@ class UserProfileService {
     try {
       final doc = await _db.collection('users').doc(uid).get();
       if (!doc.exists) return false;
-      
+
       final data = doc.data();
       return data?['isProfileCompleted'] == true;
     } catch (e) {
@@ -298,4 +320,3 @@ class UserProfileService {
     }
   }
 }
-

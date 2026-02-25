@@ -139,7 +139,7 @@ class BillboardPost {
       enthroneCount: enthroneCount,
       requiredCount: requiredCount,
       createdAt: now,
-      expiresAt: now.add(const Duration(hours: 48)), // 48시간 유지
+      expiresAt: now.add(const Duration(hours: 12)), // 12시간 유지
       status: EnthroneStatus.confirmed,
       bondGroupName: bondGroupName,
       isAnonymous: isAnonymous,

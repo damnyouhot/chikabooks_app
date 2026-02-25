@@ -144,10 +144,35 @@ export const onEnthroneCreated = functions
           !postData.isDeleted &&
           (postData.reports || 0) < 3
         ) {
+          // 작성자 닉네임 조회 (billboardPosts에 스냅샷으로 저장)
+          const authorUid =
+            postData.uid ||
+            postData.authorUid ||
+            postData.userId ||
+            postData.authorId ||
+            null;
+
+          let authorNickname: string | null = null;
+          if (authorUid) {
+            try {
+              const userDoc = await db.collection("users").doc(authorUid).get();
+              if (userDoc.exists) {
+                const u = userDoc.data() || {};
+                authorNickname =
+                  u.nickname || u.name || u.displayName || authorUid;
+              } else {
+                authorNickname = authorUid;
+              }
+            } catch (e) {
+              console.log("⚠️ [onEnthroneCreated] 작성자 닉네임 조회 실패:", e);
+              authorNickname = authorUid;
+            }
+          }
+
           // 7. 전광판에 등록
           const now = admin.firestore.Timestamp.now();
           const expiresAt = admin.firestore.Timestamp.fromMillis(
-            Date.now() + 48 * 60 * 60 * 1000 // 48시간 후
+            Date.now() + 12 * 60 * 60 * 1000 // 12시간 후
           );
 
           await db.collection("billboardPosts").add({
@@ -160,7 +185,11 @@ export const onEnthroneCreated = functions
             expiresAt: expiresAt,
             status: "confirmed",
             bondGroupName: groupName,
-            isAnonymous: true,
+            // 전국구 게시판에서는 닉네임을 보여주기 위해 기본 비익명 처리
+            isAnonymous: false,
+            authorId: authorUid,
+            authorNickname: authorNickname,
+            reactions: {},
           });
 
           console.log(`✅ [onEnthroneCreated] 전광판 등록 완료! (${groupId}/${postId})`);

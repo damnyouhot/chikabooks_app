@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../models/weekly_stamp.dart';
 import '../../services/weekly_stamp_service.dart';
 import 'bond_colors.dart';
@@ -49,15 +48,6 @@ class BondStampSection extends StatelessWidget {
                         color: BondColors.kText,
                       ),
                     ),
-                    const Spacer(),
-                    GestureDetector(
-                      onTap: () => _showStampInfo(context),
-                      child: Icon(
-                        Icons.info_outline,
-                        size: 16,
-                        color: BondColors.kText.withValues(alpha: 0.35),
-                      ),
-                    ),
                   ],
                 ),
 
@@ -97,21 +87,10 @@ class BondStampSection extends StatelessWidget {
     );
   }
 
-  void _showStampInfo(BuildContext context) {
-    HapticFeedback.lightImpact();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          '파트너 3명이 함께 투표/리액션/목표 체크를 하면\n'
-          '하루 1칸씩 채워져요.',
-          style: TextStyle(fontSize: 13, height: 1.4),
-        ),
-        behavior: SnackBarBehavior.floating,
-        duration: Duration(seconds: 4),
-      ),
-    );
-  }
+  // 스탬프 설명은 상단 "같이" 탭 설명(info) 다이얼로그에 포함됩니다.
 }
+
+
 
 
 

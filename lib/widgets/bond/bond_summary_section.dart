@@ -8,21 +8,25 @@ import 'bond_colors.dart';
 class BondSummarySection extends StatelessWidget {
   final bool isExpanded;
   final VoidCallback onToggleExpand;
+  final bool enableToggle;
   final List<GroupMemberMeta>? members;
   final String? myUid;
   final Map<String, String>? memberNicknames;
   final Map<String, int>? weeklyPostCounts; // 주간 활동 데이터
   final Map<String, int>? weeklyReactionCounts;
+  final Widget? topRightOverlay; // 예: 결 점수 게이지
 
   const BondSummarySection({
     super.key,
     required this.isExpanded,
     required this.onToggleExpand,
+    this.enableToggle = true,
     this.members,
     this.myUid,
     this.memberNicknames,
     this.weeklyPostCounts,
     this.weeklyReactionCounts,
+    this.topRightOverlay,
   });
 
   @override
@@ -32,29 +36,28 @@ class BondSummarySection extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    return GestureDetector(
-      onTap: onToggleExpand,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-        margin: const EdgeInsets.symmetric(horizontal: 20),
-        padding: const EdgeInsets.all(20),
-        decoration: BondColors.cardDecoration(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 접힌 상태: 간결한 요약
-            Row(
-              children: [
-                // 파트너 아바타
-                _buildPartnerAvatars(),
-                const SizedBox(width: 12),
-                // 텍스트
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
+    final card = AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.all(18),
+      decoration: BondColors.cardDecoration(),
+      child: Stack(
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 헤더
+              Padding(
+                padding: EdgeInsets.only(
+                  right: topRightOverlay != null ? 72 : 0,
+                ),
+                child: Row(
+                  children: [
+                    _buildPartnerAvatars(),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
                         '동행 파트너',
                         style: TextStyle(
                           fontSize: 18,
@@ -62,52 +65,59 @@ class BondSummarySection extends StatelessWidget {
                           color: BondColors.kText,
                         ),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '이번 주 함께하는 사람들',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: BondColors.kText.withOpacity(0.5),
-                        ),
+                    ),
+                    if (enableToggle)
+                      Icon(
+                        isExpanded ? Icons.expand_less : Icons.expand_more,
+                        color: BondColors.kText.withOpacity(0.5),
                       ),
-                    ],
+                  ],
+                ),
+              ),
+
+              // 1줄 요약 (토글 가능한 접힘 상태에서만)
+              if (enableToggle && !isExpanded) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _getOneLinerSummary(),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: BondColors.kText.withOpacity(0.6),
+                    fontStyle: FontStyle.italic,
                   ),
                 ),
-                Icon(
-                  isExpanded ? Icons.expand_less : Icons.expand_more,
-                  color: BondColors.kText.withOpacity(0.5),
-                ),
               ],
-            ),
 
-            // 1줄 요약 (접힌 상태에서도 표시)
-            if (!isExpanded) ...[
-              const SizedBox(height: 12),
-              Text(
-                _getOneLinerSummary(),
-                style: TextStyle(
-                  fontSize: 12,
-                  color: BondColors.kText.withOpacity(0.6),
-                  fontStyle: FontStyle.italic,
+              // 확장 시: 파트너별 감정 해석
+              if (isExpanded) ...[
+                const SizedBox(height: 14),
+                Padding(
+                  padding: EdgeInsets.only(
+                    right: topRightOverlay != null ? 72 : 0,
+                  ),
+                  child: Container(
+                    width: double.infinity,
+                    height: 0.5,
+                    color: BondColors.kShadow2.withOpacity(0.6),
+                  ),
                 ),
-              ),
+                const SizedBox(height: 14),
+                _buildExpandedPartnerDetails(),
+              ],
             ],
-
-            // 확장 시: 파트너별 감정 해석
-            if (isExpanded) ...[
-              const SizedBox(height: 16),
-              Container(
-                width: double.infinity,
-                height: 0.5,
-                color: BondColors.kShadow2.withOpacity(0.6),
-              ),
-              const SizedBox(height: 16),
-              _buildExpandedPartnerDetails(),
-            ],
-          ],
-        ),
+          ),
+          if (topRightOverlay != null)
+            Positioned(
+              top: 0,
+              right: 0,
+              child: IgnorePointer(child: topRightOverlay!),
+            ),
+        ],
       ),
     );
+
+    if (!enableToggle) return card;
+    return GestureDetector(onTap: onToggleExpand, child: card);
   }
 
   Widget _buildPartnerAvatars() {

@@ -5,13 +5,13 @@ import 'package:flutter/foundation.dart';
 enum PartnerMemberStatus {
   /// 현재 활동 중
   active,
-
+  
   /// 초대 대기 중
   invited,
-
+  
   /// 자진 탈퇴
   left,
-
+  
   /// 강제 퇴출
   removed,
 }
@@ -66,7 +66,7 @@ class PartnerGroup {
   final DateTime createdAt;
   final int maxMembers;
   final int minMembers;
-
+  
   // ─── v1 설계 추가 필드 ───
   final DateTime startedAt; // 그룹 시작 시각
   final DateTime endsAt; // 그룹 종료 시각 (7일 후)
@@ -118,7 +118,7 @@ class PartnerGroup {
     return members
         .where(
           (m) =>
-              m.status == PartnerMemberStatus.left ||
+            m.status == PartnerMemberStatus.left || 
               m.status == PartnerMemberStatus.removed,
         )
         .toList();
@@ -170,7 +170,7 @@ class PartnerGroup {
 
   factory PartnerGroup.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data()!;
-
+    
     debugPrint('🔍 [PartnerGroup.fromDoc] 파싱 시작: ${doc.id}');
 
     // 타임스탬프 파싱 (안전하게 처리)
@@ -186,8 +186,8 @@ class PartnerGroup {
     try {
       startedAt =
           data['startedAt'] != null
-              ? (data['startedAt'] as Timestamp).toDate()
-              : createdAt;
+        ? (data['startedAt'] as Timestamp).toDate()
+        : createdAt;
     } catch (e) {
       debugPrint('⚠️ [PartnerGroup.fromDoc] startedAt 파싱 실패: $e');
       startedAt = createdAt;
@@ -197,8 +197,8 @@ class PartnerGroup {
     try {
       endsAt =
           data['endsAt'] != null
-              ? (data['endsAt'] as Timestamp).toDate()
-              : startedAt.add(Duration(days: 7));
+        ? (data['endsAt'] as Timestamp).toDate()
+        : startedAt.add(Duration(days: 7));
     } catch (e) {
       debugPrint('⚠️ [PartnerGroup.fromDoc] endsAt 파싱 실패: $e');
       endsAt = startedAt.add(Duration(days: 7));
@@ -259,16 +259,16 @@ class PartnerGroup {
       weekNumber: data['weekNumber'] as int? ?? 1,
       continueSelections:
           data['continueSelections'] != null
-              ? Map<String, String>.from(data['continueSelections'])
-              : null,
+          ? Map<String, String>.from(data['continueSelections'])
+          : null,
       previousMemberUids:
           data['previousMemberUids'] != null
-              ? List<String>.from(data['previousMemberUids'])
-              : null,
+          ? List<String>.from(data['previousMemberUids'])
+          : null,
       previousPair:
           data['previousPair'] != null
-              ? List<String>.from(data['previousPair'])
-              : null,
+          ? List<String>.from(data['previousPair'])
+          : null,
       needsSupplementation: data['needsSupplementation'] as bool? ?? false,
     );
 

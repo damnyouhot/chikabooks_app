@@ -17,24 +17,8 @@ class QuizTodayPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       children: [
-        // 헤더
-        const Text(
-          '오늘의 퀴즈',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-            color: _kText,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          '매일 2문제, 가볍게 풀어보세요.',
-          style: TextStyle(fontSize: 13, color: _kText.withOpacity(0.5)),
-        ),
-        const SizedBox(height: 24),
-
         // 퀴즈 카드 1
         _QuizCard(
           index: 1,
@@ -141,8 +125,8 @@ class _QuizCardState extends State<_QuizCard> {
                 child: Text(
                   widget.question,
                   style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
                     color: _kText,
                     height: 1.5,
                   ),
@@ -180,20 +164,27 @@ class _QuizCardState extends State<_QuizCard> {
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   width: double.infinity,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: bgColor,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: borderColor, width: borderColor == Colors.transparent ? 0.5 : 1.0),
+                    border: Border.all(
+                      color: borderColor,
+                      width: borderColor == Colors.transparent ? 0.5 : 1.0,
+                    ),
                   ),
                   child: Text(
                     widget.options[i],
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: 13,
                       color: textColor,
                       fontWeight:
-                          (_answered && isCorrect) ? FontWeight.w600 : FontWeight.w400,
+                          (_answered && isCorrect)
+                              ? FontWeight.w600
+                              : FontWeight.w400,
                     ),
                   ),
                 ),
@@ -211,9 +202,10 @@ class _QuizCardState extends State<_QuizCard> {
                     : '정답: ${widget.options[widget.correctIndex]}',
                 style: TextStyle(
                   fontSize: 13,
-                  color: _selectedIndex == widget.correctIndex
-                      ? const Color(0xFF2E7D32)
-                      : _kText.withOpacity(0.6),
+                  color:
+                      _selectedIndex == widget.correctIndex
+                          ? const Color(0xFF2E7D32)
+                          : _kText.withOpacity(0.6),
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -223,5 +215,3 @@ class _QuizCardState extends State<_QuizCard> {
     );
   }
 }
-
-

@@ -23,8 +23,13 @@ const _colorBg = Color(0xFFF1F7F7);
 /// 돌보기(1탭) — 4개 정보 카드 + 캐릭터 + 4버튼
 class CaringPage extends StatefulWidget {
   final ValueChanged<int>? onTabRequested;
+  final ValueChanged<int>? onGrowthSubTabRequested;
 
-  const CaringPage({super.key, this.onTabRequested});
+  const CaringPage({
+    super.key,
+    this.onTabRequested,
+    this.onGrowthSubTabRequested,
+  });
 
   @override
   State<CaringPage> createState() => _CaringPageState();
@@ -77,7 +82,10 @@ class _CaringPageState extends State<CaringPage>
     super.initState();
     _loadRiveFile();
     _bootstrap();
-    CaringActionService.dailySettle();
+    // 오랜만에 실행 시 정산이 첫 액션과 경합하지 않도록 큐잉
+    Future.microtask(() async {
+      await CaringActionService.dailySettle();
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) => _measure());
   }
 
@@ -115,8 +123,10 @@ class _CaringPageState extends State<CaringPage>
   }
 
   /// 데이터 로드
-  Future<void> _bootstrap() async {
-    setState(() => _loading = true);
+  Future<void> _bootstrap({bool showLoader = true}) async {
+    if (showLoader) {
+      setState(() => _loading = true);
+    }
 
     try {
       await CaringStateService.loadState();
@@ -245,8 +255,8 @@ class _CaringPageState extends State<CaringPage>
     if (renderBox == null) return;
 
     final size = renderBox.size;
-    final offsetX = (size.width / 2) + (Random().nextDouble() * 60 - 30);
-    final offsetY = (size.height * 0.65) + (Random().nextDouble() * 30 - 15);
+    final offsetX = (size.width / 2) + 30 + (Random().nextDouble() * 40 - 20);
+    final offsetY = (size.height * 0.52) + (Random().nextDouble() * 20 - 10);
     final label = '결+${delta.toStringAsFixed(2)}';
 
     final entry = OverlayEntry(
@@ -267,7 +277,7 @@ class _CaringPageState extends State<CaringPage>
                       child: Text(
                         label,
                         style: TextStyle(
-                          fontSize: 18,
+                          fontSize: 14,
                           fontWeight: FontWeight.bold,
                           color: _colorAccent.withOpacity(1.0 - value),
                           decoration: TextDecoration.none,
@@ -303,9 +313,11 @@ class _CaringPageState extends State<CaringPage>
       body: Stack(
         children: [
           // 배경 (터치 불가)
-          IgnorePointer(
-            ignoring: true,
-            child: Positioned.fill(child: Container(color: _colorBg)),
+          Positioned.fill(
+            child: IgnorePointer(
+              ignoring: true,
+              child: Container(color: _colorBg),
+            ),
           ),
 
           // ── 캐릭터 ──
@@ -396,11 +408,14 @@ class _CaringPageState extends State<CaringPage>
                       subtitle: _jobsSub,
                       onTap: () => widget.onTabRequested?.call(3),
                     ),
-                    // ② 임박 제도 변경 → 성장하기 탭(2)
+                    // ② 임박 제도 변경 → 성장하기 탭(2) > 급여변경(1)
                     _PolicyRollingCard(
                       policies: _upcomingPolicies,
                       index: _policyIndex,
-                      onTap: () => widget.onTabRequested?.call(2),
+                      onTap: () {
+                        widget.onTabRequested?.call(2);
+                        widget.onGrowthSubTabRequested?.call(1);
+                      },
                     ),
                     // ③ 이주의 책 → 책 상세 페이지 (유일하게 새 화면)
                     _TapCard(
@@ -409,12 +424,15 @@ class _CaringPageState extends State<CaringPage>
                       subtitle: '',
                       onTap: _goBookDetail,
                     ),
-                    // ④ 오늘의 1문제 → 성장하기 탭(2)
+                    // ④ 오늘의 1문제 → 성장하기 탭(2) > 오늘퀴즈(0)
                     _TapCard(
                       title: '🧠 오늘의 1문제',
                       bigText: _quizSummary,
                       subtitle: '터치해서 풀기',
-                      onTap: () => widget.onTabRequested?.call(2),
+                      onTap: () {
+                        widget.onTabRequested?.call(2);
+                        widget.onGrowthSubTabRequested?.call(0);
+                      },
                     ),
                   ],
                 ),
@@ -428,33 +446,58 @@ class _CaringPageState extends State<CaringPage>
 
   /// 상단 바
   Widget _buildTopBar() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      child: Row(
-        children: [
-          IconButton(
-            icon: Icon(
-              Icons.info_outline,
-              color: _colorText.withOpacity(0.5),
-              size: 18,
-            ),
-            onPressed: () => _showConceptDialog(context),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          child: Row(
+            children: [
+              IconButton(
+                icon: Icon(
+                  Icons.info_outline,
+                  color: _colorText.withOpacity(0.5),
+                  size: 18,
+                ),
+                onPressed: () => _showConceptDialog(context),
+              ),
+              const Spacer(),
+              IconButton(
+                icon: Icon(
+                  Icons.settings_outlined,
+                  color: _colorText.withOpacity(0.4),
+                  size: 20,
+                ),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const SettingsPage()),
+                  );
+                },
+              ),
+            ],
           ),
-          const Spacer(),
-          IconButton(
-            icon: Icon(
-              Icons.settings_outlined,
-              color: _colorText.withOpacity(0.4),
-              size: 20,
+        ),
+        const Padding(
+          padding: EdgeInsets.only(left: 20),
+          child: Text(
+            '나',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: _colorText,
             ),
-            onPressed: () {
-              Navigator.of(
-                context,
-              ).push(MaterialPageRoute(builder: (_) => const SettingsPage()));
-            },
           ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 2),
+        Padding(
+          padding: const EdgeInsets.only(left: 20),
+          child: Text(
+            '오늘 하루도 잘 버텼어요.',
+            style: TextStyle(fontSize: 12, color: _colorText.withOpacity(0.55)),
+          ),
+        ),
+        const SizedBox(height: 8),
+      ],
     );
   }
 
@@ -488,6 +531,11 @@ class _CaringPageState extends State<CaringPage>
         _currentSpeech = message;
         _isDismissingSpeech = false;
       });
+
+      // 밥먹기 성공 시 결 점수 플러스 애니메이션
+      if (result.success && result.bondDelta > 0) {
+        _showFloatingDelta(result.bondDelta);
+      }
       Future.delayed(const Duration(seconds: 2), () {
         if (mounted) setState(() => _isDismissingSpeech = true);
       });
@@ -500,7 +548,7 @@ class _CaringPageState extends State<CaringPage>
         }
       });
 
-      if (result.success) _bootstrap();
+      if (result.success) _bootstrap(showLoader: false);
     }
   }
 
@@ -587,54 +635,55 @@ class _TapCard extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
+                // 타이틀 (좌측)
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // 타이틀
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      // 본문 + 세부설명 (같은 줄, 우측 정렬)
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              bigText,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                          if (subtitle.isNotEmpty) ...[
-                            const SizedBox(width: 6),
-                            Text(
-                              subtitle,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 10,
-                                color: Colors.black45,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ],
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
                   ),
                 ),
+                const SizedBox(width: 8),
+                // 본문 + 세부설명 (우측, 세로 정렬)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 140),
+                      child: Text(
+                        bigText,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.end,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    if (subtitle.isNotEmpty)
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 140),
+                        child: Text(
+                          subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.end,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: Colors.black45,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(width: 4),
                 const Icon(
                   Icons.chevron_right,
                   color: Colors.black45,
@@ -687,97 +736,84 @@ class _PolicyRollingCard extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // ✅ 타이틀은 AnimatedSwitcher 밖 (고정)
-                      const Text(
-                        '🏥 임박 제도 변경',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      // 내용만 롤링 (이전: 위로 나감 / 새것: 아래에서 올라옴)
-                      ClipRect(
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 350),
-                          layoutBuilder:
-                              (current, previous) => Stack(
-                                alignment: Alignment.centerLeft,
-                                children: [
-                                  ...previous,
-                                  if (current != null) current,
-                                ],
-                              ),
-                          transitionBuilder: (child, animation) {
-                            // animation: 진입 시 0→1, 퇴장 시 1→0
-                            // 퇴장(reverse) → 위로 나감, 진입(forward) → 아래에서 올라옴
-                            final isLeaving =
-                                animation.status == AnimationStatus.reverse ||
-                                animation.status == AnimationStatus.dismissed;
-                            final offsetTween = Tween<Offset>(
-                              begin:
-                                  isLeaving
-                                      ? const Offset(0, -1.0) // 퇴장: 위로
-                                      : const Offset(0, 1.0), // 진입: 아래에서
-                              end: Offset.zero,
-                            );
-                            return SlideTransition(
-                              position: offsetTween.animate(
-                                CurvedAnimation(
-                                  parent: animation,
-                                  curve: Curves.easeInOut,
-                                ),
-                              ),
-                              child: FadeTransition(
-                                opacity: animation,
-                                child: child,
-                              ),
-                            );
-                          },
-                          child: SizedBox(
-                            key: ValueKey(big),
-                            width: double.infinity,
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.baseline,
-                              textBaseline: TextBaseline.alphabetic,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    big,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                if (sub.isNotEmpty) ...[
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    sub,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontSize: 10,
-                                      color: Colors.black45,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                // ✅ 타이틀은 좌측 고정
+                const Expanded(
+                  child: Text(
+                    '🏥 임박 제도 변경',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
                   ),
                 ),
+                const SizedBox(width: 8),
+                // 내용만 롤링 (이전: 위로 나감 / 새것: 아래에서 올라옴) — 우측 배치
+                ClipRect(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 350),
+                    layoutBuilder:
+                        (current, previous) => Stack(
+                          alignment: Alignment.centerRight,
+                          children: [...previous, if (current != null) current],
+                        ),
+                    transitionBuilder: (child, animation) {
+                      final isLeaving =
+                          animation.status == AnimationStatus.reverse ||
+                          animation.status == AnimationStatus.dismissed;
+                      final offsetTween = Tween<Offset>(
+                        begin:
+                            isLeaving
+                                ? const Offset(0, -1.0)
+                                : const Offset(0, 1.0),
+                        end: Offset.zero,
+                      );
+                      return SlideTransition(
+                        position: offsetTween.animate(
+                          CurvedAnimation(
+                            parent: animation,
+                            curve: Curves.easeInOut,
+                          ),
+                        ),
+                        child: FadeTransition(opacity: animation, child: child),
+                      );
+                    },
+                    child: SizedBox(
+                      key: ValueKey(big),
+                      width: 140,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            big,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.end,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          if (sub.isNotEmpty)
+                            Text(
+                              sub,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.end,
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: Colors.black45,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
                 const Icon(
                   Icons.chevron_right,
                   color: Colors.black45,

@@ -11,10 +11,12 @@ import '../widgets/job/quick_action_row.dart';
 import '../screen/jobs/job_list_screen.dart';
 import '../screen/jobs/job_map_screen.dart';
 import 'my_activity_page.dart';
+import 'career/career_tab.dart';
+import 'career/career_shared.dart';
 
-// ── 디자인 팔레트 ──
-const _kText = Color(0xFF5D6B6B);
-const _kBg = Color(0xFFF1F7F7);
+// ── 디자인 팔레트 (공고보기 탭 내 로컬 참조용) ──
+const _kText = kCText;
+const _kBg = kCBg;
 
 /// 도전하기 탭 (4탭)
 ///
@@ -280,84 +282,100 @@ class _JobPageState extends State<JobPage> {
     return Scaffold(
       backgroundColor: _kBg,
       body: SafeArea(
-        child:
-            _loadingLocation
-                ? const Center(child: CircularProgressIndicator())
-                : Column(
-                  children: [
-                    // ── MainTitleCard: 내 주변 구인 현황 ──
-                    MainTitleCard(
-                      nearbyJobCount: _nearbyJobCount,
-                      currentRadius: _jobFilter.radiusKm,
-                      newJobsCount: _newJobsCount,
-                      notificationEnabled: _notificationEnabled,
-                      watchedClinicsCount: _watchedClinicsCount,
-                      weeklyJobPoints: _weeklyJobPoints, // ★ 주간 포인트 전달
-                      onRadiusChange: _showRadiusChangeDialog,
-                      onNotificationToggle: _onNotificationToggle,
-                      onWatchedClinicsPressed: _onWatchedClinicsPressed,
-                    ),
-
-                    // ── 위치 권한 없을 때 안내 (선택적) ──
-                    if (_userLocation == null)
-                      Container(
-                        margin: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFF9C4),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: const Color(0xFFFDD835).withOpacity(0.3),
-                            width: 1,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.location_off_outlined,
-                              size: 18,
-                              color: _kText.withOpacity(0.7),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                '위치 권한이 없어 반경 기반 검색이 제한됩니다.\n목록 보기에서는 전체 공고를 확인할 수 있습니다.',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: _kText.withOpacity(0.8),
-                                  height: 1.4,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                    // ── QuickActionRow: 지도/목록 전환 + 액션 버튼 ──
-                    QuickActionRow(
-                      isMapView: _isMapView,
-                      onViewToggle:
-                          () => setState(() => _isMapView = !_isMapView),
-                      onCreateJob: _onCreateJob,
-                      onMyApplications: _onMyApplications,
-                    ),
-
-                    // ── 메인 컨텐츠: 지도/목록 ──
-                    Expanded(
-                      child: IndexedStack(
-                        index: _isMapView ? 1 : 0,
-                        children: [
-                          JobListScreen(userLocation: _userLocation),
-                          JobMapScreen(userLocation: _userLocation),
-                        ],
-                      ),
-                    ),
-                  ],
+        child: DefaultTabController(
+          length: 2,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const CareerTabHeader(),
+              const SizedBox(height: 6),
+              Expanded(
+                child: TabBarView(
+                  physics: const NeverScrollableScrollPhysics(),
+                  children: [_buildJobsTab(), const CareerTab()],
                 ),
+              ),
+            ],
+          ),
+        ),
       ),
+    );
+  }
+
+  Widget _buildJobsTab() {
+    if (_loadingLocation) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return Column(
+      children: [
+        // ── MainTitleCard: 내 주변 구인 현황 ──
+        MainTitleCard(
+          nearbyJobCount: _nearbyJobCount,
+          currentRadius: _jobFilter.radiusKm,
+          newJobsCount: _newJobsCount,
+          notificationEnabled: _notificationEnabled,
+          watchedClinicsCount: _watchedClinicsCount,
+          weeklyJobPoints: _weeklyJobPoints, // ★ 주간 포인트 전달
+          onRadiusChange: _showRadiusChangeDialog,
+          onNotificationToggle: _onNotificationToggle,
+          onWatchedClinicsPressed: _onWatchedClinicsPressed,
+        ),
+
+        // ── 위치 권한 없을 때 안내 (선택적) ──
+        if (_userLocation == null)
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF9C4),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: const Color(0xFFFDD835).withOpacity(0.3),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.location_off_outlined,
+                  size: 18,
+                  color: _kText.withOpacity(0.7),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '위치 권한이 없어 반경 기반 검색이 제한됩니다.\n목록 보기에서는 전체 공고를 확인할 수 있습니다.',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: _kText.withOpacity(0.8),
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+        // ── QuickActionRow: 지도/목록 전환 + 액션 버튼 ──
+        QuickActionRow(
+          isMapView: _isMapView,
+          onViewToggle: () => setState(() => _isMapView = !_isMapView),
+          onCreateJob: _onCreateJob,
+          onMyApplications: _onMyApplications,
+        ),
+
+        // ── 메인 컨텐츠: 지도/목록 ──
+        Expanded(
+          child: IndexedStack(
+            index: _isMapView ? 1 : 0,
+            children: [
+              JobListScreen(userLocation: _userLocation),
+              JobMapScreen(userLocation: _userLocation),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

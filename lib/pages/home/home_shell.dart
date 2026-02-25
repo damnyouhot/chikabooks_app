@@ -16,8 +16,8 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   int _selectedIndex = 0;
 
-  /// 성장 탭 인덱스
-  static const int _growthTabIndex = 2;
+  /// 성장하기 탭 서브탭 인덱스 (-1 = 변경 없음)
+  int _growthSubTabIndex = -1;
 
   /// Bond 탭 인덱스
   static const int _bondTabIndex = 1;
@@ -47,13 +47,29 @@ class _HomeShellState extends State<HomeShell> {
   /// CaringPage에서 다른 탭으로 이동하는 콜백
   void _onTabRequested(int index) => setState(() => _selectedIndex = index);
 
+  /// CaringPage에서 성장하기 서브탭을 지정하는 콜백
+  void _onGrowthSubTabRequested(int subTab) {
+    setState(() {
+      _selectedIndex = 2;
+      // 같은 값이 연속 오면 didUpdateWidget이 감지 못하므로 -1 경유
+      _growthSubTabIndex = -1;
+    });
+    // 다음 프레임에서 실제 서브탭 인덱스 설정
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() => _growthSubTabIndex = subTab);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     // CaringPage에 탭 전환 콜백 주입
     final pages = <Widget>[
-      CaringPage(onTabRequested: _onTabRequested),
+      CaringPage(
+        onTabRequested: _onTabRequested,
+        onGrowthSubTabRequested: _onGrowthSubTabRequested,
+      ),
       const BondPage(),
-      const GrowthPage(),
+      GrowthPage(jumpToSubTab: _growthSubTabIndex),
       const JobPage(),
     ];
 
@@ -88,7 +104,7 @@ class _HomeShellState extends State<HomeShell> {
           BottomNavigationBarItem(
             icon: Icon(Icons.work_outline),
             activeIcon: Icon(Icons.work),
-            label: '도전하기',
+            label: '커리어',
           ),
         ],
       ),

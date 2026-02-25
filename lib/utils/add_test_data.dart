@@ -3,7 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 /// 테스트 데이터 추가 유틸리티
-/// 
+///
 /// 사용법:
 /// - Flutter 앱을 실행한 후
 /// - 개발자 콘솔에서 TestDataHelper.addTestData() 호출
@@ -15,13 +15,13 @@ class TestDataHelper {
   static Future<void> addTestData() async {
     try {
       debugPrint('🔄 테스트 데이터 추가 시작...');
-      
+
       // 1. 전광판 테스트 데이터
       await addBillboardTestPost();
-      
+
       // 2. 오늘을 나누기 테스트 데이터
       await addBondTestPosts();
-      
+
       debugPrint('✅ 테스트 데이터 추가 완료!');
     } catch (e) {
       debugPrint('⚠️ 테스트 데이터 추가 실패: $e');
@@ -32,7 +32,7 @@ class TestDataHelper {
   static Future<void> addBillboardTestPost() async {
     try {
       final now = DateTime.now();
-      final expiresAt = now.add(const Duration(hours: 48));
+      final expiresAt = now.add(const Duration(hours: 12));
 
       // 다양한 파트너 그룹의 게시물들
       final testPosts = [
@@ -58,12 +58,16 @@ class TestDataHelper {
           'textSnapshot': post['text'],
           'enthroneCount': 3,
           'requiredCount': 3,
-          'createdAt': Timestamp.fromDate(now.subtract(Duration(minutes: i * 5))),
+          'createdAt': Timestamp.fromDate(
+            now.subtract(Duration(minutes: i * 5)),
+          ),
           'expiresAt': Timestamp.fromDate(expiresAt),
           'status': 'active',
-          'bondGroupName': '결',  // 더 이상 출처로 사용하지 않음
+          'bondGroupName': '결', // 더 이상 출처로 사용하지 않음
           'isAnonymous': false,
-          'authorId': post['authorId'],  // 추가: 원작자 ID
+          'authorId': post['authorId'], // 추가: 원작자 ID
+          'authorNickname': post['authorId'],
+          'reactions': <String, int>{},
         });
       }
 
@@ -94,7 +98,8 @@ class TestDataHelper {
       final bondGroupId = partnerGroupId;
       final now = DateTime.now();
       final kst = now.toUtc().add(const Duration(hours: 9));
-      final dateKey = '${kst.year}-${kst.month.toString().padLeft(2, '0')}-${kst.day.toString().padLeft(2, '0')}';
+      final dateKey =
+          '${kst.year}-${kst.month.toString().padLeft(2, '0')}-${kst.day.toString().padLeft(2, '0')}';
       final timeSlot = kst.hour < 12 ? 'morning' : 'afternoon';
 
       // 테스트 게시물 3개 (현재 사용자 1개 + 파트너 2개)
@@ -122,21 +127,26 @@ class TestDataHelper {
             .doc(bondGroupId)
             .collection('posts')
             .add({
-          'text': post['text'],
-          'uid': post['uid'],
-          'bondGroupId': bondGroupId,
-          'dateKey': dateKey,
-          'timeSlot': timeSlot,
-          'createdAt': Timestamp.fromDate(now.subtract(Duration(minutes: testPosts.indexOf(post) * 10))),
-          'isDeleted': false,
-          'publicEligible': true,
-          'reports': 0,
-          // 테스트용 메타 정보 (익명이 아닌 경우만)
-          if (post['authorName'] != '나') '_testAuthorName': post['authorName'],
-        });
+              'text': post['text'],
+              'uid': post['uid'],
+              'bondGroupId': bondGroupId,
+              'dateKey': dateKey,
+              'timeSlot': timeSlot,
+              'createdAt': Timestamp.fromDate(
+                now.subtract(Duration(minutes: testPosts.indexOf(post) * 10)),
+              ),
+              'isDeleted': false,
+              'publicEligible': true,
+              'reports': 0,
+              // 테스트용 메타 정보 (익명이 아닌 경우만)
+              if (post['authorName'] != '나')
+                '_testAuthorName': post['authorName'],
+            });
       }
 
-      debugPrint('✅ 오늘을 나누기 테스트 게시물 ${testPosts.length}개 추가 완료 (bondGroupId: $bondGroupId)');
+      debugPrint(
+        '✅ 오늘을 나누기 테스트 게시물 ${testPosts.length}개 추가 완료 (bondGroupId: $bondGroupId)',
+      );
     } catch (e) {
       debugPrint('⚠️ 오늘을 나누기 테스트 게시물 추가 실패: $e');
     }
@@ -147,14 +157,15 @@ class TestDataHelper {
     try {
       // sourceBondId가 test-bond-group으로 시작하는 모든 문서 찾기
       final snapshot = await _db.collection('billboardPosts').get();
-      
+
       int deletedCount = 0;
       for (final doc in snapshot.docs) {
         final data = doc.data();
         final sourceBondId = data['sourceBondId'] as String?;
-        
+
         // test-bond-group으로 시작하는 문서만 삭제
-        if (sourceBondId != null && sourceBondId.startsWith('test-bond-group')) {
+        if (sourceBondId != null &&
+            sourceBondId.startsWith('test-bond-group')) {
           await doc.reference.delete();
           deletedCount++;
         }
@@ -177,19 +188,22 @@ class TestDataHelper {
       if (partnerGroupId == null) return;
 
       // bondGroups/{partnerGroupId}/posts 컬렉션의 모든 문서 가져오기
-      final snapshot = await _db
-          .collection('bondGroups')
-          .doc(partnerGroupId)
-          .collection('posts')
-          .get();
+      final snapshot =
+          await _db
+              .collection('bondGroups')
+              .doc(partnerGroupId)
+              .collection('posts')
+              .get();
 
       int deletedCount = 0;
       for (final doc in snapshot.docs) {
         final data = doc.data();
         final docUid = data['uid'] as String?;
-        
+
         // test_partner로 시작하는 uid이거나 _testAuthorName 필드가 있는 문서 삭제
-        if (docUid != null && (docUid.startsWith('test_partner_') || data.containsKey('_testAuthorName'))) {
+        if (docUid != null &&
+            (docUid.startsWith('test_partner_') ||
+                data.containsKey('_testAuthorName'))) {
           await doc.reference.delete();
           deletedCount++;
         }
@@ -201,4 +215,3 @@ class TestDataHelper {
     }
   }
 }
-

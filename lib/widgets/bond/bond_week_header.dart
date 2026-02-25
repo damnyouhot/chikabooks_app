@@ -1,6 +1,162 @@
 import 'package:flutter/material.dart';
 import 'bond_colors.dart';
 
+/// 결 점수 원형 게이지 (다른 카드에서도 재사용)
+class BondScoreGauge extends StatelessWidget {
+  final double bondScore;
+  const BondScoreGauge({super.key, required this.bondScore});
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = (bondScore / 100).clamp(0.0, 1.0);
+    final scoreText = bondScore.toStringAsFixed(1);
+
+    return SizedBox(
+      width: 60,
+      height: 60,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          SizedBox(
+            width: 60,
+            height: 60,
+            child: CircularProgressIndicator(
+              value: 1.0,
+              strokeWidth: 4.0,
+              backgroundColor: Colors.transparent,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                BondColors.kShadow2.withOpacity(0.25),
+              ),
+            ),
+          ),
+          SizedBox(
+            width: 60,
+            height: 60,
+            child: CircularProgressIndicator(
+              value: progress,
+              strokeWidth: 4.0,
+              backgroundColor: Colors.transparent,
+              valueColor: const AlwaysStoppedAnimation<Color>(
+                BondColors.kAccent,
+              ),
+            ),
+          ),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '결 점수',
+                style: TextStyle(
+                  fontSize: 8,
+                  fontWeight: FontWeight.w500,
+                  color: BondColors.kText.withOpacity(0.6),
+                  height: 1.0,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                scoreText,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: BondColors.kText,
+                  height: 1.0,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// [파트너 없음] 상태 카드
+/// - 상단 타이틀(이번 주 동행 기록) 제거
+/// - 우측 결 점수 게이지 유지
+/// - 하단 "한 주가 끝나면..." 안내 유지
+class BondNoPartnerCard extends StatelessWidget {
+  final double bondScore;
+  const BondNoPartnerCard({super.key, required this.bondScore});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: BondColors.kShadow2.withOpacity(0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '아직 동료와 만나지 않았어요.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: BondColors.kText.withOpacity(0.75),
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '함께 걸을 사람을 찾아보세요',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: BondColors.kText.withOpacity(0.75),
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              BondScoreGauge(bondScore: bondScore),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Icon(
+                Icons.info_outline,
+                size: 14,
+                color: BondColors.kText.withOpacity(0.4),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  '한 주가 끝나면 조용히 다음 페이지로 넘어갑니다',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: BondColors.kText.withOpacity(0.5),
+                    height: 1.3,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// 주간 페이지 통합 헤더
 ///
 /// - 타이틀: "이번 주 동행 기록" + 원형 게이지 (우측 상단)
@@ -88,7 +244,7 @@ class BondWeekHeader extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               // 원형 게이지
-              _buildCircularGauge(),
+              BondScoreGauge(bondScore: bondScore),
             ],
           ),
           const SizedBox(height: 16),
@@ -124,69 +280,7 @@ class BondWeekHeader extends StatelessWidget {
   }
 
   /// 원형 게이지 (결 점수 시각화)
-  Widget _buildCircularGauge() {
-    final progress = (bondScore / 100).clamp(0.0, 1.0);
-    final scoreText = bondScore.toStringAsFixed(1);
-
-    return SizedBox(
-      width: 60,
-      height: 60,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // 배경 원
-          SizedBox(
-            width: 60,
-            height: 60,
-            child: CircularProgressIndicator(
-              value: 1.0,
-              strokeWidth: 4.0,
-              backgroundColor: Colors.transparent,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                BondColors.kShadow2.withOpacity(0.25),
-              ),
-            ),
-          ),
-          // 진행 원
-          SizedBox(
-            width: 60,
-            height: 60,
-            child: CircularProgressIndicator(
-              value: progress,
-              strokeWidth: 4.0,
-              backgroundColor: Colors.transparent,
-              valueColor: AlwaysStoppedAnimation<Color>(BondColors.kAccent),
-            ),
-          ),
-          // 중앙: "결 점수" + 숫자
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                '결 점수',
-                style: TextStyle(
-                  fontSize: 8,
-                  fontWeight: FontWeight.w500,
-                  color: BondColors.kText.withOpacity(0.6),
-                  height: 1.0,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                scoreText,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: BondColors.kText,
-                  height: 1.0,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+  // (BondScoreGauge로 대체됨)
 
   /// 매칭 상태별 안내 문구
   Widget _buildStatusMessage(bool hasPartner) {

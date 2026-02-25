@@ -5,43 +5,75 @@ import 'bond_colors.dart';
 /// 결 탭 상단 타이틀 바
 class BondTopBar extends StatelessWidget {
   final VoidCallback onSettingsLongPress;
+  final String weekLabel; // 예: "2월 4주차: 16~22일"
 
-  const BondTopBar({super.key, required this.onSettingsLongPress});
+  const BondTopBar({
+    super.key,
+    required this.onSettingsLongPress,
+    required this.weekLabel,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      child: Row(
-        children: [
-          // '결' 타이틀 제거하고 설명 버튼만 표시
-          IconButton(
-            onPressed: () => _showConceptDialog(context),
-            icon: Icon(
-              Icons.info_outline,
-              size: 18,
-              color: BondColors.kText.withOpacity(0.5),
-            ),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-            tooltip: '같이 탭 설명',
-          ),
-          const Spacer(),
-          GestureDetector(
-            onTap:
-                () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SettingsPage()),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          child: Row(
+            children: [
+              IconButton(
+                icon: Icon(
+                  Icons.info_outline,
+                  color: BondColors.kText.withOpacity(0.5),
+                  size: 18,
                 ),
-            onLongPress: onSettingsLongPress,
-            child: Icon(
-              Icons.settings_outlined,
-              color: BondColors.kText.withOpacity(0.4),
-              size: 20,
+                onPressed: () => _showConceptDialog(context),
+              ),
+              const Spacer(),
+              GestureDetector(
+                onLongPress: onSettingsLongPress,
+                child: IconButton(
+                  icon: Icon(
+                    Icons.settings_outlined,
+                    color: BondColors.kText.withOpacity(0.4),
+                    size: 20,
+                  ),
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const SettingsPage()),
+                    );
+                  },
+                  tooltip: '설정',
+                ),
+              ),
+            ],
+          ),
+        ),
+        const Padding(
+          padding: EdgeInsets.only(left: 20),
+          child: Text(
+            '같이',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: BondColors.kText,
             ),
           ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 2),
+        Padding(
+          padding: const EdgeInsets.only(left: 20),
+          child: Text(
+            weekLabel,
+            style: TextStyle(
+              fontSize: 12,
+              color: BondColors.kText.withOpacity(0.55),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+      ],
     );
   }
 
@@ -159,6 +191,21 @@ class BondTopBar extends StatelessWidget {
                   SizedBox(height: 8),
                   Text(
                     '이 탭은 경쟁이 아니라\n리듬을 맞추는 공간입니다.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.5,
+                      color: Color(0xFF666666),
+                    ),
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    '🗓️ 이번 주 우리 스탬프',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    '파트너 3명이 함께 투표/리액션/목표 체크를 하면\n'
+                    '하루 1칸씩 채워져요.',
                     style: TextStyle(
                       fontSize: 12,
                       height: 1.5,

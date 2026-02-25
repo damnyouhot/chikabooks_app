@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/reaction_kind.dart';
-import '../services/bond_score_service.dart';
 import '../services/report_service.dart';
 import '../services/enthrone_service.dart';
 
@@ -17,12 +16,14 @@ class BondPostCard extends StatefulWidget {
   final Map<String, dynamic> post;
   final String postId;
   final String? bondGroupId; // 추가: 파트너 그룹 ID
+  final Map<String, String>? memberNicknames; // uid -> nickname (파트너 그룹)
 
   const BondPostCard({
     super.key,
     required this.post,
     required this.postId,
     this.bondGroupId,
+    this.memberNicknames,
   });
 
   @override
@@ -169,7 +170,7 @@ class _BondPostCardState extends State<BondPostCard> {
       }
 
       if (shouldScore) {
-        final heartBonus = await _tryGrantHeartBonus(groupId, authorUid, kind);
+        await _tryGrantHeartBonus(groupId, authorUid, kind);
         // BondScoreService 메서드가 없으므로 주석 처리
         // await BondScoreService.applyReactionScore(
         //   targetUid: authorUid,
@@ -361,9 +362,7 @@ class _BondPostCardState extends State<BondPostCard> {
       bondGroupId: groupId,
       postId: widget.postId,
     );
-    double extraBonus = 0;
     if (count >= 3 && !alreadyBonus) {
-      extraBonus = 0.5;
       await postRef.set({
         'enthroneBonusApplied': true,
       }, SetOptions(merge: true));
@@ -455,32 +454,48 @@ class _BondPostCardState extends State<BondPostCard> {
     );
   }
 
-  String _formatTimestamp(dynamic timestamp) {
-    if (timestamp == null) return '';
-    try {
-      final dt = (timestamp as Timestamp).toDate();
-      final now = DateTime.now();
-      final diff = now.difference(dt);
-
-      if (diff.inMinutes < 1) return '방금 전';
-      if (diff.inHours < 1) return '${diff.inMinutes}분 전';
-      if (diff.inDays < 1) return '${diff.inHours}시간 전';
-      if (diff.inDays < 7) return '${diff.inDays}일 전';
-      return '${dt.month}/${dt.day}';
-    } catch (_) {
-      return '';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final updatedAt = widget.post['updatedAt'];
     final createdAt = widget.post['createdAt'];
-    final timeStr = _formatTimestamp(updatedAt ?? createdAt);
+    final createdAtClient = widget.post['createdAtClient'];
+    final createdAtClientDt =
+        (createdAtClient is Timestamp) ? createdAtClient.toDate() : null;
+    final baseCreated =
+        createdAtClientDt ??
+        ((createdAt is Timestamp) ? createdAt.toDate() : DateTime.now());
+    final expiresAt = baseCreated.add(const Duration(hours: 6));
+    final remaining = expiresAt.difference(DateTime.now());
+    final remainingStr =
+        remaining.isNegative
+            ? '노출 종료'
+            : (remaining.inHours >= 1
+                ? '${remaining.inHours}시간 ${(remaining.inMinutes % 60)}분 남음'
+                : '${remaining.inMinutes.clamp(0, 59)}분 남음');
 
-    // 작성자 정보
-    final testAuthorName = widget.post['_testAuthorName'] as String?;
-    final authorName = testAuthorName ?? '익명';
+    // 작성자 정보 (익명 금지)
+    final snapAuthorNickname =
+        (widget.post['authorNickname'] as String?)?.trim();
+    final authorUid = (widget.post['uid'] as String?)?.trim();
+    final mapNickname =
+        (authorUid != null &&
+                authorUid.isNotEmpty &&
+                widget.memberNicknames != null)
+            ? widget.memberNicknames![authorUid]?.trim()
+            : null;
+
+    final testAuthorName = (widget.post['_testAuthorName'] as String?)?.trim();
+
+    final authorName =
+        (snapAuthorNickname != null && snapAuthorNickname.isNotEmpty)
+            ? snapAuthorNickname
+            : ((mapNickname != null && mapNickname.isNotEmpty)
+                ? mapNickname
+                : ((testAuthorName != null && testAuthorName.isNotEmpty)
+                    ? testAuthorName
+                    : ((authorUid != null && authorUid.isNotEmpty)
+                        ? authorUid
+                        : '치과인')));
 
     return Container(
       padding: const EdgeInsets.all(12), // 16 → 12
@@ -522,7 +537,7 @@ class _BondPostCardState extends State<BondPostCard> {
               ),
               const SizedBox(width: 6), // 8 → 6
               Text(
-                timeStr,
+                remainingStr,
                 style: TextStyle(
                   fontSize: 10,
                   color: Colors.grey[400],
@@ -690,12 +705,17 @@ class _BondPostCardState extends State<BondPostCard> {
                   color: Colors.grey[600],
                 ),
               ] else ...[
-                IconButton(
-                  onPressed: _showReportDialog,
-                  icon: const Icon(Icons.report, size: 14), // 16 → 14
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  color: Colors.grey[600],
+                // 전국구 게시판과 동일한 모양/크기/위치
+                GestureDetector(
+                  onTap: _showReportDialog,
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    child: Icon(
+                      Icons.report_outlined,
+                      size: 18,
+                      color: _kText.withOpacity(0.3),
+                    ),
+                  ),
                 ),
               ],
             ],
