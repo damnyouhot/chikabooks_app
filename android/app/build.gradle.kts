@@ -28,7 +28,7 @@ android {
         // [핵심 2] 앱의 진짜 ID (Firebase의 google-services.json 패키지명과 일치)
         applicationId = "com.chikabooks.tenth"
         
-        minSdk = 23
+        minSdk = flutter.minSdkVersion
         targetSdk = 36 // SDK 36으로 통일
         versionCode = flutter.versionCode
         versionName = flutter.versionName
