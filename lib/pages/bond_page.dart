@@ -59,12 +59,23 @@ class _BondPageState extends State<BondPage> {
   Map<String, int> _weeklyPostCounts = {}; // {uid: postCount}
   Map<String, int> _weeklyReactionCounts = {}; // {uid: reactionCount}
 
+  // ── Firestore 스트림 (initState에서 1회 생성) ──
+  Stream<DocumentSnapshot>? _userStream;
+
   // ── 결 파트 확장 ──
   // (파트너 있을 때는 항상 펼침으로 고정 — state로 관리하지 않음)
 
   @override
   void initState() {
     super.initState();
+    // 스트림을 initState에서 1회만 생성 → build()에서 매번 새로 만들지 않음
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      _userStream = FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .snapshots();
+    }
     _loadData();
     _checkAndShowNewWeekToast();
   }
@@ -361,16 +372,8 @@ class _BondPageState extends State<BondPage> {
     );
     final weekLabel = _getWeekLabel();
 
-    final userStream =
-        (uid != null)
-            ? FirebaseFirestore.instance
-                .collection('users')
-                .doc(uid)
-                .snapshots()
-            : null;
-
     return StreamBuilder<DocumentSnapshot>(
-      stream: userStream,
+      stream: _userStream,
       builder: (context, snapshot) {
         double bondScore = 50.0;
         if (snapshot.hasData && snapshot.data?.data() != null) {
