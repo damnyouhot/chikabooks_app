@@ -1,8 +1,7 @@
 // lib/pages/ebook/epub_reader_page.dart
 import 'dart:async';
-import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:epub_view/epub_view.dart';
 import '../../models/ebook.dart';
@@ -17,8 +16,9 @@ class EpubReaderPage extends StatefulWidget {
 }
 
 class _EpubReaderPageState extends State<EpubReaderPage> {
-  late EpubController _controller;
+  EpubController? _controller;
   bool _isLoading = true;
+  String? _error;
 
   final _ebookService = EbookService();
   Timer? _saveDebounce;
@@ -26,55 +26,44 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
   @override
   void initState() {
     super.initState();
-    _init();
+    if (!kIsWeb) _init();
   }
 
   Future<void> _init() async {
     try {
-      // 1. 저장된 진행도(CFI) 불러오기
+      // 저장된 CFI(진행도) 불러오기
       String? lastCfi;
-      final progress =
-          await _ebookService.getReadingProgress(widget.ebook.id);
+      final progress = await _ebookService.getReadingProgress(widget.ebook.id);
       if (progress != null) {
         final cfiValue = progress['lastCfi'];
-        if (cfiValue is String && cfiValue.isNotEmpty) {
-          lastCfi = cfiValue;
-        }
+        if (cfiValue is String && cfiValue.isNotEmpty) lastCfi = cfiValue;
       }
 
-      // 2. EPUB 파일 다운로드
-      final dir = await getApplicationDocumentsDirectory();
-      final file = File('${dir.path}/${widget.ebook.id}.epub');
+      // EPUB 바이트 다운로드 (openData 방식으로 dart:io File 의존 제거)
+      final bytes = await http.readBytes(Uri.parse(widget.ebook.fileUrl));
 
-      if (!await file.exists()) {
-        final bytes = await http.readBytes(Uri.parse(widget.ebook.fileUrl));
-        await file.writeAsBytes(bytes);
-      }
-
-      // 3. 컨트롤러 생성 (저장된 위치에서 시작)
       _controller = EpubController(
-        document: EpubDocument.openFile(file),
+        document: EpubDocument.openData(bytes),
         epubCfi: lastCfi,
       );
-      _controller.currentValueListenable.addListener(_saveProgressDebounced);
+      _controller!.currentValueListenable.addListener(_saveProgressDebounced);
 
       if (mounted) setState(() => _isLoading = false);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('ePub 열기 실패: $e')),
-        );
-        Navigator.pop(context);
+        setState(() {
+          _error = 'ePub 열기 실패: $e';
+          _isLoading = false;
+        });
       }
     }
   }
 
-  /// 진행도 저장 (디바운스: 3초)
   void _saveProgressDebounced() {
     _saveDebounce?.cancel();
     _saveDebounce = Timer(const Duration(seconds: 3), () async {
       try {
-        final cfi = _controller.generateEpubCfi();
+        final cfi = _controller?.generateEpubCfi();
         if (cfi != null) {
           await _ebookService.saveReadingProgress(
             widget.ebook.id,
@@ -90,32 +79,50 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
   @override
   void dispose() {
     _saveDebounce?.cancel();
-    if (!_isLoading) {
-      // 닫힐 때 마지막 위치 저장
+    if (_controller != null) {
       try {
-        final cfi = _controller.generateEpubCfi();
+        final cfi = _controller!.generateEpubCfi();
         if (cfi != null) {
-          _ebookService.saveReadingProgress(
-            widget.ebook.id,
-            lastCfi: cfi,
-          );
+          _ebookService.saveReadingProgress(widget.ebook.id, lastCfi: cfi);
         }
       } catch (_) {}
-      _controller.currentValueListenable
-          .removeListener(_saveProgressDebounced);
-      _controller.dispose();
+      _controller!.currentValueListenable.removeListener(
+        _saveProgressDebounced,
+      );
+      _controller!.dispose();
     }
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    // 웹은 ePub 뷰어 미지원
+    if (kIsWeb) {
+      return Scaffold(
+        appBar: AppBar(title: Text(widget.ebook.title)),
+        body: const Center(
+          child: Text(
+            'ePub 뷰어는 모바일 앱에서만 지원됩니다.',
+            style: TextStyle(fontSize: 16, color: Colors.grey),
+          ),
+        ),
+      );
+    }
+
     if (_isLoading) {
       return Scaffold(
         appBar: AppBar(title: Text(widget.ebook.title)),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
+
+    if (_error != null) {
+      return Scaffold(
+        appBar: AppBar(title: Text(widget.ebook.title)),
+        body: Center(child: Text(_error!)),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -124,7 +131,7 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
           overflow: TextOverflow.ellipsis,
         ),
       ),
-      body: EpubView(controller: _controller),
+      body: EpubView(controller: _controller!),
     );
   }
 }

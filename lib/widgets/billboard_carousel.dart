@@ -5,6 +5,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/enthrone.dart';
 import 'billboard_card.dart';
 
+// ignore_for_file: avoid_print
+
 // ── 디자인 팔레트 ──
 const _kText = Color(0xFF5D6B6B);
 const _kShadow2 = Color(0xFFD5E5E5);
@@ -32,10 +34,17 @@ class _BillboardCarouselState extends State<BillboardCarousel> {
 
   @override
   Widget build(BuildContext context) {
+    // 만료 기준: 12시간 전 (expiresAt = 생성+12h이므로 24h 안쪽 게시물만 포함)
+    // 복합 인덱스 없이 동작하도록 expiresAt 단일 필터만 Firestore에서 처리.
+    // status/isExpired 는 클라이언트에서 isActive 체크로 필터링.
+    final cutoff = DateTime.now().subtract(const Duration(hours: 12));
+
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('billboardPosts')
-          .limit(5)
+          .where('expiresAt', isGreaterThan: Timestamp.fromDate(cutoff))
+          .orderBy('expiresAt')
+          .limit(10) // 클라이언트 필터 여분 고려해 여유 있게 가져옴
           .snapshots(),
       builder: (context, snap) {
         // 에러 표시
@@ -98,10 +107,13 @@ class _BillboardCarouselState extends State<BillboardCarousel> {
           return _buildEmptyState();
         }
 
+        // isActive = status == confirmed && !isExpired (클라이언트 필터)
         final posts = docs
             .map((doc) => BillboardPost.fromDoc(
                   doc as DocumentSnapshot<Map<String, dynamic>>,
                 ))
+            .where((post) => post.isActive)
+            .take(5)
             .toList();
 
         // 인덱스 범위 체크

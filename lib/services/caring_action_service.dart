@@ -437,6 +437,83 @@ class CaringActionService {
       debugPrint('⚠️ CaringActionService._saveState error: $e');
     }
   }
+
+  // ═══════════════════════ 이벤트 감지 (우선순위 1~4) ═══════════════════════
+
+  /// 앱 진입 시 이벤트 감지 + lastOpenAt 업데이트
+  ///
+  /// 반환값: 감지된 이벤트 ID 리스트 (예: ['absence_3days', 'skill_up'])
+  /// Firestore에 lastKnownSkillLevels / lastKnownNetworkCount / lastOpenAt 저장.
+  static Future<List<String>> detectOpenEvents() async {
+    final events = <String>[];
+    try {
+      final uid = await _ensureUidReady();
+      if (uid == null) return events;
+
+      final userRef = _db.collection('users').doc(uid);
+      final doc = await userRef.get();
+      final data = doc.data() ?? {};
+
+      // ── 1. 3일 이상 미접속 체크 ──
+      final lastOpenAt = (data['lastOpenAt'] as Timestamp?)?.toDate();
+      if (lastOpenAt != null) {
+        final daysDiff = DateTime.now().difference(lastOpenAt).inDays;
+        if (daysDiff >= 3) {
+          events.add('absence_3days');
+          debugPrint('[EventDetect] absence_3days detected (${daysDiff}days)');
+        }
+      }
+
+      // lastOpenAt 갱신 (다음 실행 시 비교 기준)
+      await userRef.set(
+        {'lastOpenAt': FieldValue.serverTimestamp()},
+        SetOptions(merge: true),
+      );
+
+      // ── 2. 스킬 레벨 상승 체크 ──
+      final careerProfile = data['careerProfile'] as Map<String, dynamic>?;
+      final skills = (careerProfile?['skills'] as Map<String, dynamic>?) ?? {};
+      final lastSkillSnap =
+          (data['lastKnownSkillLevels'] as Map<String, dynamic>?) ?? {};
+
+      bool skillLeveledUp = false;
+      final currentSkillSnap = <String, dynamic>{};
+      for (final entry in skills.entries) {
+        final skillId = entry.key;
+        final currentLevel =
+            ((entry.value as Map<String, dynamic>?)?['level'] as int?) ?? 0;
+        currentSkillSnap[skillId] = currentLevel;
+        final lastLevel = (lastSkillSnap[skillId] as int?) ?? 0;
+        if (currentLevel > lastLevel) skillLeveledUp = true;
+      }
+      if (skillLeveledUp) {
+        events.add('skill_up');
+        debugPrint('[EventDetect] skill_up detected');
+      }
+
+      // ── 3. 새 근무지 추가 체크 ──
+      final lastNetworkCount = (data['lastKnownNetworkCount'] as int?) ?? -1;
+      final networkSnap = await _db
+          .collection('users')
+          .doc(uid)
+          .collection('careerNetwork')
+          .get();
+      final currentNetworkCount = networkSnap.docs.length;
+      if (lastNetworkCount >= 0 && currentNetworkCount > lastNetworkCount) {
+        events.add('new_workplace');
+        debugPrint('[EventDetect] new_workplace detected');
+      }
+
+      // 스냅샷 업데이트 (다음 실행 시 비교 기준)
+      await userRef.set({
+        'lastKnownSkillLevels': currentSkillSnap,
+        'lastKnownNetworkCount': currentNetworkCount,
+      }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('⚠️ CaringActionService.detectOpenEvents error: $e');
+    }
+    return events;
+  }
 }
 
 // ═══════════════════════ 결과 객체들 ═══════════════════════

@@ -6,7 +6,9 @@ import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart' as kakao;
 /// 카카오 로그인 서비스
 /// 서버 기반 토큰 검증 방식으로 Firebase Auth 연동
 class KakaoAuthService {
-  static final _functions = FirebaseFunctions.instanceFor(region: 'us-central1');
+  static final _functions = FirebaseFunctions.instanceFor(
+    region: 'us-central1',
+  );
   static final _auth = FirebaseAuth.instance;
 
   /// 카카오 로그인 실행 (서버 검증)
@@ -24,17 +26,19 @@ class KakaoAuthService {
 
       // 1. 카카오 SDK로 로그인
       kakao.OAuthToken token;
-      if (await kakao.isKakaoTalkInstalled()) {
-        // 카카오톡으로 로그인
+      if (kIsWeb) {
+        // 웹: 카카오톡 앱 로그인 불가 → 항상 카카오계정(브라우저) 로그인
+        token = await kakao.UserApi.instance.loginWithKakaoAccount();
+      } else if (await kakao.isKakaoTalkInstalled()) {
+        // 모바일: 카카오톡으로 로그인
         try {
           token = await kakao.UserApi.instance.loginWithKakaoTalk();
         } catch (e) {
           debugPrint('카카오톡 로그인 실패, 카카오계정으로 시도: $e');
-          // 카카오톡 실패 시 웹 브라우저로 로그인
           token = await kakao.UserApi.instance.loginWithKakaoAccount();
         }
       } else {
-        // 카카오톡 미설치 시 웹 브라우저로 로그인
+        // 모바일: 카카오톡 미설치 시 카카오계정으로 로그인
         token = await kakao.UserApi.instance.loginWithKakaoAccount();
       }
 
@@ -44,9 +48,7 @@ class KakaoAuthService {
       // 2. 서버로 Access Token 전송하여 검증 및 Custom Token 발급
       debugPrint('🔧 서버로 토큰 검증 요청...');
       final callable = _functions.httpsCallable('verifyKakaoToken');
-      final response = await callable.call({
-        'accessToken': token.accessToken,
-      });
+      final response = await callable.call({'accessToken': token.accessToken});
 
       debugPrint('✅ 서버 검증 완료: ${response.data}');
 
@@ -103,4 +105,3 @@ class KakaoAuthService {
     }
   }
 }
-

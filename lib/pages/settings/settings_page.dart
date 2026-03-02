@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -53,9 +54,9 @@ class _SettingsPageState extends State<SettingsPage> {
   /// ✅ Provider 라벨 (Firestore 기반)
   String _providerLabelFromFirestore(Map<String, dynamic>? data) {
     if (data == null) return '알 수 없음';
-    
+
     final provider = data['provider'] as String?;
-    
+
     return switch (provider) {
       'kakao' => '카카오',
       'naver' => '네이버',
@@ -121,28 +122,28 @@ class _SettingsPageState extends State<SettingsPage> {
       context: context,
       builder:
           (ctx) => AlertDialog(
-        title: const Text('로그아웃할까요?'),
-        content: const Text('로그아웃하면 다시 로그인해야 내 서재와 구매한 책을 볼 수 있어요.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('취소'),
+            title: const Text('로그아웃할까요?'),
+            content: const Text('로그아웃하면 다시 로그인해야 내 서재와 구매한 책을 볼 수 있어요.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('취소'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('로그아웃'),
+              ),
+            ],
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('로그아웃'),
-          ),
-        ],
-      ),
     );
 
     if (result == true) {
       // Firebase Auth + Google Sign-In 로그아웃
       await GoogleSignIn().signOut();
       await _auth.signOut();
-      
+
       if (!mounted) return;
-      
+
       // 설정 페이지 닫기 (AuthGate로 돌아가서 자동으로 로그인 페이지로 이동)
       Navigator.of(context).pop();
 
@@ -302,7 +303,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
       // 로딩 다이얼로그 닫기
       Navigator.of(context).pop();
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('계정 삭제 실패: $e'),
@@ -355,19 +356,19 @@ class _SettingsPageState extends State<SettingsPage> {
 
                 final data = snapshot.data;
                 final provider = _providerLabelFromFirestore(data);
-                
+
                 // 백업: Firestore에 없으면 providerData/UID 기반으로 추측
                 final displayProvider =
                     (data == null || data['provider'] == null)
-                    ? _providerLabelFromAuth(user)
-                    : provider;
+                        ? _providerLabelFromAuth(user)
+                        : provider;
 
                 return _AccountCard(
                   email: user.email ?? data?['email'] as String? ?? '이메일 정보 없음',
                   displayName:
                       data?['nickname'] as String? ?? // ✅ nickname 필드 우선
-                      user.displayName ?? 
-                      data?['displayName'] as String? ?? 
+                      user.displayName ??
+                      data?['displayName'] as String? ??
                       '닉네임 없음',
                   provider: displayProvider,
                   uid: user.uid,
@@ -418,9 +419,11 @@ class _SettingsPageState extends State<SettingsPage> {
               final uid = user?.uid ?? 'unknown';
               final email = user?.email ?? 'unknown';
               final platform =
-                  Platform.isIOS
-                      ? 'iOS'
-                      : (Platform.isAndroid ? 'Android' : 'Unknown');
+                  kIsWeb
+                      ? 'Web'
+                      : (Platform.isIOS
+                          ? 'iOS'
+                          : (Platform.isAndroid ? 'Android' : 'Unknown'));
               final version =
                   _pkg == null
                       ? 'unknown'
@@ -542,9 +545,9 @@ class _SectionTitle extends StatelessWidget {
       child: Text(
         title,
         style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: Theme.of(context).colorScheme.primary,
-            ),
+          fontWeight: FontWeight.w700,
+          color: Theme.of(context).colorScheme.primary,
+        ),
       ),
     );
   }
@@ -604,8 +607,8 @@ class _AccountCard extends StatelessWidget {
                     Text(
                       displayName,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(email, style: Theme.of(context).textTheme.bodyMedium),

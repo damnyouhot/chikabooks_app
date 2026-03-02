@@ -231,6 +231,29 @@ service cloud.firestore {
     }
 
     // ══════════════════════════════════════════════════
+    // 구인공고 (Jobs)
+    // ══════════════════════════════════════════════════
+    match /jobs/{jobId} {
+      // 공고 읽기: 로그인한 모든 사용자 (published 상태)
+      allow read: if request.auth != null;
+      // 생성/수정/삭제: 서버(Cloud Functions)만 (createJobPosting Callable)
+      allow create, update, delete: if false;
+    }
+
+    // ══════════════════════════════════════════════════
+    // 치과 사업자 인증 (Clinic Verifications)
+    // ══════════════════════════════════════════════════
+    match /clinicVerifications/{uid} {
+      // 본인 기록만 읽기
+      allow read: if request.auth != null && request.auth.uid == uid;
+      // 최초 제출(pending): 본인만
+      allow create: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.status == 'pending';
+      // 승인/거절 등 상태 변경: 서버만
+      allow update, delete: if false;
+    }
+
+    // ══════════════════════════════════════════════════
     // 기타 컬렉션 (임시로 전체 허용 - 나중에 세분화 필요)
     // ══════════════════════════════════════════════════
     match /{document=**} {

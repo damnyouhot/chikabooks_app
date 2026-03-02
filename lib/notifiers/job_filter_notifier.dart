@@ -1,74 +1,111 @@
 import 'package:flutter/material.dart';
 
+/// 공고 목록/지도 필터 상태 관리
+///
+/// ## 필터 항목
+/// - `positionFilter`  직종 (전체/치위생사/치과조무사/치과의사/기타)
+/// - `careerFilter`    경력 (전체/신입/경력)
+/// - `regionFilter`    지역 (드롭다운)
+/// - `employmentType`  근무형태 (전체/풀타임/파트타임/계약직)
+/// - `salaryRange`     급여 범위 (RangeSlider)
+/// - `sortBy`          정렬 기준 (최신순/매칭높은순/마감임박순/급여높은순/거리순)
+/// - `conditions`      기타 조건 칩 (신입가능/야간없음/주4일/파트타임/역세권/즉시지원/4대보험)
+/// - `radiusKm`        지도 반경 (km)
+/// - `searchQuery`     검색어
 class JobFilterNotifier extends ChangeNotifier {
+  // ── 목록 필터 ──────────────────────────────────────────────────
+  String _positionFilter = '전체';
   String _careerFilter = '전체';
   String _regionFilter = '전체';
-  String _positionFilter = '전체'; // 직종 필터
-  String _searchQuery = ''; // 검색어
+  String _employmentType = '전체'; // 근무형태 (신규)
   RangeValues _salaryRange = const RangeValues(0, 10000);
 
-  // ★ 새로 추가: 지도 전용 필터
-  double _radiusKm = 3.0; // 반경 (기본 3km)
-  String _sortBy = '거리순'; // 정렬: 거리순/최신순/급여순
-  Set<String> _conditions = {}; // 조건칩: 신입가능, 야간없음, 주4일, 파트타임
+  // ── 정렬 ────────────────────────────────────────────────────────
+  /// 정렬 옵션: 최신순 | 매칭높은순 | 마감임박순 | 급여높은순 | 거리순
+  String _sortBy = '최신순';
 
+  // ── 기타 조건 칩 ────────────────────────────────────────────────
+  Set<String> _conditions = {};
+
+  // ── 지도 전용 ────────────────────────────────────────────────────
+  double _radiusKm = 3.0;
+
+  // ── 검색어 ───────────────────────────────────────────────────────
+  String _searchQuery = '';
+
+  // ── Getters ──────────────────────────────────────────────────────
+  String get positionFilter => _positionFilter;
   String get careerFilter => _careerFilter;
   String get regionFilter => _regionFilter;
-  String get positionFilter => _positionFilter;
-  String get searchQuery => _searchQuery;
+  String get employmentType => _employmentType;
   RangeValues get salaryRange => _salaryRange;
-  double get radiusKm => _radiusKm;
   String get sortBy => _sortBy;
   Set<String> get conditions => _conditions;
+  double get radiusKm => _radiusKm;
+  String get searchQuery => _searchQuery;
 
-  void setCareerFilter(String newFilter) {
-    if (_careerFilter != newFilter) {
-      _careerFilter = newFilter;
+  /// 현재 적용된 필터 수 (검색어·반경 제외)
+  int get activeCount {
+    int count = 0;
+    if (_positionFilter != '전체') count++;
+    if (_careerFilter != '전체') count++;
+    if (_regionFilter != '전체') count++;
+    if (_employmentType != '전체') count++;
+    if (_salaryRange.start > 0 || _salaryRange.end < 10000) count++;
+    if (_sortBy != '최신순') count++;
+    count += _conditions.length;
+    return count;
+  }
+
+  // ── Setters ──────────────────────────────────────────────────────
+
+  void setPositionFilter(String v) {
+    if (_positionFilter != v) {
+      _positionFilter = v;
       notifyListeners();
     }
   }
 
-  void setRegionFilter(String newFilter) {
-    if (_regionFilter != newFilter) {
-      _regionFilter = newFilter;
+  void setCareerFilter(String v) {
+    if (_careerFilter != v) {
+      _careerFilter = v;
       notifyListeners();
     }
   }
 
-  void setPositionFilter(String newFilter) {
-    if (_positionFilter != newFilter) {
-      _positionFilter = newFilter;
+  void setRegionFilter(String v) {
+    if (_regionFilter != v) {
+      _regionFilter = v;
       notifyListeners();
     }
   }
 
-  void setSearchQuery(String query) {
-    if (_searchQuery != query) {
-      _searchQuery = query;
+  void setEmploymentType(String v) {
+    if (_employmentType != v) {
+      _employmentType = v;
       notifyListeners();
     }
   }
 
-  void setSalaryRange(RangeValues newRange) {
-    _salaryRange = newRange;
+  void setSalaryRange(RangeValues v) {
+    _salaryRange = v;
     notifyListeners();
   }
 
-  // ★ 새 필터 setter들
-  void setRadiusKm(double radius) {
-    if (_radiusKm != radius) {
-      _radiusKm = radius;
+  void setSortBy(String v) {
+    if (_sortBy != v) {
+      _sortBy = v;
       notifyListeners();
     }
   }
 
-  void setSortBy(String sortType) {
-    if (_sortBy != sortType) {
-      _sortBy = sortType;
-      notifyListeners();
-    }
+  /// 기타 조건 칩 Set 전체 교체 (바텀시트 적용 시)
+  void setConditions(Set<String> v) {
+    _conditions = Set.from(v);
+    notifyListeners();
   }
 
+  /// 단일 조건 토글 (지도 뷰 반경 칩 등)
   void toggleCondition(String condition) {
     if (_conditions.contains(condition)) {
       _conditions.remove(condition);
@@ -78,34 +115,49 @@ class JobFilterNotifier extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 모든 필터 초기화
+  void setSearchQuery(String v) {
+    if (_searchQuery != v) {
+      _searchQuery = v;
+      notifyListeners();
+    }
+  }
+
+  void setRadiusKm(double v) {
+    if (_radiusKm != v) {
+      _radiusKm = v;
+      notifyListeners();
+    }
+  }
+
+  // ── 초기화 ──────────────────────────────────────────────────────
+
   void resetFilters() {
+    _positionFilter = '전체';
     _careerFilter = '전체';
     _regionFilter = '전체';
-    _positionFilter = '전체';
-    _searchQuery = '';
+    _employmentType = '전체';
     _salaryRange = const RangeValues(0, 10000);
+    _sortBy = '최신순';
+    _conditions.clear();
     _radiusKm = 3.0;
-    _sortBy = '거리순';
+    notifyListeners();
+  }
+
+  void resetListFilters() {
+    _positionFilter = '전체';
+    _careerFilter = '전체';
+    _regionFilter = '전체';
+    _employmentType = '전체';
+    _salaryRange = const RangeValues(0, 10000);
+    _sortBy = '최신순';
     _conditions.clear();
     notifyListeners();
   }
 
-  /// 지도 전용 필터만 초기화
   void resetMapFilters() {
     _radiusKm = 3.0;
-    _sortBy = '거리순';
+    _sortBy = '최신순';
     _conditions.clear();
-    notifyListeners();
-  }
-
-  /// 목록 전용 필터만 초기화
-  void resetListFilters() {
-    _careerFilter = '전체';
-    _regionFilter = '전체';
-    _positionFilter = '전체';
-    _searchQuery = '';
-    _salaryRange = const RangeValues(0, 10000);
     notifyListeners();
   }
 }

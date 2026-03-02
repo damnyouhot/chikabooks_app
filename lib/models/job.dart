@@ -5,6 +5,7 @@ class Job {
   final String title;
   final String clinicName;
   final String address;
+  final String district;   // 동/구 짧은 표시용 (예: "역삼동 · 강남구")
   final double lat;
   final double lng;
   final String type;
@@ -15,11 +16,19 @@ class Job {
   final List<String> benefits;
   final List<String> images;
 
+  // ── 레벨/매칭 필드 ──────────────────────────────
+  final int jobLevel;       // 1=프리미엄, 2=추천, 3=일반
+  final int matchScore;     // 커리어 매칭 점수 0~100
+  final bool isNearStation; // 역세권 여부
+  final DateTime? closingDate; // 마감일 (null=상시)
+  final bool canApplyNow;   // 즉시지원 가능 여부
+
   Job({
     required this.id,
     required this.title,
     required this.clinicName,
     required this.address,
+    this.district = '',
     required this.lat,
     required this.lng,
     required this.type,
@@ -29,6 +38,11 @@ class Job {
     required this.details,
     required this.benefits,
     required this.images,
+    this.jobLevel = 3,
+    this.matchScore = 0,
+    this.isNearStation = false,
+    this.closingDate,
+    this.canApplyNow = false,
   });
 
   factory Job.fromDoc(DocumentSnapshot doc) {
@@ -51,6 +65,17 @@ class Job {
       posted = DateTime.now();
     }
 
+    // closingDate 파싱
+    DateTime? closing;
+    final cl = json['closingDate'];
+    if (cl is Timestamp) {
+      closing = cl.toDate();
+    } else if (cl is String) {
+      try {
+        closing = DateTime.parse(cl);
+      } catch (_) {}
+    }
+
     // location이 GeoPoint 또는 Map일 수 있음
     double lat = 0;
     double lng = 0;
@@ -71,6 +96,7 @@ class Job {
       title: json['title'] ?? '',
       clinicName: json['clinicName'] ?? '',
       address: address,
+      district: json['district'] ?? '',
       lat: lat,
       lng: lng,
       type: json['type'] ?? '',
@@ -80,6 +106,11 @@ class Job {
       details: json['details'] ?? '',
       benefits: List<String>.from(json['benefits'] ?? []),
       images: List<String>.from(json['images'] ?? []),
+      jobLevel: (json['jobLevel'] as int?) ?? 3,
+      matchScore: (json['matchScore'] as int?) ?? 0,
+      isNearStation: (json['isNearStation'] as bool?) ?? false,
+      closingDate: closing,
+      canApplyNow: (json['canApplyNow'] as bool?) ?? false,
     );
   }
 
@@ -101,6 +132,7 @@ class Job {
           'lat': lat,
           'lng': lng,
         },
+        'district': district,
         'type': type,
         'career': career,
         'salaryRange': salaryRange,
@@ -108,5 +140,10 @@ class Job {
         'details': details,
         'benefits': benefits,
         'images': images,
+        'jobLevel': jobLevel,
+        'matchScore': matchScore,
+        'isNearStation': isNearStation,
+        if (closingDate != null) 'closingDate': Timestamp.fromDate(closingDate!),
+        'canApplyNow': canApplyNow,
       };
 }

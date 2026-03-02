@@ -52,6 +52,38 @@ class JobService {
   }
 
   // ══════════════════════════════════════════════
+  // ★ 페이지네이션 (Level 3 무한 스크롤용)
+  // ══════════════════════════════════════════════
+
+  /// Firestore 커서 기반 페이지 단위 공고 조회
+  ///
+  /// [pageSize] 한 번에 가져올 최대 건수
+  /// [startAfter] 이전 페이지의 마지막 DocumentSnapshot (첫 페이지는 null)
+  ///
+  /// 반환 타입: (jobs, lastDoc, hasMore)
+  Future<({List<Job> jobs, DocumentSnapshot? lastDoc, bool hasMore})>
+      fetchJobsPaged({
+    int pageSize = 15,
+    DocumentSnapshot? startAfter,
+  }) async {
+    Query<Map<String, dynamic>> q = _db
+        .collection('jobs')
+        .orderBy('postedAt', descending: true)
+        .limit(pageSize);
+
+    if (startAfter != null) {
+      q = q.startAfterDocument(startAfter);
+    }
+
+    final snap = await q.get();
+    final jobs = snap.docs.map((d) => Job.fromDoc(d)).toList();
+    final lastDoc = snap.docs.isNotEmpty ? snap.docs.last : null;
+    final hasMore = snap.docs.length >= pageSize;
+
+    return (jobs: jobs, lastDoc: lastDoc, hasMore: hasMore);
+  }
+
+  // ══════════════════════════════════════════════
   // ★ 새 메서드: 반경 기반 검색 (지도용)
   // ══════════════════════════════════════════════
 

@@ -1279,3 +1279,238 @@ export {
 
 // ========== 계정 삭제 ==========
 export { deleteMyAccount } from "./account-deletion";
+
+// ========== 구인공고: 이미지 → 폼 자동채우기 (AI Vision) ==========
+/**
+ * parseJobImagesToForm
+ *
+ * 공고 이미지 URL 목록을 받아 OpenAI Vision으로 폼 필드를 추출한다.
+ * 현재는 Mock 구현. 실제 OpenAI 키 발급 후 아래 TODO 섹션 교체.
+ *
+ * Input  : { imageUrls: string[], jobId: string }
+ * Output : { title, role, employmentType, workHours, salary,
+ *            benefits, description, address, contact, clinicName }
+ */
+export const parseJobImagesToForm = functions
+  .runWith({ timeoutSeconds: 60, memory: "512MB" })
+  .https.onCall(async (data, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError(
+        "unauthenticated",
+        "로그인이 필요합니다."
+      );
+    }
+
+    const imageUrls: string[] = data.imageUrls ?? [];
+    if (!imageUrls.length) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "이미지 URL이 없습니다."
+      );
+    }
+
+    // ── TODO: OpenAI Vision 실제 연동 ──────────────────────────
+    // const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    // const response = await openai.chat.completions.create({ ... });
+    // ────────────────────────────────────────────────────────────
+
+    // ── Mock 응답 (이미지 분석 없이 샘플 반환) ──────────────────
+    functions.logger.info("parseJobImagesToForm called (mock)", {
+      uid: context.auth.uid,
+      imageCount: imageUrls.length,
+    });
+
+    // 실제 연동 전까지 샘플 데이터 반환
+    const mockResult = {
+      clinicName: "",
+      title: "",
+      role: "",
+      employmentType: "",
+      workHours: "",
+      salary: "",
+      benefits: [] as string[],
+      description: "",
+      address: "",
+      contact: "",
+      _mock: true,
+      _message:
+        "AI 자동입력은 OpenAI 키 연동 후 활성화됩니다. 현재는 Mock 모드입니다.",
+    };
+
+    return mockResult;
+  });
+
+// ========== 구인공고: 공고 생성 ==========
+/**
+ * createJobPosting
+ *
+ * 서버 측에서 구인공고를 생성한다(검증/정규화/스팸방지).
+ * 생성 시 status=pending 으로 설정.
+ */
+export const createJobPosting = functions.https.onCall(
+  async (data, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError(
+        "unauthenticated",
+        "로그인이 필요합니다."
+      );
+    }
+
+    const uid = context.auth.uid;
+
+    // 필수 필드 검증
+    const required = ["clinicName", "title", "address"];
+    for (const field of required) {
+      if (!data[field] || !String(data[field]).trim()) {
+        throw new functions.https.HttpsError(
+          "invalid-argument",
+          `${field} 필드가 비어 있습니다.`
+        );
+      }
+    }
+
+    const jobData = {
+      createdBy: uid,
+      clinicName: String(data.clinicName ?? "").trim(),
+      title: String(data.title ?? "").trim(),
+      role: String(data.role ?? "").trim(),
+      employmentType: String(data.employmentType ?? "").trim(),
+      workHours: String(data.workHours ?? "").trim(),
+      salary: String(data.salary ?? "").trim(),
+      benefits: Array.isArray(data.benefits) ? data.benefits : [],
+      description: String(data.description ?? "").trim(),
+      address: String(data.address ?? "").trim(),
+      contact: String(data.contact ?? "").trim(),
+      images: Array.isArray(data.images) ? data.images : [],
+      status: "pending",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    const ref = await db.collection("jobs").add(jobData);
+
+    functions.logger.info("createJobPosting", { uid, jobId: ref.id });
+
+    return { jobId: ref.id, status: "pending" };
+  }
+);
+
+// ========== 치과 사업자 인증 ==========
+/**
+ * submitClinicVerification
+ *
+ * 사업자등록증 이미지 URL 또는 직접 입력 데이터를 받아:
+ * 1) AI로 필드 추출 (현재 Mock → OpenAI 키 발급 후 실제 연동)
+ * 2) 국세청 사업자 상태 조회 (현재 Mock → API 발급 후 실제 연동)
+ * 3) 통과 시 users/{uid}.clinicVerified = true 업데이트
+ * 4) clinicVerifications/{uid} 문서 생성
+ *
+ * Input (이미지 모드): { docUrl: string, uid?: string }
+ * Input (직접제출 모드): { bizNo, clinicName, ownerName, openedAt, address, finalSubmit: true }
+ * Output: { bizNo, clinicName, ownerName, openedAt, address, ntsValid, status, _mock? }
+ */
+export const submitClinicVerification = functions.https.onCall(
+  async (data, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError(
+        "unauthenticated",
+        "로그인이 필요합니다."
+      );
+    }
+
+    const uid = context.auth.uid;
+
+    // ── 직접 제출 모드 (finalSubmit: true) ──────────────
+    if (data.finalSubmit === true) {
+      const bizNo = String(data.bizNo ?? "").trim();
+      const clinicName = String(data.clinicName ?? "").trim();
+
+      if (!bizNo || !clinicName) {
+        throw new functions.https.HttpsError(
+          "invalid-argument",
+          "사업자번호와 치과명은 필수입니다."
+        );
+      }
+
+      // TODO: 실제 국세청 API 연동 (현재 Mock)
+      const ntsResult = {
+        valid: true,
+        state: "ACTIVE",
+        _mock: true,
+        _message: "국세청 API 발급 후 실제 조회로 교체 예정",
+      };
+
+      // clinicVerifications 문서 저장
+      await db.collection("clinicVerifications").doc(uid).set({
+        status: ntsResult.valid ? "approved" : "rejected",
+        bizNo,
+        clinicName,
+        ownerName: String(data.ownerName ?? "").trim(),
+        openedAt: String(data.openedAt ?? "").trim(),
+        address: String(data.address ?? "").trim(),
+        nts: ntsResult,
+        submittedAt: admin.firestore.FieldValue.serverTimestamp(),
+        reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // 승인 시 users 문서 업데이트
+      if (ntsResult.valid) {
+        await db.collection("users").doc(uid).set(
+          {
+            role: "clinic",
+            clinicVerified: true,
+            clinic: { name: clinicName, bizNo },
+          },
+          { merge: true }
+        );
+      }
+
+      functions.logger.info("submitClinicVerification finalSubmit", {
+        uid,
+        bizNo,
+        ntsValid: ntsResult.valid,
+      });
+
+      return {
+        status: ntsResult.valid ? "approved" : "rejected",
+        ntsValid: ntsResult.valid,
+        _mock: true,
+      };
+    }
+
+    // ── 이미지 AI 추출 모드 ──────────────────────────────
+    const docUrl = String(data.docUrl ?? "");
+    if (!docUrl) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "사업자등록증 이미지 URL이 없습니다."
+      );
+    }
+
+    // TODO: OpenAI Vision으로 실제 추출 (현재 Mock)
+    functions.logger.info("submitClinicVerification AI extract (mock)", {
+      uid,
+      docUrl,
+    });
+
+    // clinicVerifications 문서에 pending 상태로 저장
+    await db.collection("clinicVerifications").doc(uid).set(
+      {
+        status: "pending",
+        docPath: docUrl,
+        submittedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    return {
+      bizNo: "",
+      clinicName: "",
+      ownerName: "",
+      openedAt: "",
+      address: "",
+      _mock: true,
+      _message:
+        "OpenAI 키 연동 전 Mock 모드입니다. 정보를 직접 입력해주세요.",
+    };
+  }
+);

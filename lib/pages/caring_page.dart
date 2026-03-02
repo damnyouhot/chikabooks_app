@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,8 +7,10 @@ import 'package:rive/rive.dart';
 import '../services/caring_state_service.dart';
 import '../services/bond_score_service.dart';
 import '../services/caring_action_service.dart';
+import '../services/base_message_service.dart';
 import '../services/job_service.dart';
 import '../services/ebook_service.dart';
+import '../data/base_message_data.dart';
 import '../models/ebook.dart';
 import '../widgets/speech_overlay.dart';
 import '../widgets/diary_input_sheet.dart';
@@ -19,6 +22,9 @@ import 'settings/settings_page.dart';
 const _colorAccent = Color(0xFFF7CBCA);
 const _colorText = Color(0xFF5D6B6B);
 const _colorBg = Color(0xFFF1F7F7);
+
+/// 기본 메시지 상태 머신 상태
+enum _LoopState { idle, showingBase, showingReaction }
 
 /// 돌보기(1탭) — 4개 정보 카드 + 캐릭터 + 4버튼
 class CaringPage extends StatefulWidget {
@@ -37,17 +43,15 @@ class CaringPage extends StatefulWidget {
 
 class _CaringPageState extends State<CaringPage>
     with SingleTickerProviderStateMixin {
-  // ── 상태 ──
+  // ── 로딩 ──
   bool _loading = true;
 
   // ── 카드 데이터 ──
   String _jobsSummary = '근처 신규 구인 확인 중...';
   String _jobsSub = '';
-
   List<Map<String, String>> _upcomingPolicies = [];
   int _policyIndex = 0;
   Timer? _policyTimer;
-
   Ebook? _weeklyBook;
   String _quizSummary = '오늘의 퀴즈 확인 중...';
 
@@ -57,15 +61,30 @@ class _CaringPageState extends State<CaringPage>
   double _topH = 270;
   double _bottomH = 100;
 
-  // ── 말풍선 ──
+  // ── 상태 머신 ──
+  _LoopState _loopState = _LoopState.idle;
+  Timer? _msgLoopTimer;
+  DateTime? _baseShowStart; // 현재 기본 메시지 노출 시작 시각
+
+  // ── 기본 메시지 (캐릭터 위) ──
+  String? _baseMsgText;
+  bool _isBaseMsgDismissing = false;
+
+  // ── 리액션 메시지 (캐릭터 아래, 기존 위치 유지) ──
   String? _currentSpeech;
   bool _isDismissingSpeech = false;
+
+  // ── 큐 / 이벤트 (세션 내 인메모리) ──
+  final Queue<String> _reactionQueue = Queue<String>();
+  final Queue<String> _eventQueue = Queue<String>();
+  final Set<String> _shownEventIds = <String>{};
 
   // ── Rive ──
   Artboard? _dogArtboard;
   StateMachineController? _dogStateMachine;
   SMITrigger? _tapTrigger;
 
+  // 터치 리액션 fallback 문구
   static const List<String> _neutralPhrases = [
     '오늘도 여기.',
     '천천히 해도 괜찮아.',
@@ -82,9 +101,14 @@ class _CaringPageState extends State<CaringPage>
     super.initState();
     _loadRiveFile();
     _bootstrap();
-    // 오랜만에 실행 시 정산이 첫 액션과 경합하지 않도록 큐잉
     Future.microtask(() async {
       await CaringActionService.dailySettle();
+      // 이벤트 감지 (Firestore) → 큐에 적재 → 루프 시작
+      final detectedEvents = await CaringActionService.detectOpenEvents();
+      for (final eventId in detectedEvents) {
+        _queueEventIfNew(eventId);
+      }
+      if (mounted) _startMsgLoop();
     });
     WidgetsBinding.instance.addPostFrameCallback((_) => _measure());
   }
@@ -92,11 +116,15 @@ class _CaringPageState extends State<CaringPage>
   @override
   void dispose() {
     _policyTimer?.cancel();
+    _msgLoopTimer?.cancel();
     _dogStateMachine?.dispose();
     super.dispose();
   }
 
-  /// Rive 파일 로드
+  // ══════════════════════════════════════════════
+  // Rive / 데이터 로드
+  // ══════════════════════════════════════════════
+
   Future<void> _loadRiveFile() async {
     try {
       final data = await rootBundle.load('assets/dog.riv');
@@ -122,29 +150,24 @@ class _CaringPageState extends State<CaringPage>
     }
   }
 
-  /// 데이터 로드
   Future<void> _bootstrap({bool showLoader = true}) async {
-    if (showLoader) {
-      setState(() => _loading = true);
-    }
+    if (showLoader) setState(() => _loading = true);
 
     try {
       await CaringStateService.loadState();
       await BondScoreService.applyCenterGravity();
-      // 구인 요약
+
       final jobService = JobService();
       final jobData = await jobService.getRecentJobsSummary();
       final jobCount = jobData['count'] ?? 0;
       final clinicName = jobData['clinicName'] ?? '';
 
-      // 임박 제도 변경 (더미 - HiraUpdateService 연동 필요)
       final policies = [
         {'title': '2026 스케일링 급여 개정', 'dday': 'D-12', 'date': '3월 1일'},
         {'title': '치주질환 급여 인정 기준 변경', 'dday': 'D-21', 'date': '3월 10일'},
         {'title': '근관치료 행위 산정 지침 개정', 'dday': 'D-26', 'date': '3월 15일'},
       ];
 
-      // 이주의 책 (EbookService 재사용)
       Ebook? featuredBook;
       try {
         final ebookService = EbookService();
@@ -191,7 +214,6 @@ class _CaringPageState extends State<CaringPage>
     if (topBox != null && bottomBox != null) {
       final newTop = topBox.size.height;
       final newBottom = bottomBox.size.height;
-
       if ((newTop - _topH).abs() > 2 || (newBottom - _bottomH).abs() > 2) {
         setState(() {
           _topH = newTop;
@@ -201,10 +223,147 @@ class _CaringPageState extends State<CaringPage>
     }
   }
 
-  /// 이주의 책 상세 페이지 이동
+  // ══════════════════════════════════════════════
+  // 기본 메시지 상태 머신
+  // ══════════════════════════════════════════════
+
+  void _startMsgLoop() {
+    // 첫 탭 진입 시 즉시 첫 메시지 노출 (공백 없이)
+    _showNextBase();
+  }
+
+  void _showNextBase() {
+    if (!mounted) return;
+    _loopState = _LoopState.showingBase;
+    _baseShowStart = DateTime.now();
+
+    // 이벤트 메시지 우선, 없으면 기본 메시지 생성
+    final msg = _eventQueue.isNotEmpty
+        ? _eventQueue.removeFirst()
+        : BaseMessageService.generate();
+
+    debugPrint('[MsgLoop] state=ShowingBaseOrEvent start');
+
+    setState(() {
+      _baseMsgText = msg;
+      _isBaseMsgDismissing = false;
+    });
+
+    _msgLoopTimer?.cancel();
+    _msgLoopTimer = Timer(const Duration(seconds: 4), _onBaseShowEnd);
+  }
+
+  void _onBaseShowEnd() {
+    if (!mounted) return;
+    setState(() => _isBaseMsgDismissing = true);
+
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+      setState(() {
+        _baseMsgText = null;
+        _isBaseMsgDismissing = false;
+      });
+      if (_reactionQueue.isNotEmpty) {
+        _showNextReaction();
+      } else {
+        _startIdleGap();
+      }
+    });
+  }
+
+  void _startIdleGap() {
+    _loopState = _LoopState.idle;
+    debugPrint('[MsgLoop] state=IdleGap start');
+    _msgLoopTimer?.cancel();
+    _msgLoopTimer = Timer(const Duration(seconds: 3), _showNextBase);
+  }
+
+  void _showNextReaction() {
+    if (!mounted) return;
+    if (_reactionQueue.isEmpty) {
+      _startIdleGap();
+      return;
+    }
+
+    _loopState = _LoopState.showingReaction;
+    final msg = _reactionQueue.removeFirst();
+    debugPrint('[Reaction] show start, queueLen=${_reactionQueue.length}');
+
+    setState(() {
+      _currentSpeech = msg;
+      _isDismissingSpeech = false;
+    });
+
+    _msgLoopTimer?.cancel();
+    // 리액션 메시지 지속시간: 2초 (밥/사랑 리액션 텍스트가 충분히 읽히도록)
+    _msgLoopTimer = Timer(const Duration(seconds: 2), () {
+      if (!mounted) return;
+      setState(() => _isDismissingSpeech = true);
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (!mounted) return;
+        setState(() {
+          _currentSpeech = null;
+          _isDismissingSpeech = false;
+        });
+        debugPrint('[Reaction] show end, dequeued');
+        _showNextReaction();
+      });
+    });
+  }
+
+  /// 리액션(밥/사랑) 발생 시 큐에 추가 + 전환 로직
+  void _enqueueReaction(String msg) {
+    _reactionQueue.add(msg);
+    debugPrint('[Reaction] queued, queueLen=${_reactionQueue.length}');
+
+    switch (_loopState) {
+      case _LoopState.showingBase:
+        final elapsed = _baseShowStart != null
+            ? DateTime.now().difference(_baseShowStart!).inMilliseconds
+            : 2001;
+        debugPrint('[MsgLoop] openShownElapsed=${elapsed}ms');
+        _msgLoopTimer?.cancel();
+        if (elapsed >= 2000) {
+          // 이미 2초 경과 → 즉시 전환
+          _onBaseShowEnd();
+        } else {
+          // 2초 채울 때까지 대기 후 전환
+          final remainMs = 2000 - elapsed;
+          _msgLoopTimer = Timer(
+            Duration(milliseconds: remainMs),
+            _onBaseShowEnd,
+          );
+        }
+        break;
+      case _LoopState.idle:
+        // 공백 중 → 즉시 리액션 표시
+        _msgLoopTimer?.cancel();
+        _showNextReaction();
+        break;
+      case _LoopState.showingReaction:
+        // 이미 리액션 처리 중 → 큐에서 자동 순차 처리
+        break;
+    }
+  }
+
+  /// 이벤트 ID를 세션 내 1회만 큐에 삽입
+  void _queueEventIfNew(String eventId) {
+    if (_shownEventIds.contains(eventId)) return;
+    _shownEventIds.add(eventId);
+    final msg = BaseMessageData.eventMessages[eventId];
+    if (msg != null) {
+      _eventQueue.add(msg);
+      debugPrint('[MsgLoop] queued event: $eventId');
+    }
+  }
+
+  // ══════════════════════════════════════════════
+  // 액션 핸들러
+  // ══════════════════════════════════════════════
+
   void _goBookDetail() {
     if (_weeklyBook == null) {
-      widget.onTabRequested?.call(2); // 책 없으면 성장하기 탭
+      widget.onTabRequested?.call(2);
       return;
     }
     Navigator.of(context).push(
@@ -212,41 +371,43 @@ class _CaringPageState extends State<CaringPage>
     );
   }
 
-  /// 캐릭터 터치
+  /// 캐릭터 터치 (사랑하기)
   void _onCircleTap() async {
     _tapTrigger?.fire();
-
-    // tryTouch 호출: 쿨타임(하루 3회) 체크
     final result = await CaringActionService.tryTouch();
     if (!mounted) return;
 
-    // 멘트: tryTouch 결과 또는 중립 문구
-    final phrase =
-        result.ment.isNotEmpty
+    final phrase = result.ment.isNotEmpty
             ? result.ment
             : _neutralPhrases[Random().nextInt(_neutralPhrases.length)];
 
-    setState(() {
-      _currentSpeech = phrase;
-      _isDismissingSpeech = false;
-    });
-
-    // 실제 점수가 있을 때만 플러스 텍스트 표시 (쿨타임 중이면 0.0)
-    if (result.bondDelta > 0) {
-      _showFloatingDelta(result.bondDelta);
+    _enqueueReaction(phrase);
+    if (result.bondDelta > 0) _showFloatingDelta(result.bondDelta);
     }
 
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) setState(() => _isDismissingSpeech = true);
-    });
-    Future.delayed(const Duration(milliseconds: 2300), () {
-      if (mounted) {
-        setState(() {
-          _currentSpeech = null;
-          _isDismissingSpeech = false;
+  void _onFeed() async {
+    final result = await CaringActionService.tryFeed();
+    if (!mounted) return;
+
+    final msg = result.success
+        ? (result.ment ?? '밥을 줬어요')
+        : (result.rejectMent ?? '나중에 다시 시도하세요');
+
+    _enqueueReaction(msg);
+    if (result.success && result.bondDelta > 0) _showFloatingDelta(result.bondDelta);
+    if (result.success) _bootstrap(showLoader: false);
+  }
+
+  void _onLove() => _onCircleTap();
+
+  void _onDiary() {
+    DiaryInputSheet.show(context, (text) async {
+      _bootstrap();
         });
       }
-    });
+
+  void _onGoal() {
+    UserGoalSheet.show(context);
   }
 
   void _showFloatingDelta(double delta) {
@@ -260,8 +421,7 @@ class _CaringPageState extends State<CaringPage>
     final label = '결+${delta.toStringAsFixed(2)}';
 
     final entry = OverlayEntry(
-      builder:
-          (ctx) => Positioned(
+      builder: (ctx) => Positioned(
             left: offsetX,
             top: offsetY,
             child: TweenAnimationBuilder<double>(
@@ -295,6 +455,10 @@ class _CaringPageState extends State<CaringPage>
     Future.delayed(const Duration(milliseconds: 1500), () => entry.remove());
   }
 
+  // ══════════════════════════════════════════════
+  // Build
+  // ══════════════════════════════════════════════
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -304,15 +468,13 @@ class _CaringPageState extends State<CaringPage>
       );
     }
 
-    // 캐릭터 영역: 카드 아래 ~ 버튼 위
-    // safeBottom: BottomNavBar 포함 하단 여백 확보
     final safeBottom = _bottomH + 8;
 
     return Scaffold(
       backgroundColor: _colorBg,
       body: Stack(
         children: [
-          // 배경 (터치 불가)
+          // 배경
           Positioned.fill(
             child: IgnorePointer(
               ignoring: true,
@@ -321,7 +483,6 @@ class _CaringPageState extends State<CaringPage>
           ),
 
           // ── 캐릭터 ──
-          // 4번째 카드 아래 ~ 하단 버튼 위 사이에 배치, 2.112배 (2.64 × 80%)
           Positioned(
             top: _topH,
             left: 0,
@@ -329,8 +490,7 @@ class _CaringPageState extends State<CaringPage>
             bottom: safeBottom,
             child: GestureDetector(
               onTap: _onCircleTap,
-              child:
-                  _dogArtboard != null
+              child: _dogArtboard != null
                       ? LayoutBuilder(
                         builder: (ctx, constraints) {
                           const scale = 2.112;
@@ -354,7 +514,23 @@ class _CaringPageState extends State<CaringPage>
             ),
           ),
 
-          // 말풍선
+          // ── 기본 메시지 (오늘의 1문제 카드와 캐릭터 사이) ──
+          Positioned(
+            top: _topH + 110,
+            left: 0,
+            right: 0,
+            child: IgnorePointer(
+              ignoring: true,
+              child: Center(
+                child: SpeechOverlay(
+                  text: _baseMsgText,
+                  isDismissing: _isBaseMsgDismissing,
+                ),
+              ),
+            ),
+          ),
+
+          // ── 리액션 말풍선 (캐릭터 아래) ──
           Positioned(
             bottom: safeBottom + 10,
             left: 0,
@@ -370,7 +546,7 @@ class _CaringPageState extends State<CaringPage>
             ),
           ),
 
-          // 하단 버튼들 (먼저 배치해야 높이 측정 가능)
+          // 하단 버튼
           Positioned(
             left: 0,
             right: 0,
@@ -386,7 +562,7 @@ class _CaringPageState extends State<CaringPage>
             ),
           ),
 
-          // 상단 카드 4개 (Stack 최상단)
+          // 상단 카드 4개
           Positioned(
             top: 0,
             left: 0,
@@ -401,14 +577,12 @@ class _CaringPageState extends State<CaringPage>
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     _buildTopBar(),
-                    // ① 구인 → 도전하기 탭(3)
                     _TapCard(
                       title: '📍 내 주변 구인 치과',
                       bigText: _jobsSummary,
                       subtitle: _jobsSub,
                       onTap: () => widget.onTabRequested?.call(3),
                     ),
-                    // ② 임박 제도 변경 → 성장하기 탭(2) > 급여변경(1)
                     _PolicyRollingCard(
                       policies: _upcomingPolicies,
                       index: _policyIndex,
@@ -417,14 +591,12 @@ class _CaringPageState extends State<CaringPage>
                         widget.onGrowthSubTabRequested?.call(1);
                       },
                     ),
-                    // ③ 이주의 책 → 책 상세 페이지 (유일하게 새 화면)
                     _TapCard(
                       title: '📖 이주의 책',
                       bigText: _weeklyBook?.title ?? '이번 주 추천 책이 없어요',
                       subtitle: '',
                       onTap: _goBookDetail,
                     ),
-                    // ④ 오늘의 1문제 → 성장하기 탭(2) > 오늘퀴즈(0)
                     _TapCard(
                       title: '🧠 오늘의 1문제',
                       bigText: _quizSummary,
@@ -444,7 +616,6 @@ class _CaringPageState extends State<CaringPage>
     );
   }
 
-  /// 상단 바
   Widget _buildTopBar() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -501,7 +672,6 @@ class _CaringPageState extends State<CaringPage>
     );
   }
 
-  /// 하단 버튼 섹션 (아이콘+텍스트 구조 복원)
   Widget _buildBottomSection() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -518,57 +688,10 @@ class _CaringPageState extends State<CaringPage>
     );
   }
 
-  void _onFeed() async {
-    final result = await CaringActionService.tryFeed();
-    if (mounted) {
-      final message =
-          result.success
-              ? (result.ment ?? '밥을 줬어요')
-              : (result.rejectMent ?? '나중에 다시 시도하세요');
-
-      // 스낵바 대신 기존 말풍선 형태로 표시
-      setState(() {
-        _currentSpeech = message;
-        _isDismissingSpeech = false;
-      });
-
-      // 밥먹기 성공 시 결 점수 플러스 애니메이션
-      if (result.success && result.bondDelta > 0) {
-        _showFloatingDelta(result.bondDelta);
-      }
-      Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) setState(() => _isDismissingSpeech = true);
-      });
-      Future.delayed(const Duration(milliseconds: 2300), () {
-        if (mounted) {
-          setState(() {
-            _currentSpeech = null;
-            _isDismissingSpeech = false;
-          });
-        }
-      });
-
-      if (result.success) _bootstrap(showLoader: false);
-    }
-  }
-
-  void _onLove() => _onCircleTap();
-
-  void _onDiary() {
-    DiaryInputSheet.show(context, (text) async {
-      _bootstrap();
-    });
-  }
-
-  void _onGoal() {
-    UserGoalSheet.show(context);
-  }
-
   void _showConceptDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder:
-          (ctx) => AlertDialog(
+      builder: (ctx) => AlertDialog(
             title: const Text(
               "'나' 탭에 대해서",
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
@@ -606,7 +729,6 @@ class _CaringPageState extends State<CaringPage>
 // 위젯 클래스들
 // ══════════════════════════════════════════════
 
-/// 일반 정보 카드 (터치 피드백 포함)
 class _TapCard extends StatelessWidget {
   const _TapCard({
     required this.title,
@@ -637,7 +759,6 @@ class _TapCard extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // 타이틀 (좌측)
                 Expanded(
                   child: Text(
                     title,
@@ -649,7 +770,6 @@ class _TapCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                // 본문 + 세부설명 (우측, 세로 정렬)
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   mainAxisSize: MainAxisSize.min,
@@ -684,11 +804,7 @@ class _TapCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(width: 4),
-                const Icon(
-                  Icons.chevron_right,
-                  color: Colors.black45,
-                  size: 20,
-                ),
+                const Icon(Icons.chevron_right, color: Colors.black45, size: 20),
               ],
             ),
           ),
@@ -698,8 +814,6 @@ class _TapCard extends StatelessWidget {
   }
 }
 
-/// 임박 제도 변경 롤링 카드
-/// 타이틀("🏥 임박 제도 변경")은 고정, big+sub 내용만 AnimatedSwitcher
 class _PolicyRollingCard extends StatelessWidget {
   const _PolicyRollingCard({
     required this.policies,
@@ -738,7 +852,6 @@ class _PolicyRollingCard extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // ✅ 타이틀은 좌측 고정
                 const Expanded(
                   child: Text(
                     '🏥 임박 제도 변경',
@@ -750,12 +863,10 @@ class _PolicyRollingCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                // 내용만 롤링 (이전: 위로 나감 / 새것: 아래에서 올라옴) — 우측 배치
                 ClipRect(
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 350),
-                    layoutBuilder:
-                        (current, previous) => Stack(
+                    layoutBuilder: (current, previous) => Stack(
                           alignment: Alignment.centerRight,
                           children: [...previous, if (current != null) current],
                         ),
@@ -764,8 +875,7 @@ class _PolicyRollingCard extends StatelessWidget {
                           animation.status == AnimationStatus.reverse ||
                           animation.status == AnimationStatus.dismissed;
                       final offsetTween = Tween<Offset>(
-                        begin:
-                            isLeaving
+                        begin: isLeaving
                                 ? const Offset(0, -1.0)
                                 : const Offset(0, 1.0),
                         end: Offset.zero,
@@ -814,11 +924,7 @@ class _PolicyRollingCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 4),
-                const Icon(
-                  Icons.chevron_right,
-                  color: Colors.black45,
-                  size: 20,
-                ),
+                const Icon(Icons.chevron_right, color: Colors.black45, size: 20),
               ],
             ),
           ),
@@ -828,7 +934,6 @@ class _PolicyRollingCard extends StatelessWidget {
   }
 }
 
-/// 하단 액션 버튼 (아이콘 + 텍스트, 원래 디자인 복원)
 class _ActionBtn extends StatelessWidget {
   const _ActionBtn({
     required this.icon,
