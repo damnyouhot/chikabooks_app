@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
@@ -15,7 +17,11 @@ class AppInitializer {
     if (kIsWeb) usePathUrlStrategy();
 
     // Rive 초기화
-    await RiveFile.initialize();
+    // iOS에서 rive 0.13.18+ 의 FFI init 심볼 에러 우회 (rive_text_ffi crash)
+    // RiveFile.import()는 정상 동작하므로 애니메이션 재생에는 영향 없음
+    if (!kIsWeb && !Platform.isIOS) {
+      await RiveFile.initialize();
+    }
 
     // 카카오 SDK 초기화
     // javaScriptAppKey: 카카오 콘솔 → 앱 키 → JavaScript 키
