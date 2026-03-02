@@ -1,8 +1,5 @@
 platform :ios, '15.0'
 
-# Uncomment this line to define a global platform for your project
-# platform :ios, '15.0'
-
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
@@ -30,9 +27,9 @@ require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelpe
 flutter_ios_podfile_setup
 
 target 'Runner' do
-  # ✅ Firebase / GoogleSignIn 등에서 non-modular header 문제를 피하려면
-  #    static linkage + modular headers 조합이 가장 안정적임
-  use_frameworks! :linkage => :static
+  # Dynamic frameworks: rive_native 0.14.x의 pod_target_xcconfig(force_load)가
+  # 프레임워크 링크 단계에서 올바르게 동작하며, Firebase 11.x도 dynamic을 완전 지원
+  use_frameworks!
   use_modular_headers!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
@@ -47,13 +44,8 @@ post_install do |installer|
     flutter_additional_ios_build_settings(target)
 
     target.build_configurations.each do |config|
-      # ✅ 전체 pods 최소 타겟 통일
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
-
-      # ✅ non-modular header 관련 빌드 차단 완화 (보험)
       config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
-
-      # ✅ 모듈 정의/Swift 버전 명시 (Xcode 최신 조합 안정화)
       config.build_settings['DEFINES_MODULE'] = 'YES'
       config.build_settings['SWIFT_VERSION'] = '5.0'
     end

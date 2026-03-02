@@ -10,7 +10,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   firebase_storage
   geolocator_windows
   pdfx
-  rive_common
+  rive_native
   url_launcher_windows
 )
 

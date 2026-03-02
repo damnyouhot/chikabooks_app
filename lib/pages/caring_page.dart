@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:rive/rive.dart';
 import '../services/caring_state_service.dart';
 import '../services/bond_score_service.dart';
@@ -79,10 +78,10 @@ class _CaringPageState extends State<CaringPage>
   final Queue<String> _eventQueue = Queue<String>();
   final Set<String> _shownEventIds = <String>{};
 
-  // ── Rive ──
-  Artboard? _dogArtboard;
-  StateMachineController? _dogStateMachine;
-  SMITrigger? _tapTrigger;
+  // ── Rive (0.14.x) ──
+  File? _riveFile;
+  RiveWidgetController? _dogController;
+  TriggerInput? _tapTrigger;
 
   // 터치 리액션 fallback 문구
   static const List<String> _neutralPhrases = [
@@ -117,34 +116,31 @@ class _CaringPageState extends State<CaringPage>
   void dispose() {
     _policyTimer?.cancel();
     _msgLoopTimer?.cancel();
-    _dogStateMachine?.dispose();
+    _tapTrigger?.dispose();
+    _dogController?.dispose();
+    _riveFile?.dispose();
     super.dispose();
   }
 
   // ══════════════════════════════════════════════
-  // Rive / 데이터 로드
+  // 데이터 로드
   // ══════════════════════════════════════════════
 
   Future<void> _loadRiveFile() async {
     try {
-      final data = await rootBundle.load('assets/dog.riv');
-      final file = RiveFile.import(data);
-      final artboard = file.mainArtboard.instance();
-
-      final controller = StateMachineController.fromArtboard(
-        artboard,
-        'State Machine 1',
+      final file = await File.asset(
+        'assets/dog.riv',
+        riveFactory: Factory.rive,
       );
-
-      if (controller != null) {
-        artboard.addController(controller);
-        _tapTrigger = controller.findInput<bool>('tap') as SMITrigger?;
+      if (file == null || !mounted) return;
+      final controller = RiveWidgetController(file);
+      _tapTrigger = controller.stateMachine.trigger('tap');
+      if (mounted) {
+        setState(() {
+          _riveFile = file;
+          _dogController = controller;
+        });
       }
-
-      setState(() {
-        _dogArtboard = artboard;
-        _dogStateMachine = controller;
-      });
     } catch (e) {
       debugPrint('❌ dog.riv 로드 실패: $e');
     }
@@ -490,27 +486,26 @@ class _CaringPageState extends State<CaringPage>
             bottom: safeBottom,
             child: GestureDetector(
               onTap: _onCircleTap,
-              child: _dogArtboard != null
-                      ? LayoutBuilder(
-                        builder: (ctx, constraints) {
-                          const scale = 2.112;
-                          return OverflowBox(
-                            maxWidth: constraints.maxWidth * scale,
-                            maxHeight: constraints.maxHeight * scale,
-                            alignment: Alignment.center,
-                            child: SizedBox(
-                              width: constraints.maxWidth * scale,
-                              height: constraints.maxHeight * scale,
-                              child: Rive(
-                                artboard: _dogArtboard!,
-                                fit: BoxFit.contain,
-                                alignment: Alignment.center,
-                              ),
+              child: _dogController != null
+                  ? LayoutBuilder(
+                      builder: (ctx, constraints) {
+                        const scale = 2.112;
+                        return OverflowBox(
+                          maxWidth: constraints.maxWidth * scale,
+                          maxHeight: constraints.maxHeight * scale,
+                          alignment: Alignment.center,
+                          child: SizedBox(
+                            width: constraints.maxWidth * scale,
+                            height: constraints.maxHeight * scale,
+                            child: RiveWidget(
+                              controller: _dogController!,
+                              fit: Fit.contain,
                             ),
-                          );
-                        },
-                      )
-                      : const SizedBox.shrink(),
+                          ),
+                        );
+                      },
+                    )
+                  : const SizedBox.shrink(),
             ),
           ),
 
