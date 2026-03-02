@@ -4,7 +4,7 @@ import '../bond_post_card.dart';
 import 'bond_colors.dart';
 
 /// 오늘을 나누기 피드 섹션
-class BondFeedSection extends StatelessWidget {
+class BondFeedSection extends StatefulWidget {
   final String? partnerGroupId;
   final Map<String, String>? memberNicknames;
   final VoidCallback onOpenWrite;
@@ -16,8 +16,51 @@ class BondFeedSection extends StatelessWidget {
     required this.onOpenWrite,
   });
 
+  @override
+  State<BondFeedSection> createState() => _BondFeedSectionState();
+}
+
+class _BondFeedSectionState extends State<BondFeedSection> {
+  Stream<QuerySnapshot>? _stream;
+
   bool get _hasPartnerGroup =>
-      partnerGroupId != null && partnerGroupId!.isNotEmpty;
+      widget.partnerGroupId != null && widget.partnerGroupId!.isNotEmpty;
+
+  @override
+  void initState() {
+    super.initState();
+    _initStream();
+  }
+
+  @override
+  void didUpdateWidget(BondFeedSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // partnerGroupId가 바뀔 때만 스트림 재생성
+    if (oldWidget.partnerGroupId != widget.partnerGroupId) {
+      _initStream();
+    }
+  }
+
+  void _initStream() {
+    if (_hasPartnerGroup) {
+      _stream = FirebaseFirestore.instance
+          .collection('partnerGroups')
+          .doc(widget.partnerGroupId)
+          .collection('posts')
+          .where('isDeleted', isEqualTo: false)
+          .where(
+            'createdAtClient',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(
+              DateTime.now().subtract(const Duration(hours: 6)),
+            ),
+          )
+          .orderBy('createdAtClient', descending: true)
+          .limit(3)
+          .snapshots();
+    } else {
+      _stream = const Stream<QuerySnapshot>.empty();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -58,7 +101,7 @@ class BondFeedSection extends StatelessWidget {
               ),
               const Spacer(),
               TextButton(
-                onPressed: isPersonalMode ? null : onOpenWrite,
+                onPressed: isPersonalMode ? null : widget.onOpenWrite,
                 style: TextButton.styleFrom(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
@@ -80,24 +123,7 @@ class BondFeedSection extends StatelessWidget {
 
           // 게시물 피드
           StreamBuilder<QuerySnapshot>(
-            stream:
-                _hasPartnerGroup
-                    ? FirebaseFirestore.instance
-                        .collection('partnerGroups')
-                        .doc(partnerGroupId)
-                        .collection('posts')
-                        .where('isDeleted', isEqualTo: false)
-                        // 6시간 존속: 최근 6시간 내 글만 노출
-                        .where(
-                          'createdAtClient',
-                          isGreaterThanOrEqualTo: Timestamp.fromDate(
-                            DateTime.now().subtract(const Duration(hours: 6)),
-                          ),
-                        )
-                        .orderBy('createdAtClient', descending: true)
-                        .limit(3)
-                        .snapshots()
-                    : const Stream<QuerySnapshot>.empty(), // ✅ 개인 모드는 빈 스트림
+            stream: _stream,
             builder: (context, snap) {
               if (snap.connectionState == ConnectionState.waiting) {
                 return const Center(
@@ -168,7 +194,7 @@ class BondFeedSection extends StatelessWidget {
                   icon: Icons.edit_note_outlined,
                   text: '첫 이야기를 나눠주세요',
                   subtitle: null,
-                  onTap: onOpenWrite,
+                  onTap: widget.onOpenWrite,
                   isPersonalMode: false,
                 );
               }
@@ -180,8 +206,8 @@ class BondFeedSection extends StatelessWidget {
                     return BondPostCard(
                       post: data,
                       postId: doc.id,
-                      bondGroupId: partnerGroupId,
-                      memberNicknames: memberNicknames,
+                      bondGroupId: widget.partnerGroupId,
+                      memberNicknames: widget.memberNicknames,
                     );
                   }),
                 ],

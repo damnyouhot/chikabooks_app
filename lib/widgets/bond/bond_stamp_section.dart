@@ -5,7 +5,7 @@ import 'bond_colors.dart';
 import 'bond_stamp_circle.dart';
 
 /// 이번 주 우리 스탬프 섹션
-class BondStampSection extends StatelessWidget {
+class BondStampSection extends StatefulWidget {
   final String? partnerGroupId;
 
   const BondStampSection({
@@ -14,14 +14,45 @@ class BondStampSection extends StatelessWidget {
   });
 
   @override
+  State<BondStampSection> createState() => _BondStampSectionState();
+}
+
+class _BondStampSectionState extends State<BondStampSection> {
+  Stream<WeeklyStampState>? _stream;
+
+  @override
+  void initState() {
+    super.initState();
+    _initStream();
+  }
+
+  @override
+  void didUpdateWidget(BondStampSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.partnerGroupId != widget.partnerGroupId) {
+      _initStream();
+    }
+  }
+
+  void _initStream() {
+    if (widget.partnerGroupId != null && widget.partnerGroupId!.isNotEmpty) {
+      setState(() {
+        _stream = WeeklyStampService.watchThisWeek(widget.partnerGroupId!);
+      });
+    } else {
+      _stream = null;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     // 파트너 그룹이 없으면 숨김
-    if (partnerGroupId == null || partnerGroupId!.isEmpty) {
+    if (widget.partnerGroupId == null || widget.partnerGroupId!.isEmpty) {
       return const SizedBox.shrink();
     }
 
     return StreamBuilder<WeeklyStampState>(
-      stream: WeeklyStampService.watchThisWeek(partnerGroupId!),
+      stream: _stream,
       builder: (context, snap) {
         final stamp = snap.data ?? WeeklyStampState.empty(
           WeeklyStampService.currentWeekKey(),

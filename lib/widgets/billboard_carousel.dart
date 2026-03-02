@@ -25,6 +25,20 @@ class BillboardCarousel extends StatefulWidget {
 class _BillboardCarouselState extends State<BillboardCarousel> {
   Timer? _timer;
   int _currentIndex = 0;
+  late Stream<QuerySnapshot> _stream;
+
+  @override
+  void initState() {
+    super.initState();
+    // 스트림을 1회만 생성 - build()에서 만들면 탭 전환 시마다 새 스트림 → 로딩 반복
+    final cutoff = DateTime.now().subtract(const Duration(hours: 12));
+    _stream = FirebaseFirestore.instance
+        .collection('billboardPosts')
+        .where('expiresAt', isGreaterThan: Timestamp.fromDate(cutoff))
+        .orderBy('expiresAt')
+        .limit(10)
+        .snapshots();
+  }
 
   @override
   void dispose() {
@@ -34,18 +48,8 @@ class _BillboardCarouselState extends State<BillboardCarousel> {
 
   @override
   Widget build(BuildContext context) {
-    // 만료 기준: 12시간 전 (expiresAt = 생성+12h이므로 24h 안쪽 게시물만 포함)
-    // 복합 인덱스 없이 동작하도록 expiresAt 단일 필터만 Firestore에서 처리.
-    // status/isExpired 는 클라이언트에서 isActive 체크로 필터링.
-    final cutoff = DateTime.now().subtract(const Duration(hours: 12));
-
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('billboardPosts')
-          .where('expiresAt', isGreaterThan: Timestamp.fromDate(cutoff))
-          .orderBy('expiresAt')
-          .limit(10) // 클라이언트 필터 여분 고려해 여유 있게 가져옴
-          .snapshots(),
+      stream: _stream,
       builder: (context, snap) {
         // 에러 표시
         if (snap.hasError) {
