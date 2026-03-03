@@ -119,7 +119,7 @@ class EbookListPage extends StatelessWidget {
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => EbookDetailPage(ebook: book),
+                      builder: (_) => EbookDetailPage(ebook: book, hideActions: true),
                     ),
                   ),
                   child: Column(
@@ -131,7 +131,7 @@ class EbookListPage extends StatelessWidget {
                           borderRadius: BorderRadius.circular(12),
                           child: Image.network(
                             book.coverUrl,
-                            fit: BoxFit.cover,
+                            fit: BoxFit.contain,
                             width: double.infinity,
                             errorBuilder: (_, __, ___) => Container(
                               color: Colors.grey[200],
@@ -214,7 +214,7 @@ class EbookListPage extends StatelessWidget {
       onTap: () => Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => EbookDetailPage(ebook: ebook),
+          builder: (_) => EbookDetailPage(ebook: ebook, hideActions: true),
         ),
       ),
       child: Column(
@@ -226,7 +226,7 @@ class EbookListPage extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
               child: Image.network(
                 ebook.coverUrl,
-                fit: BoxFit.cover,
+                fit: BoxFit.contain,
                 width: double.infinity,
                 errorBuilder: (_, __, ___) => Container(
                   color: Colors.grey[200],

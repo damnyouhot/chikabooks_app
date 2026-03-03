@@ -9,7 +9,9 @@ import 'pdf_reader_page.dart';
 
 class EbookDetailPage extends StatefulWidget {
   final Ebook ebook;
-  const EbookDetailPage({super.key, required this.ebook});
+  /// true이면 구매/읽기 버튼을 숨김 (치과책방 탭 전용)
+  final bool hideActions;
+  const EbookDetailPage({super.key, required this.ebook, this.hideActions = false});
 
   @override
   State<EbookDetailPage> createState() => _EbookDetailPageState();
@@ -120,46 +122,48 @@ class _EbookDetailPageState extends State<EbookDetailPage> {
             Text(ebook.description),
             const SizedBox(height: 32),
             
-            // 구매/읽기 버튼
-            SizedBox(
-              width: double.infinity,
-              child: _checkingPurchase
-                  ? const Center(child: CircularProgressIndicator())
-                  : FilledButton(
-                      onPressed: () => _onButtonPressed(context),
-                      child: Text(
-                        _isPurchased
-                            ? '이어서 읽기'
-                            : ebook.price == 0
-                                ? '바로 읽기'
-                                : '$priceText • 구매 후 읽기',
+            // 구매/읽기 버튼 (hideActions가 true면 숨김 — 치과책방 탭)
+            if (!widget.hideActions) ...[
+              SizedBox(
+                width: double.infinity,
+                child: _checkingPurchase
+                    ? const Center(child: CircularProgressIndicator())
+                    : FilledButton(
+                        onPressed: () => _onButtonPressed(context),
+                        child: Text(
+                          _isPurchased
+                              ? '이어서 읽기'
+                              : ebook.price == 0
+                                  ? '바로 읽기'
+                                  : '$priceText • 구매 후 읽기',
+                        ),
                       ),
-                    ),
-            ),
+              ),
 
-            // 이미 구매한 경우 안내
-            if (_isPurchased && ebook.price > 0) ...[
-              const SizedBox(height: 8),
-              Text(
-                '✓ 이미 구매한 책입니다.',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.green[600],
-                  fontWeight: FontWeight.w500,
+              // 이미 구매한 경우 안내
+              if (_isPurchased && ebook.price > 0) ...[
+                const SizedBox(height: 8),
+                Text(
+                  '✓ 이미 구매한 책입니다.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.green[600],
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-              ),
-            ],
-            
-            // 무료가 아니고 미구매인 경우 안내 문구
-            if (!_isPurchased && ebook.price > 0) ...[
-              const SizedBox(height: 8),
-              Text(
-                '* 현재 테스트 모드: 결제 없이 바로 읽을 수 있습니다.',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
+              ],
+              
+              // 무료가 아니고 미구매인 경우 안내 문구
+              if (!_isPurchased && ebook.price > 0) ...[
+                const SizedBox(height: 8),
+                Text(
+                  '* 현재 테스트 모드: 결제 없이 바로 읽을 수 있습니다.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
                 ),
-              ),
+              ],
             ],
           ],
         ),

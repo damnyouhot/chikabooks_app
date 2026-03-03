@@ -200,8 +200,8 @@ class _GrowthPageState extends State<GrowthPage>
           fontWeight: FontWeight.w400,
         ),
         tabs: const [
-          Tab(text: '오늘퀴즈'),
-          Tab(text: '급여변경'),
+          Tab(text: '오늘 퀴즈'),
+          Tab(text: '제도 변경'),
           Tab(text: '치과책방'),
           Tab(text: '내 서재'),
         ],
@@ -394,7 +394,7 @@ class _SavedHiraTab extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '급여변경 탭에서 항목을 저장하세요.',
+                  '제도 변경 탭에서 항목을 저장하세요.',
                   style: TextStyle(
                     fontSize: 12,
                     color: _kText.withOpacity(0.4),

@@ -293,20 +293,37 @@ class _Level1Card extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // 1줄: 병원명 + 배지
+                    // 1줄: 병원명 + 위치 + 배지
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        Expanded(
-                          child: Text(
-                            job.clinicName,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: _kText,
-                              letterSpacing: -0.3,
+                        Flexible(
+                          child: Text.rich(
+                            TextSpan(
+                              children: [
+                                TextSpan(
+                                  text: job.clinicName,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: _kText,
+                                    letterSpacing: -0.3,
+                                  ),
+                                ),
+                                if (job.district.isNotEmpty)
+                                  TextSpan(
+                                    text: '  ${job.district}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w400,
+                                      color: _kText.withOpacity(0.45),
+                                      letterSpacing: -0.2,
+                                    ),
+                                  ),
+                              ],
                             ),
                             overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
                           ),
                         ),
                         const SizedBox(width: 6),

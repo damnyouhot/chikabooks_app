@@ -1,6 +1,35 @@
 import 'package:flutter/material.dart';
 import 'bond_colors.dart';
 
+/// 다음 월요일 09:00 KST 까지 남은 시간을 사람이 읽기 좋은 문자열로 반환
+String _nextMatchingMessage() {
+  final now = DateTime.now();
+  // 다음 월요일 09:00 계산
+  int daysUntilMonday = (DateTime.monday - now.weekday) % 7;
+  if (daysUntilMonday == 0 && (now.hour > 9 || (now.hour == 9 && now.minute > 0))) {
+    daysUntilMonday = 7; // 이미 이번 월요일 9시를 지났으면 다음 주
+  }
+  if (daysUntilMonday == 0) daysUntilMonday = 7; // 월요일 09:00 이전도 이번 주 매칭
+  // 하지만 정확히 월요일 09:00 전이면 오늘 매칭
+  final nextMonday = DateTime(now.year, now.month, now.day + daysUntilMonday, 9, 0);
+  // 실제 남은 시간이 오늘이 월요일이고 9시 전이면 daysUntilMonday=0 처리
+  final todayIsMonday = now.weekday == DateTime.monday;
+  final before9am = now.hour < 9;
+  if (todayIsMonday && before9am) {
+    final diff = DateTime(now.year, now.month, now.day, 9, 0).difference(now);
+    final hours = diff.inHours;
+    final mins = diff.inMinutes % 60;
+    if (hours > 0) return '다음 매칭까지 약 $hours시간 $mins분 남았습니다';
+    return '다음 매칭까지 약 $mins분 남았습니다';
+  }
+
+  final diff = nextMonday.difference(now);
+  final days = diff.inDays;
+  final hours = diff.inHours % 24;
+  if (days > 0) return '다음 매칭까지 약 $days일 $hours시간 남았습니다';
+  return '다음 매칭까지 약 $hours시간 남았습니다';
+}
+
 /// 결 점수 원형 게이지 (다른 카드에서도 재사용)
 class BondScoreGauge extends StatelessWidget {
   final double bondScore;
@@ -141,7 +170,7 @@ class BondNoPartnerCard extends StatelessWidget {
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  '한 주가 끝나면 조용히 다음 페이지로 넘어갑니다',
+                  _nextMatchingMessage(),
                   style: TextStyle(
                     fontSize: 11,
                     color: BondColors.kText.withOpacity(0.5),
@@ -264,7 +293,7 @@ class BondWeekHeader extends StatelessWidget {
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  '한 주가 끝나면 조용히 다음 페이지로 넘어갑니다',
+                  _nextMatchingMessage(),
                   style: TextStyle(
                     fontSize: 11,
                     color: BondColors.kText.withOpacity(0.5),

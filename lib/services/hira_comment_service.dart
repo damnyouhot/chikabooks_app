@@ -93,5 +93,68 @@ class HiraCommentService {
       return false;
     }
   }
+
+  // ── 댓글 이모지 반응 ──
+
+  /// 이모지 반응 토글 (같은 이모지면 삭제, 다른 이모지면 변경)
+  static Future<bool> toggleCommentReaction(
+    String updateId,
+    String commentId,
+    String emoji,
+  ) async {
+    try {
+      final uid = _auth.currentUser?.uid;
+      if (uid == null) return false;
+
+      final ref = _db
+          .collection('content_hira_updates')
+          .doc(updateId)
+          .collection('comments')
+          .doc(commentId)
+          .collection('reactions')
+          .doc(uid);
+
+      final existing = await ref.get();
+      if (existing.exists && existing.data()?['emoji'] == emoji) {
+        // 동일 이모지 → 삭제
+        await ref.delete();
+      } else {
+        // 새 이모지 or 변경
+        await ref.set({
+          'emoji': emoji,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+      return true;
+    } catch (e) {
+      debugPrint('⚠️ toggleCommentReaction error: $e');
+      return false;
+    }
+  }
+
+  /// 댓글 리액션 실시간 스트림 → {emoji: count} 집계 + 내 선택
+  static Stream<Map<String, dynamic>> watchCommentReactions(
+    String updateId,
+    String commentId,
+  ) {
+    return _db
+        .collection('content_hira_updates')
+        .doc(updateId)
+        .collection('comments')
+        .doc(commentId)
+        .collection('reactions')
+        .snapshots()
+        .map((snap) {
+      final counts = <String, int>{};
+      String? myEmoji;
+      final uid = _auth.currentUser?.uid;
+      for (final doc in snap.docs) {
+        final emoji = doc.data()['emoji'] as String? ?? '';
+        counts[emoji] = (counts[emoji] ?? 0) + 1;
+        if (doc.id == uid) myEmoji = emoji;
+      }
+      return {'counts': counts, 'myEmoji': myEmoji};
+    });
+  }
 }
 

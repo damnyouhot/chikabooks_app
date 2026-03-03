@@ -248,7 +248,7 @@ class _HiraCommentSheetState extends State<HiraCommentSheet> {
   }
 }
 
-/// 개별 댓글 아이템
+/// 개별 댓글 아이템 (이모지 반응 포함)
 class _CommentItem extends StatelessWidget {
   final HiraComment comment;
   final String updateId;
@@ -257,6 +257,8 @@ class _CommentItem extends StatelessWidget {
     required this.comment,
     required this.updateId,
   });
+
+  static const _emojiList = ['👍', '❤️', '😊', '💪', '🎉'];
 
   Future<void> _deleteComment(BuildContext context) async {
     final confirmed = await showDialog<bool>(
@@ -384,10 +386,146 @@ class _CommentItem extends StatelessWidget {
                     height: 1.4,
                   ),
                 ),
+                const SizedBox(height: 6),
+                // 이모지 반응 영역
+                StreamBuilder<Map<String, dynamic>>(
+                  stream: HiraCommentService.watchCommentReactions(
+                    updateId,
+                    comment.id,
+                  ),
+                  builder: (context, snap) {
+                    final data = snap.data;
+                    final counts =
+                        (data?['counts'] as Map<String, int>?) ?? {};
+                    final myEmoji = data?['myEmoji'] as String?;
+
+                    return Wrap(
+                      spacing: 4,
+                      runSpacing: 4,
+                      children: [
+                        // 이모지 칩들 (카운트가 있는 것만 먼저 표시)
+                        for (final emoji in _emojiList)
+                          if ((counts[emoji] ?? 0) > 0)
+                            _ReactionChip(
+                              emoji: emoji,
+                              count: counts[emoji] ?? 0,
+                              isSelected: myEmoji == emoji,
+                              onTap: () =>
+                                  HiraCommentService.toggleCommentReaction(
+                                updateId,
+                                comment.id,
+                                emoji,
+                              ),
+                            ),
+                        // "+" 버튼으로 이모지 추가
+                        InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: () => _showEmojiPicker(
+                              context, myEmoji),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _kShadow2.withOpacity(0.3),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              '😀+',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: _kText.withOpacity(0.5),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showEmojiPicker(BuildContext context, String? myEmoji) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('이모지 선택', style: TextStyle(fontSize: 14)),
+        content: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _emojiList.map((emoji) {
+            final isSelected = myEmoji == emoji;
+            return GestureDetector(
+              onTap: () {
+                HiraCommentService.toggleCommentReaction(
+                  updateId,
+                  comment.id,
+                  emoji,
+                );
+                Navigator.pop(ctx);
+              },
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? _kAccent.withOpacity(0.5)
+                      : Colors.grey[100],
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(emoji, style: const TextStyle(fontSize: 20)),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+}
+
+/// 이모지 반응 칩 (bond_post_card와 동일 사이즈)
+class _ReactionChip extends StatelessWidget {
+  final String emoji;
+  final int count;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _ReactionChip({
+    required this.emoji,
+    required this.count,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? _kAccent.withOpacity(0.4)
+              : _kShadow2.withOpacity(0.3),
+          borderRadius: BorderRadius.circular(12),
+          border: isSelected
+              ? Border.all(color: _kAccent, width: 1)
+              : null,
+        ),
+        child: Text(
+          '$emoji$count',
+          style: const TextStyle(fontSize: 14),
+        ),
       ),
     );
   }

@@ -141,7 +141,7 @@ class CareerTabHeader extends StatelessWidget {
                   fontSize: 14,
                   fontWeight: FontWeight.w400,
                 ),
-                tabs: const [Tab(text: '공고보기'), Tab(text: '커리어 카드')],
+                tabs: const [Tab(text: '공고 보기'), Tab(text: '커리어 카드')],
               ),
             ),
             const SizedBox(height: 4),
