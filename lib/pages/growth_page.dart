@@ -25,9 +25,10 @@ const _kCardBg = Colors.white;
 /// 3. 치과책방 — e-Book 스토어
 /// 4. 내 서재 — 구매한 e-Book 목록
 class GrowthPage extends StatefulWidget {
-  final int jumpToSubTab;
+  /// 서브탭 점프용 notifier (HomeShell에서 주입, 값이 바뀌면 해당 탭으로 이동)
+  final ValueNotifier<int>? subTabNotifier;
 
-  const GrowthPage({super.key, this.jumpToSubTab = -1});
+  const GrowthPage({super.key, this.subTabNotifier});
 
   @override
   State<GrowthPage> createState() => _GrowthPageState();
@@ -41,19 +42,19 @@ class _GrowthPageState extends State<GrowthPage>
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 4, vsync: this);
+    widget.subTabNotifier?.addListener(_onSubTabChanged);
   }
 
-  @override
-  void didUpdateWidget(GrowthPage oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.jumpToSubTab >= 0 &&
-        widget.jumpToSubTab != oldWidget.jumpToSubTab) {
-      _tabCtrl.animateTo(widget.jumpToSubTab);
+  void _onSubTabChanged() {
+    final idx = widget.subTabNotifier?.value ?? -1;
+    if (idx >= 0 && idx < 4) {
+      _tabCtrl.animateTo(idx);
     }
   }
 
   @override
   void dispose() {
+    widget.subTabNotifier?.removeListener(_onSubTabChanged);
     _tabCtrl.dispose();
     super.dispose();
   }

@@ -70,7 +70,7 @@ class _JobPageState extends State<JobPage> {
 
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.medium,
-        timeLimit: const Duration(seconds: 10),
+        timeLimit: const Duration(seconds: 3),
       );
       final location = LatLng(position.latitude, position.longitude);
       await _jobService.saveUserLocation(location);

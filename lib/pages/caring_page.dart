@@ -54,12 +54,6 @@ class _CaringPageState extends State<CaringPage>
   Ebook? _weeklyBook;
   String _quizSummary = '오늘의 퀴즈 확인 중...';
 
-  // ── 높이 측정 (캐릭터 자동 배치) ──
-  final GlobalKey _topKey = GlobalKey();
-  final GlobalKey _bottomKey = GlobalKey();
-  double _topH = 270;
-  double _bottomH = 100;
-
   // ── 상태 머신 ──
   _LoopState _loopState = _LoopState.idle;
   Timer? _msgLoopTimer;
@@ -109,7 +103,6 @@ class _CaringPageState extends State<CaringPage>
       }
       if (mounted) _startMsgLoop();
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) => _measure());
   }
 
   @override
@@ -150,13 +143,20 @@ class _CaringPageState extends State<CaringPage>
     if (showLoader) setState(() => _loading = true);
 
     try {
-      await CaringStateService.loadState();
-      await BondScoreService.applyCenterGravity();
+      // ── 병렬 로드: CaringState / BondScore / 구인 / 전자책 동시 요청 ──
+      final futures = await Future.wait<dynamic>([
+        CaringStateService.loadState(),                                        // [0] CaringState
+        BondScoreService.applyCenterGravity(),                                 // [1] void → null
+        JobService().getRecentJobsSummary(),                                   // [2] Map
+        EbookService().watchEbooks().first.catchError((_) => <Ebook>[]),       // [3] List<Ebook>
+      ]);
 
-      final jobService = JobService();
-      final jobData = await jobService.getRecentJobsSummary();
-      final jobCount = jobData['count'] ?? 0;
-      final clinicName = jobData['clinicName'] ?? '';
+      final jobData = futures[2] as Map<String, dynamic>;
+      final jobCount = (jobData['count'] as int?) ?? 0;
+      final clinicName = (jobData['clinicName'] as String?) ?? '';
+
+      final ebooks = futures[3] as List<Ebook>;
+      final featuredBook = ebooks.isNotEmpty ? ebooks.first : null;
 
       final policies = [
         {'title': '2026 스케일링 급여 개정', 'dday': 'D-12', 'date': '3월 1일'},
@@ -164,15 +164,7 @@ class _CaringPageState extends State<CaringPage>
         {'title': '근관치료 행위 산정 지침 개정', 'dday': 'D-26', 'date': '3월 15일'},
       ];
 
-      Ebook? featuredBook;
-      try {
-        final ebookService = EbookService();
-        final ebooks = await ebookService.watchEbooks().first;
-        if (ebooks.isNotEmpty) featuredBook = ebooks.first;
-      } catch (e) {
-        debugPrint('⚠️ 이주의 책 로드 실패: $e');
-      }
-
+      if (!mounted) return;
       setState(() {
         _jobsSummary = jobCount > 0 ? '오늘 새로 올라온 $jobCount건' : '새로운 구인 공고가 없어요';
         _jobsSub = jobCount > 0 && clinicName.isNotEmpty ? clinicName : '';
@@ -183,10 +175,9 @@ class _CaringPageState extends State<CaringPage>
       });
 
       _startPolicyRolling();
-      WidgetsBinding.instance.addPostFrameCallback((_) => _measure());
     } catch (e) {
       debugPrint('❌ 데이터 로드 실패: $e');
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -200,23 +191,6 @@ class _CaringPageState extends State<CaringPage>
         _policyIndex = (_policyIndex + 1) % _upcomingPolicies.length;
       });
     });
-  }
-
-  void _measure() {
-    final topBox = _topKey.currentContext?.findRenderObject() as RenderBox?;
-    final bottomBox =
-        _bottomKey.currentContext?.findRenderObject() as RenderBox?;
-
-    if (topBox != null && bottomBox != null) {
-      final newTop = topBox.size.height;
-      final newBottom = bottomBox.size.height;
-      if ((newTop - _topH).abs() > 2 || (newBottom - _bottomH).abs() > 2) {
-        setState(() {
-          _topH = newTop;
-          _bottomH = newBottom;
-        });
-      }
-    }
   }
 
   // ══════════════════════════════════════════════
@@ -464,149 +438,145 @@ class _CaringPageState extends State<CaringPage>
       );
     }
 
-    final safeBottom = _bottomH + 8;
-
     return Scaffold(
       backgroundColor: _colorBg,
-      body: Stack(
-        children: [
-          // 배경
-          Positioned.fill(
-            child: IgnorePointer(
-              ignoring: true,
-              child: Container(color: _colorBg),
-            ),
-          ),
-
-          // ── 캐릭터 ──
-          Positioned(
-            top: _topH,
-            left: 0,
-            right: 0,
-            bottom: safeBottom,
-            child: GestureDetector(
-              onTap: _onCircleTap,
-              child: _dogController != null
-                  ? LayoutBuilder(
-                      builder: (ctx, constraints) {
-                        const scale = 2.112;
-                        return OverflowBox(
-                          maxWidth: constraints.maxWidth * scale,
-                          maxHeight: constraints.maxHeight * scale,
-                          alignment: Alignment.center,
-                          child: SizedBox(
-                            width: constraints.maxWidth * scale,
-                            height: constraints.maxHeight * scale,
-                            child: RiveWidget(
-                              controller: _dogController!,
-                              fit: Fit.contain,
-                            ),
-                          ),
-                        );
-                      },
-                    )
-                  : const SizedBox.shrink(),
-            ),
-          ),
-
-          // ── 기본 메시지 (오늘의 1문제 카드와 캐릭터 사이) ──
-          Positioned(
-            top: _topH + 110,
-            left: 0,
-            right: 0,
-            child: IgnorePointer(
-              ignoring: true,
-              child: Center(
-                child: SpeechOverlay(
-                  text: _baseMsgText,
-                  isDismissing: _isBaseMsgDismissing,
-                ),
+      body: SafeArea(
+        // ── 핵심 구조 ──
+        // Column으로 카드/캐릭터/버튼을 수직 배치
+        // 카드와 버튼은 Stack 완전 밖 → z-order 충돌 없음, 절대 가려지지 않음
+        // 캐릭터는 Expanded > ClipRect > Stack 안 → 남은 공간만 사용 (이전과 동일한 크기)
+        // 텍스트는 캐릭터 Stack 안에서 Positioned으로 겹침
+        child: Column(
+          children: [
+            // ── [위] 카드 영역: Stack 밖, 캐릭터와 완전히 독립 ──
+            Container(
+              color: _colorBg,
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildTopBar(),
+                  _TapCard(
+                    title: '📍 내 주변 구인 치과',
+                    bigText: _jobsSummary,
+                    subtitle: _jobsSub,
+                    onTap: () => widget.onTabRequested?.call(3),
+                  ),
+                  _PolicyRollingCard(
+                    policies: _upcomingPolicies,
+                    index: _policyIndex,
+                    onTap: () {
+                      widget.onTabRequested?.call(2);
+                      widget.onGrowthSubTabRequested?.call(1);
+                    },
+                  ),
+                  _TapCard(
+                    title: '📖 이주의 책',
+                    bigText: _weeklyBook?.title ?? '이번 주 추천 책이 없어요',
+                    subtitle: '',
+                    onTap: _goBookDetail,
+                  ),
+                  _TapCard(
+                    title: '🧠 오늘의 1문제',
+                    bigText: _quizSummary,
+                    subtitle: '터치해서 풀기',
+                    onTap: () {
+                      widget.onTabRequested?.call(2);
+                      widget.onGrowthSubTabRequested?.call(0);
+                    },
+                  ),
+                ],
               ),
             ),
-          ),
 
-          // ── 리액션 말풍선 (캐릭터 아래) ──
-          Positioned(
-            bottom: safeBottom + 10,
-            left: 0,
-            right: 0,
-            child: IgnorePointer(
-              ignoring: true,
-              child: Center(
-                child: SpeechOverlay(
-                  text: _currentSpeech,
-                  isDismissing: _isDismissingSpeech,
-                ),
-              ),
-            ),
-          ),
-
-          // 하단 버튼
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: SafeArea(
-              top: false,
-              child: Container(
-                key: _bottomKey,
-                color: _colorBg,
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-                child: _buildBottomSection(),
-              ),
-            ),
-          ),
-
-          // 상단 카드 4개
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: SafeArea(
-              bottom: false,
-              child: Container(
-                key: _topKey,
-                color: _colorBg,
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
+            // ── [중간] 캐릭터 + 텍스트: 카드~버튼 사이 남은 공간만 사용 ──
+            // Expanded로 정확히 남은 공간만 차지 → 이전과 동일한 캐릭터 크기
+            // ClipRect로 OverflowBox가 카드/버튼 영역을 침범하지 못하게 차단
+            Expanded(
+              child: ClipRect(
+                child: Stack(
                   children: [
-                    _buildTopBar(),
-                    _TapCard(
-                      title: '📍 내 주변 구인 치과',
-                      bigText: _jobsSummary,
-                      subtitle: _jobsSub,
-                      onTap: () => widget.onTabRequested?.call(3),
+                    // 캐릭터
+                    Positioned.fill(
+                      child: GestureDetector(
+                        onTap: _onCircleTap,
+                        child: _dogController != null
+                            ? LayoutBuilder(
+                                builder: (ctx, constraints) {
+                                  const scale = 2.112;
+                                  return OverflowBox(
+                                    maxWidth: constraints.maxWidth * scale,
+                                    maxHeight: constraints.maxHeight * scale,
+                                    alignment: Alignment.center,
+                                    child: SizedBox(
+                                      width: constraints.maxWidth * scale,
+                                      height: constraints.maxHeight * scale,
+                                      child: RiveWidget(
+                                        controller: _dogController!,
+                                        fit: Fit.contain,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              )
+                            : const SizedBox.shrink(),
+                      ),
                     ),
-                    _PolicyRollingCard(
-                      policies: _upcomingPolicies,
-                      index: _policyIndex,
-                      onTap: () {
-                        widget.onTabRequested?.call(2);
-                        widget.onGrowthSubTabRequested?.call(1);
-                      },
-                    ),
-                    _TapCard(
-                      title: '📖 이주의 책',
-                      bigText: _weeklyBook?.title ?? '이번 주 추천 책이 없어요',
-                      subtitle: '',
-                      onTap: _goBookDetail,
-                    ),
-                    _TapCard(
-                      title: '🧠 오늘의 1문제',
-                      bigText: _quizSummary,
-                      subtitle: '터치해서 풀기',
-                      onTap: () {
-                        widget.onTabRequested?.call(2);
-                        widget.onGrowthSubTabRequested?.call(0);
-                      },
+
+                    // 텍스트 오버레이 (캐릭터 위에 겹침)
+                    // LayoutBuilder로 캐릭터 영역 높이를 받아 비율로 위치 결정
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: LayoutBuilder(
+                          builder: (ctx, constraints) {
+                            final h = constraints.maxHeight;
+                            // 기본 메시지: 캐릭터 영역 상단 20% 지점
+                            final baseMsgTop = h * 0.28;
+                            // 리액션 메시지: 캐릭터 영역 하단 86% 지점
+                            final reactionTop = h * 0.86;
+                            return Stack(
+                              children: [
+                                Positioned(
+                                  top: baseMsgTop,
+                                  left: 0,
+                                  right: 0,
+                                  child: Center(
+                                    child: SpeechOverlay(
+                                      text: _baseMsgText,
+                                      isDismissing: _isBaseMsgDismissing,
+                                    ),
+                                  ),
+                                ),
+                                Positioned(
+                                  top: reactionTop,
+                                  left: 0,
+                                  right: 0,
+                                  child: Center(
+                                    child: SpeechOverlay(
+                                      text: _currentSpeech,
+                                      isDismissing: _isDismissingSpeech,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
-          ),
-        ],
+
+            // ── [아래] 버튼: Stack 밖, 캐릭터와 완전히 독립 ──
+            Container(
+              color: _colorBg,
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+              child: _buildBottomSection(),
+            ),
+          ],
+        ),
       ),
     );
   }

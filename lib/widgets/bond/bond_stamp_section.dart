@@ -30,15 +30,15 @@ class _BondStampSectionState extends State<BondStampSection> {
   void didUpdateWidget(BondStampSection oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.partnerGroupId != widget.partnerGroupId) {
-      _initStream();
+      setState(() {
+        _initStream();
+      });
     }
   }
 
   void _initStream() {
     if (widget.partnerGroupId != null && widget.partnerGroupId!.isNotEmpty) {
-      setState(() {
-        _stream = WeeklyStampService.watchThisWeek(widget.partnerGroupId!);
-      });
+      _stream = WeeklyStampService.watchThisWeek(widget.partnerGroupId!);
     } else {
       _stream = null;
     }

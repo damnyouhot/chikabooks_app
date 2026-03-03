@@ -37,7 +37,9 @@ class _BondFeedSectionState extends State<BondFeedSection> {
     super.didUpdateWidget(oldWidget);
     // partnerGroupId가 바뀔 때만 스트림 재생성
     if (oldWidget.partnerGroupId != widget.partnerGroupId) {
-      _initStream();
+      setState(() {
+        _initStream();
+      });
     }
   }
 

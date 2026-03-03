@@ -198,17 +198,26 @@ class UserProfileService {
     debugPrint('✅ [completeOnboarding] 캐시 갱신 완료');
   }
 
-  /// 온보딩 완료 여부 체크
+  /// 온보딩 완료 여부 체크 (캐시 우선 — 탭 전환 블로킹 방지)
   static Future<bool> isOnboardingCompleted() async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return false;
+
+    // 캐시가 있으면 Firestore 호출 없이 즉시 반환
+    // hasBasicProfile = nickname + region + careerBucket 모두 입력된 상태
+    if (_cache != null) {
+      return _cache!.hasBasicProfile;
+    }
 
     try {
       final doc = await _db.collection('users').doc(uid).get();
       if (!doc.exists) return false;
 
-      final data = doc.data();
-      return data?['isProfileCompleted'] == true;
+      final data = doc.data() ?? {};
+      // 조회 결과를 캐시에 저장해서 이후 호출 최적화
+      _cache = UserPublicProfile.fromMap(data);
+      // Firestore에 isProfileCompleted 필드가 있으면 우선 사용, 없으면 hasBasicProfile
+      return data['isProfileCompleted'] == true || _cache!.hasBasicProfile;
     } catch (e) {
       debugPrint('⚠️ isOnboardingCompleted error: $e');
       return false;

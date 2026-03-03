@@ -25,7 +25,7 @@ class BillboardCarousel extends StatefulWidget {
 class _BillboardCarouselState extends State<BillboardCarousel> {
   Timer? _timer;
   int _currentIndex = 0;
-  late Stream<QuerySnapshot> _stream;
+  Stream<QuerySnapshot>? _stream;
 
   @override
   void initState() {

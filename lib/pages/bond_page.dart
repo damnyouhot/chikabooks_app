@@ -59,6 +59,9 @@ class _BondPageState extends State<BondPage> {
   Map<String, int> _weeklyPostCounts = {}; // {uid: postCount}
   Map<String, int> _weeklyReactionCounts = {}; // {uid: reactionCount}
 
+  // ── 첫 로드 플래그: 탭 마운트 시 1회만 forceRefresh ──
+  bool _firstLoad = true;
+
   // ── Firestore 스트림 (initState에서 1회 생성) ──
   Stream<DocumentSnapshot>? _userStream;
 
@@ -84,103 +87,123 @@ class _BondPageState extends State<BondPage> {
     try {
       debugPrint('🔍 [BondPage] ━━━ 데이터 로딩 시작 ━━━');
 
-      // 프로필 및 그룹 정보 조회
-      final profile = await UserProfileService.getMyProfile(forceRefresh: true);
+      // ① 프로필 조회 (첫 로드만 forceRefresh, 이후는 캐시 활용)
+      final profile = await UserProfileService.getMyProfile(
+        forceRefresh: _firstLoad,
+      );
+      _firstLoad = false;
       final groupId = profile?.partnerGroupId;
 
       debugPrint('🔍 [BondPage] groupId: $groupId');
       debugPrint('🔍 [BondPage] partnerStatus: ${profile?.partnerStatus}');
 
-      if (mounted) {
-        setState(() {
-          _partnerGroupId = groupId;
-          _partnerStatus = profile?.partnerStatus ?? 'active';
-        });
+      if (!mounted) return;
+      setState(() {
+        _partnerGroupId = groupId;
+        _partnerStatus = profile?.partnerStatus ?? 'active';
+      });
 
-        if (groupId != null) {
-          debugPrint('🔍 [BondPage] 그룹 정보 조회 시작...');
+      if (groupId == null) {
+        debugPrint('⚠️ [BondPage] 파트너 그룹 없음');
+        debugPrint('✅ [BondPage] ━━━ 데이터 로딩 완료 ━━━');
+        return;
+      }
 
-          final group = await PartnerService.getMyGroup();
-          debugPrint('🔍 [BondPage] group: ${group?.id}');
-          debugPrint('🔍 [BondPage] group.endsAt: ${group?.endsAt}');
-          debugPrint(
-            '🔍 [BondPage] group.isActiveGroup: ${group?.isActiveGroup}',
-          );
-          debugPrint('🔍 [BondPage] group.memberUids: ${group?.memberUids}');
+      debugPrint('🔍 [BondPage] 그룹 정보 조회 시작...');
 
-          // ✅ 만료된 그룹 자동 정리
-          if (group == null || !BondStateHelper.isGroupActive(group)) {
-            debugPrint('⚠️ [BondPage] 그룹 만료됨 → partnerGroupId 정리');
-            final uid = FirebaseAuth.instance.currentUser?.uid;
-            if (uid != null) {
-              await FirebaseFirestore.instance
-                  .collection('users')
-                  .doc(uid)
-                  .update({
-                    'partnerGroupId': FieldValue.delete(),
-                    'partnerGroupEndsAt': FieldValue.delete(),
-                  });
-            }
-            if (mounted) {
-              setState(() {
-                _partnerGroupId = null;
-                _partnerGroup = null;
-                _groupMembers = [];
-                _memberNicknames = {};
+      // ② 그룹 + 멤버 목록 병렬 조회
+      final PartnerGroup? group;
+      final List<GroupMemberMeta> members;
+      final groupResult = await Future.wait<dynamic>([
+        PartnerService.getMyGroup(),
+        PartnerService.getGroupMembers(groupId),
+      ]);
+      group = groupResult[0] as PartnerGroup?;
+      members = groupResult[1] as List<GroupMemberMeta>;
+
+      debugPrint('🔍 [BondPage] group: ${group?.id}');
+      debugPrint('🔍 [BondPage] group.endsAt: ${group?.endsAt}');
+      debugPrint('🔍 [BondPage] group.isActiveGroup: ${group?.isActiveGroup}');
+      debugPrint('🔍 [BondPage] group.memberUids: ${group?.memberUids}');
+      debugPrint('🔍 [BondPage] members.length: ${members.length}');
+
+      // ✅ 만료된 그룹 자동 정리
+      if (group == null || !BondStateHelper.isGroupActive(group)) {
+        debugPrint('⚠️ [BondPage] 그룹 만료됨 → partnerGroupId 정리');
+        final uid = FirebaseAuth.instance.currentUser?.uid;
+        if (uid != null) {
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(uid)
+              .update({
+                'partnerGroupId': FieldValue.delete(),
+                'partnerGroupEndsAt': FieldValue.delete(),
               });
-            }
-            debugPrint('✅ [BondPage] 만료 그룹 정리 완료 → 개인 모드');
-          } else {
-            // 정상 활성 그룹
-            final members = await PartnerService.getGroupMembers(groupId);
-            debugPrint('🔍 [BondPage] members.length: ${members.length}');
-
-            final nicknames = <String, String>{};
-            for (final member in members) {
-              final metaNick = member.nickname?.trim();
-              if (metaNick != null && metaNick.isNotEmpty) {
-                nicknames[member.uid] = metaNick;
-                continue;
-              }
-
-              try {
-                final publicDoc =
-                    await FirebaseFirestore.instance
-                        .collection('publicProfiles')
-                        .doc(member.uid)
-                        .get();
-                final data = publicDoc.data();
-                final pubNick = (data?['nickname'] as String?)?.trim();
-                nicknames[member.uid] =
-                    (pubNick != null && pubNick.isNotEmpty)
-                        ? pubNick
-                        : member.uid;
-              } catch (e) {
-                debugPrint('⚠️ 닉네임 조회 실패 (${member.uid}): $e');
-                nicknames[member.uid] = member.uid;
-              }
-            }
-
-            final activityData =
-                await WeeklyActivityService.getWeeklyActivityData(groupId);
-
-            if (mounted) {
-              setState(() {
-                _partnerGroup = group;
-                _groupMembers = members;
-                _memberNicknames = nicknames;
-                _weeklyPostCounts = activityData['posts'] ?? {};
-                _weeklyReactionCounts = activityData['reactions'] ?? {};
-              });
-
-              if (group.memberUids.length == 2 && group.weekNumber == 1) {
-                _showTwoPersonStartToast();
-              }
-            }
-          }
-        } else {
-          debugPrint('⚠️ [BondPage] 파트너 그룹 없음');
         }
+        if (mounted) {
+          setState(() {
+            _partnerGroupId = null;
+            _partnerGroup = null;
+            _groupMembers = [];
+            _memberNicknames = {};
+          });
+        }
+        debugPrint('✅ [BondPage] 만료 그룹 정리 완료 → 개인 모드');
+        debugPrint('✅ [BondPage] ━━━ 데이터 로딩 완료 ━━━');
+        return;
+      }
+
+      // ③ 닉네임 조회 + 주간 활동 데이터 병렬 처리
+      // 닉네임: metaNick이 없는 멤버만 Firestore 병렬 조회
+      final membersNeedingFetch =
+          members.where((m) => (m.nickname?.trim() ?? '').isEmpty).toList();
+
+      // 닉네임 Future와 활동 데이터 Future를 동시에 실행
+      final nicknamesFuture = Future.wait<MapEntry<String, String>>(
+        membersNeedingFetch.map((m) async {
+          try {
+            final doc = await FirebaseFirestore.instance
+                .collection('publicProfiles')
+                .doc(m.uid)
+                .get();
+            final nick = (doc.data()?['nickname'] as String?)?.trim();
+            return MapEntry(m.uid, nick?.isNotEmpty == true ? nick! : m.uid);
+          } catch (e) {
+            debugPrint('⚠️ 닉네임 조회 실패 (${m.uid}): $e');
+            return MapEntry(m.uid, m.uid);
+          }
+        }),
+      );
+      final activityFuture =
+          WeeklyActivityService.getWeeklyActivityData(groupId);
+
+      final fetchedEntries = await nicknamesFuture;
+      final activityData = await activityFuture;
+
+      final nicknames = <String, String>{};
+      // metaNick 있는 멤버 먼저
+      for (final m in members) {
+        final metaNick = m.nickname?.trim();
+        if (metaNick != null && metaNick.isNotEmpty) {
+          nicknames[m.uid] = metaNick;
+        }
+      }
+      // Firestore에서 조회한 멤버 추가
+      for (final entry in fetchedEntries) {
+        nicknames[entry.key] = entry.value;
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _partnerGroup = group;
+        _groupMembers = members;
+        _memberNicknames = nicknames;
+        _weeklyPostCounts = activityData['posts'] ?? {};
+        _weeklyReactionCounts = activityData['reactions'] ?? {};
+      });
+
+      if (group.memberUids.length == 2 && group.weekNumber == 1) {
+        _showTwoPersonStartToast();
       }
 
       debugPrint('✅ [BondPage] ━━━ 데이터 로딩 완료 ━━━');

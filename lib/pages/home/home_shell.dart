@@ -16,14 +16,39 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   int _selectedIndex = 0;
 
-  /// 성장하기 탭 서브탭 인덱스 (-1 = 변경 없음)
-  int _growthSubTabIndex = -1;
-
   /// Bond 탭 인덱스
   static const int _bondTabIndex = 1;
 
+  // ── 탭 위젯 캐시: build()가 호출될 때마다 재생성되지 않도록 State에 보관 ──
+  late final CaringPage _caringPage;
+  late final BondPage _bondPage;
+  late final GrowthPage _growthPage;
+  late final JobPage _jobPage;
+
+  /// GrowthPage 서브탭 점프를 전달하는 notifier
+  /// → GrowthPage 인스턴스를 재생성하지 않고 서브탭 이동 가능
+  final ValueNotifier<int> _growthSubTabNotifier = ValueNotifier<int>(-1);
+
+  @override
+  void initState() {
+    super.initState();
+    _caringPage = CaringPage(
+      onTabRequested: _onTabRequested,
+      onGrowthSubTabRequested: _onGrowthSubTabRequested,
+    );
+    _bondPage = const BondPage();
+    _growthPage = GrowthPage(subTabNotifier: _growthSubTabNotifier);
+    _jobPage = const JobPage();
+  }
+
+  @override
+  void dispose() {
+    _growthSubTabNotifier.dispose();
+    super.dispose();
+  }
+
   void _onTap(int idx) async {
-    // Bond 탭(2번 탭) 클릭 시 프로필 체크
+    // Bond 탭(1번 탭) 클릭 시 프로필 체크
     if (idx == _bondTabIndex) {
       final isCompleted = await UserProfileService.isOnboardingCompleted();
 
@@ -49,28 +74,21 @@ class _HomeShellState extends State<HomeShell> {
 
   /// CaringPage에서 성장하기 서브탭을 지정하는 콜백
   void _onGrowthSubTabRequested(int subTab) {
-    setState(() {
-      _selectedIndex = 2;
-      // 같은 값이 연속 오면 didUpdateWidget이 감지 못하므로 -1 경유
-      _growthSubTabIndex = -1;
-    });
-    // 다음 프레임에서 실제 서브탭 인덱스 설정
+    setState(() => _selectedIndex = 2);
+    // 같은 값이 연속 오면 리스너가 감지 못하므로 -1 경유 후 실제 값 설정
+    _growthSubTabNotifier.value = -1;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) setState(() => _growthSubTabIndex = subTab);
+      _growthSubTabNotifier.value = subTab;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    // CaringPage에 탭 전환 콜백 주입
     final pages = <Widget>[
-      CaringPage(
-        onTabRequested: _onTabRequested,
-        onGrowthSubTabRequested: _onGrowthSubTabRequested,
-      ),
-      const BondPage(),
-      GrowthPage(jumpToSubTab: _growthSubTabIndex),
-      const JobPage(),
+      _caringPage,
+      _bondPage,
+      _growthPage,
+      _jobPage,
     ];
 
     return Scaffold(
