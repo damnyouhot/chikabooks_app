@@ -477,6 +477,45 @@ class PartnerService {
         .map((snap) => snap.docs.map(InboxCard.fromDoc).toList());
   }
 
+  // ═══════════════════════ 소모임 나가기 ═══════════════════════
+
+  /// 현재 소모임에서 자진 탈퇴 (Cloud Function 호출)
+  ///
+  /// 반환값:
+  /// - `LeaveResult.success(...)` — 성공
+  /// - `LeaveResult.error(message)` — 에러
+  static Future<LeaveResult> leaveGroup({String reason = ''}) async {
+    try {
+      final callable = FirebaseFunctions.instanceFor(
+        region: 'asia-northeast3',
+      ).httpsCallable('leavePartnerGroup');
+
+      final result = await callable.call<Map<String, dynamic>>({
+        'reason': reason,
+      });
+
+      final data = result.data;
+      final ok = data['ok'] as bool? ?? false;
+
+      if (ok) {
+        // 캐시 갱신 — 그룹 제거 반영
+        UserProfileService.clearCache();
+        return LeaveResult.success(
+          groupDeleted: data['groupDeleted'] as bool? ?? false,
+          remainingMembers: data['remainingMembers'] as int? ?? 0,
+        );
+      }
+
+      return LeaveResult.error('나가기 처리에 실패했어요.');
+    } on FirebaseFunctionsException catch (e) {
+      debugPrint('⚠️ leaveGroup error: ${e.code} ${e.message}');
+      return LeaveResult.error(e.message ?? '소모임 나가기 중 문제가 생겼어요.');
+    } catch (e) {
+      debugPrint('⚠️ leaveGroup error: $e');
+      return LeaveResult.error('소모임 나가기 중 문제가 생겼어요.');
+    }
+  }
+
   // ═══════════════════════ 매칭풀 ═══════════════════════
 
   /// 매칭풀에 등록 (기존 — 로컬 전용, 서버 매칭 미포함)
@@ -788,3 +827,34 @@ class MatchingResult {
 }
 
 enum MatchingStatus { matched, waiting, error }
+
+/// 소모임 나가기 결과
+class LeaveResult {
+  final LeaveStatus status;
+  final bool groupDeleted;
+  final int remainingMembers;
+  final String? message;
+
+  const LeaveResult._({
+    required this.status,
+    this.groupDeleted = false,
+    this.remainingMembers = 0,
+    this.message,
+  });
+
+  factory LeaveResult.success({
+    required bool groupDeleted,
+    required int remainingMembers,
+  }) => LeaveResult._(
+    status: LeaveStatus.success,
+    groupDeleted: groupDeleted,
+    remainingMembers: remainingMembers,
+  );
+
+  factory LeaveResult.error(String message) => LeaveResult._(
+    status: LeaveStatus.error,
+    message: message,
+  );
+}
+
+enum LeaveStatus { success, error }

@@ -21,6 +21,7 @@ import '../widgets/bond/bond_continue_section.dart';
 import '../widgets/bond/bond_notification_toast.dart';
 import '../widgets/bond/bond_supplementation_listener.dart';
 import '../widgets/bond/bond_empty_state_widget.dart';
+import '../widgets/bond/bond_leave_sheet.dart';
 import 'debug_test_data_page.dart';
 
 /// ─────────────────────────────────────────────────
@@ -216,6 +217,27 @@ class _BondPageState extends State<BondPage> {
     // 보충 멤버 합류 시 토스트 표시
     BondNotificationToast.showMemberJoined(context);
     _loadData(); // 데이터 재조회
+  }
+
+  /// 소모임 나가기 바텀시트 표시
+  void _showLeaveSheet() {
+    BondLeaveSheet.show(
+      context,
+      onLeft: () {
+        // 로컬 상태 즉시 리셋 → "파트너 없음" UI 전환
+        UserProfileService.clearCache();
+        setState(() {
+          _partnerGroupId = null;
+          _partnerGroup = null;
+          _groupMembers = [];
+          _memberNicknames = {};
+          _weeklyPostCounts = {};
+          _weeklyReactionCounts = {};
+          _partnerStatus = 'none';
+        });
+        _loadData(); // 서버 데이터와 동기화
+      },
+    );
   }
 
   Future<void> _checkAndShowNewWeekToast() async {
@@ -414,6 +436,7 @@ class _BondPageState extends State<BondPage> {
                   child: BondTopBar(
                     onSettingsLongPress: _showTestDataDialog,
                     weekLabel: weekLabel,
+                    onLeaveGroupTap: hasActivePartner ? _showLeaveSheet : null,
                   ),
                 ),
 

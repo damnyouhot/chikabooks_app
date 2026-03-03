@@ -1277,6 +1277,9 @@ export {
   scheduledSupplementation,
 } from "./partner-supplementation";
 
+// ========== 소모임 나가기 ==========
+export { leavePartnerGroup } from "./partner-leave";
+
 // ========== 계정 삭제 ==========
 export { deleteMyAccount } from "./account-deletion";
 

@@ -7,10 +7,14 @@ class BondTopBar extends StatelessWidget {
   final VoidCallback onSettingsLongPress;
   final String weekLabel; // 예: "2월 4주차: 16~22일"
 
+  /// 파트너가 있을 때만 전달 — 메뉴에 "소모임 나가기" 항목 추가
+  final VoidCallback? onLeaveGroupTap;
+
   const BondTopBar({
     super.key,
     required this.onSettingsLongPress,
     required this.weekLabel,
+    this.onLeaveGroupTap,
   });
 
   @override
@@ -33,18 +37,51 @@ class BondTopBar extends StatelessWidget {
               const Spacer(),
               GestureDetector(
                 onLongPress: onSettingsLongPress,
-                child: IconButton(
+                child: PopupMenuButton<String>(
                   icon: Icon(
-                    Icons.settings_outlined,
+                    Icons.more_vert_rounded,
                     color: BondColors.kText.withOpacity(0.4),
                     size: 20,
                   ),
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const SettingsPage()),
-                    );
+                  tooltip: '메뉴',
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  onSelected: (value) {
+                    if (value == 'settings') {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const SettingsPage()),
+                      );
+                    } else if (value == 'leave') {
+                      onLeaveGroupTap?.call();
+                    }
                   },
-                  tooltip: '설정',
+                  itemBuilder: (_) => [
+                    const PopupMenuItem(
+                      value: 'settings',
+                      child: Row(
+                        children: [
+                          Icon(Icons.settings_outlined, size: 18),
+                          SizedBox(width: 8),
+                          Text('설정', style: TextStyle(fontSize: 13)),
+                        ],
+                      ),
+                    ),
+                    if (onLeaveGroupTap != null)
+                      const PopupMenuItem(
+                        value: 'leave',
+                        child: Row(
+                          children: [
+                            Icon(Icons.logout_rounded, size: 18, color: Color(0xFFE57373)),
+                            SizedBox(width: 8),
+                            Text(
+                              '소모임 나가기',
+                              style: TextStyle(fontSize: 13, color: Color(0xFFE57373)),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ],
