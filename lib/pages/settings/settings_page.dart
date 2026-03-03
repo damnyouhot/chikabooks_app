@@ -450,16 +450,14 @@ class _SettingsPageState extends State<SettingsPage> {
             leading: const Icon(Icons.description_outlined),
             title: const Text('이용약관'),
             onTap: () {
-              // TODO: Firebase Hosting URL로 변경 예정
-              _openUrl('https://chikabooks3rd.web.app/terms.html');
+              _openUrl('https://chikabooks3rd.web.app/terms');
             },
           ),
           ListTile(
             leading: const Icon(Icons.privacy_tip_outlined),
             title: const Text('개인정보처리방침'),
             onTap: () {
-              // TODO: Firebase Hosting URL로 변경 예정
-              _openUrl('https://chikabooks3rd.web.app/privacy.html');
+              _openUrl('https://chikabooks3rd.web.app/privacy');
             },
           ),
           ListTile(
@@ -519,14 +517,6 @@ class _SettingsPageState extends State<SettingsPage> {
             onTap: user == null ? null : _confirmAndDeleteAccount,
           ),
 
-          const SizedBox(height: 24),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            child: Text(
-              '약관 및 개인정보처리방침 링크는 실제 운영 URL로 교체해야 심사에서 안전합니다.',
-              style: TextStyle(fontSize: 12, color: Colors.black54),
-            ),
-          ),
           const SizedBox(height: 24),
         ],
       ),

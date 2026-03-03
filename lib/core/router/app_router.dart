@@ -5,6 +5,7 @@ import '../../pages/hira_update_page.dart';
 import '../../pages/ebook/ebook_list_page.dart';
 import '../../pages/quiz_today_page.dart';
 import '../../features/jobs/web/job_post_web_page.dart';
+import '../../features/jobs/web/legal_page.dart';
 import '../../features/jobs/ui/clinic_verify_page.dart';
 import '../../features/publisher/pages/publisher_login_page.dart';
 import '../../features/publisher/pages/publisher_signup_page.dart';
@@ -29,6 +30,10 @@ final appRouter = GoRouter(
     GoRoute(path: '/policy', builder: (_, __) => const HiraUpdatePage()),
     GoRoute(path: '/books', builder: (_, __) => const EbookListPage()),
     GoRoute(path: '/quiz', builder: (_, __) => const QuizTodayPage()),
+
+    // ── 로그인 불필요 — 법적 문서 페이지 ──────────────────
+    GoRoute(path: '/privacy', builder: (_, __) => buildPrivacyPage()),
+    GoRoute(path: '/terms', builder: (_, __) => buildTermsPage()),
 
     // ── 게시자(치과) 전용 라우트 ──────────────────────────
     GoRoute(

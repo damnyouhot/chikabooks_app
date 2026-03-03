@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../ui/job_post_form.dart';
 import '../ui/job_post_preview.dart';
+import 'job_manage_section.dart';
 import 'web_typography.dart';
 
 const _kBg = Color(0xFFF4F0F8);
@@ -10,10 +12,12 @@ const _kBlue = Color(0xFF4A90D9);
 const _kPink = Color(0xFFF7CBCA);
 const _kPinkDark = Color(0xFFE57373);
 
-/// 구인등록 웹 페이지 (/post-job)
+/// 구인등록 웹 페이지 셸 (/post-job)
 ///
-/// Desktop (width >= 1024): 좌 – 모바일 프리뷰 | 우 – 입력 폼
-/// Mobile  (width < 1024) : 폼 단독 (프리뷰는 탭으로 전환 가능)
+/// 두 개 탭으로 구성:
+///   Tab 0 — 공고 등록 (좌 프리뷰 + 우 폼)
+///   Tab 1 — 공고 관리 (내 공고 목록)
+/// 하단 푸터에 개인정보처리방침 / 이용약관 링크 포함
 class JobPostWebPage extends StatefulWidget {
   const JobPostWebPage({super.key});
 
@@ -23,14 +27,25 @@ class JobPostWebPage extends StatefulWidget {
 
 class _JobPostWebPageState extends State<JobPostWebPage>
     with SingleTickerProviderStateMixin {
+  late final TabController _tabCtrl;
   JobPostData _data = JobPostData();
   bool _submitted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabCtrl = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabCtrl.dispose();
+    super.dispose();
+  }
 
   void _onDataChanged(JobPostData d) => setState(() => _data = d);
 
   Future<void> _onSubmit(JobPostData d) async {
-    // JobPostForm 내부에서 Storage 업로드 + createJobPosting Callable 처리 완료
-    // 여기서는 완료 화면 전환만 담당
     if (mounted) setState(() => _submitted = true);
   }
 
@@ -40,37 +55,124 @@ class _JobPostWebPageState extends State<JobPostWebPage>
 
     return Theme(
       data: WebTypo.themeData(Theme.of(context)),
-      child: _buildMainScaffold(),
-    );
-  }
+      child: Scaffold(
+        backgroundColor: _kBg,
+        body: Column(
+          children: [
+            // ── 상단: 로고 + 탭바 ──
+            _buildHeader(),
 
-  Widget _buildMainScaffold() {
-    return Scaffold(
-      backgroundColor: _kBg,
-      body: LayoutBuilder(
-        builder:
-            (context, constraints) =>
-            // 창 크기와 무관하게 항상 데스크톱 레이아웃 유지
-            // (좁으면 가로 스크롤로 처리)
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: SizedBox(
-                width: constraints.maxWidth < 940 ? 940 : constraints.maxWidth,
-                height: constraints.maxHeight,
-                child: _buildDesktopLayout(
-                  BoxConstraints(
-                    maxWidth:
-                        constraints.maxWidth < 940 ? 940 : constraints.maxWidth,
-                    maxHeight: constraints.maxHeight,
-                  ),
-                ),
+            // ── 탭 콘텐츠 ──
+            Expanded(
+              child: TabBarView(
+                controller: _tabCtrl,
+                // 내부 수평 스크롤과 제스처 충돌 방지 → 탭 전환은 탭바로만
+                physics: const NeverScrollableScrollPhysics(),
+                children: [
+                  _buildPostTab(),
+                  const JobManageSection(),
+                ],
               ),
             ),
+
+            // ── 하단 푸터 ──
+            _buildFooter(),
+          ],
+        ),
       ),
     );
   }
 
-  // ── 데스크톱: 좌 프리뷰 + 우 폼 (가운데 정렬, 최대폭 제한) ─────
+  // ── 상단 헤더 (로고 + 탭바) ──────────────────────────
+  Widget _buildHeader() {
+    return Container(
+      color: Colors.white,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // 로고 + 유틸 버튼
+          Padding(
+            padding: const EdgeInsets.fromLTRB(28, 36, 28, 8),
+            child: Row(
+              children: [
+                // 로고
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: _kBlue,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.local_hospital_outlined,
+                    size: 20,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  '치카북스',
+                  style: WebTypo.heading(color: _kText),
+                ),
+                const Spacer(),
+                // 사업자 인증 버튼
+                TextButton.icon(
+                  onPressed: () => context.push('/clinic-verify'),
+                  icon: const Icon(Icons.verified_outlined, size: 16),
+                  label: const Text('사업자 인증'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: _kBlue,
+                    textStyle: const TextStyle(fontSize: 13),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // 탭바
+          TabBar(
+            controller: _tabCtrl,
+            labelColor: _kBlue,
+            unselectedLabelColor: _kText.withOpacity(0.45),
+            indicatorColor: _kBlue,
+            indicatorWeight: 2.5,
+            indicatorSize: TabBarIndicatorSize.label,
+            labelStyle: WebTypo.sectionTitle(),
+            unselectedLabelStyle: WebTypo.sectionTitle(
+              color: _kText.withOpacity(0.45),
+            ),
+            tabs: const [
+              Tab(text: '공고 등록'),
+              Tab(text: '공고 관리'),
+            ],
+          ),
+          // 구분선
+          const Divider(height: 1, thickness: 0.6, color: Color(0xFFE0D8E8)),
+        ],
+      ),
+    );
+  }
+
+  // ── 공고 등록 탭 (기존 레이아웃) ──────────────────────
+  Widget _buildPostTab() {
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(
+          width: constraints.maxWidth < 940 ? 940 : constraints.maxWidth,
+          height: constraints.maxHeight,
+          child: _buildDesktopLayout(
+            BoxConstraints(
+              maxWidth:
+                  constraints.maxWidth < 940 ? 940 : constraints.maxWidth,
+              maxHeight: constraints.maxHeight,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── 데스크톱: 좌 프리뷰 + 우 폼 ─────────────────────
   Widget _buildDesktopLayout(BoxConstraints outer) {
     const double leftWidth = 420;
     const double rightWidth = 520;
@@ -112,7 +214,7 @@ class _JobPostWebPageState extends State<JobPostWebPage>
               width: rightWidth,
               child: Column(
                 children: [
-                  _buildTopBar(isDesktop: true),
+                  _buildFormTopBar(),
                   Expanded(
                     child: JobPostForm(
                       initialData: _data,
@@ -129,7 +231,7 @@ class _JobPostWebPageState extends State<JobPostWebPage>
     );
   }
 
-  // ── 좌측 사이드 헤더 ────────────────────────────────────
+  // ── 좌측 사이드 헤더 ────────────────────────────────
   Widget _buildSideHeader() {
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 40, 24, 20),
@@ -157,7 +259,10 @@ class _JobPostWebPageState extends State<JobPostWebPage>
                 ),
               ),
               const SizedBox(width: 10),
-              Text('치카북스 구인등록', style: WebTypo.sectionTitle(color: _kText)),
+              Text(
+                '치카북스 구인등록',
+                style: WebTypo.sectionTitle(color: _kText),
+              ),
             ],
           ),
           const SizedBox(height: 14),
@@ -173,49 +278,17 @@ class _JobPostWebPageState extends State<JobPostWebPage>
     );
   }
 
-  // ── 상단 바 ─────────────────────────────────────────────
-  Widget _buildTopBar({required bool isDesktop}) {
+  // ── 폼 상단 바 (초기화 버튼) ────────────────────────
+  Widget _buildFormTopBar() {
     return Container(
       color: Colors.white,
-      padding: EdgeInsets.fromLTRB(
-        isDesktop ? 28 : 20,
-        44,
-        isDesktop ? 28 : 20,
-        14,
-      ),
+      padding: const EdgeInsets.fromLTRB(28, 16, 28, 10),
       child: Row(
         children: [
-          if (!isDesktop) ...[
-            Row(
-              children: [
-                Container(
-                  width: 30,
-                  height: 30,
-                  decoration: BoxDecoration(
-                    color: _kBlue,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.local_hospital_outlined,
-                    size: 16,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(width: 8),
-              ],
-            ),
-          ],
           Expanded(
-            child: Text('구인공고 등록', style: WebTypo.heading(color: _kText)),
-          ),
-          // 사업자 인증 버튼
-          TextButton.icon(
-            onPressed: () => context.push('/clinic-verify'),
-            icon: const Icon(Icons.verified_outlined, size: 16),
-            label: const Text('사업자 인증'),
-            style: TextButton.styleFrom(
-              foregroundColor: _kBlue,
-              textStyle: const TextStyle(fontSize: 13),
+            child: Text(
+              '구인공고 등록',
+              style: WebTypo.heading(color: _kText),
             ),
           ),
           // 초기화 버튼
@@ -233,7 +306,60 @@ class _JobPostWebPageState extends State<JobPostWebPage>
     );
   }
 
-  // ── 제출 완료 화면 ──────────────────────────────────────
+  // ── 하단 푸터 (개인정보 / 약관 링크) ──────────────────
+  Widget _buildFooter() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 28),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            '© 치과책방',
+            style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+          ),
+          const SizedBox(width: 20),
+          _footerLink('개인정보처리방침', '/privacy'),
+          _footerDot(),
+          _footerLink('이용약관', '/terms'),
+        ],
+      ),
+    );
+  }
+
+  Widget _footerLink(String label, String path) {
+    return InkWell(
+      onTap: () {
+        // 같은 호스트의 정적 HTML을 새 탭에서 열기
+        launchUrl(
+          Uri.parse(path),
+          webOnlyWindowName: '_blank',
+        );
+      },
+      borderRadius: BorderRadius.circular(4),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey[600],
+            decoration: TextDecoration.underline,
+            decorationColor: Colors.grey[400],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _footerDot() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: Text('·', style: TextStyle(color: Colors.grey[400])),
+    );
+  }
+
+  // ── 제출 완료 화면 ───────────────────────────────────
   Widget _buildSuccessScreen() {
     return Scaffold(
       backgroundColor: _kBg,
@@ -289,14 +415,17 @@ class _JobPostWebPageState extends State<JobPostWebPage>
                 ),
               ),
               const SizedBox(height: 32),
+              // 공고 관리로 이동
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed:
-                      () => setState(() {
-                        _submitted = false;
-                        _data = JobPostData();
-                      }),
+                  onPressed: () {
+                    setState(() {
+                      _submitted = false;
+                      _data = JobPostData();
+                    });
+                    _tabCtrl.animateTo(1); // 공고 관리 탭으로 이동
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _kBlue,
                     foregroundColor: Colors.white,
@@ -307,8 +436,37 @@ class _JobPostWebPageState extends State<JobPostWebPage>
                     ),
                   ),
                   child: const Text(
+                    '내 공고 확인하기',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              // 새 공고 등록
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () => setState(() {
+                    _submitted = false;
+                    _data = JobPostData();
+                  }),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: _kText,
+                    side: BorderSide(color: _kText.withOpacity(0.2)),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
                     '새 공고 등록하기',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
@@ -319,5 +477,3 @@ class _JobPostWebPageState extends State<JobPostWebPage>
     );
   }
 }
-
-

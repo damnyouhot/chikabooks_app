@@ -1,5 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart';
@@ -13,6 +14,14 @@ class AppInitializer {
 
     // 웹에서 # 없는 경로 URL 사용
     if (kIsWeb) usePathUrlStrategy();
+
+    // 모바일: 세로 모드 고정 (가로 회전 방지)
+    if (!kIsWeb) {
+      await SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+      ]);
+    }
 
     // Rive 초기화 (0.14.x: rive_native 기반, iOS FFI 문제 해결)
     await RiveNative.init();
