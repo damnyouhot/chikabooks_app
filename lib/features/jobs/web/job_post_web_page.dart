@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../ui/job_post_form.dart';
 import '../ui/job_post_preview.dart';
 import 'job_manage_section.dart';
 import 'job_analytics_section.dart';
 import 'web_typography.dart';
+import '../../../models/job_draft.dart';
+import '../../../services/job_draft_service.dart';
 
 const _kBg = Color(0xFFF4F0F8);
 const _kText = Color(0xFF3D4A5C);
@@ -32,6 +35,7 @@ class _JobPostWebPageState extends State<JobPostWebPage>
   late final TabController _tabCtrl;
   JobPostData _data = JobPostData();
   bool _submitted = false;
+  String? _currentDraftId;
 
   @override
   void initState() {
@@ -47,8 +51,65 @@ class _JobPostWebPageState extends State<JobPostWebPage>
 
   void _onDataChanged(JobPostData d) => setState(() => _data = d);
 
+  void _onDraftIdChanged(String id) {
+    _currentDraftId = id;
+  }
+
   Future<void> _onSubmit(JobPostData d) async {
+    _currentDraftId = null;
     if (mounted) setState(() => _submitted = true);
+  }
+
+  /// 드래프트를 불러와 폼에 반영
+  Future<void> _loadDraft(JobDraft draft) async {
+    setState(() {
+      _currentDraftId = draft.id;
+      _data = JobPostData(
+        clinicName: draft.clinicName,
+        title: draft.title,
+        role: draft.role,
+        employmentType: draft.employmentType,
+        workHours: draft.workHours,
+        salary: draft.salary,
+        benefits: List.from(draft.benefits),
+        description: draft.description,
+        address: draft.address,
+        contact: draft.contact,
+      );
+    });
+    // 공고 등록 탭으로 이동
+    _tabCtrl.animateTo(0);
+  }
+
+  /// 드래프트 삭제
+  Future<void> _deleteDraft(String draftId) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('임시저장 삭제'),
+        content: const Text('이 임시저장을 삭제하시겠습니까?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('삭제'),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      await JobDraftService.deleteDraft(draftId);
+      if (_currentDraftId == draftId) {
+        setState(() {
+          _currentDraftId = null;
+          _data = JobPostData();
+        });
+      }
+    }
   }
 
   @override
@@ -201,6 +262,7 @@ class _JobPostWebPageState extends State<JobPostWebPage>
               child: Column(
                 children: [
                   _buildSideHeader(),
+                  _buildDraftListPanel(),
                   Expanded(
                     child: SingleChildScrollView(
                       padding: const EdgeInsets.symmetric(
@@ -221,9 +283,12 @@ class _JobPostWebPageState extends State<JobPostWebPage>
                   _buildFormTopBar(),
                   Expanded(
                     child: JobPostForm(
+                      key: ValueKey(_currentDraftId ?? 'new'),
                       initialData: _data,
                       onDataChanged: _onDataChanged,
                       onSubmit: _onSubmit,
+                      draftId: _currentDraftId,
+                      onDraftIdChanged: _onDraftIdChanged,
                     ),
                   ),
                 ],
@@ -282,6 +347,119 @@ class _JobPostWebPageState extends State<JobPostWebPage>
     );
   }
 
+  // ── 좌측 임시저장 목록 패널 ────────────────────────
+  Widget _buildDraftListPanel() {
+    return StreamBuilder<List<JobDraft>>(
+      stream: JobDraftService.watchMyDrafts(),
+      builder: (context, snapshot) {
+        final drafts = snapshot.data ?? [];
+        if (drafts.isEmpty) return const SizedBox.shrink();
+
+        return Container(
+          decoration: const BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: Color(0xFFD8CDE8), width: 0.8),
+            ),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.drafts_outlined,
+                      size: 16, color: _kText.withOpacity(0.6)),
+                  const SizedBox(width: 6),
+                  Text(
+                    '임시저장 (${drafts.length})',
+                    style: WebTypo.caption(
+                      color: _kText.withOpacity(0.7),
+                      size: 13,
+                    ).copyWith(fontWeight: FontWeight.w700),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ...drafts.map((draft) => _buildDraftTile(draft)),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDraftTile(JobDraft draft) {
+    final isActive = _currentDraftId == draft.id;
+    final updatedText = draft.updatedAt != null
+        ? DateFormat('MM/dd HH:mm').format(draft.updatedAt!)
+        : '';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Material(
+        color: isActive
+            ? _kBlue.withOpacity(0.08)
+            : Colors.white.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(8),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () => _loadDraft(draft),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: [
+                Icon(
+                  isActive ? Icons.edit_note : Icons.description_outlined,
+                  size: 18,
+                  color: isActive ? _kBlue : _kText.withOpacity(0.5),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        draft.displayTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight:
+                              isActive ? FontWeight.w700 : FontWeight.w500,
+                          color: isActive ? _kBlue : _kText,
+                        ),
+                      ),
+                      if (updatedText.isNotEmpty)
+                        Text(
+                          updatedText,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: _kText.withOpacity(0.4),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () => _deleteDraft(draft.id),
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: Icon(
+                      Icons.close,
+                      size: 16,
+                      color: _kText.withOpacity(0.3),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   // ── 폼 상단 바 (초기화 버튼) ────────────────────────
   Widget _buildFormTopBar() {
     return Container(
@@ -295,9 +473,25 @@ class _JobPostWebPageState extends State<JobPostWebPage>
               style: WebTypo.heading(color: _kText),
             ),
           ),
-          // 초기화 버튼
+          // 초기화 버튼 (새 공고로)
           TextButton.icon(
-            onPressed: () => setState(() => _data = JobPostData()),
+            onPressed: () => setState(() {
+              _currentDraftId = null;
+              _data = JobPostData();
+            }),
+            icon: const Icon(Icons.add, size: 16),
+            label: const Text('새 공고'),
+            style: TextButton.styleFrom(
+              foregroundColor: _kBlue,
+              textStyle: const TextStyle(fontSize: 13),
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton.icon(
+            onPressed: () => setState(() {
+              _currentDraftId = null;
+              _data = JobPostData();
+            }),
             icon: const Icon(Icons.refresh, size: 16),
             label: const Text('초기화'),
             style: TextButton.styleFrom(

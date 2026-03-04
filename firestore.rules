@@ -314,6 +314,20 @@ service cloud.firestore {
     }
 
     // ══════════════════════════════════════════════════
+    // 📝 공고 임시저장 (Job Drafts)
+    // ══════════════════════════════════════════════════
+    match /jobDrafts/{draftId} {
+      allow read: if request.auth != null &&
+        resource.data.ownerUid == request.auth.uid;
+      allow create: if request.auth != null &&
+        request.resource.data.ownerUid == request.auth.uid;
+      allow update: if request.auth != null &&
+        resource.data.ownerUid == request.auth.uid;
+      allow delete: if request.auth != null &&
+        resource.data.ownerUid == request.auth.uid;
+    }
+
+    // ══════════════════════════════════════════════════
     // 📊 공고 일별 통계 (Job Stats Daily)
     // ══════════════════════════════════════════════════
     match /jobStatsDaily/{docId} {

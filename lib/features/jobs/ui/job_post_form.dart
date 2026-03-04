@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
@@ -6,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 import '../services/job_image_uploader.dart';
+import '../../../services/job_draft_service.dart';
 
 // ── 폼 전용 타이포그래피 헬퍼 ─────────────────────────────
 TextStyle _ft({
@@ -98,22 +100,44 @@ class JobPostData {
     'address': address,
     'contact': contact,
   };
+
+  /// Firestore 또는 드래프트 데이터에서 복원
+  factory JobPostData.fromMap(Map<String, dynamic> data) {
+    return JobPostData(
+      clinicName: data['clinicName'] as String? ?? '',
+      title: data['title'] as String? ?? '',
+      role: data['role'] as String? ?? '',
+      employmentType: data['employmentType'] as String? ?? '',
+      workHours: data['workHours'] as String? ?? '',
+      salary: data['salary'] as String? ?? '',
+      benefits: List<String>.from(data['benefits'] ?? []),
+      description: data['description'] as String? ?? '',
+      address: data['address'] as String? ?? '',
+      contact: data['contact'] as String? ?? '',
+    );
+  }
 }
 
 /// 앱/웹 공통 구인공고 입력 폼
 ///
 /// [onDataChanged] : 폼 값이 바뀔 때마다 호출 (프리뷰 업데이트용)
 /// [onSubmit]      : 제출 버튼 클릭 시 호출
+/// [draftId]       : 기존 드래프트 ID (임시저장 불러오기용)
+/// [onDraftIdChanged] : 드래프트 생성/변경 시 부모에 알림
 class JobPostForm extends StatefulWidget {
   final JobPostData? initialData;
   final ValueChanged<JobPostData>? onDataChanged;
   final Future<void> Function(JobPostData data)? onSubmit;
+  final String? draftId;
+  final ValueChanged<String>? onDraftIdChanged;
 
   const JobPostForm({
     super.key,
     this.initialData,
     this.onDataChanged,
     this.onSubmit,
+    this.draftId,
+    this.onDraftIdChanged,
   });
 
   @override
@@ -147,6 +171,12 @@ class _JobPostFormState extends State<JobPostForm> {
   final Map<int, double> _uploadProgress = {};
   static const _uuid = Uuid();
 
+  // ── 임시저장 관련 ──
+  String? _draftId;
+  Timer? _autoSaveTimer;
+  bool _isSavingDraft = false;
+  DateTime? _lastSavedAt;
+
   static const _roles = ['치과위생사', '치과조무사', '데스크', '원장', '기타'];
   static const _employmentTypes = ['정규직', '계약직', '파트타임', '인턴'];
   static const _commonBenefits = ['4대보험', '퇴직금', '연차', '식비지원', '주차지원', '명절상여'];
@@ -155,6 +185,7 @@ class _JobPostFormState extends State<JobPostForm> {
   void initState() {
     super.initState();
     _data = widget.initialData ?? JobPostData();
+    _draftId = widget.draftId;
     _clinicNameCtrl = TextEditingController(text: _data.clinicName);
     _titleCtrl = TextEditingController(text: _data.title);
     _workHoursCtrl = TextEditingController(text: _data.workHours);
@@ -170,6 +201,7 @@ class _JobPostFormState extends State<JobPostForm> {
 
   @override
   void dispose() {
+    _autoSaveTimer?.cancel();
     for (final c in [
       _clinicNameCtrl,
       _titleCtrl,
@@ -198,6 +230,51 @@ class _JobPostFormState extends State<JobPostForm> {
       contact: _contactCtrl.text,
     );
     widget.onDataChanged?.call(_data);
+    _scheduleAutoSave();
+  }
+
+  // ── 임시저장 (auto-save with debounce) ──
+  void _scheduleAutoSave() {
+    _autoSaveTimer?.cancel();
+    _autoSaveTimer = Timer(const Duration(seconds: 3), _autoSave);
+  }
+
+  Future<void> _autoSave() async {
+    // 내용이 비어 있으면 저장하지 않음
+    if (!_data.toMap().values.any(
+      (v) => v is String && v.isNotEmpty || v is List && v.isNotEmpty,
+    )) return;
+
+    if (_isSavingDraft) return;
+    if (!mounted) return;
+    setState(() => _isSavingDraft = true);
+
+    try {
+      final id = await JobDraftService.saveDraft(
+        draftId: _draftId,
+        formData: _data.toMap(),
+      );
+      if (id != null && mounted) {
+        final isNew = _draftId == null;
+        _draftId = id;
+        _lastSavedAt = DateTime.now();
+        if (isNew) widget.onDraftIdChanged?.call(id);
+        setState(() {});
+      }
+    } catch (e) {
+      debugPrint('⚠️ autoSave error: $e');
+    } finally {
+      if (mounted) setState(() => _isSavingDraft = false);
+    }
+  }
+
+  /// 수동 임시저장 (버튼 클릭용)
+  Future<void> _manualSaveDraft() async {
+    _autoSaveTimer?.cancel();
+    await _autoSave();
+    if (mounted && _lastSavedAt != null) {
+      _showSnack('임시저장 완료');
+    }
   }
 
   // ── AI 자동채움 (Storage 업로드 → Callable) ────────────
@@ -338,7 +415,14 @@ class _JobPostFormState extends State<JobPostForm> {
       );
       await callable.call({..._data.toMap(), 'images': imageUrls});
 
-      // 3) 외부 onSubmit 콜백 (웹 페이지에서 완료 화면 전환 등)
+      // 3) 제출 성공 → 드래프트 삭제
+      _autoSaveTimer?.cancel();
+      if (_draftId != null) {
+        await JobDraftService.deleteDraft(_draftId!);
+        _draftId = null;
+      }
+
+      // 4) 외부 onSubmit 콜백 (웹 페이지에서 완료 화면 전환 등)
       await widget.onSubmit?.call(_data);
     } catch (e) {
       _showSnack('등록 실패: $e');
@@ -806,6 +890,53 @@ class _JobPostFormState extends State<JobPostForm> {
             activeColor: _kBlue,
           ),
         const SizedBox(height: 12),
+        // ── 임시저장 버튼 + 상태 표시 ──
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _isSavingDraft ? null : _manualSaveDraft,
+                icon: _isSavingDraft
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.save_outlined, size: 18),
+                label: Text(
+                  '임시저장',
+                  style: _ft(size: 14, weight: FontWeight.w600, color: _kBlue),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _kBlue,
+                  side: const BorderSide(color: _kBlue),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (_lastSavedAt != null || _draftId != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Center(
+              child: Text(
+                _lastSavedAt != null
+                    ? '마지막 저장: ${_lastSavedAt!.hour.toString().padLeft(2, '0')}:${_lastSavedAt!.minute.toString().padLeft(2, '0')}'
+                    : '임시저장됨',
+                style: _ft(
+                  size: 11,
+                  weight: FontWeight.w500,
+                  color: _kText.withOpacity(0.4),
+                ),
+              ),
+            ),
+          ),
+        const SizedBox(height: 10),
+        // ── 제출 버튼 ──
         SizedBox(
           width: double.infinity,
           child: ElevatedButton(
