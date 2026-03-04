@@ -859,6 +859,45 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
             ),
             const SizedBox(height: 24),
 
+            // ── 안내 박스 ─────────────────────────────
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _kBlue.withOpacity(0.06),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: _kBlue.withOpacity(0.18)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.info_outline, size: 14, color: _kBlue),
+                      const SizedBox(width: 6),
+                      Text(
+                        '치과 계정은 SNS 로그인을 지원하지 않습니다.',
+                        style: GoogleFonts.notoSansKr(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: _kText,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'SNS로 가입했다면 비밀번호를 만들어 주세요.',
+                    style: GoogleFonts.notoSansKr(
+                      fontSize: 11,
+                      color: _kText.withOpacity(0.65),
+                      height: 1.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
             // 이메일
             PubTextField(
               controller: _emailCtrl,
@@ -936,6 +975,25 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
             ),
 
             const SizedBox(height: 12),
+
+            // 비밀번호 만들기 버튼 (SNS 가입자 대상)
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => context.push('/publisher/forgot'),
+                icon: const Icon(Icons.lock_reset, size: 15),
+                label: Text(
+                  '비밀번호 만들기',
+                  style: GoogleFonts.notoSansKr(fontSize: 13),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _kBlue,
+                  side: BorderSide(color: _kBlue.withOpacity(0.4)),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
 
             // 비밀번호 찾기 + 회원가입
             Row(
