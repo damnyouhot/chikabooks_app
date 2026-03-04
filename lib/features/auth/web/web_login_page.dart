@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import '../../../services/kakao_auth_service.dart';
 import '../../../services/apple_auth_service.dart';
 import '../../../services/email_auth_service.dart';
@@ -175,7 +174,6 @@ class _ApplicantLoginCard extends StatefulWidget {
 }
 
 class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
-  final _googleSignIn = GoogleSignIn(scopes: ['email']);
   bool _isLoading = false;
   String? _loadingProvider;
   String? _errorMsg;
@@ -257,23 +255,15 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
   Future<void> _loginGoogle() async {
     _setLoading('google');
     try {
-      final googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) {
-        _clearLoading();
-        return; // 사용자 취소
-      }
-      final googleAuth = await googleUser.authentication;
-      if (googleAuth.idToken == null) {
-        _showError('Google 인증 토큰을 받지 못했어요.');
-        return;
-      }
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-      await FirebaseAuth.instance.signInWithCredential(credential);
-      await Future.delayed(const Duration(milliseconds: 200));
-      if (FirebaseAuth.instance.currentUser == null) {
+      // 웹에서는 signInWithPopup 방식 사용 (idToken null 문제 해결)
+      final googleProvider = GoogleAuthProvider();
+      googleProvider.addScope('email');
+      googleProvider.addScope('profile');
+
+      final userCredential =
+          await FirebaseAuth.instance.signInWithPopup(googleProvider);
+
+      if (userCredential.user == null) {
         _showError('Google 로그인에 실패했어요.');
         return;
       }
