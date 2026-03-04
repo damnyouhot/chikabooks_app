@@ -1,7 +1,14 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import '../../../services/kakao_auth_service.dart';
+import '../../../services/apple_auth_service.dart';
+import '../../../services/email_auth_service.dart';
+import '../../../services/sign_in_tracker.dart';
 import '../../publisher/services/clinic_auth_service.dart';
 import '../../publisher/pages/publisher_shared.dart';
 
@@ -13,7 +20,7 @@ const _kGreen = Color(0xFF4CAF50);
 
 /// 통합 로그인 페이지 (/login)
 ///
-/// 좌: 지원자 로그인 (소셜 — 앱에서만 사용, 웹에서는 안내만)
+/// 좌: 지원자 로그인 (카카오 · 구글 · 애플 · 이메일  /  네이버는 앱 전용)
 /// 우: 치과 로그인 (이메일/비밀번호)
 class WebLoginPage extends StatefulWidget {
   final String? nextRoute;
@@ -32,35 +39,36 @@ class _WebLoginPageState extends State<WebLoginPage> {
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 900),
+            constraints: const BoxConstraints(maxWidth: 960),
             child: Column(
               children: [
-                // ── 로고 + 타이틀 ──────────────────────
                 _buildLogo(),
                 const SizedBox(height: 36),
 
-                // ── 좌/우 분할 카드 ────────────────────
+                // ── 좌(지원자) / 우(치과) ────────────────
                 LayoutBuilder(
                   builder: (context, constraints) {
-                    if (constraints.maxWidth < 600) {
-                      // 모바일 레이아웃: 세로로 쌓기
+                    if (constraints.maxWidth < 620) {
                       return Column(
                         children: [
-                          _ClinicLoginCard(nextRoute: widget.nextRoute),
+                          _ApplicantLoginCard(nextRoute: widget.nextRoute),
                           const SizedBox(height: 20),
-                          const _ApplicantInfoCard(),
+                          _ClinicLoginCard(nextRoute: widget.nextRoute),
                         ],
                       );
                     }
-                    // 데스크탑 레이아웃: 좌/우 분할
                     return Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
-                          child: _ClinicLoginCard(nextRoute: widget.nextRoute),
+                          child: _ApplicantLoginCard(
+                            nextRoute: widget.nextRoute,
+                          ),
                         ),
                         const SizedBox(width: 24),
-                        const Expanded(child: _ApplicantInfoCard()),
+                        Expanded(
+                          child: _ClinicLoginCard(nextRoute: widget.nextRoute),
+                        ),
                       ],
                     );
                   },
@@ -68,7 +76,7 @@ class _WebLoginPageState extends State<WebLoginPage> {
 
                 const SizedBox(height: 24),
 
-                // ── 하단 링크 ──────────────────────────
+                // ── 하단 링크 ────────────────────────────
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -155,9 +163,578 @@ class _WebLoginPageState extends State<WebLoginPage> {
   }
 }
 
-// ═══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// 지원자 로그인 카드 (소셜 + 이메일)
+// ═══════════════════════════════════════════════════════════════
+class _ApplicantLoginCard extends StatefulWidget {
+  final String? nextRoute;
+  const _ApplicantLoginCard({this.nextRoute});
+
+  @override
+  State<_ApplicantLoginCard> createState() => _ApplicantLoginCardState();
+}
+
+class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
+  final _googleSignIn = GoogleSignIn(scopes: ['email']);
+  bool _isLoading = false;
+  String? _loadingProvider;
+  String? _errorMsg;
+  bool _showEmailForm = false;
+  bool _isSignUp = false;
+  String? _lastProvider;
+
+  final _emailCtrl = TextEditingController();
+  final _pwCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBadge();
+  }
+
+  Future<void> _loadBadge() async {
+    final p = await SignInTracker.getLocalLastProvider();
+    if (mounted && p != null) setState(() => _lastProvider = p);
+  }
+
+  @override
+  void dispose() {
+    _emailCtrl.dispose();
+    _pwCtrl.dispose();
+    super.dispose();
+  }
+
+  // ── 로그인 후 공통 라우팅 ──────────────────────────────────
+  Future<void> _handlePostLogin(String provider) async {
+    await SignInTracker.record(provider);
+    if (!mounted) return;
+
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .get();
+      final role = doc.data()?['role'] as String?;
+      if (!mounted) return;
+
+      if (role == 'clinic') {
+        final status = await ClinicAuthService.getStatus();
+        if (!mounted) return;
+        context.go(
+          status.canPost
+              ? (widget.nextRoute ?? '/post-job')
+              : '/publisher/onboarding',
+        );
+      } else {
+        context.go(widget.nextRoute ?? '/applicant/resumes');
+      }
+    } catch (_) {
+      if (mounted) context.go(widget.nextRoute ?? '/applicant/resumes');
+    }
+  }
+
+  // ── 카카오 ─────────────────────────────────────────────────
+  Future<void> _loginKakao() async {
+    _setLoading('kakao');
+    try {
+      final user = await KakaoAuthService.signInWithKakao();
+      if (user == null) {
+        _showError('카카오 로그인에 실패했어요. 다시 시도해주세요.');
+        return;
+      }
+      await _handlePostLogin('kakao');
+    } catch (e) {
+      _showError('카카오 로그인 오류: $e');
+    } finally {
+      _clearLoading();
+    }
+  }
+
+  // ── 구글 ───────────────────────────────────────────────────
+  Future<void> _loginGoogle() async {
+    _setLoading('google');
+    try {
+      final googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        _clearLoading();
+        return; // 사용자 취소
+      }
+      final googleAuth = await googleUser.authentication;
+      if (googleAuth.idToken == null) {
+        _showError('Google 인증 토큰을 받지 못했어요.');
+        return;
+      }
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+      await FirebaseAuth.instance.signInWithCredential(credential);
+      await Future.delayed(const Duration(milliseconds: 200));
+      if (FirebaseAuth.instance.currentUser == null) {
+        _showError('Google 로그인에 실패했어요.');
+        return;
+      }
+      await _handlePostLogin('google');
+    } catch (e) {
+      _showError('Google 로그인 오류: $e');
+    } finally {
+      _clearLoading();
+    }
+  }
+
+  // ── 애플 ───────────────────────────────────────────────────
+  Future<void> _loginApple() async {
+    _setLoading('apple');
+    try {
+      final user = await AppleAuthService.signInWithApple();
+      if (user == null) {
+        _showError('Apple 로그인에 실패했어요.');
+        return;
+      }
+      await _handlePostLogin('apple');
+    } catch (e) {
+      _showError('Apple 로그인 오류: $e');
+    } finally {
+      _clearLoading();
+    }
+  }
+
+  // ── 이메일 ─────────────────────────────────────────────────
+  Future<void> _loginEmail() async {
+    final email = _emailCtrl.text.trim();
+    final password = _pwCtrl.text.trim();
+    if (email.isEmpty || password.isEmpty) {
+      _showError('이메일과 비밀번호를 입력해주세요.');
+      return;
+    }
+    _setLoading('email');
+    try {
+      User? user;
+      if (_isSignUp) {
+        if (password.length < 8) {
+          _showError('비밀번호는 8자 이상이어야 해요.');
+          return;
+        }
+        user = await EmailAuthService.signUp(
+          email: email,
+          password: password,
+        );
+      } else {
+        user = await EmailAuthService.signIn(
+          email: email,
+          password: password,
+        );
+      }
+      if (user == null) {
+        _showError(_isSignUp ? '회원가입에 실패했어요.' : '로그인에 실패했어요.');
+        return;
+      }
+      await _handlePostLogin('email');
+    } on FirebaseAuthException catch (e) {
+      _showError(_mapAuthError(e.code));
+    } catch (e) {
+      _showError('이메일 로그인 오류: $e');
+    } finally {
+      _clearLoading();
+    }
+  }
+
+  // ── 헬퍼 ───────────────────────────────────────────────────
+  void _setLoading(String p) {
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _loadingProvider = p;
+        _errorMsg = null;
+      });
+    }
+  }
+
+  void _clearLoading() {
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+        _loadingProvider = null;
+      });
+    }
+  }
+
+  void _showError(String msg) {
+    if (mounted) setState(() => _errorMsg = msg);
+  }
+
+  String _mapAuthError(String code) {
+    switch (code) {
+      case 'user-not-found':
+        return '등록되지 않은 이메일이에요.';
+      case 'wrong-password':
+      case 'invalid-credential':
+        return '이메일 또는 비밀번호가 올바르지 않아요.';
+      case 'email-already-in-use':
+        return '이미 사용 중인 이메일이에요.';
+      case 'weak-password':
+        return '비밀번호가 너무 약해요.';
+      default:
+        return '로그인 중 오류가 발생했어요.';
+    }
+  }
+
+  // ── UI ─────────────────────────────────────────────────────
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(28),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ── 제목 ─────────────────────────────
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: _kGreen.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.person_outline_rounded,
+                  color: _kGreen,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '지원자 (치과위생사)',
+                    style: GoogleFonts.notoSansKr(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: _kText,
+                    ),
+                  ),
+                  Text(
+                    '이력서 작성 · 공고 지원',
+                    style: GoogleFonts.notoSansKr(
+                      fontSize: 12,
+                      color: _kText.withOpacity(0.5),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+
+          // ── 소셜 로그인 버튼들 ──────────────
+          _snsBtn('kakao', Icons.chat_bubble, '카카오로 로그인',
+              const Color(0xFFFEE500), Colors.black87, _loginKakao),
+          const SizedBox(height: 10),
+          _snsBtn('google', Icons.g_mobiledata, 'Google로 로그인',
+              Colors.white, Colors.black87, _loginGoogle,
+              border: Colors.grey[300]),
+          const SizedBox(height: 10),
+          _snsBtn('apple', Icons.apple, 'Apple로 로그인', Colors.black,
+              Colors.white, _loginApple),
+          const SizedBox(height: 10),
+
+          // 네이버 (비활성)
+          _snsBtn('naver', Icons.language, '네이버로 로그인',
+              Colors.grey[200]!, Colors.grey[500]!, null,
+              trailingLabel: '앱에서만'),
+
+          const SizedBox(height: 18),
+
+          // ── 구분선 ─────────────────────────
+          Row(
+            children: [
+              Expanded(child: Divider(color: Colors.grey[300])),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(
+                  '또는',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[400]),
+                ),
+              ),
+              Expanded(child: Divider(color: Colors.grey[300])),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // ── 이메일 로그인 ──────────────────
+          if (!_showEmailForm)
+            OutlinedButton.icon(
+              icon: Icon(
+                Icons.email_outlined,
+                size: 18,
+                color: _kText.withOpacity(0.6),
+              ),
+              label: Text(
+                '이메일로 로그인',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: _kText.withOpacity(0.7),
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: Colors.grey[300]!),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onPressed: () => setState(() => _showEmailForm = true),
+            )
+          else ...[
+            PubTextField(
+              controller: _emailCtrl,
+              label: '이메일',
+              hint: 'email@example.com',
+              keyboardType: TextInputType.emailAddress,
+            ),
+            const SizedBox(height: 10),
+            PubTextField(
+              controller: _pwCtrl,
+              label: '비밀번호',
+              obscure: true,
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: (_loadingProvider == 'email') ? null : _loginEmail,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _kGreen,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: (_loadingProvider == 'email')
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Text(
+                        _isSignUp ? '회원가입' : '로그인',
+                        style: GoogleFonts.notoSansKr(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () => setState(() => _isSignUp = !_isSignUp),
+                style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                child: Text(
+                  _isSignUp ? '이미 계정이 있어요' : '아직 계정이 없어요 (회원가입)',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: _kText.withOpacity(0.5),
+                  ),
+                ),
+              ),
+            ),
+          ],
+
+          // ── 에러 메시지 ────────────────────
+          if (_errorMsg != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: kPubPinkDark.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: 16,
+                    color: kPubPinkDark.withOpacity(0.8),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      _errorMsg!,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: kPubPinkDark.withOpacity(0.9),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// 소셜 로그인 버튼 (마지막 로그인 배지 포함)
+  Widget _snsBtn(
+    String provider,
+    IconData icon,
+    String label,
+    Color bgColor,
+    Color fgColor,
+    VoidCallback? onPressed, {
+    Color? border,
+    String? trailingLabel,
+  }) {
+    final isLast = _lastProvider == provider;
+    final busy = _loadingProvider == provider;
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: ElevatedButton.icon(
+            icon: busy
+                ? SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: fgColor,
+                    ),
+                  )
+                : Icon(icon, color: fgColor, size: 22),
+            label: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: fgColor,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (trailingLabel != null) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      trailingLabel,
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: bgColor,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: border != null
+                    ? BorderSide(color: border)
+                    : BorderSide.none,
+              ),
+            ),
+            onPressed: _isLoading ? null : onPressed,
+          ),
+        ),
+
+        // "마지막 로그인" 배지
+        if (isLast && onPressed != null)
+          Positioned(
+            right: 8,
+            top: -8,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(
+                color: _kGreen,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: _kGreen.withOpacity(0.3),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
+              child: Text(
+                '마지막 로그인',
+                style: GoogleFonts.notoSansKr(
+                  fontSize: 9,
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+
+        // 네이버에 마지막 로그인 배지 + 앱 안내
+        if (isLast && onPressed == null)
+          Positioned(
+            right: 8,
+            top: -8,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.grey[500],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '마지막 로그인 (앱)',
+                style: GoogleFonts.notoSansKr(
+                  fontSize: 9,
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
 // 치과 로그인 카드 (이메일/비밀번호)
-// ═══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
 class _ClinicLoginCard extends StatefulWidget {
   final String? nextRoute;
   const _ClinicLoginCard({this.nextRoute});
@@ -192,6 +769,10 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
         email: _emailCtrl.text.trim(),
         password: _pwCtrl.text,
       );
+
+      // provider 기록
+      await SignInTracker.record('email');
+
       if (!mounted) return;
       final status = await ClinicAuthService.getStatus();
       if (!mounted) return;
@@ -401,168 +982,3 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
     );
   }
 }
-
-// ═══════════════════════════════════════════════════════════
-// 지원자 안내 카드 (웹에서는 앱 안내, 향후 소셜 로그인 추가 가능)
-// ═══════════════════════════════════════════════════════════
-class _ApplicantInfoCard extends StatelessWidget {
-  const _ApplicantInfoCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(28),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // 아이콘 + 제목
-          Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: _kGreen.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.person_outline_rounded,
-                  color: _kGreen,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '지원자 (치과위생사)',
-                    style: GoogleFonts.notoSansKr(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: _kText,
-                    ),
-                  ),
-                  Text(
-                    '이력서 작성 · 공고 지원',
-                    style: GoogleFonts.notoSansKr(
-                      fontSize: 12,
-                      color: _kText.withOpacity(0.5),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-
-          // 안내 배너
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: _kGreen.withOpacity(0.06),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: _kGreen.withOpacity(0.15)),
-            ),
-            child: Column(
-              children: [
-                Icon(
-                  Icons.phone_android_rounded,
-                  size: 40,
-                  color: _kGreen.withOpacity(0.6),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  '치카북스 앱에서 이용해주세요',
-                  style: GoogleFonts.notoSansKr(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: _kText,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '이력서 작성, 공고 지원, 커리어 관리까지\n모바일 앱에서 편리하게 이용할 수 있어요.',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.notoSansKr(
-                    fontSize: 13,
-                    color: _kText.withOpacity(0.5),
-                    height: 1.6,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
-          // 기능 목록
-          _featureRow(Icons.description_outlined, '이력서 작성 및 관리'),
-          const SizedBox(height: 10),
-          _featureRow(Icons.search_rounded, '맞춤 공고 탐색'),
-          const SizedBox(height: 10),
-          _featureRow(Icons.send_rounded, '원클릭 지원'),
-          const SizedBox(height: 10),
-          _featureRow(Icons.badge_outlined, '커리어 카드 · 네트워크'),
-
-          const SizedBox(height: 20),
-
-          // 앱 다운로드 안내
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: _kText.withOpacity(0.04),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.info_outline_rounded,
-                  size: 16,
-                  color: _kText.withOpacity(0.4),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '앱 출시 시 App Store / Play Store에서 다운로드',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: _kText.withOpacity(0.5),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _featureRow(IconData icon, String label) {
-    return Row(
-      children: [
-        Icon(icon, size: 18, color: _kGreen.withOpacity(0.7)),
-        const SizedBox(width: 10),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            color: _kText.withOpacity(0.7),
-          ),
-        ),
-      ],
-    );
-  }
-}
-

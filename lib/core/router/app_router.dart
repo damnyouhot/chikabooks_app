@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 import '../../pages/auth/auth_gate.dart';
 import '../../pages/job_page.dart';
@@ -8,7 +9,6 @@ import '../../features/jobs/web/job_post_web_page.dart';
 import '../../features/jobs/web/legal_page.dart';
 import '../../features/jobs/ui/clinic_verify_page.dart';
 import '../../features/auth/web/web_login_page.dart';
-import '../../features/publisher/pages/publisher_login_page.dart';
 import '../../features/publisher/pages/publisher_signup_page.dart';
 import '../../features/publisher/pages/publisher_forgot_page.dart';
 import '../../features/publisher/pages/publisher_onboarding_page.dart';
@@ -17,9 +17,30 @@ import '../../features/publisher/pages/publisher_profile_page.dart';
 import '../../features/publisher/pages/publisher_verify_business_page.dart';
 import '../../features/publisher/pages/publisher_pending_page.dart';
 import '../../features/publisher/pages/publisher_done_page.dart';
+import '../../features/resume/screens/resume_home_screen.dart';
+import '../../features/resume/screens/resume_edit_screen.dart';
+import '../../features/resume/screens/ocr_review_screen.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/',
+
+  // ── 글로벌 리다이렉트: 인증 필요 경로 가드 ──────────────────
+  redirect: (context, state) {
+    final user = FirebaseAuth.instance.currentUser;
+    final path = state.uri.path;
+
+    // 인증 필요 경로 목록
+    const guardedPrefixes = ['/post-job', '/applicant', '/clinic-verify'];
+
+    final needsAuth = guardedPrefixes.any((p) => path.startsWith(p));
+
+    if (needsAuth && user == null) {
+      return '/login?next=$path';
+    }
+
+    return null;
+  },
+
   routes: [
     GoRoute(path: '/', builder: (_, __) => const AuthGate()),
     GoRoute(path: '/post-job', builder: (_, __) => const JobPostWebPage()),
@@ -49,6 +70,22 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/publisher/login',
       redirect: (_, __) => '/login',
+    ),
+
+    // ── 지원자 (치과위생사) 전용 라우트 ──────────────────
+    GoRoute(
+      path: '/applicant/resumes',
+      builder: (_, __) => const ResumeHomeScreen(),
+    ),
+    GoRoute(
+      path: '/applicant/resumes/edit/:resumeId',
+      builder: (_, state) => ResumeEditScreen(
+        resumeId: state.pathParameters['resumeId']!,
+      ),
+    ),
+    GoRoute(
+      path: '/applicant/resumes/import',
+      builder: (_, __) => const OcrReviewScreen(),
     ),
 
     // ── 치과(구 게시자) 전용 라우트 ──────────────────────

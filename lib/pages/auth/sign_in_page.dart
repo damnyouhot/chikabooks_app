@@ -8,6 +8,7 @@ import '../../services/apple_auth_service.dart';
 import '../../services/email_auth_service.dart';
 import '../../services/kakao_auth_service.dart';
 import '../../services/naver_auth_service.dart';
+import '../../services/sign_in_tracker.dart';
 
 /// 다중 소셜 로그인 페이지
 /// Google / Apple / Kakao / Naver / Email 지원
@@ -21,6 +22,18 @@ class SignInPage extends StatefulWidget {
 class _SignInPageState extends State<SignInPage> {
   final googleSignIn = GoogleSignIn(scopes: ['email']);
   bool _isLoading = false;
+  String? _lastProvider;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLastProvider();
+  }
+
+  Future<void> _loadLastProvider() async {
+    final p = await SignInTracker.getLocalLastProvider();
+    if (mounted && p != null) setState(() => _lastProvider = p);
+  }
 
   /// Google 로그인
   Future<void> _signInWithGoogle() async {
@@ -75,6 +88,9 @@ class _SignInPageState extends State<SignInPage> {
         '✅ Provider data: ${currentUser.providerData.map((e) => e.providerId).toList()}',
       );
 
+      // provider 기록 (Firestore + 로컬)
+      await SignInTracker.record('google');
+
       // AuthGate가 자동으로 홈으로 보내므로 추가 라우팅 불필요
     } catch (e) {
       debugPrint('❌ Google 로그인 에러: $e');
@@ -98,6 +114,9 @@ class _SignInPageState extends State<SignInPage> {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('Apple 로그인 실패')));
+      } else if (user != null) {
+        // 로컬 provider 기록 (배지용)
+        await SignInTracker.record('apple');
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -149,6 +168,9 @@ class _SignInPageState extends State<SignInPage> {
       // ✅ 성공 시에만 이 줄까지 도달
       debugPrint('✅ 카카오 로그인 성공: ${user.uid} (${user.email})');
 
+      // 로컬 provider 기록 (배지용, Firestore는 Function에서 이미 저장)
+      await SignInTracker.record('kakao');
+
       // AuthGate가 자동으로 홈으로 보내므로 추가 라우팅 불필요
     } catch (e) {
       debugPrint('❌ 카카오 로그인 에러: $e');
@@ -185,6 +207,9 @@ class _SignInPageState extends State<SignInPage> {
       debugPrint(
         '✅ Provider data: ${user.providerData.map((e) => e.providerId).toList()}',
       );
+
+      // 로컬 provider 기록 (배지용)
+      await SignInTracker.record('naver');
 
       // AuthGate가 자동으로 홈으로 보내므로 추가 라우팅 불필요
     } catch (e) {
@@ -331,6 +356,9 @@ class _SignInPageState extends State<SignInPage> {
                                 content: Text(isSignUp ? '회원가입 실패' : '로그인 실패'),
                               ),
                             );
+                          } else {
+                            // 이메일 로그인 provider 기록
+                            await SignInTracker.record('email');
                           }
                         }
                       },
@@ -388,56 +416,8 @@ class _SignInPageState extends State<SignInPage> {
                   else
                     Column(
                       children: [
-                        // Google 로그인
-                        _buildLoginButton(
-                          icon: Icons.g_mobiledata,
-                          label: 'Google로 로그인',
-                          color: Colors.white,
-                          textColor: Colors.black87,
-                          onPressed: _signInWithGoogle,
-                        ),
-                        const SizedBox(height: 12),
-
-                        // Apple 로그인 (iOS만)
-                        if (!kIsWeb && Platform.isIOS) ...[
-                          _buildLoginButton(
-                            icon: Icons.apple,
-                            label: 'Apple로 로그인',
-                            color: Colors.black,
-                            textColor: Colors.white,
-                            onPressed: _signInWithApple,
-                          ),
-                          const SizedBox(height: 12),
-                        ],
-
-                        // 카카오 로그인
-                        _buildLoginButton(
-                          icon: Icons.chat_bubble,
-                          label: '카카오로 로그인',
-                          color: const Color(0xFFFEE500),
-                          textColor: Colors.black87,
-                          onPressed: _signInWithKakao,
-                        ),
-                        const SizedBox(height: 12),
-
-                        // 네이버 로그인
-                        _buildLoginButton(
-                          icon: Icons.language,
-                          label: '네이버로 로그인',
-                          color: const Color(0xFF03C75A),
-                          textColor: Colors.white,
-                          onPressed: _signInWithNaver,
-                        ),
-                        const SizedBox(height: 12),
-
-                        // 이메일 로그인
-                        _buildLoginButton(
-                          icon: Icons.email,
-                          label: '이메일로 로그인',
-                          color: Colors.blueGrey,
-                          textColor: Colors.white,
-                          onPressed: _showEmailSignInDialog,
-                        ),
+                        // 마지막 로그인 버튼을 맨 위로 올리고 나머지 순서 유지
+                        ..._buildOrderedButtons(),
                       ],
                     ),
                 ],
@@ -449,33 +429,130 @@ class _SignInPageState extends State<SignInPage> {
     );
   }
 
+  /// 마지막 로그인 provider를 맨 위로 올려서 버튼 리스트 생성
+  List<Widget> _buildOrderedButtons() {
+    final buttons = <_BtnDef>[
+      _BtnDef('google', Icons.g_mobiledata, 'Google로 로그인',
+          Colors.white, Colors.black87, _signInWithGoogle),
+      if (!kIsWeb && Platform.isIOS)
+        _BtnDef('apple', Icons.apple, 'Apple로 로그인',
+            Colors.black, Colors.white, _signInWithApple),
+      _BtnDef('kakao', Icons.chat_bubble, '카카오로 로그인',
+          const Color(0xFFFEE500), Colors.black87, _signInWithKakao),
+      _BtnDef('naver', Icons.language, '네이버로 로그인',
+          const Color(0xFF03C75A), Colors.white, _signInWithNaver),
+      _BtnDef('email', Icons.email, '이메일로 로그인',
+          Colors.blueGrey, Colors.white, _showEmailSignInDialog),
+    ];
+
+    // 마지막 로그인 provider 를 맨 위로
+    if (_lastProvider != null) {
+      final idx = buttons.indexWhere((b) => b.provider == _lastProvider);
+      if (idx > 0) {
+        final btn = buttons.removeAt(idx);
+        buttons.insert(0, btn);
+      }
+    }
+
+    final widgets = <Widget>[];
+    for (final b in buttons) {
+      widgets.add(
+        _buildLoginButton(
+          provider: b.provider,
+          icon: b.icon,
+          label: b.label,
+          color: b.color,
+          textColor: b.textColor,
+          onPressed: b.onPressed,
+          isLast: b.provider == _lastProvider,
+        ),
+      );
+      widgets.add(const SizedBox(height: 12));
+    }
+    return widgets;
+  }
+
   /// 로그인 버튼 위젯
   Widget _buildLoginButton({
+    required String provider,
     required IconData icon,
     required String label,
     required Color color,
     required Color textColor,
     required VoidCallback onPressed,
+    bool isLast = false,
   }) {
-    return SizedBox(
-      width: double.infinity,
-      height: 50,
-      child: ElevatedButton.icon(
-        icon: Icon(icon, color: textColor),
-        label: Text(
-          label,
-          style: TextStyle(
-            color: textColor,
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        SizedBox(
+          width: double.infinity,
+          height: 50,
+          child: ElevatedButton.icon(
+            icon: Icon(icon, color: textColor),
+            label: Text(
+              label,
+              style: TextStyle(
+                color: textColor,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: color,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            onPressed: onPressed,
           ),
         ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: color,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-        onPressed: onPressed,
-      ),
+        if (isLast)
+          Positioned(
+            right: 8,
+            top: -8,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFF4CAF50),
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF4CAF50).withOpacity(0.3),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
+              child: const Text(
+                '마지막 로그인',
+                style: TextStyle(
+                  fontSize: 10,
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
+}
+
+/// 로그인 버튼 정의 (순서 변경용)
+class _BtnDef {
+  final String provider;
+  final IconData icon;
+  final String label;
+  final Color color;
+  final Color textColor;
+  final VoidCallback onPressed;
+  const _BtnDef(
+    this.provider,
+    this.icon,
+    this.label,
+    this.color,
+    this.textColor,
+    this.onPressed,
+  );
 }
