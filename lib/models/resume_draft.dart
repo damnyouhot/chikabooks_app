@@ -1,110 +1,83 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// OCR 드래프트 엔티티
+/// 이력서 편집 임시저장 드래프트
 /// Firestore 경로: `resumeDrafts/{draftId}`
+///
+/// 이력서 편집 중 자동/수동 임시저장 전용.
+/// data 필드에 이력서 전체 구조(Resume와 동일)를 저장.
+/// OCR 가져오기 드래프트는 별도 `resumeImportDrafts` 컬렉션 사용.
 class ResumeDraft {
   final String id;
   final String ownerUid;
-  final List<DraftSourceImage> sourceImages;
-  final String extractedText;
-  final Map<String, dynamic> suggestedFields;
-  final Map<String, double> confidence;
-  final bool autoDeleteOriginal;
-  final ResumeDraftStatus status;
+
+  /// 사용자가 지정한 이력서 제목
+  final String title;
+
+  /// 원본 이력서 ID (기존 이력서 편집 시). null이면 새 이력서.
+  final String? resumeId;
+
+  /// 이력서 전체 데이터 (Resume.sections 구조)
+  final Map<String, dynamic> data;
+
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
   const ResumeDraft({
     required this.id,
     required this.ownerUid,
-    this.sourceImages = const [],
-    this.extractedText = '',
-    this.suggestedFields = const {},
-    this.confidence = const {},
-    this.autoDeleteOriginal = true,
-    this.status = ResumeDraftStatus.processing,
+    this.title = '',
+    this.resumeId,
+    this.data = const {},
     this.createdAt,
     this.updatedAt,
   });
 
-  factory ResumeDraft.fromMap(Map<String, dynamic> data, {required String id}) {
+  factory ResumeDraft.fromMap(
+    Map<String, dynamic> map, {
+    required String id,
+  }) {
     return ResumeDraft(
       id: id,
-      ownerUid: data['ownerUid'] as String? ?? '',
-      sourceImages: (data['sourceImages'] as List?)
-              ?.map((e) => DraftSourceImage.fromMap(e))
-              .toList() ??
-          [],
-      extractedText: data['extractedText'] as String? ?? '',
-      suggestedFields:
-          Map<String, dynamic>.from(data['suggestedFields'] ?? {}),
-      confidence: Map<String, double>.from(
-        (data['confidence'] as Map?)?.map(
-              (k, v) => MapEntry(k as String, (v as num).toDouble()),
-            ) ??
-            {},
-      ),
-      autoDeleteOriginal: data['autoDeleteOriginal'] as bool? ?? true,
-      status: ResumeDraftStatus.fromString(data['status'] as String? ?? ''),
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
-      updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
+      ownerUid: map['ownerUid'] as String? ?? '',
+      title: map['title'] as String? ?? '',
+      resumeId: map['resumeId'] as String?,
+      data: Map<String, dynamic>.from(map['data'] ?? {}),
+      createdAt: (map['createdAt'] as Timestamp?)?.toDate(),
+      updatedAt: (map['updatedAt'] as Timestamp?)?.toDate(),
     );
   }
 
   factory ResumeDraft.fromDoc(DocumentSnapshot doc) {
-    return ResumeDraft.fromMap(doc.data() as Map<String, dynamic>, id: doc.id);
+    return ResumeDraft.fromMap(
+      doc.data() as Map<String, dynamic>,
+      id: doc.id,
+    );
   }
 
   Map<String, dynamic> toMap() => {
         'ownerUid': ownerUid,
-        'sourceImages': sourceImages.map((e) => e.toMap()).toList(),
-        'extractedText': extractedText,
-        'suggestedFields': suggestedFields,
-        'confidence': confidence,
-        'autoDeleteOriginal': autoDeleteOriginal,
-        'status': status.name,
+        'title': title,
+        if (resumeId != null) 'resumeId': resumeId,
+        'data': data,
         'createdAt': createdAt != null
             ? Timestamp.fromDate(createdAt!)
             : FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       };
-}
 
-enum ResumeDraftStatus {
-  processing,
-  ready,
-  confirmed,
-  failed;
-
-  static ResumeDraftStatus fromString(String s) {
-    switch (s) {
-      case 'processing':
-        return ResumeDraftStatus.processing;
-      case 'ready':
-        return ResumeDraftStatus.ready;
-      case 'confirmed':
-        return ResumeDraftStatus.confirmed;
-      case 'failed':
-        return ResumeDraftStatus.failed;
-      default:
-        return ResumeDraftStatus.processing;
-    }
-  }
-}
-
-class DraftSourceImage {
-  final String storagePath;
-  final int page;
-
-  const DraftSourceImage({required this.storagePath, this.page = 0});
-
-  factory DraftSourceImage.fromMap(Map<String, dynamic> data) {
-    return DraftSourceImage(
-      storagePath: data['storagePath'] as String? ?? '',
-      page: data['page'] as int? ?? 0,
+  ResumeDraft copyWith({
+    String? title,
+    String? resumeId,
+    Map<String, dynamic>? data,
+  }) {
+    return ResumeDraft(
+      id: id,
+      ownerUid: ownerUid,
+      title: title ?? this.title,
+      resumeId: resumeId ?? this.resumeId,
+      data: data ?? this.data,
+      createdAt: createdAt,
+      updatedAt: DateTime.now(),
     );
   }
-
-  Map<String, dynamic> toMap() => {'storagePath': storagePath, 'page': page};
 }
-

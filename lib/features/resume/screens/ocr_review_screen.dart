@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:typed_data';
-import '../../../models/resume_draft.dart';
+import '../../../models/resume_import_draft.dart';
 
 // ── 디자인 상수 ──────────────────────────────────────────
 const _kBg = Color(0xFFF8F6F9);
@@ -35,7 +35,7 @@ class _OcrReviewScreenState extends State<OcrReviewScreen> {
   bool _autoDeleteOriginal = true;
   bool _uploading = false;
   String? _draftId;
-  ResumeDraft? _draft;
+  ResumeImportDraft? _draft;
 
   final _picker = ImagePicker();
 
@@ -751,17 +751,17 @@ class _OcrReviewScreenState extends State<OcrReviewScreen> {
       if (uid == null) throw Exception('로그인 필요');
 
       // 1. Firestore에 드래프트 문서 생성
-      final draftData = ResumeDraft(
+      final draftData = ResumeImportDraft(
         id: '',
         ownerUid: uid,
         autoDeleteOriginal: _autoDeleteOriginal,
-        status: ResumeDraftStatus.processing,
+        status: ImportDraftStatus.processing,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       );
 
       final ref = await FirebaseFirestore.instance
-          .collection('resumeDrafts')
+          .collection('resumeImportDrafts')
           .add(draftData.toMap());
 
       _draftId = ref.id;
@@ -780,11 +780,11 @@ class _OcrReviewScreenState extends State<OcrReviewScreen> {
       // Mock 데이터 (OpenAI 키 연동 전까지)
       if (mounted) {
         setState(() {
-          _draft = ResumeDraft(
+          _draft = ResumeImportDraft(
             id: _draftId!,
             ownerUid: uid,
             autoDeleteOriginal: _autoDeleteOriginal,
-            status: ResumeDraftStatus.ready,
+            status: ImportDraftStatus.ready,
             suggestedFields: {
               '이름': '',
               '연락처': '',
@@ -833,7 +833,7 @@ class _OcrReviewScreenState extends State<OcrReviewScreen> {
     if (_draftId != null) {
       try {
         await FirebaseFirestore.instance
-            .collection('resumeDrafts')
+            .collection('resumeImportDrafts')
             .doc(_draftId)
             .update({
           'status': 'confirmed',
