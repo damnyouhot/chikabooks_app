@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../models/resume.dart';
+import 'resume_career_sync_service.dart';
 
 /// 이력서 Firestore CRUD 서비스
 ///
@@ -88,7 +89,7 @@ class ResumeService {
 
   // ── 수정 ────────────────────────────────────────────────
 
-  /// 이력서 전체 업데이트
+  /// 이력서 전체 업데이트 + 커리어 카드 동기화
   static Future<bool> updateResume(Resume resume) async {
     try {
       await _col.doc(resume.id).update({
@@ -96,6 +97,10 @@ class ResumeService {
         'updatedAt': FieldValue.serverTimestamp(),
       });
       debugPrint('✅ 이력서 업데이트: ${resume.id}');
+
+      // 커리어 카드에 자동 동기화
+      ResumeCareerSyncService.syncFromResume(resume);
+
       return true;
     } catch (e) {
       debugPrint('⚠️ updateResume error: $e');

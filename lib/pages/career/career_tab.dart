@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/career_profile_service.dart';
 import '../../features/resume/screens/resume_home_screen.dart';
+import '../../features/resume/screens/my_applications_screen.dart';
 import '../settings/settings_page.dart';
 import 'career_shared.dart';
 import 'career_identity_section.dart';
@@ -319,6 +320,18 @@ class CareerTabHeader extends StatelessWidget {
                   );
                 },
               ),
+              CareerEditSheetTile(
+                icon: Icons.work_outline,
+                title: '내 지원 내역',
+                onTap: () {
+                  Navigator.of(context).pop();
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const MyApplicationsScreen(),
+                    ),
+                  );
+                },
+              ),
               const SizedBox(height: 6),
             ],
           ),
@@ -474,6 +487,9 @@ class CareerTab extends StatelessWidget {
                 const SizedBox(height: 20),
                 // ── 이력서 바로가기 ──
                 _ResumeShortcutCard(),
+                const SizedBox(height: 12),
+                // ── 지원 내역 바로가기 ──
+                const _ApplicationsShortcutCard(),
                 const SizedBox(height: 14),
                 const CareerNetworkCard(),
               ],
@@ -565,6 +581,86 @@ class _ResumeShortcutCard extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     '이력서를 작성하고 공고에 빠르게 지원해요',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: kCText.withOpacity(0.5),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right,
+              color: kCText.withOpacity(0.3),
+              size: 20,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// 내 지원 내역 바로가기 카드
+// ═══════════════════════════════════════════════════════════
+class _ApplicationsShortcutCard extends StatelessWidget {
+  const _ApplicationsShortcutCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const MyApplicationsScreen()),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              const Color(0xFF4CAF50).withOpacity(0.07),
+              const Color(0xFF4CAF50).withOpacity(0.02),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: const Color(0xFF4CAF50).withOpacity(0.12),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFF4CAF50).withOpacity(0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.work_outline,
+                color: Color(0xFF4CAF50),
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '내 지원 내역',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: kCText,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '지원한 공고의 진행 상태를 확인해요',
                     style: TextStyle(
                       fontSize: 12,
                       color: kCText.withOpacity(0.5),
