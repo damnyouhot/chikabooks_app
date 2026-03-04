@@ -12,7 +12,8 @@ const _kGreen = Color(0xFF4CAF50);
 /// 탭 2개: [지원용 미리보기] / [공개용(익명) 미리보기]
 class ResumePreviewScreen extends StatefulWidget {
   final Resume resume;
-  const ResumePreviewScreen({super.key, required this.resume});
+  final int initialTab;
+  const ResumePreviewScreen({super.key, required this.resume, this.initialTab = 0});
 
   @override
   State<ResumePreviewScreen> createState() => _ResumePreviewScreenState();
@@ -25,7 +26,7 @@ class _ResumePreviewScreenState extends State<ResumePreviewScreen>
   @override
   void initState() {
     super.initState();
-    _tabCtrl = TabController(length: 2, vsync: this);
+    _tabCtrl = TabController(length: 2, vsync: this, initialIndex: widget.initialTab);
   }
 
   @override

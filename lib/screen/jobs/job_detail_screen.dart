@@ -3,7 +3,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import '../../models/job.dart';
 import '../../services/job_service.dart';
-import '../../widgets/job/quick_apply_sheet.dart';
+import '../../features/resume/screens/apply_confirm_screen.dart';
 
 class JobDetailScreen extends StatefulWidget {
   final String jobId;
@@ -35,14 +35,19 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     if (widget.autoOpenApply) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && _job != null) {
-          QuickApplySheet.show(context, _job!);
+          _openApplyConfirm(context, _job!);
         }
       });
     }
   }
 
-  void _openApplyModal(BuildContext context, Job job) {
-    QuickApplySheet.show(context, job);
+  void _openApplyConfirm(BuildContext context, Job job) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ApplyConfirmScreen(job: job),
+      ),
+    );
   }
 
   @override
@@ -77,9 +82,9 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             ],
           ),
           floatingActionButton: FloatingActionButton.extended(
-            onPressed: () => _openApplyModal(context, job),
-            label: const Text('지원하기'),
-            icon: const Icon(Icons.edit),
+            onPressed: () => _openApplyConfirm(context, job),
+            label: const Text('원클릭 지원'),
+            icon: const Icon(Icons.send_outlined),
           ),
           body: ListView(
             padding: const EdgeInsets.all(16),
@@ -177,6 +182,41 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                         ),
                   ),
                 ),
+              const SizedBox(height: 20),
+              // ── 지원 안내 ──
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF4A90D9).withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: const Color(0xFF4A90D9).withOpacity(0.12),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '원클릭 지원 (이력서 확인 후 제출)',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF3D4A5C),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '누르면 바로 전송되지 않아요. 이력서를 확인/수정한 뒤 제출해요.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: const Color(0xFF3D4A5C).withOpacity(0.5),
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 80), // FAB와 겹치지 않게 여백
             ],
           ),
         );
