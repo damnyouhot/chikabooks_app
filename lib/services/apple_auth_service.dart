@@ -10,7 +10,7 @@ class AppleAuthService {
   static final _auth = FirebaseAuth.instance;
 
   // 웹용 Apple Service ID (Apple Developer Console에서 생성한 Services ID)
-  static const _webClientId = 'com.chikabooks.nineth.web';
+  static const _webClientId = 'com.chikabooks.web';
   // Apple 로그인 후 리디렉션 URL
   static const _webRedirectUri = 'https://chikabooks3rd.web.app/__/auth/handler';
 
