@@ -178,11 +178,14 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
   String? _loadingProvider;
   String? _errorMsg;
   bool _showEmailForm = false;
+  bool _isPasswordReset = false; // 비밀번호 만들기(재설정) 모드
   bool _isSignUp = false;
   String? _lastProvider;
+  bool _resetSent = false; // 재설정 이메일 발송 완료 여부
 
   final _emailCtrl = TextEditingController();
   final _pwCtrl = TextEditingController();
+  final _resetEmailCtrl = TextEditingController();
 
   @override
   void initState() {
@@ -287,6 +290,26 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
       await _handlePostLogin('apple');
     } catch (e) {
       _showError('Apple 로그인 오류: $e');
+    } finally {
+      _clearLoading();
+    }
+  }
+
+  // ── 비밀번호 재설정 이메일 발송 ───────────────────────────
+  Future<void> _sendPasswordReset() async {
+    final email = _resetEmailCtrl.text.trim();
+    if (email.isEmpty) {
+      _showError('이메일을 입력해주세요.');
+      return;
+    }
+    _setLoading('reset');
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      if (mounted) setState(() => _resetSent = true);
+    } on FirebaseAuthException catch (e) {
+      _showError(e.code == 'user-not-found' ? '등록되지 않은 이메일이에요.' : '오류가 발생했어요. 다시 시도해주세요.');
+    } catch (_) {
+      _showError('오류가 발생했어요. 다시 시도해주세요.');
     } finally {
       _clearLoading();
     }
@@ -447,7 +470,134 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
           // 네이버 (비활성)
           _snsBtn('naver', Icons.language, '네이버로 로그인',
               Colors.grey[200]!, Colors.grey[500]!, null,
-              trailingLabel: '앱에서만'),
+              trailingLabel: '앱에서만 가능해요'),
+
+          const SizedBox(height: 12),
+
+          // ── 네이버 이용자 비밀번호 만들기 안내 ────────────
+          if (!_isPasswordReset && !_showEmailForm) ...[
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => setState(() {
+                  _isPasswordReset = true;
+                  _showEmailForm = false;
+                  _resetSent = false;
+                  _errorMsg = null;
+                }),
+                icon: const Icon(Icons.lock_reset, size: 15),
+                label: Text(
+                  '비밀번호 만들기',
+                  style: GoogleFonts.notoSansKr(fontSize: 13),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _kBlue,
+                  side: BorderSide(color: _kBlue.withOpacity(0.4)),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '비밀번호 만들기 후 이메일 로그인으로 이용해주세요.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.notoSansKr(
+                fontSize: 11,
+                color: _kText.withOpacity(0.5),
+                height: 1.5,
+              ),
+            ),
+          ] else if (_isPasswordReset) ...[
+            // ── 비밀번호 재설정 폼 ─────────────────────────
+            if (_resetSent) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                decoration: BoxDecoration(
+                  color: _kGreen.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.check_circle_outline, size: 16, color: _kGreen),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '재설정 링크를 이메일로 보냈어요.\n메일함을 확인해주세요.',
+                        style: GoogleFonts.notoSansKr(
+                          fontSize: 12,
+                          color: _kGreen,
+                          height: 1.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.center,
+                child: TextButton(
+                  onPressed: () => setState(() {
+                    _isPasswordReset = false;
+                    _resetSent = false;
+                    _resetEmailCtrl.clear();
+                  }),
+                  child: Text(
+                    '로그인으로 돌아가기',
+                    style: TextStyle(fontSize: 12, color: _kText.withOpacity(0.5)),
+                  ),
+                ),
+              ),
+            ] else ...[
+              PubTextField(
+                controller: _resetEmailCtrl,
+                label: '가입한 이메일',
+                hint: 'email@example.com',
+                keyboardType: TextInputType.emailAddress,
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: (_loadingProvider == 'reset') ? null : _sendPasswordReset,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _kBlue,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: (_loadingProvider == 'reset')
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : Text(
+                          '비밀번호 재설정 링크 보내기',
+                          style: GoogleFonts.notoSansKr(fontSize: 14, fontWeight: FontWeight.w700),
+                        ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Align(
+                alignment: Alignment.center,
+                child: TextButton(
+                  onPressed: () => setState(() {
+                    _isPasswordReset = false;
+                    _resetEmailCtrl.clear();
+                    _errorMsg = null;
+                  }),
+                  child: Text(
+                    '취소',
+                    style: TextStyle(fontSize: 12, color: _kText.withOpacity(0.5)),
+                  ),
+                ),
+              ),
+            ],
+          ],
 
           const SizedBox(height: 18),
 
@@ -489,7 +639,11 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              onPressed: () => setState(() => _showEmailForm = true),
+              onPressed: () => setState(() {
+                _showEmailForm = true;
+                _isPasswordReset = false;
+                _errorMsg = null;
+              }),
             )
           else ...[
             PubTextField(
@@ -970,7 +1124,7 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
                 onPressed: () => context.push('/publisher/forgot'),
                 icon: const Icon(Icons.lock_reset, size: 15),
                 label: Text(
-                  '비밀번호 만들기',
+                  'SNS가입자 비밀번호 만들기',
                   style: GoogleFonts.notoSansKr(fontSize: 13),
                 ),
                 style: OutlinedButton.styleFrom(

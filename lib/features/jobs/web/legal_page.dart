@@ -271,10 +271,7 @@ LegalPage buildPrivacyPage() {
             '이용 기록 (화면 이용 기록, 기능 사용 로그, 오류 로그 등)',
           ]),
           LegalContent.subheading('고객 문의'),
-          LegalContent.bullets([
-            '문의 내용',
-            '회신을 위한 연락 정보 (이메일 등)',
-          ]),
+          LegalContent.bullets(['문의 내용', '회신을 위한 연락 정보 (이메일 등)']),
           LegalContent.note(
             '※ 참고\n사업자는 서비스 운영 및 개선, 광고 제공 등을 위해 분석 도구 또는 광고 SDK를 사용할 수 있으며 적용 시 본 방침에 따라 처리합니다.',
           ),
