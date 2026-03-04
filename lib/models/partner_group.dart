@@ -97,6 +97,13 @@ class PartnerGroup {
     this.needsSupplementation = false,
   });
 
+  /// 그룹 종료까지 남은 일 수
+  int get daysLeft {
+    final now = DateTime.now();
+    final diff = endsAt.difference(now).inDays;
+    return diff < 0 ? 0 : diff;
+  }
+
   /// 현재 활동 중인 멤버 uid 목록
   List<String> get activeMemberUids {
     return members
