@@ -9,6 +9,11 @@ class AppleAuthService {
   static final _functions = FirebaseFunctions.instanceFor(region: 'us-central1');
   static final _auth = FirebaseAuth.instance;
 
+  // 웹용 Apple Service ID (Apple Developer Console에서 생성한 Services ID)
+  static const _webClientId = 'com.chikabooks.nineth.web';
+  // Apple 로그인 후 리디렉션 URL
+  static const _webRedirectUri = 'https://chikabooks3rd.web.app/__/auth/handler';
+
   /// Apple 로그인 실행
   static Future<User?> signInWithApple() async {
     try {
@@ -18,6 +23,13 @@ class AppleAuthService {
           AppleIDAuthorizationScopes.email,
           AppleIDAuthorizationScopes.fullName,
         ],
+        // 웹에서는 webAuthenticationOptions 필수
+        webAuthenticationOptions: kIsWeb
+            ? WebAuthenticationOptions(
+                clientId: _webClientId,
+                redirectUri: Uri.parse(_webRedirectUri),
+              )
+            : null,
       );
 
       final String? providerId = appleCredential.userIdentifier;

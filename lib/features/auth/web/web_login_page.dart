@@ -859,42 +859,29 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
             ),
             const SizedBox(height: 24),
 
-            // ── 안내 박스 ─────────────────────────────
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: _kBlue.withOpacity(0.06),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: _kBlue.withOpacity(0.18)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.info_outline, size: 14, color: _kBlue),
-                      const SizedBox(width: 6),
-                      Text(
-                        '치과 계정은 SNS 로그인을 지원하지 않습니다.',
-                        style: GoogleFonts.notoSansKr(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: _kText,
-                        ),
-                      ),
-                    ],
+            // ── 안내 문구 ─────────────────────────────
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Text(
+                  '치과 계정은 SNS 로그인을 지원하지 않습니다.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.notoSansKr(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: _kText,
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'SNS로 가입했다면 비밀번호를 만들어 주세요.',
-                    style: GoogleFonts.notoSansKr(
-                      fontSize: 11,
-                      color: _kText.withOpacity(0.65),
-                      height: 1.5,
-                    ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'SNS로 가입했다면 비밀번호를 만들어 주세요.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.notoSansKr(
+                    fontSize: 11,
+                    color: _kText.withOpacity(0.55),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
 
