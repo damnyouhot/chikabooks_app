@@ -1,6 +1,9 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../../models/resume.dart';
 import '../../../services/resume_service.dart';
+import '../../../services/resume_draft_service.dart';
 import '../widgets/section_profile.dart';
 import '../widgets/section_licenses.dart';
 import '../widgets/section_experiences.dart';
@@ -33,6 +36,9 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
   bool _loading = true;
   int _currentSection = 0;
   bool _saving = false;
+  bool _dirty = false; // 변경 사항 있음 표시
+  String? _draftId; // 현재 임시저장 ID
+  Timer? _autoSaveTimer;
 
   final _titleCtrl = TextEditingController();
   final _scrollCtrl = ScrollController();
@@ -53,10 +59,20 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
   void initState() {
     super.initState();
     _load();
+    // 자동 저장 타이머 (30초마다)
+    _autoSaveTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => _autoSaveDraft(),
+    );
   }
 
   @override
   void dispose() {
+    _autoSaveTimer?.cancel();
+    // 종료 전 마지막 자동 저장
+    if (_dirty && _resume != null) {
+      _autoSaveDraft();
+    }
     _titleCtrl.dispose();
     _scrollCtrl.dispose();
     super.dispose();
@@ -71,13 +87,48 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
         _titleCtrl.text = r?.title ?? '기본 이력서';
       });
     }
+    // 기존 드래프트가 있는지 확인
+    final existing =
+        await ResumeDraftService.findDraftForResume(widget.resumeId);
+    if (existing != null && mounted) {
+      setState(() => _draftId = existing.id);
+    }
   }
 
-  /// 이력서 전체 저장
+  /// 자동 임시저장 (변경 사항이 있을 때만)
+  Future<void> _autoSaveDraft() async {
+    if (!_dirty || _resume == null) return;
+
+    try {
+      final savedId = await ResumeDraftService.saveDraft(
+        draftId: _draftId,
+        title: _resume!.title,
+        resumeId: widget.resumeId,
+        data: _resume!.toMap(),
+      );
+      if (savedId != null && mounted) {
+        _draftId = savedId;
+        _dirty = false;
+        debugPrint('✅ 자동 임시저장 완료');
+      }
+    } catch (e) {
+      debugPrint('⚠️ 자동 임시저장 실패: $e');
+    }
+  }
+
+  /// 이력서 전체 저장 (확정)
   Future<void> _save() async {
     if (_resume == null) return;
     setState(() => _saving = true);
     await ResumeService.updateResume(_resume!);
+
+    // 확정 저장 후 드래프트 삭제
+    if (_draftId != null) {
+      await ResumeDraftService.deleteDraft(_draftId!);
+      _draftId = null;
+    }
+    _dirty = false;
+
     if (mounted) {
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -111,7 +162,10 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
 
   /// 섹션 데이터 업데이트 콜백 (각 섹션 위젯에서 호출)
   void _updateResume(Resume updated) {
-    setState(() => _resume = updated);
+    setState(() {
+      _resume = updated;
+      _dirty = true;
+    });
   }
 
   @override

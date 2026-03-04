@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:typed_data';
 import '../../../models/resume_import_draft.dart';
@@ -149,19 +151,21 @@ class _OcrReviewScreenState extends State<OcrReviewScreen> {
           const SizedBox(height: 20),
           Row(
             children: [
-              Expanded(
-                child: _actionButton(
-                  icon: Icons.camera_alt_outlined,
-                  label: '카메라 촬영',
-                  color: _kBlue,
-                  onTap: _pickFromCamera,
+              // 웹에서는 카메라 버튼 숨김 (브라우저 제한)
+              if (!kIsWeb)
+                Expanded(
+                  child: _actionButton(
+                    icon: Icons.camera_alt_outlined,
+                    label: '카메라 촬영',
+                    color: _kBlue,
+                    onTap: _pickFromCamera,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
+              if (!kIsWeb) const SizedBox(width: 12),
               Expanded(
                 child: _actionButton(
                   icon: Icons.photo_library_outlined,
-                  label: '갤러리에서 선택',
+                  label: kIsWeb ? '파일 선택' : '갤러리에서 선택',
                   color: _kGreen,
                   onTap: _pickFromGallery,
                 ),
@@ -674,7 +678,13 @@ class _OcrReviewScreenState extends State<OcrReviewScreen> {
           ),
           const SizedBox(height: 24),
           FilledButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () {
+              if (kIsWeb) {
+                context.go('/applicant/resumes');
+              } else {
+                Navigator.pop(context, true);
+              }
+            },
             child: const Text('이력서 목록으로'),
           ),
         ],

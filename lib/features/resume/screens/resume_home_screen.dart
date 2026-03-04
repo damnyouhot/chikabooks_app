@@ -1,6 +1,11 @@
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../models/resume.dart';
+import '../../../models/resume_draft.dart';
 import '../../../services/resume_service.dart';
+import '../../../services/resume_draft_service.dart';
 import 'resume_edit_screen.dart';
 import 'ocr_review_screen.dart';
 
@@ -36,64 +41,133 @@ class ResumeHomeScreen extends StatelessWidget {
         ),
         centerTitle: false,
         iconTheme: const IconThemeData(color: _kText),
+        actions: [
+          // 웹: 로그아웃 버튼
+          if (kIsWeb)
+            TextButton.icon(
+              icon: Icon(
+                Icons.logout,
+                size: 16,
+                color: _kText.withOpacity(0.5),
+              ),
+              label: Text(
+                '로그아웃',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: _kText.withOpacity(0.6),
+                ),
+              ),
+              onPressed: () async {
+                await FirebaseAuth.instance.signOut();
+                if (context.mounted) context.go('/login');
+              },
+            ),
+        ],
       ),
-      body: StreamBuilder<List<Resume>>(
-        stream: ResumeService.watchMyResumes(),
-        builder: (context, snap) {
-          if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          final resumes = snap.data ?? [];
-          return _buildBody(context, resumes);
-        },
-      ),
+      body: _ResumeHomeBody(),
+    );
+  }
+}
+
+/// 이력서 홈 바디 (이력서 리스트 + 임시저장 드래프트)
+class _ResumeHomeBody extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<Resume>>(
+      stream: ResumeService.watchMyResumes(),
+      builder: (context, resumeSnap) {
+        if (resumeSnap.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final resumes = resumeSnap.data ?? [];
+
+        return StreamBuilder<List<ResumeDraft>>(
+          stream: ResumeDraftService.watchMyDrafts(),
+          builder: (context, draftSnap) {
+            final drafts = draftSnap.data ?? [];
+            return _buildBody(context, resumes, drafts);
+          },
+        );
+      },
     );
   }
 
-  Widget _buildBody(BuildContext context, List<Resume> resumes) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 40),
-      children: [
-        // ── 상단 액션 버튼들 ──
-        _ActionButton(
-          icon: Icons.add_rounded,
-          label: '새 이력서 만들기',
-          color: _kBlue,
-          onTap: () => _createNew(context),
-        ),
-        const SizedBox(height: 10),
-              _ActionButton(
-                icon: Icons.camera_alt_outlined,
-                label: '사진으로 자동 입력 (OCR)',
-                color: _kGreen,
-                onTap: () => _openOcr(context),
-              ),
-        const SizedBox(height: 24),
-
-        // ── 이력서 목록 ──
-        if (resumes.isEmpty)
-          _EmptyState()
-        else ...[
-          Text(
-            '내 이력서 (${resumes.length})',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: _kText.withOpacity(0.6),
+  Widget _buildBody(
+    BuildContext context,
+    List<Resume> resumes,
+    List<ResumeDraft> drafts,
+  ) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 680),
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 40),
+          children: [
+            // ── 상단 액션 버튼들 ──
+            _ActionButton(
+              icon: Icons.add_rounded,
+              label: '새 이력서 만들기',
+              color: _kBlue,
+              onTap: () => _createNew(context),
             ),
-          ),
-          const SizedBox(height: 10),
-          ...resumes.map((r) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: _ResumeCard(
-                  resume: r,
-                  onTap: () => _openEdit(context, r.id),
-                  onDuplicate: () => _duplicate(context, r.id),
-                  onDelete: () => _confirmDelete(context, r),
+            const SizedBox(height: 10),
+            _ActionButton(
+              icon: Icons.camera_alt_outlined,
+              label: '사진으로 자동 입력 (OCR)',
+              color: _kGreen,
+              onTap: () => _openOcr(context),
+            ),
+
+            // ── 임시저장 드래프트 ──
+            if (drafts.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              Text(
+                '임시저장 (${drafts.length})',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.orange.withOpacity(0.8),
                 ),
-              )),
-        ],
-      ],
+              ),
+              const SizedBox(height: 8),
+              ...drafts.map((d) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _DraftCard(
+                      draft: d,
+                      onTap: () => _openDraft(context, d),
+                      onDelete: () => _deleteDraft(context, d),
+                    ),
+                  )),
+            ],
+
+            const SizedBox(height: 24),
+
+            // ── 이력서 목록 ──
+            if (resumes.isEmpty)
+              _EmptyState()
+            else ...[
+              Text(
+                '내 이력서 (${resumes.length})',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: _kText.withOpacity(0.6),
+                ),
+              ),
+              const SizedBox(height: 10),
+              ...resumes.map((r) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _ResumeCard(
+                      resume: r,
+                      onTap: () => _openEdit(context, r.id),
+                      onDuplicate: () => _duplicate(context, r.id),
+                      onDelete: () => _confirmDelete(context, r),
+                    ),
+                  )),
+            ],
+          ],
+        ),
+      ),
     );
   }
 
@@ -102,22 +176,47 @@ class ResumeHomeScreen extends StatelessWidget {
   Future<void> _createNew(BuildContext context) async {
     final id = await ResumeService.createResume();
     if (id != null && context.mounted) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ResumeEditScreen(resumeId: id),
-        ),
-      );
+      _navigateToEdit(context, id);
     }
   }
 
   void _openEdit(BuildContext context, String resumeId) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ResumeEditScreen(resumeId: resumeId),
+    _navigateToEdit(context, resumeId);
+  }
+
+  void _openDraft(BuildContext context, ResumeDraft draft) {
+    // 드래프트에 원본 resumeId가 있으면 해당 이력서 편집으로
+    // 없으면 새 이력서 생성 후 드래프트 데이터 적용 (향후)
+    if (draft.resumeId != null && draft.resumeId!.isNotEmpty) {
+      _navigateToEdit(context, draft.resumeId!);
+    } else {
+      // 새 이력서 생성 → 편집으로 이동
+      _createNew(context);
+    }
+  }
+
+  Future<void> _deleteDraft(BuildContext context, ResumeDraft draft) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('임시저장 삭제'),
+        content: Text('"${draft.title}" 임시저장을 삭제할까요?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('삭제'),
+          ),
+        ],
       ),
     );
+    if (result == true) {
+      await ResumeDraftService.deleteDraft(draft.id);
+    }
   }
 
   Future<void> _duplicate(BuildContext context, String resumeId) async {
@@ -134,7 +233,8 @@ class ResumeHomeScreen extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('이력서 삭제'),
-        content: Text('"${resume.title}" 이력서를 삭제할까요?\n삭제하면 복구할 수 없어요.'),
+        content:
+            Text('"${resume.title}" 이력서를 삭제할까요?\n삭제하면 복구할 수 없어요.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -154,10 +254,27 @@ class ResumeHomeScreen extends StatelessWidget {
   }
 
   void _openOcr(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const OcrReviewScreen()),
-    );
+    if (kIsWeb) {
+      context.push('/applicant/resumes/import');
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const OcrReviewScreen()),
+      );
+    }
+  }
+
+  void _navigateToEdit(BuildContext context, String resumeId) {
+    if (kIsWeb) {
+      context.push('/applicant/resumes/edit/$resumeId');
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ResumeEditScreen(resumeId: resumeId),
+        ),
+      );
+    }
   }
 }
 
@@ -394,6 +511,92 @@ class _ResumeCard extends StatelessWidget {
     if (diff.inDays < 1) return '${diff.inHours}시간 전';
     if (diff.inDays < 7) return '${diff.inDays}일 전';
     return '${date.month}/${date.day}';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// 드래프트(임시저장) 카드
+// ═══════════════════════════════════════════════════════════
+class _DraftCard extends StatelessWidget {
+  final ResumeDraft draft;
+  final VoidCallback onTap;
+  final VoidCallback onDelete;
+
+  const _DraftCard({
+    required this.draft,
+    required this.onTap,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.orange.withOpacity(0.2)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.edit_note,
+                  color: Colors.orange.withOpacity(0.7),
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      draft.title.isNotEmpty ? draft.title : '제목 없음',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: _kText,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '임시저장됨',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.orange.withOpacity(0.7),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: Icon(
+                  Icons.delete_outline,
+                  size: 18,
+                  color: _kText.withOpacity(0.3),
+                ),
+                onPressed: onDelete,
+                constraints: const BoxConstraints(),
+                padding: const EdgeInsets.all(4),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
