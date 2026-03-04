@@ -16,6 +16,7 @@ const _kBg = Color(0xFFF8F6F9);
 const _kText = Color(0xFF3D4A5C);
 const _kBlue = Color(0xFF4A90D9);
 const _kGreen = Color(0xFF4CAF50);
+const _kNaver = Color(0xFF03C75A); // 네이버 그린
 
 /// 통합 로그인 페이지 (/login)
 ///
@@ -487,12 +488,12 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
                 }),
                 icon: const Icon(Icons.lock_reset, size: 15),
                 label: Text(
-                  '비밀번호 만들기',
+                  '네이버 로그인 가입자 비밀번호 만들기',
                   style: GoogleFonts.notoSansKr(fontSize: 13),
                 ),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: _kBlue,
-                  side: BorderSide(color: _kBlue.withOpacity(0.4)),
+                  foregroundColor: _kNaver,
+                  side: BorderSide(color: _kNaver.withOpacity(0.5)),
                   padding: const EdgeInsets.symmetric(vertical: 10),
                 ),
               ),
@@ -561,7 +562,7 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
                 child: ElevatedButton(
                   onPressed: (_loadingProvider == 'reset') ? null : _sendPasswordReset,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _kBlue,
+                    backgroundColor: _kNaver,
                     foregroundColor: Colors.white,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(vertical: 14),
@@ -576,7 +577,7 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                         )
                       : Text(
-                          '비밀번호 재설정 링크 보내기',
+                          '비밀번호 설정 링크 보내기',
                           style: GoogleFonts.notoSansKr(fontSize: 14, fontWeight: FontWeight.w700),
                         ),
                 ),
