@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../models/job.dart';
 import '../../services/job_service.dart';
 import '../../features/resume/screens/apply_confirm_screen.dart';
+import '../../services/job_stats_service.dart';
 
 class JobDetailScreen extends StatefulWidget {
   final String jobId;
@@ -31,6 +32,9 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     final job = await context.read<JobService>().fetchJob(widget.jobId);
     if (!mounted) return;
     setState(() => _job = job);
+
+    // 조회수 기록
+    JobStatsService.recordView(widget.jobId);
 
     if (widget.autoOpenApply) {
       WidgetsBinding.instance.addPostFrameCallback((_) {

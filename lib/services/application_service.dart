@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../models/application.dart';
 import '../models/resume.dart';
+import 'job_stats_service.dart';
 
 /// 지원서 관련 Firestore 서비스
 ///
@@ -66,6 +67,9 @@ class ApplicationService {
       await _db.collection('users').doc(uid).update({
         'appliedJobs': FieldValue.arrayUnion([jobId]),
       });
+
+      // 통계 기록
+      await JobStatsService.recordApply(jobId);
 
       debugPrint('✅ 지원 제출: ${ref.id}');
       return ref.id;

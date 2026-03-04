@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'job_applicants_page.dart';
 import 'web_typography.dart';
 
 // ── 팔레트 ─────────────────────────────────────────────
@@ -347,6 +348,21 @@ class _JobManageSectionState extends State<JobManageSection> {
           Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              _actionButton(
+                icon: Icons.people_outline,
+                label: '지원자',
+                color: _kBlue,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => JobApplicantsPage(
+                      jobId: doc.id,
+                      jobTitle: title,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
               if (status == 'active')
                 _actionButton(
                   icon: Icons.pause_circle_outline,
@@ -368,7 +384,7 @@ class _JobManageSectionState extends State<JobManageSection> {
                   color: _kText.withOpacity(0.35),
                   onTap: null,
                 ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               _actionButton(
                 icon: Icons.delete_outline,
                 label: '삭제',

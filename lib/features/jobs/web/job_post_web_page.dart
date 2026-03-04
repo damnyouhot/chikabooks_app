@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../ui/job_post_form.dart';
 import '../ui/job_post_preview.dart';
 import 'job_manage_section.dart';
+import 'job_analytics_section.dart';
 import 'web_typography.dart';
 
 const _kBg = Color(0xFFF4F0F8);
@@ -14,9 +15,10 @@ const _kPinkDark = Color(0xFFE57373);
 
 /// 구인등록 웹 페이지 셸 (/post-job)
 ///
-/// 두 개 탭으로 구성:
+/// 세 개 탭으로 구성:
 ///   Tab 0 — 공고 등록 (좌 프리뷰 + 우 폼)
-///   Tab 1 — 공고 관리 (내 공고 목록)
+///   Tab 1 — 공고 관리 (내 공고 목록 + 지원자 열람)
+///   Tab 2 — 공고 분석 (조회수 추이 / 비교표)
 /// 하단 푸터에 개인정보처리방침 / 이용약관 링크 포함
 class JobPostWebPage extends StatefulWidget {
   const JobPostWebPage({super.key});
@@ -34,7 +36,7 @@ class _JobPostWebPageState extends State<JobPostWebPage>
   @override
   void initState() {
     super.initState();
-    _tabCtrl = TabController(length: 2, vsync: this);
+    _tabCtrl = TabController(length: 3, vsync: this);
   }
 
   @override
@@ -71,6 +73,7 @@ class _JobPostWebPageState extends State<JobPostWebPage>
                 children: [
                   _buildPostTab(),
                   const JobManageSection(),
+                  const JobAnalyticsSection(),
                 ],
               ),
             ),
@@ -143,6 +146,7 @@ class _JobPostWebPageState extends State<JobPostWebPage>
             tabs: const [
               Tab(text: '공고 등록'),
               Tab(text: '공고 관리'),
+              Tab(text: '공고 분석'),
             ],
           ),
           // 구분선

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../models/resume.dart';
 import '../../../services/resume_service.dart';
 import 'resume_edit_screen.dart';
+import 'ocr_review_screen.dart';
 
 // ── 디자인 상수 ──────────────────────────────────────────
 const _kBg = Color(0xFFF8F6F9);
@@ -61,12 +62,12 @@ class ResumeHomeScreen extends StatelessWidget {
           onTap: () => _createNew(context),
         ),
         const SizedBox(height: 10),
-        _ActionButton(
-          icon: Icons.camera_alt_outlined,
-          label: '사진으로 자동 입력 (OCR)',
-          color: _kGreen,
-          onTap: () => _showOcrPlaceholder(context),
-        ),
+              _ActionButton(
+                icon: Icons.camera_alt_outlined,
+                label: '사진으로 자동 입력 (OCR)',
+                color: _kGreen,
+                onTap: () => _openOcr(context),
+              ),
         const SizedBox(height: 24),
 
         // ── 이력서 목록 ──
@@ -152,11 +153,10 @@ class ResumeHomeScreen extends StatelessWidget {
     }
   }
 
-  void _showOcrPlaceholder(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('OCR 자동입력은 OpenAI 키 연동 후 활성화됩니다.'),
-      ),
+  void _openOcr(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const OcrReviewScreen()),
     );
   }
 }
