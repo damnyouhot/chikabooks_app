@@ -254,6 +254,86 @@ service cloud.firestore {
     }
 
     // ══════════════════════════════════════════════════
+    // 🏥 치과(병원) (Clinics)
+    // ══════════════════════════════════════════════════
+    match /clinics/{clinicId} {
+      // 읽기: 소유자/멤버 또는 지원자(공고 열람 시 병원 정보 참조)
+      allow read: if request.auth != null;
+      // 쓰기: 서버(Cloud Functions)만 – 인증 승인 시 자동 생성
+      allow write: if false;
+    }
+
+    // ══════════════════════════════════════════════════
+    // 📄 이력서 (Resumes)
+    // ══════════════════════════════════════════════════
+    match /resumes/{resumeId} {
+      // 읽기: 본인만 (병원은 application 경유로 서버에서 조회)
+      allow read: if request.auth != null &&
+        resource.data.ownerUid == request.auth.uid;
+      // 생성: 본인 uid만
+      allow create: if request.auth != null &&
+        request.resource.data.ownerUid == request.auth.uid;
+      // 수정: 본인만
+      allow update: if request.auth != null &&
+        resource.data.ownerUid == request.auth.uid;
+      // 삭제: 본인만
+      allow delete: if request.auth != null &&
+        resource.data.ownerUid == request.auth.uid;
+    }
+
+    // ══════════════════════════════════════════════════
+    // 🖼️ 이력서 OCR 드래프트 (Resume Drafts)
+    // ══════════════════════════════════════════════════
+    match /resumeDrafts/{draftId} {
+      allow read: if request.auth != null &&
+        resource.data.ownerUid == request.auth.uid;
+      allow create: if request.auth != null &&
+        request.resource.data.ownerUid == request.auth.uid;
+      allow update: if request.auth != null &&
+        resource.data.ownerUid == request.auth.uid;
+      allow delete: if request.auth != null &&
+        resource.data.ownerUid == request.auth.uid;
+    }
+
+    // ══════════════════════════════════════════════════
+    // 📨 지원서 (Applications)
+    // ══════════════════════════════════════════════════
+    match /applications/{applicationId} {
+      // 읽기: 지원자 본인 또는 해당 병원 소유자
+      allow read: if request.auth != null && (
+        resource.data.applicantUid == request.auth.uid ||
+        request.auth.uid in get(/databases/$(database)/documents/clinics/$(resource.data.clinicId)).data.ownerUids
+      );
+      // 생성: 지원자 본인 uid로만
+      allow create: if request.auth != null &&
+        request.resource.data.applicantUid == request.auth.uid;
+      // 수정: 서버만 (연락처 공개 등)
+      allow update: if false;
+      // 삭제: 지원자가 철회(withdraw) – 서버 Function 경유 권장
+      allow delete: if false;
+    }
+
+    // ══════════════════════════════════════════════════
+    // 📊 공고 일별 통계 (Job Stats Daily)
+    // ══════════════════════════════════════════════════
+    match /jobStatsDaily/{docId} {
+      // 읽기: 해당 공고의 병원 소유자만 (또는 로그인 유저 – MVP)
+      allow read: if request.auth != null;
+      // 쓰기: 서버만 (Cloud Functions에서 집계)
+      allow write: if false;
+    }
+
+    // ══════════════════════════════════════════════════
+    // 🔗 커리어 네트워크 (Career Network)
+    // ══════════════════════════════════════════════════
+    match /careerNetwork/{docId} {
+      allow read: if request.auth != null &&
+        resource.data.ownerUid == request.auth.uid;
+      allow write: if request.auth != null &&
+        request.resource.data.ownerUid == request.auth.uid;
+    }
+
+    // ══════════════════════════════════════════════════
     // 기타 컬렉션 (임시로 전체 허용 - 나중에 세분화 필요)
     // ══════════════════════════════════════════════════
     match /{document=**} {

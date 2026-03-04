@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'publisher_shared.dart';
-import '../services/publisher_service.dart';
+import '../services/clinic_auth_service.dart';
 
 class PublisherProfilePage extends StatefulWidget {
   const PublisherProfilePage({super.key});
@@ -35,7 +35,7 @@ class _PublisherProfilePageState extends State<PublisherProfilePage> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
     try {
-      await PublisherService.saveProfile(
+      await ClinicAuthService.saveProfile(
         name: _nameCtrl.text.trim(),
         position: _position,
         clinicNameDraft: _clinicCtrl.text.trim(),

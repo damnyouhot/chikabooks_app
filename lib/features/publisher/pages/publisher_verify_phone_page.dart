@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'publisher_shared.dart';
-import '../services/publisher_service.dart';
+import '../services/clinic_auth_service.dart';
 
 /// 휴대폰 OTP 인증 화면
 /// - 웹: Firebase reCAPTCHA verifier 사용 (signInWithPhoneNumber)
@@ -169,7 +169,7 @@ class _PublisherVerifyPhonePageState extends State<PublisherVerifyPhonePage> {
 
   Future<void> _onPhoneVerified(User? user) async {
     final raw = _phoneCtrl.text.trim().replaceAll(RegExp(r'[^0-9]'), '');
-    await PublisherService.markPhoneVerified(raw);
+    await ClinicAuthService.markPhoneVerified(raw);
     if (!mounted) return;
     context.go('/publisher/onboarding');
   }

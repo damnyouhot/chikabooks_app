@@ -7,6 +7,7 @@ import '../../pages/quiz_today_page.dart';
 import '../../features/jobs/web/job_post_web_page.dart';
 import '../../features/jobs/web/legal_page.dart';
 import '../../features/jobs/ui/clinic_verify_page.dart';
+import '../../features/auth/web/web_login_page.dart';
 import '../../features/publisher/pages/publisher_login_page.dart';
 import '../../features/publisher/pages/publisher_signup_page.dart';
 import '../../features/publisher/pages/publisher_forgot_page.dart';
@@ -35,11 +36,22 @@ final appRouter = GoRouter(
     GoRoute(path: '/privacy', builder: (_, __) => buildPrivacyPage()),
     GoRoute(path: '/terms', builder: (_, __) => buildTermsPage()),
 
-    // ── 게시자(치과) 전용 라우트 ──────────────────────────
+    // ── 통합 로그인 페이지 ────────────────────────────────
+    GoRoute(
+      path: '/login',
+      builder: (_, state) {
+        final next = state.uri.queryParameters['next'];
+        return WebLoginPage(nextRoute: next);
+      },
+    ),
+
+    // ── 레거시 /publisher/login → /login 리다이렉트 ───────
     GoRoute(
       path: '/publisher/login',
-      builder: (_, __) => const PublisherLoginPage(),
+      redirect: (_, __) => '/login',
     ),
+
+    // ── 치과(구 게시자) 전용 라우트 ──────────────────────
     GoRoute(
       path: '/publisher/signup',
       builder: (_, __) => const PublisherSignupPage(),
@@ -74,5 +86,3 @@ final appRouter = GoRouter(
     ),
   ],
 );
-
-

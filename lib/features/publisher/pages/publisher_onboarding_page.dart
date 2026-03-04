@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'publisher_shared.dart';
-import '../services/publisher_service.dart';
+import '../services/clinic_auth_service.dart';
 
 class PublisherOnboardingPage extends StatelessWidget {
   const PublisherOnboardingPage({super.key});
@@ -12,10 +12,10 @@ class PublisherOnboardingPage extends StatelessWidget {
       title: '게시자 인증 진행',
       subtitle: '3단계를 완료하면 공고를 작성할 수 있어요',
       showBack: false,
-      child: StreamBuilder<PublisherStatus>(
-        stream: PublisherService.watchStatus(),
+      child: StreamBuilder<ClinicStatus>(
+        stream: ClinicAuthService.watchStatus(),
         builder: (context, snap) {
-          final status = snap.data ?? const PublisherStatus();
+          final status = snap.data ?? const ClinicStatus();
           return SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: Center(
@@ -96,7 +96,7 @@ class PublisherOnboardingPage extends StatelessWidget {
 
 // ── 전체 진행률 헤더 ───────────────────────────────────────
 class _ProgressHeader extends StatelessWidget {
-  final PublisherStatus status;
+  final ClinicStatus status;
   const _ProgressHeader({required this.status});
 
   int get _doneCount =>
@@ -370,7 +370,7 @@ class _StepCard extends StatelessWidget {
 
 // ── 다음 단계 진행 버튼 ────────────────────────────────────
 class _NextStepButton extends StatelessWidget {
-  final PublisherStatus status;
+  final ClinicStatus status;
   const _NextStepButton({required this.status});
 
   String get _label {

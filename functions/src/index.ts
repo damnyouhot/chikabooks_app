@@ -1372,8 +1372,14 @@ export const createJobPosting = functions.https.onCall(
       }
     }
 
+    // clinicId는 users/{uid}.clinicId에서 가져오기
+    const userDoc = await db.collection("users").doc(uid).get();
+    const userData = userDoc.data() || {};
+    const clinicId = userData.clinicId || uid;
+
     const jobData = {
       createdBy: uid,
+      clinicId,
       clinicName: String(data.clinicName ?? "").trim(),
       title: String(data.title ?? "").trim(),
       role: String(data.role ?? "").trim(),
@@ -1455,11 +1461,30 @@ export const submitClinicVerification = functions.https.onCall(
         reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      // 승인 시 users 문서 업데이트
+      // 승인 시 clinics + users 문서 업데이트
       if (ntsResult.valid) {
+        // 1) clinics/{clinicId} 생성 (clinicId = uid를 기본값으로 사용)
+        const clinicId = uid;
+        const clinicAddress = String(data.address ?? "").trim();
+
+        await db.collection("clinics").doc(clinicId).set(
+          {
+            name: clinicName,
+            bizNo,
+            address: clinicAddress,
+            ownerUids: [uid],
+            memberUids: [uid],
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            verifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+
+        // 2) users/{uid} role: "clinic" + clinicId 저장
         await db.collection("users").doc(uid).set(
           {
             role: "clinic",
+            clinicId,
             clinicVerified: true,
             clinic: { name: clinicName, bizNo },
           },

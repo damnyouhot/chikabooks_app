@@ -2,7 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'publisher_shared.dart';
-import '../services/publisher_service.dart';
+import '../services/clinic_auth_service.dart';
 
 class PublisherSignupPage extends StatefulWidget {
   const PublisherSignupPage({super.key});
@@ -53,7 +53,7 @@ class _PublisherSignupPageState extends State<PublisherSignupPage> {
         email: _emailCtrl.text.trim(),
         password: _pwCtrl.text,
       );
-      await PublisherService.initPublisherRole();
+      await ClinicAuthService.initClinicRole();
       if (!mounted) return;
       context.go('/publisher/onboarding');
     } on FirebaseAuthException catch (e) {

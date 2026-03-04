@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'publisher_shared.dart';
-import '../services/publisher_service.dart';
+import '../services/clinic_auth_service.dart';
 
 /// 사업자 인증 검토 대기 화면 (/publisher/pending)
 class PublisherPendingPage extends StatefulWidget {
@@ -31,7 +31,7 @@ class _PublisherPendingPageState extends State<PublisherPendingPage> {
   }
 
   Future<void> _checkApproval() async {
-    final status = await PublisherService.getStatus();
+    final status = await ClinicAuthService.getStatus();
     if (!mounted) return;
     if (status.clinicVerified) {
       context.go('/publisher/done');

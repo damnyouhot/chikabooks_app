@@ -2,7 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'publisher_shared.dart';
-import '../services/publisher_service.dart';
+import '../services/clinic_auth_service.dart';
 
 class PublisherLoginPage extends StatefulWidget {
   const PublisherLoginPage({super.key});
@@ -39,7 +39,7 @@ class _PublisherLoginPageState extends State<PublisherLoginPage> {
       );
       if (!mounted) return;
       // 온보딩 상태 확인 후 적절한 화면으로
-      final status = await PublisherService.getStatus();
+      final status = await ClinicAuthService.getStatus();
       if (!mounted) return;
       if (status.canPost) {
         context.go('/post-job');
