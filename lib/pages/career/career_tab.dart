@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/career_profile_service.dart';
+import '../../features/resume/screens/resume_home_screen.dart';
 import '../settings/settings_page.dart';
 import 'career_shared.dart';
 import 'career_identity_section.dart';
@@ -305,6 +306,19 @@ class CareerTabHeader extends StatelessWidget {
                   showCareerStageGuideSheet(context);
                 },
               ),
+              const Divider(height: 12),
+              CareerEditSheetTile(
+                icon: Icons.description_outlined,
+                title: '내 이력서 관리',
+                onTap: () {
+                  Navigator.of(context).pop();
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ResumeHomeScreen(),
+                    ),
+                  );
+                },
+              ),
               const SizedBox(height: 6),
             ],
           ),
@@ -457,6 +471,9 @@ class CareerTab extends StatelessWidget {
                           )
                           .length,
                 ),
+                const SizedBox(height: 20),
+                // ── 이력서 바로가기 ──
+                _ResumeShortcutCard(),
                 const SizedBox(height: 14),
                 const CareerNetworkCard(),
               ],
@@ -486,6 +503,84 @@ class CareerTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       children: [CareerErrorCard(message: message)],
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// 이력서 바로가기 카드
+// ═══════════════════════════════════════════════════════════
+class _ResumeShortcutCard extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const ResumeHomeScreen()),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              const Color(0xFF4A90D9).withOpacity(0.07),
+              const Color(0xFF4A90D9).withOpacity(0.02),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: const Color(0xFF4A90D9).withOpacity(0.12),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFF4A90D9).withOpacity(0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.description_outlined,
+                color: Color(0xFF4A90D9),
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '내 이력서',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: kCText,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '이력서를 작성하고 공고에 빠르게 지원해요',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: kCText.withOpacity(0.5),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right,
+              color: kCText.withOpacity(0.3),
+              size: 20,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
