@@ -191,7 +191,7 @@ class _SettingsPageState extends State<SettingsPage> {
     if (confirm1 != true) return;
 
     // 2단계: "삭제" 입력 확인
-    final controller = TextEditingController();
+    String inputText = '';
     final confirm2 = await showDialog<bool>(
       context: context,
       builder:
@@ -204,7 +204,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 const Text('정말로 삭제하려면 아래에 "삭제"라고 입력해주세요.'),
                 const SizedBox(height: 16),
                 TextField(
-                  controller: controller,
+                  onChanged: (v) => inputText = v.trim(),
                   decoration: const InputDecoration(
                     hintText: '삭제',
                     border: OutlineInputBorder(),
@@ -220,7 +220,7 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               FilledButton(
                 onPressed: () {
-                  Navigator.pop(ctx, controller.text.trim() == '삭제');
+                  Navigator.pop(ctx, inputText == '삭제');
                 },
                 style: FilledButton.styleFrom(
                   backgroundColor: Theme.of(ctx).colorScheme.error,
@@ -230,8 +230,6 @@ class _SettingsPageState extends State<SettingsPage> {
             ],
           ),
     );
-
-    controller.dispose();
 
     if (confirm2 != true) {
       if (mounted) {
