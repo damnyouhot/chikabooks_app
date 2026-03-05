@@ -495,6 +495,28 @@ async function deleteWeeklyGoals(uid: string) {
 /**
  * 사용자 데이터 완전 삭제
  */
+/**
+ * 탈퇴 이력 저장 (재가입 온보딩 판단용)
+ * deletedUsers/{uid} 에 deletedAt + signUpCount 누적
+ */
+async function saveDeletedUserRecord(uid: string) {
+  try {
+    const ref = db.collection("deletedUsers").doc(uid);
+    const snap = await ref.get();
+    const prevCount: number = snap.exists ? (snap.data()?.signUpCount ?? 0) : 0;
+
+    await ref.set({
+      deletedAt: admin.firestore.FieldValue.serverTimestamp(),
+      signUpCount: prevCount + 1,
+    });
+
+    console.log(`✅ deletedUsers/${uid} 이력 저장 완료 (signUpCount=${prevCount + 1})`);
+  } catch (error) {
+    // 이력 저장 실패는 계정 삭제 자체를 막지 않음
+    console.warn("⚠️ deletedUsers 이력 저장 실패 (무시):", error);
+  }
+}
+
 async function deleteUserData(uid: string) {
   try {
     const userRef = db.collection("users").doc(uid);
@@ -589,6 +611,9 @@ export const deleteMyAccount = functions
 
       // ── 5단계: Firestore 사용자 문서 삭제 ───────────────
       await deleteUserData(uid);
+
+      // ── 5.5단계: 탈퇴 이력 저장 (재가입 온보딩 판단용) ──
+      await saveDeletedUserRecord(uid);
 
       // ── 6단계: Auth 계정 삭제 (최후) ────────────────────
       await deleteAuthAccount(uid);

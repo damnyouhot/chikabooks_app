@@ -5,6 +5,7 @@ import '../growth_page.dart';
 import '../job_page.dart';
 import '../onboarding/onboarding_profile_screen.dart';
 import '../../services/user_profile_service.dart';
+import '../../services/onboarding_service.dart';
 
 /// 메인 홈 (탭 네비게이션)
 class HomeShell extends StatefulWidget {
@@ -39,12 +40,31 @@ class _HomeShellState extends State<HomeShell> {
     _bondPage = const BondPage();
     _growthPage = GrowthPage(subTabNotifier: _growthSubTabNotifier);
     _jobPage = const JobPage();
+
+    // 로그인 직후 온보딩 실행 여부 확인
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkOnboarding());
   }
 
   @override
   void dispose() {
     _growthSubTabNotifier.dispose();
     super.dispose();
+  }
+
+  /// 로그인 직후 온보딩을 실행해야 하는지 확인
+  Future<void> _checkOnboarding() async {
+    final should = await OnboardingService.shouldRunOnboarding();
+    if (!should || !mounted) return;
+
+    // TODO: 실제 온보딩 화면으로 교체 예정
+    // 현재는 플래그만 확인하고 debugPrint로 확인
+    debugPrint('🎉 온보딩 시작 조건 충족 → 온보딩 화면 진입 예정');
+
+    // 온보딩 화면 구현 완료 후 아래 주석 해제하여 사용:
+    // await Navigator.of(context).push(
+    //   MaterialPageRoute(builder: (_) => const AppOnboardingScreen()),
+    // );
+    // await OnboardingService.completeOnboarding();
   }
 
   void _onTap(int idx) async {

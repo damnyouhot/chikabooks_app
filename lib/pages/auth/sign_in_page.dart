@@ -9,6 +9,7 @@ import '../../services/email_auth_service.dart';
 import '../../services/kakao_auth_service.dart';
 import '../../services/naver_auth_service.dart';
 import '../../services/sign_in_tracker.dart';
+import '../../services/onboarding_service.dart';
 
 /// 다중 소셜 로그인 페이지
 /// Google / Apple / Kakao / Naver / Email 지원
@@ -90,6 +91,7 @@ class _SignInPageState extends State<SignInPage> {
 
       // provider 기록 (Firestore + 로컬)
       await SignInTracker.record('google');
+      await OnboardingService.schedulePendingOnboarding();
 
       // AuthGate가 자동으로 홈으로 보내므로 추가 라우팅 불필요
     } catch (e) {
@@ -117,6 +119,7 @@ class _SignInPageState extends State<SignInPage> {
       } else if (user != null) {
         // 로컬 provider 기록 (배지용)
         await SignInTracker.record('apple');
+        await OnboardingService.schedulePendingOnboarding();
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -170,6 +173,7 @@ class _SignInPageState extends State<SignInPage> {
 
       // 로컬 provider 기록 (배지용, Firestore는 Function에서 이미 저장)
       await SignInTracker.record('kakao');
+      await OnboardingService.schedulePendingOnboarding();
 
       // AuthGate가 자동으로 홈으로 보내므로 추가 라우팅 불필요
     } catch (e) {
@@ -210,6 +214,7 @@ class _SignInPageState extends State<SignInPage> {
 
       // 로컬 provider 기록 (배지용)
       await SignInTracker.record('naver');
+      await OnboardingService.schedulePendingOnboarding();
 
       // AuthGate가 자동으로 홈으로 보내므로 추가 라우팅 불필요
     } catch (e) {
@@ -359,6 +364,7 @@ class _SignInPageState extends State<SignInPage> {
                           } else {
                             // 이메일 로그인 provider 기록
                             await SignInTracker.record('email');
+                            await OnboardingService.schedulePendingOnboarding();
                           }
                         }
                       },
