@@ -41,8 +41,10 @@ class OnboardingService {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return false;
 
-      // 테스트 계정은 isPending 여부와 관계없이 항상 온보딩 실행
-      if (user.email == _testEmail) {
+      // 테스트 계정 확인: Firebase Auth email 우선, 없으면 Firestore email 확인
+      final authEmail = user.email;
+      final isTestAccount = await _isTestAccount(user.uid, authEmail);
+      if (isTestAccount) {
         debugPrint('🧪 테스트 계정: 온보딩 강제 실행');
         return true;
       }
@@ -67,6 +69,20 @@ class OnboardingService {
     }
   }
 
+  /// 테스트 계정 여부: Auth email 없으면 Firestore에서 email 조회
+  static Future<bool> _isTestAccount(String uid, String? authEmail) async {
+    if (authEmail == _testEmail) return true;
+    // Naver 커스텀 토큰 로그인은 Firebase Auth email이 null일 수 있으므로
+    // Firestore users/{uid}.email 에서 확인
+    try {
+      final doc = await _db.collection('users').doc(uid).get();
+      final firestoreEmail = doc.data()?['email'] as String?;
+      return firestoreEmail == _testEmail;
+    } catch (_) {
+      return false;
+    }
+  }
+
   // ─────────────────────────────────────────────────────────────
   // 온보딩 완료 처리
   // ─────────────────────────────────────────────────────────────
@@ -75,17 +91,17 @@ class OnboardingService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_pendingKey);
 
-      final uid = FirebaseAuth.instance.currentUser?.uid;
-      if (uid == null) return;
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
 
       // 테스트 계정은 Firestore에 완료 기록 저장하지 않음 (매번 재실행)
-      final email = FirebaseAuth.instance.currentUser?.email;
-      if (email == _testEmail) {
+      final isTest = await _isTestAccount(user.uid, user.email);
+      if (isTest) {
         debugPrint('🧪 테스트 계정: 온보딩 완료 기록 저장 생략');
         return;
       }
 
-      await _db.collection('users').doc(uid).set(
+      await _db.collection('users').doc(user.uid).set(
         {'appOnboardingCompleted': true},
         SetOptions(merge: true),
       );

@@ -16,6 +16,7 @@ const Map<AppOnboardingStepId, String> kStepDialogue = {
   AppOnboardingStepId.step6a: '여기서 너의 커리어를 관리할 수 있어. 겁먹지마 천천히 하나씩 해도 되고,',
   AppOnboardingStepId.step6b: '나중에 이력서를 사진찍어 올리면 AI가 자동으로 입력해줄거야.',
   AppOnboardingStepId.step6c: '그렇게 완성된 우리 이력서로 여기서 바로 치과에 지원할 수도 있어.',
+  AppOnboardingStepId.step5b: '성장하기 탭도 눌러봐!',
   AppOnboardingStepId.step7a: '여기서 자기 계발도 할 수 있어',
   AppOnboardingStepId.step7b: '나랑 같이 퀴즈, 바뀌는 제도들, 책으로 공부 하면서 성장해 나가자!',
   AppOnboardingStepId.step8:  '이제 첫 번째 탭으로 가볼까?',
@@ -97,8 +98,9 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
       return;
     }
 
-    // step5(spotlight)는 오버레이 자체가 탭 클릭 유도하므로 skip
+    // spotlight step은 탭 터치로 진행 → 탭 자동이동 skip
     if (step == AppOnboardingStepId.step5) return;
+    if (step == AppOnboardingStepId.step5b) return;
 
     // 탭 이동이 필요한 step: 현재 탭 != 이전 탭이면 전환
     final tabIndex = kStepTabIndex[step] ?? 0;
@@ -190,7 +192,6 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
 
     // 1번 탭 step은 오버레이 완전 투명 (CaringPage가 캐릭터 위에 대사 표시)
     if (widget.controller.isTab0Step) {
-      // 터치만 가로채서 advance 처리
       return GestureDetector(
         behavior: HitTestBehavior.translucent,
         onTap: _onTap,
@@ -198,68 +199,78 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
       );
     }
 
+    // spotlight steps
     if (step == AppOnboardingStepId.step5) {
-      return _buildSpotlightOverlay(context);
+      return _buildSpotlightOverlay(context, targetTabIdx: 3, hint: '커리어 탭을 눌러볼까?');
+    }
+    if (step == AppOnboardingStepId.step5b) {
+      return _buildSpotlightOverlay(context, targetTabIdx: 2, hint: '성장하기 탭도 눌러볼까?');
     }
 
     return _buildTextOverlay(context, step);
   }
 
-  // ── 일반 텍스트 오버레이 ──────────────────────────────────
+  // ── 타탭 텍스트 오버레이: 앱 화면이 보이면서 상단에 말풍선만 표시 ──────
   Widget _buildTextOverlay(BuildContext context, AppOnboardingStepId step) {
     final dialogue = kStepDialogue[step];
+    if (dialogue == null) {
+      // 대사 없는 step은 터치만 감지
+      return GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: _onTap,
+        child: const SizedBox.expand(),
+      );
+    }
 
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: _onTap,
-      child: Stack(
-        children: [
-          // ── 반투명 배경 (타탭: 전체 어둡게) ── FadeTransition 제거, 즉시 표시
-          Positioned.fill(
-            child: Container(
-              color: Colors.black.withOpacity(0.55),
-            ),
-          ),
-
-          // ── 대사 버블 ──
-          if (dialogue != null)
-            Align(
-              alignment: Alignment.center,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 28),
-                child: _DialogueBubble(
-                  text: dialogue.replaceAll('{name}', _nickname ?? ''),
-                  isTab0: false,
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  // ── 핀조명(spotlight) 오버레이 — 커리어 탭 강조 ──────────
-  // 탭바는 Scaffold body 밖이므로 탭 터치는 HomeShell._onTap에서 처리
-  // 오버레이는 배경 어둠 + 안내 대사만 담당
-  Widget _buildSpotlightOverlay(BuildContext context) {
-    final screenSize = MediaQuery.of(context).size;
-    final bottomNavHeight = 56.0 + MediaQuery.of(context).padding.bottom;
-
-    final tabW = screenSize.width / 4;
-    const careerTabIdx = 3;
-    final careerTabLeft = tabW * careerTabIdx;
+    final topPad = MediaQuery.of(context).padding.top + 8;
 
     return Stack(
       children: [
-        // ── 전체 어두운 배경 + 커리어 탭 외 터치 차단 ──
+        // ── 화면 전체 터치 감지 (앱 화면은 그대로 보임) ──
+        Positioned.fill(
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: _onTap,
+            child: const SizedBox.expand(),
+          ),
+        ),
+
+        // ── 상단 말풍선 (앱 화면 위에 float) ──
+        Positioned(
+          top: topPad,
+          left: 16,
+          right: 16,
+          child: _DialogueBubble(
+            text: dialogue.replaceAll('{name}', _nickname ?? ''),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── 핀조명(spotlight) 오버레이 — 지정 탭 강조 ──────────────
+  // 탭바는 Scaffold body 밖이므로 탭 터치는 HomeShell._onTap에서 advance() 처리
+  Widget _buildSpotlightOverlay(
+    BuildContext context, {
+    required int targetTabIdx,
+    required String hint,
+  }) {
+    final screenSize = MediaQuery.of(context).size;
+    final bottomNavHeight = 56.0 + MediaQuery.of(context).padding.bottom;
+    final tabW = screenSize.width / 4;
+    final spotlightLeft = tabW * targetTabIdx;
+
+    return Stack(
+      children: [
+        // 전체 어두운 배경 (타 탭 터치 차단, 지정 탭만 밝게)
         Positioned.fill(
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: () {}, // 커리어 탭 외 영역 터치 차단
+            onTap: () {},
             child: CustomPaint(
               painter: _SpotlightPainter(
                 screenSize: screenSize,
-                spotlightLeft: careerTabLeft,
+                spotlightLeft: spotlightLeft,
                 spotlightWidth: tabW,
                 bottomNavHeight: bottomNavHeight,
               ),
@@ -267,16 +278,13 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
           ),
         ),
 
-        // ── 안내 대사 (탭바 바로 위) ──
+        // 안내 대사 (탭바 바로 위)
         Positioned(
           bottom: bottomNavHeight + 16,
           left: 20,
           right: 20,
           child: IgnorePointer(
-            child: _DialogueBubble(
-              text: '커리어 탭을 눌러볼까?',
-              isTab0: false,
-            ),
+            child: _DialogueBubble(text: hint),
           ),
         ),
       ],
@@ -285,27 +293,26 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
 }
 
 // ─────────────────────────────────────────────────────────────
-// 대사 말풍선 위젯 (타탭용 — 반투명 배경 위에 흰색 카드)
+// 대사 말풍선 위젯
 // ─────────────────────────────────────────────────────────────
 class _DialogueBubble extends StatelessWidget {
   final String text;
-  final bool isTab0; // 유지 (하위 호환) — 현재는 항상 false
 
-  const _DialogueBubble({required this.text, this.isTab0 = false});
+  const _DialogueBubble({required this.text});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.95),
-        borderRadius: BorderRadius.circular(20),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.18),
-            blurRadius: 20,
-            offset: const Offset(0, 6),
+            color: Colors.black.withOpacity(0.15),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -315,13 +322,13 @@ class _DialogueBubble extends StatelessWidget {
           Text(
             text,
             style: GoogleFonts.notoSansKr(
-              fontSize: 16,
+              fontSize: 15,
               fontWeight: FontWeight.w600,
               color: _kText,
-              height: 1.65,
+              height: 1.6,
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
@@ -333,11 +340,7 @@ class _DialogueBubble extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 4),
-              Icon(
-                Icons.touch_app_outlined,
-                size: 13,
-                color: _kText.withOpacity(0.35),
-              ),
+              Icon(Icons.touch_app_outlined, size: 13, color: _kText.withOpacity(0.35)),
             ],
           ),
         ],

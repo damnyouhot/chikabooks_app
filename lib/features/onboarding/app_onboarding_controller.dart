@@ -17,9 +17,10 @@ enum AppOnboardingStepId {
   step6a, // 탭4(커리어 > 커리어카드)  "여기서 너의 커리어를 관리할 수 있어."
   step6b, // 탭4(커리어 > 커리어카드)  "나중에 이력서를 사진찍어 올리면..."
   step6c, // 탭4(커리어 > 커리어카드)  "그렇게 완성된 우리 이력서로..."
+  step5b, // 탭4→탭3  스팟라이트 → 탭3(성장하기) 터치 유도
   step7a, // 탭3(성장하기)  "여기서 자기 계발도 할 수 있어"
   step7b, // 탭3(성장하기)  "나랑 같이 퀴즈, 제도들, 책으로..."
-  step8,  // 탭3(성장하기)  → 탭1(나) 유도
+  step8,  // 탭3(성장하기)  "이제 첫 번째 탭으로 가볼까?"
   step9a, // 탭1(나)  "난 항상 여기 있을건데..."
   step9b, // 탭1(나)  "하루 몇번이면 충분해."
   step9c, // 탭1(나)  "앞으로 잘 지내자." → 온보딩 완료
@@ -33,13 +34,14 @@ const Map<AppOnboardingStepId, int> kStepTabIndex = {
   AppOnboardingStepId.step2:  0, // 탭1: 나
   AppOnboardingStepId.step3:  0, // 탭1: 나
   AppOnboardingStepId.step4:  0, // 탭1: 나
-  AppOnboardingStepId.step5:  3, // 탭4: 커리어 (spotlight → 탭4 유도, 이전탭과 동일하게 설정해 중복이동 방지)
+  AppOnboardingStepId.step5:  3, // 탭4: 커리어 (spotlight → 탭4 유도)
   AppOnboardingStepId.step6a: 3, // 탭4: 커리어 > 커리어카드
   AppOnboardingStepId.step6b: 3, // 탭4: 커리어 > 커리어카드
   AppOnboardingStepId.step6c: 3, // 탭4: 커리어 > 커리어카드
+  AppOnboardingStepId.step5b: 3, // 탭4→탭3 (spotlight → 성장하기 유도, 탭4 유지로 중복이동 방지)
   AppOnboardingStepId.step7a: 2, // 탭3: 성장하기
   AppOnboardingStepId.step7b: 2, // 탭3: 성장하기
-  AppOnboardingStepId.step8:  2, // 탭3: 성장하기 (탭1로 유도)
+  AppOnboardingStepId.step8:  2, // 탭3: 성장하기
   AppOnboardingStepId.step9a: 0, // 탭1: 나
   AppOnboardingStepId.step9b: 0, // 탭1: 나
   AppOnboardingStepId.step9c: 0, // 탭1: 나
@@ -63,7 +65,8 @@ const Set<AppOnboardingStepId> kTouchAdvanceSteps = {
 
 /// 핀조명(spotlight) step
 const Set<AppOnboardingStepId> kSpotlightSteps = {
-  AppOnboardingStepId.step5,
+  AppOnboardingStepId.step5,  // 탭4(커리어) 유도
+  AppOnboardingStepId.step5b, // 탭3(성장하기) 유도
 };
 
 /// AppOnboardingController — 온보딩 진행 상태 관리
