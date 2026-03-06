@@ -248,22 +248,19 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
     final screenSize = MediaQuery.of(context).size;
     final bottomNavHeight = 56.0 + MediaQuery.of(context).padding.bottom;
 
-    // 하단 탭바 전체를 어둡게 처리, 커리어 탭(인덱스 3)만 밝게
-    // 탭 너비 = 화면 너비 / 4
     final tabW = screenSize.width / 4;
     const careerTabIdx = 3;
     final careerTabLeft = tabW * careerTabIdx;
 
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      // 핀조명 step은 탭 클릭으로만 진행 → 오버레이 터치 차단
-      onTap: () {},
-      child: FadeTransition(
-        opacity: _fadeAnim,
-        child: Stack(
-          children: [
-            // 화면 전체 어둠 (탭바 윗쪽 + 탭바 중 커리어 탭 외)
-            Positioned.fill(
+    return FadeTransition(
+      opacity: _fadeAnim,
+      child: Stack(
+        children: [
+          // ── 전체 어두운 배경 + 커리어 탭 외 터치 차단 ──
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {}, // 커리어 탭 외 영역 터치 차단
               child: CustomPaint(
                 painter: _SpotlightPainter(
                   screenSize: screenSize,
@@ -273,36 +270,37 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
                 ),
               ),
             ),
+          ),
 
-            // 안내 대사 (화면 중앙 하단)
-            Positioned(
-              bottom: bottomNavHeight + 16,
-              left: 20,
-              right: 20,
+          // ── 안내 대사 (탭바 바로 위) ──
+          Positioned(
+            bottom: bottomNavHeight + 16,
+            left: 20,
+            right: 20,
+            child: IgnorePointer(
               child: _DialogueBubble(
                 text: '커리어 탭을 눌러볼까?',
                 isTab0: false,
               ),
             ),
+          ),
 
-            // 커리어 탭 영역만 터치 통과 (GestureDetector 외부에 배치)
-            Positioned(
-              left: careerTabLeft,
-              bottom: 0,
-              width: tabW,
-              height: bottomNavHeight,
-              child: GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                onTap: () {
-                  // 커리어 탭 이동 + 다음 step(6a)으로 진행
-                  widget.onTabChangeRequest(3);
-                  widget.controller.advance();
-                },
-                child: Container(color: Colors.transparent),
-              ),
+          // ── 커리어 탭 영역: Stack 최상단에 독립 배치 → 터치 단독 수신 ──
+          Positioned(
+            left: careerTabLeft,
+            bottom: 0,
+            width: tabW,
+            height: bottomNavHeight,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
+                widget.onTabChangeRequest(3);
+                widget.controller.advance();
+              },
+              child: Container(color: Colors.transparent),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
