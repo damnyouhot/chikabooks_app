@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../services/onboarding_workplace_service.dart';
@@ -23,6 +24,25 @@ class OnboardingNicknamePopup extends StatefulWidget {
 class _OnboardingNicknamePopupState extends State<OnboardingNicknamePopup> {
   final _ctrl = TextEditingController();
   bool _canSubmit = false;
+
+  // 설정 화면과 동일한 랜덤 닉네임 목록 (대표 20개)
+  static const _suggestions = [
+    '스케일링중독자', '치은여왕', '어금니의비밀', '멸균요정', '핸드피스마스터',
+    '버티는치위생', '야근의전설', '인상채득러버', '치경거울요정', '소독실의숨결',
+    '핀셋천재', '레진수호자', '기구정리장인', '체어위의철학자', '치은선지킴이',
+    '석션장인', '물분사요정', '진료실탐험가', '멘탈마취전문', '스케일링왕자',
+    '칫솔들고철학', '레진빛광채', '초음파의속삭임', '교합의운명', '기구트레이요정',
+    '진료실생존자', '차트의그림자', '스케일링한숨', '치과의밤바람', '멘탈스케일링',
+    '실습의추억', '소독실은나의것', '치은빛노을', '체어사이드고수', '석션한모금',
+    '근무표전사', '점심은없다', '퇴근을꿈꾸는자', '치위생감성', '사랑니헌터',
+  ];
+
+  void _randomNickname() {
+    final rng = Random();
+    final pick = _suggestions[rng.nextInt(_suggestions.length)];
+    _ctrl.text = pick;
+    setState(() => _canSubmit = true);
+  }
 
   @override
   void dispose() {
@@ -60,33 +80,55 @@ class _OnboardingNicknamePopupState extends State<OnboardingNicknamePopup> {
               ),
             ),
             const SizedBox(height: 20),
-            TextField(
-              controller: _ctrl,
-              autofocus: true,
-              maxLength: 12,
-              onChanged: (v) => setState(() => _canSubmit = v.trim().isNotEmpty),
-              decoration: InputDecoration(
-                hintText: '닉네임 입력',
-                counterText: '',
-                filled: true,
-                fillColor: Colors.white,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
+            // ── TextField + 주사위 버튼 Row ──
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _ctrl,
+                    autofocus: true,
+                    maxLength: 12,
+                    onChanged: (v) =>
+                        setState(() => _canSubmit = v.trim().isNotEmpty),
+                    decoration: InputDecoration(
+                      hintText: '닉네임 입력',
+                      counterText: '',
+                      filled: true,
+                      fillColor: Colors.white,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: _kAccent, width: 1.5),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide:
+                            const BorderSide(color: Color(0xFFE0E0E0)),
+                      ),
+                    ),
+                  ),
                 ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+                const SizedBox(width: 8),
+                // 🎲 랜덤 닉네임 주사위 버튼
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: IconButton(
+                    onPressed: _randomNickname,
+                    icon: const Text('🎲', style: TextStyle(fontSize: 18)),
+                    tooltip: '랜덤 닉네임',
+                  ),
                 ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: _kAccent, width: 1.5),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
-                ),
-              ),
+              ],
             ),
             const SizedBox(height: 20),
             SizedBox(
@@ -152,9 +194,9 @@ class _OnboardingWorkplacePopupState extends State<OnboardingWorkplacePopup> {
         return '학교 이름 입력';
       case WorkStatus.working:
       case WorkStatus.leave:
-        return '근무 중인 치과 이름 (나만 보여요)';
+        return '근무 중인 치과 이름';
       case WorkStatus.seeking:
-        return '마지막 근무한 치과 (나만 보여요)';
+        return '마지막 근무한 치과';
       default:
         return '이름 입력';
     }

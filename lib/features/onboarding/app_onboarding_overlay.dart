@@ -99,10 +99,13 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
       return;
     }
 
-    // 탭 이동이 필요한 step
+    // step5(spotlight)는 오버레이 자체가 탭 클릭 유도하므로 skip
+    if (step == AppOnboardingStepId.step5) return;
+
+    // 탭 이동이 필요한 step: 현재 탭 != 이전 탭이면 전환
     final tabIndex = kStepTabIndex[step] ?? 0;
-    final prevTabIndex =
-        kStepTabIndex[_prevStep(step)] ?? 0;
+    final prev = _prevStep(step);
+    final prevTabIndex = prev != null ? (kStepTabIndex[prev] ?? 0) : -1;
     if (tabIndex != prevTabIndex) {
       widget.onTabChangeRequest(tabIndex);
     }

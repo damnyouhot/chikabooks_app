@@ -45,6 +45,10 @@ class _HomeShellState extends State<HomeShell> {
     _jobPage = const JobPage();
 
     _onboardingCtrl = AppOnboardingController();
+    // step 변경 시 HomeShell 리빌드 → CaringPage에 새 대사 전달
+    _onboardingCtrl.addListener(() {
+      if (mounted) setState(() {});
+    });
 
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkOnboarding());
   }

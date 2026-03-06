@@ -513,93 +513,16 @@ class _CaringPageState extends State<CaringPage>
               ),
 
             // ── [중간] 캐릭터 + 텍스트: 카드~버튼 사이 남은 공간만 사용 ──
-            // 온보딩 중에는 캐릭터가 화면 대부분을 차지하도록 Expanded
-            Expanded(
-              child: ClipRect(
-                child: Stack(
-                  children: [
-                    // 캐릭터
-                    Positioned.fill(
-                      child: GestureDetector(
-                        onTap: isOnboarding ? null : _onCircleTap,
-                        child: _dogController != null
-                            ? LayoutBuilder(
-                                builder: (ctx, constraints) {
-                                  const scale = 2.112;
-                                  return OverflowBox(
-                                    maxWidth: constraints.maxWidth * scale,
-                                    maxHeight: constraints.maxHeight * scale,
-                                    alignment: Alignment.center,
-                                    child: SizedBox(
-                                      width: constraints.maxWidth * scale,
-                                      height: constraints.maxHeight * scale,
-                                      child: RiveWidget(
-                                        controller: _dogController!,
-                                        fit: Fit.contain,
-                                      ),
-                                    ),
-                                  );
-                                },
-                              )
-                            : const SizedBox.shrink(),
-                      ),
-                    ),
-
-                    // 텍스트 오버레이 (캐릭터 위에 겹침)
-                    Positioned.fill(
-                      child: IgnorePointer(
-                        child: LayoutBuilder(
-                          builder: (ctx, constraints) {
-                            final h = constraints.maxHeight;
-                            // 기본 메시지 / 온보딩 대사: 캐릭터 영역 상단 28% 지점
-                            final baseMsgTop = h * 0.28;
-                            // 리액션 메시지: 캐릭터 영역 하단 86% 지점
-                            final reactionTop = h * 0.86;
-
-                            // 온보딩 중: 온보딩 대사를 기본메시지 자리에 표시
-                            final displayText = isOnboarding
-                                ? widget.onboardingDialogue
-                                : _baseMsgText;
-                            final isDismissing = isOnboarding
-                                ? false
-                                : _isBaseMsgDismissing;
-
-                            return Stack(
-                              children: [
-                                Positioned(
-                                  top: baseMsgTop,
-                                  left: 0,
-                                  right: 0,
-                                  child: Center(
-                                    child: SpeechOverlay(
-                                      text: displayText,
-                                      isDismissing: isDismissing,
-                                    ),
-                                  ),
-                                ),
-                                // 리액션 메시지: 온보딩 중에는 표시 안 함
-                                if (!isOnboarding)
-                                  Positioned(
-                                    top: reactionTop,
-                                    left: 0,
-                                    right: 0,
-                                    child: Center(
-                                      child: SpeechOverlay(
-                                        text: _currentSpeech,
-                                        isDismissing: _isDismissingSpeech,
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+            // 온보딩 중에도 기존 캐릭터 크기(화면 52%) 고정, 그 외엔 Expanded
+            if (isOnboarding)
+              SizedBox(
+                height: MediaQuery.of(context).size.height * 0.52,
+                child: ClipRect(child: _buildCharacterStack(isOnboarding)),
+              )
+            else
+              Expanded(
+                child: ClipRect(child: _buildCharacterStack(isOnboarding)),
               ),
-            ),
 
             // ── [아래] 버튼: 온보딩 중 숨김 ──
             if (!isOnboarding)
@@ -611,6 +534,91 @@ class _CaringPageState extends State<CaringPage>
           ],
         ),
       ),
+    );
+  }
+
+  // ── 캐릭터 + 텍스트 오버레이 Stack (공통) ──
+  Widget _buildCharacterStack(bool isOnboarding) {
+    return Stack(
+      children: [
+        // 캐릭터
+        Positioned.fill(
+          child: GestureDetector(
+            onTap: isOnboarding ? null : _onCircleTap,
+            child: _dogController != null
+                ? LayoutBuilder(
+                    builder: (ctx, constraints) {
+                      const scale = 2.112;
+                      return OverflowBox(
+                        maxWidth: constraints.maxWidth * scale,
+                        maxHeight: constraints.maxHeight * scale,
+                        alignment: Alignment.center,
+                        child: SizedBox(
+                          width: constraints.maxWidth * scale,
+                          height: constraints.maxHeight * scale,
+                          child: RiveWidget(
+                            controller: _dogController!,
+                            fit: Fit.contain,
+                          ),
+                        ),
+                      );
+                    },
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ),
+
+        // 텍스트 오버레이 (캐릭터 위에 겹침)
+        Positioned.fill(
+          child: IgnorePointer(
+            child: LayoutBuilder(
+              builder: (ctx, constraints) {
+                final h = constraints.maxHeight;
+                // 기본 메시지 / 온보딩 대사: 캐릭터 영역 상단 28% 지점
+                final baseMsgTop = h * 0.28;
+                // 리액션 메시지: 캐릭터 영역 하단 86% 지점
+                final reactionTop = h * 0.86;
+
+                // 온보딩 중: 온보딩 대사를 기본메시지 자리에 표시
+                final displayText = isOnboarding
+                    ? widget.onboardingDialogue
+                    : _baseMsgText;
+                final isDismissing =
+                    isOnboarding ? false : _isBaseMsgDismissing;
+
+                return Stack(
+                  children: [
+                    Positioned(
+                      top: baseMsgTop,
+                      left: 0,
+                      right: 0,
+                      child: Center(
+                        child: SpeechOverlay(
+                          text: displayText,
+                          isDismissing: isDismissing,
+                        ),
+                      ),
+                    ),
+                    // 리액션 메시지: 온보딩 중에는 표시 안 함
+                    if (!isOnboarding)
+                      Positioned(
+                        top: reactionTop,
+                        left: 0,
+                        right: 0,
+                        child: Center(
+                          child: SpeechOverlay(
+                            text: _currentSpeech,
+                            isDismissing: _isDismissingSpeech,
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ),
+      ],
     );
   }
 
