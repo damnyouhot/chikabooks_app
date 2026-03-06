@@ -12,12 +12,15 @@ import 'career/career_shared.dart';
 // ── 디자인 팔레트 ──
 const _kBg = kCBg;
 
-/// 커리어(도전하기) 탭 - 4번째 탭
+/// 커리어(도전하기) 탭 - 탭4
 ///
 /// - 소탭 0: 공고보기 (JobListingsScreen ↔ JobMapScreen)
 /// - 소탭 1: 커리어 카드 (CareerTab)
+///
+/// [isOnboardingActive] 온보딩 진행 중이면 커리어 카드(소탭1)로 바로 열림
 class JobPage extends StatefulWidget {
-  const JobPage({super.key});
+  final bool isOnboardingActive;
+  const JobPage({super.key, this.isOnboardingActive = false});
 
   @override
   State<JobPage> createState() => _JobPageState();
@@ -95,6 +98,8 @@ class _JobPageState extends State<JobPage> {
       body: SafeArea(
         child: DefaultTabController(
           length: 2,
+          // 탭4(커리어) 진입 시: 온보딩 중이면 소탭1(커리어카드)로 바로 시작
+          initialIndex: widget.isOnboardingActive ? 1 : 0,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [

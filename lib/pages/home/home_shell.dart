@@ -23,10 +23,9 @@ class _HomeShellState extends State<HomeShell> {
   /// Bond 탭 인덱스
   static const int _bondTabIndex = 1;
 
-  // ── 탭 위젯 캐시 ──
+  // ── 탭 위젯 캐시 (JobPage는 온보딩 상태에 따라 build에서 생성) ──
   late final BondPage _bondPage;
   late final GrowthPage _growthPage;
-  late final JobPage _jobPage;
 
   final ValueNotifier<int> _growthSubTabNotifier = ValueNotifier<int>(-1);
 
@@ -42,7 +41,7 @@ class _HomeShellState extends State<HomeShell> {
     super.initState();
     _bondPage = const BondPage();
     _growthPage = GrowthPage(subTabNotifier: _growthSubTabNotifier);
-    _jobPage = const JobPage();
+    // JobPage는 온보딩 상태를 전달하기 위해 build()에서 생성
 
     _onboardingCtrl = AppOnboardingController();
     // step 변경 시 HomeShell 리빌드 → CaringPage에 새 대사 전달
@@ -214,7 +213,11 @@ class _HomeShellState extends State<HomeShell> {
       ),
       _bondPage,
       _growthPage,
-      _jobPage,
+      // 탭4(커리어): 온보딩 중이면 커리어카드 소탭으로 바로 시작
+      JobPage(
+        key: const ValueKey('job'),
+        isOnboardingActive: _onboardingActive,
+      ),
     ];
 
     return Scaffold(

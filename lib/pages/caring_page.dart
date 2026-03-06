@@ -470,9 +470,13 @@ class _CaringPageState extends State<CaringPage>
         // 텍스트는 캐릭터 Stack 안에서 Positioned으로 겹침
         child: Column(
           children: [
-            // ── [위] 카드 영역: 온보딩 중 숨김 ──
-            if (!isOnboarding)
-              Container(
+            // ── [위] 카드 영역: 온보딩 중 invisible (공간 유지 → 캐릭터 크기 정규와 동일) ──
+            Visibility(
+              visible: !isOnboarding,
+              maintainSize: true,
+              maintainAnimation: true,
+              maintainState: true,
+              child: Container(
                 color: _colorBg,
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Column(
@@ -511,26 +515,25 @@ class _CaringPageState extends State<CaringPage>
                   ],
                 ),
               ),
+            ),
 
-            // ── [중간] 캐릭터 + 텍스트: 카드~버튼 사이 남은 공간만 사용 ──
-            // 온보딩 중에도 기존 캐릭터 크기(화면 52%) 고정, 그 외엔 Expanded
-            if (isOnboarding)
-              SizedBox(
-                height: MediaQuery.of(context).size.height * 0.52,
-                child: ClipRect(child: _buildCharacterStack(isOnboarding)),
-              )
-            else
-              Expanded(
-                child: ClipRect(child: _buildCharacterStack(isOnboarding)),
-              ),
+            // ── [중간] 캐릭터 + 텍스트: Expanded (온보딩/정규 모두 동일한 크기) ──
+            Expanded(
+              child: ClipRect(child: _buildCharacterStack(isOnboarding)),
+            ),
 
-            // ── [아래] 버튼: 온보딩 중 숨김 ──
-            if (!isOnboarding)
-              Container(
+            // ── [아래] 버튼: 온보딩 중 invisible (공간 유지) ──
+            Visibility(
+              visible: !isOnboarding,
+              maintainSize: true,
+              maintainAnimation: true,
+              maintainState: true,
+              child: Container(
                 color: _colorBg,
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
                 child: _buildBottomSection(),
               ),
+            ),
           ],
         ),
       ),
