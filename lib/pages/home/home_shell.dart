@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../bond_page.dart';
 import '../caring_page.dart';
@@ -49,7 +50,18 @@ class _HomeShellState extends State<HomeShell> {
       if (mounted) setState(() {});
     });
 
+    // 처음 진입 시 온보딩 체크
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkOnboarding());
+
+    // 재로그인 감지: UID가 바뀌거나 새로운 로그인 이벤트 발생 시 온보딩 재체크
+    FirebaseAuth.instance.authStateChanges().skip(1).listen((user) {
+      if (!mounted) return;
+      final newUid = user?.uid;
+      if (newUid != null && !_onboardingActive) {
+        // 로그아웃 후 재로그인 감지 → 온보딩 재체크
+        _checkOnboarding();
+      }
+    });
   }
 
   @override

@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:rive/rive.dart';
+import 'package:rive/rive.dart' hide Animation;
 import '../services/caring_state_service.dart';
 import '../services/bond_score_service.dart';
 import '../services/caring_action_service.dart';
@@ -53,9 +53,12 @@ class _CaringPageState extends State<CaringPage>
   // ── 로딩 ──
   bool _loading = true;
 
-  // ── 온보딩 완료 후 카드/버튼 페이드인 ──
+  // ── 온보딩 완료 후 카드/버튼 순차 페이드인 ──
+  // 카드 4개(0~400ms) + 버튼 4개(500~900ms), 전체 1200ms 컨트롤러
   late AnimationController _revealCtrl;
-  late CurvedAnimation _revealAnim;
+  // 각 항목 animation (Interval 기반): card0~3, btn0~3
+  late List<Animation<double>> _cardAnims;   // 카드 4개
+  late List<Animation<double>> _btnAnims;    // 버튼 4개
 
   // ── 카드 데이터 ──
   String _jobsSummary = '근처 신규 구인 확인 중...';
@@ -105,19 +108,40 @@ class _CaringPageState extends State<CaringPage>
   void initState() {
     super.initState();
 
-    // 카드/버튼 페이드인 컨트롤러
+    // 카드/버튼 순차 페이드인 컨트롤러 (전체 1200ms)
+    // 카드: 0→800ms 구간에서 200ms 간격
+    // 버튼: 500→1200ms 구간에서 150ms 간격
     _revealCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 1200),
     );
-    _revealAnim = CurvedAnimation(parent: _revealCtrl, curve: Curves.easeOut);
+
+    // 카드 4개: 각 200ms 간격으로 순차 등장
+    _cardAnims = List.generate(4, (i) {
+      final start = (i * 200) / 1200;
+      final end = (i * 200 + 300) / 1200;
+      return CurvedAnimation(
+        parent: _revealCtrl,
+        curve: Interval(start.clamp(0.0, 1.0), end.clamp(0.0, 1.0),
+            curve: Curves.easeOut),
+      );
+    });
+
+    // 버튼 4개: 카드 후 150ms 간격으로 순차 등장
+    _btnAnims = List.generate(4, (i) {
+      final start = (500 + i * 150) / 1200;
+      final end = (500 + i * 150 + 300) / 1200;
+      return CurvedAnimation(
+        parent: _revealCtrl,
+        curve: Interval(start.clamp(0.0, 1.0), end.clamp(0.0, 1.0),
+            curve: Curves.easeOut),
+      );
+    });
 
     // 온보딩이 없으면 처음부터 완전히 표시
     if (!widget.isOnboardingActive) {
       _revealCtrl.value = 1.0;
-    }
-
-    _loadRiveFile();
+    }    _loadRiveFile();
     _bootstrap();
     Future.microtask(() async {
       await CaringActionService.dailySettle();
@@ -356,13 +380,18 @@ class _CaringPageState extends State<CaringPage>
   }
 
   /// 이벤트 ID를 세션 내 1회만 큐에 삽입
+  /// \n으로 구분된 여러 줄은 각각 별도 메시지로 순차 큐잉
   void _queueEventIfNew(String eventId) {
     if (_shownEventIds.contains(eventId)) return;
     _shownEventIds.add(eventId);
     final msg = BaseMessageData.eventMessages[eventId];
     if (msg != null) {
-      _eventQueue.add(msg);
-      debugPrint('[MsgLoop] queued event: $eventId');
+      // 여러 줄은 각각 별도 메시지로 분리하여 순차 표시
+      final lines = msg.split('\n').where((l) => l.trim().isNotEmpty).toList();
+      for (final line in lines) {
+        _eventQueue.add(line.trim());
+      }
+      debugPrint('[MsgLoop] queued event: $eventId (${lines.length} lines)');
     }
   }
 
@@ -395,6 +424,7 @@ class _CaringPageState extends State<CaringPage>
     }
 
   void _onFeed() async {
+    _tapTrigger?.fire(); // 밥먹기 애니메이션 재생
     final result = await CaringActionService.tryFeed();
     if (!mounted) return;
 
@@ -489,8 +519,8 @@ class _CaringPageState extends State<CaringPage>
         // 텍스트는 캐릭터 Stack 안에서 Positioned으로 겹침
         child: Column(
           children: [
-            // ── [타이틀] 항상 표시 (온보딩 중에도 보임) ──
-            _buildTopBar(titleVisible: true),
+            // ── [타이틀] 온보딩 중에는 숨김, 일반 상태에서만 표시 ──
+            if (!isOnboarding) _buildTopBar(titleVisible: true),
 
             // ── [위] 카드 영역: 온보딩 중 invisible (공간 유지 → 캐릭터 크기 정규와 동일) ──
             Visibility(
@@ -498,24 +528,30 @@ class _CaringPageState extends State<CaringPage>
               maintainSize: true,
               maintainAnimation: true,
               maintainState: true,
-              child: FadeTransition(
-                opacity: isOnboarding
-                    ? const AlwaysStoppedAnimation(0.0)
-                    : _revealAnim,
-                child: Container(
-                  color: _colorBg,
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _buildTopBar(titleVisible: false), // 아이콘Row + 타이틀은 아래 별도 처리
-                      _TapCard(
+              child: Container(
+                color: _colorBg,
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildTopBar(titleVisible: false),
+                    // 카드 4개 — 순차 페이드인 (온보딩 완료 후)
+                    FadeTransition(
+                      opacity: isOnboarding
+                          ? const AlwaysStoppedAnimation(0.0)
+                          : _cardAnims[0],
+                      child: _TapCard(
                         title: '📍 내 주변 구인 치과',
                         bigText: _jobsSummary,
                         subtitle: _jobsSub,
                         onTap: () => widget.onTabRequested?.call(3),
                       ),
-                      _PolicyRollingCard(
+                    ),
+                    FadeTransition(
+                      opacity: isOnboarding
+                          ? const AlwaysStoppedAnimation(0.0)
+                          : _cardAnims[1],
+                      child: _PolicyRollingCard(
                         policies: _upcomingPolicies,
                         index: _policyIndex,
                         onTap: () {
@@ -523,13 +559,23 @@ class _CaringPageState extends State<CaringPage>
                           widget.onGrowthSubTabRequested?.call(1);
                         },
                       ),
-                      _TapCard(
+                    ),
+                    FadeTransition(
+                      opacity: isOnboarding
+                          ? const AlwaysStoppedAnimation(0.0)
+                          : _cardAnims[2],
+                      child: _TapCard(
                         title: '📖 이주의 책',
                         bigText: _weeklyBook?.title ?? '이번 주 추천 책이 없어요',
                         subtitle: '',
                         onTap: _goBookDetail,
                       ),
-                      _TapCard(
+                    ),
+                    FadeTransition(
+                      opacity: isOnboarding
+                          ? const AlwaysStoppedAnimation(0.0)
+                          : _cardAnims[3],
+                      child: _TapCard(
                         title: '🧠 오늘의 1문제',
                         bigText: _quizSummary,
                         subtitle: '터치해서 풀기',
@@ -538,8 +584,8 @@ class _CaringPageState extends State<CaringPage>
                           widget.onGrowthSubTabRequested?.call(0);
                         },
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -549,21 +595,16 @@ class _CaringPageState extends State<CaringPage>
               child: ClipRect(child: _buildCharacterStack(isOnboarding)),
             ),
 
-            // ── [아래] 버튼: 온보딩 중 invisible (공간 유지) ──
+            // ── [아래] 버튼: 온보딩 중 invisible (공간 유지), 완료 후 순차 페이드인 ──
             Visibility(
               visible: true, // 항상 공간 유지
               maintainSize: true,
               maintainAnimation: true,
               maintainState: true,
-              child: FadeTransition(
-                opacity: isOnboarding
-                    ? const AlwaysStoppedAnimation(0.0)
-                    : _revealAnim,
-                child: Container(
-                  color: _colorBg,
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-                  child: _buildBottomSection(),
-                ),
+              child: Container(
+                color: _colorBg,
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                child: _buildBottomSection(isOnboarding: isOnboarding),
               ),
             ),
           ],
@@ -609,8 +650,8 @@ class _CaringPageState extends State<CaringPage>
             child: LayoutBuilder(
               builder: (ctx, constraints) {
                 final h = constraints.maxHeight;
-                // 기본 메시지 / 온보딩 대사: 캐릭터 영역 상단 18% 지점 (2줄 위로)
-                final baseMsgTop = h * 0.18;
+                // 온보딩 중: 더 위에 표시 (2줄 위), 일반: 캐릭터 상단 18%
+                final baseMsgTop = isOnboarding ? h * 0.06 : h * 0.18;
                 // 리액션 메시지: 캐릭터 영역 하단 86% 지점
                 final reactionTop = h * 0.86;
 
@@ -722,19 +763,23 @@ class _CaringPageState extends State<CaringPage>
     }
   }
 
-  Widget _buildBottomSection() {
+  Widget _buildBottomSection({bool isOnboarding = false}) {
+    // 버튼 정의 목록
+    final buttons = [
+      _ActionBtn(icon: Icons.restaurant_outlined, label: '밥먹기', onTap: _onFeed),
+      _ActionBtn(icon: Icons.favorite_outline,    label: '사랑하기', onTap: _onLove),
+      _ActionBtn(icon: Icons.edit_outlined,        label: '기록하기', onTap: _onDiary),
+      _ActionBtn(icon: Icons.flag_outlined,        label: '목표',    onTap: _onGoal),
+    ];
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        _ActionBtn(
-          icon: Icons.restaurant_outlined,
-          label: '밥먹기',
-          onTap: _onFeed,
-        ),
-        _ActionBtn(icon: Icons.favorite_outline, label: '사랑하기', onTap: _onLove),
-        _ActionBtn(icon: Icons.edit_outlined, label: '기록하기', onTap: _onDiary),
-        _ActionBtn(icon: Icons.flag_outlined, label: '목표', onTap: _onGoal),
-      ],
+      children: List.generate(buttons.length, (i) {
+        final anim = isOnboarding
+            ? const AlwaysStoppedAnimation<double>(0.0)
+            : _btnAnims[i];
+        return FadeTransition(opacity: anim, child: buttons[i]);
+      }),
     );
   }
 

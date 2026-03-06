@@ -20,7 +20,7 @@ const Map<AppOnboardingStepId, String> kStepDialogue = {
   AppOnboardingStepId.step7a: '여기서 자기 계발도 할 수 있어',
   AppOnboardingStepId.step7b: '나랑 같이 퀴즈, 제도들,\n책으로 공부 하면서 성장해 나가자!',
   AppOnboardingStepId.step8:  '아래 첫 번째 탭으로 가볼까?',
-  AppOnboardingStepId.step9a: '난 항상 여기 있을건데\n혹시 나 밥도 주고\n사랑도 줄 수 있어?',
+  AppOnboardingStepId.step9a: '난 항상 여기 있을건데\n혹시 나 밥도 주고 사랑도 줄 수 있어?',
   AppOnboardingStepId.step9b: '하루 몇번이면 충분해.',
   AppOnboardingStepId.step9c: '앞으로 잘 지내자.',
 };
