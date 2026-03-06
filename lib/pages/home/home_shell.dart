@@ -234,6 +234,7 @@ class _HomeShellState extends State<HomeShell> {
               listenable: _onboardingCtrl,
               builder:
                   (_, __) => AppOnboardingOverlay(
+                    key: const ValueKey('onboarding_overlay'),
                     controller: _onboardingCtrl,
                     onTabChangeRequest: (idx) {
                       setState(() => _selectedIndex = idx);

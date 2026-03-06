@@ -33,7 +33,7 @@ const Map<AppOnboardingStepId, int> kStepTabIndex = {
   AppOnboardingStepId.step2:  0, // 탭1: 나
   AppOnboardingStepId.step3:  0, // 탭1: 나
   AppOnboardingStepId.step4:  0, // 탭1: 나
-  AppOnboardingStepId.step5:  0, // 탭1: 나 (스팟라이트로 탭4 유도)
+  AppOnboardingStepId.step5:  3, // 탭4: 커리어 (spotlight → 탭4 유도, 이전탭과 동일하게 설정해 중복이동 방지)
   AppOnboardingStepId.step6a: 3, // 탭4: 커리어 > 커리어카드
   AppOnboardingStepId.step6b: 3, // 탭4: 커리어 > 커리어카드
   AppOnboardingStepId.step6c: 3, // 탭4: 커리어 > 커리어카드
