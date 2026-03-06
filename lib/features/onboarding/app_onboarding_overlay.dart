@@ -6,7 +6,6 @@ import '../../services/user_profile_service.dart';
 import '../../services/onboarding_service.dart';
 
 const _kText = Color(0xFF3D3535);
-const _kBubbleBg = Color(0xFFFFFBF9);
 
 /// 대사 텍스트 맵
 const Map<AppOnboardingStepId, String> kStepDialogue = {
@@ -188,6 +187,16 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
       return const SizedBox.shrink();
     }
 
+    // 1번 탭 step은 오버레이 완전 투명 (CaringPage가 캐릭터 위에 대사 표시)
+    if (widget.controller.isTab0Step) {
+      // 터치만 가로채서 advance 처리
+      return GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: _onTap,
+        child: const SizedBox.expand(),
+      );
+    }
+
     if (step == AppOnboardingStepId.step5) {
       return _buildSpotlightOverlay(context);
     }
@@ -198,34 +207,30 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
   // ── 일반 텍스트 오버레이 ──────────────────────────────────
   Widget _buildTextOverlay(BuildContext context, AppOnboardingStepId step) {
     final dialogue = kStepDialogue[step];
-    final isTab0 = (kStepTabIndex[step] ?? 0) == 0;
 
     return GestureDetector(
-      behavior: HitTestBehavior.translucent,
+      behavior: HitTestBehavior.opaque,
       onTap: _onTap,
       child: FadeTransition(
         opacity: _fadeAnim,
         child: Stack(
           children: [
-            // ── 하단 블러 오버레이 (탭0: 카드 제외 하단만, 탭3/2: 전체 하단) ──
-            if (!isTab0)
-              Positioned.fill(
-                child: Container(
-                  color: Colors.black.withOpacity(0.55),
-                ),
+            // ── 반투명 배경 (타탭: 전체 어둡게) ──
+            Positioned.fill(
+              child: Container(
+                color: Colors.black.withOpacity(0.55),
               ),
+            ),
 
             // ── 대사 버블 ──
             if (dialogue != null)
               Align(
-                alignment: Alignment.bottomCenter,
-                child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 90),
-                    child: _DialogueBubble(
-                      text: dialogue.replaceAll('{name}', _nickname ?? ''),
-                      isTab0: isTab0,
-                    ),
+                alignment: Alignment.center,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 28),
+                  child: _DialogueBubble(
+                    text: dialogue.replaceAll('{name}', _nickname ?? ''),
+                    isTab0: false,
                   ),
                 ),
               ),
@@ -301,27 +306,27 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
 }
 
 // ─────────────────────────────────────────────────────────────
-// 대사 말풍선 위젯
+// 대사 말풍선 위젯 (타탭용 — 반투명 배경 위에 흰색 카드)
 // ─────────────────────────────────────────────────────────────
 class _DialogueBubble extends StatelessWidget {
   final String text;
-  final bool isTab0; // 1번 탭(캐릭터 있음)이면 배경색 다름
+  final bool isTab0; // 유지 (하위 호환) — 현재는 항상 false
 
-  const _DialogueBubble({required this.text, required this.isTab0});
+  const _DialogueBubble({required this.text, this.isTab0 = false});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
       decoration: BoxDecoration(
-        color: isTab0 ? _kBubbleBg : Colors.white.withOpacity(0.92),
-        borderRadius: BorderRadius.circular(16),
+        color: Colors.white.withOpacity(0.95),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            color: Colors.black.withOpacity(0.18),
+            blurRadius: 20,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -331,13 +336,13 @@ class _DialogueBubble extends StatelessWidget {
           Text(
             text,
             style: GoogleFonts.notoSansKr(
-              fontSize: 15,
-              fontWeight: FontWeight.w500,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
               color: _kText,
-              height: 1.6,
+              height: 1.65,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [

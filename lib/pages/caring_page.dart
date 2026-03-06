@@ -33,11 +33,15 @@ class CaringPage extends StatefulWidget {
   /// 온보딩 진행 중이면 true — 캐릭터 기본 메시지 루프 차단
   final bool isOnboardingActive;
 
+  /// 온보딩 중 캐릭터 위에 표시할 대사 (null이면 표시 안 함)
+  final String? onboardingDialogue;
+
   const CaringPage({
     super.key,
     this.onTabRequested,
     this.onGrowthSubTabRequested,
     this.isOnboardingActive = false,
+    this.onboardingDialogue,
   });
 
   @override
@@ -454,6 +458,8 @@ class _CaringPageState extends State<CaringPage>
       );
     }
 
+    final isOnboarding = widget.isOnboardingActive;
+
     return Scaffold(
       backgroundColor: _colorBg,
       body: SafeArea(
@@ -464,50 +470,50 @@ class _CaringPageState extends State<CaringPage>
         // 텍스트는 캐릭터 Stack 안에서 Positioned으로 겹침
         child: Column(
           children: [
-            // ── [위] 카드 영역: Stack 밖, 캐릭터와 완전히 독립 ──
-            Container(
-              color: _colorBg,
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildTopBar(),
-                  _TapCard(
-                    title: '📍 내 주변 구인 치과',
-                    bigText: _jobsSummary,
-                    subtitle: _jobsSub,
-                    onTap: () => widget.onTabRequested?.call(3),
-                  ),
-                  _PolicyRollingCard(
-                    policies: _upcomingPolicies,
-                    index: _policyIndex,
-                    onTap: () {
-                      widget.onTabRequested?.call(2);
-                      widget.onGrowthSubTabRequested?.call(1);
-                    },
-                  ),
-                  _TapCard(
-                    title: '📖 이주의 책',
-                    bigText: _weeklyBook?.title ?? '이번 주 추천 책이 없어요',
-                    subtitle: '',
-                    onTap: _goBookDetail,
-                  ),
-                  _TapCard(
-                    title: '🧠 오늘의 1문제',
-                    bigText: _quizSummary,
-                    subtitle: '터치해서 풀기',
-                    onTap: () {
-                      widget.onTabRequested?.call(2);
-                      widget.onGrowthSubTabRequested?.call(0);
-                    },
-                  ),
-                ],
+            // ── [위] 카드 영역: 온보딩 중 숨김 ──
+            if (!isOnboarding)
+              Container(
+                color: _colorBg,
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildTopBar(),
+                    _TapCard(
+                      title: '📍 내 주변 구인 치과',
+                      bigText: _jobsSummary,
+                      subtitle: _jobsSub,
+                      onTap: () => widget.onTabRequested?.call(3),
+                    ),
+                    _PolicyRollingCard(
+                      policies: _upcomingPolicies,
+                      index: _policyIndex,
+                      onTap: () {
+                        widget.onTabRequested?.call(2);
+                        widget.onGrowthSubTabRequested?.call(1);
+                      },
+                    ),
+                    _TapCard(
+                      title: '📖 이주의 책',
+                      bigText: _weeklyBook?.title ?? '이번 주 추천 책이 없어요',
+                      subtitle: '',
+                      onTap: _goBookDetail,
+                    ),
+                    _TapCard(
+                      title: '🧠 오늘의 1문제',
+                      bigText: _quizSummary,
+                      subtitle: '터치해서 풀기',
+                      onTap: () {
+                        widget.onTabRequested?.call(2);
+                        widget.onGrowthSubTabRequested?.call(0);
+                      },
+                    ),
+                  ],
+                ),
               ),
-            ),
 
             // ── [중간] 캐릭터 + 텍스트: 카드~버튼 사이 남은 공간만 사용 ──
-            // Expanded로 정확히 남은 공간만 차지 → 이전과 동일한 캐릭터 크기
-            // ClipRect로 OverflowBox가 카드/버튼 영역을 침범하지 못하게 차단
+            // 온보딩 중에는 캐릭터가 화면 대부분을 차지하도록 Expanded
             Expanded(
               child: ClipRect(
                 child: Stack(
@@ -515,7 +521,7 @@ class _CaringPageState extends State<CaringPage>
                     // 캐릭터
                     Positioned.fill(
                       child: GestureDetector(
-                        onTap: _onCircleTap,
+                        onTap: isOnboarding ? null : _onCircleTap,
                         child: _dogController != null
                             ? LayoutBuilder(
                                 builder: (ctx, constraints) {
@@ -540,16 +546,24 @@ class _CaringPageState extends State<CaringPage>
                     ),
 
                     // 텍스트 오버레이 (캐릭터 위에 겹침)
-                    // LayoutBuilder로 캐릭터 영역 높이를 받아 비율로 위치 결정
                     Positioned.fill(
                       child: IgnorePointer(
                         child: LayoutBuilder(
                           builder: (ctx, constraints) {
                             final h = constraints.maxHeight;
-                            // 기본 메시지: 캐릭터 영역 상단 20% 지점
+                            // 기본 메시지 / 온보딩 대사: 캐릭터 영역 상단 28% 지점
                             final baseMsgTop = h * 0.28;
                             // 리액션 메시지: 캐릭터 영역 하단 86% 지점
                             final reactionTop = h * 0.86;
+
+                            // 온보딩 중: 온보딩 대사를 기본메시지 자리에 표시
+                            final displayText = isOnboarding
+                                ? widget.onboardingDialogue
+                                : _baseMsgText;
+                            final isDismissing = isOnboarding
+                                ? false
+                                : _isBaseMsgDismissing;
+
                             return Stack(
                               children: [
                                 Positioned(
@@ -558,22 +572,24 @@ class _CaringPageState extends State<CaringPage>
                                   right: 0,
                                   child: Center(
                                     child: SpeechOverlay(
-                                      text: _baseMsgText,
-                                      isDismissing: _isBaseMsgDismissing,
+                                      text: displayText,
+                                      isDismissing: isDismissing,
                                     ),
                                   ),
                                 ),
-                                Positioned(
-                                  top: reactionTop,
-                                  left: 0,
-                                  right: 0,
-                                  child: Center(
-                                    child: SpeechOverlay(
-                                      text: _currentSpeech,
-                                      isDismissing: _isDismissingSpeech,
+                                // 리액션 메시지: 온보딩 중에는 표시 안 함
+                                if (!isOnboarding)
+                                  Positioned(
+                                    top: reactionTop,
+                                    left: 0,
+                                    right: 0,
+                                    child: Center(
+                                      child: SpeechOverlay(
+                                        text: _currentSpeech,
+                                        isDismissing: _isDismissingSpeech,
+                                      ),
                                     ),
                                   ),
-                                ),
                               ],
                             );
                           },
@@ -585,12 +601,13 @@ class _CaringPageState extends State<CaringPage>
               ),
             ),
 
-            // ── [아래] 버튼: Stack 밖, 캐릭터와 완전히 독립 ──
-            Container(
-              color: _colorBg,
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-              child: _buildBottomSection(),
-            ),
+            // ── [아래] 버튼: 온보딩 중 숨김 ──
+            if (!isOnboarding)
+              Container(
+                color: _colorBg,
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                child: _buildBottomSection(),
+              ),
           ],
         ),
       ),

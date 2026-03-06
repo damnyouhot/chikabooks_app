@@ -204,6 +204,9 @@ class _HomeShellState extends State<HomeShell> {
         onTabRequested: _onTabRequested,
         onGrowthSubTabRequested: _onGrowthSubTabRequested,
         isOnboardingActive: _onboardingActive,
+        onboardingDialogue: (_onboardingActive && _onboardingCtrl.isTab0Step)
+            ? kStepDialogue[_onboardingCtrl.current]
+            : null,
       ),
       _bondPage,
       _growthPage,

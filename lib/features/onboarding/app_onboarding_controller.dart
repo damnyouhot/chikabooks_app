@@ -115,5 +115,8 @@ class AppOnboardingController extends ChangeNotifier {
     if (idx < 0 || idx >= values.length - 1) return null;
     return values[idx + 1];
   }
+
+  /// 현재 step이 탭0(CaringPage)에 속하는지
+  bool get isTab0Step => (kStepTabIndex[_current] ?? 0) == 0;
 }
 
