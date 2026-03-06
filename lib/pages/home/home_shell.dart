@@ -24,7 +24,6 @@ class _HomeShellState extends State<HomeShell> {
   static const int _bondTabIndex = 1;
 
   // ── 탭 위젯 캐시 ──
-  late final CaringPage _caringPage;
   late final BondPage _bondPage;
   late final GrowthPage _growthPage;
   late final JobPage _jobPage;
@@ -41,10 +40,6 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void initState() {
     super.initState();
-    _caringPage = CaringPage(
-      onTabRequested: _onTabRequested,
-      onGrowthSubTabRequested: _onGrowthSubTabRequested,
-    );
     _bondPage = const BondPage();
     _growthPage = GrowthPage(subTabNotifier: _growthSubTabNotifier);
     _jobPage = const JobPage();
@@ -203,7 +198,13 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     final pages = <Widget>[
-      _caringPage,
+      // CaringPage는 온보딩 상태를 실시간으로 전달하기 위해 build()에서 생성
+      CaringPage(
+        key: const ValueKey('caring'),
+        onTabRequested: _onTabRequested,
+        onGrowthSubTabRequested: _onGrowthSubTabRequested,
+        isOnboardingActive: _onboardingActive,
+      ),
       _bondPage,
       _growthPage,
       _jobPage,

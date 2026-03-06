@@ -38,18 +38,19 @@ class OnboardingService {
   // ─────────────────────────────────────────────────────────────
   static Future<bool> shouldRunOnboarding() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final isPending = prefs.getBool(_pendingKey) ?? false;
-      if (!isPending) return false;
-
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return false;
 
-      // 테스트 계정은 항상 온보딩 실행
+      // 테스트 계정은 isPending 여부와 관계없이 항상 온보딩 실행
       if (user.email == _testEmail) {
         debugPrint('🧪 테스트 계정: 온보딩 강제 실행');
         return true;
       }
+
+      // 일반 계정: pendingOnboarding 플래그 확인
+      final prefs = await SharedPreferences.getInstance();
+      final isPending = prefs.getBool(_pendingKey) ?? false;
+      if (!isPending) return false;
 
       // Firestore에서 완료 여부 확인
       final completed = await _isOnboardingCompleted(user.uid);

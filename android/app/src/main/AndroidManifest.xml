@@ -33,7 +33,6 @@
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
-            android:taskAffinity=""
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
@@ -66,6 +65,16 @@
                       android:scheme="kakao683c7dcddbf93a77a45f0e1fe771c0ce" />
             </intent-filter>
         </activity>
+
+        <!-- 네이버 로그인 리다이렉트 Activity (flutter_naver_login 2.x 필수) -->
+        <activity
+            android:name="com.nhn.android.naverlogin.ui.OAuthLoginActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <activity
+            android:name="com.nhn.android.naverlogin.ui.OAuthLoginCustomTabActivity"
+            android:exported="true" />
         
         <!-- Google Maps API Key (local.properties에서 주입됨) -->
         <meta-data

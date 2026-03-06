@@ -30,10 +30,14 @@ class CaringPage extends StatefulWidget {
   final ValueChanged<int>? onTabRequested;
   final ValueChanged<int>? onGrowthSubTabRequested;
 
+  /// 온보딩 진행 중이면 true — 캐릭터 기본 메시지 루프 차단
+  final bool isOnboardingActive;
+
   const CaringPage({
     super.key,
     this.onTabRequested,
     this.onGrowthSubTabRequested,
+    this.isOnboardingActive = false,
   });
 
   @override
@@ -101,8 +105,20 @@ class _CaringPageState extends State<CaringPage>
       for (final eventId in detectedEvents) {
         _queueEventIfNew(eventId);
       }
-      if (mounted) _startMsgLoop();
+      // 온보딩 중이면 메시지 루프 시작 안 함
+      if (mounted && !widget.isOnboardingActive) _startMsgLoop();
     });
+  }
+
+  @override
+  void didUpdateWidget(CaringPage old) {
+    super.didUpdateWidget(old);
+    // 온보딩이 완료됐을 때(true→false) 메시지 루프 시작
+    if (old.isOnboardingActive && !widget.isOnboardingActive) {
+      if (_loopState == _LoopState.idle && _baseMsgText == null) {
+        _startMsgLoop();
+      }
+    }
   }
 
   @override
