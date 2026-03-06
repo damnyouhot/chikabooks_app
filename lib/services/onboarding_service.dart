@@ -54,14 +54,9 @@ class OnboardingService {
       final isPending = prefs.getBool(_pendingKey) ?? false;
       if (!isPending) return false;
 
-      // Firestore에서 완료 여부 확인
-      final completed = await _isOnboardingCompleted(user.uid);
-      if (completed) {
-        // 이미 완료된 경우 pending 플래그만 제거하고 스킵
-        await prefs.remove(_pendingKey);
-        return false;
-      }
-
+      // pendingOnboarding=true 이면 appOnboardingCompleted 무시하고 온보딩 실행
+      // (재가입 시 users/{uid} 문서가 삭제되었더라도, 새 문서에 이미 true가 쓰인 경우 방어)
+      debugPrint('✅ OnboardingService: pendingOnboarding=true → 온보딩 실행');
       return true;
     } catch (e) {
       debugPrint('⚠️ OnboardingService.shouldRunOnboarding 실패: $e');
@@ -131,13 +126,5 @@ class OnboardingService {
   // ─────────────────────────────────────────────────────────────
   // internal
   // ─────────────────────────────────────────────────────────────
-  static Future<bool> _isOnboardingCompleted(String uid) async {
-    try {
-      final doc = await _db.collection('users').doc(uid).get();
-      return doc.data()?['appOnboardingCompleted'] == true;
-    } catch (_) {
-      return false;
-    }
-  }
 }
 

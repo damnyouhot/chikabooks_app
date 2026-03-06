@@ -118,6 +118,26 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _confirmLogout() async {
+    // ── 테스트 계정(doughong@naver.com)은 로그아웃 시 회원탈퇴로 처리 ──
+    // 이렇게 하면 재로그인 시 항상 새 계정으로 온보딩 시작
+    final currentUser = _auth.currentUser;
+    final currentEmail = currentUser?.email;
+    bool isDoughong = currentEmail == 'doughong@naver.com';
+    if (!isDoughong && currentUser != null) {
+      // Naver 커스텀 토큰은 Auth email이 null → Firestore에서 확인
+      try {
+        final doc = await _firestore.collection('users').doc(currentUser.uid).get();
+        final fsEmail = doc.data()?['email'] as String?;
+        if (fsEmail == 'doughong@naver.com') isDoughong = true;
+      } catch (_) {}
+    }
+
+    if (isDoughong) {
+      // 로그아웃 대신 회원탈퇴 처리 → 재로그인 시 온보딩 재시작
+      await _confirmAndDeleteAccount();
+      return;
+    }
+
     final result = await showDialog<bool>(
       context: context,
       builder:

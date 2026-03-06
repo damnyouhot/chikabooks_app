@@ -489,6 +489,9 @@ class _CaringPageState extends State<CaringPage>
         // 텍스트는 캐릭터 Stack 안에서 Positioned으로 겹침
         child: Column(
           children: [
+            // ── [타이틀] 항상 표시 (온보딩 중에도 보임) ──
+            _buildTopBar(titleVisible: true),
+
             // ── [위] 카드 영역: 온보딩 중 invisible (공간 유지 → 캐릭터 크기 정규와 동일) ──
             Visibility(
               visible: true, // maintainSize 역할: 항상 공간 유지
@@ -505,7 +508,7 @@ class _CaringPageState extends State<CaringPage>
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _buildTopBar(),
+                      _buildTopBar(titleVisible: false), // 아이콘Row + 타이틀은 아래 별도 처리
                       _TapCard(
                         title: '📍 내 주변 구인 치과',
                         bigText: _jobsSummary,
@@ -628,6 +631,7 @@ class _CaringPageState extends State<CaringPage>
                         child: SpeechOverlay(
                           text: displayText,
                           isDismissing: isDismissing,
+                          isOnboarding: isOnboarding,
                         ),
                       ),
                     ),
@@ -654,60 +658,68 @@ class _CaringPageState extends State<CaringPage>
     );
   }
 
-  Widget _buildTopBar() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          child: Row(
-            children: [
-              IconButton(
-                icon: Icon(
-                  Icons.info_outline,
-                  color: _colorText.withOpacity(0.5),
-                  size: 18,
+  /// [titleVisible=true]  : 아이콘 행 숨김, 타이틀+서브텍스트만 표시 (온보딩 중 상단)
+  /// [titleVisible=false] : 아이콘 행 표시, 타이틀+서브텍스트 숨김 (카드영역 내부)
+  Widget _buildTopBar({bool titleVisible = true}) {
+    if (titleVisible) {
+      // 온보딩 중 상단에 항상 표시되는 타이틀 행
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            child: Row(
+              children: [
+                IconButton(
+                  icon: Icon(
+                    Icons.info_outline,
+                    color: _colorText.withOpacity(0.5),
+                    size: 18,
+                  ),
+                  onPressed: () => _showConceptDialog(context),
                 ),
-                onPressed: () => _showConceptDialog(context),
-              ),
-              const Spacer(),
-              IconButton(
-                icon: Icon(
-                  Icons.settings_outlined,
-                  color: _colorText.withOpacity(0.4),
-                  size: 20,
+                const Spacer(),
+                IconButton(
+                  icon: Icon(
+                    Icons.settings_outlined,
+                    color: _colorText.withOpacity(0.4),
+                    size: 20,
+                  ),
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const SettingsPage()),
+                    );
+                  },
                 ),
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const SettingsPage()),
-                  );
-                },
-              ),
-            ],
-          ),
-        ),
-        const Padding(
-          padding: EdgeInsets.only(left: 20),
-          child: Text(
-            '나',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: _colorText,
+              ],
             ),
           ),
-        ),
-        const SizedBox(height: 2),
-        Padding(
-          padding: const EdgeInsets.only(left: 20),
-          child: Text(
-            '오늘 하루도 잘 버텼어요.',
-            style: TextStyle(fontSize: 12, color: _colorText.withOpacity(0.55)),
+          const Padding(
+            padding: EdgeInsets.only(left: 20),
+            child: Text(
+              '나',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: _colorText,
+              ),
+            ),
           ),
-        ),
-        const SizedBox(height: 8),
-      ],
-    );
+          const SizedBox(height: 2),
+          Padding(
+            padding: const EdgeInsets.only(left: 20),
+            child: Text(
+              '오늘 하루도 잘 버텼어요.',
+              style: TextStyle(fontSize: 12, color: _colorText.withOpacity(0.55)),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+      );
+    } else {
+      // 카드 영역 내부 — 타이틀/서브텍스트를 0높이로 유지 (공간 확보용)
+      return const SizedBox.shrink();
+    }
   }
 
   Widget _buildBottomSection() {

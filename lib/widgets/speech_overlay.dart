@@ -4,11 +4,18 @@ import 'package:flutter/material.dart';
 ///
 /// Stack 안에서 캐릭터 위에 겹쳐서 사용.
 /// text=null 시 SizedBox.shrink() 반환 → 캐릭터 크기에 영향 없음.
+/// isOnboarding=true 이면 온보딩 전용 크기(17pt), false 이면 일반 크기(16pt)
 class SpeechOverlay extends StatefulWidget {
   final String? text;
   final bool isDismissing;
+  final bool isOnboarding;
 
-  const SpeechOverlay({super.key, this.text, this.isDismissing = false});
+  const SpeechOverlay({
+    super.key,
+    this.text,
+    this.isDismissing = false,
+    this.isOnboarding = false,
+  });
 
   @override
   State<SpeechOverlay> createState() => _SpeechOverlayState();
@@ -89,10 +96,10 @@ class _SpeechOverlayState extends State<SpeechOverlay>
             constraints: BoxConstraints(maxWidth: maxWidth),
             child: Text(
               _displayText!,
-              style: const TextStyle(
-                fontSize: 17,
+              style: TextStyle(
+                fontSize: widget.isOnboarding ? 17.0 : 16.0,
                 fontWeight: FontWeight.w400,
-                color: Color(0xFF5D6B6B),
+                color: const Color(0xFF5D6B6B),
                 letterSpacing: 0.2,
                 height: 1.5,
               ),
