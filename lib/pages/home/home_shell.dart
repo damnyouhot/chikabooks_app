@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../bond_page.dart';
 import '../caring_page.dart';
 import '../growth_page.dart';
@@ -6,6 +7,8 @@ import '../job_page.dart';
 import '../onboarding/onboarding_profile_screen.dart';
 import '../../services/user_profile_service.dart';
 import '../../services/onboarding_service.dart';
+import '../../features/onboarding/app_onboarding_controller.dart';
+import '../../features/onboarding/app_onboarding_overlay.dart';
 
 /// 메인 홈 (탭 네비게이션)
 class HomeShell extends StatefulWidget {
@@ -20,15 +23,20 @@ class _HomeShellState extends State<HomeShell> {
   /// Bond 탭 인덱스
   static const int _bondTabIndex = 1;
 
-  // ── 탭 위젯 캐시: build()가 호출될 때마다 재생성되지 않도록 State에 보관 ──
+  // ── 탭 위젯 캐시 ──
   late final CaringPage _caringPage;
   late final BondPage _bondPage;
   late final GrowthPage _growthPage;
   late final JobPage _jobPage;
 
-  /// GrowthPage 서브탭 점프를 전달하는 notifier
-  /// → GrowthPage 인스턴스를 재생성하지 않고 서브탭 이동 가능
   final ValueNotifier<int> _growthSubTabNotifier = ValueNotifier<int>(-1);
+
+  // ── 앱 온보딩 ──
+  bool _onboardingActive = false;
+  late final AppOnboardingController _onboardingCtrl;
+
+  // ── 2번 탭 잠금 툴팁 ──
+  OverlayEntry? _bondTooltip;
 
   @override
   void initState() {
@@ -41,44 +49,65 @@ class _HomeShellState extends State<HomeShell> {
     _growthPage = GrowthPage(subTabNotifier: _growthSubTabNotifier);
     _jobPage = const JobPage();
 
-    // 로그인 직후 온보딩 실행 여부 확인
+    _onboardingCtrl = AppOnboardingController();
+
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkOnboarding());
   }
 
   @override
   void dispose() {
     _growthSubTabNotifier.dispose();
+    _onboardingCtrl.dispose();
+    _bondTooltip?.remove();
     super.dispose();
   }
 
-  /// 로그인 직후 온보딩을 실행해야 하는지 확인
+  // ─────────────────────────────────────────────────────────
+  // 온보딩 체크 + 시작
+  // ─────────────────────────────────────────────────────────
   Future<void> _checkOnboarding() async {
     final should = await OnboardingService.shouldRunOnboarding();
     if (!should || !mounted) return;
-
-    // TODO: 실제 온보딩 화면으로 교체 예정
-    // 현재는 플래그만 확인하고 debugPrint로 확인
-    debugPrint('🎉 온보딩 시작 조건 충족 → 온보딩 화면 진입 예정');
-
-    // 온보딩 화면 구현 완료 후 아래 주석 해제하여 사용:
-    // await Navigator.of(context).push(
-    //   MaterialPageRoute(builder: (_) => const AppOnboardingScreen()),
-    // );
-    // await OnboardingService.completeOnboarding();
+    setState(() {
+      _onboardingActive = true;
+      _selectedIndex = 0;
+    });
+    _onboardingCtrl.start();
   }
 
-  void _onTap(int idx) async {
-    // Bond 탭(1번 탭) 클릭 시 프로필 체크
-    if (idx == _bondTabIndex) {
-      final isCompleted = await UserProfileService.isOnboardingCompleted();
+  void _onOnboardingComplete() {
+    setState(() => _onboardingActive = false);
+    // CaringPage 상단 4카드 + 하단 4버튼 페이드인은 해당 탭이 그냥 활성화되며 보임
+  }
 
+  // ─────────────────────────────────────────────────────────
+  // 탭 이동 (온보딩 중에는 오버레이가 요청한 탭만 허용)
+  // ─────────────────────────────────────────────────────────
+  void _onTap(int idx) async {
+    // ── 온보딩 중: 지정 탭만 허용, 그 외 차단 ──
+    if (_onboardingActive) {
+      // 2번 탭(같이)은 항상 차단
+      if (idx == _bondTabIndex) return;
+      // 커리어 탭 유도 step이면 커리어 탭만 허용
+      if (_onboardingCtrl.isSpotlight && idx != 3) return;
+      setState(() => _selectedIndex = idx);
+      return;
+    }
+
+    // ── 일반 모드 ──
+    if (idx == _bondTabIndex) {
+      // 3일 이내면 툴팁 표시
+      final isUnlocked = await _isBondTabUnlocked();
+      if (!isUnlocked) {
+        _showBondTooltip();
+        return;
+      }
+
+      final isCompleted = await UserProfileService.isOnboardingCompleted();
       if (!isCompleted && mounted) {
-        // 온보딩 화면 표시 (하단 탭 바 보이게)
         final result = await Navigator.of(context).push<bool>(
           MaterialPageRoute(builder: (_) => const OnboardingProfileScreen()),
         );
-
-        // 온보딩 완료 후에만 탭 이동
         if (result == true && mounted) {
           setState(() => _selectedIndex = idx);
         }
@@ -89,19 +118,88 @@ class _HomeShellState extends State<HomeShell> {
     setState(() => _selectedIndex = idx);
   }
 
-  /// CaringPage에서 다른 탭으로 이동하는 콜백
-  void _onTabRequested(int index) => setState(() => _selectedIndex = index);
+  /// firstLaunchAt 기준 3일 경과 여부
+  Future<bool> _isBondTabUnlocked() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final firstLaunch = prefs.getInt('firstLaunchAt');
+      if (firstLaunch == null) {
+        await prefs.setInt(
+          'firstLaunchAt',
+          DateTime.now().millisecondsSinceEpoch,
+        );
+        return false;
+      }
+      final first = DateTime.fromMillisecondsSinceEpoch(firstLaunch);
+      return DateTime.now().difference(first).inDays >= 3;
+    } catch (_) {
+      return true;
+    }
+  }
 
-  /// CaringPage에서 성장하기 서브탭을 지정하는 콜백
+  /// 2번 탭 잠금 툴팁 표시 (탭 버튼 위에 작게)
+  void _showBondTooltip() {
+    _bondTooltip?.remove();
+    _bondTooltip = null;
+
+    final overlay = Overlay.of(context);
+    late final OverlayEntry entry;
+
+    entry = OverlayEntry(
+      builder:
+          (ctx) => Positioned(
+            bottom: kBottomNavigationBarHeight + 8,
+            left: MediaQuery.of(ctx).size.width / 4 + 4,
+            right: MediaQuery.of(ctx).size.width * 2 / 4 + 4,
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF3D3535).withOpacity(0.85),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '같이 탭은 앱 설치 3일 후 가능해요',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Colors.white,
+                    decoration: TextDecoration.none,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ),
+            ),
+          ),
+    );
+
+    _bondTooltip = entry;
+    overlay.insert(entry);
+
+    Future.delayed(const Duration(seconds: 2), () {
+      entry.remove();
+      if (_bondTooltip == entry) _bondTooltip = null;
+    });
+  }
+
+  void _onTabRequested(int index) {
+    if (_onboardingActive) return;
+    setState(() => _selectedIndex = index);
+  }
+
   void _onGrowthSubTabRequested(int subTab) {
+    if (_onboardingActive) return;
     setState(() => _selectedIndex = 2);
-    // 같은 값이 연속 오면 리스너가 감지 못하므로 -1 경유 후 실제 값 설정
     _growthSubTabNotifier.value = -1;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _growthSubTabNotifier.value = subTab;
     });
   }
 
+  // ─────────────────────────────────────────────────────────
+  // Build
+  // ─────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     final pages = <Widget>[
@@ -112,7 +210,26 @@ class _HomeShellState extends State<HomeShell> {
     ];
 
     return Scaffold(
-      body: IndexedStack(index: _selectedIndex, children: pages),
+      body: Stack(
+        children: [
+          // ── 탭 콘텐츠 ──
+          IndexedStack(index: _selectedIndex, children: pages),
+
+          // ── 온보딩 오버레이 ──
+          if (_onboardingActive)
+            ListenableBuilder(
+              listenable: _onboardingCtrl,
+              builder:
+                  (_, __) => AppOnboardingOverlay(
+                    controller: _onboardingCtrl,
+                    onTabChangeRequest: (idx) {
+                      setState(() => _selectedIndex = idx);
+                    },
+                    onComplete: _onOnboardingComplete,
+                  ),
+            ),
+        ],
+      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: _onTap,
