@@ -9,18 +9,18 @@ const _kText = Color(0xFF3D3535);
 
 /// 대사 텍스트 맵
 const Map<AppOnboardingStepId, String> kStepDialogue = {
-  AppOnboardingStepId.step1a: '안녕 난 여기서 언제나 너와 함께할 저니라고 해.',
+  AppOnboardingStepId.step1a: '안녕!\n난 여기서 언제나 너와 함께할 저니라고 해.',
   AppOnboardingStepId.step1b: '넌 이름이 뭐야?',
-  AppOnboardingStepId.step3:  '나는 멍멍 치과에서 1년차로 일하고 있어. 넌?',
-  AppOnboardingStepId.step5:  '커리어 탭을 눌러봐!',
-  AppOnboardingStepId.step6a: '여기서 너의 커리어를 관리할 수 있어. 겁먹지마 천천히 하나씩 해도 되고,',
-  AppOnboardingStepId.step6b: '나중에 이력서를 사진찍어 올리면 AI가 자동으로 입력해줄거야.',
-  AppOnboardingStepId.step6c: '그렇게 완성된 우리 이력서로 여기서 바로 치과에 지원할 수도 있어.',
-  AppOnboardingStepId.step5b: '성장하기 탭도 눌러봐!',
+  AppOnboardingStepId.step3:  '나는 멍멍 치과에서\n1년차로 일하고 있어.\n넌?',
+  AppOnboardingStepId.step5:  '아래 커리어 탭을 눌러봐!',
+  AppOnboardingStepId.step6a: '여기서 너의 커리어를 관리할 수 있어.\n겁먹지마 천천히 하나씩 해도 되고,',
+  AppOnboardingStepId.step6b: '나중에 이력서를 사진찍어 올리면\nAI가 자동으로 입력해줄거야.',
+  AppOnboardingStepId.step6c: '그렇게 완성된 우리 이력서로\n여기서 바로 치과에 지원할 수도 있어.',
+  AppOnboardingStepId.step5b: '아래 성장하기 탭도 눌러봐!',
   AppOnboardingStepId.step7a: '여기서 자기 계발도 할 수 있어',
-  AppOnboardingStepId.step7b: '나랑 같이 퀴즈, 바뀌는 제도들, 책으로 공부 하면서 성장해 나가자!',
-  AppOnboardingStepId.step8:  '이제 첫 번째 탭으로 가볼까?',
-  AppOnboardingStepId.step9a: '난 항상 여기 있을건데 혹시 나 밥도 주고 관심도 줄 수 있어?',
+  AppOnboardingStepId.step7b: '나랑 같이 퀴즈, 제도들,\n책으로 공부 하면서 성장해 나가자!',
+  AppOnboardingStepId.step8:  '아래 첫 번째 탭으로 가볼까?',
+  AppOnboardingStepId.step9a: '난 항상 여기 있을건데\n혹시 나 밥도 주고\n사랑도 줄 수 있어?',
   AppOnboardingStepId.step9b: '하루 몇번이면 충분해.',
   AppOnboardingStepId.step9c: '앞으로 잘 지내자.',
 };
@@ -101,6 +101,7 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
     // spotlight step은 탭 터치로 진행 → 탭 자동이동 skip
     if (step == AppOnboardingStepId.step5) return;
     if (step == AppOnboardingStepId.step5b) return;
+    if (step == AppOnboardingStepId.step8) return; // 탭1 유도 spotlight
 
     // 탭 이동이 필요한 step: 현재 탭 != 이전 탭이면 전환
     final tabIndex = kStepTabIndex[step] ?? 0;
@@ -201,10 +202,13 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
 
     // spotlight steps
     if (step == AppOnboardingStepId.step5) {
-      return _buildSpotlightOverlay(context, targetTabIdx: 3, hint: '커리어 탭을 눌러볼까?');
+      return _buildSpotlightOverlay(context, targetTabIdx: 3, hint: '아래 커리어 탭을 눌러볼까?');
     }
     if (step == AppOnboardingStepId.step5b) {
-      return _buildSpotlightOverlay(context, targetTabIdx: 2, hint: '성장하기 탭도 눌러볼까?');
+      return _buildSpotlightOverlay(context, targetTabIdx: 2, hint: '아래 성장하기 탭도 눌러볼까?');
+    }
+    if (step == AppOnboardingStepId.step8) {
+      return _buildSpotlightOverlay(context, targetTabIdx: 0, hint: '아래 첫 번째 탭으로 가볼까?');
     }
 
     return _buildTextOverlay(context, step);
@@ -289,7 +293,7 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
           child: FadeTransition(
             opacity: _fadeCtrl,
             child: IgnorePointer(
-              child: _DialogueBubble(text: hint),
+              child: _DialogueBubble(text: hint, showTouchHint: false),
             ),
           ),
         ),
@@ -303,8 +307,9 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
 // ─────────────────────────────────────────────────────────────
 class _DialogueBubble extends StatelessWidget {
   final String text;
+  final bool showTouchHint;
 
-  const _DialogueBubble({required this.text});
+  const _DialogueBubble({required this.text, this.showTouchHint = true});
 
   @override
   Widget build(BuildContext context) {
@@ -334,21 +339,23 @@ class _DialogueBubble extends StatelessWidget {
               height: 1.6,
             ),
           ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              Text(
-                '화면을 터치하면 다음으로 넘어가요',
-                style: GoogleFonts.notoSansKr(
-                  fontSize: 11,
-                  color: _kText.withOpacity(0.4),
+          if (showTouchHint) ...[
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Text(
+                  '화면을 터치하면 다음으로 넘어가요',
+                  style: GoogleFonts.notoSansKr(
+                    fontSize: 11,
+                    color: _kText.withOpacity(0.4),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 4),
-              Icon(Icons.touch_app_outlined, size: 13, color: _kText.withOpacity(0.35)),
-            ],
-          ),
+                const SizedBox(width: 4),
+                Icon(Icons.touch_app_outlined, size: 13, color: _kText.withOpacity(0.35)),
+              ],
+            ),
+          ],
         ],
       ),
     );

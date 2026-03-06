@@ -90,7 +90,7 @@ class _SpeechOverlayState extends State<SpeechOverlay>
             child: Text(
               _displayText!,
               style: const TextStyle(
-                fontSize: 15,
+                fontSize: 17,
                 fontWeight: FontWeight.w400,
                 color: Color(0xFF5D6B6B),
                 letterSpacing: 0.2,

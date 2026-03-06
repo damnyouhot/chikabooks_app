@@ -606,8 +606,8 @@ class _CaringPageState extends State<CaringPage>
             child: LayoutBuilder(
               builder: (ctx, constraints) {
                 final h = constraints.maxHeight;
-                // 기본 메시지 / 온보딩 대사: 캐릭터 영역 상단 28% 지점
-                final baseMsgTop = h * 0.28;
+                // 기본 메시지 / 온보딩 대사: 캐릭터 영역 상단 18% 지점 (2줄 위로)
+                final baseMsgTop = h * 0.18;
                 // 리액션 메시지: 캐릭터 영역 하단 86% 지점
                 final reactionTop = h * 0.86;
 

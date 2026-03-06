@@ -41,7 +41,7 @@ const Map<AppOnboardingStepId, int> kStepTabIndex = {
   AppOnboardingStepId.step5b: 3, // 탭4→탭3 (spotlight → 성장하기 유도, 탭4 유지로 중복이동 방지)
   AppOnboardingStepId.step7a: 2, // 탭3: 성장하기
   AppOnboardingStepId.step7b: 2, // 탭3: 성장하기
-  AppOnboardingStepId.step8:  2, // 탭3: 성장하기
+  AppOnboardingStepId.step8:  3, // 탭3→탭1 spotlight (탭3 유지로 자동이동 방지, 탭1 클릭으로 진행)
   AppOnboardingStepId.step9a: 0, // 탭1: 나
   AppOnboardingStepId.step9b: 0, // 탭1: 나
   AppOnboardingStepId.step9c: 0, // 탭1: 나
@@ -57,7 +57,7 @@ const Set<AppOnboardingStepId> kTouchAdvanceSteps = {
   AppOnboardingStepId.step6c,
   AppOnboardingStepId.step7a,
   AppOnboardingStepId.step7b,
-  AppOnboardingStepId.step8,
+  // step8은 spotlight → 탭1 클릭으로만 진행 (터치 불가)
   AppOnboardingStepId.step9a,
   AppOnboardingStepId.step9b,
   AppOnboardingStepId.step9c,
@@ -67,6 +67,7 @@ const Set<AppOnboardingStepId> kTouchAdvanceSteps = {
 const Set<AppOnboardingStepId> kSpotlightSteps = {
   AppOnboardingStepId.step5,  // 탭4(커리어) 유도
   AppOnboardingStepId.step5b, // 탭3(성장하기) 유도
+  AppOnboardingStepId.step8,  // 탭1(나) 유도
 };
 
 /// AppOnboardingController — 온보딩 진행 상태 관리

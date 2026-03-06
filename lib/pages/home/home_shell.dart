@@ -95,6 +95,8 @@ class _HomeShellState extends State<HomeShell> {
         if (step == AppOnboardingStepId.step5 && idx != 3) return;
         // step5b → 성장하기(2)만 허용
         if (step == AppOnboardingStepId.step5b && idx != 2) return;
+        // step8  → 탭1(나)(0)만 허용
+        if (step == AppOnboardingStepId.step8 && idx != 0) return;
         setState(() => _selectedIndex = idx);
         _onboardingCtrl.advance(); // spotlight 해제 → 다음 step으로
         return;
