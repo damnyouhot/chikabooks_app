@@ -49,9 +49,13 @@ class CaringPage extends StatefulWidget {
 }
 
 class _CaringPageState extends State<CaringPage>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   // ── 로딩 ──
   bool _loading = true;
+
+  // ── 온보딩 완료 후 카드/버튼 페이드인 ──
+  late AnimationController _revealCtrl;
+  late CurvedAnimation _revealAnim;
 
   // ── 카드 데이터 ──
   String _jobsSummary = '근처 신규 구인 확인 중...';
@@ -100,6 +104,19 @@ class _CaringPageState extends State<CaringPage>
   @override
   void initState() {
     super.initState();
+
+    // 카드/버튼 페이드인 컨트롤러
+    _revealCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _revealAnim = CurvedAnimation(parent: _revealCtrl, curve: Curves.easeOut);
+
+    // 온보딩이 없으면 처음부터 완전히 표시
+    if (!widget.isOnboardingActive) {
+      _revealCtrl.value = 1.0;
+    }
+
     _loadRiveFile();
     _bootstrap();
     Future.microtask(() async {
@@ -117,8 +134,9 @@ class _CaringPageState extends State<CaringPage>
   @override
   void didUpdateWidget(CaringPage old) {
     super.didUpdateWidget(old);
-    // 온보딩이 완료됐을 때(true→false) 메시지 루프 시작
+    // 온보딩이 완료됐을 때(true→false) 카드/버튼 페이드인 + 메시지 루프 시작
     if (old.isOnboardingActive && !widget.isOnboardingActive) {
+      _revealCtrl.forward(from: 0.0);
       if (_loopState == _LoopState.idle && _baseMsgText == null) {
         _startMsgLoop();
       }
@@ -132,6 +150,7 @@ class _CaringPageState extends State<CaringPage>
     _tapTrigger?.dispose();
     _dogController?.dispose();
     _riveFile?.dispose();
+    _revealCtrl.dispose();
     super.dispose();
   }
 
@@ -472,47 +491,52 @@ class _CaringPageState extends State<CaringPage>
           children: [
             // ── [위] 카드 영역: 온보딩 중 invisible (공간 유지 → 캐릭터 크기 정규와 동일) ──
             Visibility(
-              visible: !isOnboarding,
+              visible: true, // maintainSize 역할: 항상 공간 유지
               maintainSize: true,
               maintainAnimation: true,
               maintainState: true,
-              child: Container(
-                color: _colorBg,
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildTopBar(),
-                    _TapCard(
-                      title: '📍 내 주변 구인 치과',
-                      bigText: _jobsSummary,
-                      subtitle: _jobsSub,
-                      onTap: () => widget.onTabRequested?.call(3),
-                    ),
-                    _PolicyRollingCard(
-                      policies: _upcomingPolicies,
-                      index: _policyIndex,
-                      onTap: () {
-                        widget.onTabRequested?.call(2);
-                        widget.onGrowthSubTabRequested?.call(1);
-                      },
-                    ),
-                    _TapCard(
-                      title: '📖 이주의 책',
-                      bigText: _weeklyBook?.title ?? '이번 주 추천 책이 없어요',
-                      subtitle: '',
-                      onTap: _goBookDetail,
-                    ),
-                    _TapCard(
-                      title: '🧠 오늘의 1문제',
-                      bigText: _quizSummary,
-                      subtitle: '터치해서 풀기',
-                      onTap: () {
-                        widget.onTabRequested?.call(2);
-                        widget.onGrowthSubTabRequested?.call(0);
-                      },
-                    ),
-                  ],
+              child: FadeTransition(
+                opacity: isOnboarding
+                    ? const AlwaysStoppedAnimation(0.0)
+                    : _revealAnim,
+                child: Container(
+                  color: _colorBg,
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildTopBar(),
+                      _TapCard(
+                        title: '📍 내 주변 구인 치과',
+                        bigText: _jobsSummary,
+                        subtitle: _jobsSub,
+                        onTap: () => widget.onTabRequested?.call(3),
+                      ),
+                      _PolicyRollingCard(
+                        policies: _upcomingPolicies,
+                        index: _policyIndex,
+                        onTap: () {
+                          widget.onTabRequested?.call(2);
+                          widget.onGrowthSubTabRequested?.call(1);
+                        },
+                      ),
+                      _TapCard(
+                        title: '📖 이주의 책',
+                        bigText: _weeklyBook?.title ?? '이번 주 추천 책이 없어요',
+                        subtitle: '',
+                        onTap: _goBookDetail,
+                      ),
+                      _TapCard(
+                        title: '🧠 오늘의 1문제',
+                        bigText: _quizSummary,
+                        subtitle: '터치해서 풀기',
+                        onTap: () {
+                          widget.onTabRequested?.call(2);
+                          widget.onGrowthSubTabRequested?.call(0);
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -524,14 +548,19 @@ class _CaringPageState extends State<CaringPage>
 
             // ── [아래] 버튼: 온보딩 중 invisible (공간 유지) ──
             Visibility(
-              visible: !isOnboarding,
+              visible: true, // 항상 공간 유지
               maintainSize: true,
               maintainAnimation: true,
               maintainState: true,
-              child: Container(
-                color: _colorBg,
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-                child: _buildBottomSection(),
+              child: FadeTransition(
+                opacity: isOnboarding
+                    ? const AlwaysStoppedAnimation(0.0)
+                    : _revealAnim,
+                child: Container(
+                  color: _colorBg,
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                  child: _buildBottomSection(),
+                ),
               ),
             ),
           ],

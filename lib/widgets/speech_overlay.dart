@@ -27,7 +27,7 @@ class _SpeechOverlayState extends State<SpeechOverlay>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 500), // 페이드인 0.5초
     );
 
     _opacity = Tween<double>(
@@ -46,24 +46,22 @@ class _SpeechOverlayState extends State<SpeechOverlay>
     super.didUpdateWidget(oldWidget);
 
     if (widget.isDismissing && !oldWidget.isDismissing) {
-      // fade-out 완료 후 _displayText 제거 → SizedBox.shrink() 반환
-      _controller.reverse().then((_) {
-        if (mounted) setState(() => _displayText = null);
-      });
+      // 사라질 때: 즉시 제거 (애니메이션 없음)
+      _controller.value = 0.0;
+      if (mounted) setState(() => _displayText = null);
     } else if (widget.text != null &&
         widget.text!.isNotEmpty &&
         widget.text != oldWidget.text &&
         !widget.isDismissing) {
-      // 새 텍스트 → 즉시 교체 후 fade-in
+      // 새 텍스트 → 즉시 교체 후 0.5초 페이드인
       setState(() => _displayText = widget.text);
       _controller.forward(from: 0.0);
     } else if ((widget.text == null || widget.text!.isEmpty) &&
         oldWidget.text != null &&
         oldWidget.text!.isNotEmpty) {
-      // text가 null로 바뀜 → fade-out 후 제거
-      _controller.reverse().then((_) {
-        if (mounted) setState(() => _displayText = null);
-      });
+      // text가 null로 바뀜 → 즉시 제거
+      _controller.value = 0.0;
+      if (mounted) setState(() => _displayText = null);
     }
   }
 

@@ -58,7 +58,7 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
     super.initState();
     _fadeCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 350),
+      duration: const Duration(milliseconds: 500), // 페이드인 0.5초
     );
     _fadeCtrl.forward();
 
@@ -235,13 +235,16 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
           ),
         ),
 
-        // ── 상단 말풍선 (앱 화면 위에 float) ──
+        // ── 상단 말풍선 (앱 화면 위에 float) — 0.5초 페이드인 ──
         Positioned(
           top: topPad,
           left: 16,
           right: 16,
-          child: _DialogueBubble(
-            text: dialogue.replaceAll('{name}', _nickname ?? ''),
+          child: FadeTransition(
+            opacity: _fadeCtrl,
+            child: _DialogueBubble(
+              text: dialogue.replaceAll('{name}', _nickname ?? ''),
+            ),
           ),
         ),
       ],
@@ -278,13 +281,16 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
           ),
         ),
 
-        // 안내 대사 (탭바 바로 위)
+        // 안내 대사 (탭바 바로 위) — 페이드인
         Positioned(
           bottom: bottomNavHeight + 16,
           left: 20,
           right: 20,
-          child: IgnorePointer(
-            child: _DialogueBubble(text: hint),
+          child: FadeTransition(
+            opacity: _fadeCtrl,
+            child: IgnorePointer(
+              child: _DialogueBubble(text: hint),
+            ),
           ),
         ),
       ],
