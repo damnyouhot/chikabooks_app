@@ -86,8 +86,13 @@ class _HomeShellState extends State<HomeShell> {
     if (_onboardingActive) {
       // 2번 탭(같이)은 항상 차단
       if (idx == _bondTabIndex) return;
-      // 커리어 탭 유도 step이면 커리어 탭만 허용
-      if (_onboardingCtrl.isSpotlight && idx != 3) return;
+      // spotlight step: 커리어 탭(3)만 허용, 누르면 탭 이동 + 다음 step 진행
+      if (_onboardingCtrl.isSpotlight) {
+        if (idx != 3) return;
+        setState(() => _selectedIndex = idx);
+        _onboardingCtrl.advance(); // spotlight 해제 + step6a로 진행
+        return;
+      }
       setState(() => _selectedIndex = idx);
       return;
     }

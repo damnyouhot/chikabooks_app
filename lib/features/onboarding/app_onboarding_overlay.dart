@@ -50,7 +50,6 @@ class AppOnboardingOverlay extends StatefulWidget {
 class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
     with TickerProviderStateMixin {
   late AnimationController _fadeCtrl;
-  late Animation<double> _fadeAnim;
   String? _nickname;
 
   @override
@@ -60,7 +59,6 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
       vsync: this,
       duration: const Duration(milliseconds: 350),
     );
-    _fadeAnim = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
     _fadeCtrl.forward();
 
     widget.controller.addListener(_onStepChanged);
@@ -214,36 +212,35 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: _onTap,
-      child: FadeTransition(
-        opacity: _fadeAnim,
-        child: Stack(
-          children: [
-            // ── 반투명 배경 (타탭: 전체 어둡게) ──
-            Positioned.fill(
-              child: Container(
-                color: Colors.black.withOpacity(0.55),
-              ),
+      child: Stack(
+        children: [
+          // ── 반투명 배경 (타탭: 전체 어둡게) ── FadeTransition 제거, 즉시 표시
+          Positioned.fill(
+            child: Container(
+              color: Colors.black.withOpacity(0.55),
             ),
+          ),
 
-            // ── 대사 버블 ──
-            if (dialogue != null)
-              Align(
-                alignment: Alignment.center,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 28),
-                  child: _DialogueBubble(
-                    text: dialogue.replaceAll('{name}', _nickname ?? ''),
-                    isTab0: false,
-                  ),
+          // ── 대사 버블 ──
+          if (dialogue != null)
+            Align(
+              alignment: Alignment.center,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 28),
+                child: _DialogueBubble(
+                  text: dialogue.replaceAll('{name}', _nickname ?? ''),
+                  isTab0: false,
                 ),
               ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }
 
   // ── 핀조명(spotlight) 오버레이 — 커리어 탭 강조 ──────────
+  // 탭바는 Scaffold body 밖이므로 탭 터치는 HomeShell._onTap에서 처리
+  // 오버레이는 배경 어둠 + 안내 대사만 담당
   Widget _buildSpotlightOverlay(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
     final bottomNavHeight = 56.0 + MediaQuery.of(context).padding.bottom;
@@ -252,56 +249,37 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
     const careerTabIdx = 3;
     final careerTabLeft = tabW * careerTabIdx;
 
-    return FadeTransition(
-      opacity: _fadeAnim,
-      child: Stack(
-        children: [
-          // ── 전체 어두운 배경 + 커리어 탭 외 터치 차단 ──
-          Positioned.fill(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () {}, // 커리어 탭 외 영역 터치 차단
-              child: CustomPaint(
-                painter: _SpotlightPainter(
-                  screenSize: screenSize,
-                  spotlightLeft: careerTabLeft,
-                  spotlightWidth: tabW,
-                  bottomNavHeight: bottomNavHeight,
-                ),
+    return Stack(
+      children: [
+        // ── 전체 어두운 배경 + 커리어 탭 외 터치 차단 ──
+        Positioned.fill(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () {}, // 커리어 탭 외 영역 터치 차단
+            child: CustomPaint(
+              painter: _SpotlightPainter(
+                screenSize: screenSize,
+                spotlightLeft: careerTabLeft,
+                spotlightWidth: tabW,
+                bottomNavHeight: bottomNavHeight,
               ),
             ),
           ),
+        ),
 
-          // ── 안내 대사 (탭바 바로 위) ──
-          Positioned(
-            bottom: bottomNavHeight + 16,
-            left: 20,
-            right: 20,
-            child: IgnorePointer(
-              child: _DialogueBubble(
-                text: '커리어 탭을 눌러볼까?',
-                isTab0: false,
-              ),
+        // ── 안내 대사 (탭바 바로 위) ──
+        Positioned(
+          bottom: bottomNavHeight + 16,
+          left: 20,
+          right: 20,
+          child: IgnorePointer(
+            child: _DialogueBubble(
+              text: '커리어 탭을 눌러볼까?',
+              isTab0: false,
             ),
           ),
-
-          // ── 커리어 탭 영역: Stack 최상단에 독립 배치 → 터치 단독 수신 ──
-          Positioned(
-            left: careerTabLeft,
-            bottom: 0,
-            width: tabW,
-            height: bottomNavHeight,
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () {
-                widget.onTabChangeRequest(3);
-                widget.controller.advance();
-              },
-              child: Container(color: Colors.transparent),
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
