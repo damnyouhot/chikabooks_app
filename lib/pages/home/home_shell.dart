@@ -213,9 +213,11 @@ class _HomeShellState extends State<HomeShell> {
       ),
       _bondPage,
       _growthPage,
-      // 탭4(커리어): 온보딩 중이면 커리어카드 소탭으로 바로 시작
+      // 탭4(커리어): key를 온보딩 상태에 따라 변경 → 온보딩 시작/종료 시 완전 재생성
+      // _onboardingActive=true  → initialIndex=1(커리어카드 소탭)으로 새로 생성
+      // _onboardingActive=false → initialIndex=0(공고보기 소탭)으로 새로 생성
       JobPage(
-        key: const ValueKey('job'),
+        key: ValueKey('job_$_onboardingActive'),
         isOnboardingActive: _onboardingActive,
       ),
     ];
