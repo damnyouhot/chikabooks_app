@@ -64,6 +64,8 @@ class _HomeShellState extends State<HomeShell> {
   // 온보딩 체크 + 시작
   // ─────────────────────────────────────────────────────────
   Future<void> _checkOnboarding() async {
+    // SharedPreferences 쓰기(schedulePendingOnboarding)가 완료되도록 짧게 대기
+    await Future.delayed(const Duration(milliseconds: 300));
     final should = await OnboardingService.shouldRunOnboarding();
     if (!should || !mounted) return;
     setState(() {

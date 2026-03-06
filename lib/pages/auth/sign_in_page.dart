@@ -354,17 +354,18 @@ class _SignInPageState extends State<SignInPage> {
                         }
 
                         if (context.mounted) {
-                          Navigator.pop(context);
                           if (user == null) {
+                            Navigator.pop(context);
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(isSignUp ? '회원가입 실패' : '로그인 실패'),
                               ),
                             );
                           } else {
-                            // 이메일 로그인 provider 기록
+                            // ✅ pop 전에 먼저 실행 — HomeShell 생성 전에 플래그 보장
                             await SignInTracker.record('email');
                             await OnboardingService.schedulePendingOnboarding();
+                            if (context.mounted) Navigator.pop(context);
                           }
                         }
                       },
