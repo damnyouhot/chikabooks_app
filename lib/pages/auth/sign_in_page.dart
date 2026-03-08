@@ -287,6 +287,32 @@ class _SignInPageState extends State<SignInPage> {
                       },
                       child: Text(isSignUp ? '로그인으로 전환' : '회원가입으로 전환'),
                     ),
+                    if (!isSignUp)
+                      TextButton(
+                        onPressed: () async {
+                          final email = emailController.text.trim();
+                          if (email.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('이메일을 먼저 입력해주세요')),
+                            );
+                            return;
+                          }
+                          final sent = await EmailAuthService.sendPasswordResetEmail(email);
+                          if (context.mounted) {
+                            Navigator.pop(context);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  sent
+                                      ? '비밀번호 재설정 이메일을 보냈습니다'
+                                      : '이메일 발송에 실패했습니다. 이메일 주소를 확인해주세요',
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                        child: const Text('비밀번호 찾기'),
+                      ),
                     ElevatedButton(
                       onPressed: () async {
                         final email = emailController.text.trim();
