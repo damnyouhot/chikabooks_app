@@ -49,13 +49,21 @@ class OnboardingService {
         return true;
       }
 
-      // 일반 계정: pendingOnboarding 플래그 확인
+      // 일반 계정: pendingOnboarding 플래그 확인 (이번 로그인이 첫 HomeShell 진입인지)
       final prefs = await SharedPreferences.getInstance();
       final isPending = prefs.getBool(_pendingKey) ?? false;
       if (!isPending) return false;
 
-      // pendingOnboarding=true 이면 appOnboardingCompleted 무시하고 온보딩 실행
-      // (재가입 시 users/{uid} 문서가 삭제되었더라도, 새 문서에 이미 true가 쓰인 경우 방어)
+      // 이미 온보딩 완료한 계정은 재로그인해도 온보딩 생략
+      // (doughong@naver.com 테스트 계정만 매번 재실행, 일반 계정은 최초 1회만)
+      final doc = await _db.collection('users').doc(user.uid).get();
+      final isCompleted = doc.data()?['appOnboardingCompleted'] as bool? ?? false;
+      if (isCompleted) {
+        await prefs.remove(_pendingKey);
+        debugPrint('✅ OnboardingService: 온보딩 완료된 계정 → 온보딩 생략');
+        return false;
+      }
+
       debugPrint('✅ OnboardingService: pendingOnboarding=true → 온보딩 실행');
       return true;
     } catch (e) {
