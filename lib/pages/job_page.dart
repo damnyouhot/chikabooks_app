@@ -47,29 +47,31 @@ class _JobPageState extends State<JobPage> {
 
   Future<void> _initializeData() async {
     _jobService = context.read<JobService>();
-    await _requestLocationPermission();
+
+    // 저장된 위치를 먼저 즉시 사용 → 로딩 완료 처리 (화면 전환 블로킹 제거)
+    final saved = await _jobService.getUserLocation();
     if (mounted) {
-      setState(() => _loadingLocation = false);
+      setState(() {
+        _userLocation = saved;
+        _loadingLocation = false;
+      });
     }
+
+    // GPS 실측값은 백그라운드로 갱신 (UI 블로킹 없음)
+    _refreshLocationInBackground();
   }
 
-  Future<void> _requestLocationPermission() async {
+  Future<void> _refreshLocationInBackground() async {
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        await _useSavedLocationFallback();
-        return;
-      }
+      if (!serviceEnabled) return;
 
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
       }
       if (permission == LocationPermission.deniedForever ||
-          permission == LocationPermission.denied) {
-        await _useSavedLocationFallback();
-        return;
-      }
+          permission == LocationPermission.denied) return;
 
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.medium,
@@ -79,15 +81,7 @@ class _JobPageState extends State<JobPage> {
       await _jobService.saveUserLocation(location);
       if (mounted) setState(() => _userLocation = location);
     } catch (e) {
-      debugPrint('⚠️ 위치 로드 실패: $e');
-      await _useSavedLocationFallback();
-    }
-  }
-
-  Future<void> _useSavedLocationFallback() async {
-    final saved = await _jobService.getUserLocation();
-    if (saved != null && mounted) {
-      setState(() => _userLocation = saved);
+      debugPrint('⚠️ 백그라운드 위치 갱신 실패: $e');
     }
   }
 
@@ -126,25 +120,29 @@ class _JobPageState extends State<JobPage> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (_isMapView) {
-      return Stack(
-        children: [
-          JobMapScreen(userLocation: _userLocation),
-          // 목록으로 돌아가는 버튼
-          Positioned(
-            top: 12,
-            left: 16,
-            child: _ListToggleButton(
-              onTap: () => setState(() => _isMapView = false),
+    // IndexedStack으로 목록/지도를 동시에 유지 → 전환 시 Maps 재초기화 없음
+    return IndexedStack(
+      index: _isMapView ? 1 : 0,
+      children: [
+        // 인덱스 0: 공고 목록
+        JobListingsScreen(
+          userLocation: _userLocation,
+          onMapToggle: () => setState(() => _isMapView = true),
+        ),
+        // 인덱스 1: 지도 (미리 빌드되어 전환 즉시 표시)
+        Stack(
+          children: [
+            JobMapScreen(userLocation: _userLocation),
+            Positioned(
+              top: 12,
+              left: 16,
+              child: _ListToggleButton(
+                onTap: () => setState(() => _isMapView = false),
+              ),
             ),
-          ),
-        ],
-      );
-    }
-
-    return JobListingsScreen(
-      userLocation: _userLocation,
-      onMapToggle: () => setState(() => _isMapView = true),
+          ],
+        ),
+      ],
     );
   }
 }

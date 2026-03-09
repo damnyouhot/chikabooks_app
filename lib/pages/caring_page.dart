@@ -19,8 +19,8 @@ import 'settings/settings_page.dart';
 
 // ── 디자인 컬러 팔레트 ──
 const _colorAccent = Color(0xFFF7CBCA);
-const _colorText = Color(0xFF5D6B6B);
-const _colorBg = Color(0xFFF1F7F7);
+const _colorText   = Color(0xFF5D6B6B);
+const _colorBg     = Color(0xFFF1F7F7);
 
 /// 기본 메시지 상태 머신 상태
 enum _LoopState { idle, showingBase, showingReaction }
@@ -844,7 +844,7 @@ class _TapCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 3),
       child: Material(
         color: Colors.white,
-        elevation: 1,
+        elevation: 0,
         borderRadius: radius,
         child: InkWell(
           borderRadius: radius,
@@ -937,7 +937,7 @@ class _PolicyRollingCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 3),
       child: Material(
         color: Colors.white,
-        elevation: 1,
+        elevation: 0,
         borderRadius: radius,
         child: InkWell(
           borderRadius: radius,

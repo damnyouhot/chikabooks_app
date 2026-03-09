@@ -99,13 +99,13 @@ class _BondPollSectionState extends State<BondPollSection> {
                         decoration: BoxDecoration(
                           color:
                               isSelected
-                                  ? BondColors.kAccent.withOpacity(0.12)
+                                  ? BondColors.kAccent.withOpacity(0.15)
                                   : BondColors.kBg,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color:
                                 isSelected
-                                    ? BondColors.kAccent.withOpacity(0.5)
+                                    ? BondColors.kAccent.withOpacity(0.7)
                                     : BondColors.kShadow2.withOpacity(0.5),
                             width: 0.5,
                           ),
@@ -127,7 +127,7 @@ class _BondPollSectionState extends State<BondPollSection> {
                                 ),
                                 color:
                                     isSelected
-                                        ? BondColors.kAccent.withOpacity(0.3)
+                                        ? BondColors.kAccent.withOpacity(0.4)
                                         : Colors.transparent,
                               ),
                               child:

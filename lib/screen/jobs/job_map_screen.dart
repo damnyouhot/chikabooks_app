@@ -22,6 +22,9 @@ const _kShadow = Color(0xFFD5E5E5);
 const _kBg = Color(0xFFF5F0F2);
 const _kPremium = Color(0xFFF48FB1); // Level 1 전용 핑크
 
+// 앱 세션 내 공고 목록 캐시 (반경/필터 조합 → 결과)
+final Map<String, List<Job>> _jobCache = {};
+
 /// 지도 뷰 (4단계 개편)
 ///
 /// ## 레이아웃
@@ -103,6 +106,20 @@ class _JobMapScreenState extends State<JobMapScreen> {
     try {
       List<Job> jobs;
 
+      // 캐시 키: 위치 반올림(소수점 2자리) + 반경 + 직무필터 + 조건필터
+      final lat = widget.userLocation?.latitude.toStringAsFixed(2) ?? 'null';
+      final lng = widget.userLocation?.longitude.toStringAsFixed(2) ?? 'null';
+      final cacheKey =
+          '$lat,$lng,${_jobFilter.radiusKm},${_jobFilter.positionFilter},${_jobFilter.conditions.join(",")}';
+
+      if (_jobCache.containsKey(cacheKey)) {
+        // 캐시 히트 → 즉시 표시 후 백그라운드 갱신
+        jobs = _jobCache[cacheKey]!;
+        _applyMarkers(jobs);
+        _fetchAndRefreshCache(cacheKey);
+        return;
+      }
+
       if (widget.userLocation != null) {
         jobs = await _jobService.fetchJobsNearby(
           widget.userLocation!,
@@ -119,54 +136,77 @@ class _JobMapScreenState extends State<JobMapScreen> {
         jobs = [...mockLevel2Jobs, ...generateMockLevel3Jobs(count: 10)];
       }
 
-      if (!mounted) return;
-
-      _allJobs = jobs;
-      final newMarkers = <Marker>{};
-
-      // Level 1 프리미엄 마커 (핑크/rose, zIndex 높음)
-      for (final job in _premiumJobs) {
-        if (job.lat == 0 && job.lng == 0) continue;
-        newMarkers.add(
-          Marker(
-            markerId: MarkerId('premium_${job.id}'),
-            position: LatLng(job.lat, job.lng),
-            icon: BitmapDescriptor.defaultMarkerWithHue(
-              BitmapDescriptor.hueRose,
-            ),
-            zIndexInt: 2,
-            onTap: () => _onPremiumPinTap(job),
-          ),
-        );
-      }
-
-      // Level 2/3 일반 마커 (청색/azure)
-      for (final job in jobs) {
-        if (job.lat == 0 && job.lng == 0) continue;
-        newMarkers.add(
-          Marker(
-            markerId: MarkerId(job.id),
-            position: LatLng(job.lat, job.lng),
-            icon: BitmapDescriptor.defaultMarkerWithHue(
-              BitmapDescriptor.hueAzure,
-            ),
-            zIndexInt: 1,
-            onTap: () => _onRegularPinTap(job),
-          ),
-        );
-      }
-
-      if (mounted) {
-        setState(() {
-          _markers
-            ..clear()
-            ..addAll(newMarkers);
-          _isLoading = false;
-        });
-      }
+      _jobCache[cacheKey] = jobs;
+      _applyMarkers(jobs);
     } catch (_) {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  /// 캐시된 결과로 먼저 표시 후, 백그라운드에서 Firestore 재조회해 캐시 갱신
+  Future<void> _fetchAndRefreshCache(String cacheKey) async {
+    try {
+      List<Job> fresh;
+      if (widget.userLocation != null) {
+        fresh = await _jobService.fetchJobsNearby(
+          widget.userLocation!,
+          _jobFilter.radiusKm,
+          positionFilter: _jobFilter.positionFilter,
+          conditions: _jobFilter.conditions,
+        );
+      } else {
+        fresh = await _jobService.fetchJobs();
+      }
+      if (fresh.isEmpty) return;
+      _jobCache[cacheKey] = fresh;
+      _applyMarkers(fresh);
+    } catch (_) {}
+  }
+
+  void _applyMarkers(List<Job> jobs) {
+    if (!mounted) return;
+
+    _allJobs = jobs;
+    final newMarkers = <Marker>{};
+
+    // Level 1 프리미엄 마커 (핑크/rose, zIndex 높음)
+    for (final job in _premiumJobs) {
+      if (job.lat == 0 && job.lng == 0) continue;
+      newMarkers.add(
+        Marker(
+          markerId: MarkerId('premium_${job.id}'),
+          position: LatLng(job.lat, job.lng),
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueRose,
+          ),
+          zIndexInt: 2,
+          onTap: () => _onPremiumPinTap(job),
+        ),
+      );
+    }
+
+    // Level 2/3 일반 마커 (청색/azure)
+    for (final job in jobs) {
+      if (job.lat == 0 && job.lng == 0) continue;
+      newMarkers.add(
+        Marker(
+          markerId: MarkerId(job.id),
+          position: LatLng(job.lat, job.lng),
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueAzure,
+          ),
+          zIndexInt: 1,
+          onTap: () => _onRegularPinTap(job),
+        ),
+      );
+    }
+
+    setState(() {
+      _markers
+        ..clear()
+        ..addAll(newMarkers);
+      _isLoading = false;
+    });
   }
 
   // ── 핀 탭 핸들러 ─────────────────────────────────────────────────
