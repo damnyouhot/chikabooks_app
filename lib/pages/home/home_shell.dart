@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../bond_page.dart';
 import '../caring_page.dart';
 import '../growth_page.dart';
@@ -34,9 +33,6 @@ class _HomeShellState extends State<HomeShell> {
   bool _onboardingActive = false;
   late final AppOnboardingController _onboardingCtrl;
 
-  // ── 2번 탭 잠금 툴팁 ──
-  OverlayEntry? _bondTooltip;
-
   @override
   void initState() {
     super.initState();
@@ -68,7 +64,6 @@ class _HomeShellState extends State<HomeShell> {
   void dispose() {
     _growthSubTabNotifier.dispose();
     _onboardingCtrl.dispose();
-    _bondTooltip?.remove();
     super.dispose();
   }
 
@@ -119,13 +114,6 @@ class _HomeShellState extends State<HomeShell> {
 
     // ── 일반 모드 ──
     if (idx == _bondTabIndex) {
-      // 3일 이내면 툴팁 표시
-      final isUnlocked = await _isBondTabUnlocked();
-      if (!isUnlocked) {
-        _showBondTooltip();
-        return;
-      }
-
       final isCompleted = await UserProfileService.isOnboardingCompleted();
       if (!isCompleted && mounted) {
         final result = await Navigator.of(context).push<bool>(
@@ -139,71 +127,6 @@ class _HomeShellState extends State<HomeShell> {
     }
 
     setState(() => _selectedIndex = idx);
-  }
-
-  /// firstLaunchAt 기준 3일 경과 여부
-  Future<bool> _isBondTabUnlocked() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final firstLaunch = prefs.getInt('firstLaunchAt');
-      if (firstLaunch == null) {
-        await prefs.setInt(
-          'firstLaunchAt',
-          DateTime.now().millisecondsSinceEpoch,
-        );
-        return false;
-      }
-      final first = DateTime.fromMillisecondsSinceEpoch(firstLaunch);
-      return DateTime.now().difference(first).inDays >= 3;
-    } catch (_) {
-      return true;
-    }
-  }
-
-  /// 2번 탭 잠금 툴팁 표시 (탭 버튼 위에 작게)
-  void _showBondTooltip() {
-    _bondTooltip?.remove();
-    _bondTooltip = null;
-
-    final overlay = Overlay.of(context);
-    late final OverlayEntry entry;
-
-    entry = OverlayEntry(
-      builder:
-          (ctx) => Positioned(
-            bottom: kBottomNavigationBarHeight + 8,
-            left: MediaQuery.of(ctx).size.width / 4 + 4,
-            right: MediaQuery.of(ctx).size.width * 2 / 4 + 4,
-            child: Material(
-              color: Colors.transparent,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF3D3535).withOpacity(0.85),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  '같이 탭은 앱 설치 3일 후 가능해요',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Colors.white,
-                    decoration: TextDecoration.none,
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
-              ),
-            ),
-          ),
-    );
-
-    _bondTooltip = entry;
-    overlay.insert(entry);
-
-    Future.delayed(const Duration(seconds: 2), () {
-      entry.remove();
-      if (_bondTooltip == entry) _bondTooltip = null;
-    });
   }
 
   void _onTabRequested(int index) {
