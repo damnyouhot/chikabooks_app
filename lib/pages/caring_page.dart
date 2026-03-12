@@ -20,9 +20,9 @@ import '../core/theme/tab_theme.dart';
 
 // ── 디자인 컬러 팔레트 (TabTheme.caring 참조) ──
 // 색상 변경 → app_colors.dart Primitive만 수정하면 자동 반영
-final _colorAccent = TabTheme.caring.accent;   // Neon Lime
-final _colorText   = TabTheme.caring.onBg;     // White (Blue bg → White)
-final _colorBg     = TabTheme.caring.bg;       // Blue
+final _colorAccent = TabTheme.caring.accent;   // Blue (#2E5BFF)
+final _colorText   = TabTheme.caring.onBg;     // Black (White bg → Black)
+final _colorBg     = TabTheme.caring.bg;       // White
 
 /// 기본 메시지 상태 머신 상태
 enum _LoopState { idle, showingBase, showingReaction }
@@ -860,14 +860,18 @@ class _TapCard extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 3),
       child: Material(
-        color: Colors.white,
+        color: TabTheme.caring.cardBg,  // 연파랑 카드 배경
         elevation: 0,
         borderRadius: radius,
         child: InkWell(
           borderRadius: radius,
           onTap: onTap,
-          child: Padding(
+          child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              borderRadius: radius,
+              border: Border.all(color: TabTheme.caring.border.withOpacity(0.35), width: 1),
+            ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
@@ -877,10 +881,10 @@ class _TapCard extends StatelessWidget {
                   fit: FlexFit.tight,
                   child: Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
+                      fontWeight: FontWeight.w700,
+                      color: TabTheme.caring.accent,  // Blue 타이틀 (대비↑)
                     ),
                   ),
                 ),
@@ -901,6 +905,7 @@ class _TapCard extends StatelessWidget {
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
+                          color: Colors.black87,
                         ),
                       ),
                       if (subtitle.isNotEmpty)
@@ -911,14 +916,14 @@ class _TapCard extends StatelessWidget {
                           textAlign: TextAlign.end,
                           style: const TextStyle(
                             fontSize: 10,
-                            color: Colors.black45,
+                            color: Color(0xFF555555),  // 진한 회색 (가독성↑)
                           ),
                         ),
                     ],
                   ),
                 ),
                 const SizedBox(width: 4),
-                const Icon(Icons.chevron_right, color: Colors.black45, size: 20),
+                Icon(Icons.chevron_right, color: TabTheme.caring.accent.withOpacity(0.6), size: 20),
               ],
             ),
           ),
@@ -955,14 +960,18 @@ class _PolicyRollingCard extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 3),
       child: Material(
-        color: Colors.white,
+        color: TabTheme.caring.cardBg,  // 연파랑 카드 배경
         elevation: 0,
         borderRadius: radius,
         child: InkWell(
           borderRadius: radius,
           onTap: onTap,
-          child: Padding(
+          child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              borderRadius: radius,
+              border: Border.all(color: TabTheme.caring.border.withOpacity(0.35), width: 1),
+            ),
             child: LayoutBuilder(
               builder: (ctx, constraints) {
                 // 오른쪽 롤링 텍스트 영역: 전체 카드 너비의 55% 이하, 최대 200
@@ -972,13 +981,13 @@ class _PolicyRollingCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     // 왼쪽 타이틀: 남은 공간 차지
-                    const Expanded(
+                    Expanded(
                       child: Text(
                         '🏥 임박 제도 변경',
                         style: TextStyle(
                           fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
+                          fontWeight: FontWeight.w700,
+                          color: TabTheme.caring.accent,  // Blue (대비↑)
                         ),
                       ),
                     ),
@@ -1028,6 +1037,7 @@ class _PolicyRollingCard extends StatelessWidget {
                                   style: const TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
                                   ),
                                 ),
                                 if (sub.isNotEmpty)
@@ -1038,7 +1048,7 @@ class _PolicyRollingCard extends StatelessWidget {
                                     textAlign: TextAlign.end,
                                     style: const TextStyle(
                                       fontSize: 10,
-                                      color: Colors.black45,
+                                      color: Color(0xFF555555),  // 진한 회색
                                     ),
                                   ),
                               ],
@@ -1048,7 +1058,7 @@ class _PolicyRollingCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 4),
-                    const Icon(Icons.chevron_right, color: Colors.black45, size: 20),
+                    Icon(Icons.chevron_right, color: TabTheme.caring.accent.withOpacity(0.6), size: 20),
                   ],
                 );
               },
@@ -1090,25 +1100,25 @@ class _ActionBtn extends StatelessWidget {
                 width: btnSize,
                 height: btnSize,
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: _colorAccent,   // Blue 채움 (대비 강화)
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.07),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
+                      color: _colorAccent.withOpacity(0.30),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
                     ),
                   ],
                 ),
-                child: Icon(icon, color: _colorText, size: iconSize),
+                child: Icon(icon, color: Colors.white, size: iconSize),  // White 아이콘
               ),
               const SizedBox(height: 6),
               Text(
                 label,
                 style: TextStyle(
                   fontSize: 11,
-                  color: _colorText.withOpacity(0.8),
-                  fontWeight: FontWeight.w500,
+                  color: _colorText,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],

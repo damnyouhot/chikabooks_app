@@ -14,11 +14,11 @@ import '../core/theme/tab_theme.dart';
 // ── 디자인 팔레트: TabTheme.growth 참조 ──
 // 색상 변경 → app_colors.dart Primitive만 수정하면 자동 반영
 final _g       = TabTheme.growth;
-final _kText    = _g.onBg;      // Black (Neon bg → Black)
-final _kBg      = _g.bg;        // Neon Lime
-final _kShadow1 = _g.border;    // 라임계열 경계선
-final _kShadow2 = _g.surface;   // 연한 구분선
-final _kCardBg  = _g.cardBg;    // 카드 배경: 흰색
+final _kText    = _g.onBg;      // Black (White bg → Black)
+final _kBg      = _g.bg;        // White
+final _kShadow1 = _g.border;    // 진한 라임 테두리 (선명한 구분선)
+final _kShadow2 = _g.surface;   // 연라임 표면
+final _kCardBg  = _g.cardBg;    // 카드 배경: 연라임 틴트
 
 /// 성장 탭 (3탭)
 ///
@@ -177,27 +177,27 @@ class _GrowthPageState extends State<GrowthPage>
       decoration: BoxDecoration(
         color: _kShadow2,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _kShadow1, width: 0.5),
+        border: Border.all(color: _kShadow1, width: 1.2),  // 진한 테두리
       ),
       child: TabBar(
         controller: _tabCtrl,
         indicator: BoxDecoration(
-          color: _kCardBg,
+          color: TabTheme.growth.accent,  // Neon 인디케이터 채움
           borderRadius: BorderRadius.circular(10),
           boxShadow: [
             BoxShadow(
-              color: _kShadow1.withOpacity(0.3),
-              blurRadius: 4,
-              offset: const Offset(0, 1),
+              color: TabTheme.growth.accent.withOpacity(0.4),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
         indicatorSize: TabBarIndicatorSize.tab,
         indicatorPadding: const EdgeInsets.all(3),
         dividerColor: Colors.transparent,
-        labelColor: _kText,
-        unselectedLabelColor: _kText.withOpacity(0.4),
-        labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        labelColor: TabTheme.growth.onAccent,    // Neon 위 → Black (대비↑)
+        unselectedLabelColor: _kText.withOpacity(0.5),
+        labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
         unselectedLabelStyle: const TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w400,
@@ -442,18 +442,18 @@ class _SavedHiraTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: _kCardBg,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _kShadow2, width: 0.5),
+          border: Border.all(color: _kShadow1, width: 1.2),  // 진한 라임 테두리
           boxShadow: [
             BoxShadow(
-              color: _kShadow1.withOpacity(0.15),
-              blurRadius: 4,
-              offset: const Offset(0, 1),
+              color: _kShadow1.withOpacity(0.20),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
         child: Row(
           children: [
-            Icon(Icons.info_outline, size: 20, color: _kText.withOpacity(0.5)),
+            Icon(Icons.info_outline, size: 20, color: TabTheme.growth.accent),  // Neon 아이콘
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -481,7 +481,7 @@ class _SavedHiraTile extends StatelessWidget {
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, color: _kText.withOpacity(0.3), size: 20),
+            Icon(Icons.chevron_right, color: TabTheme.growth.accent, size: 20),
           ],
         ),
       ),
@@ -506,12 +506,12 @@ class _MyBookTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: _kCardBg,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _kShadow2, width: 0.5),
+          border: Border.all(color: _kShadow1, width: 1.2),  // 진한 라임 테두리
           boxShadow: [
             BoxShadow(
-              color: _kShadow1.withOpacity(0.15),
-              blurRadius: 4,
-              offset: const Offset(0, 1),
+              color: _kShadow1.withOpacity(0.20),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
             ),
           ],
         ),

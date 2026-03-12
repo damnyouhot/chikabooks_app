@@ -4,12 +4,12 @@ import '../../core/theme/tab_theme.dart';
 // ── 커리어 탭 디자인 팔레트: TabTheme.job 참조 ──
 // 색상 변경 → app_colors.dart Primitive만 수정하면 자동 반영
 final _j = TabTheme.job;
-final kCText   = _j.onBg;      // White (Black bg → White)
-final kCBg     = _j.bg;        // Pure Black
-final kCAccent = _j.accent;    // Neon Lime
-final kCShadow = _j.border;    // 경계선
-final kCCardBg = _j.cardBg;    // 카드 배경
-final kCMuted  = _j.muted;     // 비활성
+final kCText   = _j.onBg;      // Black (White bg → Black)
+final kCBg     = _j.bg;        // White
+final kCAccent = _j.accent;    // Pure Black (버튼/카드 채움)
+final kCShadow = _j.border;    // Black 테두리 (선명)
+final kCCardBg = _j.cardBg;    // 연회색 카드 배경
+final kCMuted  = _j.muted;     // 진한 회색 (비활성)
 
 // ── 헬퍼 함수 ──────────────────────────────────────────────────
 String formatCareerMonths(int months) {
