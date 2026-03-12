@@ -127,14 +127,8 @@ class _BondPollSectionState extends State<BondPollSection> {
                             decoration: BoxDecoration(
                               color: isSelected
                                   ? AppColors.cardEmphasis
-                                  : const Color(0xFF2A2A2A),
+                                  : AppColors.onCardPrimary.withOpacity(0.08),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: isSelected
-                                    ? AppColors.cardEmphasis
-                                    : Colors.white.withOpacity(0.08),
-                                width: isSelected ? 0 : 0.5,
-                              ),
                             ),
                             child: Row(
                               children: [
@@ -147,7 +141,7 @@ class _BondPollSectionState extends State<BondPollSection> {
                                     border: Border.all(
                                       color: isSelected
                                           ? AppColors.onCardEmphasis.withOpacity(0.6)
-                                          : Colors.white.withOpacity(0.3),
+                                          : AppColors.onCardPrimary.withOpacity(0.3),
                                       width: isSelected ? 1.5 : 0.8,
                                     ),
                                     color: isSelected
@@ -178,7 +172,7 @@ class _BondPollSectionState extends State<BondPollSection> {
                                           : FontWeight.w400,
                                       color: isSelected
                                           ? AppColors.onCardEmphasis
-                                          : Colors.white.withOpacity(0.85),
+                                          : AppColors.onCardPrimary,
                                     ),
                                   ),
                                 ),
@@ -191,7 +185,7 @@ class _BondPollSectionState extends State<BondPollSection> {
                                       fontWeight: FontWeight.w600,
                                       color: isSelected
                                           ? AppColors.onCardEmphasis.withOpacity(0.7)
-                                          : Colors.white.withOpacity(0.45),
+                                          : AppColors.onCardPrimary.withOpacity(0.45),
                                     ),
                                   ),
                                 ],
@@ -210,9 +204,9 @@ class _BondPollSectionState extends State<BondPollSection> {
                     child: Center(
                       child: Text(
                         '파트너 그룹 내 익명 결과',
-                        style: TextStyle(
+                          style: TextStyle(
                           fontSize: 11,
-                          color: Colors.white.withOpacity(0.35),
+                          color: AppColors.onCardPrimary.withOpacity(0.35),
                         ),
                       ),
                     ),
@@ -226,7 +220,7 @@ class _BondPollSectionState extends State<BondPollSection> {
                       '지난 질문 보기',
                       style: TextStyle(
                         fontSize: 11,
-                        color: Colors.white.withOpacity(0.3),
+                        color: AppColors.onCardPrimary.withOpacity(0.3),
                       ),
                     ),
                   ),
