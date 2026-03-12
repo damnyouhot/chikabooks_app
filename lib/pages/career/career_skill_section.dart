@@ -110,18 +110,25 @@ class _CareerSkillCardState extends State<CareerSkillCard> {
         children: [
           Row(
             children: [
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: kCAccent.withOpacity(0.22),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  widget.info.icon,
-                  color: kCText.withOpacity(0.85),
-                  size: 18,
-                ),
+              // 스킬 아이콘 컨테이너: 화면 너비의 8.5%, 최소30·최대40 clamp
+              Builder(
+                builder: (ctx) {
+                  final iconBox = (MediaQuery.of(ctx).size.width * 0.085)
+                      .clamp(30.0, 40.0);
+                  return Container(
+                    width: iconBox,
+                    height: iconBox,
+                    decoration: BoxDecoration(
+                      color: kCAccent.withOpacity(0.22),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      widget.info.icon,
+                      color: kCText.withOpacity(0.85),
+                      size: iconBox * 0.53,
+                    ),
+                  );
+                },
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -421,18 +428,25 @@ class _CareerSkillEditSheetState extends State<CareerSkillEditSheet> {
                         GestureDetector(
                           onTap:
                               () => setState(() => entry['enabled'] = !enabled),
-                          child: Container(
-                            width: 26,
-                            height: 26,
-                            decoration: BoxDecoration(
-                              color: enabled ? kCText : const Color(0xFFE0E0E0),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(
-                              enabled ? Icons.check : Icons.add,
-                              size: 16,
-                              color: Colors.white,
-                            ),
+                          child: Builder(
+                            builder: (ctx) {
+                              // 토글 배지: 화면 너비의 6.5%, 최소22·최대32 clamp
+                              final badgeSize = (MediaQuery.of(ctx).size.width * 0.065)
+                                  .clamp(22.0, 32.0);
+                              return Container(
+                                width: badgeSize,
+                                height: badgeSize,
+                                decoration: BoxDecoration(
+                                  color: enabled ? kCText : const Color(0xFFE0E0E0),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(
+                                  enabled ? Icons.check : Icons.add,
+                                  size: badgeSize * 0.6,
+                                  color: Colors.white,
+                                ),
+                              );
+                            },
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -920,23 +934,30 @@ class _SkillQuizSheetState extends State<SkillQuizSheet> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      color: kCAccent.withOpacity(0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Text(
-                        'Lv.$rec',
-                        style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                          color: kCText,
+                  // 결과 원형 배지: 화면 너비의 20%, 최소64·최대96 clamp
+                  Builder(
+                    builder: (ctx) {
+                      final circleSize = (MediaQuery.of(ctx).size.width * 0.20)
+                          .clamp(64.0, 96.0);
+                      return Container(
+                        width: circleSize,
+                        height: circleSize,
+                        decoration: BoxDecoration(
+                          color: kCAccent.withOpacity(0.2),
+                          shape: BoxShape.circle,
                         ),
-                      ),
-                    ),
+                        child: Center(
+                          child: Text(
+                            'Lv.$rec',
+                            style: TextStyle(
+                              fontSize: (circleSize * 0.27).clamp(18.0, 26.0),
+                              fontWeight: FontWeight.w900,
+                              color: kCText,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                   const SizedBox(height: 14),
                   const Text(

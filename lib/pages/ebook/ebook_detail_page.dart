@@ -69,22 +69,29 @@ class _EbookDetailPageState extends State<EbookDetailPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 표지 이미지
+            // 표지 이미지: 화면 너비의 45% 기준, 최소160·최대240, 비율 2:3 유지
             Center(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: Image.network(
-                  ebook.coverUrl,
-                  width: 200,
-                  height: 300,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    width: 200,
-                    height: 300,
-                    color: Colors.grey[300],
-                    child: const Icon(Icons.book, size: 64, color: Colors.grey),
-                  ),
-                ),
+              child: LayoutBuilder(
+                builder: (ctx, constraints) {
+                  final screenW = MediaQuery.of(ctx).size.width;
+                  final coverW = (screenW * 0.45).clamp(160.0, 240.0);
+                  final coverH = coverW * 1.5; // 2:3 비율
+                  return ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Image.network(
+                      ebook.coverUrl,
+                      width: coverW,
+                      height: coverH,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        width: coverW,
+                        height: coverH,
+                        color: Colors.grey[300],
+                        child: const Icon(Icons.book, size: 64, color: Colors.grey),
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
             const SizedBox(height: 24),
@@ -206,19 +213,25 @@ class _EbookDetailPageState extends State<EbookDetailPage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // 성공 아이콘
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  color: Colors.green[50],
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.check_circle,
-                  size: 50,
-                  color: Colors.green[600],
-                ),
+              // 성공 아이콘: 화면 너비의 18%, 최소64·최대96
+              LayoutBuilder(
+                builder: (ctx, constraints) {
+                  final iconSize = (MediaQuery.of(ctx).size.width * 0.18)
+                      .clamp(64.0, 96.0);
+                  return Container(
+                    width: iconSize,
+                    height: iconSize,
+                    decoration: BoxDecoration(
+                      color: Colors.green[50],
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.check_circle,
+                      size: iconSize * 0.625,
+                      color: Colors.green[600],
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 20),
               

@@ -183,7 +183,8 @@ class _QuizStatsCard extends StatelessWidget {
               height: 80,
               child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
             )
-          : Row(
+          : IntrinsicHeight(
+              child: Row(
               children: [
                 // 이번 주 성적
                 Expanded(
@@ -194,9 +195,9 @@ class _QuizStatsCard extends StatelessWidget {
                     weekRate,
                   ),
                 ),
-                Container(
+                VerticalDivider(
                   width: 1,
-                  height: 60,
+                  thickness: 1,
                   color: _kShadow2.withOpacity(0.5),
                 ),
                 // 통산 성적
@@ -208,14 +209,15 @@ class _QuizStatsCard extends StatelessWidget {
                     totalRate,
                   ),
                 ),
-                Container(
+                VerticalDivider(
                   width: 1,
-                  height: 60,
+                  thickness: 1,
                   color: _kShadow2.withOpacity(0.5),
                 ),
                 // 순위
                 Expanded(
                   child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
                         '순위',
@@ -246,6 +248,7 @@ class _QuizStatsCard extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
             ),
     );
   }
@@ -339,24 +342,31 @@ class _QuizCardState extends State<_QuizCard> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: _kAccent.withOpacity(0.3),
-                  border: Border.all(color: _kAccent, width: 0.5),
-                ),
-                child: Center(
-                  child: Text(
-                    'Q${widget.index}',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: _kText,
+              // Q번호 원형 배지: 화면 너비의 7%, 최소24·최대34 clamp
+              Builder(
+                builder: (ctx) {
+                  final badgeSize = (MediaQuery.of(ctx).size.width * 0.07)
+                      .clamp(24.0, 34.0);
+                  return Container(
+                    width: badgeSize,
+                    height: badgeSize,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _kAccent.withOpacity(0.3),
+                      border: Border.all(color: _kAccent, width: 0.5),
                     ),
-                  ),
-                ),
+                    child: Center(
+                      child: Text(
+                        'Q${widget.index}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: _kText,
+                        ),
+                      ),
+                    ),
+                  );
+                },
               ),
               const SizedBox(width: 12),
               Expanded(

@@ -82,7 +82,15 @@ class EbookListPage extends StatelessWidget {
 
     if (recommended.isEmpty) return const SizedBox.shrink();
 
-    return Column(
+    return LayoutBuilder(
+      builder: (ctx, constraints) {
+        // 화면 너비의 55% 기준 카드 너비, 최소 120·최대 160 clamp
+        final screenW = MediaQuery.of(ctx).size.width;
+        final cardW = (screenW * 0.34).clamp(120.0, 160.0);
+        // 카드 높이: 카드 너비 * 1.57 (표지 + 텍스트 영역)
+        final sectionH = cardW * 1.57;
+
+        return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Padding(
@@ -105,7 +113,7 @@ class EbookListPage extends StatelessWidget {
           ),
         ),
         SizedBox(
-          height: 220,
+              height: sectionH,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -113,7 +121,7 @@ class EbookListPage extends StatelessWidget {
             itemBuilder: (context, i) {
               final book = recommended[i];
               return Container(
-                width: 140,
+                    width: cardW,
                 margin: const EdgeInsets.symmetric(horizontal: 4),
                 child: InkWell(
                   onTap: () => Navigator.push(
@@ -205,6 +213,8 @@ class EbookListPage extends StatelessWidget {
           ),
         ),
       ],
+        );
+      },
     );
   }
 

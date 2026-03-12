@@ -258,8 +258,10 @@ class _NetworkTimelineItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const double kMaxBarH = 110;
-    const double kMinBarH = 28;
+    // 타임라인 바 높이: 화면 높이의 비율 기반으로 상·하한 clamp
+    final screenH = MediaQuery.of(context).size.height;
+    final kMaxBarH = (screenH * 0.13).clamp(80.0, 130.0);
+    final kMinBarH = (screenH * 0.035).clamp(22.0, 36.0);
     final barHeight =
         kMinBarH + (kMaxBarH - kMinBarH) * (entry.months / maxMonths);
 

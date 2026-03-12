@@ -552,18 +552,25 @@ class _ResumeShortcutCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: const Color(0xFF4A90D9).withOpacity(0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(
-                Icons.description_outlined,
-                color: Color(0xFF4A90D9),
-                size: 22,
-              ),
+            // 아이콘 컨테이너: 화면 너비의 9.5%, 최소34·최대48 clamp
+            Builder(
+              builder: (ctx) {
+                final iconBox = (MediaQuery.of(ctx).size.width * 0.095)
+                    .clamp(34.0, 48.0);
+                return Container(
+                  width: iconBox,
+                  height: iconBox,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4A90D9).withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.description_outlined,
+                    color: const Color(0xFF4A90D9),
+                    size: iconBox * 0.55,
+                  ),
+                );
+              },
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -632,18 +639,25 @@ class _ApplicationsShortcutCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: const Color(0xFF4CAF50).withOpacity(0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(
-                Icons.work_outline,
-                color: Color(0xFF4CAF50),
-                size: 22,
-              ),
+            // 아이콘 컨테이너: 화면 너비의 9.5%, 최소34·최대48 clamp
+            Builder(
+              builder: (ctx) {
+                final iconBox = (MediaQuery.of(ctx).size.width * 0.095)
+                    .clamp(34.0, 48.0);
+                return Container(
+                  width: iconBox,
+                  height: iconBox,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4CAF50).withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.work_outline,
+                    color: const Color(0xFF4CAF50),
+                    size: iconBox * 0.55,
+                  ),
+                );
+              },
             ),
             const SizedBox(width: 14),
             Expanded(

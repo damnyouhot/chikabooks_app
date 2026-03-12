@@ -514,21 +514,29 @@ class _MyBookTile extends StatelessWidget {
         ),
         child: Row(
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.network(
-                book.coverUrl,
-                width: 52,
-                height: 68,
-                fit: BoxFit.cover,
-                errorBuilder:
-                    (_, __, ___) => Container(
-                      width: 52,
-                      height: 68,
-                      color: _kShadow2,
-                      child: Icon(Icons.book, color: _kText.withOpacity(0.3)),
-                    ),
-              ),
+            // 커버 이미지: 화면 너비의 13% 기준, 최소44·최대68 clamp, 비율 3:4 유지
+            LayoutBuilder(
+              builder: (ctx, constraints) {
+                final screenW = MediaQuery.of(ctx).size.width;
+                final coverW = (screenW * 0.13).clamp(44.0, 68.0);
+                final coverH = coverW * (4 / 3); // 3:4 비율
+                return ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(
+                    book.coverUrl,
+                    width: coverW,
+                    height: coverH,
+                    fit: BoxFit.cover,
+                    errorBuilder:
+                        (_, __, ___) => Container(
+                          width: coverW,
+                          height: coverH,
+                          color: _kShadow2,
+                          child: Icon(Icons.book, color: _kText.withOpacity(0.3)),
+                        ),
+                  ),
+                );
+              },
             ),
             const SizedBox(width: 14),
             Expanded(

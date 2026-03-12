@@ -282,12 +282,14 @@ class _ChecklistItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 체크박스: 화면 너비의 5%, 최소18·최대24 clamp
+    final checkSize = (MediaQuery.of(context).size.width * 0.05).clamp(18.0, 24.0);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          width: 20,
-          height: 20,
+          width: checkSize,
+          height: checkSize,
           margin: const EdgeInsets.only(top: 1),
           decoration: BoxDecoration(
             color: data.done ? kCAccent : Colors.white,
@@ -299,7 +301,7 @@ class _ChecklistItem extends StatelessWidget {
           ),
           child:
               data.done
-                  ? const Icon(Icons.check, size: 13, color: kCText)
+                  ? Icon(Icons.check, size: checkSize * 0.65, color: kCText)
                   : null,
         ),
         const SizedBox(width: 10),
@@ -404,23 +406,30 @@ void showCareerStageGuideSheet(BuildContext context) {
                       ),
                       child: Row(
                         children: [
-                          Container(
-                            width: 26,
-                            height: 26,
-                            decoration: BoxDecoration(
-                              color: kCAccent.withOpacity(0.3),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Center(
-                              child: Text(
-                                '${i + 1}',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w900,
-                                  color: kCText,
+                          // 단계 번호 배지: 화면 너비의 6.5%, 최소22·최대32 clamp
+                          Builder(
+                            builder: (ctx) {
+                              final badgeSize = (MediaQuery.of(ctx).size.width * 0.065)
+                                  .clamp(22.0, 32.0);
+                              return Container(
+                                width: badgeSize,
+                                height: badgeSize,
+                                decoration: BoxDecoration(
+                                  color: kCAccent.withOpacity(0.3),
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
-                              ),
-                            ),
+                                child: Center(
+                                  child: Text(
+                                    '${i + 1}',
+                                    style: TextStyle(
+                                      fontSize: (badgeSize * 0.46).clamp(10.0, 14.0),
+                                      fontWeight: FontWeight.w900,
+                                      color: kCText,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
                           ),
                           const SizedBox(width: 12),
                           Expanded(
