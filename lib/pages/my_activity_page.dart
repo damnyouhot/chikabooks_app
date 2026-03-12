@@ -3,13 +3,13 @@ import 'package:provider/provider.dart';
 import '../../services/job_service.dart';
 import '../../models/job.dart';
 import '../screen/jobs/job_detail_screen.dart';
-import '../core/theme/tab_theme.dart';
+import '../core/theme/app_colors.dart';
 
-// ── 디자인 팔레트 (TabTheme.caring 참조) ──
+// ── 디자인 팔레트 (AppColors 참조) ──
 // 색상 변경 → app_colors.dart Primitive만 수정하면 자동 반영
-final _kAccent = TabTheme.caring.accent;   // Neon Lime
-final _kText   = TabTheme.caring.onBg;     // White
-final _kBg     = TabTheme.caring.bg;       // Blue
+const _kAccent = AppColors.accent;       // Blue
+const _kText   = AppColors.textPrimary;  // Black
+const _kBg     = AppColors.appBg;        // Soft gray
 
 /// 내 활동 페이지
 ///

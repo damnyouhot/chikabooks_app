@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../models/partner_group.dart';
-import '../../core/theme/tab_theme.dart';
+import '../../core/theme/app_colors.dart';
 
-const _b = TabTheme.bond;
+// AppColors 직접 참조 (TabTheme 제거)
 
 /// 파트너 요약 (감정 해석 문장 중심)
 class BondPartnerSummary extends StatelessWidget {
@@ -35,7 +35,7 @@ class BondPartnerSummary extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _b.shadow2.withOpacity(0.3)),
+        border: Border.all(color: AppColors.surfaceMuted.withOpacity(0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -45,7 +45,7 @@ class BondPartnerSummary extends StatelessWidget {
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w600,
-              color: _b.onBg,
+              color: AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 16),
@@ -72,7 +72,7 @@ class BondPartnerSummary extends StatelessWidget {
             height: 48,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: _b.shadow2,
+              color: AppColors.surfaceMuted,
             ),
             child: Center(
               child: Text(
@@ -80,7 +80,7 @@ class BondPartnerSummary extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
-                  color: _b.onBg,
+                  color: AppColors.textPrimary,
                 ),
               ),
             ),
@@ -97,7 +97,7 @@ class BondPartnerSummary extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
-                        color: _b.onBg,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                     if (partner.mainConcernShown != null &&
@@ -107,7 +107,7 @@ class BondPartnerSummary extends StatelessWidget {
                         '· ${partner.mainConcernShown}',
                         style: TextStyle(
                           fontSize: 12,
-                          color: _b.onBg.withOpacity(0.4),
+                          color: AppColors.textPrimary.withOpacity(0.4),
                           fontWeight: FontWeight.w400,
                         ),
                       ),
@@ -119,7 +119,7 @@ class BondPartnerSummary extends StatelessWidget {
                   activityText,
                   style: TextStyle(
                     fontSize: 13,
-                    color: _b.onBg.withOpacity(0.7),
+                    color: AppColors.textPrimary.withOpacity(0.7),
                     height: 1.4,
                   ),
                 ),
@@ -128,7 +128,7 @@ class BondPartnerSummary extends StatelessWidget {
                   message,
                   style: TextStyle(
                     fontSize: 13,
-                    color: _b.onBg.withOpacity(0.5),
+                    color: AppColors.textPrimary.withOpacity(0.5),
                     fontStyle: FontStyle.italic,
                   ),
                 ),
@@ -157,3 +157,6 @@ class BondPartnerSummary extends StatelessWidget {
     return '이번 주 자주 마주쳤네';
   }
 }
+
+
+

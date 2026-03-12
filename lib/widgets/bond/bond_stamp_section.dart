@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../models/weekly_stamp.dart';
 import '../../services/weekly_stamp_service.dart';
-import '../../core/theme/tab_theme.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_style.dart';
 import 'bond_stamp_circle.dart';
 
-const _b = TabTheme.bond;
+// AppColors 직접 참조 (TabTheme 제거)
 
 /// 이번 주 우리 스탬프 섹션
 class BondStampSection extends StatefulWidget {
@@ -66,7 +67,7 @@ class _BondStampSectionState extends State<BondStampSection> {
           child: Container(
             width: double.infinity,
             // Neon 채운 스탬프 카드
-            decoration: _b.neonCardDecoration(),
+            decoration: AppStyle.emphasisCardDecoration(),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -80,7 +81,7 @@ class _BondStampSectionState extends State<BondStampSection> {
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
-                          color: _b.onCardNeon,  // Black on Neon
+                          color: AppColors.onCardEmphasis,  // Black on Neon
                         ),
                       ),
                       const Spacer(),
@@ -88,10 +89,10 @@ class _BondStampSectionState extends State<BondStampSection> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                         decoration: BoxDecoration(
-                          color: _b.onCardNeon.withOpacity(0.1),
+                          color: AppColors.onCardEmphasis.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: _b.onCardNeon.withOpacity(0.3),
+                            color: AppColors.onCardEmphasis.withOpacity(0.3),
                             width: 0.8,
                           ),
                         ),
@@ -100,7 +101,7 @@ class _BondStampSectionState extends State<BondStampSection> {
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: _b.onCardNeon,
+                            color: AppColors.onCardEmphasis,
                           ),
                         ),
                       ),
@@ -137,3 +138,5 @@ class _BondStampSectionState extends State<BondStampSection> {
     );
   }
 }
+
+

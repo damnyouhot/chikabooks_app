@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:provider/provider.dart';
 import '../bond_page.dart';
 import '../caring_page.dart';
 import '../growth_page.dart';
@@ -10,8 +9,8 @@ import '../../services/user_profile_service.dart';
 import '../../services/onboarding_service.dart';
 import '../../features/onboarding/app_onboarding_controller.dart';
 import '../../features/onboarding/app_onboarding_overlay.dart';
-
-import '../../core/theme/tab_theme.dart';
+// TabThemeNotifier 제거: 단일 컬러 시스템으로 통일
+// BottomNavBar 색상은 AppTheme.light (bottomNavigationBarTheme) 에서 고정 관리
 
 /// 메인 홈 (탭 네비게이션)
 class HomeShell extends StatefulWidget {
@@ -41,23 +40,18 @@ class _HomeShellState extends State<HomeShell> {
     super.initState();
     _bondPage = const BondPage();
     _growthPage = GrowthPage(subTabNotifier: _growthSubTabNotifier);
-    // JobPage는 온보딩 상태를 전달하기 위해 build()에서 생성
 
     _onboardingCtrl = AppOnboardingController();
-    // step 변경 시 HomeShell 리빌드 → CaringPage에 새 대사 전달
     _onboardingCtrl.addListener(() {
       if (mounted) setState(() {});
     });
 
-    // 처음 진입 시 온보딩 체크
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkOnboarding());
 
-    // 재로그인 감지: UID가 바뀌거나 새로운 로그인 이벤트 발생 시 온보딩 재체크
     FirebaseAuth.instance.authStateChanges().skip(1).listen((user) {
       if (!mounted) return;
       final newUid = user?.uid;
       if (newUid != null && !_onboardingActive) {
-        // 로그아웃 후 재로그인 감지 → 온보딩 재체크
         _checkOnboarding();
       }
     });
@@ -74,7 +68,6 @@ class _HomeShellState extends State<HomeShell> {
   // 온보딩 체크 + 시작
   // ─────────────────────────────────────────────────────────
   Future<void> _checkOnboarding() async {
-    // SharedPreferences 쓰기(schedulePendingOnboarding)가 완료되도록 충분히 대기
     await Future.delayed(const Duration(milliseconds: 600));
     final should = await OnboardingService.shouldRunOnboarding();
     if (!should || !mounted) return;
@@ -87,33 +80,27 @@ class _HomeShellState extends State<HomeShell> {
 
   void _onOnboardingComplete() {
     setState(() => _onboardingActive = false);
-    // CaringPage 상단 4카드 + 하단 4버튼 페이드인은 해당 탭이 그냥 활성화되며 보임
   }
 
   // ─────────────────────────────────────────────────────────
-  // 탭 이동 (온보딩 중에는 오버레이가 요청한 탭만 허용)
+  // 탭 이동 (TabThemeNotifier 제거 → setState만으로 단순화)
   // ─────────────────────────────────────────────────────────
   void _setTab(int idx) {
     setState(() => _selectedIndex = idx);
-    context.read<TabThemeNotifier>().setTab(idx);
   }
 
   void _onTap(int idx) async {
     // ── 온보딩 중: 지정 탭만 허용, 그 외 차단 ──
     if (_onboardingActive) {
-      // 2번 탭(같이)은 항상 차단
       if (idx == _bondTabIndex) return;
 
       if (_onboardingCtrl.isSpotlight) {
         final step = _onboardingCtrl.current;
-        // step5  → 커리어(3)만 허용
         if (step == AppOnboardingStepId.step5 && idx != 3) return;
-        // step5b → 성장하기(2)만 허용
         if (step == AppOnboardingStepId.step5b && idx != 2) return;
-        // step8  → 탭1(나)(0)만 허용
         if (step == AppOnboardingStepId.step8 && idx != 0) return;
         setState(() => _selectedIndex = idx);
-        _onboardingCtrl.advance(); // spotlight 해제 → 다음 step으로
+        _onboardingCtrl.advance();
         return;
       }
       _setTab(idx);
@@ -157,7 +144,6 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     final pages = <Widget>[
-      // CaringPage는 온보딩 상태를 실시간으로 전달하기 위해 build()에서 생성
       CaringPage(
         key: const ValueKey('caring'),
         onTabRequested: _onTabRequested,
@@ -169,9 +155,6 @@ class _HomeShellState extends State<HomeShell> {
       ),
       _bondPage,
       _growthPage,
-      // 탭4(커리어): key를 온보딩 상태에 따라 변경 → 온보딩 시작/종료 시 완전 재생성
-      // _onboardingActive=true  → initialIndex=1(커리어카드 소탭)으로 새로 생성
-      // _onboardingActive=false → initialIndex=0(공고보기 소탭)으로 새로 생성
       JobPage(
         key: ValueKey('job_$_onboardingActive'),
         isOnboardingActive: _onboardingActive,
@@ -181,38 +164,25 @@ class _HomeShellState extends State<HomeShell> {
     return Scaffold(
       body: Stack(
         children: [
-          // ── 탭 콘텐츠 ──
           IndexedStack(index: _selectedIndex, children: pages),
-
-          // ── 온보딩 오버레이 ──
           if (_onboardingActive)
             ListenableBuilder(
               listenable: _onboardingCtrl,
-              builder:
-                  (_, __) => AppOnboardingOverlay(
-                    key: const ValueKey('onboarding_overlay'),
-                    controller: _onboardingCtrl,
-                    onTabChangeRequest: (idx) {
-                      _setTab(idx);
-                    },
-                    onComplete: _onOnboardingComplete,
-                  ),
+              builder: (_, __) => AppOnboardingOverlay(
+                key: const ValueKey('onboarding_overlay'),
+                controller: _onboardingCtrl,
+                onTabChangeRequest: (idx) {
+                  _setTab(idx);
+                },
+                onComplete: _onOnboardingComplete,
+              ),
             ),
         ],
       ),
-      bottomNavigationBar: Consumer<TabThemeNotifier>(
-        builder: (_, tabNotifier, __) {
-          final tabTheme = tabNotifier.theme;
-          return BottomNavigationBar(
+      // BottomNavigationBar: 색상은 AppTheme.light (bottomNavigationBarTheme)에서 고정 관리
+      bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: _onTap,
-        type: BottomNavigationBarType.fixed,
-            backgroundColor: tabTheme.navBg,
-            selectedItemColor: tabTheme.navSelected,
-            unselectedItemColor: tabTheme.navUnselected,
-        selectedFontSize: 11,
-        unselectedFontSize: 11,
-        elevation: 0,
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.person_outline),
@@ -235,8 +205,6 @@ class _HomeShellState extends State<HomeShell> {
             label: '커리어',
           ),
         ],
-        );
-        },
       ),
     );
   }

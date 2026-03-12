@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/tab_theme.dart';
+import '../../core/theme/app_colors.dart';
 
-const _b = TabTheme.bond;
+// AppColors 직접 참조 (TabTheme 제거)
 
 /// 다음 월요일 09:00 KST 까지 남은 시간을 사람이 읽기 좋은 문자열로 반환
 String _nextMatchingMessage() {
@@ -52,7 +52,7 @@ class BondScoreGauge extends StatelessWidget {
               strokeWidth: 4.0,
               backgroundColor: Colors.transparent,
               valueColor: AlwaysStoppedAnimation<Color>(
-                _b.shadow2.withOpacity(0.25),
+                AppColors.surfaceMuted.withOpacity(0.25),
               ),
             ),
           ),
@@ -63,7 +63,7 @@ class BondScoreGauge extends StatelessWidget {
               value: progress,
               strokeWidth: 4.0,
               backgroundColor: Colors.transparent,
-              valueColor: AlwaysStoppedAnimation<Color>(_b.accent),
+              valueColor: AlwaysStoppedAnimation<Color>(AppColors.accent),
             ),
           ),
           Column(
@@ -74,7 +74,7 @@ class BondScoreGauge extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 8,
                   fontWeight: FontWeight.w500,
-                  color: _b.onBg.withOpacity(0.6),
+                  color: AppColors.textPrimary.withOpacity(0.6),
                   height: 1.0,
                 ),
               ),
@@ -84,7 +84,7 @@ class BondScoreGauge extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
-                  color: _b.onBg,
+                  color: AppColors.textPrimary,
                   height: 1.0,
                 ),
               ),
@@ -109,7 +109,7 @@ class BondNoPartnerCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _b.shadow2.withOpacity(0.3)),
+        border: Border.all(color: AppColors.surfaceMuted.withOpacity(0.3)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.03),
@@ -132,7 +132,7 @@ class BondNoPartnerCard extends StatelessWidget {
                       '아직 동료와 만나지 않았어요.',
                       style: TextStyle(
                         fontSize: 13,
-                        color: _b.onBg.withOpacity(0.75),
+                        color: AppColors.textPrimary.withOpacity(0.75),
                         height: 1.4,
                       ),
                     ),
@@ -141,7 +141,7 @@ class BondNoPartnerCard extends StatelessWidget {
                       '함께 걸을 사람을 찾아보세요',
                       style: TextStyle(
                         fontSize: 13,
-                        color: _b.onBg.withOpacity(0.75),
+                        color: AppColors.textPrimary.withOpacity(0.75),
                         height: 1.4,
                       ),
                     ),
@@ -158,7 +158,7 @@ class BondNoPartnerCard extends StatelessWidget {
               Icon(
                 Icons.info_outline,
                 size: 14,
-                color: _b.onBg.withOpacity(0.4),
+                color: AppColors.textPrimary.withOpacity(0.4),
               ),
               const SizedBox(width: 6),
               Expanded(
@@ -166,7 +166,7 @@ class BondNoPartnerCard extends StatelessWidget {
                   _nextMatchingMessage(),
                   style: TextStyle(
                     fontSize: 11,
-                    color: _b.onBg.withOpacity(0.5),
+                    color: AppColors.textPrimary.withOpacity(0.5),
                     height: 1.3,
                   ),
                 ),
@@ -205,7 +205,7 @@ class BondWeekHeader extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _b.shadow2.withOpacity(0.3)),
+        border: Border.all(color: AppColors.surfaceMuted.withOpacity(0.3)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.03),
@@ -231,7 +231,7 @@ class BondWeekHeader extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w600,
-                            color: _b.onBg,
+                            color: AppColors.textPrimary,
                           ),
                         ),
                         if (onSettingsTap != null) ...[
@@ -241,7 +241,7 @@ class BondWeekHeader extends StatelessWidget {
                             child: Icon(
                               Icons.settings_outlined,
                               size: 16,
-                              color: _b.onBg.withOpacity(0.3),
+                              color: AppColors.textPrimary.withOpacity(0.3),
                             ),
                           ),
                         ],
@@ -252,7 +252,7 @@ class BondWeekHeader extends StatelessWidget {
                       weekInfo,
                       style: TextStyle(
                         fontSize: 13,
-                        color: _b.onBg.withOpacity(0.6),
+                        color: AppColors.textPrimary.withOpacity(0.6),
                       ),
                     ),
                   ],
@@ -270,7 +270,7 @@ class BondWeekHeader extends StatelessWidget {
               Icon(
                 Icons.info_outline,
                 size: 14,
-                color: _b.onBg.withOpacity(0.4),
+                color: AppColors.textPrimary.withOpacity(0.4),
               ),
               const SizedBox(width: 6),
               Expanded(
@@ -278,7 +278,7 @@ class BondWeekHeader extends StatelessWidget {
                   _nextMatchingMessage(),
                   style: TextStyle(
                     fontSize: 11,
-                    color: _b.onBg.withOpacity(0.5),
+                    color: AppColors.textPrimary.withOpacity(0.5),
                     height: 1.3,
                   ),
                 ),
@@ -299,7 +299,7 @@ class BondWeekHeader extends StatelessWidget {
             '이번 주, 파트너와 함께 버티는 시간입니다',
             style: TextStyle(
               fontSize: 13,
-              color: _b.onBg.withOpacity(0.75),
+              color: AppColors.textPrimary.withOpacity(0.75),
               height: 1.4,
             ),
           ),
@@ -308,7 +308,7 @@ class BondWeekHeader extends StatelessWidget {
             '7일 동안 조용히 이어집니다',
             style: TextStyle(
               fontSize: 13,
-              color: _b.onBg.withOpacity(0.75),
+              color: AppColors.textPrimary.withOpacity(0.75),
               height: 1.4,
             ),
           ),
@@ -322,7 +322,7 @@ class BondWeekHeader extends StatelessWidget {
             '아직 매칭이 시작되지 않았어요',
             style: TextStyle(
               fontSize: 13,
-              color: _b.onBg.withOpacity(0.75),
+              color: AppColors.textPrimary.withOpacity(0.75),
               height: 1.4,
             ),
           ),
@@ -331,7 +331,7 @@ class BondWeekHeader extends StatelessWidget {
             '함께 걸을 사람을 찾아보세요',
             style: TextStyle(
               fontSize: 13,
-              color: _b.onBg.withOpacity(0.75),
+              color: AppColors.textPrimary.withOpacity(0.75),
               height: 1.4,
             ),
           ),
@@ -352,3 +352,6 @@ class BondWeekHeader extends StatelessWidget {
     return '$month월 ${weekOfMonth}주차 · ${monday.day}~${sunday.day}일';
   }
 }
+
+
+

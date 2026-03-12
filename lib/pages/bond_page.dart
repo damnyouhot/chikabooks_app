@@ -5,11 +5,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/user_profile_service.dart';
 import '../services/partner_service.dart';
 import '../services/weekly_activity_service.dart';
-import '../services/bond_post_service.dart'; // ✅ 추가
+import '../services/bond_post_service.dart';
 import '../models/partner_group.dart';
 import '../widgets/bond_post_sheet.dart';
 import '../widgets/profile_gate_sheet.dart';
-import '../core/theme/tab_theme.dart';
+import '../core/theme/app_colors.dart';
 
 import '../widgets/bond/bond_top_bar.dart';
 import '../widgets/bond/bond_week_header.dart';
@@ -428,7 +428,7 @@ class _BondPageState extends State<BondPage> {
         }
 
         return Scaffold(
-          backgroundColor: TabTheme.bond.bg,  // White
+          backgroundColor: AppColors.appBg,  // soft gray
           body: SafeArea(
             child: CustomScrollView(
               slivers: [

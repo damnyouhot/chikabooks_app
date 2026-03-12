@@ -3,7 +3,7 @@ import '../../services/career_profile_service.dart';
 import '../../features/resume/screens/resume_home_screen.dart';
 import '../../features/resume/screens/my_applications_screen.dart';
 import '../settings/settings_page.dart';
-import '../../core/theme/tab_theme.dart';
+import '../../core/theme/app_colors.dart';
 import 'career_shared.dart';
 import 'career_identity_section.dart';
 import 'career_skill_section.dart';
@@ -115,9 +115,9 @@ class CareerTabHeader extends StatelessWidget {
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
               decoration: BoxDecoration(
-                color: TabTheme.job.surface,  // 연회색 배경
+                color: AppColors.surfaceMuted,  // 연회색 배경
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: TabTheme.job.border, width: 1.2),
+                border: Border.all(color: AppColors.accent, width: 1.2),
               ),
               child: TabBar(
                 indicator: BoxDecoration(
@@ -134,7 +134,7 @@ class CareerTabHeader extends StatelessWidget {
                 indicatorSize: TabBarIndicatorSize.tab,
                 indicatorPadding: const EdgeInsets.all(3),
                 dividerColor: Colors.transparent,
-                labelColor: TabTheme.job.onAccent,    // White (Black 위)
+                labelColor: AppColors.onAccent,    // White (Black 위)
                 unselectedLabelColor: kCMuted,
                 labelStyle: const TextStyle(
                   fontSize: 14,
@@ -560,13 +560,13 @@ class _ResumeShortcutCard extends StatelessWidget {
                   width: iconBox,
                   height: iconBox,
                   decoration: BoxDecoration(
-                    color: TabTheme.job.accent.withOpacity(0.15),  // 연한 Neon 배경
+                    color: AppColors.accent.withOpacity(0.15),  // 연한 Neon 배경
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: TabTheme.job.accent.withOpacity(0.5), width: 1),
+                    border: Border.all(color: AppColors.accent.withOpacity(0.5), width: 1),
                   ),
                   child: Icon(
                     Icons.description_outlined,
-                    color: TabTheme.job.accent,   // Neon 아이콘
+                    color: AppColors.accent,   // Neon 아이콘
                     size: iconBox * 0.55,
                   ),
                 );
@@ -582,7 +582,7 @@ class _ResumeShortcutCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: TabTheme.job.onAccent,  // White (Black 위)
+                      color: AppColors.onAccent,  // White (Black 위)
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -590,7 +590,7 @@ class _ResumeShortcutCard extends StatelessWidget {
                     '이력서를 작성하고 공고에 빠르게 지원해요',
                     style: TextStyle(
                       fontSize: 12,
-                      color: TabTheme.job.onAccent.withOpacity(0.7),
+                      color: AppColors.onAccent.withOpacity(0.7),
                     ),
                   ),
                 ],
@@ -598,7 +598,7 @@ class _ResumeShortcutCard extends StatelessWidget {
             ),
             Icon(
               Icons.chevron_right,
-              color: TabTheme.job.onAccent.withOpacity(0.7),
+              color: AppColors.onAccent.withOpacity(0.7),
               size: 20,
             ),
           ],
@@ -645,13 +645,13 @@ class _ApplicationsShortcutCard extends StatelessWidget {
                   width: iconBox,
                   height: iconBox,
                   decoration: BoxDecoration(
-                    color: TabTheme.job.accent.withOpacity(0.15),  // 연한 Neon 배경
+                    color: AppColors.accent.withOpacity(0.15),  // 연한 Neon 배경
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: TabTheme.job.accent.withOpacity(0.5), width: 1),
+                    border: Border.all(color: AppColors.accent.withOpacity(0.5), width: 1),
                   ),
                   child: Icon(
                     Icons.work_outline,
-                    color: TabTheme.job.accent,   // Neon 아이콘
+                    color: AppColors.accent,   // Neon 아이콘
                     size: iconBox * 0.55,
                   ),
                 );
@@ -667,7 +667,7 @@ class _ApplicationsShortcutCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: TabTheme.job.onAccent,  // White
+                      color: AppColors.onAccent,  // White
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -675,7 +675,7 @@ class _ApplicationsShortcutCard extends StatelessWidget {
                     '지원한 공고의 진행 상태를 확인해요',
                     style: TextStyle(
                       fontSize: 12,
-                      color: TabTheme.job.onAccent.withOpacity(0.7),
+                      color: AppColors.onAccent.withOpacity(0.7),
                     ),
                   ),
                 ],
@@ -683,7 +683,7 @@ class _ApplicationsShortcutCard extends StatelessWidget {
             ),
             Icon(
               Icons.chevron_right,
-              color: TabTheme.job.onAccent.withOpacity(0.7),
+              color: AppColors.onAccent.withOpacity(0.7),
               size: 20,
             ),
           ],

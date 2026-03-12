@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../models/partner_group.dart';
-import '../../core/theme/tab_theme.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_style.dart';
 
 // 같이 탭 팔레트 단축 참조
-const _b = TabTheme.bond;
+// AppColors 직접 참조 (TabTheme 제거)
 
 /// 파트너 요약 섹션 (통합 버전)
 /// - 접힌 상태: 아바타 + 1줄 요약
@@ -44,7 +45,7 @@ class BondSummarySection extends StatelessWidget {
       curve: Curves.easeInOut,
       margin: const EdgeInsets.symmetric(horizontal: 20),
       // Blue 채운 카드로 임팩트 강화
-      decoration: _b.strongCardDecoration(),
+      decoration: AppStyle.primaryCardDecoration(),
       child: Stack(
         children: [
           Column(
@@ -63,14 +64,14 @@ class BondSummarySection extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
-                          color: _b.onAccent,  // White on Blue
+                          color: AppColors.onAccent,  // White on Blue
                         ),
                       ),
                     ),
                     if (enableToggle)
                       Icon(
                         isExpanded ? Icons.expand_less : Icons.expand_more,
-                        color: _b.onAccent.withOpacity(0.7),
+                        color: AppColors.onAccent.withOpacity(0.7),
                       ),
                   ],
                 ),
@@ -91,7 +92,7 @@ class BondSummarySection extends StatelessWidget {
                       _getOneLinerSummary(),
                       style: TextStyle(
                         fontSize: 13,
-                        color: _b.onAccent,
+                        color: AppColors.onAccent,
                         fontStyle: FontStyle.italic,
                       ),
                     ),
@@ -147,7 +148,7 @@ class BondSummarySection extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: isMe
-                      ? _b.cardNeon             // Neon 내 아바타
+                      ? AppColors.cardEmphasis             // Neon 내 아바타
                       : Colors.white.withOpacity(0.35),
                   border: Border.all(color: Colors.white.withOpacity(0.7), width: 1.5),
                 ),
@@ -157,7 +158,7 @@ class BondSummarySection extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
-                      color: isMe ? _b.onCardNeon : _b.onAccent,
+                      color: isMe ? AppColors.onCardEmphasis : AppColors.onAccent,
                     ),
                   ),
                 ),
@@ -205,7 +206,7 @@ class BondSummarySection extends StatelessWidget {
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: _b.onBg,
+            color: AppColors.textPrimary,
           ),
         ),
         const SizedBox(height: 12),
@@ -232,7 +233,7 @@ class BondSummarySection extends StatelessWidget {
             height: 44,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: _b.shadow2,
+              color: AppColors.surfaceMuted,
             ),
             child: Center(
               child: Text(
@@ -240,7 +241,7 @@ class BondSummarySection extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: _b.onBg,
+                  color: AppColors.textPrimary,
                 ),
               ),
             ),
@@ -259,7 +260,7 @@ class BondSummarySection extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: _b.onBg,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                     if (partner.mainConcernShown != null &&
@@ -269,7 +270,7 @@ class BondSummarySection extends StatelessWidget {
                         '· ${partner.mainConcernShown}',
                         style: TextStyle(
                           fontSize: 12,
-                          color: _b.onBg.withOpacity(0.4),
+                          color: AppColors.textPrimary.withOpacity(0.4),
                           fontWeight: FontWeight.w400,
                         ),
                       ),
@@ -281,7 +282,7 @@ class BondSummarySection extends StatelessWidget {
                   statusMessage,
                   style: TextStyle(
                     fontSize: 12,
-                    color: _b.onBg.withOpacity(0.65),
+                    color: AppColors.textPrimary.withOpacity(0.65),
                     height: 1.4,
                   ),
                 ),
@@ -306,3 +307,5 @@ class BondSummarySection extends StatelessWidget {
     }
   }
 }
+
+

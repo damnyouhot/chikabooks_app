@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/tab_theme.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_style.dart';
 
-// ── 커리어 탭 디자인 팔레트: TabTheme.job 참조 ──
+// ── 커리어 탭 디자인 팔레트: AppColors 참조 ──
 // 색상 변경 → app_colors.dart Primitive만 수정하면 자동 반영
-final _j = TabTheme.job;
-final kCText   = _j.onBg;      // Black (White bg → Black)
-final kCBg     = _j.bg;        // White
-final kCAccent = _j.accent;    // Blue (버튼/카드 채움)
-final kCShadow = _j.border;    // Blue 테두리
-final kCCardBg = _j.cardBg;    // 연파랑 카드 배경
-final kCMuted  = _j.muted;     // 진한 회색 (비활성)
+const kCText   = AppColors.textPrimary;   // Black
+const kCBg     = AppColors.appBg;         // Soft gray
+const kCAccent = AppColors.accent;        // Blue (버튼/카드 채움)
+const kCShadow = AppColors.accent;        // Blue 계열 (border 역할이었으나 제거)
+const kCCardBg = AppColors.surfaceMuted;  // Muted surface 카드 배경
+const kCMuted  = AppColors.textSecondary; // 진한 회색 (비활성)
 
 // ── 헬퍼 함수 ──────────────────────────────────────────────────
 String formatCareerMonths(int months) {
@@ -63,18 +63,7 @@ class CareerCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: padding,
-      decoration: BoxDecoration(
-        color: kCCardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: kCShadow.withOpacity(0.6), width: 0.8),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+      decoration: AppStyle.primaryCardDecoration(radius: 16),
       child: child,
     );
   }
@@ -88,11 +77,7 @@ class CareerSectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: TextStyle(
-        fontSize: 14,
-        fontWeight: FontWeight.w800,
-        color: kCText.withOpacity(0.9),
-      ),
+      style: AppStyle.cardPrimaryTitle,
     );
   }
 }
@@ -113,24 +98,21 @@ class CareerDatePickerTile extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-        decoration: BoxDecoration(
-          color: kCCardBg,
-          borderRadius: BorderRadius.circular(12),
-        ),
+        decoration: AppStyle.primaryCardDecoration(radius: 12),
         child: Row(
           children: [
-            Icon(
+            const Icon(
               Icons.calendar_today_outlined,
               size: 16,
-              color: kCText.withOpacity(0.55),
+              color: AppColors.onCardPrimary,
             ),
             const SizedBox(width: 10),
             Text(
               label,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: kCText.withOpacity(0.85),
+                color: AppColors.onCardPrimary,
               ),
             ),
           ],
@@ -179,18 +161,7 @@ class _CareerLoadingCardState extends State<CareerLoadingCard>
         return Container(
           height: widget.height,
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: kCCardBg,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: kCShadow.withOpacity(0.6), width: 0.8),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.3),
-                blurRadius: 12,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
+          decoration: AppStyle.primaryCardDecoration(radius: 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -232,7 +203,7 @@ class _ShimmerBar extends StatelessWidget {
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: kCShadow.withOpacity(opacity),
+        color: AppColors.onCardPrimary.withOpacity(opacity),
         borderRadius: BorderRadius.circular(radius),
       ),
     );
@@ -259,20 +230,23 @@ class CareerErrorCard extends StatelessWidget {
           Icon(
             Icons.wifi_off_outlined,
             size: 32,
-            color: kCText.withOpacity(0.3),
+            color: AppColors.onCardPrimary.withOpacity(0.6),
           ),
           const SizedBox(height: 10),
           Text(
             message,
-            style: TextStyle(fontSize: 13, color: kCText.withOpacity(0.55)),
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppColors.onCardPrimary,
+            ),
           ),
           if (onRetry != null) ...[
             const SizedBox(height: 12),
             TextButton(
               onPressed: onRetry,
-              child: Text(
+              child: const Text(
                 '다시 시도',
-                style: TextStyle(fontSize: 13, color: kCText.withOpacity(0.7)),
+                style: TextStyle(fontSize: 13, color: AppColors.onCardPrimary),
               ),
             ),
           ],
@@ -299,17 +273,16 @@ class CareerEditSheetTile extends StatelessWidget {
     return ListTile(
       onTap: onTap,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      leading: Icon(icon, color: kCText.withOpacity(0.75)),
+      leading: Icon(icon, color: AppColors.textPrimary.withOpacity(0.75)),
       title: Text(
         title,
-        style: TextStyle(
+        style: const TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w700,
-          color: kCText,
+          color: AppColors.textPrimary,
         ),
       ),
-      trailing: Icon(Icons.chevron_right, color: kCText.withOpacity(0.45)),
+      trailing: Icon(Icons.chevron_right, color: AppColors.textPrimary.withOpacity(0.45)),
     );
   }
 }
-

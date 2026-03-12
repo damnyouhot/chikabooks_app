@@ -5,26 +5,56 @@ import 'app_colors.dart';
 class AppTheme {
   static ThemeData get light {
     return ThemeData(
-      colorSchemeSeed: AppColors.blue,       // blue → Material 위젯 포인트
-      brightness: Brightness.light,          // 흰 배경 기반 → 라이트 모드
+      colorSchemeSeed: AppColors.blue,
+      brightness: Brightness.light,
       useMaterial3: true,
       fontFamily: 'NotoSansKR',
       fontFamilyFallback: const ['Apple SD Gothic Neo', 'Roboto'],
-      scaffoldBackgroundColor: AppColors.white,
+      // Scaffold 배경: soft gray (카드와 시각적 분리)
+      scaffoldBackgroundColor: AppColors.appBg,
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
-        foregroundColor: AppColors.black,    // AppBar 아이콘/텍스트 검정
+        foregroundColor: AppColors.textPrimary,
       ),
-      // 텍스트 기본색 검정 (흰 배경 위 최대 대비)
+      // 텍스트 기본색: Black (soft gray 배경 위 최대 대비)
       textTheme: const TextTheme(
-        bodyLarge:   TextStyle(color: AppColors.black),
-        bodyMedium:  TextStyle(color: AppColors.black),
-        bodySmall:   TextStyle(color: AppColors.black),
-        titleLarge:  TextStyle(color: AppColors.black),
-        titleMedium: TextStyle(color: AppColors.black),
-        titleSmall:  TextStyle(color: AppColors.black),
+        bodyLarge:   TextStyle(color: AppColors.textPrimary),
+        bodyMedium:  TextStyle(color: AppColors.textPrimary),
+        bodySmall:   TextStyle(color: AppColors.textSecondary),
+        titleLarge:  TextStyle(color: AppColors.textPrimary),
+        titleMedium: TextStyle(color: AppColors.textPrimary),
+        titleSmall:  TextStyle(color: AppColors.textPrimary),
+      ),
+      // BottomNavigationBar 전역 테마 (Consumer 없이 고정)
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        backgroundColor: AppColors.navBg,
+        selectedItemColor: AppColors.navSelected,
+        unselectedItemColor: AppColors.navUnselected,
+        elevation: 0,
+        type: BottomNavigationBarType.fixed,
+      ),
+      // ElevatedButton: 기본값 Blue + White, shadow 없음
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.accent,
+          foregroundColor: AppColors.onAccent,
+          elevation: 0,
+          shadowColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
+      // Card: shadow 없음, 배경 Blue (AppStyle.primaryCardDecoration 권장)
+      cardTheme: CardThemeData(
+        elevation: 0,
+        shadowColor: Colors.transparent,
+        color: AppColors.cardPrimary,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
       ),
     );
   }

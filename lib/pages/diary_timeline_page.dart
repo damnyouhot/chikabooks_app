@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
-import '../core/theme/tab_theme.dart';
+import '../core/theme/app_colors.dart';
 
-// caring 탭 서브 페이지 — TabTheme.caring 참조
-final _c = TabTheme.caring;
+// caring 탭 서브 페이지 — AppColors 참조
 
 /// 나의 기록 타임라인 페이지
 /// 
@@ -21,8 +20,8 @@ class DiaryTimelinePage extends StatelessWidget {
       return Scaffold(
         appBar: AppBar(
           title: const Text('나의 기록'),
-          backgroundColor: _c.bg,
-          foregroundColor: _c.onBg,
+          backgroundColor: AppColors.appBg,
+          foregroundColor: AppColors.textPrimary,
           elevation: 0,
         ),
         body: const Center(
@@ -32,7 +31,7 @@ class DiaryTimelinePage extends StatelessWidget {
     }
 
     return Scaffold(
-      backgroundColor: _c.bg,
+      backgroundColor: AppColors.appBg,
       appBar: AppBar(
         title: const Text(
           '나의 기록',
@@ -41,8 +40,8 @@ class DiaryTimelinePage extends StatelessWidget {
             fontWeight: FontWeight.w500,
           ),
         ),
-        backgroundColor: _c.bg,
-        foregroundColor: _c.onBg,
+        backgroundColor: AppColors.appBg,
+        foregroundColor: AppColors.textPrimary,
         elevation: 0,
       ),
       body: StreamBuilder<QuerySnapshot>(
@@ -62,7 +61,7 @@ class DiaryTimelinePage extends StatelessWidget {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return Center(
               child: CircularProgressIndicator(
-                color: _c.border,
+                color: AppColors.accent,
               ),
             );
           }
@@ -223,7 +222,7 @@ class _NoteCard extends StatelessWidget {
         color: Colors.white.withOpacity(0.7),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: _c.muted.withOpacity(0.5),
+          color: AppColors.textSecondary.withOpacity(0.5),
           width: 0.5,
         ),
       ),
@@ -265,7 +264,7 @@ class _NoteCard extends StatelessWidget {
             text,
             style: TextStyle(
               fontSize: 15,
-              color: _c.onBg,
+              color: AppColors.textPrimary,
               height: 1.5,
             ),
           ),

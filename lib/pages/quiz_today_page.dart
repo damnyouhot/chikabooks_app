@@ -2,17 +2,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
-import '../core/theme/tab_theme.dart';
 
-// ── 디자인 팔레트: TabTheme.growth 참조 ──
+// ── 디자인 팔레트: AppColors 참조 ──
 // 색상 변경 → app_colors.dart Primitive만 수정하면 자동 반영
-final _g        = TabTheme.growth;
-final _kAccent  = _g.accent;    // Blue (버튼/강조)
-final _kText    = _g.onBg;      // Black (Inversion)
-final _kShadow1 = _g.border;    // Blue 계열 경계선
-final _kShadow2 = _g.surface;   // 연파랑 구분선
-final _kCardBg  = _g.cardBg;    // 카드 배경: 연파랑
-// 퀴즈 정답/오답: 의미 컬러로 AppColors Component Override 사용
+const _kText    = AppColors.textPrimary;   // Black
+const _kCardBg  = AppColors.surfaceMuted;  // Muted surface 카드 배경
+// 퀴즈 정답/오답: 의미 컬러
 const _kCorrect = AppColors.quizCorrect;
 
 /// 오늘의 퀴즈
@@ -174,14 +169,6 @@ class _QuizStatsCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: _kCardBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _kShadow2, width: 0.5),
-        boxShadow: [
-          BoxShadow(
-            color: _kShadow1.withOpacity(0.2),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       child: !isLoaded
           ? const SizedBox(
@@ -203,7 +190,7 @@ class _QuizStatsCard extends StatelessWidget {
                 VerticalDivider(
                   width: 1,
                   thickness: 1,
-                  color: _kShadow2.withOpacity(0.5),
+                  color: AppColors.surfaceMuted.withOpacity(0.5),
                 ),
                 // 통산 성적
                 Expanded(
@@ -217,7 +204,7 @@ class _QuizStatsCard extends StatelessWidget {
                 VerticalDivider(
                   width: 1,
                   thickness: 1,
-                  color: _kShadow2.withOpacity(0.5),
+                  color: AppColors.surfaceMuted.withOpacity(0.5),
                 ),
                 // 순위
                 Expanded(
@@ -331,14 +318,6 @@ class _QuizCardState extends State<_QuizCard> {
       decoration: BoxDecoration(
         color: _kCardBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _kShadow2, width: 0.5),
-        boxShadow: [
-          BoxShadow(
-            color: _kShadow1.withOpacity(0.2),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -357,8 +336,8 @@ class _QuizCardState extends State<_QuizCard> {
                     height: badgeSize,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: _kAccent.withOpacity(0.3),
-                  border: Border.all(color: _kAccent, width: 0.5),
+                  color: AppColors.accent.withOpacity(0.3),
+                  border: Border.all(color: AppColors.accent, width: 0.5),
                 ),
                 child: Center(
                   child: Text(
@@ -394,7 +373,7 @@ class _QuizCardState extends State<_QuizCard> {
             final isCorrect = i == widget.correctIndex;
             final isSelected = i == _selectedIndex;
 
-            Color bgColor = _kShadow2.withOpacity(0.3);
+            Color bgColor = AppColors.surfaceMuted.withOpacity(0.3);
             Color textColor = _kText;
             Color borderColor = Colors.transparent;
 

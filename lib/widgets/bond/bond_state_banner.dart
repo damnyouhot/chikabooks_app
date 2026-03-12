@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/tab_theme.dart';
+import '../../core/theme/app_colors.dart';
 
-const _b = TabTheme.bond;
+// AppColors 직접 참조 (TabTheme 제거)
 
 /// 상태 안내 배너
 class BondStateBanner extends StatelessWidget {
@@ -49,7 +49,7 @@ class BondStateBanner extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: _b.onBg,
+                    color: AppColors.textPrimary,
                     height: 1.4,
                   ),
                 ),
@@ -59,7 +59,7 @@ class BondStateBanner extends StatelessWidget {
                     _getSubtitle(),
                     style: TextStyle(
                       fontSize: 12,
-                      color: _b.onBg.withOpacity(0.6),
+                      color: AppColors.textPrimary.withOpacity(0.6),
                       height: 1.4,
                     ),
                   ),
@@ -77,7 +77,7 @@ class BondStateBanner extends StatelessWidget {
       case 'no_group':    return const Color(0xFFF5F5F5);
       case 'pause':       return const Color(0xFFFFF9E6);
       case 'expiring_soon': return const Color(0xFFFFF3E0);
-      case 'two_person':  return _b.accent.withOpacity(0.08);
+      case 'two_person':  return AppColors.accent.withOpacity(0.08);
       default:            return Colors.white;
     }
   }
@@ -87,27 +87,27 @@ class BondStateBanner extends StatelessWidget {
       case 'no_group':    return Colors.grey[300]!;
       case 'pause':       return const Color(0xFFFFE082);
       case 'expiring_soon': return const Color(0xFFFFB74D);
-      case 'two_person':  return _b.accent.withOpacity(0.2);
+      case 'two_person':  return AppColors.accent.withOpacity(0.2);
       default:            return Colors.grey[200]!;
     }
   }
 
   Color _getIconBackgroundColor() {
     switch (state) {
-      case 'no_group':    return _b.accent.withOpacity(0.1);
+      case 'no_group':    return AppColors.accent.withOpacity(0.1);
       case 'pause':       return Colors.orange.withOpacity(0.1);
       case 'expiring_soon': return const Color(0xFFF57C00).withOpacity(0.1);
-      case 'two_person':  return _b.accent.withOpacity(0.2);
+      case 'two_person':  return AppColors.accent.withOpacity(0.2);
       default:            return Colors.grey[200]!;
     }
   }
 
   Color _getIconColor() {
     switch (state) {
-      case 'no_group':    return _b.accent;
+      case 'no_group':    return AppColors.accent;
       case 'pause':       return Colors.orange[700]!;
       case 'expiring_soon': return const Color(0xFFF57C00);
-      case 'two_person':  return _b.onBg;
+      case 'two_person':  return AppColors.textPrimary;
       default:            return Colors.grey[600]!;
     }
   }
@@ -142,3 +142,6 @@ class BondStateBanner extends StatelessWidget {
     }
   }
 }
+
+
+

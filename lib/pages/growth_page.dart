@@ -9,16 +9,13 @@ import 'ebook/ebook_detail_page.dart';
 import 'quiz_today_page.dart';
 import 'hira_update_page.dart';
 import 'settings/settings_page.dart';
-import '../core/theme/tab_theme.dart';
+import '../core/theme/app_colors.dart';
 
-// ── 디자인 팔레트: TabTheme.growth 참조 ──
+// ── 디자인 팔레트: AppColors 참조 ──
 // 색상 변경 → app_colors.dart Primitive만 수정하면 자동 반영
-final _g       = TabTheme.growth;
-final _kText    = _g.onBg;      // Black (White bg → Black)
-final _kBg      = _g.bg;        // White
-final _kShadow1 = _g.border;    // Blue 테두리 (선명한 구분선)
-final _kShadow2 = _g.surface;   // 연파랑 표면
-final _kCardBg  = _g.cardBg;    // 카드 배경: 연파랑 틴트
+const _kText    = AppColors.textPrimary;   // Black
+const _kBg      = AppColors.appBg;         // Soft gray
+const _kCardBg  = AppColors.surfaceMuted;  // Muted surface 카드 배경
 
 /// 성장 탭 (3탭)
 ///
@@ -175,28 +172,20 @@ class _GrowthPageState extends State<GrowthPage>
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       decoration: BoxDecoration(
-        color: _kShadow2,
+        color: AppColors.surfaceMuted,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _kShadow1, width: 1.2),  // 진한 테두리
       ),
       child: TabBar(
         controller: _tabCtrl,
         indicator: BoxDecoration(
-          color: TabTheme.growth.accent,  // Neon 인디케이터 채움
+          color: AppColors.accent,  // Blue 인디케이터
           borderRadius: BorderRadius.circular(10),
-          boxShadow: [
-            BoxShadow(
-              color: TabTheme.growth.accent.withOpacity(0.4),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
         ),
         indicatorSize: TabBarIndicatorSize.tab,
         indicatorPadding: const EdgeInsets.all(3),
         dividerColor: Colors.transparent,
-        labelColor: TabTheme.growth.onAccent,    // Neon 위 → Black (대비↑)
-        unselectedLabelColor: _kText.withOpacity(0.5),
+        labelColor: AppColors.onAccent,    // Blue 위 → White
+        unselectedLabelColor: AppColors.textSecondary,
         labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
         unselectedLabelStyle: const TextStyle(
           fontSize: 14,
@@ -249,7 +238,7 @@ class _MyLibraryViewState extends State<_MyLibraryView>
           margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
-            color: _kShadow2.withOpacity(0.3),
+            color: AppColors.surfaceMuted.withOpacity(0.3),
             borderRadius: BorderRadius.circular(12),
           ),
           child: TabBar(
@@ -259,7 +248,7 @@ class _MyLibraryViewState extends State<_MyLibraryView>
               borderRadius: BorderRadius.circular(10),
               boxShadow: [
                 BoxShadow(
-                  color: _kShadow1.withOpacity(0.1),
+                  color: AppColors.surfaceMuted.withOpacity(0.1),
                   blurRadius: 4,
                   offset: const Offset(0, 1),
                 ),
@@ -306,7 +295,7 @@ class _MyBooksTab extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.menu_book_outlined, size: 48, color: _kShadow1),
+                Icon(Icons.menu_book_outlined, size: 48, color: AppColors.textSecondary),
                 const SizedBox(height: 12),
                 Text(
                   '구매한 도서가 없습니다.',
@@ -386,7 +375,7 @@ class _SavedHiraTab extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.bookmark_border, size: 48, color: _kShadow1),
+                Icon(Icons.bookmark_border, size: 48, color: AppColors.textSecondary),
                 const SizedBox(height: 12),
                 Text(
                   '저장한 변경사항이 없습니다',
@@ -442,18 +431,10 @@ class _SavedHiraTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: _kCardBg,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _kShadow1, width: 1.2),  // 진한 라임 테두리
-          boxShadow: [
-            BoxShadow(
-              color: _kShadow1.withOpacity(0.20),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
         ),
         child: Row(
           children: [
-            Icon(Icons.info_outline, size: 20, color: TabTheme.growth.accent),  // Neon 아이콘
+            const Icon(Icons.info_outline, size: 20, color: AppColors.accent),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -481,7 +462,7 @@ class _SavedHiraTile extends StatelessWidget {
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, color: TabTheme.growth.accent, size: 20),
+            const Icon(Icons.chevron_right, color: AppColors.accent, size: 20),
           ],
         ),
       ),
@@ -506,14 +487,6 @@ class _MyBookTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: _kCardBg,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _kShadow1, width: 1.2),  // 진한 라임 테두리
-          boxShadow: [
-            BoxShadow(
-              color: _kShadow1.withOpacity(0.20),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
         ),
         child: Row(
           children: [
@@ -534,7 +507,7 @@ class _MyBookTile extends StatelessWidget {
                     (_, __, ___) => Container(
                           width: coverW,
                           height: coverH,
-                      color: _kShadow2,
+                      color: AppColors.surfaceMuted,
                       child: Icon(Icons.book, color: _kText.withOpacity(0.3)),
                     ),
               ),
@@ -627,14 +600,6 @@ class _BookStoreBrowseView extends StatelessWidget {
                     child: Container(
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: _kShadow2, width: 0.5),
-                        boxShadow: [
-                          BoxShadow(
-                            color: _kShadow1.withOpacity(0.15),
-                            blurRadius: 4,
-                            offset: const Offset(0, 1),
-                          ),
-                        ],
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(12),
@@ -644,7 +609,7 @@ class _BookStoreBrowseView extends StatelessWidget {
                           width: double.infinity,
                           errorBuilder:
                               (_, __, ___) => Container(
-                                color: _kShadow2,
+                                color: AppColors.surfaceMuted,
                                 child: Icon(
                                   Icons.image,
                                   color: _kText.withOpacity(0.3),

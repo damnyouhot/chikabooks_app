@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/tab_theme.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_style.dart';
 
-const _b = TabTheme.bond;
+// AppColors 직접 참조 (TabTheme 제거)
 
 /// 공감 투표 섹션
 class BondPollSection extends StatefulWidget {
@@ -31,7 +32,7 @@ class _BondPollSectionState extends State<BondPollSection> {
               Icon(
                 Icons.how_to_vote_outlined,
                 size: 16,
-                color: _b.onBg.withOpacity(0.4),
+                color: AppColors.textPrimary.withOpacity(0.4),
               ),
               const SizedBox(width: 6),
               Text(
@@ -39,7 +40,7 @@ class _BondPollSectionState extends State<BondPollSection> {
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
-                  color: _b.onBg,
+                  color: AppColors.textPrimary,
                 ),
               ),
               const SizedBox(width: 6),
@@ -47,7 +48,7 @@ class _BondPollSectionState extends State<BondPollSection> {
                 '다들 어떤지 궁금해서.',
                 style: TextStyle(
                   fontSize: 11,
-                  color: _b.onBg.withOpacity(0.4),
+                  color: AppColors.textPrimary.withOpacity(0.4),
                 ),
               ),
               const Spacer(),
@@ -58,7 +59,7 @@ class _BondPollSectionState extends State<BondPollSection> {
           // 투표 카드 — Dark 배경
           Container(
             width: double.infinity,
-            decoration: _b.darkCardDecoration(),
+            decoration: AppStyle.primaryCardDecoration(),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -72,7 +73,7 @@ class _BondPollSectionState extends State<BondPollSection> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: _b.cardNeon,
+                          color: AppColors.cardEmphasis,
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
@@ -80,7 +81,7 @@ class _BondPollSectionState extends State<BondPollSection> {
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w800,
-                            color: _b.onCardNeon,
+                            color: AppColors.onCardEmphasis,
                           ),
                         ),
                       ),
@@ -91,7 +92,7 @@ class _BondPollSectionState extends State<BondPollSection> {
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
-                            color: _b.onCardDark,  // White on Dark
+                            color: AppColors.onCardPrimary,  // White on Dark
                             height: 1.4,
                           ),
                         ),
@@ -125,12 +126,12 @@ class _BondPollSectionState extends State<BondPollSection> {
                             ),
                             decoration: BoxDecoration(
                               color: isSelected
-                                  ? _b.cardNeon
+                                  ? AppColors.cardEmphasis
                                   : const Color(0xFF2A2A2A),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
                                 color: isSelected
-                                    ? _b.cardNeon
+                                    ? AppColors.cardEmphasis
                                     : Colors.white.withOpacity(0.08),
                                 width: isSelected ? 0 : 0.5,
                               ),
@@ -145,12 +146,12 @@ class _BondPollSectionState extends State<BondPollSection> {
                                     shape: BoxShape.circle,
                                     border: Border.all(
                                       color: isSelected
-                                          ? _b.onCardNeon.withOpacity(0.6)
+                                          ? AppColors.onCardEmphasis.withOpacity(0.6)
                                           : Colors.white.withOpacity(0.3),
                                       width: isSelected ? 1.5 : 0.8,
                                     ),
                                     color: isSelected
-                                        ? _b.onCardNeon.withOpacity(0.15)
+                                        ? AppColors.onCardEmphasis.withOpacity(0.15)
                                         : Colors.transparent,
                                   ),
                                   child: isSelected
@@ -160,7 +161,7 @@ class _BondPollSectionState extends State<BondPollSection> {
                                             height: 8,
                                             decoration: BoxDecoration(
                                               shape: BoxShape.circle,
-                                              color: _b.onCardNeon,
+                                              color: AppColors.onCardEmphasis,
                                             ),
                                           ),
                                         )
@@ -176,7 +177,7 @@ class _BondPollSectionState extends State<BondPollSection> {
                                           ? FontWeight.w700
                                           : FontWeight.w400,
                                       color: isSelected
-                                          ? _b.onCardNeon
+                                          ? AppColors.onCardEmphasis
                                           : Colors.white.withOpacity(0.85),
                                     ),
                                   ),
@@ -189,7 +190,7 @@ class _BondPollSectionState extends State<BondPollSection> {
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
                                       color: isSelected
-                                          ? _b.onCardNeon.withOpacity(0.7)
+                                          ? AppColors.onCardEmphasis.withOpacity(0.7)
                                           : Colors.white.withOpacity(0.45),
                                     ),
                                   ),
@@ -238,3 +239,5 @@ class _BondPollSectionState extends State<BondPollSection> {
     );
   }
 }
+
+

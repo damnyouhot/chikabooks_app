@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 // ── 디자인 팔레트 ──
-const _kAccent = Color(0xFFF7CBCA);
 const _kText = Color(0xFF5D6B6B);
 const _kShadow2 = Color(0xFFD5E5E5);
 

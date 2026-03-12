@@ -16,13 +16,13 @@ import '../widgets/diary_input_sheet.dart';
 import '../widgets/user_goal_sheet.dart';
 import '../pages/ebook/ebook_detail_page.dart';
 import 'settings/settings_page.dart';
-import '../core/theme/tab_theme.dart';
+import '../core/theme/app_colors.dart';
 
-// ── 디자인 컬러 팔레트 (TabTheme.caring 참조) ──
+// ── 디자인 컬러 팔레트 (AppColors 참조) ──
 // 색상 변경 → app_colors.dart Primitive만 수정하면 자동 반영
-final _colorAccent = TabTheme.caring.accent;   // Blue (#2E5BFF)
-final _colorText   = TabTheme.caring.onBg;     // Black (White bg → Black)
-final _colorBg     = TabTheme.caring.bg;       // White
+const _colorAccent = AppColors.accent;       // Blue (#2E5BFF)
+const _colorText   = AppColors.textPrimary;  // Black
+const _colorBg     = AppColors.appBg;        // Soft gray
 
 /// 기본 메시지 상태 머신 상태
 enum _LoopState { idle, showingBase, showingReaction }
@@ -860,7 +860,7 @@ class _TapCard extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 3),
       child: Material(
-        color: TabTheme.caring.cardBg,  // 연파랑 카드 배경
+        color: AppColors.surfaceMuted,  // muted surface 카드 배경
         elevation: 0,
         borderRadius: radius,
         child: InkWell(
@@ -870,7 +870,6 @@ class _TapCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
               borderRadius: radius,
-              border: Border.all(color: TabTheme.caring.border.withOpacity(0.35), width: 1),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
@@ -881,10 +880,10 @@ class _TapCard extends StatelessWidget {
                   fit: FlexFit.tight,
                   child: Text(
                     title,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: TabTheme.caring.accent,  // Blue 타이틀 (대비↑)
+                      color: AppColors.accent,  // Blue 타이틀 (대비↑)
                     ),
                   ),
                 ),
@@ -905,7 +904,7 @@ class _TapCard extends StatelessWidget {
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                       if (subtitle.isNotEmpty)
@@ -916,14 +915,14 @@ class _TapCard extends StatelessWidget {
                           textAlign: TextAlign.end,
                           style: const TextStyle(
                             fontSize: 10,
-                            color: Color(0xFF555555),  // 진한 회색 (가독성↑)
+                            color: AppColors.textSecondary,
                           ),
                         ),
                     ],
                   ),
                 ),
                 const SizedBox(width: 4),
-                Icon(Icons.chevron_right, color: TabTheme.caring.accent.withOpacity(0.6), size: 20),
+                const Icon(Icons.chevron_right, color: AppColors.accent, size: 20),
               ],
             ),
           ),
@@ -960,7 +959,7 @@ class _PolicyRollingCard extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 3),
       child: Material(
-        color: TabTheme.caring.cardBg,  // 연파랑 카드 배경
+        color: AppColors.surfaceMuted,  // muted surface 카드 배경
         elevation: 0,
         borderRadius: radius,
         child: InkWell(
@@ -970,7 +969,6 @@ class _PolicyRollingCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
               borderRadius: radius,
-              border: Border.all(color: TabTheme.caring.border.withOpacity(0.35), width: 1),
             ),
             child: LayoutBuilder(
               builder: (ctx, constraints) {
@@ -984,10 +982,10 @@ class _PolicyRollingCard extends StatelessWidget {
                     Expanded(
                       child: Text(
                         '🏥 임박 제도 변경',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
-                          color: TabTheme.caring.accent,  // Blue (대비↑)
+                          color: AppColors.accent,  // Blue (대비↑)
                         ),
                       ),
                     ),
@@ -1037,7 +1035,7 @@ class _PolicyRollingCard extends StatelessWidget {
                                   style: const TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.black87,
+                                    color: AppColors.textPrimary,
                                   ),
                                 ),
                                 if (sub.isNotEmpty)
@@ -1048,7 +1046,7 @@ class _PolicyRollingCard extends StatelessWidget {
                                     textAlign: TextAlign.end,
                                     style: const TextStyle(
                                       fontSize: 10,
-                                      color: Color(0xFF555555),  // 진한 회색
+                                      color: AppColors.textSecondary,  // 진한 회색
                                     ),
                                   ),
                               ],
@@ -1058,7 +1056,7 @@ class _PolicyRollingCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 4),
-                    Icon(Icons.chevron_right, color: TabTheme.caring.accent.withOpacity(0.6), size: 20),
+                    const Icon(Icons.chevron_right, color: AppColors.accent, size: 20),
                   ],
                 );
               },

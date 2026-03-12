@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../bond_post_card.dart';
-import '../../core/theme/tab_theme.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_style.dart';
 
-const _b = TabTheme.bond;
+// AppColors 직접 참조 (TabTheme 제거)
 
 /// 오늘을 나누기 피드 섹션
 class BondFeedSection extends StatefulWidget {
@@ -80,7 +81,7 @@ class _BondFeedSectionState extends State<BondFeedSection> {
               Icon(
                 Icons.chat_bubble_outline,
                 size: 16,
-                color: _b.onBg.withOpacity(isPersonalMode ? 0.4 : 0.6),
+                color: AppColors.textPrimary.withOpacity(isPersonalMode ? 0.4 : 0.6),
               ),
               const SizedBox(width: 6),
               Text(
@@ -88,7 +89,7 @@ class _BondFeedSectionState extends State<BondFeedSection> {
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
-                  color: _b.onBg,
+                  color: AppColors.textPrimary,
                 ),
               ),
               const SizedBox(width: 6),
@@ -96,7 +97,7 @@ class _BondFeedSectionState extends State<BondFeedSection> {
                 '여기선 괜찮아',
                 style: TextStyle(
                   fontSize: 11,
-                  color: _b.onBg.withOpacity(0.4),
+                  color: AppColors.textPrimary.withOpacity(0.4),
                 ),
               ),
               const Spacer(),
@@ -111,10 +112,10 @@ class _BondFeedSectionState extends State<BondFeedSection> {
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   backgroundColor: isPersonalMode
                       ? Colors.transparent
-                      : _b.accent,             // Blue 배경
+                      : AppColors.accent,             // Blue 배경
                   foregroundColor: isPersonalMode
-                      ? _b.onBg.withOpacity(0.3)
-                      : _b.onAccent,           // White 텍스트
+                      ? AppColors.textPrimary.withOpacity(0.3)
+                      : AppColors.onAccent,           // White 텍스트
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20),
                   ),
@@ -233,19 +234,19 @@ class _BondFeedSectionState extends State<BondFeedSection> {
         padding: const EdgeInsets.all(24),
         decoration: isPersonalMode
             ? BoxDecoration(
-                color: _b.cardBg,
+                color: AppColors.surfaceMuted,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: _b.shadow1.withOpacity(0.3)),
+                border: Border.all(color: AppColors.surfaceMuted.withOpacity(0.3)),
               )
-            : _b.strongCardDecoration(),  // Blue 빈 피드 카드
+            : AppStyle.primaryCardDecoration(),  // Blue 빈 피드 카드
         child: Column(
           children: [
             Icon(
               icon,
               size: 40,
               color: isPersonalMode
-                  ? _b.onBg.withOpacity(0.3)
-                  : _b.onAccent.withOpacity(0.7),  // White on Blue
+                  ? AppColors.textPrimary.withOpacity(0.3)
+                  : AppColors.onAccent.withOpacity(0.7),  // White on Blue
             ),
             const SizedBox(height: 8),
             Text(
@@ -254,8 +255,8 @@ class _BondFeedSectionState extends State<BondFeedSection> {
               style: TextStyle(
                 fontSize: 14,
                 color: isPersonalMode
-                    ? _b.onBg.withOpacity(0.5)
-                    : _b.onAccent,  // White on Blue
+                    ? AppColors.textPrimary.withOpacity(0.5)
+                    : AppColors.onAccent,  // White on Blue
                 height: 1.4,
               ),
             ),
@@ -265,8 +266,8 @@ class _BondFeedSectionState extends State<BondFeedSection> {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
                 decoration: BoxDecoration(
                   color: isPersonalMode
-                      ? _b.accent
-                      : _b.cardNeon,   // Neon 서브텍스트 버튼
+                      ? AppColors.accent
+                      : AppColors.cardEmphasis,   // Neon 서브텍스트 버튼
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
@@ -275,7 +276,7 @@ class _BondFeedSectionState extends State<BondFeedSection> {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
-                    color: isPersonalMode ? _b.onAccent : _b.onCardNeon,
+                    color: isPersonalMode ? AppColors.onAccent : AppColors.onCardEmphasis,
                   ),
                 ),
               ),
@@ -286,3 +287,5 @@ class _BondFeedSectionState extends State<BondFeedSection> {
     );
   }
 }
+
+

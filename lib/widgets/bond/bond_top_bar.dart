@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../pages/settings/settings_page.dart';
-import '../../core/theme/tab_theme.dart';
+import '../../core/theme/app_colors.dart';
 
-const _b = TabTheme.bond;
+// AppColors 직접 참조 (TabTheme 제거)
 
 /// 결 탭 상단 타이틀 바
 class BondTopBar extends StatelessWidget {
@@ -29,7 +29,7 @@ class BondTopBar extends StatelessWidget {
               IconButton(
                 icon: Icon(
                   Icons.info_outline,
-                  color: _b.onBg.withOpacity(0.5),
+                  color: AppColors.textPrimary.withOpacity(0.5),
                   size: 18,
                 ),
                 onPressed: () => _showConceptDialog(context),
@@ -40,7 +40,7 @@ class BondTopBar extends StatelessWidget {
                 child: PopupMenuButton<String>(
                   icon: Icon(
                     Icons.more_vert_rounded,
-                    color: _b.onBg.withOpacity(0.4),
+                    color: AppColors.textPrimary.withOpacity(0.4),
                     size: 20,
                   ),
                   tooltip: '메뉴',
@@ -94,7 +94,7 @@ class BondTopBar extends StatelessWidget {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w700,
-              color: _b.onBg,
+              color: AppColors.textPrimary,
             ),
           ),
         ),
@@ -105,7 +105,7 @@ class BondTopBar extends StatelessWidget {
             weekLabel,
             style: TextStyle(
               fontSize: 12,
-              color: _b.onBg.withOpacity(0.55),
+              color: AppColors.textPrimary.withOpacity(0.55),
             ),
           ),
         ),
@@ -220,3 +220,6 @@ class BondTopBar extends StatelessWidget {
     );
   }
 }
+
+
+
