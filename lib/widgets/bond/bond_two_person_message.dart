@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'bond_colors.dart';
+import '../../core/theme/tab_theme.dart';
+
+const _b = TabTheme.bond;
 
 /// 2인 그룹 특별 메시지
-/// - "이번 주는 두 사람의 페이지야. 가끔은 조용한 주도 좋지."
-/// - 3인이 안 찼다고 부족하게 보이면 안 됨
 class BondTwoPersonMessage extends StatelessWidget {
   const BondTwoPersonMessage({super.key});
 
@@ -13,12 +13,9 @@ class BondTwoPersonMessage extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: BondColors.kAccent.withOpacity(0.08),
+        color: _b.accent.withOpacity(0.08),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: BondColors.kAccent.withOpacity(0.2),
-          width: 1,
-        ),
+        border: Border.all(color: _b.accent.withOpacity(0.2), width: 1),
       ),
       child: Row(
         children: [
@@ -27,25 +24,21 @@ class BondTwoPersonMessage extends StatelessWidget {
             height: 40,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: BondColors.kAccent.withOpacity(0.2),
+              color: _b.accent.withOpacity(0.2),
             ),
-            child: const Icon(
-              Icons.people,
-              size: 20,
-              color: BondColors.kText,
-            ),
+            child: Icon(Icons.people, size: 20, color: _b.onBg),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   '이번 주는 두 사람의 페이지야',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: BondColors.kText,
+                    color: _b.onBg,
                     height: 1.4,
                   ),
                 ),
@@ -54,7 +47,7 @@ class BondTwoPersonMessage extends StatelessWidget {
                   '가끔은 조용한 주도 좋지',
                   style: TextStyle(
                     fontSize: 13,
-                    color: BondColors.kText.withOpacity(0.6),
+                    color: _b.onBg.withOpacity(0.6),
                     height: 1.4,
                   ),
                 ),
@@ -66,13 +59,3 @@ class BondTwoPersonMessage extends StatelessWidget {
     );
   }
 }
-
-
-
-
-
-
-
-
-
-

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../bond_post_card.dart';
-import 'bond_colors.dart';
+import '../../core/theme/tab_theme.dart';
+
+const _b = TabTheme.bond;
 
 /// 오늘을 나누기 피드 섹션
 class BondFeedSection extends StatefulWidget {
@@ -35,7 +37,6 @@ class _BondFeedSectionState extends State<BondFeedSection> {
   @override
   void didUpdateWidget(BondFeedSection oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // partnerGroupId가 바뀔 때만 스트림 재생성
     if (oldWidget.partnerGroupId != widget.partnerGroupId) {
       setState(() {
         _initStream();
@@ -79,18 +80,15 @@ class _BondFeedSectionState extends State<BondFeedSection> {
               Icon(
                 Icons.chat_bubble_outline,
                 size: 16,
-                color:
-                    isPersonalMode
-                        ? BondColors.kText.withOpacity(0.4)
-                        : BondColors.kText.withOpacity(0.6),
+                color: _b.onBg.withOpacity(isPersonalMode ? 0.4 : 0.6),
               ),
               const SizedBox(width: 6),
-              const Text(
+              Text(
                 '털어놔',
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
-                  color: BondColors.kText,
+                  color: _b.onBg,
                 ),
               ),
               const SizedBox(width: 6),
@@ -98,7 +96,7 @@ class _BondFeedSectionState extends State<BondFeedSection> {
                 '여기선 괜찮아',
                 style: TextStyle(
                   fontSize: 11,
-                  color: BondColors.kText.withOpacity(0.4),
+                  color: _b.onBg.withOpacity(0.4),
                 ),
               ),
               const Spacer(),
@@ -113,10 +111,10 @@ class _BondFeedSectionState extends State<BondFeedSection> {
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   backgroundColor: isPersonalMode
                       ? Colors.transparent
-                      : BondColors.kAccent,   // Blue 배경
+                      : _b.accent,             // Blue 배경
                   foregroundColor: isPersonalMode
-                      ? BondColors.kText.withOpacity(0.3)
-                      : BondColors.kOnAccent, // White 텍스트
+                      ? _b.onBg.withOpacity(0.3)
+                      : _b.onAccent,           // White 텍스트
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20),
                   ),
@@ -158,11 +156,7 @@ class _BondFeedSectionState extends State<BondFeedSection> {
                     children: [
                       Row(
                         children: [
-                          Icon(
-                            Icons.error_outline,
-                            color: Colors.red.shade700,
-                            size: 20,
-                          ),
+                          Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
                           const SizedBox(width: 8),
                           Text(
                             '데이터 조회 오류',
@@ -177,23 +171,19 @@ class _BondFeedSectionState extends State<BondFeedSection> {
                       const SizedBox(height: 8),
                       Text(
                         '${snap.error}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.red.shade900,
-                        ),
+                        style: TextStyle(fontSize: 12, color: Colors.red.shade900),
                       ),
                     ],
                   ),
                 );
               }
 
-              // ✅ 개인 모드: 파트너 필요 안내
               if (!_hasPartnerGroup) {
                 return _buildEmptyState(
                   icon: Icons.group_outlined,
                   text: '파트너와 함께할 때만\n기록할 수 있어요',
                   subtitle: '매칭을 시작해보세요',
-                  onTap: null, // 터치 비활성화
+                  onTap: null,
                   isPersonalMode: true,
                 );
               }
@@ -243,21 +233,19 @@ class _BondFeedSectionState extends State<BondFeedSection> {
         padding: const EdgeInsets.all(24),
         decoration: isPersonalMode
             ? BoxDecoration(
-                color: BondColors.kCardBg,
+                color: _b.cardBg,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: BondColors.kShadow1.withOpacity(0.3),
-                ),
+                border: Border.all(color: _b.shadow1.withOpacity(0.3)),
               )
-            : BondColors.blueCardDecoration(),  // Blue 빈 피드 카드
+            : _b.strongCardDecoration(),  // Blue 빈 피드 카드
         child: Column(
           children: [
             Icon(
               icon,
               size: 40,
               color: isPersonalMode
-                  ? BondColors.kText.withOpacity(0.3)
-                  : BondColors.kOnAccent.withOpacity(0.7),  // White on Blue
+                  ? _b.onBg.withOpacity(0.3)
+                  : _b.onAccent.withOpacity(0.7),  // White on Blue
             ),
             const SizedBox(height: 8),
             Text(
@@ -266,8 +254,8 @@ class _BondFeedSectionState extends State<BondFeedSection> {
               style: TextStyle(
                 fontSize: 14,
                 color: isPersonalMode
-                    ? BondColors.kText.withOpacity(0.5)
-                    : BondColors.kOnAccent,  // White on Blue
+                    ? _b.onBg.withOpacity(0.5)
+                    : _b.onAccent,  // White on Blue
                 height: 1.4,
               ),
             ),
@@ -277,8 +265,8 @@ class _BondFeedSectionState extends State<BondFeedSection> {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
                 decoration: BoxDecoration(
                   color: isPersonalMode
-                      ? BondColors.kAccent
-                      : BondColors.kNeon,   // Neon 서브텍스트 버튼
+                      ? _b.accent
+                      : _b.cardNeon,   // Neon 서브텍스트 버튼
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
@@ -287,7 +275,7 @@ class _BondFeedSectionState extends State<BondFeedSection> {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
-                    color: isPersonalMode ? BondColors.kOnAccent : BondColors.kOnNeon,
+                    color: isPersonalMode ? _b.onAccent : _b.onCardNeon,
                   ),
                 ),
               ),
@@ -298,4 +286,3 @@ class _BondFeedSectionState extends State<BondFeedSection> {
     );
   }
 }
-

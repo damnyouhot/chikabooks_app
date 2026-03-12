@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'bond_colors.dart';
+import '../../core/theme/tab_theme.dart';
+
+const _b = TabTheme.bond;
 
 /// 스탬프 원 위젯 (pop 애니메이션 포함)
 class BondStampCircle extends StatefulWidget {
@@ -43,7 +45,6 @@ class _BondStampCircleState extends State<BondStampCircle>
   @override
   void didUpdateWidget(covariant BondStampCircle oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // 채워지지 않았다가 → 채워짐으로 변경 시 pop 애니메이션 + 햅틱
     if (!_wasFilledBefore && widget.isFilled) {
       _popCtrl.forward(from: 0);
       HapticFeedback.mediumImpact();
@@ -72,24 +73,23 @@ class _BondStampCircleState extends State<BondStampCircle>
         height: 34,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          // Neon 채워진 원 | Blue 오늘 표시 | 기본 빈 원
           color: widget.isFilled
-              ? BondColors.kNeon          // Neon for filled
+              ? _b.cardNeon                                     // Neon for filled
               : widget.isToday
-                  ? BondColors.kAccent.withValues(alpha: 0.15)  // Blue tint for today
-                  : BondColors.kShadow2.withValues(alpha: 0.25),
+                  ? _b.accent.withOpacity(0.15)                // Blue tint for today
+                  : _b.shadow2.withOpacity(0.25),
           border: Border.all(
             color: widget.isToday
-                ? BondColors.kAccent.withValues(alpha: 0.9)  // Blue border today
+                ? _b.accent.withOpacity(0.9)                   // Blue border today
                 : widget.isFilled
-                    ? BondColors.kNeon.withValues(alpha: 0.6)
-                    : BondColors.kShadow1.withValues(alpha: 0.3),
+                    ? _b.cardNeon.withOpacity(0.6)
+                    : _b.shadow1.withOpacity(0.3),
             width: widget.isToday ? 2.0 : 0.8,
           ),
           boxShadow: widget.isFilled
               ? [
                   BoxShadow(
-                    color: BondColors.kNeon.withValues(alpha: 0.55),
+                    color: _b.cardNeon.withOpacity(0.55),
                     blurRadius: 10,
                     spreadRadius: 1,
                   ),
@@ -102,12 +102,11 @@ class _BondStampCircleState extends State<BondStampCircle>
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w700,
-              // Neon bg → Black | Blue/empty → Black
               color: widget.isFilled
-                  ? BondColors.kOnNeon          // Black on Neon
+                  ? _b.onCardNeon                              // Black on Neon
                   : widget.isToday
-                      ? BondColors.kAccent      // Blue for today label
-                      : BondColors.kText.withValues(alpha: 0.45),
+                      ? _b.accent                             // Blue for today label
+                      : _b.onBg.withOpacity(0.45),
             ),
           ),
         ),
@@ -115,20 +114,3 @@ class _BondStampCircleState extends State<BondStampCircle>
     );
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'app_colors.dart';
 
 /// ══════════════════════════════════════════════════════
-/// TabTheme — 탭별 독립 컬러 팔레트
+/// TabTheme — 탭별 독립 컬러 팔레트 (단일 소스)
 ///
 /// 🎨 색상 변경 방법:
 ///   app_colors.dart의 Primitive 4개(white/lime/black/blue)만 수정하면
@@ -12,17 +12,33 @@ import 'app_colors.dart';
 /// 반전 법칙:
 ///   Blue/Black 채운 요소 → White 텍스트/아이콘
 ///   Neon/White 채운 요소 → Black 텍스트/아이콘
+///
+/// 카드 종류 (같이 탭 등 복합 카드 지원):
+///   cardBg       — 기본 카드 (연한 색조)
+///   cardStrong   — 강조 채움 카드 (accent 색으로 채움, 텍스트 onAccent)
+///   cardNeon     — 형광 채움 카드 (lime 색으로 채움, 텍스트 Black)
+///   cardDark     — 다크 채움 카드 (거의 검정, 텍스트 White)
 /// ══════════════════════════════════════════════════════
 class TabTheme {
-  final Color bg;       // 배경
-  final Color onBg;     // 배경 위 텍스트/아이콘 (반전 법칙 적용)
-  final Color accent;   // 포인트(버튼, 하이라이트)
-  final Color onAccent; // accent 위 텍스트/아이콘
-  final Color cardBg;   // 카드 배경
-  final Color onCard;   // 카드 위 텍스트/아이콘
-  final Color surface;  // 서브 표면
-  final Color border;   // 구분선/테두리
-  final Color muted;    // 비활성
+  final Color bg;          // 배경
+  final Color onBg;        // 배경 위 텍스트/아이콘
+  final Color accent;      // 포인트(버튼, 하이라이트)
+  final Color onAccent;    // accent 위 텍스트/아이콘
+  final Color cardBg;      // 기본 카드 배경
+  final Color onCard;      // 카드 위 텍스트/아이콘
+  final Color surface;     // 서브 표면
+  final Color border;      // 구분선/테두리
+  final Color muted;       // 비활성
+  // ── 강조 카드 (구 BondColors 통합) ──────────────────
+  final Color cardStrong;  // 강조 채움 카드 배경 (Blue 등)
+  final Color onCardStrong;// 강조 카드 위 텍스트
+  final Color cardNeon;    // 형광 채움 카드 배경
+  final Color onCardNeon;  // 형광 카드 위 텍스트
+  final Color cardDark;    // 다크 채움 카드 배경
+  final Color onCardDark;  // 다크 카드 위 텍스트
+  // ── 파생 색상 ────────────────────────────────────────
+  final Color shadow1;     // 그림자/구분선 (연한)
+  final Color shadow2;     // 더 연한 구분선
 
   const TabTheme({
     required this.bg,
@@ -34,6 +50,14 @@ class TabTheme {
     required this.surface,
     required this.border,
     required this.muted,
+    required this.cardStrong,
+    required this.onCardStrong,
+    required this.cardNeon,
+    required this.onCardNeon,
+    required this.cardDark,
+    required this.onCardDark,
+    required this.shadow1,
+    required this.shadow2,
   });
 
   // ── 사전 정의 테마 ──────────────────────────────────────
@@ -41,56 +65,88 @@ class TabTheme {
   // 반전 법칙: Blue/Black 채운 요소 → White 텍스트
   //            Neon/White 채운 요소  → Black 텍스트
 
-  /// 탭0 (나/Caring): White 배경 + Blue 포인트 + Neon 강조
+  /// 탭0 (나/Caring): White 배경 + Blue 포인트
   static const caring = TabTheme(
-    bg:       AppColors.white,
-    onBg:     AppColors.black,   // White bg → Black text
-    accent:   AppColors.blue,    // 버튼/카드 채움: Blue
-    onAccent: AppColors.white,   // Blue 위 → White text
-    cardBg:   Color(0xFFF0F4FF), // 연파랑 카드 배경
-    onCard:   AppColors.black,
-    surface:  Color(0xFFE8EDFF), // 서브 표면 (연파랑)
-    border:   AppColors.blue,    // 테두리: Blue (선명하게)
-    muted:    Color(0xFF555555), // 비활성: 진한 회색 (가독성↑)
+    bg:           AppColors.white,
+    onBg:         AppColors.black,
+    accent:       AppColors.blue,
+    onAccent:     AppColors.white,
+    cardBg:       Color(0xFFF0F4FF),   // 연파랑 카드 배경
+    onCard:       AppColors.black,
+    surface:      Color(0xFFE8EDFF),
+    border:       AppColors.blue,
+    muted:        Color(0xFF555555),
+    cardStrong:   AppColors.blue,      // Blue 채움 카드
+    onCardStrong: AppColors.white,
+    cardNeon:     AppColors.lime,      // Neon 채움 카드
+    onCardNeon:   AppColors.black,
+    cardDark:     Color(0xFF111111),   // Dark 채움 카드
+    onCardDark:   AppColors.white,
+    shadow1:      Color(0xFFD0D8FF),   // 연파랑 그림자
+    shadow2:      Color(0xFFEEF1FF),   // 더 연한 파랑
   );
 
-  /// 탭1 (같이/Bond): White 배경 + Blue 포인트 + Neon 강조
+  /// 탭1 (같이/Bond): White 배경 + Blue 포인트
   static const bond = TabTheme(
-    bg:       AppColors.white,
-    onBg:     AppColors.black,   // White bg → Black text
-    accent:   AppColors.blue,
-    onAccent: AppColors.white,   // Blue accent → White text
-    cardBg:   Color(0xFFF0F4FF), // 연파랑 카드 배경
-    onCard:   AppColors.black,
-    surface:  Color(0xFFE8EDFF), // 파생값
-    border:   AppColors.blue,    // 테두리: Blue (선명하게)
-    muted:    Color(0xFF555555), // 진한 회색
+    bg:           AppColors.white,
+    onBg:         AppColors.black,
+    accent:       AppColors.blue,
+    onAccent:     AppColors.white,
+    cardBg:       Color(0xFFF5F7FF),   // 연파랑 카드 배경 (구 BondColors.kCardBg)
+    onCard:       AppColors.black,
+    surface:      Color(0xFFEEF1FF),
+    border:       AppColors.blue,
+    muted:        Color(0xFF888888),
+    cardStrong:   AppColors.blue,      // Blue 채움 카드 (구 blueCardDecoration)
+    onCardStrong: AppColors.white,
+    cardNeon:     AppColors.lime,      // Neon 채움 카드 (구 neonCardDecoration)
+    onCardNeon:   AppColors.black,
+    cardDark:     Color(0xFF111111),   // Dark 채움 카드 (구 darkCardDecoration)
+    onCardDark:   AppColors.white,
+    shadow1:      Color(0xFFD0D8FF),   // 구 BondColors.kShadow1
+    shadow2:      Color(0xFFEEF1FF),   // 구 BondColors.kShadow2
   );
 
-  /// 탭2 (성장하기/Growth): White 배경 + Neon 포인트 + Black 강조
+  /// 탭2 (성장하기/Growth): White 배경 + Neon 포인트
   static const growth = TabTheme(
-    bg:       AppColors.white,
-    onBg:     AppColors.black,   // White bg → Black text
-    accent:   AppColors.lime,    // 버튼/카드 채움: Neon
-    onAccent: AppColors.black,   // Neon 위 → Black text
-    cardBg:   Color(0xFFF8FFD6), // 연한 Neon 카드 배경
-    onCard:   AppColors.black,
-    surface:  Color(0xFFF0FFB0), // 서브 표면 (연라임)
-    border:   Color(0xFFB8E600), // 테두리: 진한 라임 (선명하게)
-    muted:    Color(0xFF444444), // 비활성: 어두운 회색
+    bg:           AppColors.white,
+    onBg:         AppColors.black,
+    accent:       AppColors.lime,
+    onAccent:     AppColors.black,
+    cardBg:       Color(0xFFF8FFD6),   // 연라임 카드 배경
+    onCard:       AppColors.black,
+    surface:      Color(0xFFF0FFB0),
+    border:       Color(0xFFB8E600),
+    muted:        Color(0xFF444444),
+    cardStrong:   AppColors.lime,      // Neon 채움 카드
+    onCardStrong: AppColors.black,
+    cardNeon:     AppColors.lime,
+    onCardNeon:   AppColors.black,
+    cardDark:     Color(0xFF111111),
+    onCardDark:   AppColors.white,
+    shadow1:      Color(0xFFD8F570),   // 연라임 그림자
+    shadow2:      Color(0xFFEEFFB3),
   );
 
-  /// 탭3 (커리어/Job): White 배경 + Black 포인트 + Neon 강조
+  /// 탭3 (커리어/Job): White 배경 + Black 포인트
   static const job = TabTheme(
-    bg:       AppColors.white,
-    onBg:     AppColors.black,   // White bg → Black text
-    accent:   AppColors.black,   // 버튼/카드 채움: Black
-    onAccent: AppColors.white,   // Black 위 → White text
-    cardBg:   Color(0xFFF2F2F2), // 연한 회색 카드 배경
-    onCard:   AppColors.black,
-    surface:  Color(0xFFE8E8E8), // 파생값
-    border:   AppColors.black,   // 테두리: Black (선명하게)
-    muted:    Color(0xFF555555), // 비활성: 진한 회색
+    bg:           AppColors.white,
+    onBg:         AppColors.black,
+    accent:       AppColors.black,
+    onAccent:     AppColors.white,
+    cardBg:       Color(0xFFF2F2F2),   // 연회색 카드 배경
+    onCard:       AppColors.black,
+    surface:      Color(0xFFE8E8E8),
+    border:       AppColors.black,
+    muted:        Color(0xFF555555),
+    cardStrong:   AppColors.black,     // Black 채움 카드
+    onCardStrong: AppColors.white,
+    cardNeon:     AppColors.lime,      // Neon 채움 카드
+    onCardNeon:   AppColors.black,
+    cardDark:     Color(0xFF111111),
+    onCardDark:   AppColors.white,
+    shadow1:      Color(0xFFCCCCCC),   // 회색 그림자
+    shadow2:      Color(0xFFE5E5E5),
   );
 
   static const List<TabTheme> _byIndex = [caring, bond, growth, job];
@@ -109,6 +165,61 @@ class TabTheme {
 
   /// BottomNavBar 비선택 아이콘 컬러
   Color get navUnselected => muted;
+
+  // ── 카드 데코레이션 헬퍼 (구 BondColors 통합) ────────────
+
+  /// 기본 카드 데코레이션
+  BoxDecoration cardDecoration({double radius = 16}) => BoxDecoration(
+    color: cardBg,
+    borderRadius: BorderRadius.circular(radius),
+    border: Border.all(color: shadow1.withOpacity(0.5), width: 0.8),
+    boxShadow: [
+      BoxShadow(
+        color: accent.withOpacity(0.07),
+        blurRadius: 12,
+        offset: const Offset(0, 3),
+      ),
+    ],
+  );
+
+  /// 강조 채움 카드 데코레이션 (accent 색으로 채움)
+  BoxDecoration strongCardDecoration({double radius = 16}) => BoxDecoration(
+    color: cardStrong,
+    borderRadius: BorderRadius.circular(radius),
+    boxShadow: [
+      BoxShadow(
+        color: cardStrong.withOpacity(0.35),
+        blurRadius: 18,
+        offset: const Offset(0, 6),
+      ),
+    ],
+  );
+
+  /// Neon 채움 카드 데코레이션
+  BoxDecoration neonCardDecoration({double radius = 16}) => BoxDecoration(
+    color: cardNeon,
+    borderRadius: BorderRadius.circular(radius),
+    boxShadow: [
+      BoxShadow(
+        color: cardNeon.withOpacity(0.45),
+        blurRadius: 14,
+        offset: const Offset(0, 5),
+      ),
+    ],
+  );
+
+  /// Dark 채움 카드 데코레이션
+  BoxDecoration darkCardDecoration({double radius = 16}) => BoxDecoration(
+    color: cardDark,
+    borderRadius: BorderRadius.circular(radius),
+    boxShadow: [
+      BoxShadow(
+        color: AppColors.black.withOpacity(0.25),
+        blurRadius: 12,
+        offset: const Offset(0, 4),
+      ),
+    ],
+  );
 }
 
 // ── Provider (ChangeNotifier 기반) ───────────────────────

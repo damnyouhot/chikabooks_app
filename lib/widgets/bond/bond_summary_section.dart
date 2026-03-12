@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../models/partner_group.dart';
-import 'bond_colors.dart';
+import '../../core/theme/tab_theme.dart';
+
+// 같이 탭 팔레트 단축 참조
+const _b = TabTheme.bond;
 
 /// 파트너 요약 섹션 (통합 버전)
 /// - 접힌 상태: 아바타 + 1줄 요약
@@ -41,7 +44,7 @@ class BondSummarySection extends StatelessWidget {
       curve: Curves.easeInOut,
       margin: const EdgeInsets.symmetric(horizontal: 20),
       // Blue 채운 카드로 임팩트 강화
-      decoration: BondColors.blueCardDecoration(),
+      decoration: _b.strongCardDecoration(),
       child: Stack(
         children: [
           Column(
@@ -54,20 +57,20 @@ class BondSummarySection extends StatelessWidget {
                   children: [
                     _buildPartnerAvatars(),
                     const SizedBox(width: 12),
-                    const Expanded(
+                    Expanded(
                       child: Text(
                         '동행 파트너',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
-                          color: BondColors.kOnAccent,  // White on Blue
+                          color: _b.onAccent,  // White on Blue
                         ),
                       ),
                     ),
                     if (enableToggle)
                       Icon(
                         isExpanded ? Icons.expand_less : Icons.expand_more,
-                        color: BondColors.kOnAccent.withOpacity(0.7),
+                        color: _b.onAccent.withOpacity(0.7),
                       ),
                   ],
                 ),
@@ -86,9 +89,9 @@ class BondSummarySection extends StatelessWidget {
                     ),
                     child: Text(
                       _getOneLinerSummary(),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
-                        color: BondColors.kOnAccent,
+                        color: _b.onAccent,
                         fontStyle: FontStyle.italic,
                       ),
                     ),
@@ -144,7 +147,7 @@ class BondSummarySection extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: isMe
-                      ? BondColors.kNeon           // Neon 내 아바타
+                      ? _b.cardNeon             // Neon 내 아바타
                       : Colors.white.withOpacity(0.35),
                   border: Border.all(color: Colors.white.withOpacity(0.7), width: 1.5),
                 ),
@@ -154,7 +157,7 @@ class BondSummarySection extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
-                      color: isMe ? BondColors.kOnNeon : BondColors.kOnAccent,
+                      color: isMe ? _b.onCardNeon : _b.onAccent,
                     ),
                   ),
                 ),
@@ -197,12 +200,12 @@ class BondSummarySection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           '이번 주 함께하는 사람들',
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: BondColors.kText,
+            color: _b.onBg,
           ),
         ),
         const SizedBox(height: 12),
@@ -229,15 +232,15 @@ class BondSummarySection extends StatelessWidget {
             height: 44,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: BondColors.kShadow2,
+              color: _b.shadow2,
             ),
             child: Center(
               child: Text(
                 nickname.isNotEmpty ? nickname[0] : 'P',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: BondColors.kText,
+                  color: _b.onBg,
                 ),
               ),
             ),
@@ -253,10 +256,10 @@ class BondSummarySection extends StatelessWidget {
                   children: [
                     Text(
                       nickname,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: BondColors.kText,
+                        color: _b.onBg,
                       ),
                     ),
                     if (partner.mainConcernShown != null &&
@@ -266,7 +269,7 @@ class BondSummarySection extends StatelessWidget {
                         '· ${partner.mainConcernShown}',
                         style: TextStyle(
                           fontSize: 12,
-                          color: BondColors.kText.withOpacity(0.4),
+                          color: _b.onBg.withOpacity(0.4),
                           fontWeight: FontWeight.w400,
                         ),
                       ),
@@ -278,7 +281,7 @@ class BondSummarySection extends StatelessWidget {
                   statusMessage,
                   style: TextStyle(
                     fontSize: 12,
-                    color: BondColors.kText.withOpacity(0.65),
+                    color: _b.onBg.withOpacity(0.65),
                     height: 1.4,
                   ),
                 ),

@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import '../../models/partner_group.dart';
-import 'bond_colors.dart';
+import '../../core/theme/tab_theme.dart';
+
+const _b = TabTheme.bond;
 
 /// 파트너 요약 (감정 해석 문장 중심)
-/// - 숫자/KPI 중심 → 감정 해석
-/// - "활동 3회" → "이번 주 3번 다녀갔어 / 조금 바쁜 주 같아"
 class BondPartnerSummary extends StatelessWidget {
   final List<GroupMemberMeta> members;
   final String? myUid;
   final Map<String, String>? memberNicknames;
-  final Map<String, int>? weeklyPostCounts; // 주간 게시물 수 {uid: count}
-  final Map<String, int>? weeklyReactionCounts; // 주간 리액션 수 {uid: count}
+  final Map<String, int>? weeklyPostCounts;
+  final Map<String, int>? weeklyReactionCounts;
 
   const BondPartnerSummary({
     super.key,
@@ -23,7 +23,6 @@ class BondPartnerSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 나를 제외한 파트너들
     final partners = members.where((m) => m.uid != myUid).toList();
 
     if (partners.isEmpty) {
@@ -36,17 +35,17 @@ class BondPartnerSummary extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: BondColors.kShadow2.withOpacity(0.3)),
+        border: Border.all(color: _b.shadow2.withOpacity(0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             '이번 주 함께하는 사람들',
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w600,
-              color: BondColors.kText,
+              color: _b.onBg,
             ),
           ),
           const SizedBox(height: 16),
@@ -60,8 +59,6 @@ class BondPartnerSummary extends StatelessWidget {
     final nickname = memberNicknames?[partner.uid] ?? '파트너';
     final postCount = weeklyPostCounts?[partner.uid] ?? 0;
     final reactionCount = weeklyReactionCounts?[partner.uid] ?? 0;
-
-    // 감정 해석 메시지 생성
     final message = _generateEmotionalMessage(postCount, reactionCount);
     final activityText = _generateActivityText(postCount, reactionCount);
 
@@ -70,40 +67,37 @@ class BondPartnerSummary extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 아바타
           Container(
             width: 48,
             height: 48,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: BondColors.kShadow2,
+              color: _b.shadow2,
             ),
             child: Center(
               child: Text(
                 nickname.isNotEmpty ? nickname[0] : 'P',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
-                  color: BondColors.kText,
+                  color: _b.onBg,
                 ),
               ),
             ),
           ),
           const SizedBox(width: 12),
-          // 내용
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 닉네임 + 관심사
                 Row(
                   children: [
                     Text(
                       nickname,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
-                        color: BondColors.kText,
+                        color: _b.onBg,
                       ),
                     ),
                     if (partner.mainConcernShown != null &&
@@ -113,7 +107,7 @@ class BondPartnerSummary extends StatelessWidget {
                         '· ${partner.mainConcernShown}',
                         style: TextStyle(
                           fontSize: 12,
-                          color: BondColors.kText.withOpacity(0.4),
+                          color: _b.onBg.withOpacity(0.4),
                           fontWeight: FontWeight.w400,
                         ),
                       ),
@@ -121,22 +115,20 @@ class BondPartnerSummary extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 4),
-                // 활동 설명
                 Text(
                   activityText,
                   style: TextStyle(
                     fontSize: 13,
-                    color: BondColors.kText.withOpacity(0.7),
+                    color: _b.onBg.withOpacity(0.7),
                     height: 1.4,
                   ),
                 ),
                 const SizedBox(height: 4),
-                // 감정 해석
                 Text(
                   message,
                   style: TextStyle(
                     fontSize: 13,
-                    color: BondColors.kText.withOpacity(0.5),
+                    color: _b.onBg.withOpacity(0.5),
                     fontStyle: FontStyle.italic,
                   ),
                 ),
@@ -148,47 +140,20 @@ class BondPartnerSummary extends StatelessWidget {
     );
   }
 
-  /// 활동 텍스트 생성
   String _generateActivityText(int postCount, int reactionCount) {
-    if (postCount == 0 && reactionCount == 0) {
-      return '이번 주는 조용히 지나갔어';
-    }
-
-    if (postCount > 0 && reactionCount > 0) {
-      return '이번 주 ${postCount}번 다녀갔고, ${reactionCount}번 반응했어';
-    }
-
-    if (postCount > 0) {
-      return '이번 주 ${postCount}번 다녀갔어';
-    }
-
+    if (postCount == 0 && reactionCount == 0) return '이번 주는 조용히 지나갔어';
+    if (postCount > 0 && reactionCount > 0) return '이번 주 ${postCount}번 다녀갔고, ${reactionCount}번 반응했어';
+    if (postCount > 0) return '이번 주 ${postCount}번 다녀갔어';
     return '${reactionCount}번 조용히 반응했어';
   }
 
-  /// 감정 해석 메시지 생성
   String _generateEmotionalMessage(int postCount, int reactionCount) {
     final totalActivity = postCount + reactionCount;
-
-    if (totalActivity == 0) {
-      return '조용함도 같이 있는 방식이야';
-    }
-
-    if (totalActivity == 1) {
-      return '한 번의 흔적도 소중해';
-    }
-
-    if (totalActivity <= 3) {
-      return '적당히 바쁜 주였나봐';
-    }
-
-    if (totalActivity <= 5) {
-      return '꾸준히 곁에 있었어';
-    }
-
-    if (postCount > 5) {
-      return '많이 바빴던 주 같아';
-    }
-
+    if (totalActivity == 0) return '조용함도 같이 있는 방식이야';
+    if (totalActivity == 1) return '한 번의 흔적도 소중해';
+    if (totalActivity <= 3) return '적당히 바쁜 주였나봐';
+    if (totalActivity <= 5) return '꾸준히 곁에 있었어';
+    if (postCount > 5) return '많이 바빴던 주 같아';
     return '이번 주 자주 마주쳤네';
   }
 }

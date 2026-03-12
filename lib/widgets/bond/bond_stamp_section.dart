@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../models/weekly_stamp.dart';
 import '../../services/weekly_stamp_service.dart';
-import 'bond_colors.dart';
+import '../../core/theme/tab_theme.dart';
 import 'bond_stamp_circle.dart';
+
+const _b = TabTheme.bond;
 
 /// 이번 주 우리 스탬프 섹션
 class BondStampSection extends StatefulWidget {
@@ -63,8 +65,8 @@ class _BondStampSectionState extends State<BondStampSection> {
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Container(
             width: double.infinity,
-            // Neon 채운 스탬프 카드로 임팩트 강화
-            decoration: BondColors.neonCardDecoration(),
+            // Neon 채운 스탬프 카드
+            decoration: _b.neonCardDecoration(),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -73,12 +75,12 @@ class _BondStampSectionState extends State<BondStampSection> {
                   padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
                   child: Row(
                     children: [
-                      const Text(
+                      Text(
                         '이번 주 우리 스탬프',
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
-                          color: BondColors.kOnNeon,  // Black on Neon
+                          color: _b.onCardNeon,  // Black on Neon
                         ),
                       ),
                       const Spacer(),
@@ -86,19 +88,19 @@ class _BondStampSectionState extends State<BondStampSection> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                         decoration: BoxDecoration(
-                          color: BondColors.kOnNeon.withOpacity(0.1),
+                          color: _b.onCardNeon.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: BondColors.kOnNeon.withOpacity(0.3),
+                            color: _b.onCardNeon.withOpacity(0.3),
                             width: 0.8,
                           ),
                         ),
                         child: Text(
                           '${stamp.filledCount}/7',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: BondColors.kOnNeon,
+                            color: _b.onCardNeon,
                           ),
                         ),
                       ),
@@ -134,23 +136,4 @@ class _BondStampSectionState extends State<BondStampSection> {
       },
     );
   }
-
-  // 스탬프 설명은 상단 "같이" 탭 설명(info) 다이얼로그에 포함됩니다.
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

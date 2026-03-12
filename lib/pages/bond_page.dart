@@ -9,7 +9,8 @@ import '../services/bond_post_service.dart'; // ✅ 추가
 import '../models/partner_group.dart';
 import '../widgets/bond_post_sheet.dart';
 import '../widgets/profile_gate_sheet.dart';
-import '../widgets/bond/bond_colors.dart';
+import '../core/theme/tab_theme.dart';
+
 import '../widgets/bond/bond_top_bar.dart';
 import '../widgets/bond/bond_week_header.dart';
 import '../widgets/bond/bond_summary_section.dart';
@@ -427,7 +428,7 @@ class _BondPageState extends State<BondPage> {
         }
 
         return Scaffold(
-          backgroundColor: BondColors.kBg,  // White
+          backgroundColor: TabTheme.bond.bg,  // White
           body: SafeArea(
             child: CustomScrollView(
               slivers: [

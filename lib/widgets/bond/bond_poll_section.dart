@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'bond_colors.dart';
+import '../../core/theme/tab_theme.dart';
+
+const _b = TabTheme.bond;
 
 /// 공감 투표 섹션
 class BondPollSection extends StatefulWidget {
@@ -14,10 +16,8 @@ class _BondPollSectionState extends State<BondPollSection> {
 
   @override
   Widget build(BuildContext context) {
-    // 더미 투표 데이터
     const question = '요즘 가장 힘든 순간은?';
     final options = ['환자 컴플레인 받을 때', '야근이 길어질 때', '동료와 의견이 다를 때', '체력이 바닥날 때'];
-    // 더미 결과 (선택 후에만 표시)
     final results = [35.2, 24.8, 15.3, 24.7];
 
     return Padding(
@@ -31,15 +31,15 @@ class _BondPollSectionState extends State<BondPollSection> {
               Icon(
                 Icons.how_to_vote_outlined,
                 size: 16,
-                color: BondColors.kText.withOpacity(0.4),
+                color: _b.onBg.withOpacity(0.4),
               ),
               const SizedBox(width: 6),
-              const Text(
+              Text(
                 '공감 투표',
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
-                  color: BondColors.kText,
+                  color: _b.onBg,
                 ),
               ),
               const SizedBox(width: 6),
@@ -47,7 +47,7 @@ class _BondPollSectionState extends State<BondPollSection> {
                 '다들 어떤지 궁금해서.',
                 style: TextStyle(
                   fontSize: 11,
-                  color: BondColors.kText.withOpacity(0.4),
+                  color: _b.onBg.withOpacity(0.4),
                 ),
               ),
               const Spacer(),
@@ -58,7 +58,7 @@ class _BondPollSectionState extends State<BondPollSection> {
           // 투표 카드 — Dark 배경
           Container(
             width: double.infinity,
-            decoration: BondColors.darkCardDecoration(),
+            decoration: _b.darkCardDecoration(),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -72,15 +72,15 @@ class _BondPollSectionState extends State<BondPollSection> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: BondColors.kNeon,
+                          color: _b.cardNeon,
                           borderRadius: BorderRadius.circular(6),
                         ),
-                        child: const Text(
+                        child: Text(
                           '이번 주',
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w800,
-                            color: BondColors.kOnNeon,
+                            color: _b.onCardNeon,
                           ),
                         ),
                       ),
@@ -88,10 +88,10 @@ class _BondPollSectionState extends State<BondPollSection> {
                       Expanded(
                         child: Text(
                           question,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
-                            color: BondColors.kOnDark,  // White on Dark
+                            color: _b.onCardDark,  // White on Dark
                             height: 1.4,
                           ),
                         ),
@@ -124,14 +124,13 @@ class _BondPollSectionState extends State<BondPollSection> {
                               vertical: 13,
                             ),
                             decoration: BoxDecoration(
-                              // 선택 → Neon | 미선택 → 어두운 회색
                               color: isSelected
-                                  ? BondColors.kNeon
+                                  ? _b.cardNeon
                                   : const Color(0xFF2A2A2A),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
                                 color: isSelected
-                                    ? BondColors.kNeon
+                                    ? _b.cardNeon
                                     : Colors.white.withOpacity(0.08),
                                 width: isSelected ? 0 : 0.5,
                               ),
@@ -146,12 +145,12 @@ class _BondPollSectionState extends State<BondPollSection> {
                                     shape: BoxShape.circle,
                                     border: Border.all(
                                       color: isSelected
-                                          ? BondColors.kOnNeon.withOpacity(0.6)
+                                          ? _b.onCardNeon.withOpacity(0.6)
                                           : Colors.white.withOpacity(0.3),
                                       width: isSelected ? 1.5 : 0.8,
                                     ),
                                     color: isSelected
-                                        ? BondColors.kOnNeon.withOpacity(0.15)
+                                        ? _b.onCardNeon.withOpacity(0.15)
                                         : Colors.transparent,
                                   ),
                                   child: isSelected
@@ -159,9 +158,9 @@ class _BondPollSectionState extends State<BondPollSection> {
                                           child: Container(
                                             width: 8,
                                             height: 8,
-                                            decoration: const BoxDecoration(
+                                            decoration: BoxDecoration(
                                               shape: BoxShape.circle,
-                                              color: BondColors.kOnNeon,
+                                              color: _b.onCardNeon,
                                             ),
                                           ),
                                         )
@@ -176,14 +175,12 @@ class _BondPollSectionState extends State<BondPollSection> {
                                       fontWeight: isSelected
                                           ? FontWeight.w700
                                           : FontWeight.w400,
-                                      // Neon bg → Black | Dark bg → White
                                       color: isSelected
-                                          ? BondColors.kOnNeon
+                                          ? _b.onCardNeon
                                           : Colors.white.withOpacity(0.85),
                                     ),
                                   ),
                                 ),
-                                // 결과 퍼센트 (투표 후)
                                 if (hasVoted) ...[
                                   const SizedBox(width: 8),
                                   Text(
@@ -192,7 +189,7 @@ class _BondPollSectionState extends State<BondPollSection> {
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
                                       color: isSelected
-                                          ? BondColors.kOnNeon.withOpacity(0.7)
+                                          ? _b.onCardNeon.withOpacity(0.7)
                                           : Colors.white.withOpacity(0.45),
                                     ),
                                   ),
