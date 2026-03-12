@@ -528,17 +528,7 @@ class _ResumeShortcutCard extends StatelessWidget {
       ),
       child: Container(
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: kCAccent,  // Black으로 채움 (강한 대비)
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.18),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
+        decoration: AppStyle.primaryCardDecoration(), // Blue flat, no shadow
         child: Row(
           children: [
             // 아이콘 컨테이너: 화면 너비의 9.5%, 최소34·최대48 clamp
@@ -550,13 +540,13 @@ class _ResumeShortcutCard extends StatelessWidget {
                   width: iconBox,
                   height: iconBox,
                   decoration: BoxDecoration(
-                    color: AppColors.accent.withOpacity(0.15),  // 연한 Neon 배경
+                    color: AppColors.onCardPrimary.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.accent.withOpacity(0.5), width: 1),
+                    // border 없음
                   ),
                   child: Icon(
                     Icons.description_outlined,
-                    color: AppColors.accent,   // Neon 아이콘
+                    color: AppColors.onCardPrimary, // White
                     size: iconBox * 0.55,
                   ),
                 );
@@ -572,7 +562,7 @@ class _ResumeShortcutCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.onAccent,  // White (Black 위)
+                      color: AppColors.onCardPrimary,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -580,7 +570,7 @@ class _ResumeShortcutCard extends StatelessWidget {
                     '이력서를 작성하고 공고에 빠르게 지원해요',
                     style: TextStyle(
                       fontSize: 12,
-                      color: AppColors.onAccent.withOpacity(0.7),
+                      color: AppColors.onCardPrimary.withOpacity(0.7),
                     ),
                   ),
                 ],
@@ -588,7 +578,7 @@ class _ResumeShortcutCard extends StatelessWidget {
             ),
             Icon(
               Icons.chevron_right,
-              color: AppColors.onAccent.withOpacity(0.7),
+              color: AppColors.onCardPrimary.withOpacity(0.7),
               size: 20,
             ),
           ],

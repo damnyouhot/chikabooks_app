@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/career_profile_service.dart';
+import '../../core/theme/app_colors.dart';
 import 'career_shared.dart';
 
 // ── 스킬 정보 모델 ─────────────────────────────────────────────
@@ -34,24 +35,30 @@ class CareerSkillEmptyState extends StatelessWidget {
           Icon(
             Icons.auto_awesome_outlined,
             size: 32,
-            color: kCText.withOpacity(0.3),
+            color: AppColors.onCardPrimary.withOpacity(0.4),
           ),
           const SizedBox(height: 10),
           Text(
             '아직 스킬 카드가 없어요',
-            style: TextStyle(fontSize: 14, color: kCText.withOpacity(0.55)),
+            style: TextStyle(
+              fontSize: 14,
+              color: AppColors.onCardPrimary.withOpacity(0.7),
+            ),
           ),
           const SizedBox(height: 4),
           Text(
             '"관리"를 눌러 내 스킬을 추가해 보세요',
-            style: TextStyle(fontSize: 12, color: kCText.withOpacity(0.4)),
+            style: TextStyle(
+              fontSize: 12,
+              color: AppColors.onCardPrimary.withOpacity(0.5),
+            ),
           ),
           const SizedBox(height: 14),
           ElevatedButton(
             onPressed: onTap,
             style: ElevatedButton.styleFrom(
-              backgroundColor: kCText,
-              foregroundColor: Colors.white,
+              backgroundColor: AppColors.cardEmphasis, // Neon 버튼
+              foregroundColor: AppColors.onCardEmphasis, // Black 텍스트
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -119,12 +126,12 @@ class _CareerSkillCardState extends State<CareerSkillCard> {
                     width: iconBox,
                     height: iconBox,
                     decoration: BoxDecoration(
-                      color: kCAccent.withOpacity(0.22),
+                      color: AppColors.onCardPrimary.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(
                       widget.info.icon,
-                      color: kCText.withOpacity(0.85),
+                      color: AppColors.onCardPrimary,
                       size: iconBox * 0.53,
                     ),
                   );
@@ -137,10 +144,10 @@ class _CareerSkillCardState extends State<CareerSkillCard> {
                   children: [
                     Text(
                       widget.info.title,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
-                        color: kCText,
+                        color: AppColors.onCardPrimary,
                       ),
                     ),
                     if (widget.info.recommended != null) ...[
@@ -150,14 +157,14 @@ class _CareerSkillCardState extends State<CareerSkillCard> {
                           Icon(
                             Icons.auto_awesome,
                             size: 10,
-                            color: kCAccent.withOpacity(0.8),
+                            color: AppColors.onCardPrimary.withOpacity(0.7),
                           ),
                           const SizedBox(width: 3),
                           Text(
                             '추천 Lv.${widget.info.recommended}',
                             style: TextStyle(
                               fontSize: 11,
-                              color: kCText.withOpacity(0.55),
+                              color: AppColors.onCardPrimary.withOpacity(0.65),
                             ),
                           ),
                         ],
@@ -168,7 +175,7 @@ class _CareerSkillCardState extends State<CareerSkillCard> {
                         '체크 질문으로 측정해보세요',
                         style: TextStyle(
                           fontSize: 10,
-                          color: kCText.withOpacity(0.38),
+                          color: AppColors.onCardPrimary.withOpacity(0.45),
                         ),
                       ),
                     ],
@@ -177,10 +184,10 @@ class _CareerSkillCardState extends State<CareerSkillCard> {
               ),
               Text(
                 'Lv.${widget.info.level}',
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w900,
-                  color: kCText,
+                  color: AppColors.onCardPrimary,
                 ),
               ),
             ],
@@ -189,17 +196,18 @@ class _CareerSkillCardState extends State<CareerSkillCard> {
           Row(
             children: [
               Expanded(
-                child: OutlinedButton(
-                  onPressed:
-                      () => SkillQuizSheet.show(
-                        context,
-                        skillId: widget.info.id,
-                        skillTitle: widget.info.title,
-                        currentLevel: widget.info.level,
-                      ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: kCText.withOpacity(0.85),
-                    side: BorderSide(color: kCShadow, width: 0.8),
+                child: ElevatedButton(
+                  onPressed: () => SkillQuizSheet.show(
+                    context,
+                    skillId: widget.info.id,
+                    skillTitle: widget.info.title,
+                    currentLevel: widget.info.level,
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.onCardPrimary.withOpacity(0.15),
+                    foregroundColor: AppColors.onCardPrimary,
+                    elevation: 0,
+                    shadowColor: Colors.transparent,
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -252,7 +260,7 @@ class _LevelAdjust extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: kCShadow,
+        color: AppColors.onCardPrimary.withOpacity(0.15),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -261,22 +269,22 @@ class _LevelAdjust extends StatelessWidget {
           IconButton(
             onPressed: onMinus,
             icon: const Icon(Icons.remove, size: 18),
-            color: kCText.withOpacity(0.8),
+            color: AppColors.onCardPrimary.withOpacity(0.8),
             constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
             padding: EdgeInsets.zero,
           ),
           Text(
             '$level',
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w900,
-              color: kCText,
+              color: AppColors.onCardPrimary,
             ),
           ),
           IconButton(
             onPressed: onPlus,
             icon: const Icon(Icons.add, size: 18),
-            color: kCText.withOpacity(0.8),
+            color: AppColors.onCardPrimary.withOpacity(0.8),
             constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
             padding: EdgeInsets.zero,
           ),
@@ -414,10 +422,7 @@ class _CareerSkillEditSheetState extends State<CareerSkillEditSheet> {
                               ? kCAccent.withOpacity(0.12)
                               : kCCardBg,
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: enabled ? kCAccent : Colors.transparent,
-                        width: 1.2,
-                      ),
+                      // border 없음
                     ),
                     padding: const EdgeInsets.symmetric(
                       horizontal: 14,

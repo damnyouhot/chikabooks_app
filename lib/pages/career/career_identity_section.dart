@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/career_profile_service.dart';
+import '../../core/theme/app_colors.dart';
 import 'career_shared.dart';
 
 // ── 커리어 아이덴티티 카드 (빈 상태) ────────────────────────────
@@ -17,12 +18,12 @@ class CareerIdentityEmptyCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Text(
+                const Text(
                   '내 커리어 카드',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
-                    color: kCText,
+                    color: AppColors.onCardPrimary, // White (Blue 카드 위)
                   ),
                 ),
                 const Spacer(),
@@ -32,15 +33,16 @@ class CareerIdentityEmptyCard extends StatelessWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: kCAccent.withOpacity(0.3),
+                    color: AppColors.onCardPrimary.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(999),
+                    // border 없음
                   ),
-                  child: Text(
+                  child: const Text(
                     '채우기',
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
-                      color: kCText,
+                      color: AppColors.onCardPrimary,
                     ),
                   ),
                 ),
@@ -49,7 +51,10 @@ class CareerIdentityEmptyCard extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               '아직 비어 있어요',
-              style: TextStyle(fontSize: 12, color: kCText.withOpacity(0.65)),
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.onCardPrimary.withOpacity(0.65),
+              ),
             ),
             const SizedBox(height: 14),
             const _PlaceholderRow(label: '현재 치과'),
@@ -61,8 +66,8 @@ class CareerIdentityEmptyCard extends StatelessWidget {
               child: ElevatedButton(
                 onPressed: () => CareerIdentitySheet.show(context),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: kCAccent,
-                  foregroundColor: kCText,
+                  backgroundColor: AppColors.cardEmphasis, // Neon 버튼
+                  foregroundColor: AppColors.onCardEmphasis, // Black 텍스트
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(
@@ -96,7 +101,7 @@ class _PlaceholderRow extends StatelessWidget {
             '$label:',
             style: TextStyle(
               fontSize: 12,
-              color: kCText.withOpacity(0.75),
+              color: AppColors.onCardPrimary.withOpacity(0.75),
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -105,7 +110,7 @@ class _PlaceholderRow extends StatelessWidget {
           child: Container(
             height: 14,
             decoration: BoxDecoration(
-              color: const Color(0xFFF1F3F3),
+              color: AppColors.onCardPrimary.withOpacity(0.15),
               borderRadius: BorderRadius.circular(8),
             ),
           ),
@@ -170,7 +175,7 @@ class CareerIdentityFilledCard extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: kCText.withOpacity(0.85),
+                  color: AppColors.onCardPrimary.withOpacity(0.85),
                 ),
               ),
               const Spacer(),
@@ -178,7 +183,7 @@ class CareerIdentityFilledCard extends StatelessWidget {
                 onPressed: () => CareerIdentitySheet.show(context),
                 icon: Icon(
                   Icons.edit_outlined,
-                  color: kCText.withOpacity(0.6),
+                  color: AppColors.onCardPrimary.withOpacity(0.6),
                   size: 18,
                 ),
                 tooltip: '수정',
@@ -190,10 +195,10 @@ class CareerIdentityFilledCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             titleLine,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w900,
-              color: kCText,
+              color: AppColors.onCardPrimary,
             ),
           ),
           const SizedBox(height: 6),
@@ -204,17 +209,17 @@ class CareerIdentityFilledCard extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: kCText.withOpacity(0.6),
+                  color: AppColors.onCardPrimary.withOpacity(0.6),
                 ),
               ),
               Text(
                 totalCareerMonths == 0
                     ? '미입력'
                     : formatCareerMonths(totalCareerMonths),
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w800,
-                  color: kCText,
+                  color: AppColors.onCardPrimary,
                 ),
               ),
               if (useOverride) ...[
@@ -225,7 +230,7 @@ class CareerIdentityFilledCard extends StatelessWidget {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: kCShadow.withOpacity(0.6),
+                    color: AppColors.onCardPrimary.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
@@ -233,7 +238,7 @@ class CareerIdentityFilledCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
-                      color: kCText.withOpacity(0.6),
+                      color: AppColors.onCardPrimary.withOpacity(0.8),
                     ),
                   ),
                 ),
@@ -246,14 +251,17 @@ class CareerIdentityFilledCard extends StatelessWidget {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              color: kCText.withOpacity(0.75),
+              color: AppColors.onCardPrimary.withOpacity(0.75),
             ),
           ),
           const SizedBox(height: 8),
           if (tags.isEmpty)
             Text(
               '아직 없어요',
-              style: TextStyle(fontSize: 12, color: kCText.withOpacity(0.65)),
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.onCardPrimary.withOpacity(0.65),
+              ),
             )
           else
             Wrap(
@@ -267,16 +275,16 @@ class CareerIdentityFilledCard extends StatelessWidget {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: kCAccent.withOpacity(0.18),
+                      color: AppColors.onCardPrimary.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: kCShadow, width: 0.5),
+                      // border 없음
                     ),
                     child: Text(
                       t,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: kCText.withOpacity(0.85),
+                        color: AppColors.onCardPrimary,
                       ),
                     ),
                   ),
@@ -723,4 +731,3 @@ class _ChoiceChip extends StatelessWidget {
     );
   }
 }
-

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/app_colors.dart';
 import 'career_shared.dart';
 
 // ── 커리어 단계 규칙 모델 ──────────────────────────────────────
@@ -117,16 +118,16 @@ class CareerStageCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
-                        color: kCText.withOpacity(0.5),
+                        color: AppColors.onCardPrimary.withOpacity(0.6),
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       current.name,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w900,
-                        color: kCText,
+                        color: AppColors.onCardPrimary,
                       ),
                     ),
                   ],
@@ -138,15 +139,15 @@ class CareerStageCard extends StatelessWidget {
                   vertical: 5,
                 ),
                 decoration: BoxDecoration(
-                  color: kCAccent.withOpacity(0.25),
+                  color: AppColors.onCardPrimary.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
                   '${stageIdx + 1} / ${_kStageRules.length}단계',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
-                    color: kCText,
+                    color: AppColors.onCardPrimary,
                   ),
                 ),
               ),
@@ -158,9 +159,9 @@ class CareerStageCard extends StatelessWidget {
             child: LinearProgressIndicator(
               value: progress,
               minHeight: 7,
-              backgroundColor: kCShadow.withOpacity(0.5),
+              backgroundColor: AppColors.onCardPrimary.withOpacity(0.2),
               valueColor: AlwaysStoppedAnimation<Color>(
-                isMax ? kCAccent : kCAccent,
+                isMax ? AppColors.cardEmphasis : AppColors.cardEmphasis,
               ),
             ),
           ),
@@ -171,7 +172,7 @@ class CareerStageCard extends StatelessWidget {
               style: TextStyle(
                 fontSize: 13,
                 height: 1.5,
-                color: kCText.withOpacity(0.7),
+                color: AppColors.onCardPrimary.withOpacity(0.8),
               ),
             )
           else if (stageIdx == 0 && totalCareerMonths == 0 && totalClinics == 0)
@@ -179,7 +180,7 @@ class CareerStageCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
-                color: kCShadow.withOpacity(0.25),
+                color: AppColors.onCardPrimary.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -187,7 +188,7 @@ class CareerStageCard extends StatelessWidget {
                   Icon(
                     Icons.info_outline,
                     size: 16,
-                    color: kCText.withOpacity(0.45),
+                    color: AppColors.onCardPrimary.withOpacity(0.55),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -196,7 +197,7 @@ class CareerStageCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12,
                         height: 1.5,
-                        color: kCText.withOpacity(0.55),
+                        color: AppColors.onCardPrimary.withOpacity(0.7),
                       ),
                     ),
                   ),
@@ -209,7 +210,7 @@ class CareerStageCard extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
-                color: kCText.withOpacity(0.65),
+                color: AppColors.onCardPrimary.withOpacity(0.7),
               ),
             ),
             const SizedBox(height: 10),
@@ -292,17 +293,19 @@ class _ChecklistItem extends StatelessWidget {
           height: checkSize,
           margin: const EdgeInsets.only(top: 1),
           decoration: BoxDecoration(
-            color: data.done ? kCAccent : Colors.white,
+            color: data.done
+                ? AppColors.cardEmphasis  // Neon (완료)
+                : AppColors.onCardPrimary.withOpacity(0.12), // White 반투명 (미완료)
             borderRadius: BorderRadius.circular(6),
-            border: Border.all(
-              color: data.done ? kCAccent : kCShadow,
-              width: data.done ? 0 : 0.9,
-            ),
+            // border 없음
           ),
-          child:
-              data.done
-                  ? Icon(Icons.check, size: checkSize * 0.65, color: kCText)
-                  : null,
+          child: data.done
+              ? Icon(
+                  Icons.check,
+                  size: checkSize * 0.65,
+                  color: AppColors.onCardEmphasis, // Black 체크 on Neon
+                )
+              : null,
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -314,14 +317,12 @@ class _ChecklistItem extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color:
-                      data.done
-                          ? kCText.withOpacity(0.45)
-                          : kCText.withOpacity(0.85),
-                  decoration:
-                      data.done
-                          ? TextDecoration.lineThrough
-                          : TextDecoration.none,
+                  color: data.done
+                      ? AppColors.onCardPrimary.withOpacity(0.45)
+                      : AppColors.onCardPrimary.withOpacity(0.9),
+                  decoration: data.done
+                      ? TextDecoration.lineThrough
+                      : TextDecoration.none,
                 ),
               ),
               if (!data.done)
@@ -329,7 +330,7 @@ class _ChecklistItem extends StatelessWidget {
                   data.current,
                   style: TextStyle(
                     fontSize: 11,
-                    color: kCText.withOpacity(0.4),
+                    color: AppColors.onCardPrimary.withOpacity(0.5),
                   ),
                 ),
             ],

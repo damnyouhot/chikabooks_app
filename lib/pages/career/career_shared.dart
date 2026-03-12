@@ -77,7 +77,13 @@ class CareerSectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: AppStyle.cardPrimaryTitle,
+      style: const TextStyle(
+        // 앱 배경(#F7F8FA) 위에 직접 렌더링되므로 Black 텍스트 사용
+        // (카드 내부 제목은 각 섹션에서 onCardPrimary=White 직접 지정)
+        color: AppColors.textPrimary,
+        fontSize: 16,
+        fontWeight: FontWeight.w700,
+      ),
     );
   }
 }
