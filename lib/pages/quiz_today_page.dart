@@ -2,14 +2,16 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
+import '../core/theme/tab_theme.dart';
 
-// ── 디자인 팔레트: Neon(#D1FF00) + Black(#000000) ──
-// growth_page 배경(Neon) 위에서 렌더링됨
-const _kAccent  = Color(0xFF000000);   // Black accent (Neon 배경 위)
-const _kText    = Color(0xFF000000);   // Pure Black (Inversion)
-const _kShadow1 = Color(0xFFB8E600);   // 라임계열 경계선
-const _kShadow2 = Color(0xFFE5FF66);   // 연한 구분선
-const _kCardBg  = Color(0xFFFFFFFF);   // 카드 배경: 흰색
+// ── 디자인 팔레트: TabTheme.growth 참조 ──
+// 색상 변경 → app_colors.dart Primitive만 수정하면 자동 반영
+final _g        = TabTheme.growth;
+final _kAccent  = _g.accent;    // Black (Neon bg → Black accent)
+final _kText    = _g.onBg;      // Black (Inversion)
+final _kShadow1 = _g.border;    // 라임계열 경계선
+final _kShadow2 = _g.surface;   // 연한 구분선
+final _kCardBg  = _g.cardBg;    // 카드 배경: 흰색
 // 퀴즈 정답/오답: 의미 컬러로 AppColors Component Override 사용
 const _kCorrect = AppColors.quizCorrect;
 
@@ -270,7 +272,7 @@ class _QuizStatsCard extends StatelessWidget {
         const SizedBox(height: 6),
         Text(
           '${rate.toStringAsFixed(0)}%',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w700,
             color: _kText,
@@ -353,21 +355,21 @@ class _QuizCardState extends State<_QuizCard> {
                   return Container(
                     width: badgeSize,
                     height: badgeSize,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: _kAccent.withOpacity(0.3),
-                      border: Border.all(color: _kAccent, width: 0.5),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _kAccent.withOpacity(0.3),
+                  border: Border.all(color: _kAccent, width: 0.5),
+                ),
+                child: Center(
+                  child: Text(
+                    'Q${widget.index}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: _kText,
                     ),
-                    child: Center(
-                      child: Text(
-                        'Q${widget.index}',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: _kText,
-                        ),
-                      ),
-                    ),
+                  ),
+                ),
                   );
                 },
               ),
@@ -375,7 +377,7 @@ class _QuizCardState extends State<_QuizCard> {
               Expanded(
                 child: Text(
                   widget.question,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
                     color: _kText,

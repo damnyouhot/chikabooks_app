@@ -77,19 +77,19 @@ class _EbookDetailPageState extends State<EbookDetailPage> {
                   final coverW = (screenW * 0.45).clamp(160.0, 240.0);
                   final coverH = coverW * 1.5; // 2:3 비율
                   return ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: Image.network(
-                      ebook.coverUrl,
+                borderRadius: BorderRadius.circular(16),
+                child: Image.network(
+                  ebook.coverUrl,
                       width: coverW,
                       height: coverH,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
                         width: coverW,
                         height: coverH,
-                        color: Colors.grey[300],
-                        child: const Icon(Icons.book, size: 64, color: Colors.grey),
-                      ),
-                    ),
+                    color: Colors.grey[300],
+                    child: const Icon(Icons.book, size: 64, color: Colors.grey),
+                  ),
+                ),
                   );
                 },
               ),
@@ -221,15 +221,15 @@ class _EbookDetailPageState extends State<EbookDetailPage> {
                   return Container(
                     width: iconSize,
                     height: iconSize,
-                    decoration: BoxDecoration(
-                      color: Colors.green[50],
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.check_circle,
+                decoration: BoxDecoration(
+                  color: Colors.green[50],
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.check_circle,
                       size: iconSize * 0.625,
-                      color: Colors.green[600],
-                    ),
+                  color: Colors.green[600],
+                ),
                   );
                 },
               ),

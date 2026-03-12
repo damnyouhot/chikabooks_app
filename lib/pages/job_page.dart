@@ -10,7 +10,7 @@ import 'career/career_tab.dart';
 import 'career/career_shared.dart';
 
 // ── 디자인 팔레트 ──
-const _kBg = kCBg;
+final _kBg = kCBg;
 
 /// 커리어(도전하기) 탭 - 탭4
 ///

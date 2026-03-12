@@ -9,14 +9,16 @@ import 'ebook/ebook_detail_page.dart';
 import 'quiz_today_page.dart';
 import 'hira_update_page.dart';
 import 'settings/settings_page.dart';
+import '../core/theme/tab_theme.dart';
 
-// ── 디자인 팔레트: Neon(#D1FF00) + Black(#000000) ──
-// Inversion Rule: Neon bg → Black 텍스트/아이콘
-const _kText    = Color(0xFF000000);   // Pure Black
-const _kBg      = Color(0xFFD1FF00);   // Neon Lime
-const _kShadow1 = Color(0xFFB8E600);   // 라임보다 진한 경계선
-const _kShadow2 = Color(0xFFE5FF66);   // 연한 구분선
-const _kCardBg  = Color(0xFFFFFFFF);   // 카드 배경: 흰색 (가독성 유지)
+// ── 디자인 팔레트: TabTheme.growth 참조 ──
+// 색상 변경 → app_colors.dart Primitive만 수정하면 자동 반영
+final _g       = TabTheme.growth;
+final _kText    = _g.onBg;      // Black (Neon bg → Black)
+final _kBg      = _g.bg;        // Neon Lime
+final _kShadow1 = _g.border;    // 라임계열 경계선
+final _kShadow2 = _g.surface;   // 연한 구분선
+final _kCardBg  = _g.cardBg;    // 카드 배경: 흰색
 
 /// 성장 탭 (3탭)
 ///
@@ -123,8 +125,8 @@ class _GrowthPageState extends State<GrowthPage>
             ],
           ),
         ),
-        const Padding(
-          padding: EdgeInsets.only(left: 20),
+        Padding(
+          padding: const EdgeInsets.only(left: 20),
           child: Text(
             '성장하기',
             style: TextStyle(
@@ -461,7 +463,7 @@ class _SavedHiraTile extends StatelessWidget {
                     update.title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: _kText,
@@ -522,20 +524,20 @@ class _MyBookTile extends StatelessWidget {
                 final coverW = (screenW * 0.13).clamp(44.0, 68.0);
                 final coverH = coverW * (4 / 3); // 3:4 비율
                 return ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.network(
-                    book.coverUrl,
+              borderRadius: BorderRadius.circular(8),
+              child: Image.network(
+                book.coverUrl,
                     width: coverW,
                     height: coverH,
-                    fit: BoxFit.cover,
-                    errorBuilder:
-                        (_, __, ___) => Container(
+                fit: BoxFit.cover,
+                errorBuilder:
+                    (_, __, ___) => Container(
                           width: coverW,
                           height: coverH,
-                          color: _kShadow2,
-                          child: Icon(Icons.book, color: _kText.withOpacity(0.3)),
-                        ),
-                  ),
+                      color: _kShadow2,
+                      child: Icon(Icons.book, color: _kText.withOpacity(0.3)),
+                    ),
+              ),
                 );
               },
             ),
@@ -548,7 +550,7 @@ class _MyBookTile extends StatelessWidget {
                     book.title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                       color: _kText,
@@ -657,7 +659,7 @@ class _BookStoreBrowseView extends StatelessWidget {
                     b.title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
                       color: _kText,

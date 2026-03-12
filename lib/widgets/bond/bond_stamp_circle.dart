@@ -72,22 +72,25 @@ class _BondStampCircleState extends State<BondStampCircle>
         height: 34,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
+          // Neon 채워진 원 | Blue 오늘 표시 | 기본 빈 원
           color: widget.isFilled
-              ? BondColors.kAccent.withValues(alpha: 0.75)
-              : BondColors.kShadow2.withValues(alpha: 0.3),
+              ? BondColors.kNeon          // Neon for filled
+              : widget.isToday
+                  ? BondColors.kAccent.withValues(alpha: 0.15)  // Blue tint for today
+                  : BondColors.kShadow2.withValues(alpha: 0.25),
           border: Border.all(
             color: widget.isToday
-                ? BondColors.kAccent.withValues(alpha: 0.8)
+                ? BondColors.kAccent.withValues(alpha: 0.9)  // Blue border today
                 : widget.isFilled
-                    ? BondColors.kAccent.withValues(alpha: 0.4)
-                    : BondColors.kShadow2.withValues(alpha: 0.4),
-            width: widget.isToday ? 1.5 : 0.5,
+                    ? BondColors.kNeon.withValues(alpha: 0.6)
+                    : BondColors.kShadow1.withValues(alpha: 0.3),
+            width: widget.isToday ? 2.0 : 0.8,
           ),
           boxShadow: widget.isFilled
               ? [
                   BoxShadow(
-                    color: BondColors.kAccent.withValues(alpha: 0.35),
-                    blurRadius: 8,
+                    color: BondColors.kNeon.withValues(alpha: 0.55),
+                    blurRadius: 10,
                     spreadRadius: 1,
                   ),
                 ]
@@ -98,10 +101,13 @@ class _BondStampCircleState extends State<BondStampCircle>
             widget.dayLabel,
             style: TextStyle(
               fontSize: 11,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w700,
+              // Neon bg → Black | Blue/empty → Black
               color: widget.isFilled
-                  ? Colors.white
-                  : BondColors.kText.withValues(alpha: 0.5),
+                  ? BondColors.kOnNeon          // Black on Neon
+                  : widget.isToday
+                      ? BondColors.kAccent      // Blue for today label
+                      : BondColors.kText.withValues(alpha: 0.45),
             ),
           ),
         ),

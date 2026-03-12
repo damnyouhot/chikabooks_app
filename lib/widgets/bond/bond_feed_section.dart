@@ -106,15 +106,23 @@ class _BondFeedSectionState extends State<BondFeedSection> {
                 onPressed: isPersonalMode ? null : widget.onOpenWrite,
                 style: TextButton.styleFrom(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
+                    horizontal: 14,
+                    vertical: 7,
                   ),
                   minimumSize: const Size(0, 0),
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  foregroundColor: BondColors.kText.withOpacity(0.7),
+                  backgroundColor: isPersonalMode
+                      ? Colors.transparent
+                      : BondColors.kAccent,   // Blue 배경
+                  foregroundColor: isPersonalMode
+                      ? BondColors.kText.withOpacity(0.3)
+                      : BondColors.kOnAccent, // White 텍스트
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
                   textStyle: const TextStyle(
                     fontSize: 12,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 child: const Text('글작성'),
@@ -229,29 +237,27 @@ class _BondFeedSectionState extends State<BondFeedSection> {
     required bool isPersonalMode,
   }) {
     return GestureDetector(
-      onTap: onTap, // null이면 터치 비활성화
+      onTap: onTap,
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: isPersonalMode ? Colors.grey[100] : BondColors.kCardBg,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color:
-                isPersonalMode
-                    ? Colors.grey[300]!
-                    : BondColors.kShadow2.withOpacity(0.3),
-          ),
-        ),
+        decoration: isPersonalMode
+            ? BoxDecoration(
+                color: BondColors.kCardBg,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: BondColors.kShadow1.withOpacity(0.3),
+                ),
+              )
+            : BondColors.blueCardDecoration(),  // Blue 빈 피드 카드
         child: Column(
           children: [
             Icon(
               icon,
               size: 40,
-              color:
-                  isPersonalMode
-                      ? Colors.grey[400]
-                      : BondColors.kText.withOpacity(0.3),
+              color: isPersonalMode
+                  ? BondColors.kText.withOpacity(0.3)
+                  : BondColors.kOnAccent.withOpacity(0.7),  // White on Blue
             ),
             const SizedBox(height: 8),
             Text(
@@ -259,19 +265,31 @@ class _BondFeedSectionState extends State<BondFeedSection> {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
-                color:
-                    isPersonalMode
-                        ? Colors.grey[600]
-                        : BondColors.kText.withOpacity(0.5),
+                color: isPersonalMode
+                    ? BondColors.kText.withOpacity(0.5)
+                    : BondColors.kOnAccent,  // White on Blue
                 height: 1.4,
               ),
             ),
             if (subtitle != null) ...[
-              const SizedBox(height: 4),
-              Text(
-                subtitle,
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+                decoration: BoxDecoration(
+                  color: isPersonalMode
+                      ? BondColors.kAccent
+                      : BondColors.kNeon,   // Neon 서브텍스트 버튼
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  subtitle,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: isPersonalMode ? BondColors.kOnAccent : BondColors.kOnNeon,
+                  ),
+                ),
               ),
             ],
           ],

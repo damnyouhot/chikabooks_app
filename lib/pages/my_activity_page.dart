@@ -3,12 +3,13 @@ import 'package:provider/provider.dart';
 import '../../services/job_service.dart';
 import '../../models/job.dart';
 import '../screen/jobs/job_detail_screen.dart';
-import '../core/theme/app_colors.dart';
+import '../core/theme/tab_theme.dart';
 
-// ── 디자인 팔레트 (AppColors 위임) ──
-const _kAccent = AppColors.accent;
-const _kText   = AppColors.text;
-const _kBg     = AppColors.bg;
+// ── 디자인 팔레트 (TabTheme.caring 참조) ──
+// 색상 변경 → app_colors.dart Primitive만 수정하면 자동 반영
+final _kAccent = TabTheme.caring.accent;   // Neon Lime
+final _kText   = TabTheme.caring.onBg;     // White
+final _kBg     = TabTheme.caring.bg;       // Blue
 
 /// 내 활동 페이지
 ///
@@ -43,7 +44,7 @@ class _MyActivityPageState extends State<MyActivityPage>
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: const Text(
+        title: Text(
           '내 활동',
           style: TextStyle(
             color: _kText,
@@ -51,7 +52,7 @@ class _MyActivityPageState extends State<MyActivityPage>
             fontWeight: FontWeight.bold,
           ),
         ),
-        iconTheme: const IconThemeData(color: _kText),
+        iconTheme: IconThemeData(color: _kText),
         bottom: TabBar(
           controller: _tabController,
           labelColor: _kText,
@@ -226,7 +227,7 @@ class _ApplicationCard extends StatelessWidget {
                   // 병원명
                   Text(
                     job.clinicName,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: _kText,
@@ -404,7 +405,7 @@ class _BookmarkCard extends StatelessWidget {
                         // 병원명
                         Text(
                           job.clinicName,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                             color: _kText,

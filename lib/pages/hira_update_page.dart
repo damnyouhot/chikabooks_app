@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import '../widgets/hira_update_section.dart';
+import '../core/theme/tab_theme.dart';
 
 // ── growth 탭 내부: 배경은 growth_page Scaffold가 담당 ──
-// 컨테이너 색상을 Neon으로 맞춤
-const _kBg = Color(0xFFD1FF00);  // Neon Lime
+// 색상 변경 → app_colors.dart Primitive만 수정하면 자동 반영
+final _kBg = TabTheme.growth.bg;  // Neon Lime
 
 /// HIRA 수가·급여 변경 포인트 페이지
 class HiraUpdatePage extends StatelessWidget {

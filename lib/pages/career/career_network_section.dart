@@ -24,7 +24,7 @@ class _CareerNetworkCardState extends State<CareerNetworkCard> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   '나의 치과 네트워크',
                   style: TextStyle(
                     fontSize: 15,
@@ -68,7 +68,7 @@ class _CareerNetworkCardState extends State<CareerNetworkCard> {
                   padding: const EdgeInsets.symmetric(vertical: 6),
                   child: Row(
                     children: [
-                      const Expanded(
+                      Expanded(
                         child: Text(
                           '나의 치과 네트워크',
                           style: TextStyle(
@@ -305,7 +305,7 @@ class _NetworkTimelineItem extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   entry.clinicName,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w800,
                     color: kCText,
@@ -336,14 +336,14 @@ class _NetworkTimelineItem extends StatelessWidget {
                                   color: kCAccent.withOpacity(0.25),
                                   borderRadius: BorderRadius.circular(999),
                                 ),
-                                child: Text(
-                                  t,
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                    color: kCText,
-                                  ),
+                              child: Text(
+                                t,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: kCText,
                                 ),
+                              ),
                               ),
                             )
                             .toList(),
@@ -444,7 +444,7 @@ class _DentalNetworkListSheet extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
                     '치과 네트워크',
                     style: TextStyle(
@@ -547,14 +547,14 @@ class _DentalNetworkListSheet extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  e.clinicName,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w800,
-                                    color: kCText,
-                                  ),
-                                ),
+                            Text(
+                              e.clinicName,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                                color: kCText,
+                              ),
+                            ),
                                 const SizedBox(height: 2),
                                 Text(
                                   '${e.periodLabel}  ·  ${formatCareerMonths(e.months)}',
@@ -759,7 +759,7 @@ class _DentalEntryFormSheetState extends State<_DentalEntryFormSheet> {
               alignment: Alignment.centerLeft,
               child: Text(
                 isEdit ? '이력 수정' : '치과 이력 추가',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w900,
                   color: kCText,
@@ -774,7 +774,7 @@ class _DentalEntryFormSheetState extends State<_DentalEntryFormSheet> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     '치과 이름',
                     style: TextStyle(
                       fontSize: 13,
@@ -800,7 +800,7 @@ class _DentalEntryFormSheetState extends State<_DentalEntryFormSheet> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  const Text(
+                  Text(
                     '입사 연월',
                     style: TextStyle(
                       fontSize: 13,
@@ -825,7 +825,7 @@ class _DentalEntryFormSheetState extends State<_DentalEntryFormSheet> {
                           borderRadius: BorderRadius.circular(4),
                         ),
                       ),
-                      const Text(
+                      Text(
                         '현재 재직 중',
                         style: TextStyle(
                           fontSize: 13,
@@ -837,7 +837,7 @@ class _DentalEntryFormSheetState extends State<_DentalEntryFormSheet> {
                   ),
                   if (!_isCurrent) ...[
                     const SizedBox(height: 10),
-                    const Text(
+                    Text(
                       '퇴사 연월',
                       style: TextStyle(
                         fontSize: 13,
@@ -855,7 +855,7 @@ class _DentalEntryFormSheetState extends State<_DentalEntryFormSheet> {
                     ),
                   ],
                   const SizedBox(height: 20),
-                  const Text(
+                  Text(
                     '주요 업무 태그',
                     style: TextStyle(
                       fontSize: 13,
@@ -901,7 +901,7 @@ class _DentalEntryFormSheetState extends State<_DentalEntryFormSheet> {
                             .toList(),
                   ),
                   const SizedBox(height: 20),
-                  const Text(
+                  Text(
                     '이 기간에 성장한 스킬',
                     style: TextStyle(
                       fontSize: 13,

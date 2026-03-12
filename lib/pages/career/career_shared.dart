@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/tab_theme.dart';
 
-// ── 커리어 탭 디자인 팔레트: Black(#000000) + Neon(#D1FF00) ──
-// Inversion Rule: Black bg → White 텍스트/아이콘
-const kCText   = Color(0xFFFFFFFF);   // White (Inversion)
-const kCBg     = Color(0xFF000000);   // Pure Black
-const kCAccent = Color(0xFFD1FF00);   // Neon Lime
-const kCShadow = Color(0xFF333333);   // 경계선
-const kCCardBg = Color(0xFF1A1A1A);   // 카드 배경: 진한 검정
-const kCMuted  = Color(0xFF888888);   // 비활성
+// ── 커리어 탭 디자인 팔레트: TabTheme.job 참조 ──
+// 색상 변경 → app_colors.dart Primitive만 수정하면 자동 반영
+final _j = TabTheme.job;
+final kCText   = _j.onBg;      // White (Black bg → White)
+final kCBg     = _j.bg;        // Pure Black
+final kCAccent = _j.accent;    // Neon Lime
+final kCShadow = _j.border;    // 경계선
+final kCCardBg = _j.cardBg;    // 카드 배경
+final kCMuted  = _j.muted;     // 비활성
 
 // ── 헬퍼 함수 ──────────────────────────────────────────────────
 String formatCareerMonths(int months) {
@@ -300,7 +302,7 @@ class CareerEditSheetTile extends StatelessWidget {
       leading: Icon(icon, color: kCText.withOpacity(0.75)),
       title: Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w700,
           color: kCText,

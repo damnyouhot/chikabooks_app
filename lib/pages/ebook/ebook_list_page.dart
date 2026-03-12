@@ -90,7 +90,7 @@ class EbookListPage extends StatelessWidget {
         // 카드 높이: 카드 너비 * 1.57 (표지 + 텍스트 영역)
         final sectionH = cardW * 1.57;
 
-        return Column(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Padding(

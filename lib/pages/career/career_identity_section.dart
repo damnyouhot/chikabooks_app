@@ -17,7 +17,7 @@ class CareerIdentityEmptyCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Text(
+                Text(
                   '내 커리어 카드',
                   style: TextStyle(
                     fontSize: 16,
@@ -35,7 +35,7 @@ class CareerIdentityEmptyCard extends StatelessWidget {
                     color: kCAccent.withOpacity(0.3),
                     borderRadius: BorderRadius.circular(999),
                   ),
-                  child: const Text(
+                  child: Text(
                     '채우기',
                     style: TextStyle(
                       fontSize: 11,
@@ -190,7 +190,7 @@ class CareerIdentityFilledCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             titleLine,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w900,
               color: kCText,
@@ -211,7 +211,7 @@ class CareerIdentityFilledCard extends StatelessWidget {
                 totalCareerMonths == 0
                     ? '미입력'
                     : formatCareerMonths(totalCareerMonths),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w800,
                   color: kCText,
@@ -438,7 +438,7 @@ class _CareerIdentitySheetState extends State<CareerIdentitySheet> {
           shrinkWrap: true,
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           children: [
-            const Text(
+            Text(
               '커리어 카드 수정',
               style: TextStyle(
                 fontSize: 16,
@@ -447,7 +447,7 @@ class _CareerIdentitySheetState extends State<CareerIdentitySheet> {
               ),
             ),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               '현재 상태',
               style: TextStyle(
                 fontSize: 12,
@@ -477,7 +477,7 @@ class _CareerIdentitySheetState extends State<CareerIdentitySheet> {
               ],
             ),
             const SizedBox(height: 14),
-            const Text(
+            Text(
               '현재 치과명',
               style: TextStyle(
                 fontSize: 12,
@@ -502,13 +502,13 @@ class _CareerIdentitySheetState extends State<CareerIdentitySheet> {
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: kCAccent, width: 1.4),
+                  borderSide: BorderSide(color: kCAccent, width: 1.4),
                 ),
               ),
             ),
             if (_status == 'employed') ...[
               const SizedBox(height: 14),
-              const Text(
+              Text(
                 '현재 치과 입사 연월',
                 style: TextStyle(
                   fontSize: 12,
@@ -541,7 +541,7 @@ class _CareerIdentitySheetState extends State<CareerIdentitySheet> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
+                            Text(
                               '총 경력 직접 입력',
                               style: TextStyle(
                                 fontSize: 13,
@@ -595,7 +595,7 @@ class _CareerIdentitySheetState extends State<CareerIdentitySheet> {
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(10),
-                                borderSide: const BorderSide(
+                                borderSide: BorderSide(
                                   color: kCAccent,
                                   width: 1.4,
                                 ),
@@ -629,7 +629,7 @@ class _CareerIdentitySheetState extends State<CareerIdentitySheet> {
               ),
             ),
             const SizedBox(height: 14),
-            const Text(
+            Text(
               '전문 분야(선택)',
               style: TextStyle(
                 fontSize: 12,

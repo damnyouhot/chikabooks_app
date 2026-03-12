@@ -63,51 +63,68 @@ class _BondStampSectionState extends State<BondStampSection> {
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BondColors.cardDecoration(),
+            // Neon 채운 스탬프 카드로 임팩트 강화
+            decoration: BondColors.neonCardDecoration(),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 타이틀 + 안내 아이콘
-                Row(
-                  children: [
-                    const Text(
-                      '이번 주 우리 스탬프',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: BondColors.kText,
+                // Neon 헤더 영역
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
+                  child: Row(
+                    children: [
+                      const Text(
+                        '이번 주 우리 스탬프',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: BondColors.kOnNeon,  // Black on Neon
+                        ),
                       ),
-                    ),
-                  ],
+                      const Spacer(),
+                      // 채운 칸 뱃지
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: BondColors.kOnNeon.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: BondColors.kOnNeon.withOpacity(0.3),
+                            width: 0.8,
+                          ),
+                        ),
+                        child: Text(
+                          '${stamp.filledCount}/7',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: BondColors.kOnNeon,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
 
-                const SizedBox(height: 16),
-
-                // 7개 스탬프 원 (월~일)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: List.generate(7, (i) {
-                    final isFilled = stamp.isFilled(i);
-                    final isToday = i == todayIdx;
-                    return BondStampCircle(
-                      dayLabel: const ['월', '화', '수', '목', '금', '토', '일'][i],
-                      isFilled: isFilled,
-                      isToday: isToday,
-                    );
-                  }),
-                ),
-
-                const SizedBox(height: 14),
-
-                // 요약 텍스트
-                Center(
-                  child: Text(
-                    '이번 주 ${stamp.filledCount}/7 칸 채웠어요',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: BondColors.kText.withValues(alpha: 0.5),
-                    ),
+                // 스탬프 원 7개 (흰 내부 배경)
+                Container(
+                  margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.65),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: List.generate(7, (i) {
+                      final isFilled = stamp.isFilled(i);
+                      final isToday = i == todayIdx;
+                      return BondStampCircle(
+                        dayLabel: const ['월', '화', '수', '목', '금', '토', '일'][i],
+                        isFilled: isFilled,
+                        isToday: isToday,
+                      );
+                    }),
                   ),
                 ),
               ],

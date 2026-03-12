@@ -137,7 +137,7 @@ class _CareerSkillCardState extends State<CareerSkillCard> {
                   children: [
                     Text(
                       widget.info.title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
                         color: kCText,
@@ -177,7 +177,7 @@ class _CareerSkillCardState extends State<CareerSkillCard> {
               ),
               Text(
                 'Lv.${widget.info.level}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w900,
                   color: kCText,
@@ -267,7 +267,7 @@ class _LevelAdjust extends StatelessWidget {
           ),
           Text(
             '$level',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w900,
               color: kCText,
@@ -373,7 +373,7 @@ class _CareerSkillEditSheetState extends State<CareerSkillEditSheet> {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(
               children: [
-                const Text(
+                Text(
                   '스킬 관리',
                   style: TextStyle(
                     fontSize: 18,
@@ -484,7 +484,7 @@ class _CareerSkillEditSheetState extends State<CareerSkillEditSheet> {
                           ),
                           Text(
                             'Lv.$level',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w900,
                               color: kCText,
@@ -719,7 +719,7 @@ class _SkillQuizSheetState extends State<SkillQuizSheet> {
               children: [
                 Text(
                   '${widget.skillTitle} 체크 질문',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
                     color: kCText,
@@ -960,7 +960,7 @@ class _SkillQuizSheetState extends State<SkillQuizSheet> {
                     },
                   ),
                   const SizedBox(height: 14),
-                  const Text(
+                  Text(
                     '추천 레벨',
                     style: TextStyle(
                       fontSize: 13,

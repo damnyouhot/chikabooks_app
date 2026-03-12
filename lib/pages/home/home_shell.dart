@@ -204,37 +204,37 @@ class _HomeShellState extends State<HomeShell> {
         builder: (_, tabNotifier, __) {
           final tabTheme = tabNotifier.theme;
           return BottomNavigationBar(
-            currentIndex: _selectedIndex,
-            onTap: _onTap,
-            type: BottomNavigationBarType.fixed,
+        currentIndex: _selectedIndex,
+        onTap: _onTap,
+        type: BottomNavigationBarType.fixed,
             backgroundColor: tabTheme.navBg,
             selectedItemColor: tabTheme.navSelected,
             unselectedItemColor: tabTheme.navUnselected,
-            selectedFontSize: 11,
-            unselectedFontSize: 11,
-            elevation: 0,
-            items: const [
-              BottomNavigationBarItem(
-                icon: Icon(Icons.person_outline),
-                activeIcon: Icon(Icons.person),
-                label: '나',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.people_outline),
-                activeIcon: Icon(Icons.people),
-                label: '같이',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.menu_book_outlined),
-                activeIcon: Icon(Icons.menu_book),
-                label: '성장하기',
-              ),
+        selectedFontSize: 11,
+        unselectedFontSize: 11,
+        elevation: 0,
+        items: const [
           BottomNavigationBarItem(
-              icon: Icon(Icons.work_outline),
-              activeIcon: Icon(Icons.work),
-              label: '커리어',
-            ),
-          ],
+            icon: Icon(Icons.person_outline),
+            activeIcon: Icon(Icons.person),
+            label: '나',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.people_outline),
+            activeIcon: Icon(Icons.people),
+            label: '같이',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.menu_book_outlined),
+            activeIcon: Icon(Icons.menu_book),
+            label: '성장하기',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.work_outline),
+            activeIcon: Icon(Icons.work),
+            label: '커리어',
+          ),
+        ],
         );
         },
       ),

@@ -59,7 +59,7 @@ class CareerTabHeader extends StatelessWidget {
               padding: const EdgeInsets.only(left: 20, right: 12),
               child: Row(
                 children: [
-                  const Text(
+                  Text(
                     '커리어',
                     style: TextStyle(
                       fontSize: 18,
@@ -162,7 +162,7 @@ class CareerTabHeader extends StatelessWidget {
               '커리어 탭에 대해서',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
-            content: const SingleChildScrollView(
+            content: SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
@@ -264,8 +264,8 @@ class CareerTabHeader extends StatelessWidget {
             shrinkWrap: true,
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
             children: [
-              const Padding(
-                padding: EdgeInsets.fromLTRB(8, 8, 8, 6),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 8, 6),
                 child: Text(
                   '무엇을 수정할까요?',
                   style: TextStyle(
@@ -577,7 +577,7 @@ class _ResumeShortcutCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     '내 이력서',
                     style: TextStyle(
                       fontSize: 14,
@@ -664,7 +664,7 @@ class _ApplicationsShortcutCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     '내 지원 내역',
                     style: TextStyle(
                       fontSize: 14,

@@ -40,18 +40,16 @@ class BondSummarySection extends StatelessWidget {
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
       margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.all(18),
-      decoration: BondColors.cardDecoration(),
+      // Blue 채운 카드로 임팩트 강화
+      decoration: BondColors.blueCardDecoration(),
       child: Stack(
         children: [
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 헤더
+              // Blue 헤더 배너
               Padding(
-                padding: EdgeInsets.only(
-                  right: topRightOverlay != null ? 72 : 0,
-                ),
+                padding: EdgeInsets.fromLTRB(18, 18, topRightOverlay != null ? 80 : 18, 14),
                 child: Row(
                   children: [
                     _buildPartnerAvatars(),
@@ -61,48 +59,54 @@ class BondSummarySection extends StatelessWidget {
                         '동행 파트너',
                         style: TextStyle(
                           fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: BondColors.kText,
+                          fontWeight: FontWeight.w700,
+                          color: BondColors.kOnAccent,  // White on Blue
                         ),
                       ),
                     ),
                     if (enableToggle)
                       Icon(
                         isExpanded ? Icons.expand_less : Icons.expand_more,
-                        color: BondColors.kText.withOpacity(0.5),
+                        color: BondColors.kOnAccent.withOpacity(0.7),
                       ),
                   ],
                 ),
               ),
 
-              // 1줄 요약 (토글 가능한 접힘 상태에서만)
+              // 1줄 요약 (접힘 상태에서만)
               if (enableToggle && !isExpanded) ...[
-                const SizedBox(height: 12),
-                Text(
-                  _getOneLinerSummary(),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: BondColors.kText.withOpacity(0.6),
-                    fontStyle: FontStyle.italic,
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      _getOneLinerSummary(),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: BondColors.kOnAccent,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
                   ),
                 ),
               ],
 
-              // 확장 시: 파트너별 감정 해석
+              // 확장 시: White 배경의 내부 카드
               if (isExpanded) ...[
-                const SizedBox(height: 14),
-                Padding(
-                  padding: EdgeInsets.only(
-                    right: topRightOverlay != null ? 72 : 0,
+                Container(
+                  margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Container(
-                    width: double.infinity,
-                    height: 0.5,
-                    color: BondColors.kShadow2.withOpacity(0.6),
-                  ),
+                  child: _buildExpandedPartnerDetails(),
                 ),
-                const SizedBox(height: 14),
-                _buildExpandedPartnerDetails(),
               ],
             ],
           ),
@@ -139,19 +143,18 @@ class BondSummarySection extends StatelessWidget {
                 height: 36,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color:
-                      isMe
-                          ? BondColors.kAccent.withOpacity(0.3)
-                          : BondColors.kShadow2,
-                  border: Border.all(color: BondColors.kCardBg, width: 1.5),
+                  color: isMe
+                      ? BondColors.kNeon           // Neon 내 아바타
+                      : Colors.white.withOpacity(0.35),
+                  border: Border.all(color: Colors.white.withOpacity(0.7), width: 1.5),
                 ),
                 child: Center(
                   child: Text(
                     nickname.isNotEmpty ? nickname[0] : (isMe ? '나' : 'P'),
                     style: TextStyle(
                       fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: BondColors.kText.withOpacity(0.7),
+                      fontWeight: FontWeight.w700,
+                      color: isMe ? BondColors.kOnNeon : BondColors.kOnAccent,
                     ),
                   ),
                 ),

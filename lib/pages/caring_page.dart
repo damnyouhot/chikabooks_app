@@ -16,12 +16,13 @@ import '../widgets/diary_input_sheet.dart';
 import '../widgets/user_goal_sheet.dart';
 import '../pages/ebook/ebook_detail_page.dart';
 import 'settings/settings_page.dart';
-import '../core/theme/app_colors.dart';
+import '../core/theme/tab_theme.dart';
 
-// ── 디자인 컬러 팔레트 (AppColors 위임) ──
-const _colorAccent = AppColors.accent;   // #D1FF00
-const _colorText   = AppColors.text;     // #000000
-const _colorBg     = AppColors.bg;       // #2E5BFF
+// ── 디자인 컬러 팔레트 (TabTheme.caring 참조) ──
+// 색상 변경 → app_colors.dart Primitive만 수정하면 자동 반영
+final _colorAccent = TabTheme.caring.accent;   // Neon Lime
+final _colorText   = TabTheme.caring.onBg;     // White (Blue bg → White)
+final _colorBg     = TabTheme.caring.bg;       // Blue
 
 /// 기본 메시지 상태 머신 상태
 enum _LoopState { idle, showingBase, showingReaction }
@@ -502,9 +503,9 @@ class _CaringPageState extends State<CaringPage>
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(
+      return Scaffold(
         backgroundColor: _colorBg,
-        body: Center(child: CircularProgressIndicator()),
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
@@ -751,8 +752,8 @@ class _CaringPageState extends State<CaringPage>
               ],
             ),
           ),
-          const Padding(
-            padding: EdgeInsets.only(left: 20),
+          Padding(
+            padding: const EdgeInsets.only(left: 20),
             child: Text(
               '나',
               style: TextStyle(
