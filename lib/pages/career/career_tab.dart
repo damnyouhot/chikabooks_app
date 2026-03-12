@@ -4,6 +4,7 @@ import '../../features/resume/screens/resume_home_screen.dart';
 import '../../features/resume/screens/my_applications_screen.dart';
 import '../settings/settings_page.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_style.dart';
 import 'career_shared.dart';
 import 'career_identity_section.dart';
 import 'career_skill_section.dart';
@@ -114,27 +115,16 @@ class CareerTabHeader extends StatelessWidget {
             // ── 소탭바 (성장하기 탭바와 동일한 필 스타일) ──
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceMuted,  // 연회색 배경
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.accent, width: 1.2),
-              ),
+              decoration: AppStyle.segmentContainerDecoration(),
               child: TabBar(
                 indicator: BoxDecoration(
-                  color: kCText,  // Black 인디케이터 채움 (강한 대비)
+                  color: AppColors.segmentSelected,  // Blue 인디케이터
                   borderRadius: BorderRadius.circular(10),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.20),
-                      blurRadius: 4,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
                 ),
                 indicatorSize: TabBarIndicatorSize.tab,
                 indicatorPadding: const EdgeInsets.all(3),
                 dividerColor: Colors.transparent,
-                labelColor: AppColors.onAccent,    // White (Black 위)
+                labelColor: AppColors.onSegmentSelected,    // White (Blue 위)
                 unselectedLabelColor: kCMuted,
                 labelStyle: const TextStyle(
                   fontSize: 14,
@@ -623,17 +613,7 @@ class _ApplicationsShortcutCard extends StatelessWidget {
       ),
       child: Container(
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: kCText,  // Black으로 채움 (강한 대비)
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.18),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
+        decoration: AppStyle.primaryCardDecoration(),  // Blue 카드 (flat)
         child: Row(
           children: [
             // 아이콘 컨테이너: 화면 너비의 9.5%, 최소34·최대48 clamp
@@ -645,13 +625,12 @@ class _ApplicationsShortcutCard extends StatelessWidget {
                   width: iconBox,
                   height: iconBox,
                   decoration: BoxDecoration(
-                    color: AppColors.accent.withOpacity(0.15),  // 연한 Neon 배경
+                    color: AppColors.onCardPrimary.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.accent.withOpacity(0.5), width: 1),
                   ),
                   child: Icon(
                     Icons.work_outline,
-                    color: AppColors.accent,   // Neon 아이콘
+                    color: AppColors.onCardPrimary,
                     size: iconBox * 0.55,
                   ),
                 );
