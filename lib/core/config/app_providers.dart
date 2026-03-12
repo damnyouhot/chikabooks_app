@@ -5,6 +5,7 @@ import '../../notifiers/job_filter_notifier.dart';
 import '../../services/ebook_service.dart';
 import '../../services/job_service.dart';
 import '../../services/store_service.dart';
+import '../theme/tab_theme.dart';
 
 /// 앱 전역 Provider 설정
 class AppProviders extends StatelessWidget {
@@ -21,6 +22,7 @@ class AppProviders extends StatelessWidget {
           initialData: null,
         ),
         ChangeNotifierProvider(create: (_) => JobFilterNotifier()),
+        ChangeNotifierProvider(create: (_) => TabThemeNotifier()),
         Provider(create: (_) => JobService()),
         Provider(create: (_) => EbookService()),
         Provider(create: (_) => StoreService()),

@@ -427,7 +427,7 @@ class _BondPageState extends State<BondPage> {
         }
 
         return Scaffold(
-          backgroundColor: BondColors.kBg,
+          backgroundColor: BondColors.kBg,  // White
           body: SafeArea(
             child: CustomScrollView(
               slivers: [

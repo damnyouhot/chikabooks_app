@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/career_profile_service.dart';
 import 'career_shared.dart';
-import '../../core/theme/app_colors.dart';
 
 // ── 스킬 정보 모델 ─────────────────────────────────────────────
 class CareerSkillInfo {
@@ -253,7 +252,7 @@ class _LevelAdjust extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surfaceChip,
+        color: kCShadow,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -413,7 +412,7 @@ class _CareerSkillEditSheetState extends State<CareerSkillEditSheet> {
                       color:
                           enabled
                               ? kCAccent.withOpacity(0.12)
-                              : AppColors.surfaceInput,
+                              : kCCardBg,
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
                         color: enabled ? kCAccent : Colors.transparent,
@@ -438,7 +437,7 @@ class _CareerSkillEditSheetState extends State<CareerSkillEditSheet> {
                                 width: badgeSize,
                                 height: badgeSize,
                                 decoration: BoxDecoration(
-                                  color: enabled ? kCText : AppColors.muted,
+                                  color: enabled ? kCText : kCMuted,
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Icon(
@@ -811,8 +810,8 @@ class _SkillQuizSheetState extends State<SkillQuizSheet> {
                         ans == true
                             ? kCAccent.withOpacity(0.18)
                             : ans == false
-                            ? AppColors.surfaceCard
-                            : Colors.white,
+                            ? kCCardBg
+                            : Colors.transparent,
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
                       color: ans == true ? kCAccent : kCShadow,
@@ -860,7 +859,7 @@ class _SkillQuizSheetState extends State<SkillQuizSheet> {
                           _QuizBtn(
                             label: 'No',
                             active: ans == false,
-                            color: AppColors.muted,
+                            color: kCMuted,
                             onTap: () => setState(() => _answers[i] = false),
                           ),
                         ],
@@ -923,8 +922,8 @@ class _SkillQuizSheetState extends State<SkillQuizSheet> {
         diff == 0
             ? kCText.withOpacity(0.5)
             : diff > 0
-            ? AppColors.success
-            : AppColors.warning;
+            ? kCAccent      // 현재 레벨 > 권장 → Neon 포인트
+            : const Color(0xFFFF9100);  // 경고 오렌지
 
     return Expanded(
       child: Padding(

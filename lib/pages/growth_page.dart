@@ -9,14 +9,14 @@ import 'ebook/ebook_detail_page.dart';
 import 'quiz_today_page.dart';
 import 'hira_update_page.dart';
 import 'settings/settings_page.dart';
-import '../core/theme/app_colors.dart';
 
-// ── 디자인 팔레트 (AppColors 위임) ──
-const _kText    = AppColors.text;     // #000000
-const _kBg      = AppColors.bg;       // #2E5BFF
-const _kShadow1 = AppColors.shadow;   // #8AAEFF
-const _kShadow2 = AppColors.muted;    // #CCD6FF
-const _kCardBg  = AppColors.cardBg;   // #FFFFFF
+// ── 디자인 팔레트: Neon(#D1FF00) + Black(#000000) ──
+// Inversion Rule: Neon bg → Black 텍스트/아이콘
+const _kText    = Color(0xFF000000);   // Pure Black
+const _kBg      = Color(0xFFD1FF00);   // Neon Lime
+const _kShadow1 = Color(0xFFB8E600);   // 라임보다 진한 경계선
+const _kShadow2 = Color(0xFFE5FF66);   // 연한 구분선
+const _kCardBg  = Color(0xFFFFFFFF);   // 카드 배경: 흰색 (가독성 유지)
 
 /// 성장 탭 (3탭)
 ///

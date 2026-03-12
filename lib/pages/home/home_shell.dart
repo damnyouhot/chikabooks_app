@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
 import '../bond_page.dart';
 import '../caring_page.dart';
 import '../growth_page.dart';
@@ -10,7 +11,7 @@ import '../../services/onboarding_service.dart';
 import '../../features/onboarding/app_onboarding_controller.dart';
 import '../../features/onboarding/app_onboarding_overlay.dart';
 
-import '../../core/theme/app_colors.dart';
+import '../../core/theme/tab_theme.dart';
 
 /// 메인 홈 (탭 네비게이션)
 class HomeShell extends StatefulWidget {
@@ -92,6 +93,11 @@ class _HomeShellState extends State<HomeShell> {
   // ─────────────────────────────────────────────────────────
   // 탭 이동 (온보딩 중에는 오버레이가 요청한 탭만 허용)
   // ─────────────────────────────────────────────────────────
+  void _setTab(int idx) {
+    setState(() => _selectedIndex = idx);
+    context.read<TabThemeNotifier>().setTab(idx);
+  }
+
   void _onTap(int idx) async {
     // ── 온보딩 중: 지정 탭만 허용, 그 외 차단 ──
     if (_onboardingActive) {
@@ -110,7 +116,7 @@ class _HomeShellState extends State<HomeShell> {
         _onboardingCtrl.advance(); // spotlight 해제 → 다음 step으로
         return;
       }
-      setState(() => _selectedIndex = idx);
+      _setTab(idx);
       return;
     }
 
@@ -122,23 +128,23 @@ class _HomeShellState extends State<HomeShell> {
           MaterialPageRoute(builder: (_) => const OnboardingProfileScreen()),
         );
         if (result == true && mounted) {
-          setState(() => _selectedIndex = idx);
+          _setTab(idx);
         }
         return;
       }
     }
 
-    setState(() => _selectedIndex = idx);
+    _setTab(idx);
   }
 
   void _onTabRequested(int index) {
     if (_onboardingActive) return;
-    setState(() => _selectedIndex = index);
+    _setTab(index);
   }
 
   void _onGrowthSubTabRequested(int subTab) {
     if (_onboardingActive) return;
-    setState(() => _selectedIndex = 2);
+    _setTab(2);
     _growthSubTabNotifier.value = -1;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _growthSubTabNotifier.value = subTab;
@@ -187,45 +193,50 @@ class _HomeShellState extends State<HomeShell> {
                     key: const ValueKey('onboarding_overlay'),
                     controller: _onboardingCtrl,
                     onTabChangeRequest: (idx) {
-                      setState(() => _selectedIndex = idx);
+                      _setTab(idx);
                     },
                     onComplete: _onOnboardingComplete,
                   ),
             ),
         ],
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: _onTap,
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: AppColors.bg,           // #2E5BFF 블루
-        selectedItemColor: AppColors.accent,      // #D1FF00 라임
-        unselectedItemColor: AppColors.muted,     // #CCD6FF 연블루
-        selectedFontSize: 11,
-        unselectedFontSize: 11,
-        elevation: 0,
-        items: const [
+      bottomNavigationBar: Consumer<TabThemeNotifier>(
+        builder: (_, tabNotifier, __) {
+          final tabTheme = tabNotifier.theme;
+          return BottomNavigationBar(
+            currentIndex: _selectedIndex,
+            onTap: _onTap,
+            type: BottomNavigationBarType.fixed,
+            backgroundColor: tabTheme.navBg,
+            selectedItemColor: tabTheme.navSelected,
+            unselectedItemColor: tabTheme.navUnselected,
+            selectedFontSize: 11,
+            unselectedFontSize: 11,
+            elevation: 0,
+            items: const [
+              BottomNavigationBarItem(
+                icon: Icon(Icons.person_outline),
+                activeIcon: Icon(Icons.person),
+                label: '나',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.people_outline),
+                activeIcon: Icon(Icons.people),
+                label: '같이',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.menu_book_outlined),
+                activeIcon: Icon(Icons.menu_book),
+                label: '성장하기',
+              ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
-            label: '나',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.people_outline),
-            activeIcon: Icon(Icons.people),
-            label: '같이',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.menu_book_outlined),
-            activeIcon: Icon(Icons.menu_book),
-            label: '성장하기',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.work_outline),
-            activeIcon: Icon(Icons.work),
-            label: '커리어',
-          ),
-        ],
+              icon: Icon(Icons.work_outline),
+              activeIcon: Icon(Icons.work),
+              label: '커리어',
+            ),
+          ],
+        );
+        },
       ),
     );
   }

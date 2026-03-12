@@ -3,7 +3,6 @@ import '../../services/career_profile_service.dart';
 import '../../features/resume/screens/resume_home_screen.dart';
 import '../../features/resume/screens/my_applications_screen.dart';
 import '../settings/settings_page.dart';
-import '../../core/theme/app_colors.dart';
 import 'career_shared.dart';
 import 'career_identity_section.dart';
 import 'career_skill_section.dart';
@@ -117,15 +116,15 @@ class CareerTabHeader extends StatelessWidget {
               decoration: BoxDecoration(
                 color: kCShadow,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.shadow, width: 0.5),
+                border: Border.all(color: kCShadow, width: 0.5),
               ),
               child: TabBar(
                 indicator: BoxDecoration(
-                  color: Colors.white,
+                  color: kCAccent,  // Neon Lime — Black 배경 위 포인트
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.shadow.withOpacity(0.3),
+                      color: kCAccent.withOpacity(0.3),
                       blurRadius: 4,
                       offset: const Offset(0, 1),
                     ),
@@ -134,8 +133,8 @@ class CareerTabHeader extends StatelessWidget {
                 indicatorSize: TabBarIndicatorSize.tab,
                 indicatorPadding: const EdgeInsets.all(3),
                 dividerColor: Colors.transparent,
-                labelColor: kCText,
-                unselectedLabelColor: kCText.withOpacity(0.4),
+                labelColor: kCBg,          // Black (Neon 배경 위)
+                unselectedLabelColor: kCMuted,  // 비활성 회색
                 labelStyle: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -183,7 +182,7 @@ class CareerTabHeader extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       height: 1.5,
-                      color: AppColors.text,
+                      color: kCText,
                     ),
                   ),
                   SizedBox(height: 14),
@@ -197,7 +196,7 @@ class CareerTabHeader extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       height: 1.5,
-                      color: AppColors.text,
+                      color: kCText,
                     ),
                   ),
                   SizedBox(height: 14),
@@ -211,7 +210,7 @@ class CareerTabHeader extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       height: 1.5,
-                      color: AppColors.text,
+                      color: kCText,
                     ),
                   ),
                   SizedBox(height: 14),
@@ -225,7 +224,7 @@ class CareerTabHeader extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       height: 1.5,
-                      color: AppColors.text,
+                      color: kCText,
                     ),
                   ),
                   SizedBox(height: 16),
@@ -234,7 +233,7 @@ class CareerTabHeader extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       height: 1.5,
-                      color: AppColors.text,
+                      color: kCText,
                     ),
                   ),
                 ],
@@ -254,7 +253,7 @@ class CareerTabHeader extends StatelessWidget {
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
-      backgroundColor: Colors.white,
+      backgroundColor: kCCardBg,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -540,15 +539,15 @@ class _ResumeShortcutCard extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              AppColors.careerBlue.withOpacity(0.07),
-              AppColors.careerBlue.withOpacity(0.02),
+              kCAccent.withOpacity(0.12),
+              kCAccent.withOpacity(0.04),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: AppColors.careerBlue.withOpacity(0.12),
+            color: kCAccent.withOpacity(0.25),
           ),
         ),
         child: Row(
@@ -562,12 +561,12 @@ class _ResumeShortcutCard extends StatelessWidget {
                   width: iconBox,
                   height: iconBox,
                   decoration: BoxDecoration(
-                    color: AppColors.careerBlue.withOpacity(0.12),
+                    color: kCAccent.withOpacity(0.18),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
                     Icons.description_outlined,
-                    color: AppColors.careerBlue,
+                    color: kCAccent,
                     size: iconBox * 0.55,
                   ),
                 );
@@ -627,15 +626,15 @@ class _ApplicationsShortcutCard extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              AppColors.success.withOpacity(0.07),
-              AppColors.success.withOpacity(0.02),
+              kCAccent.withOpacity(0.08),
+              kCAccent.withOpacity(0.02),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: AppColors.success.withOpacity(0.12),
+            color: kCAccent.withOpacity(0.2),
           ),
         ),
         child: Row(
@@ -649,12 +648,12 @@ class _ApplicationsShortcutCard extends StatelessWidget {
                   width: iconBox,
                   height: iconBox,
                   decoration: BoxDecoration(
-                    color: AppColors.success.withOpacity(0.12),
+                    color: kCAccent.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
                     Icons.work_outline,
-                    color: AppColors.success,
+                    color: kCAccent,
                     size: iconBox * 0.55,
                   ),
                 );

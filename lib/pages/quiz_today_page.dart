@@ -3,12 +3,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
 
-// ── 디자인 팔레트 (AppColors 위임) ──
-const _kAccent  = AppColors.accent;   // #D1FF00
-const _kText    = AppColors.text;     // #000000
-const _kShadow1 = AppColors.shadow;   // #8AAEFF
-const _kShadow2 = AppColors.muted;    // #CCD6FF
-const _kCardBg  = AppColors.cardBg;   // #FFFFFF
+// ── 디자인 팔레트: Neon(#D1FF00) + Black(#000000) ──
+// growth_page 배경(Neon) 위에서 렌더링됨
+const _kAccent  = Color(0xFF000000);   // Black accent (Neon 배경 위)
+const _kText    = Color(0xFF000000);   // Pure Black (Inversion)
+const _kShadow1 = Color(0xFFB8E600);   // 라임계열 경계선
+const _kShadow2 = Color(0xFFE5FF66);   // 연한 구분선
+const _kCardBg  = Color(0xFFFFFFFF);   // 카드 배경: 흰색
 // 퀴즈 정답/오답: 의미 컬러로 AppColors Component Override 사용
 const _kCorrect = AppColors.quizCorrect;
 

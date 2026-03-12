@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/app_colors.dart';
 
-// ── 커리어 탭 디자인 팔레트 (AppColors 위임) ──
-const kCText   = AppColors.text;    // #000000
-const kCBg     = AppColors.bg;      // #2E5BFF
-const kCAccent = AppColors.accent;  // #D1FF00
-const kCShadow = AppColors.shadow;  // #8AAEFF
+// ── 커리어 탭 디자인 팔레트: Black(#000000) + Neon(#D1FF00) ──
+// Inversion Rule: Black bg → White 텍스트/아이콘
+const kCText   = Color(0xFFFFFFFF);   // White (Inversion)
+const kCBg     = Color(0xFF000000);   // Pure Black
+const kCAccent = Color(0xFFD1FF00);   // Neon Lime
+const kCShadow = Color(0xFF333333);   // 경계선
+const kCCardBg = Color(0xFF1A1A1A);   // 카드 배경: 진한 검정
+const kCMuted  = Color(0xFF888888);   // 비활성
 
 // ── 헬퍼 함수 ──────────────────────────────────────────────────
 String formatCareerMonths(int months) {
@@ -60,12 +62,12 @@ class CareerCard extends StatelessWidget {
     return Container(
       padding: padding,
       decoration: BoxDecoration(
-        color: AppColors.cardBg,
+        color: kCCardBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.shadowWith(0.35), width: 0.8),
+        border: Border.all(color: kCShadow.withOpacity(0.6), width: 0.8),
         boxShadow: [
           BoxShadow(
-            color: AppColors.bgWith(0.18),
+            color: Colors.black.withOpacity(0.3),
             blurRadius: 12,
             offset: const Offset(0, 2),
           ),
@@ -110,7 +112,7 @@ class CareerDatePickerTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         decoration: BoxDecoration(
-          color: AppColors.surfaceInput,
+          color: kCCardBg,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -176,12 +178,12 @@ class _CareerLoadingCardState extends State<CareerLoadingCard>
           height: widget.height,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppColors.cardBg,
+            color: kCCardBg,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.shadowWith(0.35), width: 0.8),
+            border: Border.all(color: kCShadow.withOpacity(0.6), width: 0.8),
             boxShadow: [
               BoxShadow(
-                color: AppColors.bgWith(0.18),
+                color: Colors.black.withOpacity(0.3),
                 blurRadius: 12,
                 offset: const Offset(0, 2),
               ),

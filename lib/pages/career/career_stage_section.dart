@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'career_shared.dart';
-import '../../core/theme/app_colors.dart';
 
 // ── 커리어 단계 규칙 모델 ──────────────────────────────────────
 class _StageRule {
@@ -161,7 +160,7 @@ class CareerStageCard extends StatelessWidget {
               minHeight: 7,
               backgroundColor: kCShadow.withOpacity(0.5),
               valueColor: AlwaysStoppedAnimation<Color>(
-                isMax ? AppColors.success : kCAccent,
+                isMax ? kCAccent : kCAccent,
               ),
             ),
           ),
@@ -402,7 +401,7 @@ void showCareerStageGuideSheet(BuildContext context) {
                     return Container(
                       padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
                       decoration: BoxDecoration(
-                        color: AppColors.surfaceCard,
+                        color: kCCardBg,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
