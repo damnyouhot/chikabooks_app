@@ -6,9 +6,9 @@ import '../../core/theme/tab_theme.dart';
 final _j = TabTheme.job;
 final kCText   = _j.onBg;      // Black (White bg → Black)
 final kCBg     = _j.bg;        // White
-final kCAccent = _j.accent;    // Pure Black (버튼/카드 채움)
-final kCShadow = _j.border;    // Black 테두리 (선명)
-final kCCardBg = _j.cardBg;    // 연회색 카드 배경
+final kCAccent = _j.accent;    // Blue (버튼/카드 채움)
+final kCShadow = _j.border;    // Blue 테두리
+final kCCardBg = _j.cardBg;    // 연파랑 카드 배경
 final kCMuted  = _j.muted;     // 진한 회색 (비활성)
 
 // ── 헬퍼 함수 ──────────────────────────────────────────────────

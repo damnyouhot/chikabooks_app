@@ -16,9 +16,9 @@ import '../core/theme/tab_theme.dart';
 final _g       = TabTheme.growth;
 final _kText    = _g.onBg;      // Black (White bg → Black)
 final _kBg      = _g.bg;        // White
-final _kShadow1 = _g.border;    // 진한 라임 테두리 (선명한 구분선)
-final _kShadow2 = _g.surface;   // 연라임 표면
-final _kCardBg  = _g.cardBg;    // 카드 배경: 연라임 틴트
+final _kShadow1 = _g.border;    // Blue 테두리 (선명한 구분선)
+final _kShadow2 = _g.surface;   // 연파랑 표면
+final _kCardBg  = _g.cardBg;    // 카드 배경: 연파랑 틴트
 
 /// 성장 탭 (3탭)
 ///

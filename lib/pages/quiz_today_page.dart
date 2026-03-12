@@ -7,11 +7,11 @@ import '../core/theme/tab_theme.dart';
 // ── 디자인 팔레트: TabTheme.growth 참조 ──
 // 색상 변경 → app_colors.dart Primitive만 수정하면 자동 반영
 final _g        = TabTheme.growth;
-final _kAccent  = _g.accent;    // Black (Neon bg → Black accent)
+final _kAccent  = _g.accent;    // Blue (버튼/강조)
 final _kText    = _g.onBg;      // Black (Inversion)
-final _kShadow1 = _g.border;    // 라임계열 경계선
-final _kShadow2 = _g.surface;   // 연한 구분선
-final _kCardBg  = _g.cardBg;    // 카드 배경: 흰색
+final _kShadow1 = _g.border;    // Blue 계열 경계선
+final _kShadow2 = _g.surface;   // 연파랑 구분선
+final _kCardBg  = _g.cardBg;    // 카드 배경: 연파랑
 // 퀴즈 정답/오답: 의미 컬러로 AppColors Component Override 사용
 const _kCorrect = AppColors.quizCorrect;
 

@@ -107,46 +107,46 @@ class TabTheme {
     shadow2:      Color(0xFFEEF1FF),   // 구 BondColors.kShadow2
   );
 
-  /// 탭2 (성장하기/Growth): White 배경 + Neon 포인트
+  /// 탭2 (성장하기/Growth): White 배경 + Blue 포인트
   static const growth = TabTheme(
     bg:           AppColors.white,
     onBg:         AppColors.black,
-    accent:       AppColors.lime,
-    onAccent:     AppColors.black,
-    cardBg:       Color(0xFFF8FFD6),   // 연라임 카드 배경
+    accent:       AppColors.blue,      // Blue로 통일
+    onAccent:     AppColors.white,     // Blue 위 → White
+    cardBg:       Color(0xFFF0F4FF),   // 연파랑 카드 배경
     onCard:       AppColors.black,
-    surface:      Color(0xFFF0FFB0),
-    border:       Color(0xFFB8E600),
-    muted:        Color(0xFF444444),
-    cardStrong:   AppColors.lime,      // Neon 채움 카드
-    onCardStrong: AppColors.black,
-    cardNeon:     AppColors.lime,
+    surface:      Color(0xFFE8EDFF),
+    border:       AppColors.blue,
+    muted:        Color(0xFF555555),
+    cardStrong:   AppColors.blue,      // Blue 채움 카드
+    onCardStrong: AppColors.white,
+    cardNeon:     AppColors.lime,      // 형광 채움 카드 (보조 유지)
     onCardNeon:   AppColors.black,
     cardDark:     Color(0xFF111111),
     onCardDark:   AppColors.white,
-    shadow1:      Color(0xFFD8F570),   // 연라임 그림자
-    shadow2:      Color(0xFFEEFFB3),
+    shadow1:      Color(0xFFD0D8FF),   // 연파랑 그림자
+    shadow2:      Color(0xFFEEF1FF),
   );
 
-  /// 탭3 (커리어/Job): White 배경 + Black 포인트
+  /// 탭3 (커리어/Job): White 배경 + Blue 포인트
   static const job = TabTheme(
     bg:           AppColors.white,
     onBg:         AppColors.black,
-    accent:       AppColors.black,
-    onAccent:     AppColors.white,
-    cardBg:       Color(0xFFF2F2F2),   // 연회색 카드 배경
+    accent:       AppColors.blue,      // Blue로 통일
+    onAccent:     AppColors.white,     // Blue 위 → White
+    cardBg:       Color(0xFFF0F4FF),   // 연파랑 카드 배경
     onCard:       AppColors.black,
-    surface:      Color(0xFFE8E8E8),
-    border:       AppColors.black,
+    surface:      Color(0xFFE8EDFF),
+    border:       AppColors.blue,
     muted:        Color(0xFF555555),
-    cardStrong:   AppColors.black,     // Black 채움 카드
+    cardStrong:   AppColors.blue,      // Blue 채움 카드
     onCardStrong: AppColors.white,
-    cardNeon:     AppColors.lime,      // Neon 채움 카드
+    cardNeon:     AppColors.lime,      // 형광 채움 카드 (보조 유지)
     onCardNeon:   AppColors.black,
     cardDark:     Color(0xFF111111),
     onCardDark:   AppColors.white,
-    shadow1:      Color(0xFFCCCCCC),   // 회색 그림자
-    shadow2:      Color(0xFFE5E5E5),
+    shadow1:      Color(0xFFD0D8FF),   // 연파랑 그림자
+    shadow2:      Color(0xFFEEF1FF),
   );
 
   static const List<TabTheme> _byIndex = [caring, bond, growth, job];
