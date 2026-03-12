@@ -16,11 +16,12 @@ import '../widgets/diary_input_sheet.dart';
 import '../widgets/user_goal_sheet.dart';
 import '../pages/ebook/ebook_detail_page.dart';
 import 'settings/settings_page.dart';
+import '../core/theme/app_colors.dart';
 
-// ── 디자인 컬러 팔레트 ──
-const _colorAccent = Color(0xFFF7CBCA);
-const _colorText   = Color(0xFF5D6B6B);
-const _colorBg     = Color(0xFFF1F7F7);
+// ── 디자인 컬러 팔레트 (AppColors 위임) ──
+const _colorAccent = AppColors.accent;   // #D1FF00
+const _colorText   = AppColors.text;     // #000000
+const _colorBg     = AppColors.bg;       // #2E5BFF
 
 /// 기본 메시지 상태 머신 상태
 enum _LoopState { idle, showingBase, showingReaction }

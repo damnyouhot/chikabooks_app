@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/career_profile_service.dart';
 import 'career_shared.dart';
+import '../../core/theme/app_colors.dart';
 
 // ── 치과 네트워크 카드 ─────────────────────────────────────────
 class CareerNetworkCard extends StatefulWidget {
@@ -212,7 +213,7 @@ class _NetworkEmptyHint extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F3F3),
+        color: AppColors.surfaceChip,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
@@ -270,7 +271,7 @@ class _NetworkTimelineItem extends StatelessWidget {
         color:
             entry.isCurrent
                 ? kCAccent.withOpacity(0.1)
-                : const Color(0xFFF6F6F6),
+                : AppColors.surfaceCard,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color:
@@ -530,7 +531,7 @@ class _DentalNetworkListSheet extends StatelessWidget {
                         color:
                             e.isCurrent
                                 ? kCAccent.withOpacity(0.1)
-                                : const Color(0xFFF6F6F6),
+                                : AppColors.surfaceCard,
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
                           color:
@@ -788,7 +789,7 @@ class _DentalEntryFormSheetState extends State<_DentalEntryFormSheet> {
                     decoration: InputDecoration(
                       hintText: '예) 서울 ○○치과',
                       filled: true,
-                      fillColor: const Color(0xFFF5F5F5),
+                      fillColor: AppColors.surfaceInput,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide.none,
@@ -883,7 +884,7 @@ class _DentalEntryFormSheetState extends State<_DentalEntryFormSheet> {
                                     }),
                                 selectedColor: kCAccent.withOpacity(0.35),
                                 checkmarkColor: kCText,
-                                backgroundColor: const Color(0xFFF1F3F3),
+                                backgroundColor: AppColors.surfaceChip,
                                 labelStyle: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w700,
@@ -929,7 +930,7 @@ class _DentalEntryFormSheetState extends State<_DentalEntryFormSheet> {
                                     }),
                                 selectedColor: kCShadow.withOpacity(0.6),
                                 checkmarkColor: kCText,
-                                backgroundColor: const Color(0xFFF1F3F3),
+                                backgroundColor: AppColors.surfaceChip,
                                 labelStyle: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w700,

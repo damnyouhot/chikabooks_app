@@ -3,6 +3,7 @@ import '../../services/career_profile_service.dart';
 import '../../features/resume/screens/resume_home_screen.dart';
 import '../../features/resume/screens/my_applications_screen.dart';
 import '../settings/settings_page.dart';
+import '../../core/theme/app_colors.dart';
 import 'career_shared.dart';
 import 'career_identity_section.dart';
 import 'career_skill_section.dart';
@@ -116,7 +117,7 @@ class CareerTabHeader extends StatelessWidget {
               decoration: BoxDecoration(
                 color: kCShadow,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFDDD3D8), width: 0.5),
+                border: Border.all(color: AppColors.shadow, width: 0.5),
               ),
               child: TabBar(
                 indicator: BoxDecoration(
@@ -124,7 +125,7 @@ class CareerTabHeader extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFFDDD3D8).withOpacity(0.3),
+                      color: AppColors.shadow.withOpacity(0.3),
                       blurRadius: 4,
                       offset: const Offset(0, 1),
                     ),
@@ -182,7 +183,7 @@ class CareerTabHeader extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       height: 1.5,
-                      color: Color(0xFF666666),
+                      color: AppColors.text,
                     ),
                   ),
                   SizedBox(height: 14),
@@ -196,7 +197,7 @@ class CareerTabHeader extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       height: 1.5,
-                      color: Color(0xFF666666),
+                      color: AppColors.text,
                     ),
                   ),
                   SizedBox(height: 14),
@@ -210,7 +211,7 @@ class CareerTabHeader extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       height: 1.5,
-                      color: Color(0xFF666666),
+                      color: AppColors.text,
                     ),
                   ),
                   SizedBox(height: 14),
@@ -224,7 +225,7 @@ class CareerTabHeader extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       height: 1.5,
-                      color: Color(0xFF666666),
+                      color: AppColors.text,
                     ),
                   ),
                   SizedBox(height: 16),
@@ -233,7 +234,7 @@ class CareerTabHeader extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       height: 1.5,
-                      color: Color(0xFF888888),
+                      color: AppColors.text,
                     ),
                   ),
                 ],
@@ -539,15 +540,15 @@ class _ResumeShortcutCard extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              const Color(0xFF4A90D9).withOpacity(0.07),
-              const Color(0xFF4A90D9).withOpacity(0.02),
+              AppColors.careerBlue.withOpacity(0.07),
+              AppColors.careerBlue.withOpacity(0.02),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: const Color(0xFF4A90D9).withOpacity(0.12),
+            color: AppColors.careerBlue.withOpacity(0.12),
           ),
         ),
         child: Row(
@@ -561,12 +562,12 @@ class _ResumeShortcutCard extends StatelessWidget {
                   width: iconBox,
                   height: iconBox,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF4A90D9).withOpacity(0.12),
+                    color: AppColors.careerBlue.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
                     Icons.description_outlined,
-                    color: const Color(0xFF4A90D9),
+                    color: AppColors.careerBlue,
                     size: iconBox * 0.55,
                   ),
                 );
@@ -626,15 +627,15 @@ class _ApplicationsShortcutCard extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              const Color(0xFF4CAF50).withOpacity(0.07),
-              const Color(0xFF4CAF50).withOpacity(0.02),
+              AppColors.success.withOpacity(0.07),
+              AppColors.success.withOpacity(0.02),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: const Color(0xFF4CAF50).withOpacity(0.12),
+            color: AppColors.success.withOpacity(0.12),
           ),
         ),
         child: Row(
@@ -648,12 +649,12 @@ class _ApplicationsShortcutCard extends StatelessWidget {
                   width: iconBox,
                   height: iconBox,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF4CAF50).withOpacity(0.12),
+                    color: AppColors.success.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
                     Icons.work_outline,
-                    color: const Color(0xFF4CAF50),
+                    color: AppColors.success,
                     size: iconBox * 0.55,
                   ),
                 );

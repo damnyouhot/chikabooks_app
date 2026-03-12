@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import '../widgets/hira_update_section.dart';
+import '../core/theme/app_colors.dart';
 
-// ── 디자인 팔레트 (성장 탭과 통일) ──
-const _kBg = Color(0xFFF1F7F7);
+// ── 디자인 팔레트 (AppColors 위임) ──
+const _kBg = AppColors.bg;
 
 /// HIRA 수가·급여 변경 포인트 페이지
 class HiraUpdatePage extends StatelessWidget {

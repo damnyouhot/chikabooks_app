@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/career_profile_service.dart';
 import 'career_shared.dart';
+import '../../core/theme/app_colors.dart';
 
 // ── 스킬 정보 모델 ─────────────────────────────────────────────
 class CareerSkillInfo {
@@ -252,7 +253,7 @@ class _LevelAdjust extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F3F3),
+        color: AppColors.surfaceChip,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -412,7 +413,7 @@ class _CareerSkillEditSheetState extends State<CareerSkillEditSheet> {
                       color:
                           enabled
                               ? kCAccent.withOpacity(0.12)
-                              : const Color(0xFFF5F5F5),
+                              : AppColors.surfaceInput,
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
                         color: enabled ? kCAccent : Colors.transparent,
@@ -437,7 +438,7 @@ class _CareerSkillEditSheetState extends State<CareerSkillEditSheet> {
                                 width: badgeSize,
                                 height: badgeSize,
                                 decoration: BoxDecoration(
-                                  color: enabled ? kCText : const Color(0xFFE0E0E0),
+                                  color: enabled ? kCText : AppColors.muted,
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Icon(
@@ -810,7 +811,7 @@ class _SkillQuizSheetState extends State<SkillQuizSheet> {
                         ans == true
                             ? kCAccent.withOpacity(0.18)
                             : ans == false
-                            ? const Color(0xFFF3F3F3)
+                            ? AppColors.surfaceCard
                             : Colors.white,
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
@@ -859,7 +860,7 @@ class _SkillQuizSheetState extends State<SkillQuizSheet> {
                           _QuizBtn(
                             label: 'No',
                             active: ans == false,
-                            color: const Color(0xFFE0E0E0),
+                            color: AppColors.muted,
                             onTap: () => setState(() => _answers[i] = false),
                           ),
                         ],
@@ -922,8 +923,8 @@ class _SkillQuizSheetState extends State<SkillQuizSheet> {
         diff == 0
             ? kCText.withOpacity(0.5)
             : diff > 0
-            ? const Color(0xFF4CAF82)
-            : const Color(0xFFE67E55);
+            ? AppColors.success
+            : AppColors.warning;
 
     return Expanded(
       child: Padding(

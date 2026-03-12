@@ -1,14 +1,16 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../core/theme/app_colors.dart';
 
-// ── 디자인 팔레트 (2탭과 통일) ──
-const _kAccent = Color(0xFFF7CBCA);
-const _kText = Color(0xFF5D6B6B);
-const _kShadow1 = Color(0xFFDDD3D8);
-const _kShadow2 = Color(0xFFD5E5E5);
-const _kCardBg = Colors.white;
-const _kCorrect = Color(0xFF2E7D32);
+// ── 디자인 팔레트 (AppColors 위임) ──
+const _kAccent  = AppColors.accent;   // #D1FF00
+const _kText    = AppColors.text;     // #000000
+const _kShadow1 = AppColors.shadow;   // #8AAEFF
+const _kShadow2 = AppColors.muted;    // #CCD6FF
+const _kCardBg  = AppColors.cardBg;   // #FFFFFF
+// 퀴즈 정답/오답: 의미 컬러로 AppColors Component Override 사용
+const _kCorrect = AppColors.quizCorrect;
 
 /// 오늘의 퀴즈
 ///
@@ -395,13 +397,13 @@ class _QuizCardState extends State<_QuizCard> {
 
             if (_answered) {
               if (isCorrect) {
-                bgColor = const Color(0xFFE8F5E9);
-                textColor = const Color(0xFF2E7D32);
-                borderColor = const Color(0xFF66BB6A);
+                bgColor = AppColors.quizCorrectBg;
+                textColor = AppColors.quizCorrect;
+                borderColor = AppColors.quizCorrectBorder;
               } else if (isSelected && !isCorrect) {
-                bgColor = const Color(0xFFFCE4EC);
-                textColor = const Color(0xFFC62828);
-                borderColor = const Color(0xFFEF5350);
+                bgColor = AppColors.quizWrongBg;
+                textColor = AppColors.quizWrong;
+                borderColor = AppColors.quizWrongBorder;
               }
             }
 
@@ -452,7 +454,7 @@ class _QuizCardState extends State<_QuizCard> {
                   fontSize: 13,
                   color:
                       _selectedIndex == widget.correctIndex
-                          ? const Color(0xFF2E7D32)
+                          ? AppColors.quizCorrect
                           : _kText.withOpacity(0.6),
                   fontWeight: FontWeight.w500,
                 ),

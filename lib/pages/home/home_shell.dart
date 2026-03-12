@@ -10,6 +10,8 @@ import '../../services/onboarding_service.dart';
 import '../../features/onboarding/app_onboarding_controller.dart';
 import '../../features/onboarding/app_onboarding_overlay.dart';
 
+import '../../core/theme/app_colors.dart';
+
 /// 메인 홈 (탭 네비게이션)
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
@@ -196,9 +198,9 @@ class _HomeShellState extends State<HomeShell> {
         currentIndex: _selectedIndex,
         onTap: _onTap,
         type: BottomNavigationBarType.fixed,
-        backgroundColor: Colors.white,
-        selectedItemColor: const Color(0xFF1E88E5),
-        unselectedItemColor: Colors.grey[350],
+        backgroundColor: AppColors.bg,           // #2E5BFF 블루
+        selectedItemColor: AppColors.accent,      // #D1FF00 라임
+        unselectedItemColor: AppColors.muted,     // #CCD6FF 연블루
         selectedFontSize: 11,
         unselectedFontSize: 11,
         elevation: 0,

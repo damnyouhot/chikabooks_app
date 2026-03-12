@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
+import '../core/theme/app_colors.dart';
 import '../notifiers/job_filter_notifier.dart';
 import '../services/job_service.dart';
 import '../screen/jobs/job_listings_screen.dart';
@@ -176,7 +177,7 @@ class _ListToggleButton extends StatelessWidget {
             Icon(
               Icons.list_alt_rounded,
               size: 16,
-              color: const Color(0xFF5D6B6B).withOpacity(0.8),
+              color: AppColors.text.withOpacity(0.8),
             ),
             const SizedBox(width: 5),
             Text(
@@ -184,7 +185,7 @@ class _ListToggleButton extends StatelessWidget {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: const Color(0xFF5D6B6B).withOpacity(0.85),
+                color: AppColors.text.withOpacity(0.85),
                 letterSpacing: -0.2,
               ),
             ),

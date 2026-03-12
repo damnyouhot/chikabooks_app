@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/app_colors.dart';
 
-// ── 커리어 탭 디자인 팔레트 ──
-const kCText = Color(0xFF5D6B6B);
-const kCBg = Color(0xFFF1F7F7);
-const kCAccent = Color(0xFFF7CBCA);
-const kCShadow = Color(0xFFD5E5E5);
+// ── 커리어 탭 디자인 팔레트 (AppColors 위임) ──
+const kCText   = AppColors.text;    // #000000
+const kCBg     = AppColors.bg;      // #2E5BFF
+const kCAccent = AppColors.accent;  // #D1FF00
+const kCShadow = AppColors.shadow;  // #8AAEFF
 
 // ── 헬퍼 함수 ──────────────────────────────────────────────────
 String formatCareerMonths(int months) {
@@ -59,12 +60,12 @@ class CareerCard extends StatelessWidget {
     return Container(
       padding: padding,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: kCShadow, width: 0.5),
+        border: Border.all(color: AppColors.shadowWith(0.35), width: 0.8),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: AppColors.bgWith(0.18),
             blurRadius: 12,
             offset: const Offset(0, 2),
           ),
@@ -109,7 +110,7 @@ class CareerDatePickerTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         decoration: BoxDecoration(
-          color: const Color(0xFFF5F5F5),
+          color: AppColors.surfaceInput,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -175,12 +176,12 @@ class _CareerLoadingCardState extends State<CareerLoadingCard>
           height: widget.height,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.cardBg,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: kCShadow, width: 0.5),
+            border: Border.all(color: AppColors.shadowWith(0.35), width: 0.8),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: AppColors.bgWith(0.18),
                 blurRadius: 12,
                 offset: const Offset(0, 2),
               ),

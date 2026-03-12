@@ -3,11 +3,12 @@ import 'package:provider/provider.dart';
 import '../../services/job_service.dart';
 import '../../models/job.dart';
 import '../screen/jobs/job_detail_screen.dart';
+import '../core/theme/app_colors.dart';
 
-// ── 디자인 팔레트 ──
-const _kAccent = Color(0xFFF7CBCA);
-const _kText = Color(0xFF5D6B6B);
-const _kBg = Color(0xFFF1F7F7);
+// ── 디자인 팔레트 (AppColors 위임) ──
+const _kAccent = AppColors.accent;
+const _kText   = AppColors.text;
+const _kBg     = AppColors.bg;
 
 /// 내 활동 페이지
 ///

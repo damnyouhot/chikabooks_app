@@ -9,13 +9,14 @@ import 'ebook/ebook_detail_page.dart';
 import 'quiz_today_page.dart';
 import 'hira_update_page.dart';
 import 'settings/settings_page.dart';
+import '../core/theme/app_colors.dart';
 
-// ── 디자인 팔레트 (2탭과 통일) ──
-const _kText = Color(0xFF5D6B6B);
-const _kBg = Color(0xFFF1F7F7);
-const _kShadow1 = Color(0xFFDDD3D8);
-const _kShadow2 = Color(0xFFD5E5E5);
-const _kCardBg = Colors.white;
+// ── 디자인 팔레트 (AppColors 위임) ──
+const _kText    = AppColors.text;     // #000000
+const _kBg      = AppColors.bg;       // #2E5BFF
+const _kShadow1 = AppColors.shadow;   // #8AAEFF
+const _kShadow2 = AppColors.muted;    // #CCD6FF
+const _kCardBg  = AppColors.cardBg;   // #FFFFFF
 
 /// 성장 탭 (3탭)
 ///
