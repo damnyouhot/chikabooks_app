@@ -61,18 +61,18 @@ class JobCard extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     job.address,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 12,
-                      color: AppColors.textPrimary.withOpacity(0.5),
+                      color: AppColors.textDisabled,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
                   Text(
                     '${job.salaryRange[0]}~${job.salaryRange[1]}만원',
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 13,
-                      color: AppColors.textPrimary.withOpacity(0.7),
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ],
@@ -122,7 +122,7 @@ class JobCard extends StatelessWidget {
       child: Icon(
         Icons.business,
         size: 48,
-        color: AppColors.textPrimary.withOpacity(0.3),
+        color: AppColors.textDisabled,
       ),
     );
   }

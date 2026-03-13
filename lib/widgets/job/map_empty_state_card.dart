@@ -40,7 +40,7 @@ class MapEmptyStateCard extends StatelessWidget {
                 child: Icon(
                   Icons.location_off_outlined,
                   size: 28,
-                  color: AppColors.textPrimary.withOpacity(0.5),
+                  color: AppColors.textDisabled,
                 ),
               ),
               const SizedBox(height: AppSpacing.lg),
@@ -60,9 +60,9 @@ class MapEmptyStateCard extends StatelessWidget {
               // 서브 텍스트
               Text(
                 '반경을 넓히거나 알림을 켜두면\n바로 알려드릴게요',
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 13,
-                  color: AppColors.textPrimary.withOpacity(0.6),
+                  color: AppColors.textSecondary,
                   height: 1.5,
                 ),
                 textAlign: TextAlign.center,
@@ -136,12 +136,12 @@ class MapEmptyStateCard extends StatelessWidget {
                   // 3. 공고 등록 — 텍스트 버튼
                   TextButton.icon(
                     onPressed: onCreateJob,
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.textPrimary.withOpacity(0.7),
-                      padding: const EdgeInsets.symmetric(
-                        vertical: AppSpacing.sm,
-                      ),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.textSecondary,
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.sm,
                     ),
+                  ),
                     icon: const Icon(Icons.add_circle_outline, size: 16),
                     label: const Text(
                       '공고 등록하기',

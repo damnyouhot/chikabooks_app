@@ -110,8 +110,8 @@ class _SegmentButton extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          // 선택 시 White fill (Shadow 없음)
-          color: isSelected ? AppColors.white : Colors.transparent,
+          // 선택 시 Blue fill (시스템 일관성: segmentSelected)
+          color: isSelected ? AppColors.segmentSelected : Colors.transparent,
           borderRadius: BorderRadius.circular(AppRadius.sm),
         ),
         child: Row(
@@ -121,8 +121,8 @@ class _SegmentButton extends StatelessWidget {
               icon,
               size: 16,
               color: isSelected
-                  ? AppColors.textPrimary
-                  : AppColors.textPrimary.withOpacity(0.5),
+                  ? AppColors.onSegmentSelected
+                  : AppColors.onSegmentUnselected,
             ),
             const SizedBox(width: AppSpacing.xs),
             Text(
@@ -132,8 +132,8 @@ class _SegmentButton extends StatelessWidget {
                 fontWeight:
                     isSelected ? FontWeight.w600 : FontWeight.w400,
                 color: isSelected
-                    ? AppColors.textPrimary
-                    : AppColors.textPrimary.withOpacity(0.5),
+                    ? AppColors.onSegmentSelected
+                    : AppColors.onSegmentUnselected,
               ),
             ),
           ],

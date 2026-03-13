@@ -61,14 +61,14 @@ class MainTitleCard extends StatelessWidget {
                 Icon(
                   Icons.location_on_outlined,
                   size: 16,
-                  color: AppColors.textPrimary.withOpacity(0.6),
+                  color: AppColors.textSecondary,
                 ),
                 const SizedBox(width: AppSpacing.xs),
                 Text(
                   '반경 ${currentRadius.toStringAsFixed(0)}km',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 13,
-                    color: AppColors.textPrimary.withOpacity(0.7),
+                    color: AppColors.textSecondary,
                   ),
                 ),
                 const SizedBox(width: 2),
@@ -108,23 +108,23 @@ class MainTitleCard extends StatelessWidget {
                   Icon(
                     Icons.fiber_new,
                     size: 16,
-                    color: AppColors.accent.withOpacity(0.8),
+                    color: AppColors.accent,
                   ),
                   const SizedBox(width: AppSpacing.xs),
                   Text(
                     '새 공고 ${newJobsCount}건',
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 12,
-                      color: AppColors.accent.withOpacity(0.9),
+                      color: AppColors.accent,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                   const SizedBox(width: AppSpacing.xs),
                   Text(
                     '(24시간)',
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 11,
-                      color: AppColors.textPrimary.withOpacity(0.5),
+                      color: AppColors.textDisabled,
                     ),
                   ),
                 ],
@@ -145,14 +145,14 @@ class MainTitleCard extends StatelessWidget {
                       Icon(
                         Icons.notifications_outlined,
                         size: 16,
-                        color: AppColors.textPrimary.withOpacity(0.6),
+                        color: AppColors.textSecondary,
                       ),
                       const SizedBox(width: 6),
                       Text(
                         '주변 구인 알림',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 12,
-                          color: AppColors.textPrimary.withOpacity(0.7),
+                          color: AppColors.textSecondary,
                         ),
                       ),
                       const SizedBox(width: AppSpacing.sm),
@@ -182,20 +182,20 @@ class MainTitleCard extends StatelessWidget {
                         Icon(
                           Icons.favorite_border,
                           size: 14,
-                          color: AppColors.textPrimary.withOpacity(0.6),
+                          color: AppColors.textSecondary,
                         ),
                         const SizedBox(width: AppSpacing.xs),
                         Text(
                           '관심 치과 $watchedClinicsCount',
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 11,
-                            color: AppColors.textPrimary.withOpacity(0.7),
+                            color: AppColors.textSecondary,
                           ),
                         ),
                         Icon(
                           Icons.chevron_right,
                           size: 14,
-                          color: AppColors.textPrimary.withOpacity(0.4),
+                          color: AppColors.textDisabled,
                         ),
                       ],
                     ),
@@ -222,14 +222,14 @@ class MainTitleCard extends StatelessWidget {
                     Icon(
                       Icons.star_outline,
                       size: 12,
-                      color: AppColors.accent.withOpacity(0.9),
+                      color: AppColors.accent,
                     ),
                     const SizedBox(width: AppSpacing.xs),
                     Text(
                       '이번 주 구직 활동으로 +${weeklyJobPoints.toStringAsFixed(1)}P 적립',
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 10,
-                        color: AppColors.textPrimary.withOpacity(0.7),
+                        color: AppColors.textSecondary,
                       ),
                     ),
                   ],
