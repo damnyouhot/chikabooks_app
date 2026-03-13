@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
-
-// ── 디자인 팔레트 ──
-const _kText = Color(0xFF5D6B6B);
-const _kShadow2 = Color(0xFFD5E5E5);
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
 
 /// 지도 위에 떠있는 검색바
 ///
-/// 검색창 + 필터 버튼 + 요약 정보
+/// 검색창 + 필터 버튼 + 필터 요약
+/// 원칙: Shadow 없음 / Border 없음
+/// - 배경: AppColors.white (지도 위 플로팅 → opacity 제거, 완전 불투명)
+/// - 필터 버튼: surfaceMuted (Border 없음)
+/// - 구분선: AppColors.divider
 class FloatingSearchBar extends StatelessWidget {
   final String searchQuery;
   final Function(String) onSearchChanged;
   final VoidCallback onFilterPressed;
-  final String filterSummary; // "반경 3km · 신입 가능 6 · 주4일 2"
+  final String filterSummary;
 
   const FloatingSearchBar({
     super.key,
@@ -24,44 +26,43 @@ class FloatingSearchBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Positioned(
-      top: 12,
-      left: 12,
-      right: 12,
+      top: AppSpacing.md,
+      left: AppSpacing.md,
+      right: AppSpacing.md,
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.95),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: _kShadow2, width: 0.5),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(AppRadius.xl),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             // 검색창 + 필터 버튼
             Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(AppSpacing.md),
               child: Row(
                 children: [
                   // 검색 아이콘
-                  Icon(Icons.search, color: _kText.withOpacity(0.5), size: 20),
-                  const SizedBox(width: 8),
+                  const Icon(
+                    Icons.search,
+                    color: AppColors.textDisabled,
+                    size: 20,
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
 
                   // 검색 입력
                   Expanded(
                     child: TextField(
                       onChanged: onSearchChanged,
-                      style: const TextStyle(fontSize: 14, color: _kText),
-                      decoration: InputDecoration(
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textPrimary,
+                      ),
+                      decoration: const InputDecoration(
                         hintText: '치과명, 동네로 검색',
                         hintStyle: TextStyle(
                           fontSize: 14,
-                          color: _kText.withOpacity(0.4),
+                          color: AppColors.textDisabled,
                         ),
                         border: InputBorder.none,
                         isDense: true,
@@ -69,21 +70,21 @@ class FloatingSearchBar extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: AppSpacing.sm),
 
-                  // 필터 버튼
+                  // 필터 버튼 → surfaceMuted (Border 없음)
                   InkWell(
                     onTap: onFilterPressed,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
                     child: Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(AppSpacing.sm),
                       decoration: BoxDecoration(
-                        color: _kShadow2.withOpacity(0.3),
-                        borderRadius: BorderRadius.circular(8),
+                        color: AppColors.surfaceMuted,
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
                       ),
-                      child: Icon(
+                      child: const Icon(
                         Icons.tune,
-                        color: _kText.withOpacity(0.7),
+                        color: AppColors.textSecondary,
                         size: 18,
                       ),
                     ),
@@ -92,27 +93,30 @@ class FloatingSearchBar extends StatelessWidget {
               ),
             ),
 
-            // 구분선
+            // 필터 요약 (있을 때만)
             if (filterSummary.isNotEmpty) ...[
-              Divider(color: _kShadow2.withOpacity(0.5), height: 1),
-
-              // 필터 요약
+              const Divider(color: AppColors.divider, height: 1),
               Padding(
-                padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  AppSpacing.sm,
+                  AppSpacing.md,
+                  10,
+                ),
                 child: Row(
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.info_outline,
                       size: 12,
-                      color: _kText.withOpacity(0.4),
+                      color: AppColors.textDisabled,
                     ),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: AppSpacing.xs),
                     Expanded(
                       child: Text(
                         filterSummary,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 11,
-                          color: _kText.withOpacity(0.6),
+                          color: AppColors.textSecondary,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -128,6 +132,3 @@ class FloatingSearchBar extends StatelessWidget {
     );
   }
 }
-
-
-
