@@ -1,19 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_tokens.dart';
+import '../core/widgets/app_muted_button.dart';
+import '../core/widgets/app_badge.dart';
 import '../models/hira_update.dart';
 import '../services/hira_update_service.dart';
 import 'hira_comment_sheet.dart';
 
-// ── 디자인 팔레트 ──
-const _kText = Color(0xFF5D6B6B);
-const _kBg = Color(0xFFF1F7F7);
-const _kShadow2 = Color(0xFFD5E5E5);
-const _kHighRed = Color(0xFFE57373);
-const _kMidOrange = Color(0xFFFFB74D);
-const _kLowGray = Color(0xFFBDBDBD);
-
 /// HIRA 업데이트 상세 BottomSheet
+///
+/// 원칙:
+///   - boxShadow 없음 / Border 없음
+///   - 배경: AppColors.appBg
+///   - 버튼: AppMutedButton
+///   - 임팩트 뱃지: AppStatusBadge
 class HiraUpdateDetailSheet extends StatelessWidget {
   final HiraUpdate update;
 
@@ -24,104 +26,135 @@ class HiraUpdateDetailSheet extends StatelessWidget {
     return Container(
       height: MediaQuery.of(context).size.height * 0.75,
       decoration: const BoxDecoration(
-        color: _kBg,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        color: AppColors.appBg,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
       ),
       child: Column(
         children: [
-          // 헤더
           _buildHeader(context),
-          
-          // 내용
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(AppSpacing.xl),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 배지 + 제목
+                  // 임팩트 뱃지 + 제목
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildImpactBadge(),
-                      const SizedBox(width: 8),
+                      AppStatusBadge(
+                        badgeLevel: _impactToLevel(update.impactLevel),
+                        badgeText: _impactToText(update.impactLevel),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
                       Expanded(
                         child: Text(
                           update.title,
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
-                            color: _kText,
+                            color: AppColors.textPrimary,
                             height: 1.4,
                           ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  
+                  const SizedBox(height: AppSpacing.sm),
+
                   // 날짜
                   Text(
                     DateFormat('yyyy년 MM월 dd일 발표').format(update.publishedAt),
                     style: TextStyle(
                       fontSize: 12,
-                      color: _kText.withOpacity(0.5),
+                      color: AppColors.textPrimary.withOpacity(0.45),
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  
-                  // 업무 영향
+                  const SizedBox(height: AppSpacing.xl),
+
+                  // 업무 영향 체크
                   if (update.actionHints.isNotEmpty) ...[
                     Text(
                       '업무 영향 체크',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: _kText.withOpacity(0.8),
+                        color: AppColors.textPrimary.withOpacity(0.8),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    ...update.actionHints.map((hint) => Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Icon(
-                                Icons.check_circle_outline,
-                                size: 16,
-                                color: _kText.withOpacity(0.5),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  hint,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: _kText.withOpacity(0.7),
-                                    height: 1.4,
-                                  ),
+                    const SizedBox(height: AppSpacing.md),
+                    ...update.actionHints.map(
+                      (hint) => Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              Icons.check_circle_outline,
+                              size: 16,
+                              color: AppColors.textPrimary.withOpacity(0.45),
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
+                            Expanded(
+                              child: Text(
+                                hint,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: AppColors.textPrimary.withOpacity(0.65),
+                                  height: 1.4,
                                 ),
                               ),
-                            ],
-                          ),
-                        )),
-                    const SizedBox(height: 20),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
                   ],
-                  
-                  // 버튼들
+
+                  // 버튼 행: 원문 보기 + 저장
                   Row(
                     children: [
                       Expanded(
-                        child: _buildLinkButton(context),
+                        child: AppMutedButton(
+                          icon: Icons.open_in_new,
+                          label: '원문 보기',
+                          onTap: () => _openLink(context),
+                          padding: const EdgeInsets.symmetric(
+                            vertical: AppSpacing.md,
+                          ),
+                        ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: AppSpacing.sm),
                       Expanded(
-                        child: _buildSaveButton(context),
+                        child: _SaveButton(update: update),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  _buildCommentButton(context),
+                  const SizedBox(height: AppSpacing.md),
+
+                  // 댓글 버튼 (전체 너비)
+                  SizedBox(
+                    width: double.infinity,
+                    child: AppMutedButton(
+                      icon: Icons.mode_comment_outlined,
+                      label: update.commentCount > 0
+                          ? '댓글 ${update.commentCount}개'
+                          : '댓글 쓰기',
+                      onTap: () {
+                        Navigator.pop(context);
+                        showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (ctx) => HiraCommentSheet(update: update),
+                        );
+                      },
+                      padding: const EdgeInsets.symmetric(
+                        vertical: AppSpacing.md,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -132,153 +165,63 @@ class HiraUpdateDetailSheet extends StatelessWidget {
   }
 
   Widget _buildHeader(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: _kShadow2.withOpacity(0.5)),
-        ),
-      ),
-      child: Row(
-        children: [
-          const Text(
-            '상세 정보',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: _kText,
-            ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.xl,
+            vertical: AppSpacing.lg,
           ),
-          const Spacer(),
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Icon(
-              Icons.close,
-              size: 22,
-              color: _kText.withOpacity(0.5),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildImpactBadge() {
-    Color badgeColor;
-    String badgeText;
-
-    switch (update.impactLevel) {
-      case 'HIGH':
-        badgeColor = _kHighRed;
-        badgeText = '중요';
-        break;
-      case 'MID':
-        badgeColor = _kMidOrange;
-        badgeText = '보통';
-        break;
-      default:
-        badgeColor = _kLowGray;
-        badgeText = '참고만';
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: badgeColor.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: badgeColor.withOpacity(0.3),
-          width: 0.5,
-        ),
-      ),
-      child: Text(
-        badgeText,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          color: badgeColor,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLinkButton(BuildContext context) {
-    return ElevatedButton.icon(
-      onPressed: () => _openLink(context),
-      icon: const Icon(Icons.open_in_new, size: 16),
-      label: const Text('원문 보기'),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: _kShadow2.withOpacity(0.3),
-        foregroundColor: _kText.withOpacity(0.7),
-        elevation: 0,
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-          side: BorderSide(color: _kShadow2.withOpacity(0.5)),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSaveButton(BuildContext context) {
-    return StreamBuilder<bool>(
-      stream: HiraUpdateService.watchSaved(update.id),
-      builder: (context, snapshot) {
-        final isSaved = snapshot.data ?? false;
-        return ElevatedButton.icon(
-          onPressed: () => _toggleSave(context, isSaved),
-          icon: Icon(isSaved ? Icons.bookmark : Icons.bookmark_border, size: 16),
-          label: Text(isSaved ? '저장됨' : '저장'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: isSaved
-                ? const Color(0xFFF7CBCA).withOpacity(0.3)
-                : _kShadow2.withOpacity(0.3),
-            foregroundColor: _kText.withOpacity(0.7),
-            elevation: 0,
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-              side: BorderSide(
-                color: isSaved
-                    ? const Color(0xFFF7CBCA).withOpacity(0.5)
-                    : _kShadow2.withOpacity(0.5),
+          child: Row(
+            children: [
+              const Text(
+                '상세 정보',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
               ),
-            ),
+              const Spacer(),
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Icon(
+                  Icons.close,
+                  size: 22,
+                  color: AppColors.textPrimary.withOpacity(0.45),
+                ),
+              ),
+            ],
           ),
-        );
-      },
+        ),
+        const Divider(height: 1, color: AppColors.divider),
+      ],
     );
   }
 
-  Widget _buildCommentButton(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton.icon(
-        onPressed: () {
-          Navigator.pop(context);
-          showModalBottomSheet(
-            context: context,
-            isScrollControlled: true,
-            backgroundColor: Colors.transparent,
-            builder: (context) => HiraCommentSheet(update: update),
-          );
-        },
-        icon: const Icon(Icons.mode_comment_outlined, size: 16),
-        label: Text(
-          update.commentCount > 0 ? '댓글 ${update.commentCount}개' : '댓글 쓰기',
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: _kShadow2.withOpacity(0.3),
-          foregroundColor: _kText.withOpacity(0.7),
-          elevation: 0,
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-            side: BorderSide(color: _kShadow2.withOpacity(0.5)),
-          ),
-        ),
-      ),
-    );
+  /// impactLevel → AppStatusBadge badgeLevel 매핑
+  String _impactToLevel(String impactLevel) {
+    switch (impactLevel) {
+      case 'HIGH':
+        return 'ACTIVE';
+      case 'MID':
+        return 'SOON';
+      default:
+        return 'NOTICE';
+    }
+  }
+
+  /// impactLevel → 표시 텍스트
+  String _impactToText(String impactLevel) {
+    switch (impactLevel) {
+      case 'HIGH':
+        return '중요';
+      case 'MID':
+        return '보통';
+      default:
+        return '참고만';
+    }
   }
 
   Future<void> _openLink(BuildContext context) async {
@@ -301,6 +244,31 @@ class HiraUpdateDetailSheet extends StatelessWidget {
       }
     }
   }
+}
+
+// ── 저장 버튼 (StreamBuilder 분리) ──────────────────────────
+
+class _SaveButton extends StatelessWidget {
+  final HiraUpdate update;
+  const _SaveButton({required this.update});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<bool>(
+      stream: HiraUpdateService.watchSaved(update.id),
+      builder: (context, snapshot) {
+        final isSaved = snapshot.data ?? false;
+        return AppMutedButton(
+          icon: isSaved ? Icons.bookmark : Icons.bookmark_border,
+          label: isSaved ? '저장됨' : '저장',
+          isActive: isSaved,
+          activeColor: AppColors.accent.withOpacity(0.12),
+          onTap: () => _toggleSave(context, isSaved),
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+        );
+      },
+    );
+  }
 
   Future<void> _toggleSave(BuildContext context, bool currentlySaved) async {
     final success = currentlySaved
@@ -317,4 +285,3 @@ class HiraUpdateDetailSheet extends StatelessWidget {
     }
   }
 }
-
