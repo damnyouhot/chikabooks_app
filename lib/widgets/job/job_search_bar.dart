@@ -1,19 +1,16 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
 
-// ── 디자인 팔레트 ──
-const _kText = Color(0xFF5D6B6B);
-const _kAccent = Color(0xFFF7CBCA);
-const _kShadow = Color(0xFFD5E5E5);
-const _kBg = Color(0xFFF5F0F2);
-
-/// 공고보기 탭 상단 고정 검색/요약 바 (Sticky 1)
+/// 공고보기 탭 상단 고정 검색/요약 바 (Sticky)
 ///
-/// - 좌: 검색창 (치과명, 동네로 검색)
-/// - 우: 커리어 요약 1줄 + 필터 버튼
-/// - 우 끝: 지도 보기 전환 버튼
+/// 원칙: Shadow 없음 / Border(하단 구분선만 유지)
+/// - 검색창: surfaceMuted fill, 포커스 시 accent border
+/// - 필터 버튼: 비활성 → surfaceMuted / 활성 → accent fill
+/// - 배지: accent + onAccent
 class JobSearchBarDelegate extends SliverPersistentHeaderDelegate {
   final String searchQuery;
-  final String careerSummary;   // 예: "진료실 · 2년차 · 서울"
+  final String careerSummary;
   final int activeFilterCount;
   final ValueChanged<String> onSearchChanged;
   final VoidCallback onFilterPressed;
@@ -109,11 +106,15 @@ class _JobSearchBarContentState extends State<_JobSearchBarContent> {
   Widget build(BuildContext context) {
     return Container(
       height: JobSearchBarDelegate.height,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: 10,
+      ),
+      // 하단 구분선만 유지 (Border.all 제거)
+      decoration: const BoxDecoration(
+        color: AppColors.white,
         border: Border(
-          bottom: BorderSide(color: _kShadow.withOpacity(0.6), width: 0.5),
+          bottom: BorderSide(color: AppColors.divider, width: 0.5),
         ),
       ),
       child: Column(
@@ -122,7 +123,6 @@ class _JobSearchBarContentState extends State<_JobSearchBarContent> {
           // ── 1행: 검색창 + 필터 + 지도 버튼 ──
           Row(
             children: [
-              // 검색창
               Expanded(
                 child: SizedBox(
                   height: 38,
@@ -131,20 +131,20 @@ class _JobSearchBarContentState extends State<_JobSearchBarContent> {
                     onChanged: widget.onSearchChanged,
                     style: const TextStyle(
                       fontSize: 13,
-                      color: _kText,
+                      color: AppColors.textPrimary,
                       letterSpacing: -0.3,
                     ),
                     decoration: InputDecoration(
                       hintText: '치과명, 동네로 검색',
-                      hintStyle: TextStyle(
+                      hintStyle: const TextStyle(
                         fontSize: 13,
-                        color: _kText.withOpacity(0.4),
+                        color: AppColors.textDisabled,
                         letterSpacing: -0.3,
                       ),
-                      prefixIcon: Icon(
+                      prefixIcon: const Icon(
                         Icons.search_rounded,
                         size: 18,
-                        color: _kText.withOpacity(0.45),
+                        color: AppColors.textDisabled,
                       ),
                       suffixIcon: _ctrl.text.isNotEmpty
                           ? GestureDetector(
@@ -152,30 +152,31 @@ class _JobSearchBarContentState extends State<_JobSearchBarContent> {
                                 _ctrl.clear();
                                 widget.onSearchChanged('');
                               },
-                              child: Icon(
+                              child: const Icon(
                                 Icons.close_rounded,
                                 size: 16,
-                                color: _kText.withOpacity(0.4),
+                                color: AppColors.textDisabled,
                               ),
                             )
                           : null,
+                      // 기본/활성 border 제거, 포커스만 accent
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide:
-                            BorderSide(color: _kShadow, width: 0.5),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                        borderSide: BorderSide.none,
                       ),
                       enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide:
-                            BorderSide(color: _kShadow, width: 0.5),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                        borderSide: BorderSide.none,
                       ),
                       focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide:
-                            BorderSide(color: _kAccent, width: 1.0),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                        borderSide: const BorderSide(
+                          color: AppColors.accent,
+                          width: 1.0,
+                        ),
                       ),
                       filled: true,
-                      fillColor: _kBg.withOpacity(0.5),
+                      fillColor: AppColors.surfaceMuted,
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 10,
                         vertical: 0,
@@ -185,7 +186,7 @@ class _JobSearchBarContentState extends State<_JobSearchBarContent> {
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: AppSpacing.sm),
 
               // 필터 버튼
               _IconBadgeButton(
@@ -197,7 +198,7 @@ class _JobSearchBarContentState extends State<_JobSearchBarContent> {
               ),
               const SizedBox(width: 6),
 
-              // 지도 보기 전환 버튼
+              // 지도 전환 버튼
               _MapToggleButton(onTap: widget.onMapToggle),
             ],
           ),
@@ -208,28 +209,28 @@ class _JobSearchBarContentState extends State<_JobSearchBarContent> {
             child: widget.careerSummary.isNotEmpty
                 ? Row(
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.person_outline_rounded,
                         size: 12,
-                        color: _kText.withOpacity(0.45),
+                        color: AppColors.textDisabled,
                       ),
-                      const SizedBox(width: 4),
+                      const SizedBox(width: AppSpacing.xs),
                       Text(
                         widget.careerSummary,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 11,
-                          color: _kText.withOpacity(0.55),
+                          color: AppColors.textSecondary,
                           letterSpacing: -0.2,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   )
-                : Text(
+                : const Text(
                     '커리어 카드를 등록하면 맞춤 공고를 추천해드려요',
                     style: TextStyle(
                       fontSize: 11,
-                      color: _kText.withOpacity(0.4),
+                      color: AppColors.textDisabled,
                       letterSpacing: -0.2,
                     ),
                   ),
@@ -240,7 +241,7 @@ class _JobSearchBarContentState extends State<_JobSearchBarContent> {
   }
 }
 
-// ── 필터 아이콘 + 배지 버튼 ─────────────────────────────────────
+// ── 필터 아이콘 + 배지 버튼 ──────────────────────────────────────
 class _IconBadgeButton extends StatelessWidget {
   final IconData icon;
   final int badgeCount;
@@ -265,24 +266,23 @@ class _IconBadgeButton extends StatelessWidget {
         children: [
           InkWell(
             onTap: onTap,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(AppRadius.md),
             child: Container(
               width: 38,
               height: 38,
               decoration: BoxDecoration(
+                // 활성 → accent fill / 비활성 → surfaceMuted (Border 없음)
                 color: isActive
-                    ? _kAccent.withOpacity(0.15)
-                    : _kShadow.withOpacity(0.25),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: isActive ? _kAccent : _kShadow,
-                  width: 0.5,
-                ),
+                    ? AppColors.accent
+                    : AppColors.surfaceMuted,
+                borderRadius: BorderRadius.circular(AppRadius.md),
               ),
               child: Icon(
                 icon,
                 size: 18,
-                color: isActive ? _kAccent : _kText.withOpacity(0.65),
+                color: isActive
+                    ? AppColors.onAccent
+                    : AppColors.textSecondary,
               ),
             ),
           ),
@@ -293,17 +293,19 @@ class _IconBadgeButton extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.all(3),
                 decoration: const BoxDecoration(
-                  color: _kAccent,
+                  color: AppColors.accent,
                   shape: BoxShape.circle,
                 ),
-                constraints:
-                    const BoxConstraints(minWidth: 16, minHeight: 16),
+                constraints: const BoxConstraints(
+                  minWidth: 16,
+                  minHeight: 16,
+                ),
                 child: Text(
                   '$badgeCount',
                   style: const TextStyle(
                     fontSize: 9,
                     fontWeight: FontWeight.w700,
-                    color: _kText,
+                    color: AppColors.onAccent,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -315,7 +317,7 @@ class _IconBadgeButton extends StatelessWidget {
   }
 }
 
-// ── 지도 전환 버튼 ───────────────────────────────────────────────
+// ── 지도 전환 버튼 ────────────────────────────────────────────────
 class _MapToggleButton extends StatelessWidget {
   final VoidCallback onTap;
 
@@ -325,30 +327,30 @@ class _MapToggleButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(AppRadius.md),
       child: Container(
         height: 38,
         padding: const EdgeInsets.symmetric(horizontal: 10),
+        // surfaceMuted fill (Border 없음)
         decoration: BoxDecoration(
-          color: _kShadow.withOpacity(0.25),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: _kShadow, width: 0.5),
+          color: AppColors.surfaceMuted,
+          borderRadius: BorderRadius.circular(AppRadius.md),
         ),
-        child: Row(
+        child: const Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               Icons.map_outlined,
               size: 15,
-              color: _kText.withOpacity(0.65),
+              color: AppColors.textSecondary,
             ),
-            const SizedBox(width: 4),
+            SizedBox(width: AppSpacing.xs),
             Text(
               '지도',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
-                color: _kText.withOpacity(0.7),
+                color: AppColors.textSecondary,
                 letterSpacing: -0.2,
               ),
             ),

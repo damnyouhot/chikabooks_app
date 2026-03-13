@@ -1,22 +1,14 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
 import '../../notifiers/job_filter_notifier.dart';
-
-// ── 디자인 팔레트 ──
-const _kAccent = Color(0xFFF7CBCA);
-const _kText = Color(0xFF5D6B6B);
-const _kShadow = Color(0xFFD5E5E5);
-const _kBlue = Color(0xFF90CAF9);
 
 /// 상세 필터 바텀시트
 ///
-/// ## 섹션 구성
-/// 1. 정렬 (최신순 / 매칭높은순 / 마감임박순 / 급여높은순)
-/// 2. 직종
-/// 3. 경력
-/// 4. 근무형태
-/// 5. 지역
-/// 6. 급여 범위
-/// 7. 기타 조건
+/// 원칙: Shadow 없음 / Border 없음
+/// - 칩 선택: segmentSelected(Blue) / surfaceMuted(미선택), Border 제거
+/// - 적용 버튼: accent(Blue) + onAccent
+/// - 슬라이더: accent(Blue)
 class FilterBottomSheet extends StatefulWidget {
   final JobFilterNotifier filter;
 
@@ -86,19 +78,19 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
         maxHeight: MediaQuery.of(context).size.height * 0.88,
       ),
       decoration: const BoxDecoration(
-        color: Colors.white,
+        color: AppColors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           // 드래그 핸들
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           Container(
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: _kText.withValues(alpha: 0.18),
+              color: AppColors.disabledBg,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -106,7 +98,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
 
           // 헤더
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
             child: Row(
               children: [
                 const Text(
@@ -114,7 +106,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
-                    color: _kText,
+                    color: AppColors.textPrimary,
                     letterSpacing: -0.4,
                   ),
                 ),
@@ -124,96 +116,93 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                   style: TextButton.styleFrom(
                     padding: EdgeInsets.zero,
                     minimumSize: const Size(48, 32),
+                    foregroundColor: AppColors.textSecondary,
                   ),
-                  child: Text(
+                  child: const Text(
                     '초기화',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: _kText.withValues(alpha: 0.55),
-                    ),
+                    style: TextStyle(fontSize: 13),
                   ),
                 ),
               ],
             ),
           ),
-          Divider(height: 1, color: _kShadow.withValues(alpha: 0.5)),
+          const Divider(height: 1, color: AppColors.divider),
 
           // 스크롤 가능 필터 내용
           Flexible(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.xl,
+                18,
+                AppSpacing.xl,
+                AppSpacing.sm,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // ① 정렬
-                  _SectionTitle(title: '정렬'),
-                  const SizedBox(height: 8),
+                  const _SectionTitle(title: '정렬'),
+                  const SizedBox(height: AppSpacing.sm),
                   _ChipGroup(
                     options: const ['최신순', '매칭높은순', '마감임박순', '급여높은순'],
                     selected: _sortBy,
                     onTap: (v) => setState(() => _sortBy = v),
-                    accentColor: _kBlue,
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: AppSpacing.xl),
 
                   // ② 직종
-                  _SectionTitle(title: '직종'),
-                  const SizedBox(height: 8),
+                  const _SectionTitle(title: '직종'),
+                  const SizedBox(height: AppSpacing.sm),
                   _ChipGroup(
                     options: const [
-                      '전체',
-                      '치위생사',
-                      '치과조무사',
-                      '치과의사',
-                      '기공사',
-                      '기타',
+                      '전체', '치위생사', '치과조무사', '치과의사', '기공사', '기타',
                     ],
                     selected: _positionFilter,
                     onTap: (v) => setState(() => _positionFilter = v),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: AppSpacing.xl),
 
                   // ③ 경력
-                  _SectionTitle(title: '경력'),
-                  const SizedBox(height: 8),
+                  const _SectionTitle(title: '경력'),
+                  const SizedBox(height: AppSpacing.sm),
                   _ChipGroup(
                     options: const ['전체', '신입', '1년 이상', '3년 이상', '5년 이상'],
                     selected: _careerFilter,
                     onTap: (v) => setState(() => _careerFilter = v),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: AppSpacing.xl),
 
                   // ④ 근무형태
-                  _SectionTitle(title: '근무형태'),
-                  const SizedBox(height: 8),
+                  const _SectionTitle(title: '근무형태'),
+                  const SizedBox(height: AppSpacing.sm),
                   _ChipGroup(
                     options: const ['전체', '풀타임', '파트타임', '계약직'],
                     selected: _employmentType,
                     onTap: (v) => setState(() => _employmentType = v),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: AppSpacing.xl),
 
                   // ⑤ 지역
-                  _SectionTitle(title: '지역'),
-                  const SizedBox(height: 8),
+                  const _SectionTitle(title: '지역'),
+                  const SizedBox(height: AppSpacing.sm),
                   _RegionDropdown(
                     value: _regionFilter,
                     onChanged: (v) => setState(() => _regionFilter = v),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: AppSpacing.xl),
 
                   // ⑥ 급여 범위
-                  _SectionTitle(title: '급여 범위'),
-                  const SizedBox(height: 4),
+                  const _SectionTitle(title: '급여 범위'),
+                  const SizedBox(height: AppSpacing.xs),
                   _SalaryRangeSlider(
                     range: _salaryRange,
                     onChanged: (v) => setState(() => _salaryRange = v),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: AppSpacing.xl),
 
                   // ⑦ 기타 조건
-                  _SectionTitle(title: '기타 조건'),
-                  const SizedBox(height: 8),
+                  const _SectionTitle(title: '기타 조건'),
+                  const SizedBox(height: AppSpacing.sm),
                   _ConditionsChips(
                     conditions: _conditions,
                     onToggle: (c) => setState(() {
@@ -224,19 +213,24 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                       }
                     }),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.sm),
                 ],
               ),
             ),
           ),
 
-          // 하단 적용 버튼
+          // 하단 적용 버튼 — 주요 액션 → accent(Blue)
           Container(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-            decoration: BoxDecoration(
-              color: Colors.white,
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.xl,
+              AppSpacing.md,
+              AppSpacing.xl,
+              AppSpacing.xxl,
+            ),
+            decoration: const BoxDecoration(
+              color: AppColors.white,
               border: Border(
-                top: BorderSide(color: _kShadow.withValues(alpha: 0.4)),
+                top: BorderSide(color: AppColors.divider),
               ),
             ),
             child: SizedBox(
@@ -244,12 +238,12 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
               child: ElevatedButton(
                 onPressed: _applyFilters,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _kAccent,
-                  foregroundColor: _kText,
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: AppColors.onAccent,
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                   ),
                 ),
                 child: const Text(
@@ -278,7 +272,7 @@ class _SectionTitle extends StatelessWidget {
       style: const TextStyle(
         fontSize: 13,
         fontWeight: FontWeight.w700,
-        color: _kText,
+        color: AppColors.textPrimary,
         letterSpacing: -0.3,
       ),
     );
@@ -286,40 +280,39 @@ class _SectionTitle extends StatelessWidget {
 }
 
 // ── 단일 선택 칩 그룹 ────────────────────────────────────────────
+// 선택 → segmentSelected(Blue) fill + onSegmentSelected(White) 텍스트
+// 미선택 → surfaceMuted fill + textSecondary 텍스트 (Border 없음)
 class _ChipGroup extends StatelessWidget {
   final List<String> options;
   final String selected;
   final ValueChanged<String> onTap;
-  final Color accentColor;
 
   const _ChipGroup({
     required this.options,
     required this.selected,
     required this.onTap,
-    this.accentColor = _kAccent,
   });
 
   @override
   Widget build(BuildContext context) {
     return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+      spacing: AppSpacing.sm,
+      runSpacing: AppSpacing.sm,
       children: options.map((opt) {
         final isSelected = opt == selected;
         return GestureDetector(
           onTap: () => onTap(opt),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: AppSpacing.sm,
+            ),
             decoration: BoxDecoration(
               color: isSelected
-                  ? accentColor.withValues(alpha: 0.18)
-                  : _kShadow.withValues(alpha: 0.25),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: isSelected ? accentColor : _kShadow,
-                width: isSelected ? 1.5 : 0.5,
-              ),
+                  ? AppColors.segmentSelected
+                  : AppColors.surfaceMuted,
+              borderRadius: BorderRadius.circular(AppRadius.full),
             ),
             child: Text(
               opt,
@@ -327,7 +320,9 @@ class _ChipGroup extends StatelessWidget {
                 fontSize: 13,
                 fontWeight:
                     isSelected ? FontWeight.w700 : FontWeight.w400,
-                color: isSelected ? _kText : _kText.withValues(alpha: 0.65),
+                color: isSelected
+                    ? AppColors.onSegmentSelected
+                    : AppColors.textSecondary,
                 letterSpacing: -0.2,
               ),
             ),
@@ -346,40 +341,30 @@ class _ConditionsChips extends StatelessWidget {
   const _ConditionsChips({required this.conditions, required this.onToggle});
 
   static const _allConditions = [
-    '신입가능',
-    '야간없음',
-    '주4일',
-    '파트타임 가능',
-    '역세권',
-    '즉시지원',
-    '4대보험',
-    '퇴직금',
-    '연차',
-    '식비지원',
+    '신입가능', '야간없음', '주4일', '파트타임 가능', '역세권',
+    '즉시지원', '4대보험', '퇴직금', '연차', '식비지원',
   ];
 
   @override
   Widget build(BuildContext context) {
     return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+      spacing: AppSpacing.sm,
+      runSpacing: AppSpacing.sm,
       children: _allConditions.map((c) {
         final isSelected = conditions.contains(c);
         return GestureDetector(
           onTap: () => onToggle(c),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 160),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: 7,
+            ),
             decoration: BoxDecoration(
               color: isSelected
-                  ? _kAccent.withValues(alpha: 0.18)
-                  : _kShadow.withValues(alpha: 0.22),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: isSelected ? _kAccent : _kShadow,
-                width: isSelected ? 1.5 : 0.5,
-              ),
+                  ? AppColors.segmentSelected
+                  : AppColors.surfaceMuted,
+              borderRadius: BorderRadius.circular(AppRadius.full),
             ),
             child: Text(
               c,
@@ -387,7 +372,9 @@ class _ConditionsChips extends StatelessWidget {
                 fontSize: 12,
                 fontWeight:
                     isSelected ? FontWeight.w700 : FontWeight.w400,
-                color: isSelected ? _kText : _kText.withValues(alpha: 0.6),
+                color: isSelected
+                    ? AppColors.onSegmentSelected
+                    : AppColors.textSecondary,
                 letterSpacing: -0.2,
               ),
             ),
@@ -416,30 +403,31 @@ class _RegionDropdown extends StatelessWidget {
     return DropdownButtonFormField<String>(
       value: value,
       decoration: InputDecoration(
+        // 기본/활성 border 제거, 포커스만 accent
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: _kShadow, width: 0.5),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: _kShadow, width: 0.5),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: _kAccent, width: 1.0),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          borderSide: const BorderSide(color: AppColors.accent, width: 1.0),
         ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: 10,
+        ),
         filled: true,
-        fillColor: _kShadow.withValues(alpha: 0.15),
+        fillColor: AppColors.surfaceMuted,
       ),
       items: _regions
-          .map(
-            (r) => DropdownMenuItem(
-              value: r,
-              child: Text(r, style: const TextStyle(fontSize: 13)),
-            ),
-          )
+          .map((r) => DropdownMenuItem(
+                value: r,
+                child: Text(r, style: const TextStyle(fontSize: 13)),
+              ))
           .toList(),
       onChanged: (v) {
         if (v != null) onChanged(v);
@@ -467,10 +455,10 @@ class _SalaryRangeSlider extends StatelessWidget {
       children: [
         Text(
           '${_label(range.start)} ~ ${_label(range.end)}',
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: _kText.withValues(alpha: 0.75),
+            color: AppColors.textSecondary,
             letterSpacing: -0.3,
           ),
         ),
@@ -479,8 +467,9 @@ class _SalaryRangeSlider extends StatelessWidget {
           min: 0,
           max: 10000,
           divisions: 20,
-          activeColor: _kAccent,
-          inactiveColor: _kShadow,
+          // activeColor → accent(Blue)
+          activeColor: AppColors.accent,
+          inactiveColor: AppColors.disabledBg,
           labels: RangeLabels(_label(range.start), _label(range.end)),
           onChanged: onChanged,
         ),
