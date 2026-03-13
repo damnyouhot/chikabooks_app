@@ -6,6 +6,9 @@ import '../widgets/partner/group_status_card.dart';
 import '../widgets/partner/new_slot_card.dart';
 import '../widgets/partner/bond_score_card.dart';
 import '../widgets/partner/invite_card.dart';
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_tokens.dart';
+import '../core/widgets/app_muted_card.dart';
 
 /// 파트너 페이지
 ///
@@ -107,37 +110,26 @@ class _PartnerPageState extends State<PartnerPage> {
   }
 
   Widget _buildNoGroupCard() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
+    return AppMutedCard(
+      radius: AppRadius.xl,
+      padding: const EdgeInsets.all(AppSpacing.xxl),
+      child: const Column(
         children: [
-          const Icon(Icons.people_outline,
-              color: Color(0xFFCE93D8), size: 40),
-          const SizedBox(height: 12),
-          const Text(
+          Icon(Icons.people_outline, color: AppColors.accent, size: 40),
+          SizedBox(height: 12),
+          Text(
             '아직 파트너가 없어요',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF424242),
+              color: AppColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: 6),
           Text(
             '비슷한 고민을 가진 3명이 1주일간\n서로의 하루를 나눕니다.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
           ),
         ],
       ),

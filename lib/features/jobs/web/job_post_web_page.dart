@@ -7,14 +7,9 @@ import '../ui/job_post_preview.dart';
 import 'job_manage_section.dart';
 import 'job_analytics_section.dart';
 import 'web_typography.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../models/job_draft.dart';
 import '../../../services/job_draft_service.dart';
-
-const _kBg = Color(0xFFF4F0F8);
-const _kText = Color(0xFF3D4A5C);
-const _kBlue = Color(0xFF4A90D9);
-const _kPink = Color(0xFFF7CBCA);
-const _kPinkDark = Color(0xFFE57373);
 
 /// 구인등록 웹 페이지 셸 (/post-job)
 ///
@@ -95,7 +90,7 @@ class _JobPostWebPageState extends State<JobPostWebPage>
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
             child: const Text('삭제'),
           ),
         ],
@@ -119,7 +114,7 @@ class _JobPostWebPageState extends State<JobPostWebPage>
     return Theme(
       data: WebTypo.themeData(Theme.of(context)),
       child: Scaffold(
-        backgroundColor: _kBg,
+        backgroundColor: AppColors.appBg,
         body: Column(
           children: [
             // ── 상단: 로고 + 탭바 ──
@@ -150,7 +145,7 @@ class _JobPostWebPageState extends State<JobPostWebPage>
   // ── 상단 헤더 (로고 + 탭바) ──────────────────────────
   Widget _buildHeader() {
     return Container(
-      color: Colors.white,
+      color: AppColors.white,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -164,19 +159,19 @@ class _JobPostWebPageState extends State<JobPostWebPage>
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: _kBlue,
+                    color: AppColors.accent,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Icon(
                     Icons.local_hospital_outlined,
                     size: 20,
-                    color: Colors.white,
+                    color: AppColors.white,
                   ),
                 ),
                 const SizedBox(width: 10),
                 Text(
                   '치카북스',
-                  style: WebTypo.heading(color: _kText),
+                  style: WebTypo.heading(color: AppColors.textPrimary),
                 ),
                 const Spacer(),
                 // 사업자 인증 버튼
@@ -185,7 +180,7 @@ class _JobPostWebPageState extends State<JobPostWebPage>
                   icon: const Icon(Icons.verified_outlined, size: 16),
                   label: const Text('사업자 인증'),
                   style: TextButton.styleFrom(
-                    foregroundColor: _kBlue,
+                    foregroundColor: AppColors.accent,
                     textStyle: const TextStyle(fontSize: 13),
                   ),
                 ),
@@ -195,14 +190,14 @@ class _JobPostWebPageState extends State<JobPostWebPage>
           // 탭바
           TabBar(
             controller: _tabCtrl,
-            labelColor: _kBlue,
-            unselectedLabelColor: _kText.withOpacity(0.45),
-            indicatorColor: _kBlue,
+            labelColor: AppColors.accent,
+            unselectedLabelColor: AppColors.textDisabled,
+            indicatorColor: AppColors.accent,
             indicatorWeight: 2.5,
             indicatorSize: TabBarIndicatorSize.label,
             labelStyle: WebTypo.sectionTitle(),
             unselectedLabelStyle: WebTypo.sectionTitle(
-              color: _kText.withOpacity(0.45),
+              color: AppColors.textDisabled,
             ),
             tabs: const [
               Tab(text: '공고 등록'),
@@ -211,7 +206,7 @@ class _JobPostWebPageState extends State<JobPostWebPage>
             ],
           ),
           // 구분선
-          const Divider(height: 1, thickness: 0.6, color: Color(0xFFE0D8E8)),
+          const Divider(height: 1, thickness: 0.6, color: AppColors.divider),
         ],
       ),
     );
@@ -318,19 +313,19 @@ class _JobPostWebPageState extends State<JobPostWebPage>
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: _kBlue,
+                  color: AppColors.accent,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(
                   Icons.local_hospital_outlined,
                   size: 20,
-                  color: Colors.white,
+                  color: AppColors.white,
                 ),
               ),
               const SizedBox(width: 10),
               Text(
                 '치카북스 구인등록',
-                style: WebTypo.sectionTitle(color: _kText),
+                style: WebTypo.sectionTitle(color: AppColors.textPrimary),
               ),
             ],
           ),
@@ -338,7 +333,7 @@ class _JobPostWebPageState extends State<JobPostWebPage>
           Text(
             '지원자가 보게 될 화면을\n실시간으로 확인해보세요.',
             style: WebTypo.caption(
-              color: _kText.withOpacity(0.6),
+              color: AppColors.textSecondary,
               size: 13,
             ).copyWith(height: 1.6),
           ),
@@ -367,13 +362,13 @@ class _JobPostWebPageState extends State<JobPostWebPage>
             children: [
               Row(
                 children: [
-                  Icon(Icons.drafts_outlined,
-                      size: 16, color: _kText.withOpacity(0.6)),
+                  const Icon(Icons.drafts_outlined,
+                      size: 16, color: AppColors.textSecondary),
                   const SizedBox(width: 6),
                   Text(
                     '임시저장 (${drafts.length})',
                     style: WebTypo.caption(
-                      color: _kText.withOpacity(0.7),
+                      color: AppColors.textSecondary,
                       size: 13,
                     ).copyWith(fontWeight: FontWeight.w700),
                   ),
@@ -398,8 +393,8 @@ class _JobPostWebPageState extends State<JobPostWebPage>
       padding: const EdgeInsets.only(bottom: 6),
       child: Material(
         color: isActive
-            ? _kBlue.withOpacity(0.08)
-            : Colors.white.withOpacity(0.6),
+            ? AppColors.accent.withOpacity(0.08)
+            : AppColors.white.withOpacity(0.6),
         borderRadius: BorderRadius.circular(8),
         child: InkWell(
           borderRadius: BorderRadius.circular(8),
@@ -411,7 +406,7 @@ class _JobPostWebPageState extends State<JobPostWebPage>
                 Icon(
                   isActive ? Icons.edit_note : Icons.description_outlined,
                   size: 18,
-                  color: isActive ? _kBlue : _kText.withOpacity(0.5),
+                  color: isActive ? AppColors.accent : AppColors.textSecondary,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -426,15 +421,15 @@ class _JobPostWebPageState extends State<JobPostWebPage>
                           fontSize: 13,
                           fontWeight:
                               isActive ? FontWeight.w700 : FontWeight.w500,
-                          color: isActive ? _kBlue : _kText,
+                          color: isActive ? AppColors.accent : AppColors.textPrimary,
                         ),
                       ),
                       if (updatedText.isNotEmpty)
                         Text(
                           updatedText,
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 11,
-                            color: _kText.withOpacity(0.4),
+                            color: AppColors.textDisabled,
                           ),
                         ),
                     ],
@@ -443,12 +438,12 @@ class _JobPostWebPageState extends State<JobPostWebPage>
                 InkWell(
                   borderRadius: BorderRadius.circular(12),
                   onTap: () => _deleteDraft(draft.id),
-                  child: Padding(
-                    padding: const EdgeInsets.all(4),
+                  child: const Padding(
+                    padding: EdgeInsets.all(4),
                     child: Icon(
                       Icons.close,
                       size: 16,
-                      color: _kText.withOpacity(0.3),
+                      color: AppColors.textDisabled,
                     ),
                   ),
                 ),
@@ -463,14 +458,14 @@ class _JobPostWebPageState extends State<JobPostWebPage>
   // ── 폼 상단 바 (초기화 버튼) ────────────────────────
   Widget _buildFormTopBar() {
     return Container(
-      color: Colors.white,
+      color: AppColors.white,
       padding: const EdgeInsets.fromLTRB(28, 16, 28, 10),
       child: Row(
         children: [
           Expanded(
             child: Text(
               '구인공고 등록',
-              style: WebTypo.heading(color: _kText),
+              style: WebTypo.heading(color: AppColors.textPrimary),
             ),
           ),
           // 초기화 버튼 (새 공고로)
@@ -482,7 +477,7 @@ class _JobPostWebPageState extends State<JobPostWebPage>
             icon: const Icon(Icons.add, size: 16),
             label: const Text('새 공고'),
             style: TextButton.styleFrom(
-              foregroundColor: _kBlue,
+              foregroundColor: AppColors.accent,
               textStyle: const TextStyle(fontSize: 13),
             ),
           ),
@@ -495,7 +490,7 @@ class _JobPostWebPageState extends State<JobPostWebPage>
             icon: const Icon(Icons.refresh, size: 16),
             label: const Text('초기화'),
             style: TextButton.styleFrom(
-              foregroundColor: _kText.withOpacity(0.5),
+              foregroundColor: AppColors.textSecondary,
               textStyle: const TextStyle(fontSize: 13),
             ),
           ),
@@ -507,14 +502,14 @@ class _JobPostWebPageState extends State<JobPostWebPage>
   // ── 하단 푸터 (개인정보 / 약관 링크) ──────────────────
   Widget _buildFooter() {
     return Container(
-      color: Colors.white,
+      color: AppColors.white,
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 28),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(
+          const Text(
             '© 치과책방',
-            style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+            style: TextStyle(fontSize: 12, color: AppColors.textDisabled),
           ),
           const SizedBox(width: 20),
           _footerLink('개인정보처리방침', '/privacy'),
@@ -539,11 +534,11 @@ class _JobPostWebPageState extends State<JobPostWebPage>
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
         child: Text(
           label,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 12,
-            color: Colors.grey[600],
+            color: AppColors.textSecondary,
             decoration: TextDecoration.underline,
-            decorationColor: Colors.grey[400],
+            decorationColor: AppColors.textDisabled,
           ),
         ),
       ),
@@ -551,31 +546,24 @@ class _JobPostWebPageState extends State<JobPostWebPage>
   }
 
   Widget _footerDot() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 6),
-      child: Text('·', style: TextStyle(color: Colors.grey[400])),
+    return const Padding(
+      padding: EdgeInsets.symmetric(horizontal: 6),
+      child: Text('·', style: TextStyle(color: AppColors.textDisabled)),
     );
   }
 
   // ── 제출 완료 화면 ───────────────────────────────────
   Widget _buildSuccessScreen() {
     return Scaffold(
-      backgroundColor: _kBg,
+      backgroundColor: AppColors.appBg,
       body: Center(
         child: Container(
           constraints: const BoxConstraints(maxWidth: 480),
           margin: const EdgeInsets.all(32),
           padding: const EdgeInsets.all(40),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.white,
             borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.07),
-                blurRadius: 20,
-                offset: const Offset(0, 4),
-              ),
-            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -584,13 +572,13 @@ class _JobPostWebPageState extends State<JobPostWebPage>
                 width: 72,
                 height: 72,
                 decoration: BoxDecoration(
-                  color: _kPink.withOpacity(0.35),
+                  color: AppColors.error.withOpacity(0.12),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   Icons.check_circle_outline,
                   size: 40,
-                  color: _kPinkDark.withOpacity(0.8),
+                  color: AppColors.error.withOpacity(0.8),
                 ),
               ),
               const SizedBox(height: 24),
@@ -599,16 +587,16 @@ class _JobPostWebPageState extends State<JobPostWebPage>
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w700,
-                  color: _kText,
+                  color: AppColors.textPrimary,
                 ),
               ),
               const SizedBox(height: 12),
-              Text(
+              const Text(
                 '구인공고가 접수되었습니다.\n검수 후 앱에 게시될 예정이에요. (보통 1~2 영업일 소요)',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 14,
-                  color: _kText.withOpacity(0.6),
+                  color: AppColors.textSecondary,
                   height: 1.6,
                 ),
               ),
@@ -625,8 +613,8 @@ class _JobPostWebPageState extends State<JobPostWebPage>
                     _tabCtrl.animateTo(1); // 공고 관리 탭으로 이동
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _kBlue,
-                    foregroundColor: Colors.white,
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: AppColors.white,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
@@ -652,8 +640,8 @@ class _JobPostWebPageState extends State<JobPostWebPage>
                     _data = JobPostData();
                   }),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: _kText,
-                    side: BorderSide(color: _kText.withOpacity(0.2)),
+                    foregroundColor: AppColors.textPrimary,
+                    side: BorderSide(color: AppColors.textPrimary.withOpacity(0.2)),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),

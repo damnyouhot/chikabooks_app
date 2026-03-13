@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/theme/app_colors.dart';
 import 'publisher_shared.dart';
 import '../services/clinic_auth_service.dart';
 
@@ -96,7 +97,7 @@ class _PublisherLoginPageState extends State<PublisherLoginPage> {
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
+                          color: AppColors.black.withOpacity(0.05),
                           blurRadius: 12,
                           offset: const Offset(0, 4),
                         ),

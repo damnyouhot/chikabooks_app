@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../core/theme/app_colors.dart';
 
 // ── 치카북스 게시자 화면 공통 팔레트 ─────────────────────
-const kPubBg = Color(0xFFF8F6F9);
-const kPubText = Color(0xFF3D4A5C);
-const kPubBlue = Color(0xFF4A90D9);
-const kPubPink = Color(0xFFF7CBCA);
-const kPubPinkDark = Color(0xFFE57373);
-const kPubBorder = Color(0xFFE0D8E8);
-const kPubCard = Colors.white;
+// 아래 상수들은 외부 참조(web_login_page 등)가 있으므로 이름은 유지하되
+// AppColors 토큰으로 값을 통일합니다.
+const kPubBg      = AppColors.appBg;
+const kPubText    = AppColors.textPrimary;
+const kPubBlue    = AppColors.accent;
+// kPubPink: AppColors.error(0xFFE57373) 계열 연분홍 — const 한계로 리터럴 유지
+const kPubPink    = Color(0xFFF7CBCA); // ≈ AppColors.error.withOpacity(0.25)
+const kPubPinkDark = AppColors.error;
+const kPubBorder  = AppColors.divider;
+const kPubCard    = AppColors.white;
 
 // ── 공통 텍스트 필드 ──────────────────────────────────────
 class PubTextField extends StatelessWidget {
@@ -42,7 +46,7 @@ class PubTextField extends StatelessWidget {
         fontSize: 14,
         fontWeight: FontWeight.w500,
         letterSpacing: -0.3,
-        color: kPubText,
+        color: AppColors.textPrimary,
       ),
       decoration: InputDecoration(
         labelText: label,
@@ -51,13 +55,13 @@ class PubTextField extends StatelessWidget {
         hintStyle: GoogleFonts.notoSansKr(
           fontSize: 13,
           letterSpacing: -0.2,
-          color: kPubText.withOpacity(0.4),
+          color: AppColors.textDisabled,
         ),
         labelStyle: GoogleFonts.notoSansKr(
           fontSize: 13,
           fontWeight: FontWeight.w500,
           letterSpacing: -0.2,
-          color: kPubText.withOpacity(0.7),
+          color: AppColors.textSecondary,
         ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
@@ -65,22 +69,22 @@ class PubTextField extends StatelessWidget {
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: kPubBorder),
+          borderSide: const BorderSide(color: AppColors.divider),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: kPubBorder),
+          borderSide: const BorderSide(color: AppColors.divider),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: kPubBlue, width: 1.5),
+          borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: kPubPinkDark.withOpacity(0.7)),
+          borderSide: BorderSide(color: AppColors.error.withOpacity(0.7)),
         ),
         filled: true,
-        fillColor: kPubBg,
+        fillColor: AppColors.appBg,
       ),
     );
   }
@@ -106,8 +110,8 @@ class PubPrimaryButton extends StatelessWidget {
       child: ElevatedButton(
         onPressed: isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
-          backgroundColor: kPubBlue,
-          foregroundColor: Colors.white,
+          backgroundColor: AppColors.accent,
+          foregroundColor: AppColors.white,
           elevation: 0,
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(
@@ -121,7 +125,7 @@ class PubPrimaryButton extends StatelessWidget {
                   height: 20,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: Colors.white,
+                    color: AppColors.white,
                   ),
                 )
                 : Text(
@@ -155,9 +159,9 @@ class PubScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kPubBg,
+      backgroundColor: AppColors.appBg,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.white,
         elevation: 0,
         automaticallyImplyLeading: showBack,
         leading:
@@ -165,7 +169,7 @@ class PubScaffold extends StatelessWidget {
                 ? IconButton(
                   icon: const Icon(
                     Icons.arrow_back_ios,
-                    color: kPubText,
+                    color: AppColors.textPrimary,
                     size: 18,
                   ),
                   onPressed:
@@ -181,7 +185,7 @@ class PubScaffold extends StatelessWidget {
             Text(
               title,
               style: GoogleFonts.notoSansKr(
-                color: kPubText,
+                color: AppColors.textPrimary,
                 fontSize: 16,
                 fontWeight: FontWeight.w800,
                 letterSpacing: -0.5,
@@ -191,7 +195,7 @@ class PubScaffold extends StatelessWidget {
               Text(
                 subtitle!,
                 style: GoogleFonts.notoSansKr(
-                  color: kPubText.withOpacity(0.5),
+                  color: AppColors.textSecondary,
                   fontSize: 11,
                   fontWeight: FontWeight.w500,
                   letterSpacing: -0.1,
@@ -204,5 +208,3 @@ class PubScaffold extends StatelessWidget {
     );
   }
 }
-
-

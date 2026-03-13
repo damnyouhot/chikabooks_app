@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/theme/app_colors.dart';
 
 /// 캐릭터 위로 떠오르는 수치 표시 (+1, +3 등)
 /// 
@@ -79,13 +80,13 @@ class _FloatingDeltaState extends State<FloatingDelta>
             opacity: _opacity.value,
             child: Text(
               '결 +${widget.value}',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
-                color: Color(0xFF7BA5A5), // 기존 팔레트 _colorAccent 사용
+                color: AppColors.accent, // diary/bond teal accent
                 shadows: [
                   Shadow(
-                    color: Colors.white60,
+                    color: AppColors.white.withOpacity(0.6),
                     blurRadius: 4,
                   ),
                 ],

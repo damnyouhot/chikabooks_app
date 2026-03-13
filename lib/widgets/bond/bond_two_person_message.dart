@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
-
-// AppColors 직접 참조 (TabTheme 제거)
+import '../../core/theme/app_tokens.dart';
+import '../../core/widgets/app_muted_card.dart';
 
 /// 2인 그룹 특별 메시지
 class BondTwoPersonMessage extends StatelessWidget {
@@ -9,14 +9,9 @@ class BondTwoPersonMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+    return AppMutedCard(
+      radius: AppRadius.lg,
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.accent.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.accent.withOpacity(0.2), width: 1),
-      ),
       child: Row(
         children: [
           Container(
@@ -24,12 +19,16 @@ class BondTwoPersonMessage extends StatelessWidget {
             height: 40,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: AppColors.accent.withOpacity(0.2),
+              color: AppColors.accent.withOpacity(0.12),
             ),
-            child: Icon(Icons.people, size: 20, color: AppColors.textPrimary),
+            child: const Icon(
+              Icons.people,
+              size: 20,
+              color: AppColors.accent,
+            ),
           ),
           const SizedBox(width: 12),
-          Expanded(
+          const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -42,12 +41,12 @@ class BondTwoPersonMessage extends StatelessWidget {
                     height: 1.4,
                   ),
                 ),
-                const SizedBox(height: 2),
+                SizedBox(height: 2),
                 Text(
                   '가끔은 조용한 주도 좋지',
                   style: TextStyle(
                     fontSize: 13,
-                    color: AppColors.textPrimary.withOpacity(0.6),
+                    color: AppColors.textSecondary,
                     height: 1.4,
                   ),
                 ),
@@ -59,6 +58,3 @@ class BondTwoPersonMessage extends StatelessWidget {
     );
   }
 }
-
-
-

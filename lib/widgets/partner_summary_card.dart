@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/activity_log_service.dart';
 import '../services/partner_service.dart';
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_tokens.dart';
 
 /// CaringPage 파트너 소식 접이식 카드
 ///
@@ -54,38 +56,33 @@ class _PartnerSummaryCardState extends State<PartnerSummaryCard> {
     if (_items.isEmpty) return const SizedBox.shrink();
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      margin: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg, vertical: AppSpacing.xs),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.92),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF6A5ACD).withOpacity(0.08),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         children: [
           // 헤더 (탭하면 펼침)
           InkWell(
             onTap: () => setState(() => _expanded = !_expanded),
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppRadius.xl),
             child: Padding(
               padding: const EdgeInsets.symmetric(
-                  horizontal: 16, vertical: 12),
+                  horizontal: AppSpacing.lg, vertical: 12),
               child: Row(
                 children: [
                   const Icon(Icons.people_outline,
-                      color: Color(0xFF6A5ACD), size: 18),
+                      color: AppColors.accent, size: 18),
                   const SizedBox(width: 8),
                   const Text(
                     '파트너 소식',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF6A5ACD),
+                      color: AppColors.accent,
                     ),
                   ),
                   const SizedBox(width: 6),
@@ -94,7 +91,7 @@ class _PartnerSummaryCardState extends State<PartnerSummaryCard> {
                     width: 6,
                     height: 6,
                     decoration: const BoxDecoration(
-                      color: Color(0xFFFF8A80),
+                      color: AppColors.error,
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -103,7 +100,7 @@ class _PartnerSummaryCardState extends State<PartnerSummaryCard> {
                     _expanded
                         ? Icons.keyboard_arrow_up
                         : Icons.keyboard_arrow_down,
-                    color: Colors.grey[400],
+                    color: AppColors.textDisabled,
                     size: 20,
                   ),
                 ],
@@ -115,7 +112,8 @@ class _PartnerSummaryCardState extends State<PartnerSummaryCard> {
           if (_expanded) ...[
             const Divider(height: 1, indent: 16, endIndent: 16),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, 4),
               child: Column(
                 children: _items
                     .map((item) => _buildItemRow(item))
@@ -124,13 +122,14 @@ class _PartnerSummaryCardState extends State<PartnerSummaryCard> {
             ),
             // 확인 버튼
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+              padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg, 4, AppSpacing.lg, 12),
               child: SizedBox(
                 width: double.infinity,
                 child: TextButton(
                   onPressed: _markRead,
                   style: TextButton.styleFrom(
-                    foregroundColor: Colors.grey[500],
+                    foregroundColor: AppColors.textDisabled,
                   ),
                   child: const Text('확인했어',
                       style:
@@ -152,7 +151,7 @@ class _PartnerSummaryCardState extends State<PartnerSummaryCard> {
           // 뱃지
           Text(
             item.memberMeta.displayLabel,
-            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),
           const Spacer(),
           // 아이콘 요약
@@ -165,4 +164,3 @@ class _PartnerSummaryCardState extends State<PartnerSummaryCard> {
     );
   }
 }
-

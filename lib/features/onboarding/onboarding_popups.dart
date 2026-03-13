@@ -2,9 +2,13 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../services/onboarding_workplace_service.dart';
+import '../../core/theme/app_colors.dart';
 
+// _kBg: 따뜻한 크림 배경 — 온보딩 다이얼로그 전용, 의도적 유지
 const _kBg = Color(0xFFFFFBF9);
+// _kText: 온보딩 다이얼로그 전용 텍스트 톤 — AppColors.textPrimary 대신 약간 따뜻한 느낌
 const _kText = Color(0xFF3D3535);
+// _kAccent: 온보딩 민트/그린 액센트 — 치카북스 메인 accent와 별개 의도적 유지
 const _kAccent = Color(0xFF6BBFA0);
 const _kRadius = 20.0;
 
@@ -94,23 +98,23 @@ class _OnboardingNicknamePopupState extends State<OnboardingNicknamePopup> {
                       hintText: '닉네임 입력',
                       counterText: '',
                       filled: true,
-                      fillColor: Colors.white,
+                      fillColor: AppColors.white,
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 16,
                         vertical: 14,
                       ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+                        borderSide: const BorderSide(color: AppColors.divider),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: _kAccent, width: 1.5),
+                        borderSide:
+                            const BorderSide(color: _kAccent, width: 1.5),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide:
-                            const BorderSide(color: Color(0xFFE0E0E0)),
+                        borderSide: const BorderSide(color: AppColors.divider),
                       ),
                     ),
                   ),
@@ -119,7 +123,7 @@ class _OnboardingNicknamePopupState extends State<OnboardingNicknamePopup> {
                 // 🎲 랜덤 닉네임 주사위 버튼
                 Container(
                   decoration: BoxDecoration(
-                    color: Colors.grey[100],
+                    color: AppColors.surfaceMuted,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: IconButton(
@@ -140,7 +144,7 @@ class _OnboardingNicknamePopupState extends State<OnboardingNicknamePopup> {
                         : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _kAccent,
-                  foregroundColor: Colors.white,
+                  foregroundColor: AppColors.white,
                   disabledBackgroundColor: _kAccent.withOpacity(0.35),
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(vertical: 14),
@@ -251,14 +255,14 @@ class _OnboardingWorkplacePopupState extends State<OnboardingWorkplacePopup> {
                         _ctrl.clear();
                       }),
                       selectedColor: _kAccent,
-                      backgroundColor: Colors.white,
+                      backgroundColor: AppColors.white,
                       labelStyle: GoogleFonts.notoSansKr(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: selected ? Colors.white : _kText.withOpacity(0.7),
+                        color: selected ? AppColors.white : AppColors.textSecondary,
                       ),
                       side: BorderSide(
-                        color: selected ? _kAccent : const Color(0xFFDDDDDD),
+                        color: selected ? _kAccent : AppColors.divider,
                       ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
@@ -279,22 +283,23 @@ class _OnboardingWorkplacePopupState extends State<OnboardingWorkplacePopup> {
                   hintText: _hintText,
                   counterText: '',
                   filled: true,
-                  fillColor: Colors.white,
+                  fillColor: AppColors.white,
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 16,
                     vertical: 14,
                   ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+                    borderSide: const BorderSide(color: AppColors.divider),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: _kAccent, width: 1.5),
+                    borderSide:
+                        const BorderSide(color: _kAccent, width: 1.5),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+                    borderSide: const BorderSide(color: AppColors.divider),
                   ),
                 ),
               ),
@@ -319,7 +324,7 @@ class _OnboardingWorkplacePopupState extends State<OnboardingWorkplacePopup> {
                         : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _kAccent,
-                  foregroundColor: Colors.white,
+                  foregroundColor: AppColors.white,
                   disabledBackgroundColor: _kAccent.withOpacity(0.35),
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(vertical: 14),
@@ -334,7 +339,7 @@ class _OnboardingWorkplacePopupState extends State<OnboardingWorkplacePopup> {
                             height: 18,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: Colors.white,
+                              color: AppColors.white,
                             ),
                           )
                         : Text(
@@ -352,4 +357,3 @@ class _OnboardingWorkplacePopupState extends State<OnboardingWorkplacePopup> {
     );
   }
 }
-

@@ -26,13 +26,13 @@ class BondBillboardSection extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 6),
-              Icon(Icons.mic_none, size: 16, color: AppColors.textPrimary.withOpacity(0.4)),
+              Icon(Icons.mic_none, size: 16, color: AppColors.textDisabled),
               const SizedBox(width: 4),
               Text(
                 '만장일치 추대된 이야기들',
                 style: TextStyle(
                   fontSize: 11,
-                  color: AppColors.textPrimary.withOpacity(0.5),
+                  color: AppColors.textSecondary,
                 ),
               ),
             ],

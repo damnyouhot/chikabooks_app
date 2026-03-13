@@ -4,7 +4,9 @@ import 'app_onboarding_controller.dart';
 import 'onboarding_popups.dart';
 import '../../services/user_profile_service.dart';
 import '../../services/onboarding_service.dart';
+import '../../core/theme/app_colors.dart';
 
+// _kText: 온보딩 다이얼로그 전용 따뜻한 텍스트 — 의도적 유지
 const _kText = Color(0xFF3D3535);
 
 /// 대사 텍스트 맵
@@ -123,7 +125,7 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
     showDialog(
       context: context,
       barrierDismissible: false,
-      barrierColor: Colors.black.withOpacity(0.4),
+      barrierColor: AppColors.black.withOpacity(0.4),
       builder:
           (_) => OnboardingNicknamePopup(
             onDone: (nickname) async {
@@ -150,7 +152,7 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
     showDialog(
       context: context,
       barrierDismissible: false,
-      barrierColor: Colors.black.withOpacity(0.4),
+      barrierColor: AppColors.black.withOpacity(0.4),
       builder:
           (_) => OnboardingWorkplacePopup(
             onDone: (status, placeName) {
@@ -317,11 +319,11 @@ class _DialogueBubble extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.15),
+            color: AppColors.black.withOpacity(0.15),
             blurRadius: 16,
             offset: const Offset(0, 4),
           ),
@@ -380,7 +382,7 @@ class _SpotlightPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = Colors.black.withOpacity(0.70);
+    final paint = Paint()..color = AppColors.black.withOpacity(0.70);
 
     // 커리어 탭 영역을 제외한 나머지 전체를 어둡게 처리
     final path =
@@ -401,7 +403,7 @@ class _SpotlightPainter extends CustomPainter {
     // 커리어 탭 주변에 밝은 테두리(glow)
     final glowPaint =
         Paint()
-          ..color = Colors.white.withOpacity(0.25)
+          ..color = AppColors.white.withOpacity(0.25)
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2;
     canvas.drawRect(

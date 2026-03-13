@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import '../../core/theme/app_colors.dart';
 import 'package:http/http.dart' as http;
 import 'package:epub_view/epub_view.dart';
 import '../../models/ebook.dart';
@@ -99,11 +100,16 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
     // 웹은 ePub 뷰어 미지원
     if (kIsWeb) {
       return Scaffold(
-        appBar: AppBar(title: Text(widget.ebook.title)),
+        backgroundColor: AppColors.appBg,
+        appBar: AppBar(
+          backgroundColor: AppColors.appBg,
+          elevation: 0,
+          title: Text(widget.ebook.title),
+        ),
         body: const Center(
           child: Text(
             'ePub 뷰어는 모바일 앱에서만 지원됩니다.',
-            style: TextStyle(fontSize: 16, color: Colors.grey),
+            style: TextStyle(fontSize: 16, color: AppColors.textDisabled),
           ),
         ),
       );
@@ -111,20 +117,38 @@ class _EpubReaderPageState extends State<EpubReaderPage> {
 
     if (_isLoading) {
       return Scaffold(
-        appBar: AppBar(title: Text(widget.ebook.title)),
+        backgroundColor: AppColors.appBg,
+        appBar: AppBar(
+          backgroundColor: AppColors.appBg,
+          elevation: 0,
+          title: Text(widget.ebook.title),
+        ),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_error != null) {
       return Scaffold(
-        appBar: AppBar(title: Text(widget.ebook.title)),
-        body: Center(child: Text(_error!)),
+        backgroundColor: AppColors.appBg,
+        appBar: AppBar(
+          backgroundColor: AppColors.appBg,
+          elevation: 0,
+          title: Text(widget.ebook.title),
+        ),
+        body: Center(
+          child: Text(
+            _error!,
+            style: const TextStyle(color: AppColors.error),
+          ),
+        ),
       );
     }
 
     return Scaffold(
+      backgroundColor: AppColors.appBg,
       appBar: AppBar(
+        backgroundColor: AppColors.appBg,
+        elevation: 0,
         title: Text(
           widget.ebook.title,
           maxLines: 1,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:math';
+import '../core/theme/app_colors.dart';
 import '../pages/diary_timeline_page.dart';
 
 /// 나만 보는 한 줄 기록 (BottomSheet)
@@ -86,7 +87,7 @@ class _DiaryInputSheetState extends State<DiaryInputSheet> {
       child: Container(
         padding: const EdgeInsets.all(24),
         decoration: const BoxDecoration(
-          color: Colors.white,
+          color: AppColors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: Column(
@@ -101,7 +102,7 @@ class _DiaryInputSheetState extends State<DiaryInputSheet> {
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF5D6B6B),
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 const Spacer(),
@@ -119,7 +120,7 @@ class _DiaryInputSheetState extends State<DiaryInputSheet> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF7BA5A5).withOpacity(0.1),
+                      color: AppColors.accent.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
@@ -127,14 +128,14 @@ class _DiaryInputSheetState extends State<DiaryInputSheet> {
                         Icon(
                           Icons.history,
                           size: 16,
-                          color: const Color(0xFF7BA5A5),
+                          color: AppColors.accent,
                         ),
                         const SizedBox(width: 4),
                         const Text(
                           '어제',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Color(0xFF7BA5A5),
+                            color: AppColors.accent,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -150,7 +151,7 @@ class _DiaryInputSheetState extends State<DiaryInputSheet> {
               '나만 보는 기록이에요',
               style: TextStyle(
                 fontSize: 13,
-                color: Colors.grey[600],
+                color: AppColors.textSecondary,
               ),
             ),
             const SizedBox(height: 20),
@@ -163,23 +164,23 @@ class _DiaryInputSheetState extends State<DiaryInputSheet> {
               decoration: InputDecoration(
                 hintText: '지금 마음을 한 문장으로 남겨볼까?',
                 hintStyle: TextStyle(
-                  color: Colors.grey[400],
+                  color: AppColors.textDisabled,
                   fontSize: 14,
                 ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey[300]!),
+                  borderSide: BorderSide(color: AppColors.divider),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(
-                    color: Color(0xFF7BA5A5), // 기존 팔레트 _colorAccent
+                    color: AppColors.accent,
                     width: 1.5,
                   ),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey[300]!),
+                  borderSide: BorderSide(color: AppColors.divider),
                 ),
               ),
             ),
@@ -193,7 +194,7 @@ class _DiaryInputSheetState extends State<DiaryInputSheet> {
                   child: const Text(
                     '취소',
                     style: TextStyle(
-                      color: Color(0xFF5D6B6B),
+                      color: AppColors.textPrimary,
                     ),
                   ),
                 ),
@@ -201,8 +202,8 @@ class _DiaryInputSheetState extends State<DiaryInputSheet> {
                 ElevatedButton(
                   onPressed: _isSaving ? null : _save,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF7BA5A5),
-                    foregroundColor: Colors.white,
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: AppColors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -217,7 +218,7 @@ class _DiaryInputSheetState extends State<DiaryInputSheet> {
                           height: 16,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: Colors.white,
+                            color: AppColors.white,
                           ),
                         )
                       : const Text('저장'),

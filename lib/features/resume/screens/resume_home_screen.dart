@@ -6,14 +6,10 @@ import '../../../models/resume.dart';
 import '../../../models/resume_draft.dart';
 import '../../../services/resume_service.dart';
 import '../../../services/resume_draft_service.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_tokens.dart';
 import 'resume_edit_screen.dart';
 import 'ocr_review_screen.dart';
-
-// ── 디자인 상수 ──────────────────────────────────────────
-const _kBg = Color(0xFFF8F6F9);
-const _kText = Color(0xFF3D4A5C);
-const _kBlue = Color(0xFF4A90D9);
-const _kGreen = Color(0xFF4CAF50);
 
 /// 이력서 홈 화면
 ///
@@ -26,21 +22,21 @@ class ResumeHomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _kBg,
+      backgroundColor: AppColors.appBg,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.white,
         elevation: 0,
         title: const Text(
           '내 이력서',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w800,
-            color: _kText,
+            color: AppColors.textPrimary,
             letterSpacing: -0.3,
           ),
         ),
         centerTitle: false,
-        iconTheme: const IconThemeData(color: _kText),
+        iconTheme: const IconThemeData(color: AppColors.textPrimary),
         actions: [
           // 웹: 로그아웃 버튼
           if (kIsWeb)
@@ -48,13 +44,13 @@ class ResumeHomeScreen extends StatelessWidget {
               icon: Icon(
                 Icons.logout,
                 size: 16,
-                color: _kText.withOpacity(0.5),
+                color: AppColors.textSecondary,
               ),
               label: Text(
                 '로그아웃',
                 style: TextStyle(
                   fontSize: 13,
-                  color: _kText.withOpacity(0.6),
+                  color: AppColors.textSecondary,
                 ),
               ),
               onPressed: () async {
@@ -101,20 +97,20 @@ class _ResumeHomeBody extends StatelessWidget {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 680),
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 20, 16, 40),
+          padding: const EdgeInsets.fromLTRB(AppSpacing.lg, 20, AppSpacing.lg, 40),
           children: [
             // ── 상단 액션 버튼들 ──
             _ActionButton(
               icon: Icons.add_rounded,
               label: '새 이력서 만들기',
-              color: _kBlue,
+              color: AppColors.accent,
               onTap: () => _createNew(context),
             ),
             const SizedBox(height: 10),
             _ActionButton(
               icon: Icons.camera_alt_outlined,
               label: '사진으로 자동 입력 (OCR)',
-              color: _kGreen,
+              color: AppColors.success,
               onTap: () => _openOcr(context),
             ),
 
@@ -126,7 +122,7 @@ class _ResumeHomeBody extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  color: Colors.orange.withOpacity(0.8),
+                  color: AppColors.warning,
                 ),
               ),
               const SizedBox(height: 8),
@@ -151,7 +147,7 @@ class _ResumeHomeBody extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  color: _kText.withOpacity(0.6),
+                  color: AppColors.textSecondary,
                 ),
               ),
               const SizedBox(height: 10),
@@ -208,7 +204,7 @@ class _ResumeHomeBody extends StatelessWidget {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
             child: const Text('삭제'),
           ),
         ],
@@ -242,7 +238,7 @@ class _ResumeHomeBody extends StatelessWidget {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
             child: const Text('삭제'),
           ),
         ],
@@ -297,16 +293,16 @@ class _ActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(14),
+      color: AppColors.white,
+      borderRadius: BorderRadius.circular(AppRadius.lg),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: 14),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: color.withOpacity(0.2)),
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            border: Border.all(color: AppColors.divider),
           ),
           child: Row(
             children: [
@@ -315,22 +311,22 @@ class _ActionButton extends StatelessWidget {
                 height: 36,
                 decoration: BoxDecoration(
                   color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                 ),
                 child: Icon(icon, color: color, size: 20),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Text(
                   label,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    color: _kText,
+                    color: AppColors.textPrimary,
                   ),
                 ),
               ),
-              Icon(Icons.chevron_right, color: _kText.withOpacity(0.3), size: 20),
+              const Icon(Icons.chevron_right, color: AppColors.textDisabled, size: 20),
             ],
           ),
         ),
@@ -361,16 +357,16 @@ class _ResumeCard extends StatelessWidget {
     final sectionCount = _countFilledSections();
 
     return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(14),
+      color: AppColors.white,
+      borderRadius: BorderRadius.circular(AppRadius.lg),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         child: Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(AppSpacing.lg),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: _kText.withOpacity(0.06)),
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            border: Border.all(color: AppColors.divider),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -384,7 +380,7 @@ class _ResumeCard extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
-                        color: _kText,
+                        color: AppColors.textPrimary,
                         letterSpacing: -0.3,
                       ),
                       overflow: TextOverflow.ellipsis,
@@ -393,31 +389,31 @@ class _ResumeCard extends StatelessWidget {
                   _buildMenu(context),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.sm),
 
               // 메타 정보
               Row(
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.access_time,
                     size: 13,
-                    color: _kText.withOpacity(0.35),
+                    color: AppColors.textDisabled,
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: AppSpacing.xs),
                   Text(
                     updatedText,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 12,
-                      color: _kText.withOpacity(0.45),
+                      color: AppColors.textDisabled,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: AppSpacing.md),
                   Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: _completionColor(sectionCount).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(AppRadius.xs),
                     ),
                     child: Text(
                       '$sectionCount/8 섹션',
@@ -434,15 +430,15 @@ class _ResumeCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: _kGreen.withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(4),
+                        color: AppColors.success.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(AppRadius.xs),
                       ),
                       child: const Text(
                         '익명 기본',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w500,
-                          color: _kGreen,
+                          color: AppColors.success,
                         ),
                       ),
                     ),
@@ -457,7 +453,7 @@ class _ResumeCard extends StatelessWidget {
 
   Widget _buildMenu(BuildContext context) {
     return PopupMenuButton<String>(
-      icon: Icon(Icons.more_vert, size: 18, color: _kText.withOpacity(0.3)),
+      icon: Icon(Icons.more_vert, size: 18, color: AppColors.textDisabled),
       padding: EdgeInsets.zero,
       constraints: const BoxConstraints(),
       onSelected: (value) {
@@ -478,7 +474,7 @@ class _ResumeCard extends StatelessWidget {
         const PopupMenuItem(value: 'duplicate', child: Text('복제')),
         const PopupMenuItem(
           value: 'delete',
-          child: Text('삭제', style: TextStyle(color: Colors.red)),
+          child: Text('삭제', style: TextStyle(color: AppColors.error)),
         ),
       ],
     );
@@ -498,9 +494,9 @@ class _ResumeCard extends StatelessWidget {
   }
 
   Color _completionColor(int count) {
-    if (count >= 6) return _kGreen;
-    if (count >= 3) return Colors.orange;
-    return _kText.withOpacity(0.5);
+    if (count >= 6) return AppColors.success;
+    if (count >= 3) return AppColors.warning;
+    return AppColors.textSecondary;
   }
 
   String _formatDate(DateTime? date) {
@@ -531,16 +527,16 @@ class _DraftCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(12),
+      color: AppColors.white,
+      borderRadius: BorderRadius.circular(AppRadius.md),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.orange.withOpacity(0.2)),
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(color: AppColors.warning.withOpacity(0.2)),
           ),
           child: Row(
             children: [
@@ -548,12 +544,12 @@ class _DraftCard extends StatelessWidget {
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
+                  color: AppColors.warning.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
                 ),
                 child: Icon(
                   Icons.edit_note,
-                  color: Colors.orange.withOpacity(0.7),
+                  color: AppColors.warning.withOpacity(0.7),
                   size: 18,
                 ),
               ),
@@ -567,7 +563,7 @@ class _DraftCard extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: _kText,
+                        color: AppColors.textPrimary,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -576,17 +572,17 @@ class _DraftCard extends StatelessWidget {
                       '임시저장됨',
                       style: TextStyle(
                         fontSize: 11,
-                        color: Colors.orange.withOpacity(0.7),
+                        color: AppColors.warning.withOpacity(0.7),
                       ),
                     ),
                   ],
                 ),
               ),
               IconButton(
-                icon: Icon(
+                icon: const Icon(
                   Icons.delete_outline,
                   size: 18,
-                  color: _kText.withOpacity(0.3),
+                  color: AppColors.textDisabled,
                 ),
                 onPressed: onDelete,
                 constraints: const BoxConstraints(),
@@ -610,26 +606,26 @@ class _EmptyState extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 60),
       child: Column(
         children: [
-          Icon(
+          const Icon(
             Icons.description_outlined,
             size: 56,
-            color: _kText.withOpacity(0.15),
+            color: AppColors.textDisabled,
           ),
-          const SizedBox(height: 16),
-          Text(
+          const SizedBox(height: AppSpacing.lg),
+          const Text(
             '아직 이력서가 없어요',
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w600,
-              color: _kText.withOpacity(0.4),
+              color: AppColors.textSecondary,
             ),
           ),
           const SizedBox(height: 6),
-          Text(
+          const Text(
             '위 버튼으로 첫 이력서를 만들어보세요!',
             style: TextStyle(
               fontSize: 13,
-              color: _kText.withOpacity(0.3),
+              color: AppColors.textDisabled,
             ),
           ),
         ],

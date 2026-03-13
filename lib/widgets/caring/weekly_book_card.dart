@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
+import '../../core/widgets/app_muted_card.dart';
 
 /// 📖 이주의 책 카드
 class WeeklyBookCard extends StatelessWidget {
@@ -9,128 +12,121 @@ class WeeklyBookCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bookTitle = data?['title'] as String? ?? '';
-    final bookSubtitle = data?['subtitle'] as String? ?? '';
+    final bookTitle    = data?['title']        as String? ?? '';
+    final bookSubtitle = data?['subtitle']     as String? ?? '';
     final thumbnailUrl = data?['thumbnailUrl'] as String?;
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 1),
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: onPreview,
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return AppMutedCard(
+      radius: AppRadius.sm,
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      onTap: onPreview,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 타이틀
+          const Row(
             children: [
-              // 타이틀
-              Row(
-                children: [
-                  Text('📖', style: TextStyle(fontSize: 13)),
-                  const SizedBox(width: 3),
-                  Text(
-                    '이주의 책',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              // 로딩 상태
-              if (data == null)
-                Text('로딩 중...', style: TextStyle(fontSize: 11))
-              // 데이터 없음
-              else if (bookTitle.isEmpty)
-                Text('이주의 책이 선정되지 않았어요', style: TextStyle(fontSize: 11))
-              // 책 정보
-              else
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // 작은 표지 썸네일
-                    Container(
-                      width: 34,
-                      height: 46,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(3),
-                        image:
-                            thumbnailUrl != null
-                                ? DecorationImage(
-                                  image: NetworkImage(thumbnailUrl),
-                                  fit: BoxFit.cover,
-                                )
-                                : null,
-                      ),
-                      child:
-                          thumbnailUrl == null
-                              ? Icon(
-                                Icons.book,
-                                size: 18,
-                                color: Colors.grey[600],
-                              )
-                              : null,
-                    ),
-                    const SizedBox(width: 8),
-                    // 우측 텍스트
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // 메인 제목
-                          Text(
-                            bookTitle,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          if (bookSubtitle.isNotEmpty) ...[
-                            const SizedBox(height: 1),
-                            // 서브타이틀
-                            Text(
-                              '― $bookSubtitle',
-                              style: TextStyle(
-                                fontSize: 9,
-                                color: Colors.black54,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                          const SizedBox(height: 4),
-                          // CTA 버튼
-                          OutlinedButton(
-                            onPressed: onPreview,
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 3,
-                              ),
-                              minimumSize: Size.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            child: Text(
-                              '1분 미리보기',
-                              style: TextStyle(fontSize: 9),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+              Text('📖', style: TextStyle(fontSize: 13)),
+              SizedBox(width: 3),
+              Text(
+                '이주의 책',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
                 ),
+              ),
             ],
           ),
-        ),
+          const SizedBox(height: 4),
+          // 로딩 상태
+          if (data == null)
+            const Text(
+              '로딩 중...',
+              style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+            )
+          // 데이터 없음
+          else if (bookTitle.isEmpty)
+            const Text(
+              '이주의 책이 선정되지 않았어요',
+              style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+            )
+          // 책 정보
+          else
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 작은 표지 썸네일
+                Container(
+                  width: 34,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: AppColors.disabledBg,
+                    borderRadius: BorderRadius.circular(AppRadius.xs),
+                    image: thumbnailUrl != null
+                        ? DecorationImage(
+                            image: NetworkImage(thumbnailUrl),
+                            fit: BoxFit.cover,
+                          )
+                        : null,
+                  ),
+                  child: thumbnailUrl == null
+                      ? const Icon(
+                          Icons.book,
+                          size: 18,
+                          color: AppColors.textDisabled,
+                        )
+                      : null,
+                ),
+                const SizedBox(width: 8),
+                // 우측 텍스트
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        bookTitle,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (bookSubtitle.isNotEmpty) ...[
+                        const SizedBox(height: 1),
+                        Text(
+                          '― $bookSubtitle',
+                          style: const TextStyle(
+                            fontSize: 9,
+                            color: AppColors.textSecondary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                      const SizedBox(height: 4),
+                      OutlinedButton(
+                        onPressed: onPreview,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.accent,
+                          side: const BorderSide(color: AppColors.divider),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.sm + 2,
+                            vertical: AppSpacing.xs - 1,
+                          ),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: const Text('1분 미리보기', style: TextStyle(fontSize: 9)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+        ],
       ),
     );
   }

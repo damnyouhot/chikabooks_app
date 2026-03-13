@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../core/theme/app_colors.dart';
 import '../services/bond_post_service.dart';
 import '../services/user_profile_service.dart';
 
@@ -179,7 +180,7 @@ class _BondPostSheetState extends State<BondPostSheet> {
           builder: (context, scrollCtrl) {
             return Container(
               decoration: const BoxDecoration(
-                color: Colors.white,
+                color: AppColors.white,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
               padding: EdgeInsets.only(
@@ -199,7 +200,7 @@ class _BondPostSheetState extends State<BondPostSheet> {
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF6A5ACD),
+                        color: AppColors.accent,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -211,14 +212,14 @@ class _BondPostSheetState extends State<BondPostSheet> {
                         fontSize: 12,
                         color:
                             _remainingPosts > 0
-                                ? Colors.grey[600]
-                                : Colors.red[400],
+                                ? AppColors.textSecondary
+                                : AppColors.error,
                       ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       '기분을 나누면 더 기쁘고 덜 힘들어요',
-                      style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                      style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
                     ),
                     const SizedBox(height: 20),
 
@@ -236,7 +237,7 @@ class _BondPostSheetState extends State<BondPostSheet> {
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16),
                           borderSide: const BorderSide(
-                            color: Color(0xFF6A5ACD),
+                            color: AppColors.accent,
                             width: 2,
                           ),
                         ),
@@ -252,10 +253,10 @@ class _BondPostSheetState extends State<BondPostSheet> {
                       child: ElevatedButton(
                         onPressed: _posting ? null : _submit,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFF7CBCA), // _kAccent
-                          foregroundColor: const Color(0xFF5D6B6B), // _kText
-                          disabledBackgroundColor: Colors.grey[300],
-                          disabledForegroundColor: Colors.grey[600],
+                          backgroundColor: const Color(0xFFF7CBCA), // bond accent (intentional brand)
+                          foregroundColor: AppColors.textPrimary,
+                          disabledBackgroundColor: AppColors.disabledBg,
+                          disabledForegroundColor: AppColors.textSecondary,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
                           ),
@@ -267,7 +268,7 @@ class _BondPostSheetState extends State<BondPostSheet> {
                                   height: 20,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    color: const Color(0xFF5D6B6B), // _kText
+                                    color: AppColors.textPrimary,
                                   ),
                                 )
                                 : const Text(

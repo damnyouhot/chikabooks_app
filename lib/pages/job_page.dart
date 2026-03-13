@@ -2,15 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
+import '../core/theme/app_colors.dart';
 import '../notifiers/job_filter_notifier.dart';
 import '../services/job_service.dart';
 import '../screen/jobs/job_listings_screen.dart';
 import '../screen/jobs/job_map_screen.dart';
 import 'career/career_tab.dart';
-import 'career/career_shared.dart';
-
-// ── 디자인 팔레트 ──
-final _kBg = kCBg;
 
 /// 커리어(도전하기) 탭 - 탭4
 ///
@@ -88,7 +85,7 @@ class _JobPageState extends State<JobPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _kBg,
+      backgroundColor: AppColors.appBg,
       body: SafeArea(
         child: DefaultTabController(
           length: 2,
@@ -97,8 +94,7 @@ class _JobPageState extends State<JobPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const CareerTabHeader(),
-              const SizedBox(height: 6),
+              // 소탭 헤더는 JobListingsScreen / CareerTab 내부에서 각각 렌더링
               Expanded(
                 child: TabBarView(
                   physics: const NeverScrollableScrollPhysics(),
@@ -130,67 +126,13 @@ class _JobPageState extends State<JobPage> {
           onMapToggle: () => setState(() => _isMapView = true),
         ),
         // 인덱스 1: 지도 (미리 빌드되어 전환 즉시 표시)
-        Stack(
-          children: [
-            JobMapScreen(userLocation: _userLocation),
-            Positioned(
-              top: 12,
-              left: 16,
-              child: _ListToggleButton(
-                onTap: () => setState(() => _isMapView = false),
-              ),
-            ),
-          ],
+        // 목록 버튼은 JobMapScreen 내부 RadiusChipRow 우측에 통합됨
+        JobMapScreen(
+          userLocation: _userLocation,
+          onListToggle: () => setState(() => _isMapView = false),
         ),
       ],
     );
   }
 }
 
-/// 지도 모드에서 목록으로 돌아가는 플로팅 버튼
-class _ListToggleButton extends StatelessWidget {
-  final VoidCallback onTap;
-
-  const _ListToggleButton({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.12),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.list_alt_rounded,
-              size: 16,
-              color: kCText.withOpacity(0.8),
-            ),
-            const SizedBox(width: 5),
-            Text(
-              '목록',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: kCText.withOpacity(0.85),
-                letterSpacing: -0.2,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

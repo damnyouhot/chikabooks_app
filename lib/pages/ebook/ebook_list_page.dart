@@ -34,9 +34,9 @@ class EbookListPage extends StatelessWidget {
           return Center(
             child: Text(
               '등록된 전자책이 없습니다.',
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 14,
-                color: AppColors.textPrimary.withOpacity(0.6),
+                color: AppColors.textSecondary,
               ),
             ),
           );
@@ -89,7 +89,7 @@ class _RecommendedSection extends StatelessWidget {
       return [...free, ...extra];
     }
     return free;
-  }
+    }
 
   @override
   Widget build(BuildContext context) {
@@ -103,37 +103,37 @@ class _RecommendedSection extends StatelessWidget {
         final cardW = (screenW * 0.34).clamp(120.0, 160.0);
         final sectionH = cardW * 1.57;
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
             // 섹션 헤더
-            const Padding(
+        const Padding(
               padding: EdgeInsets.fromLTRB(
                 AppSpacing.xl,
                 AppSpacing.xl,
                 AppSpacing.xl,
                 AppSpacing.md,
               ),
-              child: Row(
-                children: [
+          child: Row(
+            children: [
                   Text('🌟', style: TextStyle(fontSize: 20)),
                   SizedBox(width: AppSpacing.sm),
-                  Text(
-                    '이번 주 추천',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
+              Text(
+                '이번 주 추천',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
                       color: AppColors.textPrimary,
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
+            ],
+          ),
+        ),
             // 가로 스크롤 카드 목록
-            SizedBox(
+        SizedBox(
               height: sectionH,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                 itemCount: books.length,
                 itemBuilder: (context, i) =>
@@ -178,62 +178,62 @@ class _RecommendedCard extends StatelessWidget {
       width: width,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
-        child: InkWell(
+                child: InkWell(
           borderRadius: BorderRadius.circular(AppRadius.lg),
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
               builder: (_) =>
                   EbookDetailPage(ebook: book, hideActions: true),
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 표지
-              Expanded(
-                child: ClipRRect(
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 표지
+                      Expanded(
+                        child: ClipRRect(
                   borderRadius: BorderRadius.circular(AppRadius.lg),
-                  child: Image.network(
-                    book.coverUrl,
-                    fit: BoxFit.contain,
-                    width: double.infinity,
-                    errorBuilder: (_, __, ___) => Container(
+                          child: Image.network(
+                            book.coverUrl,
+                            fit: BoxFit.contain,
+                            width: double.infinity,
+                            errorBuilder: (_, __, ___) => Container(
                       color: AppColors.disabledBg,
                       child: const Icon(
                         Icons.image_not_supported,
                         color: AppColors.textDisabled,
                       ),
-                    ),
-                  ),
-                ),
-              ),
+                            ),
+                          ),
+                        ),
+                      ),
               const SizedBox(height: AppSpacing.sm),
-              // 제목
-              Text(
-                book.title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+                      // 제목
+                      Text(
+                        book.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 2),
-              // 저자
-              Text(
-                book.author,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      // 저자
+                      Text(
+                        book.author,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  fontSize: 11,
+                          fontSize: 11,
                   color: AppColors.textSecondary,
-                ),
-              ),
+                        ),
+                      ),
               // 무료 뱃지
-              if (book.price == 0)
-                Padding(
+                      if (book.price == 0)
+                        Padding(
                   padding: const EdgeInsets.only(top: AppSpacing.xs),
                   child: AppBadge(
                     label: '무료',
@@ -242,12 +242,12 @@ class _RecommendedCard extends StatelessWidget {
                   ),
                 ),
             ],
+            ),
           ),
         ),
-      ),
     );
   }
-}
+  }
 
 // ── 전체 그리드 카드 ──────────────────────────────────────
 

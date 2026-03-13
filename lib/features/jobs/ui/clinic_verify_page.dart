@@ -6,15 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/theme/app_colors.dart';
 import '../services/job_image_uploader.dart';
-
-// ── 팔레트 ─────────────────────────────────────────────
-const _kBg = Color(0xFFF8F6F9);
-const _kText = Color(0xFF3D4A5C);
-const _kBlue = Color(0xFF4A90D9);
-const _kPink = Color(0xFFF7CBCA);
-const _kPinkDark = Color(0xFFE57373);
-const _kBorder = Color(0xFFE0D8E8);
 
 /// 치과 사업자 인증 페이지 (/clinic-verify)
 ///
@@ -162,20 +155,20 @@ class _ClinicVerifyPageState extends State<ClinicVerifyPage> {
     if (_submitted) return _buildSuccessScreen();
 
     return Scaffold(
-      backgroundColor: _kBg,
+      backgroundColor: AppColors.appBg,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.white,
         elevation: 0,
         title: const Text(
           '치과 사업자 인증',
           style: TextStyle(
-            color: _kText,
+            color: AppColors.textPrimary,
             fontSize: 16,
             fontWeight: FontWeight.w700,
           ),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: _kText, size: 18),
+          icon: const Icon(Icons.arrow_back_ios, color: AppColors.textPrimary, size: 18),
           onPressed: () => context.canPop() ? context.pop() : null,
         ),
       ),
@@ -215,14 +208,14 @@ class _ClinicVerifyPageState extends State<ClinicVerifyPage> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _kBlue.withOpacity(0.08),
+        color: AppColors.accent.withOpacity(0.08),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _kBlue.withOpacity(0.2)),
+        border: Border.all(color: AppColors.accent.withOpacity(0.2)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.info_outline, color: _kBlue.withOpacity(0.8), size: 20),
+          Icon(Icons.info_outline, color: AppColors.accent.withOpacity(0.8), size: 20),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -230,7 +223,7 @@ class _ClinicVerifyPageState extends State<ClinicVerifyPage> {
               '내용을 확인하고 제출하면 검토 후 구인공고 등록이 가능해요.',
               style: TextStyle(
                 fontSize: 13,
-                color: _kText.withOpacity(0.8),
+                color: AppColors.textPrimary.withOpacity(0.8),
                 height: 1.5,
               ),
             ),
@@ -248,12 +241,12 @@ class _ClinicVerifyPageState extends State<ClinicVerifyPage> {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _kBorder, width: 0.8),
+        border: Border.all(color: AppColors.divider, width: 0.8),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: AppColors.black.withOpacity(0.04),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -269,14 +262,14 @@ class _ClinicVerifyPageState extends State<ClinicVerifyPage> {
                 width: 24,
                 height: 24,
                 decoration: BoxDecoration(
-                  color: _kBlue,
+                  color: AppColors.accent,
                   shape: BoxShape.circle,
                 ),
                 child: Center(
                   child: Text(
                     step,
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: AppColors.white,
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
                     ),
@@ -289,7 +282,7 @@ class _ClinicVerifyPageState extends State<ClinicVerifyPage> {
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
-                  color: _kText,
+                  color: AppColors.textPrimary,
                 ),
               ),
             ],
@@ -312,11 +305,11 @@ class _ClinicVerifyPageState extends State<ClinicVerifyPage> {
             height: 160,
             width: double.infinity,
             decoration: BoxDecoration(
-              color: _kPink.withOpacity(0.15),
+              color: AppColors.error.withOpacity(0.15),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color:
-                    _docImage != null ? _kPinkDark.withOpacity(0.3) : _kBorder,
+                    _docImage != null ? AppColors.error.withOpacity(0.3) : AppColors.divider,
                 width: 1.5,
               ),
             ),
@@ -328,14 +321,14 @@ class _ClinicVerifyPageState extends State<ClinicVerifyPage> {
                         Icon(
                           Icons.add_photo_alternate_outlined,
                           size: 36,
-                          color: _kText.withOpacity(0.3),
+                          color: AppColors.textPrimary.withOpacity(0.3),
                         ),
                         const SizedBox(height: 8),
                         Text(
                           '탭해서 사진 선택',
                           style: TextStyle(
                             fontSize: 13,
-                            color: _kText.withOpacity(0.4),
+                            color: AppColors.textPrimary.withOpacity(0.4),
                           ),
                         ),
                       ],
@@ -360,14 +353,14 @@ class _ClinicVerifyPageState extends State<ClinicVerifyPage> {
                         if (_uploadProgress > 0 && _uploadProgress < 1.0)
                           Container(
                             decoration: BoxDecoration(
-                              color: Colors.black45,
+                              color: AppColors.black.withOpacity(0.45),
                               borderRadius: BorderRadius.circular(11),
                             ),
                             child: Center(
                               child: Text(
                                 '업로드 중 ${(_uploadProgress * 100).toInt()}%',
                                 style: const TextStyle(
-                                  color: Colors.white,
+                                  color: AppColors.white,
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
@@ -385,13 +378,13 @@ class _ClinicVerifyPageState extends State<ClinicVerifyPage> {
                                 vertical: 5,
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.black54,
+                                color: AppColors.black.withOpacity(0.54),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: const Text(
                                 '변경',
                                 style: TextStyle(
-                                  color: Colors.white,
+                                  color: AppColors.white,
                                   fontSize: 12,
                                 ),
                               ),
@@ -415,14 +408,14 @@ class _ClinicVerifyPageState extends State<ClinicVerifyPage> {
                       height: 16,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Colors.white,
+                        color: AppColors.white,
                       ),
                     )
                     : const Icon(Icons.auto_awesome, size: 18),
             label: Text(_isLoading ? '분석 중...' : 'AI로 자동 읽기'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: _kPinkDark,
-              foregroundColor: Colors.white,
+              backgroundColor: AppColors.error,
+              foregroundColor: AppColors.white,
               elevation: 0,
               padding: const EdgeInsets.symmetric(vertical: 12),
               shape: RoundedRectangleBorder(
@@ -446,7 +439,7 @@ class _ClinicVerifyPageState extends State<ClinicVerifyPage> {
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 13,
-              color: _kText.withOpacity(0.45),
+              color: AppColors.textPrimary.withOpacity(0.45),
               height: 1.5,
             ),
           ),
@@ -479,11 +472,11 @@ class _ClinicVerifyPageState extends State<ClinicVerifyPage> {
           onChanged: (v) => setState(() => _confirmed = v ?? false),
           title: const Text(
             'AI가 읽은 내용을 직접 확인했습니다.',
-            style: TextStyle(fontSize: 13, color: _kText),
+            style: TextStyle(fontSize: 13, color: AppColors.textPrimary),
           ),
           controlAffinity: ListTileControlAffinity.leading,
           contentPadding: EdgeInsets.zero,
-          activeColor: _kBlue,
+          activeColor: AppColors.accent,
         ),
         const SizedBox(height: 12),
         SizedBox(
@@ -491,8 +484,8 @@ class _ClinicVerifyPageState extends State<ClinicVerifyPage> {
           child: ElevatedButton(
             onPressed: _isLoading ? null : _submit,
             style: ElevatedButton.styleFrom(
-              backgroundColor: _kBlue,
-              foregroundColor: Colors.white,
+              backgroundColor: AppColors.accent,
+              foregroundColor: AppColors.white,
               elevation: 0,
               padding: const EdgeInsets.symmetric(vertical: 15),
               shape: RoundedRectangleBorder(
@@ -506,7 +499,7 @@ class _ClinicVerifyPageState extends State<ClinicVerifyPage> {
                       height: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Colors.white,
+                        color: AppColors.white,
                       ),
                     )
                     : const Text(
@@ -522,7 +515,7 @@ class _ClinicVerifyPageState extends State<ClinicVerifyPage> {
         Center(
           child: Text(
             '검토 후 승인 완료 시 구인공고 등록이 가능해요.',
-            style: TextStyle(fontSize: 12, color: _kText.withOpacity(0.45)),
+            style: TextStyle(fontSize: 12, color: AppColors.textPrimary.withOpacity(0.45)),
           ),
         ),
       ],
@@ -532,17 +525,17 @@ class _ClinicVerifyPageState extends State<ClinicVerifyPage> {
   // ── 완료 화면 ──────────────────────────────────────────
   Widget _buildSuccessScreen() {
     return Scaffold(
-      backgroundColor: _kBg,
+      backgroundColor: AppColors.appBg,
       body: Center(
         child: Container(
           constraints: const BoxConstraints(maxWidth: 400),
           margin: const EdgeInsets.all(32),
           padding: const EdgeInsets.all(36),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.white,
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.07), blurRadius: 20),
+              BoxShadow(color: AppColors.black.withOpacity(0.07), blurRadius: 20),
             ],
           ),
           child: Column(
@@ -552,13 +545,13 @@ class _ClinicVerifyPageState extends State<ClinicVerifyPage> {
                 width: 64,
                 height: 64,
                 decoration: BoxDecoration(
-                  color: _kPink.withOpacity(0.3),
+                  color: AppColors.error.withOpacity(0.3),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   Icons.check_circle_outline,
                   size: 36,
-                  color: _kPinkDark.withOpacity(0.8),
+                  color: AppColors.error.withOpacity(0.8),
                 ),
               ),
               const SizedBox(height: 20),
@@ -567,7 +560,7 @@ class _ClinicVerifyPageState extends State<ClinicVerifyPage> {
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w700,
-                  color: _kText,
+                  color: AppColors.textPrimary,
                 ),
               ),
               const SizedBox(height: 10),
@@ -577,7 +570,7 @@ class _ClinicVerifyPageState extends State<ClinicVerifyPage> {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 13,
-                  color: _kText.withOpacity(0.6),
+                  color: AppColors.textPrimary.withOpacity(0.6),
                   height: 1.6,
                 ),
               ),
@@ -587,8 +580,8 @@ class _ClinicVerifyPageState extends State<ClinicVerifyPage> {
                 child: ElevatedButton(
                   onPressed: () => context.go('/post-job'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _kBlue,
-                    foregroundColor: Colors.white,
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: AppColors.white,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(vertical: 13),
                     shape: RoundedRectangleBorder(
@@ -613,30 +606,30 @@ class _ClinicVerifyPageState extends State<ClinicVerifyPage> {
   }) {
     return TextField(
       controller: ctrl,
-      style: const TextStyle(fontSize: 14, color: _kText),
+      style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
-        hintStyle: TextStyle(fontSize: 13, color: _kText.withOpacity(0.4)),
-        labelStyle: TextStyle(fontSize: 13, color: _kText.withOpacity(0.7)),
+        hintStyle: TextStyle(fontSize: 13, color: AppColors.textDisabled),
+        labelStyle: TextStyle(fontSize: 13, color: AppColors.textSecondary),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 14,
           vertical: 12,
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: _kBorder),
+          borderSide: BorderSide(color: AppColors.divider),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: _kBorder),
+          borderSide: BorderSide(color: AppColors.divider),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: _kBlue, width: 1.5),
+          borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
         ),
         filled: true,
-        fillColor: _kBg,
+        fillColor: AppColors.appBg,
       ),
     );
   }

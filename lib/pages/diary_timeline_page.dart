@@ -3,8 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import '../core/theme/app_colors.dart';
-
-// caring 탭 서브 페이지 — AppColors 참조
+import '../core/theme/app_tokens.dart';
+import '../core/widgets/app_muted_card.dart';
 
 /// 나의 기록 타임라인 페이지
 /// 
@@ -73,25 +73,25 @@ class DiaryTimelinePage extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.edit_note_outlined,
                     size: 64,
-                    color: Colors.grey[400],
+                    color: AppColors.textDisabled,
                   ),
                   const SizedBox(height: 16),
-                  Text(
+                  const Text(
                     '아직 기록이 없어요',
                     style: TextStyle(
                       fontSize: 16,
-                      color: Colors.grey[600],
+                      color: AppColors.textSecondary,
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Text(
+                  const Text(
                     '오늘의 마음을 기록해보세요',
                     style: TextStyle(
                       fontSize: 14,
-                      color: Colors.grey[500],
+                      color: AppColors.textDisabled,
                     ),
                   ),
                 ],
@@ -205,7 +205,7 @@ class _NoteCard extends StatelessWidget {
             },
             child: const Text(
               '삭제',
-              style: TextStyle(color: Colors.red),
+              style: TextStyle(color: AppColors.error),
             ),
           ),
         ],
@@ -215,34 +215,28 @@ class _NoteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.7),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppColors.textSecondary.withOpacity(0.5),
-          width: 0.5,
-        ),
-      ),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+      child: AppMutedCard(
+      radius: AppRadius.xl,
+      padding: const EdgeInsets.all(AppSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 날짜/시간
           Row(
             children: [
-              Icon(
+              const Icon(
                 Icons.schedule,
                 size: 14,
-                color: Colors.grey[500],
+                color: AppColors.textDisabled,
               ),
               const SizedBox(width: 4),
               Text(
                 _formatDate(createdAt),
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 12,
-                  color: Colors.grey[600],
+                  color: AppColors.textSecondary,
                   fontWeight: FontWeight.w400,
                 ),
               ),
@@ -250,10 +244,10 @@ class _NoteCard extends StatelessWidget {
               // 삭제 버튼
               GestureDetector(
                 onTap: () => _showDeleteDialog(context),
-                child: Icon(
+                child: const Icon(
                   Icons.delete_outline,
                   size: 18,
-                  color: Colors.grey[400],
+                  color: AppColors.textDisabled,
                 ),
               ),
             ],
@@ -262,7 +256,7 @@ class _NoteCard extends StatelessWidget {
           // 기록 내용
           Text(
             text,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 15,
               color: AppColors.textPrimary,
               height: 1.5,
@@ -270,7 +264,8 @@ class _NoteCard extends StatelessWidget {
           ),
         ],
       ),
-    );
+    ),
+  );
   }
 }
 

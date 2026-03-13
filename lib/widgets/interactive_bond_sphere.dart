@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:rive/rive.dart';
+import '../core/theme/app_colors.dart';
 
 /// 인터랙티브 Rive 구체 위젯
 ///
@@ -90,7 +91,7 @@ class _InteractiveBondSphereState extends State<InteractiveBondSphere> {
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF6B4CE6).withValues(alpha: 0.2),
+              color: AppColors.accent.withValues(alpha: 0.2),
               blurRadius: 30,
               spreadRadius: 10,
             ),

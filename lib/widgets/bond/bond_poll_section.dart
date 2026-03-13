@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_style.dart';
-
-// AppColors 직접 참조 (TabTheme 제거)
+import '../../core/theme/app_tokens.dart';
+import '../../core/widgets/app_primary_card.dart';
+import '../../core/widgets/app_badge.dart';
 
 /// 공감 투표 섹션
 class BondPollSection extends StatefulWidget {
@@ -18,24 +18,29 @@ class _BondPollSectionState extends State<BondPollSection> {
   @override
   Widget build(BuildContext context) {
     const question = '요즘 가장 힘든 순간은?';
-    final options = ['환자 컴플레인 받을 때', '야근이 길어질 때', '동료와 의견이 다를 때', '체력이 바닥날 때'];
+    final options  = [
+      '환자 컴플레인 받을 때',
+      '야근이 길어질 때',
+      '동료와 의견이 다를 때',
+      '체력이 바닥날 때',
+    ];
     final results = [35.2, 24.8, 15.3, 24.7];
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 섹션 타이틀
           Row(
             children: [
-              Icon(
+              const Icon(
                 Icons.how_to_vote_outlined,
                 size: 16,
-                color: AppColors.textPrimary.withOpacity(0.4),
+                color: AppColors.textDisabled,
               ),
               const SizedBox(width: 6),
-              Text(
+              const Text(
                 '공감 투표',
                 style: TextStyle(
                   fontSize: 15,
@@ -44,11 +49,11 @@ class _BondPollSectionState extends State<BondPollSection> {
                 ),
               ),
               const SizedBox(width: 6),
-              Text(
+              const Text(
                 '다들 어떤지 궁금해서.',
                 style: TextStyle(
                   fontSize: 11,
-                  color: AppColors.textPrimary.withOpacity(0.4),
+                  color: AppColors.textDisabled,
                 ),
               ),
               const Spacer(),
@@ -56,43 +61,32 @@ class _BondPollSectionState extends State<BondPollSection> {
           ),
           const SizedBox(height: 12),
 
-          // 투표 카드 — Dark 배경
-          Container(
-            width: double.infinity,
-            decoration: AppStyle.primaryCardDecoration(),
+          // 투표 카드 — AppPrimaryCard (Dark 배경)
+          AppPrimaryCard(
+            padding: EdgeInsets.zero,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // 질문 영역
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.xl, AppSpacing.xl, AppSpacing.xl, AppSpacing.lg),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Neon 꾸밈 뱃지
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: AppColors.cardEmphasis,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          '이번 주',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.onCardEmphasis,
-                          ),
-                        ),
+                      AppBadge(
+                        label: '이번 주',
+                        bgColor: AppColors.cardEmphasis,
+                        textColor: AppColors.onCardEmphasis,
                       ),
                       const SizedBox(width: 10),
-                      Expanded(
+                      const Expanded(
                         child: Text(
                           question,
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
-                            color: AppColors.onCardPrimary,  // White on Dark
+                            color: AppColors.onCardPrimary,
                             height: 1.4,
                           ),
                         ),
@@ -106,13 +100,13 @@ class _BondPollSectionState extends State<BondPollSection> {
                   padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
                   child: Column(
                     children: options.asMap().entries.map((entry) {
-                      final i = entry.key;
-                      final option = entry.value;
+                      final i        = entry.key;
+                      final option   = entry.value;
                       final isSelected = _selectedPollOption == i;
-                      final hasVoted = _selectedPollOption != null;
+                      final hasVoted   = _selectedPollOption != null;
 
                       return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                         child: GestureDetector(
                           onTap: hasVoted
                               ? null
@@ -121,39 +115,38 @@ class _BondPollSectionState extends State<BondPollSection> {
                             duration: const Duration(milliseconds: 280),
                             width: double.infinity,
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
+                              horizontal: AppSpacing.lg,
                               vertical: 13,
                             ),
                             decoration: BoxDecoration(
                               color: isSelected
                                   ? AppColors.cardEmphasis
                                   : AppColors.onCardPrimary.withOpacity(0.08),
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(AppRadius.md),
                             ),
                             child: Row(
                               children: [
-                                // 라디오 아이콘
                                 Container(
                                   width: 18,
                                   height: 18,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
+                                    color: isSelected
+                                        ? AppColors.onCardEmphasis.withOpacity(0.15)
+                                        : Colors.transparent,
                                     border: Border.all(
                                       color: isSelected
                                           ? AppColors.onCardEmphasis.withOpacity(0.6)
                                           : AppColors.onCardPrimary.withOpacity(0.3),
                                       width: isSelected ? 1.5 : 0.8,
                                     ),
-                                    color: isSelected
-                                        ? AppColors.onCardEmphasis.withOpacity(0.15)
-                                        : Colors.transparent,
                                   ),
                                   child: isSelected
                                       ? Center(
                                           child: Container(
                                             width: 8,
                                             height: 8,
-                                            decoration: BoxDecoration(
+                                            decoration: const BoxDecoration(
                                               shape: BoxShape.circle,
                                               color: AppColors.onCardEmphasis,
                                             ),
@@ -198,23 +191,22 @@ class _BondPollSectionState extends State<BondPollSection> {
                   ),
                 ),
 
-                if (_selectedPollOption != null) ...[
+                if (_selectedPollOption != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: Center(
                       child: Text(
                         '파트너 그룹 내 익명 결과',
-                          style: TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
                           color: AppColors.onCardPrimary.withOpacity(0.35),
                         ),
                       ),
                     ),
                   ),
-                ],
 
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.only(bottom: AppSpacing.lg),
                   child: Center(
                     child: Text(
                       '지난 질문 보기',
@@ -233,5 +225,3 @@ class _BondPollSectionState extends State<BondPollSection> {
     );
   }
 }
-
-

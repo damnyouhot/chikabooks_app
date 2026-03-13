@@ -47,6 +47,17 @@ class AppTheme {
           ),
         ),
       ),
+      // FilledButton: Material3 기본 보라색 → AppColors.accent(Blue)로 고정
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: AppColors.accent,
+          foregroundColor: AppColors.onAccent,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
       // Card: shadow 없음, 배경 Blue (AppStyle.primaryCardDecoration 권장)
       cardTheme: CardThemeData(
         elevation: 0,

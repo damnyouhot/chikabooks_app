@@ -5,6 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
+import '../../core/widgets/app_badge.dart';
+import '../../core/widgets/app_muted_card.dart';
 import '../../data/mock_jobs.dart';
 import '../../models/job.dart';
 import '../../notifiers/job_filter_notifier.dart';
@@ -15,25 +19,21 @@ import '../../widgets/job/quick_apply_sheet.dart';
 import '../../widgets/job/radius_chip_row.dart';
 import 'job_detail_screen.dart';
 
-// ── 디자인 팔레트 ──
-const _kAccent = Color(0xFFF7CBCA);
-const _kText = Color(0xFF5D6B6B);
-const _kShadow = Color(0xFFD5E5E5);
-const _kBg = Color(0xFFF5F0F2);
-const _kPremium = Color(0xFFF48FB1); // Level 1 전용 핑크
-
 // 앱 세션 내 공고 목록 캐시 (반경/필터 조합 → 결과)
 final Map<String, List<Job>> _jobCache = {};
+
+// Level 1 프리미엄 전용 의미색 (핑크 → Blue 시스템 편입)
+// 섹션 헤더·배지·Edge Indicator는 AppColors.accent(Blue) 사용
 
 /// 지도 뷰 (4단계 개편)
 ///
 /// ## 레이아웃
-/// - 상단 1/4: 프리미엄 공고 가로 슬라이더 (Level 1 광고 카드)
-/// - 하단 3/4: Google Maps + Edge Indicator + 검색/반경 오버레이
+/// - 상단: 프리미엄 공고 가로 슬라이더 (Level 1 광고 카드, 자동+수동 슬라이드)
+/// - 하단: Google Maps + Edge Indicator + 검색/반경 오버레이
 ///
 /// ## 마커 스타일
-/// - Level 1 (프리미엄): 핑크(rose) 마커, zIndex 2 (위에 표시)
-/// - Level 2/3 (일반): 청색(azure) 마커, zIndex 1
+/// - Level 1 (프리미엄): Rose 마커, zIndex 2 (위에 표시)
+/// - Level 2/3 (일반): Azure 마커, zIndex 1
 ///
 /// ## Edge Indicator
 /// - 현재 지도 뷰포트 밖에 있는 프리미엄 클리닉을 화면 가장자리에 방향 표시
@@ -41,7 +41,10 @@ final Map<String, List<Job>> _jobCache = {};
 class JobMapScreen extends StatefulWidget {
   final LatLng? userLocation;
 
-  const JobMapScreen({super.key, this.userLocation});
+  /// 목록 모드로 전환하는 콜백 (RadiusChipRow 우측 "목록" 버튼)
+  final VoidCallback? onListToggle;
+
+  const JobMapScreen({super.key, this.userLocation, this.onListToggle});
 
   @override
   State<JobMapScreen> createState() => _JobMapScreenState();
@@ -53,9 +56,10 @@ class _JobMapScreenState extends State<JobMapScreen> {
   bool _isLoading = true;
   List<Job> _allJobs = [];
 
-  // 프리미엄 카드 슬라이더
+  // 프리미엄 카드 슬라이더 + 자동 슬라이드
   final _carouselCtrl = PageController(viewportFraction: 0.88);
   int _carouselPage = 0;
+  Timer? _adTimer;
 
   // Level 2/3 핀 선택 시 하단 미리보기 카드
   Job? _selectedJob;
@@ -67,8 +71,9 @@ class _JobMapScreenState extends State<JobMapScreen> {
 
   late JobService _jobService;
   late JobFilterNotifier _jobFilter;
+  bool _initialized = false;
 
-  // Level 1 프리미엄 공고 (광고 카드 + 핑크 마커)
+  // Level 1 프리미엄 공고 (광고 카드 + Rose 마커)
   final List<Job> _premiumJobs = mockLevel1Jobs;
 
   CameraPosition get _initialPosition {
@@ -84,6 +89,25 @@ class _JobMapScreenState extends State<JobMapScreen> {
   @override
   void initState() {
     super.initState();
+    _startAdAutoScroll();
+  }
+
+  void _startAdAutoScroll() {
+    _adTimer?.cancel();
+    _adTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (!mounted || !_carouselCtrl.hasClients || _premiumJobs.isEmpty) return;
+      final next = (_carouselPage + 1) % _premiumJobs.length;
+      _carouselCtrl.animateToPage(
+        next,
+        duration: const Duration(milliseconds: 450),
+        curve: Curves.easeInOut,
+      );
+    });
+  }
+
+  void _restartAdAutoScroll() {
+    _adTimer?.cancel();
+    _startAdAutoScroll();
   }
 
   @override
@@ -91,13 +115,17 @@ class _JobMapScreenState extends State<JobMapScreen> {
     super.didChangeDependencies();
     _jobService = context.read<JobService>();
     _jobFilter = context.watch<JobFilterNotifier>();
-    if (_isLoading) _loadJobMarkers();
+    if (!_initialized) {
+      _initialized = true;
+      _loadJobMarkers();
+    }
   }
 
   @override
   void dispose() {
     _carouselCtrl.dispose();
     _boundsTimer?.cancel();
+    _adTimer?.cancel();
     super.dispose();
   }
 
@@ -169,7 +197,7 @@ class _JobMapScreenState extends State<JobMapScreen> {
     _allJobs = jobs;
     final newMarkers = <Marker>{};
 
-    // Level 1 프리미엄 마커 (핑크/rose, zIndex 높음)
+    // Level 1 프리미엄 마커 (Rose, zIndex 높음)
     for (final job in _premiumJobs) {
       if (job.lat == 0 && job.lng == 0) continue;
       newMarkers.add(
@@ -185,7 +213,7 @@ class _JobMapScreenState extends State<JobMapScreen> {
       );
     }
 
-    // Level 2/3 일반 마커 (청색/azure)
+    // Level 2/3 일반 마커 (Azure)
     for (final job in jobs) {
       if (job.lat == 0 && job.lng == 0) continue;
       newMarkers.add(
@@ -373,17 +401,15 @@ class _JobMapScreenState extends State<JobMapScreen> {
   // ────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final sh = MediaQuery.of(context).size.height;
-    // 광고 카드 영역 높이: 화면의 약 27%, 최소 170 · 최대 220
-    final adH = (sh * 0.27).clamp(170.0, 220.0);
-
     return Scaffold(
+      // Stack이 viewInsets를 직접 읽어 키보드 대응 → Scaffold 자동 리사이즈 끔
+      resizeToAvoidBottomInset: false,
       body: Column(
         children: [
-          // ── 상단 1/4: 프리미엄 공고 슬라이더 ─────────────────
-          SizedBox(height: adH, child: _buildAdCarousel()),
+          // ── 상단: 프리미엄 공고 슬라이더 (컨텐츠 기반 높이) ──────
+          _buildAdCarousel(),
 
-          // ── 하단 3/4: 지도 + 오버레이 ────────────────────────
+          // ── 하단: 지도 + 오버레이 ────────────────────────────────
           Expanded(
             child: Stack(
               key: _mapKey,
@@ -410,14 +436,14 @@ class _JobMapScreenState extends State<JobMapScreen> {
                 // 로딩
                 if (_isLoading)
                   Container(
-                    color: Colors.white.withValues(alpha: 0.7),
+                    color: AppColors.white.withValues(alpha: 0.7),
                     child: const Center(child: CircularProgressIndicator()),
                   ),
 
                 // Empty State
                 if (!_isLoading && _allJobs.isEmpty)
                   MapEmptyStateCard(
-                    onExpandRadius: () => _onRadiusChanged(10.0),
+                    onExpandRadius: () => _onRadiusChanged(20.0),
                     onEnableNotification: () {},
                     onCreateJob: () {},
                   ),
@@ -430,19 +456,21 @@ class _JobMapScreenState extends State<JobMapScreen> {
                   filterSummary: _filterSummary(),
                 ),
 
-                // 반경 칩
+                // 반경 칩 + 목록 버튼
                 RadiusChipRow(
                   selectedRadius: _jobFilter.radiusKm,
                   onRadiusChanged: _onRadiusChanged,
+                  onListToggle: widget.onListToggle,
                 ),
 
                 // Edge Indicators (화면 밖 프리미엄 방향 표시)
                 ..._buildEdgeIndicators(),
 
-                // 줌 컨트롤
+                // 줌 컨트롤 — 반경칩 + 검색바 위
                 Positioned(
                   right: 12,
-                  bottom: 120,
+                  // 검색바(41) + 칩행(30) + 간격(6) + 하단여백(8) + 여유(12) ≒ 97
+                  bottom: 97,
                   child: _ZoomControls(
                     onZoomIn: () =>
                         _mapController?.animateCamera(CameraUpdate.zoomIn()),
@@ -451,13 +479,14 @@ class _JobMapScreenState extends State<JobMapScreen> {
                   ),
                 ),
 
-                // 하단 미리보기 카드 (일반 핀 탭 시)
+                // 하단 미리보기 카드 (일반 핀 탭 시) — 검색바 위
                 AnimatedPositioned(
                   duration: const Duration(milliseconds: 280),
                   curve: Curves.easeOutCubic,
                   left: 16,
                   right: 16,
-                  bottom: _selectedJob != null ? 16 : -260,
+                  // 검색바(41) + 칩행(30) + 간격(6) + 하단여백(8) + 여유(6) ≒ 91
+                  bottom: _selectedJob != null ? 91 : -260,
                   child: _selectedJob != null
                       ? _PreviewCard(
                           job: _selectedJob!,
@@ -478,20 +507,27 @@ class _JobMapScreenState extends State<JobMapScreen> {
   // ── 프리미엄 광고 카드 슬라이더 ─────────────────────────────────
   Widget _buildAdCarousel() {
     return Container(
-      color: Colors.white,
+      color: AppColors.white,
       child: Column(
+        // mainAxisSize.min → 자식 컨텐츠 높이에 맞게 자동 결정 (오버플로우 없음)
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 섹션 헤더
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.sm + 2,
+              AppSpacing.lg,
+              6,
+            ),
             child: Row(
               children: [
                 Container(
                   width: 3,
                   height: 13,
                   decoration: BoxDecoration(
-                    color: _kPremium,
+                    color: AppColors.accent,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -501,7 +537,7 @@ class _JobMapScreenState extends State<JobMapScreen> {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: _kText,
+                    color: AppColors.textPrimary,
                     letterSpacing: -0.3,
                   ),
                 ),
@@ -510,17 +546,16 @@ class _JobMapScreenState extends State<JobMapScreen> {
                   '핀 탭으로 이동 · 카드 탭으로 상세',
                   style: TextStyle(
                     fontSize: 10,
-                    color: _kText.withValues(alpha: 0.4),
+                    color: AppColors.textDisabled,
                     letterSpacing: -0.2,
                   ),
                 ),
                 const Spacer(),
-                // 페이지 인디케이터
                 Text(
                   '${_carouselPage + 1} / ${_premiumJobs.length}',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 11,
-                    color: _kText.withValues(alpha: 0.4),
+                    color: AppColors.textDisabled,
                     letterSpacing: -0.2,
                   ),
                 ),
@@ -528,11 +563,16 @@ class _JobMapScreenState extends State<JobMapScreen> {
             ),
           ),
 
-          // 가로 스크롤 카드
-          Expanded(
+          // 가로 스크롤 카드 — 고정 높이 박스로 감싸서 PageView 높이 확정
+          // 실측 내용 높이 ~102px + 여유 12px = 114px → 어떤 폰에서도 안전
+          SizedBox(
+            height: 114,
             child: PageView.builder(
               controller: _carouselCtrl,
-              onPageChanged: (i) => setState(() => _carouselPage = i),
+              onPageChanged: (i) {
+                setState(() => _carouselPage = i);
+                _restartAdAutoScroll(); // 수동 스와이프 후 타이머 재시작
+              },
               itemCount: _premiumJobs.length,
               itemBuilder: (_, i) => _PremiumAdCard(
                 job: _premiumJobs[i],
@@ -542,6 +582,7 @@ class _JobMapScreenState extends State<JobMapScreen> {
               ),
             ),
           ),
+          const SizedBox(height: 6),
         ],
       ),
     );
@@ -577,33 +618,22 @@ class _PremiumAdCard extends StatelessWidget {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 220),
       margin: EdgeInsets.fromLTRB(
-        isSelected ? 8 : 4,
-        isSelected ? 0 : 4,
-        isSelected ? 8 : 4,
-        10,
+        isSelected ? 4 : 2,
+        isSelected ? 0 : 2,
+        isSelected ? 4 : 2,
+        5,
       ),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isSelected
-              ? _kPremium.withValues(alpha: 0.6)
-              : _kShadow.withValues(alpha: 0.4),
-          width: isSelected ? 1.5 : 0.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isSelected ? 0.07 : 0.03),
-            blurRadius: isSelected ? 12 : 5,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: isSelected
+            ? AppColors.accent.withValues(alpha: 0.06)
+            : AppColors.surfaceMuted,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
       ),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           child: Row(
             children: [
               // 좌: 이미지 / 병원 아이콘
@@ -620,22 +650,10 @@ class _PremiumAdCard extends StatelessWidget {
                     Row(
                       children: [
                         if (job.matchScore > 0) ...[
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: _kPremium.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(5),
-                            ),
-                            child: Text(
-                              '매칭 ${job.matchScore}%',
-                              style: const TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: _kPremium,
-                                letterSpacing: -0.2,
-                              ),
-                            ),
+                          AppBadge(
+                            label: '매칭 ${job.matchScore}%',
+                            bgColor: AppColors.accent.withValues(alpha: 0.12),
+                            textColor: AppColors.accent,
                           ),
                           const SizedBox(width: 6),
                         ],
@@ -645,8 +663,8 @@ class _PremiumAdCard extends StatelessWidget {
                             fontSize: 10,
                             fontWeight: FontWeight.w600,
                             color: _dDayText == 'D-day' || _dDayText == 'D-1'
-                                ? const Color(0xFFE57373)
-                                : _kText.withValues(alpha: 0.4),
+                                ? AppColors.error
+                                : AppColors.textDisabled,
                             letterSpacing: -0.2,
                           ),
                         ),
@@ -656,11 +674,11 @@ class _PremiumAdCard extends StatelessWidget {
                           onTap: onPinTap,
                           behavior: HitTestBehavior.opaque,
                           child: Padding(
-                            padding: const EdgeInsets.only(left: 8),
+                            padding: const EdgeInsets.only(left: AppSpacing.sm),
                             child: Icon(
                               Icons.location_on_rounded,
                               size: 18,
-                              color: _kPremium.withValues(alpha: 0.7),
+                              color: AppColors.accent.withValues(alpha: 0.7),
                             ),
                           ),
                         ),
@@ -674,7 +692,7 @@ class _PremiumAdCard extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
-                        color: _kText,
+                        color: AppColors.textPrimary,
                         letterSpacing: -0.3,
                       ),
                       maxLines: 1,
@@ -685,9 +703,9 @@ class _PremiumAdCard extends StatelessWidget {
                     // 공고 제목
                     Text(
                       job.title,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 11,
-                        color: _kText.withValues(alpha: 0.6),
+                        color: AppColors.textSecondary,
                         letterSpacing: -0.2,
                       ),
                       maxLines: 1,
@@ -738,32 +756,32 @@ class _CardThumbnail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const size = 70.0;
+    const size = 44.0;
     return ClipRRect(
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(AppRadius.sm + 2),
       child: SizedBox(
         width: size,
         height: size,
         child: job.images.isNotEmpty
             ? Image.network(job.images.first, fit: BoxFit.cover)
             : Container(
-                color: _kBg,
+                color: AppColors.surfaceMuted,
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.local_hospital_outlined,
                       size: 22,
-                      color: _kPremium.withValues(alpha: 0.5),
+                      color: AppColors.textDisabled,
                     ),
                     const SizedBox(height: 4),
                     Text(
                       job.clinicName.length > 3
                           ? job.clinicName.substring(0, 3)
                           : job.clinicName,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 8,
-                        color: _kText.withValues(alpha: 0.4),
+                        color: AppColors.textDisabled,
                         letterSpacing: -0.2,
                       ),
                       textAlign: TextAlign.center,
@@ -802,16 +820,9 @@ class _EdgeIndicator extends StatelessWidget {
       child: Container(
         width: 36,
         height: 36,
-        decoration: BoxDecoration(
-          color: _kPremium,
+        decoration: const BoxDecoration(
+          color: AppColors.accent,
           shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: _kPremium.withValues(alpha: 0.45),
-              blurRadius: 8,
-              spreadRadius: 1,
-            ),
-          ],
         ),
         child: Stack(
           alignment: Alignment.center,
@@ -822,7 +833,7 @@ class _EdgeIndicator extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 9,
                 fontWeight: FontWeight.w800,
-                color: Colors.white,
+                color: AppColors.onAccent,
                 letterSpacing: -0.3,
               ),
             ),
@@ -833,7 +844,7 @@ class _EdgeIndicator extends StatelessWidget {
                 child: const Icon(
                   Icons.arrow_upward_rounded,
                   size: 10,
-                  color: Colors.white,
+                  color: AppColors.onAccent,
                 ),
               ),
             ),
@@ -855,21 +866,14 @@ class _ZoomControls extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           _ZoomBtn(icon: Icons.add, onTap: onZoomIn),
-          Divider(height: 0.5, thickness: 0.5, color: _kShadow),
+          Divider(height: 0.5, thickness: 0.5, color: AppColors.divider),
           _ZoomBtn(icon: Icons.remove, onTap: onZoomOut),
         ],
       ),
@@ -887,11 +891,11 @@ class _ZoomBtn extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(AppRadius.md),
       child: SizedBox(
         width: 36,
         height: 36,
-        child: Icon(icon, size: 18, color: _kText.withValues(alpha: 0.6)),
+        child: Icon(icon, size: 18, color: AppColors.textSecondary),
       ),
     );
   }
@@ -919,19 +923,8 @@ class _PreviewCard extends StatelessWidget {
         final bookmarkedIds = snapshot.data ?? [];
         final isBookmarked = bookmarkedIds.contains(job.id);
 
-        return Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.14),
-                blurRadius: 18,
-                offset: const Offset(0, -3),
-              ),
-            ],
-          ),
+        return AppMutedCard(
+          padding: const EdgeInsets.all(AppSpacing.lg),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -951,7 +944,7 @@ class _PreviewCard extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
-                        color: _kText,
+                        color: AppColors.textPrimary,
                         letterSpacing: -0.3,
                       ),
                       overflow: TextOverflow.ellipsis,
@@ -970,20 +963,20 @@ class _PreviewCard extends StatelessWidget {
                       isBookmarked ? Icons.favorite : Icons.favorite_border,
                       color: isBookmarked
                           ? Colors.red
-                          : _kText.withValues(alpha: 0.4),
+                          : AppColors.textDisabled,
                       size: 20,
                     ),
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: AppSpacing.sm),
                   // 닫기
                   GestureDetector(
                     onTap: onDismiss,
-                    child: Icon(
+                    child: const Icon(
                       Icons.close,
                       size: 18,
-                      color: _kText.withValues(alpha: 0.35),
+                      color: AppColors.textDisabled,
                     ),
                   ),
                 ],
@@ -993,14 +986,14 @@ class _PreviewCard extends StatelessWidget {
               // 공고 제목
               Text(
                 job.title,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 13,
-                  color: _kText.withValues(alpha: 0.65),
+                  color: AppColors.textSecondary,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.sm),
 
               // 태그: 직무 · 경력
               Row(
@@ -1028,16 +1021,16 @@ class _PreviewCard extends StatelessWidget {
                     const Spacer(),
                     Text(
                       '${jobService.calculateDistance(userLocation!, LatLng(job.lat, job.lng)).toStringAsFixed(1)}km',
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
-                        color: _kAccent.withValues(alpha: 0.9),
+                        color: AppColors.accent,
                       ),
                     ),
                   ],
                 ],
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: AppSpacing.sm + 2),
 
               // 버튼: 1분 지원 + 상세 보기
               Row(
@@ -1061,12 +1054,12 @@ class _PreviewCard extends StatelessWidget {
                         }
                       },
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: _kText,
-                        side: BorderSide(
-                            color: _kAccent.withValues(alpha: 0.8)),
+                        foregroundColor: AppColors.textSecondary,
+                        side: const BorderSide(color: AppColors.divider),
                         padding: const EdgeInsets.symmetric(vertical: 11),
+                        elevation: 0,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                         ),
                       ),
                       child: const Text(
@@ -1078,7 +1071,7 @@ class _PreviewCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () => Navigator.push(
@@ -1088,12 +1081,12 @@ class _PreviewCard extends StatelessWidget {
                         ),
                       ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: _kAccent,
-                        foregroundColor: _kText,
+                        backgroundColor: AppColors.accent,
+                        foregroundColor: AppColors.onAccent,
                         elevation: 0,
                         padding: const EdgeInsets.symmetric(vertical: 11),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                         ),
                       ),
                       child: const Text(
@@ -1132,8 +1125,9 @@ class _MiniTag extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
+        // 직무/경력/역세권/급여 고유 의미색 유지 (호출자가 지정)
         color: color,
-        borderRadius: BorderRadius.circular(5),
+        borderRadius: BorderRadius.circular(AppRadius.xs - 1),
       ),
       child: Text(
         label,

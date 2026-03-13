@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
-
-// AppColors 직접 참조 (TabTheme 제거)
+import '../../core/theme/app_tokens.dart';
+import '../../core/widgets/app_muted_card.dart';
 
 /// 상태 안내 배너
 class BondStateBanner extends StatelessWidget {
@@ -16,18 +16,11 @@ class BondStateBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (state == 'active' && memberCount != 2) {
-      return const SizedBox.shrink();
-    }
+    if (state == 'active' && memberCount != 2) return const SizedBox.shrink();
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: _getBackgroundColor(),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _getBorderColor(), width: 1),
-      ),
+    return AppMutedCard(
+      radius: AppRadius.lg,
+      padding: const EdgeInsets.all(AppSpacing.lg),
       child: Row(
         children: [
           Container(
@@ -35,7 +28,7 @@ class BondStateBanner extends StatelessWidget {
             height: 40,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: _getIconBackgroundColor(),
+              color: _getIconBgColor(),
             ),
             child: Icon(_getIcon(), size: 20, color: _getIconColor()),
           ),
@@ -46,7 +39,7 @@ class BondStateBanner extends StatelessWidget {
               children: [
                 Text(
                   _getTitle(),
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
@@ -57,9 +50,9 @@ class BondStateBanner extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     _getSubtitle(),
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 12,
-                      color: AppColors.textPrimary.withOpacity(0.6),
+                      color: AppColors.textSecondary,
                       height: 1.4,
                     ),
                   ),
@@ -72,76 +65,51 @@ class BondStateBanner extends StatelessWidget {
     );
   }
 
-  Color _getBackgroundColor() {
+  Color _getIconBgColor() {
     switch (state) {
-      case 'no_group':    return const Color(0xFFF5F5F5);
-      case 'pause':       return const Color(0xFFFFF9E6);
-      case 'expiring_soon': return const Color(0xFFFFF3E0);
-      case 'two_person':  return AppColors.accent.withOpacity(0.08);
-      default:            return Colors.white;
-    }
-  }
-
-  Color _getBorderColor() {
-    switch (state) {
-      case 'no_group':    return Colors.grey[300]!;
-      case 'pause':       return const Color(0xFFFFE082);
-      case 'expiring_soon': return const Color(0xFFFFB74D);
-      case 'two_person':  return AppColors.accent.withOpacity(0.2);
-      default:            return Colors.grey[200]!;
-    }
-  }
-
-  Color _getIconBackgroundColor() {
-    switch (state) {
-      case 'no_group':    return AppColors.accent.withOpacity(0.1);
-      case 'pause':       return Colors.orange.withOpacity(0.1);
-      case 'expiring_soon': return const Color(0xFFF57C00).withOpacity(0.1);
-      case 'two_person':  return AppColors.accent.withOpacity(0.2);
-      default:            return Colors.grey[200]!;
+      case 'pause':         return AppColors.warning.withOpacity(0.10);
+      case 'expiring_soon': return AppColors.warning.withOpacity(0.10);
+      case 'two_person':    return AppColors.accent.withOpacity(0.12);
+      default:              return AppColors.accent.withOpacity(0.10); // no_group
     }
   }
 
   Color _getIconColor() {
     switch (state) {
-      case 'no_group':    return AppColors.accent;
-      case 'pause':       return Colors.orange[700]!;
-      case 'expiring_soon': return const Color(0xFFF57C00);
-      case 'two_person':  return AppColors.textPrimary;
-      default:            return Colors.grey[600]!;
+      case 'pause':         return AppColors.warning;
+      case 'expiring_soon': return AppColors.warning;
+      case 'two_person':    return AppColors.textPrimary;
+      default:              return AppColors.accent;
     }
   }
 
   IconData _getIcon() {
     switch (state) {
-      case 'no_group':    return Icons.auto_stories_outlined;
-      case 'pause':       return Icons.pause_circle_outline;
+      case 'no_group':      return Icons.auto_stories_outlined;
+      case 'pause':         return Icons.pause_circle_outline;
       case 'expiring_soon': return Icons.access_time;
-      case 'two_person':  return Icons.people;
-      default:            return Icons.info_outline;
+      case 'two_person':    return Icons.people;
+      default:              return Icons.info_outline;
     }
   }
 
   String _getTitle() {
     switch (state) {
-      case 'no_group':    return '이번 주는 조용한 페이지야';
-      case 'pause':       return '지금은 쉬는 중이야';
+      case 'no_group':      return '이번 주는 조용한 페이지야';
+      case 'pause':         return '지금은 쉬는 중이야';
       case 'expiring_soon': return '이번 주가 곧 끝나';
-      case 'two_person':  return '이번 주는 두 사람의 페이지야';
-      default:            return '';
+      case 'two_person':    return '이번 주는 두 사람의 페이지야';
+      default:              return '';
     }
   }
 
   String _getSubtitle() {
     switch (state) {
-      case 'no_group':    return '월요일 오전 9시, 새로운 동행이 자동으로 이어져';
-      case 'pause':       return '언제든 다시 시작할 수 있어';
+      case 'no_group':      return '월요일 오전 9시, 새로운 동행이 자동으로 이어져';
+      case 'pause':         return '언제든 다시 시작할 수 있어';
       case 'expiring_soon': return '월요일 오전 9시에 새 파트너와 함께해';
-      case 'two_person':  return '가끔은 조용한 주도 좋지';
-      default:            return '';
+      case 'two_person':    return '가끔은 조용한 주도 좋지';
+      default:              return '';
     }
   }
 }
-
-
-

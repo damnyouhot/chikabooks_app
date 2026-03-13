@@ -2,14 +2,13 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
 
-/// 지도 위에 떠있는 검색바
+/// 지도 하단 고정 검색바
 ///
-/// 검색창 + 필터 버튼 + 필터 요약
-/// 원칙: Shadow 없음 / Border 없음
-/// - 배경: AppColors.white (지도 위 플로팅 → opacity 제거, 완전 불투명)
-/// - 필터 버튼: surfaceMuted (Border 없음)
-/// - 구분선: AppColors.divider
-class FloatingSearchBar extends StatelessWidget {
+/// - 화면 하단에 고정
+/// - 키보드가 올라오면 viewInsets.bottom을 읽어 자연스럽게 위로 밀림
+/// - 포커스 시 "취소" 버튼 표시
+/// - 원칙: Shadow 약하게 / 크기 약 70% 축소
+class FloatingSearchBar extends StatefulWidget {
   final String searchQuery;
   final Function(String) onSearchChanged;
   final VoidCallback onFilterPressed;
@@ -24,109 +23,118 @@ class FloatingSearchBar extends StatelessWidget {
   });
 
   @override
+  State<FloatingSearchBar> createState() => _FloatingSearchBarState();
+}
+
+class _FloatingSearchBarState extends State<FloatingSearchBar> {
+  final _focusNode = FocusNode();
+  bool _focused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(() {
+      if (mounted) setState(() => _focused = _focusNode.hasFocus);
+    });
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // 키보드 높이 → 키보드가 올라오면 검색바도 자동으로 올라감
+    final keyboardH = MediaQuery.of(context).viewInsets.bottom;
+
     return Positioned(
-      top: AppSpacing.md,
       left: AppSpacing.md,
       right: AppSpacing.md,
-      child: Container(
+      bottom: keyboardH > 0
+          ? keyboardH + AppSpacing.sm // 키보드 바로 위
+          : AppSpacing.md, // 기본: 화면 하단
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
         decoration: BoxDecoration(
           color: AppColors.white,
-          borderRadius: BorderRadius.circular(AppRadius.xl),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // 검색창 + 필터 버튼
-            Padding(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              child: Row(
-                children: [
-                  // 검색 아이콘
-                  const Icon(
-                    Icons.search,
-                    color: AppColors.textDisabled,
-                    size: 20,
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-
-                  // 검색 입력
-                  Expanded(
-                    child: TextField(
-                      onChanged: onSearchChanged,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: AppColors.textPrimary,
-                      ),
-                      decoration: const InputDecoration(
-                        hintText: '치과명, 동네로 검색',
-                        hintStyle: TextStyle(
-                          fontSize: 14,
-                          color: AppColors.textDisabled,
-                        ),
-                        border: InputBorder.none,
-                        isDense: true,
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-
-                  // 필터 버튼 → surfaceMuted (Border 없음)
-                  InkWell(
-                    onTap: onFilterPressed,
-                    borderRadius: BorderRadius.circular(AppRadius.sm),
-                    child: Container(
-                      padding: const EdgeInsets.all(AppSpacing.sm),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceMuted,
-                        borderRadius: BorderRadius.circular(AppRadius.sm),
-                      ),
-                      child: const Icon(
-                        Icons.tune,
-                        color: AppColors.textSecondary,
-                        size: 18,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.10),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
             ),
-
-            // 필터 요약 (있을 때만)
-            if (filterSummary.isNotEmpty) ...[
-              const Divider(color: AppColors.divider, height: 1),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.md,
-                  AppSpacing.sm,
-                  AppSpacing.md,
-                  10,
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.info_outline,
-                      size: 12,
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: 8,
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.search,
+                color: AppColors.textDisabled,
+                size: 17,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: TextField(
+                  focusNode: _focusNode,
+                  onChanged: widget.onSearchChanged,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textPrimary,
+                  ),
+                  decoration: const InputDecoration(
+                    hintText: '치과명, 동네로 검색',
+                    hintStyle: TextStyle(
+                      fontSize: 13,
                       color: AppColors.textDisabled,
                     ),
-                    const SizedBox(width: AppSpacing.xs),
-                    Expanded(
-                      child: Text(
-                        filterSummary,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textSecondary,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
+                    border: InputBorder.none,
+                    isDense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ),
                 ),
               ),
+              const SizedBox(width: 6),
+              if (_focused)
+                GestureDetector(
+                  onTap: () => _focusNode.unfocus(),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 4),
+                    child: Text(
+                      '취소',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                )
+              else
+                InkWell(
+                  onTap: widget.onFilterPressed,
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceMuted,
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                    ),
+                    child: const Icon(
+                      Icons.tune,
+                      color: AppColors.textSecondary,
+                      size: 15,
+                    ),
+                  ),
+                ),
             ],
-          ],
+          ),
         ),
       ),
     );

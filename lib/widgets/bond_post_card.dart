@@ -1,14 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../core/theme/app_colors.dart';
 import '../models/reaction_kind.dart';
 import '../services/report_service.dart';
 import '../services/enthrone_service.dart';
-
-// ── 디자인 팔레트 ──
-const _kAccent = Color(0xFFF7CBCA);
-const _kText = Color(0xFF5D6B6B);
-const _kShadow2 = Color(0xFFD5E5E5);
 
 /// "결을 같이하기" 게시물 카드
 /// 수정/삭제/신고/추대 기능 포함
@@ -445,7 +441,7 @@ class _BondPostCardState extends State<BondPostCard> {
                   ).showSnackBar(const SnackBar(content: Text('삭제되었습니다.')));
                 }
               },
-              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              style: TextButton.styleFrom(foregroundColor: AppColors.error),
               child: const Text('삭제'),
             ),
           ],
@@ -501,11 +497,11 @@ class _BondPostCardState extends State<BondPostCard> {
       padding: const EdgeInsets.all(12), // 16 → 12
       margin: const EdgeInsets.only(bottom: 8), // 12 → 8
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.white,
         borderRadius: BorderRadius.circular(12), // 16 → 12
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.08), // 0.1 → 0.08
+            color: AppColors.textDisabled.withOpacity(0.08), // 0.1 → 0.08
             blurRadius: 6, // 8 → 6
             offset: const Offset(0, 1), // (0,2) → (0,1)
           ),
@@ -523,7 +519,7 @@ class _BondPostCardState extends State<BondPostCard> {
                   vertical: 2,
                 ), // (10,4) → (8,2)
                 decoration: BoxDecoration(
-                  color: _kShadow2.withOpacity(0.5),
+                  color: AppColors.accent.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10), // 12 → 10
                 ),
                 child: Text(
@@ -531,7 +527,7 @@ class _BondPostCardState extends State<BondPostCard> {
                   style: const TextStyle(
                     fontSize: 11, // 12 → 11
                     fontWeight: FontWeight.w600,
-                    color: _kText,
+                    color: AppColors.textPrimary,
                   ),
                 ),
               ),
@@ -540,7 +536,7 @@ class _BondPostCardState extends State<BondPostCard> {
                 remainingStr,
                 style: TextStyle(
                   fontSize: 10,
-                  color: Colors.grey[400],
+                  color: AppColors.textDisabled,
                 ), // 11 → 10
               ),
               if (updatedAt != null) ...[
@@ -549,7 +545,7 @@ class _BondPostCardState extends State<BondPostCard> {
                   '(수정됨)',
                   style: TextStyle(
                     fontSize: 10,
-                    color: Colors.grey[500],
+                    color: AppColors.textSecondary,
                   ), // 11 → 10
                 ),
               ],
@@ -565,7 +561,7 @@ class _BondPostCardState extends State<BondPostCard> {
             style: const TextStyle(
               fontSize: 14, // 15 → 14
               height: 1.4, // 1.5 → 1.4
-              color: Color(0xFF333333),
+              color: AppColors.textPrimary,
             ),
           ),
 
@@ -585,7 +581,7 @@ class _BondPostCardState extends State<BondPostCard> {
                           vertical: 2,
                         ), // (8,4) → (6,2)
                         decoration: BoxDecoration(
-                          color: _kAccent.withOpacity(0.2),
+                          color: AppColors.accent.withOpacity(0.15),
                           borderRadius: BorderRadius.circular(10), // 12 → 10
                         ),
                         child: Text(
@@ -611,8 +607,8 @@ class _BondPostCardState extends State<BondPostCard> {
                   size: 14, // 16 → 14
                   color:
                       _hasEnthroned
-                          ? const Color(0xFF6A5ACD)
-                          : Colors.grey[600],
+                          ? AppColors.accent
+                          : AppColors.textSecondary,
                 ),
                 label: Text(
                   _enthroneCount > 0
@@ -622,8 +618,8 @@ class _BondPostCardState extends State<BondPostCard> {
                     fontSize: 11, // 12 → 11
                     color:
                         _hasEnthroned
-                            ? const Color(0xFF6A5ACD)
-                            : Colors.grey[600],
+                            ? AppColors.accent
+                            : AppColors.textSecondary,
                     fontWeight:
                         _hasEnthroned ? FontWeight.w600 : FontWeight.normal,
                   ),
@@ -640,13 +636,13 @@ class _BondPostCardState extends State<BondPostCard> {
 
               // 리플 개수만 표시
               if (_replies.isNotEmpty)
-                Padding(
+                  Padding(
                   padding: const EdgeInsets.only(left: 4),
                   child: Text(
                     '💬 ${_replies.length}',
                     style: TextStyle(
                       fontSize: 11, // 작게
-                      color: Colors.grey[600],
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ),
@@ -665,7 +661,7 @@ class _BondPostCardState extends State<BondPostCard> {
                   ),
                   child: Text(
                     '😊',
-                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                    style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
                   ),
                 ),
 
@@ -683,26 +679,26 @@ class _BondPostCardState extends State<BondPostCard> {
                 child: Icon(
                   Icons.comment_outlined,
                   size: 14,
-                  color: Colors.grey[600],
+                  color: AppColors.textSecondary,
                 ),
               ),
 
               const Spacer(),
 
               if (_isMyPost) ...[
-                IconButton(
+                  IconButton(
                   onPressed: _showEditDialog,
                   icon: const Icon(Icons.edit, size: 14), // 16 → 14
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
-                  color: Colors.grey[600],
+                  color: AppColors.textSecondary,
                 ),
                 IconButton(
                   onPressed: _confirmDelete,
                   icon: const Icon(Icons.delete, size: 14), // 16 → 14
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
-                  color: Colors.grey[600],
+                  color: AppColors.textSecondary,
                 ),
               ] else ...[
                 // 전국구 게시판과 동일한 모양/크기/위치
@@ -713,7 +709,7 @@ class _BondPostCardState extends State<BondPostCard> {
                     child: Icon(
                       Icons.report_outlined,
                       size: 18,
-                      color: _kText.withOpacity(0.3),
+                      color: AppColors.textPrimary.withOpacity(0.3),
                     ),
                   ),
                 ),
@@ -748,8 +744,8 @@ class _BondPostCardState extends State<BondPostCard> {
                       decoration: BoxDecoration(
                         color:
                             isSelected
-                                ? _kAccent.withOpacity(0.4)
-                                : Colors.grey[100],
+                                ? AppColors.accent.withOpacity(0.3)
+                                : AppColors.surfaceMuted,
                         shape: BoxShape.circle,
                       ),
                       child: Text(emoji, style: const TextStyle(fontSize: 20)),

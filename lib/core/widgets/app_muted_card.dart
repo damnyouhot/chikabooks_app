@@ -10,6 +10,7 @@ import '../theme/app_tokens.dart';
 ///   - 퀴즈 문제 카드 (_QuizCard)
 ///   - HIRA 업데이트 카드 (HiraUpdateCard)
 ///   - 내 서재 타일 (_MyBookTile, _SavedHiraTile)
+///   - Caring 위젯들 (DailyQuizCard, WeeklyBookCard 등)
 ///
 /// 원칙:
 ///   - boxShadow 없음 / Border 없음
@@ -21,6 +22,7 @@ class AppMutedCard extends StatelessWidget {
     super.key,
     required this.child,
     this.padding,
+    this.margin,
     this.radius,
     this.onTap,
   });
@@ -29,6 +31,9 @@ class AppMutedCard extends StatelessWidget {
 
   /// 내부 패딩. 기본값: EdgeInsets.all(AppSpacing.lg) = 16
   final EdgeInsetsGeometry? padding;
+
+  /// 외부 margin. 기본값: null (여백 없음)
+  final EdgeInsetsGeometry? margin;
 
   /// 카드 radius. 기본값: AppRadius.lg = 14
   final double? radius;
@@ -43,6 +48,7 @@ class AppMutedCard extends StatelessWidget {
     final borderRadius = BorderRadius.circular(r);
 
     final content = Container(
+      margin: margin,
       padding: p,
       decoration: BoxDecoration(
         color: AppColors.surfaceMuted,
@@ -64,4 +70,3 @@ class AppMutedCard extends StatelessWidget {
     );
   }
 }
-

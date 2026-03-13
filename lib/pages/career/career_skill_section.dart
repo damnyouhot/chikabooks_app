@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../services/career_profile_service.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
+import '../../core/widgets/app_badge.dart';
 import 'career_shared.dart';
 
 // ── 스킬 정보 모델 ─────────────────────────────────────────────
@@ -29,7 +31,10 @@ class CareerSkillEmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CareerCard(
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+      padding: const EdgeInsets.symmetric(
+        vertical: AppSpacing.xxl,
+        horizontal: AppSpacing.lg,
+      ),
       child: Column(
         children: [
           Icon(
@@ -57,11 +62,14 @@ class CareerSkillEmptyState extends StatelessWidget {
           ElevatedButton(
             onPressed: onTap,
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.cardEmphasis, // Neon 버튼
+              backgroundColor: AppColors.cardEmphasis,   // Neon 버튼
               foregroundColor: AppColors.onCardEmphasis, // Black 텍스트
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.xxl,
+                vertical: AppSpacing.sm + 2,
+              ),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.md),
               ),
               elevation: 0,
             ),
@@ -120,20 +128,20 @@ class _CareerSkillCardState extends State<CareerSkillCard> {
               // 스킬 아이콘 컨테이너: 화면 너비의 8.5%, 최소30·최대40 clamp
               Builder(
                 builder: (ctx) {
-                  final iconBox = (MediaQuery.of(ctx).size.width * 0.085)
-                      .clamp(30.0, 40.0);
+                  final iconBox =
+                      (MediaQuery.of(ctx).size.width * 0.085).clamp(30.0, 40.0);
                   return Container(
                     width: iconBox,
                     height: iconBox,
-                decoration: BoxDecoration(
+                    decoration: BoxDecoration(
                       color: AppColors.onCardPrimary.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  widget.info.icon,
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                    ),
+                    child: Icon(
+                      widget.info.icon,
                       color: AppColors.onCardPrimary,
                       size: iconBox * 0.53,
-                ),
+                    ),
                   );
                 },
               ),
@@ -198,11 +206,11 @@ class _CareerSkillCardState extends State<CareerSkillCard> {
               Expanded(
                 child: ElevatedButton(
                   onPressed: () => SkillQuizSheet.show(
-                        context,
-                        skillId: widget.info.id,
-                        skillTitle: widget.info.title,
-                        currentLevel: widget.info.level,
-                      ),
+                    context,
+                    skillId: widget.info.id,
+                    skillTitle: widget.info.title,
+                    currentLevel: widget.info.level,
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.onCardPrimary.withOpacity(0.15),
                     foregroundColor: AppColors.onCardPrimary,
@@ -210,7 +218,7 @@ class _CareerSkillCardState extends State<CareerSkillCard> {
                     shadowColor: Colors.transparent,
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                     ),
                   ),
                   child: const Text(
@@ -222,21 +230,21 @@ class _CareerSkillCardState extends State<CareerSkillCard> {
               const SizedBox(width: 10),
               _saving
                   ? const SizedBox(
-                    width: 80,
-                    height: 36,
-                    child: Center(
-                      child: SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                      width: 80,
+                      height: 36,
+                      child: Center(
+                        child: SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
                       ),
-                    ),
-                  )
+                    )
                   : _LevelAdjust(
-                    level: widget.info.level,
-                    onMinus: () => _adjustLevel(-1),
-                    onPlus: () => _adjustLevel(1),
-                  ),
+                      level: widget.info.level,
+                      onMinus: () => _adjustLevel(-1),
+                      onPlus: () => _adjustLevel(1),
+                    ),
             ],
           ),
         ],
@@ -261,7 +269,7 @@ class _LevelAdjust extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.onCardPrimary.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -362,39 +370,42 @@ class _CareerSkillEditSheetState extends State<CareerSkillEditSheet> {
     return Container(
       margin: const EdgeInsets.only(top: 60),
       decoration: const BoxDecoration(
-        color: Colors.white,
+        color: AppColors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
         children: [
           const SizedBox(height: 10),
+          // drag handle
           Container(
             width: 38,
             height: 4,
             decoration: BoxDecoration(
-              color: kCShadow,
+              color: AppColors.disabledBg, // 이전 kCShadow
               borderRadius: BorderRadius.circular(4),
             ),
           ),
           const SizedBox(height: 16),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
             child: Row(
-              children: [
+              children: const [
                 Text(
                   '스킬 관리',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
-                    color: kCText,
+                    color: AppColors.textPrimary,
                   ),
                 ),
-                const SizedBox(width: 6),
-                Text(
-                  '표시할 스킬을 선택하고 레벨을 조정하세요',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: kCText.withOpacity(0.5),
+                SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    '표시할 스킬을 선택하고 레벨을 조정하세요',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary, // 이전 kCText.withOpacity(0.5)
+                    ),
                   ),
                 ),
               ],
@@ -402,11 +413,15 @@ class _CareerSkillEditSheetState extends State<CareerSkillEditSheet> {
           ),
           const SizedBox(height: 12),
           if (_loading)
-            const Expanded(child: Center(child: CircularProgressIndicator()))
+            const Expanded(
+              child: Center(child: CircularProgressIndicator()),
+            )
           else
             Expanded(
               child: ListView.separated(
-                padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPad + 16),
+                padding: EdgeInsets.fromLTRB(
+                  AppSpacing.lg, 0, AppSpacing.lg, bottomPad + AppSpacing.lg,
+                ),
                 itemCount: CareerProfileService.skillMaster.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 8),
                 itemBuilder: (context, i) {
@@ -417,12 +432,10 @@ class _CareerSkillEditSheetState extends State<CareerSkillEditSheet> {
                   final level = entry['level'] as int;
                   return Container(
                     decoration: BoxDecoration(
-                      color:
-                          enabled
-                              ? kCAccent.withOpacity(0.12)
-                              : kCCardBg,
-                      borderRadius: BorderRadius.circular(14),
-                      // border 없음
+                      color: enabled
+                          ? AppColors.accent.withOpacity(0.10) // 이전 kCAccent.withOpacity(0.12)
+                          : AppColors.surfaceMuted,             // 이전 kCCardBg
+                      borderRadius: BorderRadius.circular(AppRadius.lg),
                     ),
                     padding: const EdgeInsets.symmetric(
                       horizontal: 14,
@@ -431,25 +444,29 @@ class _CareerSkillEditSheetState extends State<CareerSkillEditSheet> {
                     child: Row(
                       children: [
                         GestureDetector(
-                          onTap:
-                              () => setState(() => entry['enabled'] = !enabled),
+                          onTap: () =>
+                              setState(() => entry['enabled'] = !enabled),
                           child: Builder(
                             builder: (ctx) {
-                              // 토글 배지: 화면 너비의 6.5%, 최소22·최대32 clamp
-                              final badgeSize = (MediaQuery.of(ctx).size.width * 0.065)
-                                  .clamp(22.0, 32.0);
+                              final badgeSize =
+                                  (MediaQuery.of(ctx).size.width * 0.065)
+                                      .clamp(22.0, 32.0);
                               return Container(
                                 width: badgeSize,
                                 height: badgeSize,
-                            decoration: BoxDecoration(
-                                  color: enabled ? kCText : kCMuted,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(
-                              enabled ? Icons.check : Icons.add,
+                                decoration: BoxDecoration(
+                                  // 이전 enabled ? kCText : kCMuted
+                                  color: enabled
+                                      ? AppColors.accent
+                                      : AppColors.textDisabled,
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadius.sm),
+                                ),
+                                child: Icon(
+                                  enabled ? Icons.check : Icons.add,
                                   size: badgeSize * 0.6,
-                              color: Colors.white,
-                            ),
+                                  color: AppColors.white,
+                                ),
                               );
                             },
                           ),
@@ -458,7 +475,10 @@ class _CareerSkillEditSheetState extends State<CareerSkillEditSheet> {
                         Icon(
                           iconFromSkillName(m['icon'] as String),
                           size: 18,
-                          color: kCText.withOpacity(enabled ? 0.85 : 0.35),
+                          // 이전 kCText.withOpacity(enabled ? 0.85 : 0.35)
+                          color: enabled
+                              ? AppColors.textPrimary
+                              : AppColors.textDisabled,
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -467,20 +487,21 @@ class _CareerSkillEditSheetState extends State<CareerSkillEditSheet> {
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
-                              color: kCText.withOpacity(enabled ? 1.0 : 0.4),
+                              // 이전 kCText.withOpacity(enabled ? 1.0 : 0.4)
+                              color: enabled
+                                  ? AppColors.textPrimary
+                                  : AppColors.textDisabled,
                             ),
                           ),
                         ),
                         if (enabled) ...[
                           IconButton(
-                            onPressed:
-                                level > 1
-                                    ? () => setState(
-                                      () => entry['level'] = level - 1,
-                                    )
-                                    : null,
+                            onPressed: level > 1
+                                ? () => setState(
+                                    () => entry['level'] = level - 1)
+                                : null,
                             icon: const Icon(Icons.remove, size: 16),
-                            color: kCText.withOpacity(0.7),
+                            color: AppColors.textSecondary, // 이전 kCText.withOpacity(0.7)
                             constraints: const BoxConstraints(
                               minWidth: 30,
                               minHeight: 30,
@@ -489,21 +510,19 @@ class _CareerSkillEditSheetState extends State<CareerSkillEditSheet> {
                           ),
                           Text(
                             'Lv.$level',
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w900,
-                              color: kCText,
+                              color: AppColors.textPrimary,
                             ),
                           ),
                           IconButton(
-                            onPressed:
-                                level < 6
-                                    ? () => setState(
-                                      () => entry['level'] = level + 1,
-                                    )
-                                    : null,
+                            onPressed: level < 6
+                                ? () => setState(
+                                    () => entry['level'] = level + 1)
+                                : null,
                             icon: const Icon(Icons.add, size: 16),
-                            color: kCText.withOpacity(0.7),
+                            color: AppColors.textSecondary,
                             constraints: const BoxConstraints(
                               minWidth: 30,
                               minHeight: 30,
@@ -513,9 +532,9 @@ class _CareerSkillEditSheetState extends State<CareerSkillEditSheet> {
                         ] else
                           Text(
                             '비활성',
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 11,
-                              color: kCText.withOpacity(0.3),
+                              color: AppColors.textDisabled, // 이전 kCText.withOpacity(0.3)
                             ),
                           ),
                       ],
@@ -526,37 +545,38 @@ class _CareerSkillEditSheetState extends State<CareerSkillEditSheet> {
             ),
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg, 0, AppSpacing.lg, AppSpacing.md,
+              ),
               child: SizedBox(
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
                   onPressed: _saving ? null : _save,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: kCText,
-                    foregroundColor: Colors.white,
+                    backgroundColor: AppColors.accent,   // 이전 kCText(Black)
+                    foregroundColor: AppColors.onAccent, // 이전 Colors.white
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(AppRadius.lg),
                     ),
                     elevation: 0,
                   ),
-                  child:
-                      _saving
-                          ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                          : const Text(
-                            '저장',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                            ),
+                  child: _saving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.onAccent,
                           ),
+                        )
+                      : const Text(
+                          '저장',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
                 ),
               ),
             ),
@@ -634,12 +654,11 @@ class SkillQuizSheet extends StatefulWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder:
-          (_) => SkillQuizSheet._(
-            skillId: skillId,
-            skillTitle: skillTitle,
-            currentLevel: currentLevel,
-          ),
+      builder: (_) => SkillQuizSheet._(
+        skillId: skillId,
+        skillTitle: skillTitle,
+        currentLevel: currentLevel,
+      ),
     );
   }
 
@@ -671,7 +690,7 @@ class _SkillQuizSheetState extends State<SkillQuizSheet> {
         skillId: widget.skillId,
         enabled: true,
         level: _recommendedLevel,
-        recommendedLevel: _recommendedLevel, // 퀴즈 결과 저장
+        recommendedLevel: _recommendedLevel,
       );
       if (mounted) Navigator.of(context).pop();
     } catch (_) {
@@ -686,7 +705,7 @@ class _SkillQuizSheetState extends State<SkillQuizSheet> {
         skillId: widget.skillId,
         enabled: true,
         level: level,
-        recommendedLevel: _recommendedLevel, // 퀴즈 결과는 항상 기록
+        recommendedLevel: _recommendedLevel,
       );
       if (mounted) Navigator.of(context).pop();
     } catch (_) {
@@ -702,32 +721,33 @@ class _SkillQuizSheetState extends State<SkillQuizSheet> {
     return Container(
       margin: const EdgeInsets.only(top: 60),
       decoration: const BoxDecoration(
-        color: Colors.white,
+        color: AppColors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
         children: [
           const SizedBox(height: 10),
+          // drag handle
           Container(
             width: 38,
             height: 4,
             decoration: BoxDecoration(
-              color: kCShadow,
+              color: AppColors.disabledBg,
               borderRadius: BorderRadius.circular(4),
             ),
           ),
           const SizedBox(height: 16),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   '${widget.skillTitle} 체크 질문',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
-                    color: kCText,
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -735,9 +755,9 @@ class _SkillQuizSheetState extends State<SkillQuizSheet> {
                   questions == null
                       ? '이 스킬은 아직 질문이 준비 중이에요'
                       : '해당하는 항목에 체크해 주세요 (${_answers.where((a) => a != null).length}/${questions.length})',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 12,
-                    color: kCText.withOpacity(0.5),
+                    color: AppColors.textSecondary, // 이전 kCText.withOpacity(0.5)
                   ),
                 ),
               ],
@@ -758,19 +778,24 @@ class _SkillQuizSheetState extends State<SkillQuizSheet> {
   Widget _buildNoQuiz(double bottomPad) {
     return Expanded(
       child: Padding(
-        padding: EdgeInsets.fromLTRB(20, 20, 20, bottomPad + 20),
+        padding: EdgeInsets.fromLTRB(
+          AppSpacing.xl, AppSpacing.xl, AppSpacing.xl, bottomPad + AppSpacing.xl,
+        ),
         child: Column(
           children: [
-            Icon(
+            const Icon(
               Icons.construction_outlined,
               size: 48,
-              color: kCText.withOpacity(0.25),
+              color: AppColors.textDisabled, // 이전 kCText.withOpacity(0.25)
             ),
             const SizedBox(height: 12),
-            Text(
+            const Text(
               '이 스킬의 체크 질문은\n곧 추가될 예정이에요',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 15, color: kCText.withOpacity(0.5)),
+              style: TextStyle(
+                fontSize: 15,
+                color: AppColors.textSecondary, // 이전 kCText.withOpacity(0.5)
+              ),
             ),
             const SizedBox(height: 20),
             SizedBox(
@@ -778,10 +803,10 @@ class _SkillQuizSheetState extends State<SkillQuizSheet> {
               child: ElevatedButton(
                 onPressed: () => Navigator.of(context).pop(),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: kCText,
-                  foregroundColor: Colors.white,
+                  backgroundColor: AppColors.accent,   // 이전 kCText(Black)
+                  foregroundColor: AppColors.onAccent,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
                   ),
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(vertical: 14),
@@ -804,24 +829,22 @@ class _SkillQuizSheetState extends State<SkillQuizSheet> {
         children: [
           Expanded(
             child: ListView.separated(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg, AppSpacing.xs, AppSpacing.lg, AppSpacing.md,
+              ),
               itemCount: questions.length,
               separatorBuilder: (_, __) => const SizedBox(height: 10),
               itemBuilder: (context, i) {
                 final ans = _answers[i];
                 return Container(
                   decoration: BoxDecoration(
-                    color:
-                        ans == true
-                            ? kCAccent.withOpacity(0.18)
-                            : ans == false
-                            ? kCCardBg
-                            : Colors.transparent,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: ans == true ? kCAccent : kCShadow,
-                      width: ans == true ? 1.4 : 0.8,
-                    ),
+                    // border 제거 — 색상으로만 선택 상태 표현
+                    color: ans == true
+                        ? AppColors.accent.withOpacity(0.12)  // 이전 kCAccent.withOpacity(0.18) + border
+                        : ans == false
+                        ? AppColors.surfaceMuted               // 이전 kCCardBg
+                        : AppColors.surfaceMuted.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
                   ),
                   padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
                   child: Row(
@@ -831,10 +854,10 @@ class _SkillQuizSheetState extends State<SkillQuizSheet> {
                         padding: const EdgeInsets.only(top: 1),
                         child: Text(
                           '${i + 1}.',
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
-                            color: kCText.withOpacity(0.45),
+                            color: AppColors.textDisabled, // 이전 kCText.withOpacity(0.45)
                           ),
                         ),
                       ),
@@ -846,7 +869,10 @@ class _SkillQuizSheetState extends State<SkillQuizSheet> {
                             fontSize: 13,
                             height: 1.45,
                             fontWeight: FontWeight.w600,
-                            color: kCText.withOpacity(ans == false ? 0.4 : 0.9),
+                            // 이전 kCText.withOpacity(ans == false ? 0.4 : 0.9)
+                            color: ans == false
+                                ? AppColors.textDisabled
+                                : AppColors.textPrimary,
                           ),
                         ),
                       ),
@@ -857,14 +883,14 @@ class _SkillQuizSheetState extends State<SkillQuizSheet> {
                           _QuizBtn(
                             label: 'Yes',
                             active: ans == true,
-                            color: kCAccent,
+                            activeColor: AppColors.accent,
                             onTap: () => setState(() => _answers[i] = true),
                           ),
                           const SizedBox(height: 4),
                           _QuizBtn(
                             label: 'No',
                             active: ans == false,
-                            color: kCMuted,
+                            activeColor: AppColors.textSecondary, // 이전 kCMuted
                             onTap: () => setState(() => _answers[i] = false),
                           ),
                         ],
@@ -877,21 +903,22 @@ class _SkillQuizSheetState extends State<SkillQuizSheet> {
           ),
           SafeArea(
             child: Padding(
-              padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPad + 12),
+              padding: EdgeInsets.fromLTRB(
+                AppSpacing.lg, 0, AppSpacing.lg, bottomPad + AppSpacing.md,
+              ),
               child: SizedBox(
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
-                  onPressed:
-                      _allAnswered
-                          ? () => setState(() => _showResult = true)
-                          : null,
+                  onPressed: _allAnswered
+                      ? () => setState(() => _showResult = true)
+                      : null,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: kCText,
-                    foregroundColor: Colors.white,
-                    disabledBackgroundColor: kCShadow,
+                    backgroundColor: AppColors.accent,         // 이전 kCText(Black)
+                    foregroundColor: AppColors.onAccent,
+                    disabledBackgroundColor: AppColors.disabledBg, // 이전 kCShadow
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(AppRadius.lg),
                     ),
                     elevation: 0,
                   ),
@@ -917,22 +944,25 @@ class _SkillQuizSheetState extends State<SkillQuizSheet> {
     final rec = _recommendedLevel;
     final cur = widget.currentLevel;
     final diff = rec - cur;
-    final diffText =
-        diff == 0
-            ? '현재 레벨과 같아요'
-            : diff > 0
-            ? '+$diff 상향 추천'
-            : '$diff 하향 추천';
-    final diffColor =
-        diff == 0
-            ? kCText.withOpacity(0.5)
-            : diff > 0
-            ? kCAccent      // 현재 레벨 > 권장 → Neon 포인트
-            : const Color(0xFFFF9100);  // 경고 오렌지
+    final diffText = diff == 0
+        ? '현재 레벨과 같아요'
+        : diff > 0
+        ? '+$diff 상향 추천'
+        : '$diff 하향 추천';
+
+    // 이전 diff>0 → kCAccent(Blue), diff<0 → Color(0xFFFF9100)(경고 오렌지)
+    // 시스템 편입: diff>0 → accent, diff<0 → warning, diff==0 → textSecondary
+    final diffColor = diff == 0
+        ? AppColors.textSecondary
+        : diff > 0
+        ? AppColors.accent
+        : AppColors.warning;
 
     return Expanded(
       child: Padding(
-        padding: EdgeInsets.fromLTRB(20, 8, 20, bottomPad + 16),
+        padding: EdgeInsets.fromLTRB(
+          AppSpacing.xl, AppSpacing.sm, AppSpacing.xl, bottomPad + AppSpacing.lg,
+        ),
         child: Column(
           children: [
             Expanded(
@@ -942,74 +972,61 @@ class _SkillQuizSheetState extends State<SkillQuizSheet> {
                   // 결과 원형 배지: 화면 너비의 20%, 최소64·최대96 clamp
                   Builder(
                     builder: (ctx) {
-                      final circleSize = (MediaQuery.of(ctx).size.width * 0.20)
-                          .clamp(64.0, 96.0);
+                      final circleSize =
+                          (MediaQuery.of(ctx).size.width * 0.20).clamp(64.0, 96.0);
                       return Container(
                         width: circleSize,
                         height: circleSize,
-                    decoration: BoxDecoration(
-                      color: kCAccent.withOpacity(0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Text(
-                        'Lv.$rec',
+                        decoration: BoxDecoration(
+                          color: AppColors.accent.withOpacity(0.15), // 이전 kCAccent.withOpacity(0.2)
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: Text(
+                            'Lv.$rec',
                             style: TextStyle(
                               fontSize: (circleSize * 0.27).clamp(18.0, 26.0),
-                          fontWeight: FontWeight.w900,
-                          color: kCText,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
                       );
                     },
                   ),
                   const SizedBox(height: 14),
-                  Text(
+                  const Text(
                     '추천 레벨',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: kCText,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     '$_yesCount / ${_questions!.length}개 해당',
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 12,
-                      color: kCText.withOpacity(0.5),
+                      color: AppColors.textSecondary, // 이전 kCText.withOpacity(0.5)
                     ),
                   ),
                   const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: diffColor.withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      diffText,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: diffColor,
-                      ),
-                    ),
+                  AppBadge(
+                    label: diffText,
+                    bgColor: diffColor.withOpacity(0.12),
+                    textColor: diffColor,
                   ),
                   const SizedBox(height: 28),
-                  const Divider(),
+                  const Divider(color: AppColors.divider),
                   const SizedBox(height: 16),
-                  Text(
+                  const Text(
                     '최종 결정권은 나에게 있어요.\n추천 레벨로 저장할까요?',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 14,
                       height: 1.5,
-                      color: kCText.withOpacity(0.7),
+                      color: AppColors.textSecondary, // 이전 kCText.withOpacity(0.7)
                     ),
                   ),
                 ],
@@ -1019,16 +1036,13 @@ class _SkillQuizSheetState extends State<SkillQuizSheet> {
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed:
-                        _saving
-                            ? null
-                            : () => _applyCustom(widget.currentLevel),
+                    onPressed: _saving ? null : () => _applyCustom(widget.currentLevel),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: kCText,
-                      side: BorderSide(color: kCShadow),
+                      foregroundColor: AppColors.textPrimary,
+                      side: const BorderSide(color: AppColors.divider), // 이전 kCShadow
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(AppRadius.lg),
                       ),
                     ),
                     child: Text(
@@ -1045,31 +1059,30 @@ class _SkillQuizSheetState extends State<SkillQuizSheet> {
                   child: ElevatedButton(
                     onPressed: _saving ? null : _applyRecommended,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: kCText,
-                      foregroundColor: Colors.white,
+                      backgroundColor: AppColors.accent,   // 이전 kCText(Black)
+                      foregroundColor: AppColors.onAccent,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(AppRadius.lg),
                       ),
                       elevation: 0,
                     ),
-                    child:
-                        _saving
-                            ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                            : Text(
-                              'Lv.$rec 으로 저장',
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w800,
-                              ),
+                    child: _saving
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.onAccent,
                             ),
+                          )
+                        : Text(
+                            'Lv.$rec 으로 저장',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
                   ),
                 ),
               ],
@@ -1084,13 +1097,13 @@ class _SkillQuizSheetState extends State<SkillQuizSheet> {
 class _QuizBtn extends StatelessWidget {
   final String label;
   final bool active;
-  final Color color;
+  final Color activeColor;
   final VoidCallback onTap;
 
   const _QuizBtn({
     required this.label,
     required this.active,
-    required this.color,
+    required this.activeColor,
     required this.onTap,
   });
 
@@ -1103,12 +1116,9 @@ class _QuizBtn extends StatelessWidget {
         width: 48,
         height: 30,
         decoration: BoxDecoration(
-          color: active ? color : Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: active ? color : kCShadow,
-            width: active ? 0 : 0.8,
-          ),
+          // border 제거 — 배경색으로 선택 상태 표현
+          color: active ? activeColor : AppColors.surfaceMuted,
+          borderRadius: BorderRadius.circular(AppRadius.sm),
         ),
         child: Center(
           child: Text(
@@ -1116,7 +1126,8 @@ class _QuizBtn extends StatelessWidget {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w800,
-              color: active ? kCText : kCText.withOpacity(0.4),
+              // 이전 active ? kCText : kCText.withOpacity(0.4)
+              color: active ? AppColors.white : AppColors.textDisabled,
             ),
           ),
         ),
@@ -1124,4 +1135,3 @@ class _QuizBtn extends StatelessWidget {
     );
   }
 }
-

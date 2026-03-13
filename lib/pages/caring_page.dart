@@ -18,11 +18,6 @@ import '../pages/ebook/ebook_detail_page.dart';
 import 'settings/settings_page.dart';
 import '../core/theme/app_colors.dart';
 
-// ── 디자인 컬러 팔레트 (AppColors 참조) ──
-// 색상 변경 → app_colors.dart Primitive만 수정하면 자동 반영
-const _colorAccent = AppColors.accent;       // Blue (#2E5BFF)
-const _colorText   = AppColors.textPrimary;  // Black
-const _colorBg     = AppColors.appBg;        // Soft gray
 
 /// 기본 메시지 상태 머신 상태
 enum _LoopState { idle, showingBase, showingReaction }
@@ -480,7 +475,7 @@ class _CaringPageState extends State<CaringPage>
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
-                          color: _colorAccent.withOpacity(1.0 - value),
+                          color: AppColors.accent.withOpacity(1.0 - value),
                           decoration: TextDecoration.none,
                         ),
                       ),
@@ -504,7 +499,7 @@ class _CaringPageState extends State<CaringPage>
   Widget build(BuildContext context) {
     if (_loading) {
       return Scaffold(
-        backgroundColor: _colorBg,
+        backgroundColor: AppColors.appBg,
         body: const Center(child: CircularProgressIndicator()),
       );
     }
@@ -512,7 +507,7 @@ class _CaringPageState extends State<CaringPage>
     final isOnboarding = widget.isOnboardingActive;
 
     return Scaffold(
-      backgroundColor: _colorBg,
+      backgroundColor: AppColors.appBg,
       body: SafeArea(
         // ── 핵심 구조 ──
         // Column으로 카드/캐릭터/버튼을 수직 배치
@@ -538,7 +533,7 @@ class _CaringPageState extends State<CaringPage>
                       .clamp(240.0, 320.0),
                 ),
               child: Container(
-                color: _colorBg,
+                color: AppColors.appBg,
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -612,7 +607,7 @@ class _CaringPageState extends State<CaringPage>
               maintainAnimation: true,
               maintainState: true,
               child: Container(
-                color: _colorBg,
+                color: AppColors.appBg,
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
                 child: _buildBottomSection(isOnboarding: isOnboarding),
               ),
@@ -724,23 +719,33 @@ class _CaringPageState extends State<CaringPage>
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── 타이틀 + 아이콘 (한 행으로 통합) ──
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            padding: const EdgeInsets.only(left: 20, right: 4),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                IconButton(
-                  icon: Icon(
-                    Icons.info_outline,
-                    color: _colorText.withOpacity(0.5),
-                    size: 18,
+                Text(
+                  '나',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
                   ),
-                  onPressed: () => _showConceptDialog(context),
                 ),
                 const Spacer(),
                 IconButton(
                   icon: Icon(
+                    Icons.info_outline,
+                    color: AppColors.textSecondary,
+                    size: 18,
+                  ),
+                  onPressed: () => _showConceptDialog(context),
+                ),
+                IconButton(
+                  icon: Icon(
                     Icons.settings_outlined,
-                    color: _colorText.withOpacity(0.4),
+                    color: AppColors.textDisabled,
                     size: 20,
                   ),
                   onPressed: () {
@@ -752,23 +757,12 @@ class _CaringPageState extends State<CaringPage>
               ],
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.only(left: 20),
-            child: Text(
-              '나',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: _colorText,
-              ),
-            ),
-          ),
-          const SizedBox(height: 2),
+          // ── 서브타이틀 ──
           Padding(
             padding: const EdgeInsets.only(left: 20),
             child: Text(
               '오늘 하루도 잘 버텼어요.',
-              style: TextStyle(fontSize: 12, color: _colorText.withOpacity(0.55)),
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
             ),
           ),
           const SizedBox(height: 8),
@@ -1095,27 +1089,20 @@ class _ActionBtn extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-                width: btnSize,
-                height: btnSize,
-            decoration: BoxDecoration(
-                  color: _colorAccent,   // Blue 채움 (대비 강화)
+            width: btnSize,
+            height: btnSize,
+            decoration: const BoxDecoration(
+              color: AppColors.accent,
               shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                      color: _colorAccent.withOpacity(0.30),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
-                ),
-              ],
             ),
-                child: Icon(icon, color: Colors.white, size: iconSize),  // White 아이콘
+            child: Icon(icon, color: AppColors.onAccent, size: iconSize),
           ),
           const SizedBox(height: 6),
           Text(
             label,
             style: TextStyle(
               fontSize: 11,
-                  color: _colorText,
+                  color: AppColors.textPrimary,
                   fontWeight: FontWeight.w600,
             ),
           ),

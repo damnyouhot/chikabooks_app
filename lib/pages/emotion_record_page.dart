@@ -1,6 +1,7 @@
 // lib/pages/emotion_record_page.dart
 import 'package:flutter/material.dart';
 import '../services/emotion_service.dart';
+import '../core/theme/app_colors.dart';
 import 'dart:developer' as developer;
 
 class EmotionRecordPage extends StatefulWidget {
@@ -88,7 +89,7 @@ class _EmotionRecordPageState extends State<EmotionRecordPage> {
               style: TextStyle(
                 fontSize: 48,
                 fontWeight: FontWeight.bold,
-                color: Theme.of(context).primaryColor,
+                color: AppColors.accent,
               ),
             ),
             const SizedBox(height: 24),
@@ -110,7 +111,7 @@ class _EmotionRecordPageState extends State<EmotionRecordPage> {
                 onPressed: _loading ? null : _submit,
                 child:
                     _loading
-                        ? const CircularProgressIndicator(color: Colors.white)
+                        ? const CircularProgressIndicator(color: AppColors.onAccent)
                         : const Text('기록하기', style: TextStyle(fontSize: 18)),
               ),
             ),

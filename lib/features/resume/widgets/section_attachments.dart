@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../models/resume.dart';
-
-const _kText = Color(0xFF3D4A5C);
-const _kBlue = Color(0xFF4A90D9);
+import '../../../core/theme/app_colors.dart';
 
 /// H. 첨부파일 섹션
 class SectionAttachments extends StatefulWidget {
@@ -60,13 +58,13 @@ class _SectionAttachmentsState extends State<SectionAttachments> {
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w700,
-            color: _kText,
+            color: AppColors.textPrimary,
           ),
         ),
         const SizedBox(height: 4),
         Text(
           '자격증, 수료증, 경력증명서 등을 첨부해주세요.',
-          style: TextStyle(fontSize: 12, color: _kText.withOpacity(0.4)),
+          style: TextStyle(fontSize: 12, color: AppColors.textDisabled),
         ),
         const SizedBox(height: 16),
 
@@ -78,14 +76,14 @@ class _SectionAttachmentsState extends State<SectionAttachments> {
                 Icon(
                   Icons.cloud_upload_outlined,
                   size: 48,
-                  color: _kText.withOpacity(0.15),
+                  color: AppColors.textDisabled,
                 ),
                 const SizedBox(height: 12),
                 Text(
                   '아직 첨부파일이 없어요',
                   style: TextStyle(
                     fontSize: 14,
-                    color: _kText.withOpacity(0.3),
+                    color: AppColors.textDisabled,
                   ),
                 ),
               ],
@@ -105,7 +103,7 @@ class _SectionAttachmentsState extends State<SectionAttachments> {
           icon: const Icon(Icons.attach_file, size: 18),
           label: const Text('파일 추가'),
           style: OutlinedButton.styleFrom(
-            foregroundColor: _kBlue,
+            foregroundColor: AppColors.accent,
             padding: const EdgeInsets.symmetric(vertical: 12),
           ),
         ),
@@ -175,7 +173,7 @@ class _AttachmentCardState extends State<_AttachmentCard> {
           children: [
             Icon(
               Icons.insert_drive_file_outlined,
-              color: _kBlue.withOpacity(0.5),
+              color: AppColors.accent.withOpacity(0.5),
               size: 28,
             ),
             const SizedBox(width: 10),
@@ -188,19 +186,19 @@ class _AttachmentCardState extends State<_AttachmentCard> {
                     onChanged: (_) => _emit(),
                     decoration: InputDecoration(
                       hintText: '파일 제목',
-                      hintStyle: TextStyle(color: _kText.withOpacity(0.25)),
+                      hintStyle: TextStyle(color: AppColors.textDisabled),
                       border: InputBorder.none,
                       isDense: true,
                       contentPadding: EdgeInsets.zero,
                     ),
-                    style: const TextStyle(fontSize: 13, color: _kText),
+                    style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
                   ),
                   const SizedBox(height: 4),
                   DropdownButton<String>(
                     value: _type,
                     isDense: true,
                     underline: const SizedBox.shrink(),
-                    style: TextStyle(fontSize: 11, color: _kText.withOpacity(0.5)),
+                    style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
                     items: _typeOptions
                         .map((t) => DropdownMenuItem(value: t, child: Text(t)))
                         .toList(),
@@ -214,7 +212,7 @@ class _AttachmentCardState extends State<_AttachmentCard> {
             ),
             IconButton(
               icon: const Icon(Icons.close, size: 16),
-              color: Colors.red.withOpacity(0.5),
+              color: AppColors.error.withOpacity(0.5),
               onPressed: widget.onRemove,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),

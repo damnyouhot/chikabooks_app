@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_tokens.dart';
+import '../../../core/widgets/app_muted_card.dart';
 import '../../../models/resume.dart';
-
-// ── 디자인 상수 ──────────────────────────────────────────
-const _kBg = Color(0xFFF8F6F9);
-const _kText = Color(0xFF3D4A5C);
-const _kBlue = Color(0xFF4A90D9);
-const _kGreen = Color(0xFF4CAF50);
 
 /// 이력서 미리보기 화면
 ///
@@ -38,25 +35,25 @@ class _ResumePreviewScreenState extends State<ResumePreviewScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _kBg,
+      backgroundColor: AppColors.appBg,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.white,
         elevation: 0,
         title: Text(
           widget.resume.title,
           style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w700,
-            color: _kText,
+            color: AppColors.textPrimary,
           ),
         ),
         centerTitle: false,
-        iconTheme: const IconThemeData(color: _kText),
+        iconTheme: const IconThemeData(color: AppColors.textPrimary),
         bottom: TabBar(
           controller: _tabCtrl,
-          labelColor: _kBlue,
-          unselectedLabelColor: _kText.withOpacity(0.4),
-          indicatorColor: _kBlue,
+          labelColor: AppColors.accent,
+          unselectedLabelColor: AppColors.textDisabled,
+          indicatorColor: AppColors.accent,
           labelStyle:
               const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
           tabs: const [
@@ -78,28 +75,27 @@ class _ResumePreviewScreenState extends State<ResumePreviewScreen>
   Widget _buildFullPreview(Resume r, {required bool anonymous}) {
     final profile = r.profile;
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.md),
       children: [
         // ── 익명 모드 안내 배너 ──
         if (anonymous)
           Container(
-            margin: const EdgeInsets.only(bottom: 16),
-            padding: const EdgeInsets.all(12),
+            margin: const EdgeInsets.only(bottom: AppSpacing.md),
+            padding: const EdgeInsets.all(AppSpacing.md),
             decoration: BoxDecoration(
-              color: _kGreen.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: _kGreen.withOpacity(0.2)),
+              color: AppColors.success.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(AppRadius.md),
             ),
             child: Row(
               children: [
-                Icon(Icons.visibility_off, size: 18, color: _kGreen),
+                const Icon(Icons.visibility_off, size: 18, color: AppColors.success),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     '병원이 지원 직후 처음 보게 될 화면이에요.\n개인 식별정보(이름, 연락처)는 마스킹됩니다.',
                     style: TextStyle(
                       fontSize: 12,
-                      color: _kGreen.withOpacity(0.8),
+                      color: AppColors.success.withOpacity(0.8),
                       height: 1.5,
                     ),
                   ),
@@ -143,9 +139,9 @@ class _ResumePreviewScreenState extends State<ResumePreviewScreen>
             icon: Icons.edit_note,
             child: Text(
               profile!.summary,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 13,
-                color: _kText.withOpacity(0.7),
+                color: AppColors.textSecondary,
                 height: 1.6,
               ),
             ),
@@ -166,14 +162,16 @@ class _ResumePreviewScreenState extends State<ResumePreviewScreen>
                             Icon(
                               l.has ? Icons.check_circle : Icons.circle_outlined,
                               size: 16,
-                              color: l.has ? _kGreen : _kText.withOpacity(0.2),
+                              color: l.has ? AppColors.success : AppColors.textDisabled,
                             ),
                             const SizedBox(width: 8),
                             Text(
                               l.type,
                               style: TextStyle(
                                 fontSize: 13,
-                                color: _kText.withOpacity(l.has ? 0.8 : 0.4),
+                                color: l.has
+                                    ? AppColors.textPrimary
+                                    : AppColors.textDisabled,
                                 fontWeight:
                                     l.has ? FontWeight.w600 : FontWeight.w400,
                               ),
@@ -193,14 +191,10 @@ class _ResumePreviewScreenState extends State<ResumePreviewScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: r.experiences.map((e) {
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: _kText.withOpacity(0.06)),
-                  ),
+                return AppMutedCard(
+                  margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  radius: AppRadius.md,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -211,14 +205,14 @@ class _ResumePreviewScreenState extends State<ResumePreviewScreen>
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
-                          color: _kText,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                       Text(
                         '${e.start} ~ ${e.end}',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 12,
-                          color: _kText.withOpacity(0.45),
+                          color: AppColors.textDisabled,
                         ),
                       ),
                       if (e.tasks.isNotEmpty) ...[
@@ -244,9 +238,9 @@ class _ResumePreviewScreenState extends State<ResumePreviewScreen>
                         const SizedBox(height: 4),
                         Text(
                           '성과: ${e.achievementsText}',
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 12,
-                            color: _kText.withOpacity(0.5),
+                            color: AppColors.textSecondary,
                           ),
                         ),
                       ],
@@ -268,11 +262,14 @@ class _ResumePreviewScreenState extends State<ResumePreviewScreen>
               children: r.skills.map((s) {
                 return Chip(
                   avatar: CircleAvatar(
-                    backgroundColor: _kBlue.withOpacity(0.15),
+                    backgroundColor: AppColors.accent.withOpacity(0.15),
                     radius: 10,
                     child: Text(
                       '${s.level}',
-                      style: const TextStyle(fontSize: 9, color: _kBlue),
+                      style: const TextStyle(
+                        fontSize: 9,
+                        color: AppColors.accent,
+                      ),
                     ),
                   ),
                   label: Text(s.name, style: const TextStyle(fontSize: 12)),
@@ -294,9 +291,9 @@ class _ResumePreviewScreenState extends State<ResumePreviewScreen>
                         child: Text(
                           '${e.school} — ${e.major}'
                           '${e.gradYear != null ? ' (${e.gradYear}년 졸업)' : ''}',
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 13,
-                            color: _kText.withOpacity(0.7),
+                            color: AppColors.textSecondary,
                           ),
                         ),
                       ))
@@ -318,9 +315,9 @@ class _ResumePreviewScreenState extends State<ResumePreviewScreen>
                           '${t.title} · ${t.org}'
                           '${t.hours != null ? ' (${t.hours}시간)' : ''}'
                           '${t.year != null ? ' · ${t.year}' : ''}',
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 12,
-                            color: _kText.withOpacity(0.6),
+                            color: AppColors.textSecondary,
                           ),
                         ),
                       ))
@@ -340,14 +337,17 @@ class _ResumePreviewScreenState extends State<ResumePreviewScreen>
                         padding: const EdgeInsets.only(bottom: 4),
                         child: Row(
                           children: [
-                            Icon(Icons.insert_drive_file_outlined,
-                                size: 16, color: _kBlue.withOpacity(0.5)),
+                            Icon(
+                              Icons.insert_drive_file_outlined,
+                              size: 16,
+                              color: AppColors.accent.withOpacity(0.5),
+                            ),
                             const SizedBox(width: 6),
                             Text(
                               '${a.title} (${a.type})',
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 12,
-                                color: _kText.withOpacity(0.6),
+                                color: AppColors.textSecondary,
                               ),
                             ),
                           ],
@@ -372,9 +372,9 @@ class _ResumePreviewScreenState extends State<ResumePreviewScreen>
             width: 80,
             child: Text(
               label,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 12,
-                color: _kText.withOpacity(0.45),
+                color: AppColors.textDisabled,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -382,9 +382,9 @@ class _ResumePreviewScreenState extends State<ResumePreviewScreen>
           Expanded(
             child: Text(
               value,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 13,
-                color: _kText.withOpacity(0.8),
+                color: AppColors.textPrimary,
               ),
             ),
           ),
@@ -417,27 +417,23 @@ class _PreviewSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _kText.withOpacity(0.06)),
-      ),
+    return AppMutedCard(
+      margin: const EdgeInsets.only(bottom: AppSpacing.md),
+      padding: const EdgeInsets.all(AppSpacing.md),
+      radius: AppRadius.md,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, size: 18, color: _kBlue.withOpacity(0.6)),
+              Icon(icon, size: 18, color: AppColors.accent.withOpacity(0.6)),
               const SizedBox(width: 8),
               Text(
                 title,
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
-                  color: _kText,
+                  color: AppColors.textPrimary,
                 ),
               ),
             ],
@@ -449,4 +445,3 @@ class _PreviewSection extends StatelessWidget {
     );
   }
 }
-

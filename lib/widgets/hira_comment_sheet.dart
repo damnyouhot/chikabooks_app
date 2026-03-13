@@ -3,14 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import '../models/hira_update.dart';
 import '../services/hira_comment_service.dart';
-
-// ── 디자인 팔레트 (기존 탭과 통일) ──
-const _kText = Color(0xFF5D6B6B);
-const _kBg = Color(0xFFF1F7F7);
-const _kShadow1 = Color(0xFFDDD3D8);
-const _kShadow2 = Color(0xFFD5E5E5);
-const _kCardBg = Colors.white;
-const _kAccent = Color(0xFFF7CBCA);
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_tokens.dart';
 
 /// HIRA 댓글 BottomSheet
 class HiraCommentSheet extends StatefulWidget {
@@ -75,17 +69,17 @@ class _HiraCommentSheetState extends State<HiraCommentSheet> {
     return Container(
       height: MediaQuery.of(context).size.height * 0.7,
       decoration: BoxDecoration(
-        color: _kCardBg,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        color: AppColors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
       ),
       child: Column(
         children: [
           // 헤더
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               border: Border(
-                bottom: BorderSide(color: _kShadow2.withOpacity(0.5)),
+                bottom: BorderSide(color: AppColors.divider),
               ),
             ),
             child: Row(
@@ -95,16 +89,16 @@ class _HiraCommentSheetState extends State<HiraCommentSheet> {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: _kText,
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 const Spacer(),
                 GestureDetector(
                   onTap: () => Navigator.pop(context),
-                  child: Icon(
+                  child: const Icon(
                     Icons.close,
                     size: 22,
-                    color: _kText.withOpacity(0.5),
+                    color: AppColors.textSecondary,
                   ),
                 ),
               ],
@@ -119,7 +113,7 @@ class _HiraCommentSheetState extends State<HiraCommentSheet> {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(
                     child: CircularProgressIndicator(
-                      color: Color(0xFF7BA5A5),
+                      color: AppColors.accent,
                     ),
                   );
                 }
@@ -133,14 +127,14 @@ class _HiraCommentSheetState extends State<HiraCommentSheet> {
                         Icon(
                           Icons.comment_outlined,
                           size: 48,
-                          color: _kShadow1,
+                          color: AppColors.textDisabled,
                         ),
                         const SizedBox(height: 12),
-                        Text(
+                        const Text(
                           '첫 댓글을 남겨보세요',
                           style: TextStyle(
                             fontSize: 14,
-                            color: _kText.withOpacity(0.5),
+                            color: AppColors.textSecondary,
                           ),
                         ),
                       ],
@@ -151,9 +145,9 @@ class _HiraCommentSheetState extends State<HiraCommentSheet> {
                 return ListView.separated(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   itemCount: comments.length,
-                  separatorBuilder: (_, __) => Divider(
+                  separatorBuilder: (_, __) => const Divider(
                     height: 1,
-                    color: _kShadow2.withOpacity(0.3),
+                    color: AppColors.divider,
                   ),
                   itemBuilder: (context, i) {
                     final comment = comments[i];
@@ -175,10 +169,10 @@ class _HiraCommentSheetState extends State<HiraCommentSheet> {
               top: 12,
               bottom: MediaQuery.of(context).viewInsets.bottom + 12,
             ),
-            decoration: BoxDecoration(
-              color: _kBg,
+            decoration: const BoxDecoration(
+              color: AppColors.surfaceMuted,
               border: Border(
-                top: BorderSide(color: _kShadow2.withOpacity(0.5)),
+                top: BorderSide(color: AppColors.divider),
               ),
             ),
             child: Row(
@@ -191,10 +185,10 @@ class _HiraCommentSheetState extends State<HiraCommentSheet> {
                       vertical: 10,
                     ),
                     decoration: BoxDecoration(
-                      color: _kCardBg,
-                      borderRadius: BorderRadius.circular(20),
+                      color: AppColors.white,
+                      borderRadius: BorderRadius.circular(AppRadius.full),
                       border: Border.all(
-                        color: _kShadow2.withOpacity(0.5),
+                        color: AppColors.divider,
                       ),
                     ),
                     child: TextField(
@@ -203,13 +197,13 @@ class _HiraCommentSheetState extends State<HiraCommentSheet> {
                       maxLength: 200,
                       style: const TextStyle(
                         fontSize: 14,
-                        color: _kText,
+                        color: AppColors.textPrimary,
                       ),
-                      decoration: InputDecoration(
+                      decoration: const InputDecoration(
                         hintText: '댓글을 입력하세요...',
                         hintStyle: TextStyle(
                           fontSize: 14,
-                          color: _kText.withOpacity(0.4),
+                          color: AppColors.textDisabled,
                         ),
                         border: InputBorder.none,
                         isDense: true,
@@ -226,16 +220,16 @@ class _HiraCommentSheetState extends State<HiraCommentSheet> {
                     height: 44,
                     decoration: BoxDecoration(
                       color: _isSending
-                          ? _kShadow2
-                          : _kAccent.withOpacity(0.8),
+                          ? AppColors.disabledBg
+                          : AppColors.accent.withOpacity(0.8),
                       borderRadius: BorderRadius.circular(22),
                     ),
                     child: Icon(
                       Icons.send,
                       size: 20,
                       color: _isSending
-                          ? _kText.withOpacity(0.3)
-                          : _kText.withOpacity(0.7),
+                          ? AppColors.textDisabled
+                          : AppColors.textPrimary,
                     ),
                   ),
                 ),
@@ -275,7 +269,7 @@ class _CommentItem extends StatelessWidget {
             onPressed: () => Navigator.pop(context, true),
             child: const Text(
               '삭제',
-              style: TextStyle(color: Colors.red),
+              style: TextStyle(color: AppColors.error),
             ),
           ),
         ],
@@ -332,13 +326,13 @@ class _CommentItem extends StatelessWidget {
             width: 32,
             height: 32,
             decoration: BoxDecoration(
-              color: _kAccent.withOpacity(0.3),
-              borderRadius: BorderRadius.circular(16),
+              color: AppColors.accent.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(AppRadius.full),
             ),
-            child: Icon(
+            child: const Icon(
               Icons.person_outline,
               size: 18,
-              color: _kText.withOpacity(0.5),
+              color: AppColors.textSecondary,
             ),
           ),
           const SizedBox(width: 12),
@@ -351,28 +345,28 @@ class _CommentItem extends StatelessWidget {
                   children: [
                     Text(
                       comment.userName,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: _kText.withOpacity(0.7),
+                        color: AppColors.textPrimary,
                       ),
                     ),
                     const SizedBox(width: 8),
                     Text(
                       _formatTime(comment.createdAt),
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 11,
-                        color: _kText.withOpacity(0.4),
+                        color: AppColors.textDisabled,
                       ),
                     ),
                     const Spacer(),
                     if (isMyComment)
                       GestureDetector(
                         onTap: () => _deleteComment(context),
-                        child: Icon(
+                        child: const Icon(
                           Icons.delete_outline,
                           size: 16,
-                          color: _kText.withOpacity(0.3),
+                          color: AppColors.textDisabled,
                         ),
                       ),
                   ],
@@ -382,7 +376,7 @@ class _CommentItem extends StatelessWidget {
                   comment.text,
                   style: const TextStyle(
                     fontSize: 14,
-                    color: _kText,
+                    color: AppColors.textPrimary,
                     height: 1.4,
                   ),
                 ),
@@ -428,14 +422,14 @@ class _CommentItem extends StatelessWidget {
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: _kShadow2.withOpacity(0.3),
-                              borderRadius: BorderRadius.circular(12),
+                              color: AppColors.surfaceMuted,
+                              borderRadius: BorderRadius.circular(AppRadius.md),
                             ),
                             child: Text(
                               '😀+',
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 14,
-                                color: _kText.withOpacity(0.5),
+                                color: AppColors.textSecondary,
                               ),
                             ),
                           ),
@@ -476,8 +470,8 @@ class _CommentItem extends StatelessWidget {
                 height: 44,
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? _kAccent.withOpacity(0.5)
-                      : Colors.grey[100],
+                      ? AppColors.accent.withOpacity(0.4)
+                      : AppColors.surfaceMuted,
                   shape: BoxShape.circle,
                 ),
                 child: Center(
@@ -515,11 +509,11 @@ class _ReactionChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(
           color: isSelected
-              ? _kAccent.withOpacity(0.4)
-              : _kShadow2.withOpacity(0.3),
-          borderRadius: BorderRadius.circular(12),
+              ? AppColors.accent.withOpacity(0.3)
+              : AppColors.surfaceMuted,
+          borderRadius: BorderRadius.circular(AppRadius.md),
           border: isSelected
-              ? Border.all(color: _kAccent, width: 1)
+              ? Border.all(color: AppColors.accent, width: 1)
               : null,
         ),
         child: Text(

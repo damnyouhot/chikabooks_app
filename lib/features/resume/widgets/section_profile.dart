@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../models/resume.dart';
-
-const _kText = Color(0xFF3D4A5C);
+import '../../../core/theme/app_colors.dart';
 
 /// A. 기본정보 섹션
 class SectionProfile extends StatefulWidget {
@@ -91,8 +90,8 @@ class _SectionProfileState extends State<SectionProfile> {
             return FilterChip(
               label: Text(type),
               selected: selected,
-              selectedColor: const Color(0xFF4A90D9).withOpacity(0.15),
-              checkmarkColor: const Color(0xFF4A90D9),
+            selectedColor: AppColors.accent.withOpacity(0.15),
+            checkmarkColor: AppColors.accent,
               onSelected: (val) {
                 setState(() {
                   if (val) {
@@ -119,13 +118,13 @@ class _SectionProfileState extends State<SectionProfile> {
           style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w700,
-            color: _kText,
+            color: AppColors.textPrimary,
           ),
         ),
         const SizedBox(height: 2),
         Text(
           sub,
-          style: TextStyle(fontSize: 12, color: _kText.withOpacity(0.4)),
+          style: TextStyle(fontSize: 12, color: AppColors.textDisabled),
         ),
       ],
     );
@@ -146,7 +145,7 @@ class _SectionProfileState extends State<SectionProfile> {
         decoration: InputDecoration(
           labelText: label,
           hintText: hint,
-          hintStyle: TextStyle(color: _kText.withOpacity(0.2)),
+            hintStyle: TextStyle(color: AppColors.textDisabled),
           border: const OutlineInputBorder(),
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 14, vertical: 12),

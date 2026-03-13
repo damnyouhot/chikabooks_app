@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../models/resume.dart';
-
-const _kText = Color(0xFF3D4A5C);
-const _kBlue = Color(0xFF4A90D9);
+import '../../../core/theme/app_colors.dart';
 
 /// E. 임상 스킬 / 소프트 스킬 섹션
 class SectionSkills extends StatefulWidget {
@@ -78,12 +76,12 @@ class _SectionSkillsState extends State<SectionSkills> {
       children: [
         const Text(
           '임상 스킬',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _kText),
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
         ),
         const SizedBox(height: 4),
         Text(
           '보유한 스킬을 선택하고 숙련도를 설정하세요. (1~5)',
-          style: TextStyle(fontSize: 12, color: _kText.withOpacity(0.4)),
+          style: TextStyle(fontSize: 12, color: AppColors.textDisabled),
         ),
         const SizedBox(height: 12),
         Wrap(
@@ -94,8 +92,8 @@ class _SectionSkillsState extends State<SectionSkills> {
             return FilterChip(
               label: Text(s, style: const TextStyle(fontSize: 12)),
               selected: selected,
-              selectedColor: _kBlue.withOpacity(0.12),
-              checkmarkColor: _kBlue,
+              selectedColor: AppColors.accent.withOpacity(0.12),
+              checkmarkColor: AppColors.accent,
               onSelected: (_) => _toggleSkill(s, s),
             );
           }).toList(),
@@ -104,7 +102,7 @@ class _SectionSkillsState extends State<SectionSkills> {
         const SizedBox(height: 24),
         const Text(
           '소프트 스킬',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _kText),
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
         ),
         const SizedBox(height: 12),
         Wrap(
@@ -115,8 +113,8 @@ class _SectionSkillsState extends State<SectionSkills> {
             return FilterChip(
               label: Text(s, style: const TextStyle(fontSize: 12)),
               selected: selected,
-              selectedColor: _kBlue.withOpacity(0.12),
-              checkmarkColor: _kBlue,
+              selectedColor: AppColors.accent.withOpacity(0.12),
+              checkmarkColor: AppColors.accent,
               onSelected: (_) => _toggleSkill(s, s),
             );
           }).toList(),
@@ -127,7 +125,7 @@ class _SectionSkillsState extends State<SectionSkills> {
           const SizedBox(height: 24),
           const Text(
             '숙련도 설정',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _kText),
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
           ),
           const SizedBox(height: 8),
           ...List.generate(_items.length, (i) {
@@ -138,9 +136,9 @@ class _SectionSkillsState extends State<SectionSkills> {
                 children: [
                   SizedBox(
                     width: 100,
-                    child: Text(
-                      s.name,
-                      style: const TextStyle(fontSize: 13, color: _kText),
+                      child: Text(
+                        s.name,
+                        style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -151,7 +149,7 @@ class _SectionSkillsState extends State<SectionSkills> {
                       max: 5,
                       divisions: 4,
                       label: _levelLabel(s.level),
-                      activeColor: _kBlue,
+                      activeColor: AppColors.accent,
                       onChanged: (v) => _setLevel(i, v.round()),
                     ),
                   ),
@@ -159,10 +157,10 @@ class _SectionSkillsState extends State<SectionSkills> {
                     width: 36,
                     child: Text(
                       _levelLabel(s.level),
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
-                        color: _kBlue,
+                        color: AppColors.accent,
                       ),
                       textAlign: TextAlign.center,
                     ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/theme/app_colors.dart';
 
 /// 캐릭터 말풍선 — 배경 없는 텍스트 (페이드 인/아웃)
 ///
@@ -99,7 +100,7 @@ class _SpeechOverlayState extends State<SpeechOverlay>
               style: TextStyle(
                 fontSize: widget.isOnboarding ? 17.0 : 16.0,
                 fontWeight: FontWeight.w400,
-                color: const Color(0xFF5D6B6B),
+                color: AppColors.textPrimary,
                 letterSpacing: 0.2,
                 height: 1.5,
               ),

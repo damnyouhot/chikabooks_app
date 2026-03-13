@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../models/resume.dart';
-
-const _kText = Color(0xFF3D4A5C);
-const _kBlue = Color(0xFF4A90D9);
+import '../../../core/theme/app_colors.dart';
 
 /// D. 경력 섹션 (근무지별)
 class SectionExperiences extends StatefulWidget {
@@ -68,13 +66,13 @@ class _SectionExperiencesState extends State<SectionExperiences> {
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w700,
-            color: _kText,
+            color: AppColors.textPrimary,
           ),
         ),
         const SizedBox(height: 4),
         Text(
           '최신 경력부터 입력해주세요.',
-          style: TextStyle(fontSize: 12, color: _kText.withOpacity(0.4)),
+          style: TextStyle(fontSize: 12, color: AppColors.textDisabled),
         ),
         const SizedBox(height: 16),
 
@@ -92,7 +90,7 @@ class _SectionExperiencesState extends State<SectionExperiences> {
           icon: const Icon(Icons.add, size: 18),
           label: const Text('경력 추가'),
           style: OutlinedButton.styleFrom(
-            foregroundColor: _kBlue,
+            foregroundColor: AppColors.accent,
             padding: const EdgeInsets.symmetric(vertical: 12),
           ),
         ),
@@ -188,13 +186,13 @@ class _ExperienceCardState extends State<_ExperienceCard> {
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    color: _kText,
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 const Spacer(),
                 IconButton(
                   icon: const Icon(Icons.delete_outline, size: 18),
-                  color: Colors.red.withOpacity(0.6),
+                  color: AppColors.error.withOpacity(0.6),
                   onPressed: widget.onRemove,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
@@ -222,7 +220,7 @@ class _ExperienceCardState extends State<_ExperienceCard> {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: _kText.withOpacity(0.7),
+                color: AppColors.textSecondary,
               ),
             ),
             const SizedBox(height: 4),
@@ -234,8 +232,8 @@ class _ExperienceCardState extends State<_ExperienceCard> {
                 return FilterChip(
                   label: Text(t, style: const TextStyle(fontSize: 11)),
                   selected: selected,
-                  selectedColor: _kBlue.withOpacity(0.12),
-                  checkmarkColor: _kBlue,
+                  selectedColor: AppColors.accent.withOpacity(0.12),
+                  checkmarkColor: AppColors.accent,
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   onSelected: (val) {
                     setState(() {
@@ -269,7 +267,7 @@ class _ExperienceCardState extends State<_ExperienceCard> {
         decoration: InputDecoration(
           labelText: label,
           hintText: hint,
-          hintStyle: TextStyle(color: _kText.withOpacity(0.2)),
+          hintStyle: TextStyle(color: AppColors.textDisabled),
           border: const OutlineInputBorder(),
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 12, vertical: 10),

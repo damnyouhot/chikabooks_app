@@ -1,14 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../core/theme/app_colors.dart';
 import '../../services/contact_request_service.dart';
-
-// ── 디자인 상수 ──────────────────────────────────────────
-const _kBg = Color(0xFFF8F6F9);
-const _kText = Color(0xFF3D4A5C);
-const _kBlue = Color(0xFF4A90D9);
-const _kGreen = Color(0xFF4CAF50);
-const _kOrange = Color(0xFFF57C00);
 
 /// 알림 목록 화면
 ///
@@ -19,20 +13,20 @@ class NotificationListScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _kBg,
+      backgroundColor: AppColors.appBg,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.white,
         elevation: 0,
         title: const Text(
           '알림',
           style: TextStyle(
             fontSize: 17,
             fontWeight: FontWeight.w700,
-            color: _kText,
+            color: AppColors.textPrimary,
           ),
         ),
         centerTitle: false,
-        iconTheme: const IconThemeData(color: _kText),
+        iconTheme: const IconThemeData(color: AppColors.textPrimary),
       ),
       body: StreamBuilder<List<Map<String, dynamic>>>(
         stream: ContactRequestService.watchMyNotifications(),
@@ -60,18 +54,18 @@ class NotificationListScreen extends StatelessWidget {
   }
 
   Widget _buildEmpty() {
-    return Center(
+    return const Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(Icons.notifications_none,
-              size: 56, color: _kText.withOpacity(0.15)),
-          const SizedBox(height: 16),
+              size: 56, color: AppColors.textDisabled),
+          SizedBox(height: 16),
           Text(
             '새로운 알림이 없습니다.',
             style: TextStyle(
               fontSize: 14,
-              color: _kText.withOpacity(0.4),
+              color: AppColors.textDisabled,
             ),
           ),
         ],
@@ -118,12 +112,12 @@ class _NotificationCardState extends State<_NotificationCard> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: _read ? Colors.white : _kBlue.withOpacity(0.04),
+          color: _read ? AppColors.white : AppColors.accent.withOpacity(0.04),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: _read
-                ? const Color(0xFFE0D8E8)
-                : _kBlue.withOpacity(0.15),
+                ? AppColors.divider
+                : AppColors.accent.withOpacity(0.15),
           ),
         ),
         child: Column(
@@ -137,10 +131,10 @@ class _NotificationCardState extends State<_NotificationCard> {
                 Expanded(
                   child: Text(
                     _title,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: _kText,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                 ),
@@ -149,7 +143,7 @@ class _NotificationCardState extends State<_NotificationCard> {
                     width: 8,
                     height: 8,
                     decoration: const BoxDecoration(
-                      color: _kBlue,
+                      color: AppColors.accent,
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -160,9 +154,9 @@ class _NotificationCardState extends State<_NotificationCard> {
             // 본문
             Text(
               _body,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 13,
-                color: _kText.withOpacity(0.6),
+                color: AppColors.textSecondary,
                 height: 1.5,
               ),
             ),
@@ -172,9 +166,9 @@ class _NotificationCardState extends State<_NotificationCard> {
               const SizedBox(height: 6),
               Text(
                 _formatTime(_createdAt!),
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 11,
-                  color: _kText.withOpacity(0.3),
+                  color: AppColors.textDisabled,
                 ),
               ),
             ],
@@ -191,21 +185,21 @@ class _NotificationCardState extends State<_NotificationCard> {
   }
 
   Widget _iconForType() {
-    IconData icon;
-    Color color;
+    final IconData icon;
+    final Color color;
 
     switch (_type) {
       case 'contact_request':
         icon = Icons.mail_outline;
-        color = _kOrange;
+        color = AppColors.warning;
         break;
       case 'contact_approved':
         icon = Icons.check_circle_outline;
-        color = _kGreen;
+        color = AppColors.success;
         break;
       default:
         icon = Icons.notifications_outlined;
-        color = _kBlue;
+        color = AppColors.accent;
     }
 
     return Container(
@@ -231,9 +225,8 @@ class _NotificationCardState extends State<_NotificationCard> {
                 ? null
                 : () => _handleReject(applicationId),
             style: OutlinedButton.styleFrom(
-              foregroundColor: _kText.withOpacity(0.6),
-              side: BorderSide(
-                  color: _kText.withOpacity(0.15)),
+              foregroundColor: AppColors.textSecondary,
+              side: const BorderSide(color: AppColors.divider),
               padding:
                   const EdgeInsets.symmetric(vertical: 10),
             ),
@@ -248,7 +241,7 @@ class _NotificationCardState extends State<_NotificationCard> {
                 ? null
                 : () => _handleApprove(applicationId),
             style: FilledButton.styleFrom(
-              backgroundColor: _kGreen,
+              backgroundColor: AppColors.success,
               padding:
                   const EdgeInsets.symmetric(vertical: 10),
             ),
@@ -257,7 +250,7 @@ class _NotificationCardState extends State<_NotificationCard> {
                     width: 18,
                     height: 18,
                     child: CircularProgressIndicator(
-                      color: Colors.white,
+                      color: AppColors.white,
                       strokeWidth: 2,
                     ),
                   )
@@ -326,4 +319,3 @@ class _NotificationCardState extends State<_NotificationCard> {
     return DateFormat('M월 d일').format(dt);
   }
 }
-

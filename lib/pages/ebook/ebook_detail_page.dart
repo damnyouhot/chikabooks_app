@@ -94,12 +94,12 @@ class _EbookDetailPageState extends State<EbookDetailPage> {
                   final coverH = coverW * 1.5;
                   return ClipRRect(
                     borderRadius: BorderRadius.circular(AppRadius.xl),
-                    child: Image.network(
-                      ebook.coverUrl,
+                child: Image.network(
+                  ebook.coverUrl,
                       width: coverW,
                       height: coverH,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
                         width: coverW,
                         height: coverH,
                         color: AppColors.disabledBg,
@@ -107,15 +107,15 @@ class _EbookDetailPageState extends State<EbookDetailPage> {
                           Icons.book,
                           size: 64,
                           color: AppColors.textDisabled,
-                        ),
-                      ),
+                  ),
+                ),
                     ),
                   );
                 },
               ),
             ),
             const SizedBox(height: AppSpacing.xxl),
-
+            
             // 제목
             Text(
               ebook.title,
@@ -124,7 +124,7 @@ class _EbookDetailPageState extends State<EbookDetailPage> {
                   ),
             ),
             const SizedBox(height: AppSpacing.sm),
-
+            
             // 저자
             Text(
               '저자: ${ebook.author}',
@@ -144,7 +144,7 @@ class _EbookDetailPageState extends State<EbookDetailPage> {
               textColor: _isPdf ? AppColors.error : AppColors.accent,
             ),
             const SizedBox(height: AppSpacing.lg),
-
+            
             // 설명
             Text(
               ebook.description,
@@ -154,7 +154,7 @@ class _EbookDetailPageState extends State<EbookDetailPage> {
               ),
             ),
             const SizedBox(height: AppSpacing.xxl + 8),
-
+            
             // 구매/읽기 버튼 (hideActions가 true면 숨김 — 치과책방 탭)
             if (!widget.hideActions) ...[
               SizedBox(
@@ -176,24 +176,24 @@ class _EbookDetailPageState extends State<EbookDetailPage> {
               // 이미 구매한 경우 안내
               if (_isPurchased && ebook.price > 0) ...[
                 const SizedBox(height: AppSpacing.sm),
-                Text(
+                  Text(
                   '✓ 이미 구매한 책입니다.',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 12,
-                    color: AppColors.success.withOpacity(0.9),
+                    color: AppColors.success,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
-
+              
               // 무료가 아니고 미구매인 경우 안내 문구
               if (!_isPurchased && ebook.price > 0) ...[
                 const SizedBox(height: AppSpacing.sm),
-                Text(
+                  Text(
                   '* 현재 테스트 모드: 결제 없이 바로 읽을 수 있습니다.',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 12,
-                    color: AppColors.textPrimary.withOpacity(0.5),
+                    color: AppColors.textSecondary,
                   ),
                 ),
               ],
@@ -249,20 +249,20 @@ class _EbookDetailPageState extends State<EbookDetailPage> {
                   return Container(
                     width: iconSize,
                     height: iconSize,
-                    decoration: BoxDecoration(
+                decoration: BoxDecoration(
                       color: AppColors.success.withOpacity(0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.check_circle,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.check_circle,
                       size: iconSize * 0.625,
                       color: AppColors.success,
-                    ),
+                ),
                   );
                 },
               ),
               const SizedBox(height: AppSpacing.xl),
-
+              
               // 제목
               const Text(
                 '구매 완료! 🎉',
@@ -273,7 +273,7 @@ class _EbookDetailPageState extends State<EbookDetailPage> {
                 ),
               ),
               const SizedBox(height: AppSpacing.sm),
-
+              
               // 책 제목
               Text(
                 ebook.title,
@@ -284,7 +284,7 @@ class _EbookDetailPageState extends State<EbookDetailPage> {
                 ),
               ),
               const SizedBox(height: AppSpacing.lg),
-
+              
               // 안내 메시지 카드: AppColors 토큰으로 색상 지정
               Container(
                 padding: const EdgeInsets.all(AppSpacing.md),
@@ -313,7 +313,7 @@ class _EbookDetailPageState extends State<EbookDetailPage> {
                 ),
               ),
               const SizedBox(height: AppSpacing.xxl),
-
+              
               // 버튼들
               Row(
                 children: [

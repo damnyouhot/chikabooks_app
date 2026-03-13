@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../models/partner_group.dart';
 import '../../core/theme/app_colors.dart';
-
-// AppColors 직접 참조 (TabTheme 제거)
+import '../../core/theme/app_tokens.dart';
+import '../../core/widgets/app_muted_card.dart';
 
 /// 파트너 요약 (감정 해석 문장 중심)
 class BondPartnerSummary extends StatelessWidget {
@@ -24,23 +24,15 @@ class BondPartnerSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final partners = members.where((m) => m.uid != myUid).toList();
+    if (partners.isEmpty) return const SizedBox.shrink();
 
-    if (partners.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.surfaceMuted.withOpacity(0.3)),
-      ),
+    return AppMutedCard(
+      radius: AppRadius.xl,
+      padding: const EdgeInsets.all(AppSpacing.xl),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          const Text(
             '이번 주 함께하는 사람들',
             style: TextStyle(
               fontSize: 15,
@@ -56,28 +48,28 @@ class BondPartnerSummary extends StatelessWidget {
   }
 
   Widget _buildPartnerCard(GroupMemberMeta partner) {
-    final nickname = memberNicknames?[partner.uid] ?? '파트너';
-    final postCount = weeklyPostCounts?[partner.uid] ?? 0;
+    final nickname     = memberNicknames?[partner.uid] ?? '파트너';
+    final postCount    = weeklyPostCounts?[partner.uid] ?? 0;
     final reactionCount = weeklyReactionCounts?[partner.uid] ?? 0;
-    final message = _generateEmotionalMessage(postCount, reactionCount);
+    final message      = _generateEmotionalMessage(postCount, reactionCount);
     final activityText = _generateActivityText(postCount, reactionCount);
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: AppSpacing.lg),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             width: 48,
             height: 48,
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               shape: BoxShape.circle,
               color: AppColors.surfaceMuted,
             ),
             child: Center(
               child: Text(
                 nickname.isNotEmpty ? nickname[0] : 'P',
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
@@ -94,7 +86,7 @@ class BondPartnerSummary extends StatelessWidget {
                   children: [
                     Text(
                       nickname,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
@@ -105,9 +97,9 @@ class BondPartnerSummary extends StatelessWidget {
                       const SizedBox(width: 6),
                       Text(
                         '· ${partner.mainConcernShown}',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 12,
-                          color: AppColors.textPrimary.withOpacity(0.4),
+                          color: AppColors.textDisabled,
                           fontWeight: FontWeight.w400,
                         ),
                       ),
@@ -117,18 +109,18 @@ class BondPartnerSummary extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   activityText,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 13,
-                    color: AppColors.textPrimary.withOpacity(0.7),
+                    color: AppColors.textSecondary,
                     height: 1.4,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   message,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 13,
-                    color: AppColors.textPrimary.withOpacity(0.5),
+                    color: AppColors.textDisabled,
                     fontStyle: FontStyle.italic,
                   ),
                 ),
@@ -142,7 +134,9 @@ class BondPartnerSummary extends StatelessWidget {
 
   String _generateActivityText(int postCount, int reactionCount) {
     if (postCount == 0 && reactionCount == 0) return '이번 주는 조용히 지나갔어';
-    if (postCount > 0 && reactionCount > 0) return '이번 주 ${postCount}번 다녀갔고, ${reactionCount}번 반응했어';
+    if (postCount > 0 && reactionCount > 0) {
+      return '이번 주 ${postCount}번 다녀갔고, ${reactionCount}번 반응했어';
+    }
     if (postCount > 0) return '이번 주 ${postCount}번 다녀갔어';
     return '${reactionCount}번 조용히 반응했어';
   }
@@ -157,6 +151,3 @@ class BondPartnerSummary extends StatelessWidget {
     return '이번 주 자주 마주쳤네';
   }
 }
-
-
-

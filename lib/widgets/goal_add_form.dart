@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../models/user_goal.dart';
 import '../services/user_goal_service.dart';
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_tokens.dart';
+import '../core/widgets/app_primary_button.dart';
 
 /// 목표 추가 폼 (완성형)
 class GoalAddForm extends StatefulWidget {
@@ -13,9 +16,6 @@ class GoalAddForm extends StatefulWidget {
 }
 
 class _GoalAddFormState extends State<GoalAddForm> {
-  static const _kAccent = Color(0xFFF7CBCA);
-  static const _kText = Color(0xFF5D6B6B);
-  static const _kShadow2 = Color(0xFFD5E5E5);
 
   final _titleController = TextEditingController();
   GoalType _selectedType = GoalType.routine;
@@ -31,18 +31,18 @@ class _GoalAddFormState extends State<GoalAddForm> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.white,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close, color: _kText),
+          icon: const Icon(Icons.close, color: AppColors.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           '새 목표',
           style: TextStyle(
-            color: _kText,
+            color: AppColors.textPrimary,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -58,7 +58,7 @@ class _GoalAddFormState extends State<GoalAddForm> {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: _kText,
+                color: AppColors.textPrimary,
               ),
             ),
             const SizedBox(height: 12),
@@ -90,7 +90,7 @@ class _GoalAddFormState extends State<GoalAddForm> {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: _kText,
+                color: AppColors.textPrimary,
               ),
             ),
             const SizedBox(height: 12),
@@ -99,17 +99,17 @@ class _GoalAddFormState extends State<GoalAddForm> {
               maxLength: 60,
               decoration: InputDecoration(
                 hintText: '작고 하찮을수록 성공률이 올라가요.',
-                hintStyle: TextStyle(
-                  color: _kText.withOpacity(0.4),
+                hintStyle: const TextStyle(
+                  color: AppColors.textDisabled,
                   fontSize: 14,
                 ),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: _kShadow2),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  borderSide: const BorderSide(color: AppColors.divider),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: _kAccent, width: 2),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  borderSide: const BorderSide(color: AppColors.accent, width: 2),
                 ),
               ),
             ),
@@ -122,7 +122,7 @@ class _GoalAddFormState extends State<GoalAddForm> {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: _kText,
+                color: AppColors.textPrimary,
               ),
             ),
             const SizedBox(height: 12),
@@ -144,7 +144,7 @@ class _GoalAddFormState extends State<GoalAddForm> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: _kText,
+                  color: AppColors.textPrimary,
                 ),
               ),
               const SizedBox(height: 12),
@@ -161,11 +161,11 @@ class _GoalAddFormState extends State<GoalAddForm> {
                       height: 42,
                       decoration: BoxDecoration(
                         color: isSelected
-                            ? _kAccent.withOpacity(0.3)
+                            ? AppColors.accent.withOpacity(0.3)
                             : Colors.transparent,
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: isSelected ? _kAccent : _kShadow2,
+                          color: isSelected ? AppColors.accent : AppColors.divider,
                           width: 1,
                         ),
                       ),
@@ -176,7 +176,7 @@ class _GoalAddFormState extends State<GoalAddForm> {
                           fontSize: 16,
                           fontWeight:
                               isSelected ? FontWeight.w600 : FontWeight.w400,
-                          color: _kText,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                     ),
@@ -188,27 +188,9 @@ class _GoalAddFormState extends State<GoalAddForm> {
             const SizedBox(height: 40),
 
             // 5. 추가하기 버튼
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: ElevatedButton(
-                onPressed: _addGoal,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _kAccent,
-                  foregroundColor: _kText,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  elevation: 0,
-                ),
-                child: const Text(
-                  '추가하기',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
+            AppPrimaryButton(
+              label: '추가하기',
+              onPressed: _addGoal,
             ),
           ],
         ),
@@ -223,10 +205,10 @@ class _GoalAddFormState extends State<GoalAddForm> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isSelected ? _kAccent.withOpacity(0.2) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+          color: isSelected ? AppColors.accent.withOpacity(0.2) : Colors.transparent,
+          borderRadius: BorderRadius.circular(AppRadius.md),
           border: Border.all(
-            color: isSelected ? _kAccent : _kShadow2,
+            color: isSelected ? AppColors.accent : AppColors.divider,
             width: 1.5,
           ),
         ),
@@ -237,15 +219,15 @@ class _GoalAddFormState extends State<GoalAddForm> {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                color: _kText,
+                color: AppColors.textPrimary,
               ),
             ),
             const SizedBox(height: 4),
             Text(
               subtitle,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 11,
-                color: _kText.withOpacity(0.5),
+                color: AppColors.textDisabled,
               ),
             ),
           ],
@@ -261,10 +243,10 @@ class _GoalAddFormState extends State<GoalAddForm> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? _kAccent.withOpacity(0.3) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+          color: isSelected ? AppColors.accent.withOpacity(0.3) : Colors.transparent,
+          borderRadius: BorderRadius.circular(AppRadius.md),
           border: Border.all(
-            color: isSelected ? _kAccent : _kShadow2,
+            color: isSelected ? AppColors.accent : AppColors.divider,
             width: 1,
           ),
         ),
@@ -273,7 +255,7 @@ class _GoalAddFormState extends State<GoalAddForm> {
           style: TextStyle(
             fontSize: 13,
             fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-            color: _kText,
+            color: AppColors.textPrimary,
           ),
         ),
       ),

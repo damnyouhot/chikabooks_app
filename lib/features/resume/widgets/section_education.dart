@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../models/resume.dart';
-
-const _kText = Color(0xFF3D4A5C);
-const _kBlue = Color(0xFF4A90D9);
+import '../../../core/theme/app_colors.dart';
 
 /// F. 학력/실습 섹션
 class SectionEducation extends StatefulWidget {
@@ -55,13 +53,13 @@ class _SectionEducationState extends State<SectionEducation> {
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w700,
-            color: _kText,
+            color: AppColors.textPrimary,
           ),
         ),
         const SizedBox(height: 4),
         Text(
           '치위생과 졸업 및 실습 정보를 입력해주세요.',
-          style: TextStyle(fontSize: 12, color: _kText.withOpacity(0.4)),
+          style: TextStyle(fontSize: 12, color: AppColors.textDisabled),
         ),
         const SizedBox(height: 16),
 
@@ -78,7 +76,7 @@ class _SectionEducationState extends State<SectionEducation> {
           icon: const Icon(Icons.add, size: 18),
           label: const Text('학력 추가'),
           style: OutlinedButton.styleFrom(
-            foregroundColor: _kBlue,
+            foregroundColor: AppColors.accent,
             padding: const EdgeInsets.symmetric(vertical: 12),
           ),
         ),
@@ -152,13 +150,13 @@ class _EducationCardState extends State<_EducationCard> {
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    color: _kText,
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 const Spacer(),
                 IconButton(
                   icon: const Icon(Icons.delete_outline, size: 18),
-                  color: Colors.red.withOpacity(0.6),
+                  color: AppColors.error.withOpacity(0.6),
                   onPressed: widget.onRemove,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
@@ -191,7 +189,7 @@ class _EducationCardState extends State<_EducationCard> {
         decoration: InputDecoration(
           labelText: label,
           hintText: hint,
-          hintStyle: TextStyle(color: _kText.withOpacity(0.2)),
+            hintStyle: TextStyle(color: AppColors.textDisabled),
           border: const OutlineInputBorder(),
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 12, vertical: 10),

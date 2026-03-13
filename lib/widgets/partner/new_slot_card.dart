@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 import '../../models/slot_status.dart';
 import '../../models/slot_message.dart';
 import '../../services/partner_service.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
+import '../../core/widgets/app_muted_card.dart';
+import '../../core/widgets/app_primary_button.dart';
 
 /// 새로운 슬롯 카드 (서버 시간 기준)
 ///
@@ -39,19 +43,9 @@ class _NewSlotCardState extends State<NewSlotCard> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFCE93D8).withOpacity(0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+    return AppMutedCard(
+      radius: AppRadius.xl,
+      padding: const EdgeInsets.all(AppSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -59,21 +53,21 @@ class _NewSlotCardState extends State<NewSlotCard> {
           Row(
             children: [
               const Icon(Icons.chat_bubble_outline,
-                  color: Color(0xFFCE93D8), size: 20),
+                  color: AppColors.accent, size: 20),
               const SizedBox(width: 8),
               const Text(
                 '오늘의 말',
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF424242),
+                  color: AppColors.textPrimary,
                 ),
               ),
               const Spacer(),
               if (_slotStatus != null && _slotStatus!.slotKey != null)
                 Text(
                   _slotStatus!.timeLabel,
-                  style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                  style: const TextStyle(fontSize: 12, color: AppColors.textDisabled),
                 ),
             ],
           ),
@@ -99,7 +93,7 @@ class _NewSlotCardState extends State<NewSlotCard> {
               child: Center(
                 child: Text(
                   '슬롯 상태를 불러올 수 없어요',
-                  style: TextStyle(fontSize: 13, color: Colors.grey),
+                  style: TextStyle(fontSize: 13, color: AppColors.textDisabled),
                 ),
               ),
             ),
@@ -120,7 +114,7 @@ class _NewSlotCardState extends State<NewSlotCard> {
             children: [
               Text(
                 '다음 오픈: ${_formatNextOpen(status.nextOpensAt)}',
-                style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+                style: const TextStyle(fontSize: 13, color: AppColors.textDisabled),
               ),
             ],
           ),
@@ -157,23 +151,14 @@ class _NewSlotCardState extends State<NewSlotCard> {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFFCE93D8),
+                color: AppColors.accent,
               ),
             ),
             const SizedBox(height: 8),
-            ElevatedButton(
+            AppPrimaryButton(
+              label: '한마디 쓰기 ✍️',
               onPressed: () => _showWriteDialog(status),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFCE93D8),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-              ),
-              child: const Text('한마디 쓰기 ✍️',
-                  style: TextStyle(fontWeight: FontWeight.w600)),
+              radius: AppRadius.full,
             ),
           ],
         ),
@@ -193,8 +178,8 @@ class _NewSlotCardState extends State<NewSlotCard> {
           width: double.infinity,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: const Color(0xFFF3E5F5),
-            borderRadius: BorderRadius.circular(14),
+            color: AppColors.accent.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(AppRadius.md),
           ),
           child: Text(
             message.message,
@@ -211,11 +196,11 @@ class _NewSlotCardState extends State<NewSlotCard> {
             myReaction: message.reactions[myUid],
           )
         else
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
             child: Text(
               '내가 남긴 한마디',
-              style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+              style: TextStyle(fontSize: 12, color: AppColors.textDisabled),
             ),
           ),
       ],
@@ -349,12 +334,15 @@ class _ReactionRowState extends State<_ReactionRow> {
             }
           },
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md, vertical: AppSpacing.xs),
             decoration: BoxDecoration(
-              color: selected ? const Color(0xFFE8DAFF) : Colors.grey[100],
-              borderRadius: BorderRadius.circular(16),
+              color: selected
+                  ? AppColors.accent.withOpacity(0.12)
+                  : AppColors.surfaceMuted,
+              borderRadius: BorderRadius.circular(AppRadius.full),
               border: selected
-                  ? Border.all(color: const Color(0xFF6A5ACD), width: 1.5)
+                  ? Border.all(color: AppColors.accent, width: 1.5)
                   : null,
             ),
             child: Text(
@@ -362,8 +350,7 @@ class _ReactionRowState extends State<_ReactionRow> {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-                color:
-                    selected ? const Color(0xFF6A5ACD) : Colors.grey[600],
+                color: selected ? AppColors.accent : AppColors.textSecondary,
               ),
             ),
           ),
@@ -372,6 +359,3 @@ class _ReactionRowState extends State<_ReactionRow> {
     );
   }
 }
-
-
-

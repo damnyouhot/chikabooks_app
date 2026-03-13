@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 import '../services/job_image_uploader.dart';
 import '../../../services/job_draft_service.dart';
+import '../../../core/theme/app_colors.dart';
 
 // ── 폼 전용 타이포그래피 헬퍼 ─────────────────────────────
 TextStyle _ft({
@@ -21,15 +22,6 @@ TextStyle _ft({
   color: color,
   letterSpacing: letterSpacing,
 );
-
-// ── 디자인 팔레트 ──────────────────────────────────────
-const _kBg = Color(0xFFF8F6F9);
-const _kText = Color(0xFF3D4A5C);
-const _kBlue = Color(0xFF4A90D9);
-const _kPink = Color(0xFFF7CBCA);
-const _kPinkDark = Color(0xFFE57373);
-const _kCardBg = Colors.white;
-const _kBorder = Color(0xFFE0D8E8);
 
 /// 구인공고 폼 데이터 모델
 class JobPostData {
@@ -479,12 +471,12 @@ class _JobPostFormState extends State<JobPostForm> {
   Widget _sectionCard({required String title, required Widget child}) {
     return Container(
       decoration: BoxDecoration(
-        color: _kCardBg,
+        color: AppColors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _kBorder, width: 0.8),
+        border: Border.all(color: AppColors.divider, width: 0.8),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFCFB8D8).withOpacity(0.08),
+            color: AppColors.accent.withOpacity(0.08),
             blurRadius: 12,
             offset: const Offset(0, 3),
           ),
@@ -496,7 +488,7 @@ class _JobPostFormState extends State<JobPostForm> {
         children: [
           Text(
             title,
-            style: _ft(size: 14, weight: FontWeight.w800, color: _kText),
+            style: _ft(size: 14, weight: FontWeight.w800, color: AppColors.textPrimary),
           ),
           const SizedBox(height: 14),
           child,
@@ -515,7 +507,7 @@ class _JobPostFormState extends State<JobPostForm> {
           style: _ft(
             size: 12,
             weight: FontWeight.w500,
-            color: _kText.withOpacity(0.6),
+            color: AppColors.textSecondary,
           ),
         ),
         const SizedBox(height: 12),
@@ -544,7 +536,7 @@ class _JobPostFormState extends State<JobPostForm> {
                                     (_, __, ___) => Container(
                                       width: 90,
                                       height: 90,
-                                      color: _kPink.withOpacity(0.3),
+                                      color: AppColors.error.withOpacity(0.25),
                                       child: const Icon(Icons.image_outlined),
                                     ),
                               )
@@ -561,12 +553,12 @@ class _JobPostFormState extends State<JobPostForm> {
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(10),
                           child: Container(
-                            color: Colors.black45,
+                            color: AppColors.black.withOpacity(0.45),
                             child: Center(
                               child: Text(
                                 '${(progress * 100).toInt()}%',
                                 style: const TextStyle(
-                                  color: Colors.white,
+                                  color: AppColors.white,
                                   fontSize: 14,
                                   fontWeight: FontWeight.w700,
                                 ),
@@ -592,14 +584,14 @@ class _JobPostFormState extends State<JobPostForm> {
                           child: Container(
                             width: 20,
                             height: 20,
-                            decoration: const BoxDecoration(
+                            decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: Colors.black54,
+                              color: AppColors.black.withOpacity(0.54),
                             ),
                             child: const Icon(
                               Icons.close,
                               size: 12,
-                              color: Colors.white,
+                              color: AppColors.white,
                             ),
                           ),
                         ),
@@ -619,8 +611,8 @@ class _JobPostFormState extends State<JobPostForm> {
               icon: const Icon(Icons.add_photo_alternate_outlined, size: 18),
               label: Text('사진 추가 (${_data.images.length}/4)'),
               style: OutlinedButton.styleFrom(
-                foregroundColor: _kText,
-                side: BorderSide(color: _kBorder),
+                foregroundColor: AppColors.textPrimary,
+                side: BorderSide(color: AppColors.divider),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -641,14 +633,14 @@ class _JobPostFormState extends State<JobPostForm> {
                         height: 14,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: Colors.white,
+                          color: AppColors.white,
                         ),
                       )
                       : const Icon(Icons.auto_awesome, size: 18),
               label: Text(_isLoadingAi ? '분석 중...' : 'AI로 자동 채우기'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: _kPinkDark,
-                foregroundColor: Colors.white,
+                backgroundColor: AppColors.error,
+                foregroundColor: AppColors.white,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
@@ -740,20 +732,20 @@ class _JobPostFormState extends State<JobPostForm> {
                   label: Text(b),
                   selected: selected,
                   onSelected: (_) => _toggleBenefit(b),
-                  selectedColor: _kPink.withOpacity(0.4),
-                  checkmarkColor: _kText,
+                  selectedColor: AppColors.error.withOpacity(0.25),
+                  checkmarkColor: AppColors.textPrimary,
                   labelStyle: _ft(
                     size: 13,
                     weight: FontWeight.w600,
-                    color: _kText.withOpacity(selected ? 1.0 : 0.6),
+                    color: _data.benefits.contains(b) ? AppColors.textPrimary : AppColors.textSecondary,
                   ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                     side: BorderSide(
-                      color: selected ? _kPinkDark.withOpacity(0.4) : _kBorder,
+                      color: selected ? AppColors.error.withOpacity(0.4) : AppColors.divider,
                     ),
                   ),
-                  backgroundColor: Colors.white,
+                  backgroundColor: AppColors.white,
                 );
               }).toList(),
         ),
@@ -764,13 +756,13 @@ class _JobPostFormState extends State<JobPostForm> {
             Expanded(
               child: TextField(
                 controller: _benefitInputCtrl,
-                style: _ft(size: 13, weight: FontWeight.w600, color: _kText),
+                style: _ft(size: 13, weight: FontWeight.w600, color: AppColors.textPrimary),
                 decoration: InputDecoration(
                   hintText: '기타 복리후생 직접 입력',
                   hintStyle: _ft(
                     size: 13,
                     weight: FontWeight.w400,
-                    color: _kText.withOpacity(0.4),
+                    color: AppColors.textDisabled,
                   ),
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 14,
@@ -778,11 +770,11 @@ class _JobPostFormState extends State<JobPostForm> {
                   ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: _kBorder),
+                    borderSide: const BorderSide(color: AppColors.divider),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: _kBorder),
+                    borderSide: const BorderSide(color: AppColors.divider),
                   ),
                 ),
               ),
@@ -799,7 +791,7 @@ class _JobPostFormState extends State<JobPostForm> {
                 _notify();
               },
               style: TextButton.styleFrom(
-                foregroundColor: _kBlue,
+                foregroundColor: AppColors.accent,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -830,7 +822,7 @@ class _JobPostFormState extends State<JobPostForm> {
                           );
                           _notify();
                         },
-                        backgroundColor: _kBlue.withOpacity(0.1),
+                        backgroundColor: AppColors.accent.withOpacity(0.1),
                         side: BorderSide.none,
                       ),
                     )
@@ -883,11 +875,11 @@ class _JobPostFormState extends State<JobPostForm> {
             onChanged: (v) => setState(() => _aiReviewed = v ?? false),
             title: Text(
               'AI 자동입력 내용을 직접 검토했습니다.',
-              style: _ft(size: 13, weight: FontWeight.w600, color: _kText),
+              style: _ft(size: 13, weight: FontWeight.w600, color: AppColors.textPrimary),
             ),
             controlAffinity: ListTileControlAffinity.leading,
             contentPadding: EdgeInsets.zero,
-            activeColor: _kBlue,
+            activeColor: AppColors.accent,
           ),
         const SizedBox(height: 12),
         // ── 임시저장 버튼 + 상태 표시 ──
@@ -905,11 +897,11 @@ class _JobPostFormState extends State<JobPostForm> {
                     : const Icon(Icons.save_outlined, size: 18),
                 label: Text(
                   '임시저장',
-                  style: _ft(size: 14, weight: FontWeight.w600, color: _kBlue),
+                  style: _ft(size: 14, weight: FontWeight.w600, color: AppColors.accent),
                 ),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: _kBlue,
-                  side: const BorderSide(color: _kBlue),
+                  foregroundColor: AppColors.accent,
+                  side: const BorderSide(color: AppColors.accent),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
@@ -930,7 +922,7 @@ class _JobPostFormState extends State<JobPostForm> {
                 style: _ft(
                   size: 11,
                   weight: FontWeight.w500,
-                  color: _kText.withOpacity(0.4),
+                  color: AppColors.textDisabled,
                 ),
               ),
             ),
@@ -942,8 +934,8 @@ class _JobPostFormState extends State<JobPostForm> {
           child: ElevatedButton(
             onPressed: _isSubmitting ? null : _submit,
             style: ElevatedButton.styleFrom(
-              backgroundColor: _kBlue,
-              foregroundColor: Colors.white,
+              backgroundColor: AppColors.accent,
+              foregroundColor: AppColors.white,
               elevation: 0,
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
@@ -957,7 +949,7 @@ class _JobPostFormState extends State<JobPostForm> {
                       height: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Colors.white,
+                        color: AppColors.white,
                       ),
                     )
                     : Text(
@@ -973,7 +965,7 @@ class _JobPostFormState extends State<JobPostForm> {
             style: _ft(
               size: 12,
               weight: FontWeight.w500,
-              color: _kText.withOpacity(0.5),
+              color: AppColors.textSecondary,
             ),
           ),
         ),
@@ -993,19 +985,19 @@ class _JobPostFormState extends State<JobPostForm> {
       controller: controller,
       maxLines: maxLines,
       validator: validator,
-      style: _ft(size: 14, weight: FontWeight.w600, color: _kText),
+      style: _ft(size: 14, weight: FontWeight.w600, color: AppColors.textPrimary),
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
         hintStyle: _ft(
           size: 13,
           weight: FontWeight.w400,
-          color: _kText.withOpacity(0.4),
+          color: AppColors.textDisabled,
         ),
         labelStyle: _ft(
           size: 13,
           weight: FontWeight.w600,
-          color: _kText.withOpacity(0.7),
+          color: AppColors.textSecondary,
         ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 14,
@@ -1013,18 +1005,18 @@ class _JobPostFormState extends State<JobPostForm> {
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: _kBorder),
+          borderSide: const BorderSide(color: AppColors.divider),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: _kBorder),
+          borderSide: const BorderSide(color: AppColors.divider),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: _kBlue, width: 1.5),
+          borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
         ),
         filled: true,
-        fillColor: _kBg,
+        fillColor: AppColors.appBg,
       ),
     );
   }
@@ -1048,20 +1040,20 @@ class _JobPostFormState extends State<JobPostForm> {
                     style: _ft(
                       size: 14,
                       weight: FontWeight.w600,
-                      color: _kText,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                 ),
               )
               .toList(),
       onChanged: onChanged,
-      style: _ft(size: 14, weight: FontWeight.w600, color: _kText),
+      style: _ft(size: 14, weight: FontWeight.w600, color: AppColors.textPrimary),
       decoration: InputDecoration(
         labelText: label,
         labelStyle: _ft(
           size: 13,
           weight: FontWeight.w600,
-          color: _kText.withOpacity(0.7),
+          color: AppColors.textSecondary,
         ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 14,
@@ -1069,18 +1061,18 @@ class _JobPostFormState extends State<JobPostForm> {
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: _kBorder),
+          borderSide: const BorderSide(color: AppColors.divider),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: _kBorder),
+          borderSide: const BorderSide(color: AppColors.divider),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: _kBlue, width: 1.5),
+          borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
         ),
         filled: true,
-        fillColor: _kBg,
+        fillColor: AppColors.appBg,
       ),
     );
   }

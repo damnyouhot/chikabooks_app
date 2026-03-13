@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 import '../../models/weekly_stamp.dart';
 import '../../services/weekly_stamp_service.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_style.dart';
+import '../../core/theme/app_tokens.dart';
+import '../../core/widgets/app_badge.dart';
 import 'bond_stamp_circle.dart';
-
-// AppColors 직접 참조 (TabTheme 제거)
 
 /// 이번 주 우리 스탬프 섹션
 class BondStampSection extends StatefulWidget {
@@ -33,9 +32,7 @@ class _BondStampSectionState extends State<BondStampSection> {
   void didUpdateWidget(BondStampSection oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.partnerGroupId != widget.partnerGroupId) {
-      setState(() {
-        _initStream();
-      });
+      setState(() => _initStream());
     }
   }
 
@@ -49,7 +46,6 @@ class _BondStampSectionState extends State<BondStampSection> {
 
   @override
   Widget build(BuildContext context) {
-    // 파트너 그룹이 없으면 숨김
     if (widget.partnerGroupId == null || widget.partnerGroupId!.isEmpty) {
       return const SizedBox.shrink();
     }
@@ -57,65 +53,52 @@ class _BondStampSectionState extends State<BondStampSection> {
     return StreamBuilder<WeeklyStampState>(
       stream: _stream,
       builder: (context, snap) {
-        final stamp = snap.data ?? WeeklyStampState.empty(
-          WeeklyStampService.currentWeekKey(),
-        );
+        final stamp = snap.data ??
+            WeeklyStampState.empty(WeeklyStampService.currentWeekKey());
         final todayIdx = WeeklyStampService.todayDayOfWeek();
 
         return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
           child: Container(
             width: double.infinity,
-            // Neon 채운 스탬프 카드
-            decoration: AppStyle.emphasisCardDecoration(),
+            decoration: BoxDecoration(
+              color: AppColors.cardEmphasis,
+              borderRadius: BorderRadius.circular(AppRadius.xl),
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Neon 헤더 영역
+                // Neon 헤더
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.xl, 18, AppSpacing.xl, 14),
                   child: Row(
                     children: [
-                      Text(
+                      const Text(
                         '이번 주 우리 스탬프',
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.onCardEmphasis,  // Black on Neon
+                          color: AppColors.onCardEmphasis,
                         ),
                       ),
                       const Spacer(),
-                      // 채운 칸 뱃지
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: AppColors.onCardEmphasis.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: AppColors.onCardEmphasis.withOpacity(0.3),
-                            width: 0.8,
-                          ),
-                        ),
-                        child: Text(
-                          '${stamp.filledCount}/7',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.onCardEmphasis,
-                          ),
-                        ),
+                      AppBadge(
+                        label: '${stamp.filledCount}/7',
+                        bgColor: AppColors.onCardEmphasis.withOpacity(0.15),
+                        textColor: AppColors.onCardEmphasis,
+                        isCircle: false,
                       ),
                     ],
                   ),
                 ),
-
-                // 스탬프 원 7개 (흰 내부 배경)
+                // 스탬프 원 7개
                 Container(
                   margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.65),
-                    borderRadius: BorderRadius.circular(14),
+                    color: AppColors.white.withOpacity(0.65),
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -138,5 +121,3 @@ class _BondStampSectionState extends State<BondStampSection> {
     );
   }
 }
-
-

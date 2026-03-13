@@ -3,12 +3,8 @@ import '../models/enthrone.dart';
 import '../services/enthrone_service.dart';
 import '../services/report_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
-// ── 디자인 팔레트 (bond_page와 통일) ──
-const _kText = Color(0xFF5D6B6B);
-const _kShadow2 = Color(0xFFD5E5E5);
-const _kCardBg = Colors.white;
-const _kAccent = Color(0xFFF7CBCA); // 털어놔 카드와 동일
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_tokens.dart';
 
 /// 전광판 카드 위젯
 class BillboardCard extends StatelessWidget {
@@ -41,11 +37,11 @@ class BillboardCard extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         margin: const EdgeInsets.only(bottom: 8),
         decoration: BoxDecoration(
-          color: _kCardBg,
-          borderRadius: BorderRadius.circular(12),
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(AppRadius.md),
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.08),
+              color: AppColors.textDisabled.withOpacity(0.08),
               blurRadius: 6,
               offset: const Offset(0, 1),
             ),
@@ -65,15 +61,15 @@ class BillboardCard extends StatelessWidget {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: _kShadow2.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(10),
+                    color: AppColors.accent.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
                   ),
                   child: _buildAuthorLabel(),
                 ),
                 const SizedBox(width: 6),
                 Text(
                   _formatDate(post.createdAt),
-                  style: TextStyle(fontSize: 10, color: Colors.grey[400]),
+                  style: const TextStyle(fontSize: 10, color: AppColors.textDisabled),
                 ),
               ],
             ),
@@ -90,7 +86,7 @@ class BillboardCard extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 14,
                   height: 1.4,
-                  color: Color(0xFF333333),
+                  color: AppColors.textPrimary,
                 ),
               ),
             ),
@@ -133,11 +129,11 @@ class BillboardCard extends StatelessWidget {
                   },
                   child: Container(
                     padding: const EdgeInsets.all(6),
-                    child: Icon(
-                      Icons.report_outlined,
-                      size: 18,
-                      color: _kText.withOpacity(0.3),
-                    ),
+                  child: Icon(
+                    Icons.report_outlined,
+                    size: 18,
+                    color: AppColors.textPrimary.withOpacity(0.3),
+                  ),
                   ),
                 ),
               ],
@@ -170,14 +166,14 @@ class BillboardCard extends StatelessWidget {
         margin: const EdgeInsets.only(right: 4),
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(
-          color: _kAccent.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(10),
+          color: AppColors.accent.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
         ),
         child: Text(
           label,
           style: const TextStyle(
             fontSize: 14,
-            color: _kText,
+            color: AppColors.textPrimary,
             decoration: TextDecoration.none,
           ),
         ),
@@ -189,27 +185,27 @@ class BillboardCard extends StatelessWidget {
     // 1) billboardPosts에 닉네임 스냅샷이 있으면 그걸 우선 표시
     final snapName = post.authorNickname;
     if (snapName != null && snapName.isNotEmpty) {
-      return Text(
-        snapName,
-        style: const TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: _kText,
-        ),
-      );
-    }
+        return Text(
+          snapName,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+          ),
+        );
+      }
 
-    // 2) 없으면 authorId(uid)로 users/{uid}.nickname 조회 (기존 글 호환)
-    final authorUid = post.authorId;
-    if (authorUid == null || authorUid.isEmpty) {
-      return const Text(
-        '치과인',
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: _kText,
-        ),
-      );
+      // 2) 없으면 authorId(uid)로 users/{uid}.nickname 조회 (기존 글 호환)
+      final authorUid = post.authorId;
+      if (authorUid == null || authorUid.isEmpty) {
+        return const Text(
+          '치과인',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+          ),
+        );
     }
 
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
@@ -223,14 +219,14 @@ class BillboardCard extends StatelessWidget {
         final nickname = (data?['nickname'] as String?)?.trim();
         final label =
             (nickname != null && nickname.isNotEmpty) ? nickname : authorUid;
-        return Text(
-          label,
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: _kText,
-          ),
-        );
+          return Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          );
       },
     );
   }
@@ -294,7 +290,7 @@ class BillboardSection extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF5D6B6B),
+                  color: AppColors.textPrimary,
                 ),
               ),
               const Spacer(),
@@ -304,7 +300,7 @@ class BillboardSection extends StatelessWidget {
                 },
                 child: Text(
                   '더보기',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                 ),
               ),
             ],
@@ -331,25 +327,25 @@ class BillboardSection extends StatelessWidget {
                 return Container(
                   padding: const EdgeInsets.all(32),
                   decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(16),
+                    color: AppColors.surfaceMuted,
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                   ),
                   child: Column(
                     children: [
                       Icon(
                         Icons.auto_awesome_outlined,
                         size: 48,
-                        color: Colors.grey[400],
+                        color: AppColors.textDisabled,
                       ),
                       const SizedBox(height: 12),
                       Text(
                         '아직 추대된 글이 없어요',
-                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                        style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         '좋은 글에 추대를 보내보세요',
-                        style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                        style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                       ),
                     ],
                   ),

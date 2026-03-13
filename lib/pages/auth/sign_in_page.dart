@@ -10,6 +10,7 @@ import '../../services/kakao_auth_service.dart';
 import '../../services/naver_auth_service.dart';
 import '../../services/sign_in_tracker.dart';
 import '../../services/onboarding_service.dart';
+import '../../core/theme/app_colors.dart';
 
 /// 다중 소셜 로그인 페이지
 /// Google / Apple / Kakao / Naver / Email 지원
@@ -425,7 +426,7 @@ class _SignInPageState extends State<SignInPage> {
                   const Icon(
                     Icons.medical_services,
                     size: 80,
-                    color: Colors.white,
+                    color: AppColors.white,
                   ),
                   const SizedBox(height: 16),
                   const Text(
@@ -433,19 +434,19 @@ class _SignInPageState extends State<SignInPage> {
                     style: TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: AppColors.white,
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
+                  Text(
                     '치과 커뮤니티 & 구인구직 플랫폼',
-                    style: TextStyle(fontSize: 14, color: Colors.white70),
+                    style: TextStyle(fontSize: 14, color: AppColors.white.withOpacity(0.7)),
                   ),
                   const SizedBox(height: 48),
 
                   // 로딩 표시
                   if (_isLoading)
-                    const CircularProgressIndicator(color: Colors.white)
+                    const CircularProgressIndicator(color: AppColors.white)
                   else
                     Column(
                       children: [
@@ -547,21 +548,14 @@ class _SignInPageState extends State<SignInPage> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
               decoration: BoxDecoration(
-                color: const Color(0xFF4CAF50),
+                color: AppColors.success,
                 borderRadius: BorderRadius.circular(8),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF4CAF50).withOpacity(0.3),
-                    blurRadius: 4,
-                    offset: const Offset(0, 1),
-                  ),
-                ],
               ),
               child: const Text(
                 '마지막 로그인',
                 style: TextStyle(
                   fontSize: 10,
-                  color: Colors.white,
+                  color: AppColors.white,
                   fontWeight: FontWeight.w700,
                 ),
               ),

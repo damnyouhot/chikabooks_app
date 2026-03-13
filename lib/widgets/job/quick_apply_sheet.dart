@@ -106,7 +106,7 @@ class _QuickApplySheetState extends State<QuickApplySheet> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('✅ 지원이 완료되었습니다! +1.0P'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.success,
           ),
         );
       }

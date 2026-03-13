@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/career_profile_service.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
 import 'career_shared.dart';
 
 // ── 치과 네트워크 카드 ─────────────────────────────────────────
@@ -20,8 +22,10 @@ class _CareerNetworkCardState extends State<CareerNetworkCard> {
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
           return CareerCard(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-            child: Column(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg, 14, AppSpacing.lg, 14,
+            ),
+            child: const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
@@ -29,15 +33,15 @@ class _CareerNetworkCardState extends State<CareerNetworkCard> {
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w900,
-                    color: kCText,
+                    color: AppColors.onCardPrimary,
                   ),
                 ),
-                const SizedBox(height: 6),
+                SizedBox(height: 6),
                 Text(
                   '불러오는 중...',
                   style: TextStyle(
                     fontSize: 12,
-                    color: kCText.withOpacity(0.45),
+                    color: AppColors.onCardPrimary, // 이전 kCText.withOpacity(0.45)
                   ),
                 ),
               ],
@@ -45,43 +49,44 @@ class _CareerNetworkCardState extends State<CareerNetworkCard> {
           );
         }
         if (snap.hasError) {
-          return CareerErrorCard(message: '치과 네트워크를 불러오지 못했어요.');
+          return const CareerErrorCard(message: '치과 네트워크를 불러오지 못했어요.');
         }
 
         final entries = snap.data ?? [];
         final totalClinics = entries.length;
         final totalMonths = entries.fold(0, (sum, e) => sum + e.months);
-        final maxMonths =
-            entries.isEmpty
-                ? 1
-                : entries.map((e) => e.months).reduce((a, b) => a > b ? a : b);
+        final maxMonths = entries.isEmpty
+            ? 1
+            : entries.map((e) => e.months).reduce((a, b) => a > b ? a : b);
 
         return CareerCard(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg, 14, AppSpacing.lg, 14,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               InkWell(
                 onTap: () => setState(() => _expanded = !_expanded),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.md),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 6),
                   child: Row(
                     children: [
-                      Expanded(
+                      const Expanded(
                         child: Text(
                           '나의 치과 네트워크',
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w900,
-                            color: kCText,
+                            color: AppColors.onCardPrimary,
                           ),
                         ),
                       ),
                       IconButton(
                         onPressed: () => DentalNetworkEditSheet.show(context),
                         icon: const Icon(Icons.add, size: 18),
-                        color: kCText.withOpacity(0.65),
+                        color: AppColors.onCardPrimary, // 이전 kCText.withOpacity(0.65)
                         constraints: const BoxConstraints(
                           minWidth: 32,
                           minHeight: 32,
@@ -92,10 +97,10 @@ class _CareerNetworkCardState extends State<CareerNetworkCard> {
                       const SizedBox(width: 2),
                       Text(
                         _expanded ? '접기' : '펼치기',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
-                          color: kCText.withOpacity(0.65),
+                          color: AppColors.onCardPrimary,
                         ),
                       ),
                       const SizedBox(width: 4),
@@ -103,7 +108,7 @@ class _CareerNetworkCardState extends State<CareerNetworkCard> {
                         _expanded
                             ? Icons.keyboard_arrow_up
                             : Icons.keyboard_arrow_down,
-                        color: kCText.withOpacity(0.6),
+                        color: AppColors.onCardPrimary,
                       ),
                     ],
                   ),
@@ -121,51 +126,45 @@ class _CareerNetworkCardState extends State<CareerNetworkCard> {
                         : '총 $totalClinics곳 · 총 ${formatCareerMonths(totalMonths)}',
                     style: TextStyle(
                       fontSize: 12,
-                      color:
-                          totalClinics == 0
-                              ? kCAccent.withOpacity(0.8)
-                              : kCText.withOpacity(0.65),
+                      // 이전 totalClinics==0 → kCAccent.withOpacity(0.8) : kCText.withOpacity(0.65)
+                      color: totalClinics == 0
+                          ? AppColors.cardEmphasis          // Neon 포인트 (빈 상태 CTA)
+                          : AppColors.onCardPrimary,
                     ),
                   ),
                 ),
               ),
               AnimatedCrossFade(
-                crossFadeState:
-                    _expanded
-                        ? CrossFadeState.showSecond
-                        : CrossFadeState.showFirst,
+                crossFadeState: _expanded
+                    ? CrossFadeState.showSecond
+                    : CrossFadeState.showFirst,
                 duration: const Duration(milliseconds: 200),
                 firstChild: const SizedBox(height: 0),
                 secondChild: Padding(
                   padding: const EdgeInsets.only(top: 12),
-                  child:
-                      entries.isEmpty
-                          ? _NetworkEmptyHint(
-                            onAdd: () => DentalNetworkEditSheet.show(context),
-                          )
-                          : Column(
-                            children:
-                                entries
-                                    .map(
-                                      (e) => Padding(
-                                        padding: const EdgeInsets.only(
-                                          bottom: 10,
-                                        ),
-                                        child: _NetworkTimelineItem(
-                                          entry: e,
-                                          maxMonths: maxMonths,
-                                          onEdit:
-                                              () => DentalNetworkEditSheet.show(
-                                                context,
-                                                editing: e,
-                                              ),
-                                          onDelete:
-                                              () => _confirmDelete(context, e),
-                                        ),
-                                      ),
-                                    )
-                                    .toList(),
-                          ),
+                  child: entries.isEmpty
+                      ? _NetworkEmptyHint(
+                          onAdd: () => DentalNetworkEditSheet.show(context),
+                        )
+                      : Column(
+                          children: entries
+                              .map(
+                                (e) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 10),
+                                  child: _NetworkTimelineItem(
+                                    entry: e,
+                                    maxMonths: maxMonths,
+                                    onEdit: () => DentalNetworkEditSheet.show(
+                                      context,
+                                      editing: e,
+                                    ),
+                                    onDelete: () =>
+                                        _confirmDelete(context, e),
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                        ),
                 ),
               ),
             ],
@@ -181,21 +180,23 @@ class _CareerNetworkCardState extends State<CareerNetworkCard> {
   ) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder:
-          (ctx) => AlertDialog(
-            title: const Text('삭제하시겠어요?'),
-            content: Text('"${entry.clinicName}" 이력을 삭제합니다.'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(false),
-                child: const Text('취소'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(true),
-                child: const Text('삭제', style: TextStyle(color: Colors.red)),
-              ),
-            ],
+      builder: (ctx) => AlertDialog(
+        title: const Text('삭제하시겠어요?'),
+        content: Text('"${entry.clinicName}" 이력을 삭제합니다.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('취소'),
           ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text(
+              '삭제',
+              style: TextStyle(color: AppColors.error),
+            ),
+          ),
+        ],
+      ),
     );
     if (ok == true) {
       await CareerProfileService.deleteNetworkEntry(entry.id);
@@ -212,31 +213,36 @@ class _NetworkEmptyHint extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: kCShadow,
-        borderRadius: BorderRadius.circular(14),
+        // 이전 kCShadow — surfaceMuted로 통일
+        color: AppColors.onCardPrimary.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
       ),
       child: Row(
         children: [
+          // 왼쪽 accent 바 — 이전 kCAccent → cardEmphasis(Neon)
           Container(
-            width: 8,
+            width: 7,
             height: 46,
             decoration: BoxDecoration(
-              color: kCAccent,
-              borderRadius: BorderRadius.circular(10),
+              color: AppColors.cardEmphasis,
+              borderRadius: BorderRadius.circular(AppRadius.md),
             ),
           ),
           const SizedBox(width: 10),
-          Expanded(
+          const Expanded(
             child: Text(
               '아직 이력이 없어요.\n첫 근무지를 추가하면 타임라인이 만들어져요.',
               style: TextStyle(
                 fontSize: 12,
                 height: 1.35,
-                color: kCText.withOpacity(0.75),
+                color: AppColors.onCardPrimary, // 이전 kCText.withOpacity(0.75)
               ),
             ),
           ),
-          TextButton(onPressed: onAdd, child: const Text('추가하기')),
+          TextButton(
+            onPressed: onAdd,
+            child: const Text('추가하기'),
+          ),
         ],
       ),
     );
@@ -258,7 +264,6 @@ class _NetworkTimelineItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 타임라인 바 높이: 화면 높이의 비율 기반으로 상·하한 clamp
     final screenH = MediaQuery.of(context).size.height;
     final kMaxBarH = (screenH * 0.13).clamp(80.0, 130.0);
     final kMinBarH = (screenH * 0.035).clamp(22.0, 36.0);
@@ -267,28 +272,26 @@ class _NetworkTimelineItem extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color:
-            entry.isCurrent
-                ? kCAccent.withOpacity(0.1)
-                : kCCardBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color:
-              entry.isCurrent ? kCAccent.withOpacity(0.5) : Colors.transparent,
-          width: 0.8,
-        ),
+        // border 제거 — 배경색으로 현재 재직 여부 표현
+        color: entry.isCurrent
+            ? AppColors.onCardPrimary.withOpacity(0.12) // 이전 kCAccent.withOpacity(0.1) + border
+            : AppColors.onCardPrimary.withOpacity(0.07), // 이전 kCCardBg
+        borderRadius: BorderRadius.circular(AppRadius.lg),
       ),
       padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 타임라인 바 — 이전 isCurrent ? kCAccent : kCAccent.withOpacity(0.45)
           Container(
             width: 7,
             height: barHeight,
             margin: const EdgeInsets.only(top: 2, right: 12),
             decoration: BoxDecoration(
-              color: entry.isCurrent ? kCAccent : kCAccent.withOpacity(0.45),
-              borderRadius: BorderRadius.circular(10),
+              color: entry.isCurrent
+                  ? AppColors.cardEmphasis                  // Neon (현재 재직)
+                  : AppColors.onCardPrimary.withOpacity(0.3), // 이전 근무지
+              borderRadius: BorderRadius.circular(AppRadius.md),
             ),
           ),
           Expanded(
@@ -297,26 +300,26 @@ class _NetworkTimelineItem extends StatelessWidget {
               children: [
                 Text(
                   entry.periodLabel,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 11,
-                    color: kCText.withOpacity(0.5),
+                    color: AppColors.onCardPrimary, // 이전 kCText.withOpacity(0.5)
                   ),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   entry.clinicName,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w800,
-                    color: kCText,
+                    color: AppColors.onCardPrimary,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   formatCareerMonths(entry.months),
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 12,
-                    color: kCText.withOpacity(0.6),
+                    color: AppColors.onCardPrimary, // 이전 kCText.withOpacity(0.6)
                   ),
                 ),
                 if (entry.tags.isNotEmpty) ...[
@@ -324,47 +327,47 @@ class _NetworkTimelineItem extends StatelessWidget {
                   Wrap(
                     spacing: 4,
                     runSpacing: 4,
-                    children:
-                        entry.tags
-                            .map(
-                              (t) => Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 3,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: kCAccent.withOpacity(0.25),
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                              child: Text(
-                                t,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: kCText,
-                                ),
+                    children: entry.tags
+                        .map(
+                          (t) => Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.sm,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              // 이전 kCAccent.withOpacity(0.25)
+                              color: AppColors.onCardPrimary.withOpacity(0.20),
+                              borderRadius:
+                                  BorderRadius.circular(AppRadius.full),
+                            ),
+                            child: Text(
+                              t,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.onCardPrimary,
                               ),
-                              ),
-                            )
-                            .toList(),
+                            ),
+                          ),
+                        )
+                        .toList(),
                   ),
                 ],
                 if (entry.acquiredSkills.isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Wrap(
                     spacing: 4,
-                    children:
-                        entry.acquiredSkills
-                            .map(
-                              (s) => Text(
-                                '$s +1',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: kCText.withOpacity(0.5),
-                                ),
-                              ),
-                            )
-                            .toList(),
+                    children: entry.acquiredSkills
+                        .map(
+                          (s) => Text(
+                            '$s +1',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.onCardPrimary,
+                            ),
+                          ),
+                        )
+                        .toList(),
                   ),
                 ],
               ],
@@ -376,14 +379,14 @@ class _NetworkTimelineItem extends StatelessWidget {
               IconButton(
                 onPressed: onEdit,
                 icon: const Icon(Icons.edit_outlined, size: 16),
-                color: kCText.withOpacity(0.55),
+                color: AppColors.onCardPrimary, // 이전 kCText.withOpacity(0.55)
                 constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
                 padding: EdgeInsets.zero,
               ),
               IconButton(
                 onPressed: onDelete,
                 icon: const Icon(Icons.delete_outline, size: 16),
-                color: Colors.redAccent.withOpacity(0.7),
+                color: AppColors.error, // 이전 Colors.redAccent.withOpacity(0.7)
                 constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
                 padding: EdgeInsets.zero,
               ),
@@ -425,32 +428,33 @@ class _DentalNetworkListSheet extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(top: 60),
       decoration: const BoxDecoration(
-        color: Colors.white,
+        color: AppColors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
         children: [
           const SizedBox(height: 10),
+          // drag handle
           Container(
             width: 38,
             height: 4,
             decoration: BoxDecoration(
-              color: kCShadow,
+              color: AppColors.disabledBg, // 이전 kCShadow
               borderRadius: BorderRadius.circular(4),
             ),
           ),
           const SizedBox(height: 16),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
             child: Row(
               children: [
-                Expanded(
+                const Expanded(
                   child: Text(
                     '치과 네트워크',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w900,
-                      color: kCText,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                 ),
@@ -467,14 +471,14 @@ class _DentalNetworkListSheet extends StatelessWidget {
                   icon: const Icon(Icons.add, size: 16),
                   label: const Text('추가'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: kCText,
-                    foregroundColor: Colors.white,
+                    backgroundColor: AppColors.accent,   // 이전 kCText(Black)
+                    foregroundColor: AppColors.onAccent,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 14,
                       vertical: 8,
                     ),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                     ),
                     elevation: 0,
                     textStyle: const TextStyle(
@@ -498,20 +502,20 @@ class _DentalNetworkListSheet extends StatelessWidget {
                       padding: const EdgeInsets.all(32),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
-                        children: [
+                        children: const [
                           Icon(
                             Icons.business_outlined,
                             size: 48,
-                            color: kCText.withOpacity(0.2),
+                            color: AppColors.textDisabled, // 이전 kCText.withOpacity(0.2)
                           ),
-                          const SizedBox(height: 12),
+                          SizedBox(height: 12),
                           Text(
                             '아직 등록된 치과가 없어요.\n오른쪽 위 추가 버튼을 눌러보세요.',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 14,
                               height: 1.5,
-                              color: kCText.withOpacity(0.45),
+                              color: AppColors.textSecondary, // 이전 kCText.withOpacity(0.45)
                             ),
                           ),
                         ],
@@ -520,25 +524,20 @@ class _DentalNetworkListSheet extends StatelessWidget {
                   );
                 }
                 return ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.lg, 0, AppSpacing.lg, AppSpacing.xxl,
+                  ),
                   itemCount: entries.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 8),
                   itemBuilder: (context, i) {
                     final e = entries[i];
                     return Container(
                       decoration: BoxDecoration(
-                        color:
-                            e.isCurrent
-                                ? kCAccent.withOpacity(0.1)
-                                : kCCardBg,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color:
-                              e.isCurrent
-                                  ? kCAccent.withOpacity(0.5)
-                                  : Colors.transparent,
-                          width: 0.8,
-                        ),
+                        // border 제거 — 배경색으로 현재 재직 여부 표현
+                        color: e.isCurrent
+                            ? AppColors.accent.withOpacity(0.10)
+                            : AppColors.surfaceMuted, // 이전 kCCardBg
+                        borderRadius: BorderRadius.circular(AppRadius.lg),
                       ),
                       padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
                       child: Row(
@@ -547,20 +546,20 @@ class _DentalNetworkListSheet extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                            Text(
-                              e.clinicName,
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w800,
-                                color: kCText,
-                              ),
-                            ),
+                                Text(
+                                  e.clinicName,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
                                 const SizedBox(height: 2),
                                 Text(
                                   '${e.periodLabel}  ·  ${formatCareerMonths(e.months)}',
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                     fontSize: 12,
-                                    color: kCText.withOpacity(0.55),
+                                    color: AppColors.textSecondary, // 이전 kCText.withOpacity(0.55)
                                   ),
                                 ),
                               ],
@@ -573,49 +572,44 @@ class _DentalNetworkListSheet extends StatelessWidget {
                                 context: context,
                                 isScrollControlled: true,
                                 backgroundColor: Colors.transparent,
-                                builder:
-                                    (_) => _DentalEntryFormSheet(editing: e),
+                                builder: (_) => _DentalEntryFormSheet(editing: e),
                               );
                             },
                             icon: const Icon(Icons.edit_outlined, size: 18),
-                            color: kCText.withOpacity(0.6),
+                            color: AppColors.textSecondary, // 이전 kCText.withOpacity(0.6)
                           ),
                           IconButton(
                             onPressed: () async {
                               final ok = await showDialog<bool>(
                                 context: context,
-                                builder:
-                                    (ctx) => AlertDialog(
-                                      title: const Text('삭제하시겠어요?'),
-                                      content: Text(
-                                        '"${e.clinicName}" 이력을 삭제합니다.',
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed:
-                                              () =>
-                                                  Navigator.of(ctx).pop(false),
-                                          child: const Text('취소'),
-                                        ),
-                                        TextButton(
-                                          onPressed:
-                                              () => Navigator.of(ctx).pop(true),
-                                          child: const Text(
-                                            '삭제',
-                                            style: TextStyle(color: Colors.red),
-                                          ),
-                                        ),
-                                      ],
+                                builder: (ctx) => AlertDialog(
+                                  title: const Text('삭제하시겠어요?'),
+                                  content: Text(
+                                    '"${e.clinicName}" 이력을 삭제합니다.',
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.of(ctx).pop(false),
+                                      child: const Text('취소'),
                                     ),
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.of(ctx).pop(true),
+                                      child: const Text(
+                                        '삭제',
+                                        style: TextStyle(color: AppColors.error),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               );
                               if (ok == true) {
-                                await CareerProfileService.deleteNetworkEntry(
-                                  e.id,
-                                );
+                                await CareerProfileService.deleteNetworkEntry(e.id);
                               }
                             },
                             icon: const Icon(Icons.delete_outline, size: 18),
-                            color: Colors.redAccent.withOpacity(0.65),
+                            color: AppColors.error, // 이전 Colors.redAccent.withOpacity(0.65)
                           ),
                         ],
                       ),
@@ -704,9 +698,9 @@ class _DentalEntryFormSheetState extends State<_DentalEntryFormSheet> {
   Future<void> _save() async {
     final name = _clinicCtrl.text.trim();
     if (name.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('치과 이름을 입력해 주세요.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('치과 이름을 입력해 주세요.')),
+      );
       return;
     }
     setState(() => _saving = true);
@@ -738,31 +732,32 @@ class _DentalEntryFormSheetState extends State<_DentalEntryFormSheet> {
     return Container(
       margin: const EdgeInsets.only(top: 60),
       decoration: const BoxDecoration(
-        color: Colors.white,
+        color: AppColors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
         children: [
           const SizedBox(height: 10),
+          // drag handle
           Container(
             width: 38,
             height: 4,
             decoration: BoxDecoration(
-              color: kCShadow,
+              color: AppColors.disabledBg, // 이전 kCShadow
               borderRadius: BorderRadius.circular(4),
             ),
           ),
           const SizedBox(height: 16),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
                 isEdit ? '이력 수정' : '치과 이력 추가',
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w900,
-                  color: kCText,
+                  color: AppColors.textPrimary,
                 ),
               ),
             ),
@@ -770,16 +765,18 @@ class _DentalEntryFormSheetState extends State<_DentalEntryFormSheet> {
           const SizedBox(height: 16),
           Expanded(
             child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, bottomPad + 16),
+              padding: EdgeInsets.fromLTRB(
+                AppSpacing.xl, 0, AppSpacing.xl, bottomPad + AppSpacing.lg,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  const Text(
                     '치과 이름',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: kCText,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -788,9 +785,9 @@ class _DentalEntryFormSheetState extends State<_DentalEntryFormSheet> {
                     decoration: InputDecoration(
                       hintText: '예) 서울 ○○치과',
                       filled: true,
-                      fillColor: kCCardBg,
+                      fillColor: AppColors.surfaceMuted, // 이전 kCCardBg
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
                         borderSide: BorderSide.none,
                       ),
                       contentPadding: const EdgeInsets.symmetric(
@@ -799,13 +796,13 @@ class _DentalEntryFormSheetState extends State<_DentalEntryFormSheet> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  Text(
+                  const SizedBox(height: AppSpacing.xl),
+                  const Text(
                     '입사 연월',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: kCText,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -813,138 +810,133 @@ class _DentalEntryFormSheetState extends State<_DentalEntryFormSheet> {
                     label: '${_startDate.year}년 ${_startDate.month}월',
                     onTap: () => _pickDate(isStart: true),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppSpacing.lg),
                   Row(
                     children: [
                       Checkbox(
                         value: _isCurrent,
-                        onChanged:
-                            (v) => setState(() => _isCurrent = v ?? true),
-                        activeColor: kCText,
+                        onChanged: (v) =>
+                            setState(() => _isCurrent = v ?? true),
+                        activeColor: AppColors.accent, // 이전 kCText(Black)
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(4),
                         ),
                       ),
-                      Text(
+                      const Text(
                         '현재 재직 중',
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
-                          color: kCText,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                     ],
                   ),
                   if (!_isCurrent) ...[
                     const SizedBox(height: 10),
-                    Text(
+                    const Text(
                       '퇴사 연월',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
-                        color: kCText,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 6),
                     CareerDatePickerTile(
-                      label:
-                          _endDate == null
-                              ? '날짜 선택'
-                              : '${_endDate!.year}년 ${_endDate!.month}월',
+                      label: _endDate == null
+                          ? '날짜 선택'
+                          : '${_endDate!.year}년 ${_endDate!.month}월',
                       onTap: () => _pickDate(isStart: false),
                     ),
                   ],
-                  const SizedBox(height: 20),
-                  Text(
+                  const SizedBox(height: AppSpacing.xl),
+                  const Text(
                     '주요 업무 태그',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: kCText,
+                      color: AppColors.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.sm),
                   Wrap(
                     spacing: 6,
                     runSpacing: 6,
-                    children:
-                        _kTagOptions
-                            .map(
-                              (t) => FilterChip(
-                                label: Text(t),
-                                selected: _tags.contains(t),
-                                onSelected:
-                                    (v) => setState(() {
-                                      if (v) {
-                                        _tags.add(t);
-                                      } else {
-                                        _tags.remove(t);
-                                      }
-                                    }),
-                                selectedColor: kCAccent.withOpacity(0.35),
-                                checkmarkColor: kCText,
-                                backgroundColor: kCShadow,
-                                labelStyle: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color:
-                                      _tags.contains(t)
-                                          ? kCText
-                                          : kCText.withOpacity(0.6),
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                side: BorderSide.none,
-                              ),
-                            )
-                            .toList(),
+                    children: _kTagOptions
+                        .map(
+                          (t) => FilterChip(
+                            label: Text(t),
+                            selected: _tags.contains(t),
+                            onSelected: (v) => setState(() {
+                              if (v) {
+                                _tags.add(t);
+                              } else {
+                                _tags.remove(t);
+                              }
+                            }),
+                            // 이전 kCAccent.withOpacity(0.35) → accent 계열
+                            selectedColor: AppColors.accent.withOpacity(0.18),
+                            checkmarkColor: AppColors.accent,
+                            backgroundColor: AppColors.surfaceMuted, // 이전 kCShadow
+                            labelStyle: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: _tags.contains(t)
+                                  ? AppColors.textPrimary
+                                  : AppColors.textSecondary,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            side: BorderSide.none,
+                          ),
+                        )
+                        .toList(),
                   ),
-                  const SizedBox(height: 20),
-                  Text(
+                  const SizedBox(height: AppSpacing.xl),
+                  const Text(
                     '이 기간에 성장한 스킬',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: kCText,
+                      color: AppColors.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.sm),
                   Wrap(
                     spacing: 6,
                     runSpacing: 6,
-                    children:
-                        _kTagOptions
-                            .map(
-                              (t) => FilterChip(
-                                label: Text(t),
-                                selected: _acquiredSkills.contains(t),
-                                onSelected:
-                                    (v) => setState(() {
-                                      if (v) {
-                                        _acquiredSkills.add(t);
-                                      } else {
-                                        _acquiredSkills.remove(t);
-                                      }
-                                    }),
-                                selectedColor: kCShadow.withOpacity(0.6),
-                                checkmarkColor: kCText,
-                                backgroundColor: kCShadow,
-                                labelStyle: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color:
-                                      _acquiredSkills.contains(t)
-                                          ? kCText
-                                          : kCText.withOpacity(0.6),
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                side: BorderSide.none,
-                              ),
-                            )
-                            .toList(),
+                    children: _kTagOptions
+                        .map(
+                          (t) => FilterChip(
+                            label: Text(t),
+                            selected: _acquiredSkills.contains(t),
+                            onSelected: (v) => setState(() {
+                              if (v) {
+                                _acquiredSkills.add(t);
+                              } else {
+                                _acquiredSkills.remove(t);
+                              }
+                            }),
+                            // 이전 kCShadow.withOpacity(0.6) → surfaceMuted
+                            selectedColor: AppColors.surfaceMuted,
+                            checkmarkColor: AppColors.textPrimary,
+                            backgroundColor: AppColors.surfaceMuted,
+                            labelStyle: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: _acquiredSkills.contains(t)
+                                  ? AppColors.textPrimary
+                                  : AppColors.textSecondary,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            side: BorderSide.none,
+                          ),
+                        )
+                        .toList(),
                   ),
                   const SizedBox(height: 28),
                   SizedBox(
@@ -953,30 +945,29 @@ class _DentalEntryFormSheetState extends State<_DentalEntryFormSheet> {
                     child: ElevatedButton(
                       onPressed: _saving ? null : _save,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: kCText,
-                        foregroundColor: Colors.white,
+                        backgroundColor: AppColors.accent,   // 이전 kCText(Black)
+                        foregroundColor: AppColors.onAccent,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(AppRadius.lg),
                         ),
                         elevation: 0,
                       ),
-                      child:
-                          _saving
-                              ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                              : Text(
-                                isEdit ? '수정 완료' : '저장',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w800,
-                                ),
+                      child: _saving
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppColors.onAccent,
                               ),
+                            )
+                          : Text(
+                              isEdit ? '수정 완료' : '저장',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
                     ),
                   ),
                 ],
@@ -988,4 +979,3 @@ class _DentalEntryFormSheetState extends State<_DentalEntryFormSheet> {
     );
   }
 }
-

@@ -2,18 +2,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../models/application.dart';
 import '../../../models/resume.dart';
 import '../../../services/resume_service.dart';
 import 'web_typography.dart';
-
-// ── 팔레트 ─────────────────────────────────────────────
-const _kText = Color(0xFF3D4A5C);
-const _kBlue = Color(0xFF4A90D9);
-const _kGreen = Color(0xFF66BB6A);
-const _kOrange = Color(0xFFF57C00);
-const _kBorder = Color(0xFFE0D8E8);
-const _kBg = Color(0xFFF4F0F8);
 
 /// 공고별 지원자 목록 페이지 (웹)
 ///
@@ -40,25 +33,25 @@ class _JobApplicantsPageState extends State<JobApplicantsPage> {
     return Theme(
       data: WebTypo.themeData(Theme.of(context)),
       child: Scaffold(
-        backgroundColor: _kBg,
+        backgroundColor: AppColors.appBg,
         appBar: AppBar(
-          backgroundColor: Colors.white,
+          backgroundColor: AppColors.white,
           elevation: 0,
           title: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 '지원자 목록',
-                style: WebTypo.sectionTitle(color: _kText),
+                style: WebTypo.sectionTitle(color: AppColors.textPrimary),
               ),
               Text(
                 widget.jobTitle,
                 style: WebTypo.caption(
-                    color: _kText.withOpacity(0.5), size: 12),
+                    color: AppColors.textSecondary, size: 12),
               ),
             ],
           ),
-          iconTheme: const IconThemeData(color: _kText),
+          iconTheme: const IconThemeData(color: AppColors.textPrimary),
         ),
         body: Center(
           child: ConstrainedBox(
@@ -106,12 +99,12 @@ class _JobApplicantsPageState extends State<JobApplicantsPage> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.people_outline, size: 56,
-              color: _kText.withOpacity(0.15)),
+          const Icon(Icons.people_outline, size: 56,
+              color: AppColors.textDisabled),
           const SizedBox(height: 16),
           Text(
             '아직 지원자가 없습니다.',
-            style: WebTypo.body(color: _kText.withOpacity(0.4)),
+            style: WebTypo.body(color: AppColors.textDisabled),
           ),
         ],
       ),
@@ -195,9 +188,9 @@ class _ApplicantCardState extends State<_ApplicantCard> {
       return Container(
         height: 120,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.white,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _kBorder),
+          border: Border.all(color: AppColors.divider),
         ),
         alignment: Alignment.center,
         child: const CircularProgressIndicator(),
@@ -220,9 +213,9 @@ class _ApplicantCardState extends State<_ApplicantCard> {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _kBorder, width: 0.8),
+        border: Border.all(color: AppColors.divider, width: 0.8),
       ),
       padding: const EdgeInsets.all(18),
       child: Column(
@@ -235,11 +228,11 @@ class _ApplicantCardState extends State<_ApplicantCard> {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: _kBlue.withOpacity(0.08),
+                  color: AppColors.accent.withOpacity(0.08),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(Icons.person_outline,
-                    size: 20, color: _kBlue.withOpacity(0.6)),
+                    size: 20, color: AppColors.accent.withOpacity(0.6)),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -253,14 +246,14 @@ class _ApplicantCardState extends State<_ApplicantCard> {
                       style: GoogleFonts.notoSansKr(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
-                        color: _kText,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                     Text(
                       dateStr,
                       style: GoogleFonts.notoSansKr(
                         fontSize: 11,
-                        color: _kText.withOpacity(0.4),
+                        color: AppColors.textDisabled,
                       ),
                     ),
                   ],
@@ -322,33 +315,33 @@ class _ApplicantCardState extends State<_ApplicantCard> {
 
     switch (status) {
       case ApplicationStatus.submitted:
-        bg = _kBlue.withOpacity(0.1);
-        fg = _kBlue;
+        bg = AppColors.accent.withOpacity(0.1);
+        fg = AppColors.accent;
         label = '지원';
         break;
       case ApplicationStatus.reviewed:
-        bg = _kOrange.withOpacity(0.1);
-        fg = _kOrange;
+        bg = AppColors.warning.withOpacity(0.1);
+        fg = AppColors.warning;
         label = '열람';
         break;
       case ApplicationStatus.contactRequested:
-        bg = _kOrange.withOpacity(0.1);
-        fg = _kOrange;
+        bg = AppColors.warning.withOpacity(0.1);
+        fg = AppColors.warning;
         label = '요청중';
         break;
       case ApplicationStatus.contactShared:
-        bg = _kGreen.withOpacity(0.1);
-        fg = _kGreen;
+        bg = AppColors.success.withOpacity(0.1);
+        fg = AppColors.success;
         label = '공개';
         break;
       case ApplicationStatus.rejected:
-        bg = Colors.grey.withOpacity(0.1);
-        fg = Colors.grey;
+        bg = AppColors.textDisabled.withOpacity(0.1);
+        fg = AppColors.textDisabled;
         label = '거절';
         break;
       case ApplicationStatus.withdrawn:
-        bg = Colors.grey.withOpacity(0.1);
-        fg = Colors.grey;
+        bg = AppColors.textDisabled.withOpacity(0.1);
+        fg = AppColors.textDisabled;
         label = '철회';
         break;
     }
@@ -374,19 +367,19 @@ class _ApplicantCardState extends State<_ApplicantCard> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: _kText.withOpacity(0.04),
+        color: AppColors.surfaceMuted,
         borderRadius: BorderRadius.circular(6),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 13, color: _kText.withOpacity(0.4)),
+          Icon(icon, size: 13, color: AppColors.textDisabled),
           const SizedBox(width: 4),
           Text(
             text,
             style: GoogleFonts.notoSansKr(
               fontSize: 12,
-              color: _kText.withOpacity(0.6),
+              color: AppColors.textSecondary,
             ),
           ),
         ],
@@ -398,14 +391,14 @@ class _ApplicantCardState extends State<_ApplicantCard> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: _kBlue.withOpacity(0.06),
+        color: AppColors.accent.withOpacity(0.06),
         borderRadius: BorderRadius.circular(5),
       ),
       child: Text(
         skill,
         style: GoogleFonts.notoSansKr(
           fontSize: 11,
-          color: _kBlue.withOpacity(0.7),
+          color: AppColors.accent.withOpacity(0.7),
         ),
       ),
     );
@@ -415,20 +408,20 @@ class _ApplicantCardState extends State<_ApplicantCard> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: _kGreen.withOpacity(0.06),
+        color: AppColors.success.withOpacity(0.06),
         borderRadius: BorderRadius.circular(5),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(Icons.verified_outlined,
-              size: 12, color: _kGreen.withOpacity(0.7)),
+              size: 12, color: AppColors.success.withOpacity(0.7)),
           const SizedBox(width: 3),
           Text(
             license,
             style: GoogleFonts.notoSansKr(
               fontSize: 11,
-              color: _kGreen.withOpacity(0.7),
+              color: AppColors.success.withOpacity(0.7),
             ),
           ),
         ],
@@ -440,23 +433,23 @@ class _ApplicantCardState extends State<_ApplicantCard> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: _kGreen.withOpacity(0.04),
+        color: AppColors.success.withOpacity(0.04),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: _kGreen.withOpacity(0.15)),
+        border: Border.all(color: AppColors.success.withOpacity(0.15)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.check_circle, size: 14, color: _kGreen),
+              Icon(Icons.check_circle, size: 14, color: AppColors.success),
               const SizedBox(width: 6),
               Text(
                 '연락처 공개됨',
                 style: GoogleFonts.notoSansKr(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: _kGreen,
+                  color: AppColors.success,
                 ),
               ),
             ],
@@ -484,7 +477,7 @@ class _ApplicantCardState extends State<_ApplicantCard> {
               label,
               style: GoogleFonts.notoSansKr(
                 fontSize: 12,
-                color: _kText.withOpacity(0.4),
+                color: AppColors.textDisabled,
               ),
             ),
           ),
@@ -492,7 +485,7 @@ class _ApplicantCardState extends State<_ApplicantCard> {
             value,
             style: GoogleFonts.notoSansKr(
               fontSize: 13,
-              color: _kText,
+              color: AppColors.textPrimary,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -516,8 +509,8 @@ class _ApplicantCardState extends State<_ApplicantCard> {
         ),
         label: Text(isRequested ? '승인 대기중' : '연락처 요청'),
         style: OutlinedButton.styleFrom(
-          foregroundColor: _kBlue,
-          side: BorderSide(color: _kBlue.withOpacity(0.3)),
+          foregroundColor: AppColors.accent,
+          side: BorderSide(color: AppColors.accent.withOpacity(0.3)),
           padding: const EdgeInsets.symmetric(vertical: 12),
           textStyle: GoogleFonts.notoSansKr(
             fontSize: 13,
@@ -551,4 +544,3 @@ class _ApplicantCardState extends State<_ApplicantCard> {
     return years > 0 ? '${years}년차' : '신입';
   }
 }
-

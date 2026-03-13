@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-
-const _kText = Color(0xFF3D4A5C);
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_tokens.dart';
 
 /// B. Professional Summary 섹션
 class SectionSummary extends StatefulWidget {
@@ -44,20 +44,20 @@ class _SectionSummaryState extends State<SectionSummary> {
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w700,
-            color: _kText,
+            color: AppColors.textPrimary,
           ),
         ),
         const SizedBox(height: 4),
         Text(
           '3~5줄로 자신을 소개해주세요.',
-          style: TextStyle(fontSize: 12, color: _kText.withOpacity(0.4)),
+          style: TextStyle(fontSize: 12, color: AppColors.textDisabled),
         ),
         const SizedBox(height: 16),
 
         // 템플릿 버튼
         Text(
           '템플릿 활용하기',
-          style: TextStyle(fontSize: 12, color: _kText.withOpacity(0.5)),
+          style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
         ),
         const SizedBox(height: 8),
         ..._templates.map((t) => Padding(
@@ -71,14 +71,14 @@ class _SectionSummaryState extends State<SectionSummary> {
                 child: Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    border: Border.all(color: _kText.withOpacity(0.08)),
-                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.divider),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                   ),
                   child: Text(
                     t,
                     style: TextStyle(
                       fontSize: 12,
-                      color: _kText.withOpacity(0.5),
+                      color: AppColors.textSecondary,
                       height: 1.5,
                     ),
                   ),
@@ -94,7 +94,7 @@ class _SectionSummaryState extends State<SectionSummary> {
           onChanged: widget.onChanged,
           decoration: InputDecoration(
             hintText: '자유롭게 작성하거나 위 템플릿을 수정해주세요.',
-            hintStyle: TextStyle(color: _kText.withOpacity(0.2)),
+            hintStyle: TextStyle(color: AppColors.textDisabled),
             border: const OutlineInputBorder(),
             contentPadding: const EdgeInsets.all(14),
           ),

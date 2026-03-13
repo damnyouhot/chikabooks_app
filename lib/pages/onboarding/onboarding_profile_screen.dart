@@ -1,5 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_primary_button.dart';
 import '../../models/user_public_profile.dart';
 import '../../services/user_profile_service.dart';
 
@@ -748,26 +750,26 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
     // ✅ 로딩 중일 때 표시
     if (_isLoading) {
       return const Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.white,
         body: Center(
           child: CircularProgressIndicator(
-            color: Color(0xFF6A5ACD),
+            color: AppColors.accent,
           ),
         ),
       );
     }
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.white,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.white,
         elevation: 0,
         leading: TextButton(
           onPressed: () => Navigator.of(context).pop(),
           child: Text(
             '나중에',
             style: TextStyle(
-              color: Colors.grey[600],
+              color: AppColors.textSecondary,
               fontSize: 13,
             ),
           ),
@@ -790,10 +792,10 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
                       child: Text(
                         '가벼운 소통을 위해\n나의 캐릭터를 설정해요',
                         textAlign: TextAlign.center,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF2D2D2D),
+                          color: AppColors.textPrimary,
                           height: 1.4,
                         ),
                       ),
@@ -805,7 +807,7 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 13,
-                          color: Colors.grey[500],
+                          color: AppColors.textSecondary,
                         ),
                       ),
                     ),
@@ -826,7 +828,7 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
                               hintStyle: TextStyle(fontSize: 13),
                               counterText: '',
                               filled: true,
-                              fillColor: Colors.grey[50],
+                              fillColor: AppColors.surfaceMuted,
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(10),
                                 borderSide: BorderSide.none,
@@ -841,10 +843,10 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
                         ),
                         const SizedBox(width: 8),
                         Container(
-                          decoration: BoxDecoration(
-                            color: Colors.grey[100],
-                            borderRadius: BorderRadius.circular(10),
-                          ),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceMuted,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                           child: IconButton(
                             onPressed: _generateRandomNickname,
                             icon: const Text('🎲', style: TextStyle(fontSize: 18)),
@@ -872,20 +874,20 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
                             ),
                             decoration: BoxDecoration(
                               color: selected
-                                  ? const Color(0xFF6A5ACD)
-                                  : Colors.grey[100],
+                                  ? AppColors.accent
+                                  : AppColors.surfaceMuted,
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
                                 color: selected
-                                    ? const Color(0xFF6A5ACD)
-                                    : Colors.grey[300]!,
+                                  ? AppColors.accent
+                                  : AppColors.divider,
                                 width: 1,
                               ),
                             ),
                             child: Text(
                               career,
                               style: TextStyle(
-                                color: selected ? Colors.white : Colors.grey[700],
+                                color: selected ? AppColors.white : AppColors.textSecondary,
                                 fontSize: 12,
                                 fontWeight:
                                     selected ? FontWeight.w600 : FontWeight.normal,
@@ -914,20 +916,20 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
                             ),
                             decoration: BoxDecoration(
                               color: selected
-                                  ? const Color(0xFF6A5ACD)
-                                  : Colors.grey[100],
+                                  ? AppColors.accent
+                                  : AppColors.surfaceMuted,
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
                                 color: selected
-                                    ? const Color(0xFF6A5ACD)
-                                    : Colors.grey[300]!,
+                                    ? AppColors.accent
+                                    : AppColors.divider,
                                 width: 1,
                               ),
                             ),
                             child: Text(
                               region,
                               style: TextStyle(
-                                color: selected ? Colors.white : Colors.grey[700],
+                                color: selected ? AppColors.white : AppColors.textSecondary,
                                 fontSize: 12,
                                 fontWeight:
                                     selected ? FontWeight.w600 : FontWeight.normal,
@@ -959,16 +961,16 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
                             decoration: BoxDecoration(
                               color: selected
                                   ? (isSpecial
-                                      ? const Color(0xFFE8DAFF)
-                                      : const Color(0xFF6A5ACD))
-                                  : Colors.grey[100],
+                                      ? AppColors.accent.withOpacity(0.15)
+                                      : AppColors.accent)
+                                  : AppColors.surfaceMuted,
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
                                 color: selected
                                     ? (isSpecial
-                                        ? const Color(0xFFE8DAFF)
-                                        : const Color(0xFF6A5ACD))
-                                    : Colors.grey[300]!,
+                                        ? AppColors.accent.withOpacity(0.15)
+                                        : AppColors.accent)
+                                    : AppColors.divider,
                                 width: 1,
                               ),
                             ),
@@ -977,9 +979,9 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
                               style: TextStyle(
                                 color: selected
                                     ? (isSpecial
-                                        ? const Color(0xFF6A5ACD)
-                                        : Colors.white)
-                                    : Colors.grey[700],
+                                        ? AppColors.accent
+                                        : AppColors.white)
+                                    : AppColors.textSecondary,
                                 fontSize: 12,
                                 fontWeight:
                                     selected ? FontWeight.w600 : FontWeight.normal,
@@ -998,7 +1000,7 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
                           '${_selectedConcerns.length}/3 선택됨',
                           style: TextStyle(
                             fontSize: 11,
-                            color: Colors.grey[600],
+                            color: AppColors.textSecondary,
                           ),
                         ),
                       ),
@@ -1008,8 +1010,8 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
                     if (_error != null) ...[
                       Text(
                         _error!,
-                        style: const TextStyle(
-                          color: Colors.redAccent,
+                          style: const TextStyle(
+                          color: AppColors.error,
                           fontSize: 11,
                         ),
                         textAlign: TextAlign.center,
@@ -1024,44 +1026,11 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
             // ━━━━━━━━━━ 완료 버튼 (하단 고정) ━━━━━━━━━━
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
-              child: SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _canComplete ? _complete : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF6A5ACD),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    disabledBackgroundColor: Colors.grey[300],
-                    elevation: 0,
-                  ),
-                  child: _saving
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              '시작할게요',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            SizedBox(width: 6),
-                            Text('🌟', style: TextStyle(fontSize: 16)),
-                          ],
-                        ),
-                ),
+              child: AppPrimaryButton(
+                label: '시작할게요 🌟',
+                onPressed: _canComplete ? _complete : null,
+                isEnabled: _canComplete,
+                isLoading: _saving,
               ),
             ),
           ],
@@ -1076,7 +1045,7 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
       style: const TextStyle(
         fontSize: 15,
         fontWeight: FontWeight.bold,
-        color: Color(0xFF2D2D2D),
+        color: AppColors.textPrimary,
       ),
     );
   }

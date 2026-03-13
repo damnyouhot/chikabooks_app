@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../models/partner_group.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
+import '../../core/widgets/app_muted_card.dart';
+import '../../core/widgets/app_badge.dart';
 
 /// "이번 주 파트너" 상태 카드
 class GroupStatusCard extends StatelessWidget {
@@ -16,19 +20,9 @@ class GroupStatusCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final daysLeft = group.daysLeft;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF6A5ACD).withOpacity(0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+    return AppMutedCard(
+      radius: AppRadius.xl,
+      padding: const EdgeInsets.all(AppSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -36,36 +30,25 @@ class GroupStatusCard extends StatelessWidget {
           Row(
             children: [
               const Icon(Icons.people_outline,
-                  color: Color(0xFF6A5ACD), size: 20),
+                  color: AppColors.accent, size: 20),
               const SizedBox(width: 8),
               const Text(
                 '이번 주 파트너',
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF424242),
+                  color: AppColors.textPrimary,
                 ),
               ),
               const Spacer(),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: daysLeft <= 1
-                      ? const Color(0xFFFFEBEE)
-                      : const Color(0xFFE8EAF6),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  daysLeft == 0 ? '오늘 종료' : 'D-$daysLeft',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: daysLeft <= 1
-                        ? Colors.redAccent
-                        : const Color(0xFF6A5ACD),
-                  ),
-                ),
+              AppBadge(
+                label: daysLeft == 0 ? '오늘 종료' : 'D-$daysLeft',
+                bgColor: daysLeft <= 1
+                    ? AppColors.error.withOpacity(0.10)
+                    : AppColors.accent.withOpacity(0.10),
+                textColor: daysLeft <= 1
+                    ? AppColors.error
+                    : AppColors.accent,
               ),
             ],
           ),
@@ -80,16 +63,16 @@ class GroupStatusCard extends StatelessWidget {
                       width: 8,
                       height: 8,
                       decoration: const BoxDecoration(
-                        color: Color(0xFFCE93D8),
+                        color: AppColors.accent,
                         shape: BoxShape.circle,
                       ),
                     ),
                     const SizedBox(width: 10),
                     Text(
                       m.displayLabel,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 13,
-                        color: Colors.grey[700],
+                        color: AppColors.textSecondary,
                       ),
                     ),
                   ],
@@ -100,6 +83,3 @@ class GroupStatusCard extends StatelessWidget {
     );
   }
 }
-
-
-

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
+import '../../core/widgets/app_muted_card.dart';
 
 /// 감성 공지 토스트 (4가지 필수)
 class BondNotificationToast {
@@ -66,7 +69,6 @@ class BondNotificationToast {
     );
 
     overlay.insert(overlayEntry);
-
     Future.delayed(const Duration(seconds: 3), () {
       overlayEntry.remove();
     });
@@ -101,18 +103,14 @@ class _ToastWidgetState extends State<_ToastWidget>
       duration: const Duration(milliseconds: 400),
       vsync: this,
     );
-
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeOut),
     );
-
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, -1),
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
-
     _controller.forward();
-
     Future.delayed(const Duration(milliseconds: 2600), () {
       if (mounted) _controller.reverse();
     });
@@ -130,18 +128,11 @@ class _ToastWidgetState extends State<_ToastWidget>
       opacity: _fadeAnimation,
       child: SlideTransition(
         position: _slideAnimation,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
+        child: AppMutedCard(
+          radius: AppRadius.md,
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.md,
           ),
           child: Row(
             children: [
@@ -157,16 +148,16 @@ class _ToastWidgetState extends State<_ToastWidget>
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF424242),
+                        color: AppColors.textPrimary,
                       ),
                     ),
                     if (widget.subMessage != null) ...[
                       const SizedBox(height: 2),
                       Text(
                         widget.subMessage!,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 11,
-                          color: Colors.grey[600],
+                          color: AppColors.textSecondary,
                         ),
                       ),
                     ],
@@ -180,15 +171,3 @@ class _ToastWidgetState extends State<_ToastWidget>
     );
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-

@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/partner_service.dart';
 import '../../core/theme/app_colors.dart';
-
-// AppColors 직접 참조 (TabTheme 제거)
+import '../../core/theme/app_tokens.dart';
 
 /// 소모임 나가기 바텀시트
 class BondLeaveSheet extends StatefulWidget {
@@ -81,13 +80,14 @@ class _BondLeaveSheetState extends State<BondLeaveSheet> {
     return Container(
       margin: EdgeInsets.only(bottom: bottomPad),
       decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        color: AppColors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
       ),
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.xxl, AppSpacing.lg, AppSpacing.xxl, AppSpacing.xxl),
           child: _step == 1 ? _buildStep1() : _buildStep2(),
         ),
       ),
@@ -104,17 +104,17 @@ class _BondLeaveSheetState extends State<BondLeaveSheet> {
             width: 36,
             height: 4,
             decoration: BoxDecoration(
-              color: Colors.grey[300],
+              color: AppColors.disabledBg,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: AppSpacing.xl),
         Row(
           children: [
-            Icon(Icons.logout_rounded, size: 22, color: AppColors.textPrimary.withOpacity(0.7)),
+            const Icon(Icons.logout_rounded, size: 22, color: AppColors.textSecondary),
             const SizedBox(width: 8),
-            Text(
+            const Text(
               '소모임 나가기',
               style: TextStyle(
                 fontSize: 17,
@@ -124,35 +124,35 @@ class _BondLeaveSheetState extends State<BondLeaveSheet> {
             ),
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: AppSpacing.lg),
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(AppSpacing.lg),
           decoration: BoxDecoration(
-            color: AppColors.surfaceMuted.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(12),
+            color: AppColors.surfaceMuted,
+            borderRadius: BorderRadius.circular(AppRadius.md),
           ),
-          child: Column(
+          child: const Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 '나가면 지금 소모임에서 더 이상 활동할 수 없어요.',
-                style: TextStyle(fontSize: 13, color: AppColors.textPrimary.withOpacity(0.8), height: 1.5),
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.5),
               ),
-              const SizedBox(height: 6),
+              SizedBox(height: 6),
               Text(
                 '기존 게시물과 기록은 다른 멤버에게 계속 보일 수 있어요.',
-                style: TextStyle(fontSize: 13, color: AppColors.textPrimary.withOpacity(0.8), height: 1.5),
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.5),
               ),
-              const SizedBox(height: 6),
+              SizedBox(height: 6),
               Text(
                 '나간 후에는 다시 "추천으로 찾기"를 통해 새 소모임에 참여할 수 있어요.',
-                style: TextStyle(fontSize: 13, color: AppColors.textPrimary.withOpacity(0.8), height: 1.5),
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.5),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: AppSpacing.xl),
         Row(
           children: [
             Expanded(
@@ -160,15 +160,17 @@ class _BondLeaveSheetState extends State<BondLeaveSheet> {
                 onPressed: () => Navigator.of(context).pop(),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  side: BorderSide(color: AppColors.surfaceMuted.withOpacity(0.5)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                  ),
+                  side: const BorderSide(color: AppColors.divider),
                 ),
-                child: Text(
+                child: const Text(
                   '취소',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
-                    color: AppColors.textPrimary.withOpacity(0.6),
+                    color: AppColors.textSecondary,
                   ),
                 ),
               ),
@@ -178,13 +180,19 @@ class _BondLeaveSheetState extends State<BondLeaveSheet> {
               child: FilledButton(
                 onPressed: () => setState(() => _step = 2),
                 style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFFE57373),
+                  backgroundColor: AppColors.error,
                   padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                  ),
                 ),
                 child: const Text(
                   '나가기',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white),
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.white,
+                  ),
                 ),
               ),
             ),
@@ -206,22 +214,26 @@ class _BondLeaveSheetState extends State<BondLeaveSheet> {
             width: 36,
             height: 4,
             decoration: BoxDecoration(
-              color: Colors.grey[300],
+              color: AppColors.disabledBg,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
         ),
-        const SizedBox(height: 20),
-        Text(
+        const SizedBox(height: AppSpacing.xl),
+        const Text(
           '정말 나갈까요?',
-          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+          style: TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+          ),
         ),
         const SizedBox(height: 4),
-        Text(
+        const Text(
           '이유를 알려주시면 더 나은 경험을 만들게요.',
-          style: TextStyle(fontSize: 12, color: AppColors.textPrimary.withOpacity(0.5)),
+          style: TextStyle(fontSize: 12, color: AppColors.textDisabled),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: AppSpacing.lg),
 
         ...List.generate(_reasons.length, (i) {
           final selected = _selectedReasonIndex == i;
@@ -229,32 +241,34 @@ class _BondLeaveSheetState extends State<BondLeaveSheet> {
             onTap: () => setState(() => _selectedReasonIndex = i),
             child: Container(
               width: double.infinity,
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 12,
+              ),
               decoration: BoxDecoration(
                 color: selected
-                    ? AppColors.accent.withOpacity(0.15)
-                    : AppColors.surfaceMuted.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: selected ? AppColors.accent : AppColors.surfaceMuted.withOpacity(0.3),
-                  width: selected ? 1.2 : 0.5,
-                ),
+                    ? AppColors.accent.withOpacity(0.12)
+                    : AppColors.surfaceMuted,
+                borderRadius: BorderRadius.circular(AppRadius.md),
               ),
               child: Row(
                 children: [
                   Icon(
-                    selected ? Icons.radio_button_checked : Icons.radio_button_off,
+                    selected
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_off,
                     size: 18,
-                    color: selected ? AppColors.accent : AppColors.textPrimary.withOpacity(0.3),
+                    color: selected ? AppColors.accent : AppColors.textDisabled,
                   ),
                   const SizedBox(width: 10),
                   Text(
                     _reasons[i],
                     style: TextStyle(
                       fontSize: 13,
-                      color: AppColors.textPrimary.withOpacity(0.85),
-                      fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                      color: AppColors.textPrimary,
+                      fontWeight:
+                          selected ? FontWeight.w600 : FontWeight.w400,
                     ),
                   ),
                 ],
@@ -268,24 +282,39 @@ class _BondLeaveSheetState extends State<BondLeaveSheet> {
           TextField(
             controller: _otherController,
             maxLength: 100,
-            style: TextStyle(fontSize: 13, color: AppColors.textPrimary.withOpacity(0.9)),
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppColors.textPrimary,
+            ),
             decoration: InputDecoration(
               hintText: '이유를 간단히 적어주세요',
-              hintStyle: TextStyle(fontSize: 13, color: AppColors.textPrimary.withOpacity(0.3)),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              hintStyle: const TextStyle(
+                fontSize: 13,
+                color: AppColors.textDisabled,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 12,
+              ),
+              filled: true,
+              fillColor: AppColors.surfaceMuted,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: AppColors.surfaceMuted),
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                borderSide: const BorderSide(color: AppColors.divider),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: AppColors.surfaceMuted.withOpacity(0.5)),
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                borderSide: const BorderSide(color: AppColors.divider),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                borderSide: const BorderSide(color: AppColors.accent),
               ),
             ),
           ),
         ],
 
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.md),
         GestureDetector(
           onTap: () => setState(() => _confirmed = !_confirmed),
           child: Row(
@@ -296,20 +325,22 @@ class _BondLeaveSheetState extends State<BondLeaveSheet> {
                 child: Checkbox(
                   value: _confirmed,
                   onChanged: (v) => setState(() => _confirmed = v ?? false),
-                  activeColor: const Color(0xFFE57373),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                  side: BorderSide(color: AppColors.textPrimary.withOpacity(0.3)),
+                  activeColor: AppColors.error,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  side: const BorderSide(color: AppColors.textDisabled),
                 ),
               ),
               const SizedBox(width: 8),
-              Text(
+              const Text(
                 '위 내용을 확인했어요',
-                style: TextStyle(fontSize: 13, color: AppColors.textPrimary.withOpacity(0.7)),
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: AppSpacing.xl),
 
         Row(
           children: [
@@ -318,15 +349,17 @@ class _BondLeaveSheetState extends State<BondLeaveSheet> {
                 onPressed: _loading ? null : () => setState(() => _step = 1),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  side: BorderSide(color: AppColors.surfaceMuted.withOpacity(0.5)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                  ),
+                  side: const BorderSide(color: AppColors.divider),
                 ),
-                child: Text(
+                child: const Text(
                   '돌아가기',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
-                    color: AppColors.textPrimary.withOpacity(0.6),
+                    color: AppColors.textSecondary,
                   ),
                 ),
               ),
@@ -336,20 +369,29 @@ class _BondLeaveSheetState extends State<BondLeaveSheet> {
               child: FilledButton(
                 onPressed: (canSubmit && !_loading) ? _onLeave : null,
                 style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFFE57373),
-                  disabledBackgroundColor: Colors.grey[300],
+                  backgroundColor: AppColors.error,
+                  disabledBackgroundColor: AppColors.disabledBg,
                   padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                  ),
                 ),
                 child: _loading
                     ? const SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.white,
+                        ),
                       )
                     : const Text(
                         '나가기',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.white,
+                        ),
                       ),
               ),
             ),
@@ -359,6 +401,3 @@ class _BondLeaveSheetState extends State<BondLeaveSheet> {
     );
   }
 }
-
-
-

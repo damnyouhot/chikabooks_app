@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_primary_button.dart';
 import '../../models/partner_preferences.dart';
 import '../../services/user_profile_service.dart';
 
@@ -137,7 +139,7 @@ class _PartnerPreferencesPageState extends State<PartnerPreferencesPage> {
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF424242),
+              color: AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 12),
@@ -183,9 +185,9 @@ class _PartnerPreferencesPageState extends State<PartnerPreferencesPage> {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey[200]!),
+          border: Border.all(color: AppColors.divider),
         ),
         child: Row(
           children: [
@@ -200,22 +202,22 @@ class _PartnerPreferencesPageState extends State<PartnerPreferencesPage> {
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF424242),
+                      color: AppColors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     subtitle,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 11,
-                      color: Colors.grey[600],
+                      color: AppColors.textSecondary,
                       height: 1.3,
                     ),
                   ),
                 ],
               ),
             ),
-            Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey[400]),
+            Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.textDisabled),
           ],
         ),
       ),
@@ -233,7 +235,7 @@ class _PartnerPreferencesPageState extends State<PartnerPreferencesPage> {
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF424242),
+              color: AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 12),
@@ -282,19 +284,9 @@ class _PartnerPreferencesPageState extends State<PartnerPreferencesPage> {
           
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton(
+            child: AppPrimaryButton(
+              label: '저장하기',
               onPressed: _savePreferences,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                backgroundColor: const Color(0xFF1E88E5),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text(
-                '저장하기',
-                style: TextStyle(fontSize: 15, color: Colors.white),
-              ),
             ),
           ),
         ],
@@ -313,7 +305,7 @@ class _PartnerPreferencesPageState extends State<PartnerPreferencesPage> {
       children: [
         Text(
           label,
-          style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+          style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
         ),
         const SizedBox(height: 6),
         Row(
@@ -391,27 +383,27 @@ class _PartnerPreferencesPageState extends State<PartnerPreferencesPage> {
       margin: const EdgeInsets.all(20),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F5),
+        color: AppColors.surfaceMuted,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.shield_outlined,
-            size: 20,
-            color: Color(0xFF1E88E5),
-          ),
+            const Icon(
+              Icons.shield_outlined,
+              size: 20,
+              color: AppColors.accent,
+            ),
           const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              '지역은 크게만 참고해요.\n서로 안전한 거리가 더 중요해요.',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[700],
-                height: 1.5,
+            Expanded(
+              child: Text(
+                '지역은 크게만 참고해요.\n서로 안전한 거리가 더 중요해요.',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                  height: 1.5,
+                ),
               ),
             ),
-          ),
         ],
       ),
     );

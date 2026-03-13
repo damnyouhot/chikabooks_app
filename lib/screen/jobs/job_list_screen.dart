@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import '../../core/theme/app_colors.dart';
 import '../../models/job.dart';
 import '../../notifiers/job_filter_notifier.dart';
 import '../../services/job_service.dart';
@@ -8,11 +9,8 @@ import '../../widgets/job_card.dart';
 import '../../widgets/job/compact_filter_row.dart';
 import '../../widgets/job/filter_bottom_sheet.dart';
 
-// ── 디자인 팔레트 ──
-const _kText = Color(0xFF5D6B6B);
-
 class JobListScreen extends StatelessWidget {
-  final LatLng? userLocation; // ★ 사용자 위치 추가
+  final LatLng? userLocation;
 
   const JobListScreen({super.key, this.userLocation});
 
@@ -33,7 +31,6 @@ class JobListScreen extends StatelessWidget {
 
     return Column(
       children: [
-        // ★ CompactFilterRow (1줄)
         CompactFilterRow(
           searchQuery: jobFilter.searchQuery,
           onSearchChanged: jobFilter.setSearchQuery,
@@ -65,9 +62,9 @@ class JobListScreen extends StatelessWidget {
                 return Center(
                   child: Text(
                     '오류 발생: ${snapshot.error}',
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 14,
-                      color: _kText.withOpacity(0.6),
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 );
@@ -77,24 +74,21 @@ class JobListScreen extends StatelessWidget {
 
               // 클라이언트 사이드 필터링 (검색어, 직종)
               if (jobFilter.searchQuery.isNotEmpty) {
-                jobs =
-                    jobs.where((job) {
-                      final query = jobFilter.searchQuery.toLowerCase();
-                      return job.clinicName.toLowerCase().contains(query) ||
-                          job.address.toLowerCase().contains(query);
-                    }).toList();
+                jobs = jobs.where((job) {
+                  final query = jobFilter.searchQuery.toLowerCase();
+                  return job.clinicName.toLowerCase().contains(query) ||
+                      job.address.toLowerCase().contains(query);
+                }).toList();
               }
 
               if (jobFilter.positionFilter != '전체') {
-                jobs =
-                    jobs
-                        .where((job) => job.type == jobFilter.positionFilter)
-                        .toList();
+                jobs = jobs
+                    .where((job) => job.type == jobFilter.positionFilter)
+                    .toList();
               }
 
               // 정렬
               if (jobFilter.sortBy == '거리순' && userLocation != null) {
-                // ★ 거리순 정렬 (사용자 위치 기준)
                 jobs.sort((a, b) {
                   final distA = jobService.calculateDistance(
                     userLocation!,
@@ -115,29 +109,29 @@ class JobListScreen extends StatelessWidget {
               }
 
               if (jobs.isEmpty) {
-                return Center(
+                return const Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
                         Icons.search_off,
                         size: 48,
-                        color: _kText.withOpacity(0.3),
+                        color: AppColors.textDisabled,
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: 16),
                       Text(
                         '조건에 맞는 공고가 없습니다.',
                         style: TextStyle(
                           fontSize: 14,
-                          color: _kText.withOpacity(0.5),
+                          color: AppColors.textSecondary,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: 8),
                       Text(
                         '필터를 조정해보세요.',
                         style: TextStyle(
                           fontSize: 12,
-                          color: _kText.withOpacity(0.4),
+                          color: AppColors.textDisabled,
                         ),
                       ),
                     ],

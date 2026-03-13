@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/store_item.dart';
 import '../../services/store_service.dart';
+import '../../core/theme/app_colors.dart';
 
 class RewardStorePage extends StatefulWidget {
   const RewardStorePage({super.key});
@@ -57,7 +58,7 @@ class _RewardStorePageState extends State<RewardStorePage> {
                           (_, __, ___) => const Icon(
                             Icons.redeem,
                             size: 48,
-                            color: Colors.grey,
+                            color: AppColors.textDisabled,
                           ),
                     ),
                   ),

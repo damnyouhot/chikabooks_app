@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../core/theme/app_colors.dart';
 
-const _kText = Color(0xFF3D4A5C);
+// _kPink는 치카북스 브랜드 핑크 — 의도적 유지
 const _kPink = Color(0xFFFF6B9D);
 
 /// 약관/개인정보처리방침 등 법적 문서를 표시하는 공용 웹 페이지
@@ -24,7 +25,7 @@ class LegalPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.white,
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 800),
@@ -38,7 +39,7 @@ class LegalPage extends StatelessWidget {
                   style: GoogleFonts.notoSansKr(
                     fontSize: 24,
                     fontWeight: FontWeight.w700,
-                    color: const Color(0xFF1a1a1a),
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -53,14 +54,14 @@ class LegalPage extends StatelessWidget {
 
                 // ── 푸터 ──
                 const SizedBox(height: 24),
-                Divider(color: Colors.grey[300]),
+                Divider(color: AppColors.divider),
                 const SizedBox(height: 16),
                 Center(
                   child: Text(
                     '본 ${title.contains('약관') ? '약관' : '방침'}은 ${effectiveDate}부터 적용됩니다.',
                     style: GoogleFonts.notoSansKr(
                       fontSize: 13,
-                      color: Colors.grey[500],
+                      color: AppColors.textDisabled,
                     ),
                   ),
                 ),
@@ -70,7 +71,7 @@ class LegalPage extends StatelessWidget {
                     '© 치과책방. All rights reserved.',
                     style: GoogleFonts.notoSansKr(
                       fontSize: 13,
-                      color: Colors.grey[500],
+                      color: AppColors.textDisabled,
                     ),
                   ),
                 ),
@@ -93,7 +94,7 @@ class LegalPage extends StatelessWidget {
           style: GoogleFonts.notoSansKr(
             fontSize: 18,
             fontWeight: FontWeight.w600,
-            color: const Color(0xFF2c2c2c),
+            color: AppColors.textPrimary,
           ),
         ),
         const SizedBox(height: 12),
@@ -113,7 +114,7 @@ class LegalPage extends StatelessWidget {
             content.text,
             style: GoogleFonts.notoSansKr(
               fontSize: 15,
-              color: const Color(0xFF444444),
+              color: AppColors.textPrimary,
               height: 1.7,
             ),
           ),
@@ -127,7 +128,7 @@ class LegalPage extends StatelessWidget {
             style: GoogleFonts.notoSansKr(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: const Color(0xFF3c3c3c),
+              color: AppColors.textPrimary,
             ),
           ),
         );
@@ -149,7 +150,7 @@ class LegalPage extends StatelessWidget {
                               '•  ',
                               style: GoogleFonts.notoSansKr(
                                 fontSize: 15,
-                                color: _kText,
+                                color: AppColors.textPrimary,
                               ),
                             ),
                             Expanded(
@@ -157,7 +158,7 @@ class LegalPage extends StatelessWidget {
                                 item,
                                 style: GoogleFonts.notoSansKr(
                                   fontSize: 15,
-                                  color: const Color(0xFF444444),
+                                  color: AppColors.textPrimary,
                                   height: 1.7,
                                 ),
                               ),
@@ -175,16 +176,16 @@ class LegalPage extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: 16),
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: const Color(0xFFFFF8E1),
+            color: const Color(0xFFFFF8E1), // 노란 노트 배경 — 의도적 유지
             border: const Border(
-              left: BorderSide(color: Color(0xFFFFC107), width: 4),
+              left: BorderSide(color: Color(0xFFFFC107), width: 4), // 황색 경고 테두리 — 의도적 유지
             ),
           ),
           child: Text(
             content.text,
             style: GoogleFonts.notoSansKr(
               fontSize: 15,
-              color: const Color(0xFF444444),
+              color: AppColors.textPrimary,
               height: 1.7,
             ),
           ),

@@ -6,14 +6,8 @@ import '../../../models/job.dart';
 import '../../../services/application_service.dart';
 import '../../../services/job_service.dart';
 import '../../../screen/jobs/job_detail_screen.dart';
-
-// ── 디자인 상수 ──────────────────────────────────────────
-const _kBg = Color(0xFFF8F6F9);
-const _kText = Color(0xFF3D4A5C);
-const _kBlue = Color(0xFF4A90D9);
-const _kGreen = Color(0xFF4CAF50);
-const _kOrange = Color(0xFFF57C00);
-const _kRed = Color(0xFFE53935);
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_tokens.dart';
 
 /// 내 지원 내역 화면
 ///
@@ -33,20 +27,20 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _kBg,
+      backgroundColor: AppColors.appBg,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.white,
         elevation: 0,
         title: const Text(
           '내 지원 내역',
           style: TextStyle(
             fontSize: 17,
             fontWeight: FontWeight.w700,
-            color: _kText,
+            color: AppColors.textPrimary,
           ),
         ),
         centerTitle: false,
-        iconTheme: const IconThemeData(color: _kText),
+        iconTheme: const IconThemeData(color: AppColors.textPrimary),
       ),
       body: Column(
         children: [
@@ -95,8 +89,8 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
     ];
 
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(12, 4, 12, 10),
+      color: AppColors.white,
+      padding: const EdgeInsets.fromLTRB(AppSpacing.md, 4, AppSpacing.md, 10),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
@@ -107,22 +101,22 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
               child: FilterChip(
                 label: Text(
                   f.label,
-                  style: TextStyle(
+                    style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: selected ? Colors.white : _kText.withOpacity(0.6),
+                    color: selected ? AppColors.white : AppColors.textSecondary,
                   ),
                 ),
                 selected: selected,
                 onSelected: (_) {
                   setState(() => _statusFilter = f.value);
                 },
-                selectedColor: _kBlue,
-                backgroundColor: Colors.white,
+                selectedColor: AppColors.accent,
+                backgroundColor: AppColors.white,
                 side: BorderSide(
                   color: selected
-                      ? _kBlue
-                      : _kText.withOpacity(0.12),
+                      ? AppColors.accent
+                      : AppColors.divider,
                 ),
                 showCheckmark: false,
                 padding: const EdgeInsets.symmetric(
@@ -145,22 +139,22 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(Icons.work_off_outlined,
-              size: 56, color: _kText.withOpacity(0.15)),
-          const SizedBox(height: 16),
-          Text(
+              size: 56, color: AppColors.textDisabled),
+          const SizedBox(height: AppSpacing.lg),
+          const Text(
             '아직 지원한 공고가 없어요.',
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: _kText.withOpacity(0.4),
+              color: AppColors.textSecondary,
             ),
           ),
           const SizedBox(height: 6),
-          Text(
+          const Text(
             '공고 보기 탭에서 마음에 드는 공고를 찾아보세요!',
             style: TextStyle(
               fontSize: 12,
-              color: _kText.withOpacity(0.3),
+              color: AppColors.textDisabled,
             ),
           ),
         ],
@@ -174,13 +168,13 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(Icons.filter_list_off,
-              size: 40, color: _kText.withOpacity(0.15)),
-          const SizedBox(height: 12),
-          Text(
+              size: 40, color: AppColors.textDisabled),
+          const SizedBox(height: AppSpacing.md),
+          const Text(
             '해당 상태의 지원 내역이 없습니다.',
             style: TextStyle(
               fontSize: 13,
-              color: _kText.withOpacity(0.4),
+              color: AppColors.textSecondary,
             ),
           ),
         ],
@@ -242,20 +236,11 @@ class _ApplicationCardState extends State<_ApplicationCard> {
         );
       },
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.lg),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: const Color(0xFFE0D8E8),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.03),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(color: AppColors.divider),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -268,9 +253,9 @@ class _ApplicationCardState extends State<_ApplicationCard> {
                 if (app.submittedAt != null)
                   Text(
                     _formatDate(app.submittedAt!),
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 11,
-                      color: _kText.withOpacity(0.35),
+                      color: AppColors.textDisabled,
                     ),
                   ),
               ],
@@ -286,15 +271,15 @@ class _ApplicationCardState extends State<_ApplicationCard> {
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
-                  color: _kText,
+                  color: AppColors.textPrimary,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
                 _job!.title,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 13,
-                  color: _kText.withOpacity(0.7),
+                  color: AppColors.textSecondary,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -303,16 +288,16 @@ class _ApplicationCardState extends State<_ApplicationCard> {
               Row(
                 children: [
                   Icon(Icons.location_on_outlined,
-                      size: 13, color: _kText.withOpacity(0.35)),
+                      size: 13, color: AppColors.textDisabled),
                   const SizedBox(width: 3),
                   Expanded(
                     child: Text(
                       _job!.district.isNotEmpty
                           ? _job!.district
                           : _job!.address,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 11,
-                        color: _kText.withOpacity(0.4),
+                        color: AppColors.textDisabled,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -321,9 +306,9 @@ class _ApplicationCardState extends State<_ApplicationCard> {
                   const SizedBox(width: 8),
                   Text(
                     '${_job!.type} · ${_job!.career}',
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 11,
-                      color: _kText.withOpacity(0.4),
+                      color: AppColors.textDisabled,
                     ),
                   ),
                 ],
@@ -333,7 +318,7 @@ class _ApplicationCardState extends State<_ApplicationCard> {
                 '공고 정보를 불러올 수 없습니다.',
                 style: TextStyle(
                   fontSize: 13,
-                  color: _kText.withOpacity(0.4),
+                  color: AppColors.textSecondary,
                 ),
               ),
 
@@ -344,22 +329,22 @@ class _ApplicationCardState extends State<_ApplicationCard> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: _kGreen.withOpacity(0.06),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: _kGreen.withOpacity(0.15)),
+                  color: AppColors.success.withOpacity(0.06),
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  border: Border.all(color: AppColors.success.withOpacity(0.2)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     const Icon(Icons.check_circle,
-                        size: 14, color: _kGreen),
+                        size: 14, color: AppColors.success),
                     const SizedBox(width: 6),
-                    Text(
+                    const Text(
                       '연락처 공개 완료',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
-                        color: _kGreen.withOpacity(0.8),
+                        color: AppColors.success,
                       ),
                     ),
                     if (app.visibilityGranted.sharedAt != null) ...[
@@ -368,7 +353,7 @@ class _ApplicationCardState extends State<_ApplicationCard> {
                         _formatDate(app.visibilityGranted.sharedAt!),
                         style: TextStyle(
                           fontSize: 10,
-                          color: _kGreen.withOpacity(0.5),
+                          color: AppColors.success.withOpacity(0.5),
                         ),
                       ),
                     ],
@@ -388,7 +373,7 @@ class _ApplicationCardState extends State<_ApplicationCard> {
                   TextButton(
                     onPressed: _withdrawing ? null : _handleWithdraw,
                     style: TextButton.styleFrom(
-                      foregroundColor: _kRed.withOpacity(0.7),
+                      foregroundColor: AppColors.error.withOpacity(0.7),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
                         vertical: 6,
@@ -442,7 +427,7 @@ class _ApplicationCardState extends State<_ApplicationCard> {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: _kRed),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
             child: const Text('철회하기'),
           ),
         ],
@@ -474,8 +459,8 @@ class _ApplicationCardState extends State<_ApplicationCard> {
           width: 120,
           height: 14,
           decoration: BoxDecoration(
-            color: _kText.withOpacity(0.06),
-            borderRadius: BorderRadius.circular(4),
+            color: AppColors.surfaceMuted,
+            borderRadius: BorderRadius.circular(AppRadius.xs),
           ),
         ),
         const SizedBox(height: 6),
@@ -483,8 +468,8 @@ class _ApplicationCardState extends State<_ApplicationCard> {
           width: 200,
           height: 12,
           decoration: BoxDecoration(
-            color: _kText.withOpacity(0.04),
-            borderRadius: BorderRadius.circular(4),
+            color: AppColors.surfaceMuted,
+            borderRadius: BorderRadius.circular(AppRadius.xs),
           ),
         ),
       ],
@@ -516,10 +501,10 @@ class _StatusBadge extends StatelessWidget {
     final (label, color, icon) = _statusInfo;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 4),
       decoration: BoxDecoration(
         color: color.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(AppRadius.xs),
         border: Border.all(color: color.withOpacity(0.2)),
       ),
       child: Row(
@@ -543,17 +528,17 @@ class _StatusBadge extends StatelessWidget {
   (String, Color, IconData) get _statusInfo {
     switch (status) {
       case ApplicationStatus.submitted:
-        return ('지원 완료', _kBlue, Icons.check_circle_outline);
+        return ('지원 완료', AppColors.accent, Icons.check_circle_outline);
       case ApplicationStatus.reviewed:
-        return ('열람됨', _kOrange, Icons.visibility_outlined);
+        return ('열람됨', AppColors.warning, Icons.visibility_outlined);
       case ApplicationStatus.contactRequested:
-        return ('연락처 요청', _kOrange, Icons.mail_outline);
+        return ('연락처 요청', AppColors.warning, Icons.mail_outline);
       case ApplicationStatus.contactShared:
-        return ('연락처 공개', _kGreen, Icons.lock_open_outlined);
+        return ('연락처 공개', AppColors.success, Icons.lock_open_outlined);
       case ApplicationStatus.rejected:
-        return ('불합격', _kRed, Icons.block_outlined);
+        return ('불합격', AppColors.error, Icons.block_outlined);
       case ApplicationStatus.withdrawn:
-        return ('철회', const Color(0xFF9E9E9E), Icons.undo_outlined);
+        return ('철회', AppColors.textDisabled, Icons.undo_outlined);
     }
   }
 }

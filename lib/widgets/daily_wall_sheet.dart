@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../core/theme/app_colors.dart';
 import '../models/daily_wall_post.dart';
 import '../services/daily_wall_service.dart';
 
@@ -66,7 +67,7 @@ class _DailyWallSheetState extends State<DailyWallSheet>
       builder: (context, scrollCtrl) {
         return Container(
           decoration: const BoxDecoration(
-            color: Colors.white,
+            color: AppColors.white,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: Column(
@@ -77,7 +78,7 @@ class _DailyWallSheetState extends State<DailyWallSheet>
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey[300],
+                  color: AppColors.divider,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -89,7 +90,7 @@ class _DailyWallSheetState extends State<DailyWallSheet>
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF6A5ACD),
+                  color: AppColors.accent,
                 ),
               ),
               const SizedBox(height: 8),
@@ -97,9 +98,9 @@ class _DailyWallSheetState extends State<DailyWallSheet>
               // 탭바
               TabBar(
                 controller: _tabCtrl,
-                labelColor: const Color(0xFF6A5ACD),
-                unselectedLabelColor: Colors.grey,
-                indicatorColor: const Color(0xFF6A5ACD),
+                labelColor: AppColors.accent,
+                unselectedLabelColor: AppColors.textDisabled,
+                indicatorColor: AppColors.accent,
                 tabs: const [
                   Tab(text: '만들기'),
                   Tab(text: '오늘의 문장들'),
@@ -214,20 +215,20 @@ class _ComposeTabState extends State<_ComposeTab> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Icon(Icons.check_circle_outline,
-                size: 56, color: Color(0xFF6A5ACD)),
+                size: 56, color: AppColors.accent),
             const SizedBox(height: 16),
             const Text(
               '오늘은 이미 남겼어요',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF6A5ACD),
+                color: AppColors.accent,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               '"오늘의 문장들" 탭에서 확인해 보세요.',
-              style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
             ),
           ],
         ),
@@ -247,10 +248,10 @@ class _ComposeTabState extends State<_ComposeTab> {
             runSpacing: 8,
             children: DailyWallService.situationTags.map((tag) {
               final selected = _selectedSituation == tag;
-              return ChoiceChip(
+                return ChoiceChip(
                 label: Text(tag),
                 selected: selected,
-                selectedColor: const Color(0xFFE8DAFF),
+                selectedColor: AppColors.accent.withOpacity(0.15),
                 onSelected: (_) =>
                     setState(() => _selectedSituation = tag),
               );
@@ -272,13 +273,13 @@ class _ComposeTabState extends State<_ComposeTab> {
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
+                    decoration: BoxDecoration(
                     color: selected
-                        ? const Color(0xFFE8DAFF)
-                        : Colors.grey[100],
+                        ? AppColors.accent.withOpacity(0.15)
+                        : AppColors.surfaceMuted,
                     borderRadius: BorderRadius.circular(16),
                     border: selected
-                        ? Border.all(color: const Color(0xFF6A5ACD), width: 2)
+                        ? Border.all(color: AppColors.accent, width: 2)
                         : null,
                   ),
                   child: Text(emoji, style: const TextStyle(fontSize: 28)),
@@ -297,10 +298,10 @@ class _ComposeTabState extends State<_ComposeTab> {
             runSpacing: 8,
             children: DailyWallService.endings.entries.map((e) {
               final selected = _selectedEndingKey == e.key;
-              return ChoiceChip(
+                return ChoiceChip(
                 label: Text(e.value),
                 selected: selected,
-                selectedColor: const Color(0xFFE8DAFF),
+                selectedColor: AppColors.accent.withOpacity(0.15),
                 onSelected: (_) =>
                     setState(() => _selectedEndingKey = e.key),
               );
@@ -315,7 +316,7 @@ class _ComposeTabState extends State<_ComposeTab> {
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFFF5F0FF),
+                color: AppColors.accent.withOpacity(0.06),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Text(
@@ -324,7 +325,7 @@ class _ComposeTabState extends State<_ComposeTab> {
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
                   height: 1.5,
-                  color: Color(0xFF424242),
+                  color: AppColors.textPrimary,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -339,12 +340,12 @@ class _ComposeTabState extends State<_ComposeTab> {
             child: ElevatedButton(
               onPressed: _canPost ? _submit : null,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF6A5ACD),
-                foregroundColor: Colors.white,
+                backgroundColor: AppColors.accent,
+                foregroundColor: AppColors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
-                disabledBackgroundColor: Colors.grey[300],
+                disabledBackgroundColor: AppColors.disabledBg,
               ),
               child: _posting
                   ? const SizedBox(
@@ -352,7 +353,7 @@ class _ComposeTabState extends State<_ComposeTab> {
                       height: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Colors.white,
+                        color: AppColors.white,
                       ),
                     )
                   : const Text(
@@ -373,7 +374,7 @@ class _ComposeTabState extends State<_ComposeTab> {
       style: const TextStyle(
         fontSize: 14,
         fontWeight: FontWeight.w700,
-        color: Color(0xFF424242),
+        color: AppColors.textPrimary,
       ),
     );
   }
@@ -401,12 +402,12 @@ class _FeedTab extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.cloud_off, size: 48, color: Colors.grey[300]),
+                Icon(Icons.cloud_off, size: 48, color: AppColors.textDisabled),
                 const SizedBox(height: 12),
                 Text(
                   '불러오는 중 문제가 생겼어요.\n잠시 후 다시 시도해 주세요.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey[500], fontSize: 14),
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
                 ),
               ],
             ),
@@ -418,12 +419,12 @@ class _FeedTab extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.edit_note, size: 48, color: Colors.grey[300]),
+                Icon(Icons.edit_note, size: 48, color: AppColors.textDisabled),
                 const SizedBox(height: 12),
                 Text(
                   '아직 오늘의 문장이 없어요.\n첫 번째로 남겨 보세요!',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey[500], fontSize: 14),
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
                 ),
               ],
             ),
@@ -501,9 +502,9 @@ class _PostCardState extends State<_PostCard> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFFAF8FF),
+        color: AppColors.accent.withOpacity(0.04),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE8DAFF), width: 1),
+        border: Border.all(color: AppColors.accent.withOpacity(0.2), width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -515,7 +516,7 @@ class _PostCardState extends State<_PostCard> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE8DAFF),
+                  color: AppColors.accent.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
@@ -523,7 +524,7 @@ class _PostCardState extends State<_PostCard> {
                   style: const TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF6A5ACD),
+                    color: AppColors.accent,
                   ),
                 ),
               ),
@@ -534,7 +535,7 @@ class _PostCardState extends State<_PostCard> {
                   width: 8,
                   height: 8,
                   decoration: const BoxDecoration(
-                    color: Color(0xFFCE93D8),
+                    color: AppColors.accent,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -550,7 +551,7 @@ class _PostCardState extends State<_PostCard> {
               fontSize: 16,
               fontWeight: FontWeight.w500,
               height: 1.6,
-              color: Color(0xFF333333),
+              color: AppColors.textPrimary,
             ),
           ),
 
@@ -576,8 +577,8 @@ class _PostCardState extends State<_PostCard> {
                       horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: _myReactionKey != null
-                        ? const Color(0xFFE8DAFF)
-                        : Colors.grey[100],
+                        ? AppColors.accent.withOpacity(0.15)
+                        : AppColors.surfaceMuted,
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(
@@ -592,15 +593,15 @@ class _PostCardState extends State<_PostCard> {
                         )
                       else
                         Icon(Icons.add_reaction_outlined,
-                            size: 16, color: Colors.grey[500]),
+                            size: 16, color: AppColors.textSecondary),
                       const SizedBox(width: 4),
                       Text(
                         _myReactionKey != null ? '변경' : '공감',
                         style: TextStyle(
                           fontSize: 11,
                           color: _myReactionKey != null
-                              ? const Color(0xFF6A5ACD)
-                              : Colors.grey[500],
+                              ? AppColors.accent
+                              : AppColors.textSecondary,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -634,7 +635,7 @@ class _PostCardState extends State<_PostCard> {
         if (option == null) return const SizedBox.shrink();
         return Text(
           '${option.emoji}${e.value}',
-          style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+          style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
         );
       }).toList(),
     );
@@ -644,9 +645,9 @@ class _PostCardState extends State<_PostCard> {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE8DAFF)),
+        border: Border.all(color: AppColors.accent.withOpacity(0.2)),
       ),
       child: Wrap(
         spacing: 4,
@@ -662,11 +663,11 @@ class _PostCardState extends State<_PostCard> {
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
                 color: isSelected
-                    ? const Color(0xFFE8DAFF)
-                    : Colors.grey[50],
+                    ? AppColors.accent.withOpacity(0.15)
+                    : AppColors.surfaceMuted,
                 borderRadius: BorderRadius.circular(20),
                 border: isSelected
-                    ? Border.all(color: const Color(0xFF6A5ACD), width: 1.5)
+                    ? Border.all(color: AppColors.accent, width: 1.5)
                     : null,
               ),
               child: Row(
@@ -681,8 +682,8 @@ class _PostCardState extends State<_PostCard> {
                       fontWeight:
                           isSelected ? FontWeight.bold : FontWeight.normal,
                       color: isSelected
-                          ? const Color(0xFF6A5ACD)
-                          : Colors.grey[600],
+                          ? AppColors.accent
+                          : AppColors.textSecondary,
                     ),
                   ),
                 ],

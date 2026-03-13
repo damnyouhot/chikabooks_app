@@ -1,6 +1,10 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_tokens.dart';
+import '../../../core/widgets/app_muted_button.dart';
+import '../../../core/widgets/app_primary_button.dart';
 import '../../../models/resume.dart';
 import '../../../services/resume_service.dart';
 import '../../../services/resume_draft_service.dart';
@@ -13,11 +17,6 @@ import '../widgets/section_trainings.dart';
 import '../widgets/section_attachments.dart';
 import '../widgets/section_summary.dart';
 import 'resume_preview_screen.dart';
-
-// ── 디자인 상수 ──────────────────────────────────────────
-const _kBg = Color(0xFFF8F6F9);
-const _kText = Color(0xFF3D4A5C);
-const _kBlue = Color(0xFF4A90D9);
 
 /// 이력서 편집 화면
 ///
@@ -172,21 +171,21 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
   Widget build(BuildContext context) {
     if (_loading) {
       return Scaffold(
-        backgroundColor: _kBg,
+        backgroundColor: AppColors.appBg,
         appBar: AppBar(title: const Text('이력서 편집')),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
     if (_resume == null) {
       return Scaffold(
-        backgroundColor: _kBg,
+        backgroundColor: AppColors.appBg,
         appBar: AppBar(title: const Text('이력서 편집')),
         body: const Center(child: Text('이력서를 찾을 수 없어요.')),
       );
     }
 
     return Scaffold(
-      backgroundColor: _kBg,
+      backgroundColor: AppColors.appBg,
       appBar: _buildAppBar(),
       body: Column(
         children: [
@@ -203,7 +202,7 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.white,
       elevation: 0,
       title: GestureDetector(
         onTap: () => _showTitleDialog(),
@@ -216,18 +215,18 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
-                  color: _kText,
+                  color: AppColors.textPrimary,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
             const SizedBox(width: 4),
-            Icon(Icons.edit, size: 14, color: _kText.withOpacity(0.3)),
+            const Icon(Icons.edit, size: 14, color: AppColors.textDisabled),
           ],
         ),
       ),
       centerTitle: false,
-      iconTheme: const IconThemeData(color: _kText),
+      iconTheme: const IconThemeData(color: AppColors.textPrimary),
       actions: [
         TextButton(
           onPressed: () {
@@ -240,7 +239,7 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
           },
           child: const Text(
             '미리보기',
-            style: TextStyle(fontSize: 13, color: _kBlue),
+            style: TextStyle(fontSize: 13, color: AppColors.accent),
           ),
         ),
       ],
@@ -249,7 +248,7 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
 
   Widget _buildSectionBar() {
     return Container(
-      color: Colors.white,
+      color: AppColors.white,
       padding: const EdgeInsets.only(bottom: 8),
       child: SingleChildScrollView(
         controller: _scrollCtrl,
@@ -265,23 +264,21 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
                 avatar: Icon(
                   s.icon,
                   size: 16,
-                  color: selected ? Colors.white : _kText.withOpacity(0.5),
+                  color: selected ? AppColors.onAccent : AppColors.textDisabled,
                 ),
                 label: Text(
                   s.label,
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                    color: selected ? Colors.white : _kText.withOpacity(0.7),
+                    color: selected ? AppColors.onAccent : AppColors.textSecondary,
                   ),
                 ),
                 selected: selected,
-                selectedColor: _kBlue,
-                backgroundColor: Colors.white,
+                selectedColor: AppColors.accent,
+                backgroundColor: AppColors.white,
                 side: BorderSide(
-                  color: selected
-                      ? _kBlue
-                      : _kText.withOpacity(0.1),
+                  color: selected ? AppColors.accent : AppColors.divider,
                 ),
                 onSelected: (_) => setState(() => _currentSection = i),
               ),
@@ -382,32 +379,23 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
 
   Widget _buildBottomBar() {
     return Container(
-      color: Colors.white,
+      color: AppColors.white,
       padding: EdgeInsets.fromLTRB(
-        16,
-        12,
-        16,
-        12 + MediaQuery.of(context).padding.bottom,
+        AppSpacing.xl,
+        AppSpacing.md,
+        AppSpacing.xl,
+        AppSpacing.md + MediaQuery.of(context).padding.bottom,
       ),
       child: Row(
         children: [
           // 이전
           if (_currentSection > 0)
             Expanded(
-              child: OutlinedButton(
-                onPressed: () =>
+              child: AppMutedButton(
+                onTap: () =>
                     setState(() => _currentSection = _currentSection - 1),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  side: BorderSide(color: _kText.withOpacity(0.15)),
-                ),
-                child: Text(
-                  '이전',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: _kText.withOpacity(0.6),
-                  ),
-                ),
+                label: '이전',
+                padding: const EdgeInsets.symmetric(vertical: 14),
               ),
             ),
           if (_currentSection > 0) const SizedBox(width: 10),
@@ -415,34 +403,15 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
           // 다음 / 저장
           Expanded(
             flex: 2,
-            child: FilledButton(
-              onPressed: _currentSection < _sections.length - 1
-                  ? () => setState(() => _currentSection++)
-                  : _saving
-                      ? null
+            child: AppPrimaryButton(
+              onPressed: _saving
+                  ? null
+                  : _currentSection < _sections.length - 1
+                      ? () => setState(() => _currentSection++)
                       : _save,
-              style: FilledButton.styleFrom(
-                backgroundColor: _kBlue,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-              child: _saving
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2,
-                      ),
-                    )
-                  : Text(
-                      _currentSection < _sections.length - 1
-                          ? '다음'
-                          : '저장하기',
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
+              label: _currentSection < _sections.length - 1 ? '다음' : '저장하기',
+              isLoading: _saving,
+              padding: const EdgeInsets.symmetric(vertical: 14),
             ),
           ),
         ],

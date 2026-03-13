@@ -89,26 +89,33 @@ class _GrowthPageState extends State<GrowthPage>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // ── 타이틀 + 아이콘 (한 행으로 통합) ──
         Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.sm,
-            vertical: AppSpacing.xs - 2,
-          ),
+          padding: const EdgeInsets.only(left: AppSpacing.xl, right: 4),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              IconButton(
-                icon: Icon(
-                  Icons.info_outline,
-                  color: AppColors.textPrimary.withOpacity(0.5),
-                  size: 18,
+              const Text(
+                '성장하기',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
                 ),
-                onPressed: () => _showConceptDialog(context),
               ),
               const Spacer(),
               IconButton(
                 icon: Icon(
+                  Icons.info_outline,
+                  color: AppColors.textDisabled,
+                  size: 18,
+                ),
+                onPressed: () => _showConceptDialog(context),
+              ),
+              IconButton(
+                icon: Icon(
                   Icons.settings_outlined,
-                  color: AppColors.textPrimary.withOpacity(0.4),
+                  color: AppColors.textDisabled,
                   size: 20,
                 ),
                 onPressed: () => Navigator.of(context).push(
@@ -118,25 +125,14 @@ class _GrowthPageState extends State<GrowthPage>
             ],
           ),
         ),
-        const Padding(
-          padding: EdgeInsets.only(left: AppSpacing.xl),
-          child: Text(
-            '성장하기',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-            ),
-          ),
-        ),
-        const SizedBox(height: AppSpacing.xs - 2),
+        // ── 서브타이틀 ──
         Padding(
           padding: const EdgeInsets.only(left: AppSpacing.xl),
           child: Text(
             '오늘도 하나씩, 꾸준히 성장해요.',
             style: TextStyle(
               fontSize: 12,
-              color: AppColors.textPrimary.withOpacity(0.55),
+              color: AppColors.textSecondary,
             ),
           ),
         ),
@@ -149,18 +145,18 @@ class _GrowthPageState extends State<GrowthPage>
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text(
-          '성장하기 탭에 대해서',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-        ),
-        content: const SingleChildScrollView(
-          child: Text('', style: TextStyle(fontSize: 13, height: 1.6)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('닫기'),
-          ),
+            title: const Text(
+              '성장하기 탭에 대해서',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            content: const SingleChildScrollView(
+              child: Text('', style: TextStyle(fontSize: 13, height: 1.6)),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('닫기'),
+              ),
         ],
       ),
     );
@@ -200,7 +196,7 @@ class _MyLibraryViewState extends State<_MyLibraryView>
       children: [
         // 서브 탭바 → AppSegmentedControl
         AppSegmentedControl(
-          controller: _tabCtrl,
+            controller: _tabCtrl,
           labels: const ['전자책', '저장한 변경사항'],
           margin: const EdgeInsets.symmetric(
             horizontal: AppSpacing.xl,
@@ -247,7 +243,7 @@ class _MyBooksTab extends StatelessWidget {
                 Text(
                   '구매한 도서가 없습니다.',
                   style: TextStyle(
-                    color: AppColors.textPrimary.withOpacity(0.6),
+                    color: AppColors.textSecondary,
                     fontSize: 14,
                   ),
                 ),
@@ -255,7 +251,7 @@ class _MyBooksTab extends StatelessWidget {
                 Text(
                   '치과책방에서 도서를 만나보세요.',
                   style: TextStyle(
-                    color: AppColors.textPrimary.withOpacity(0.4),
+                    color: AppColors.textDisabled,
                     fontSize: 12,
                   ),
                 ),
@@ -271,15 +267,15 @@ class _MyBooksTab extends StatelessWidget {
               return const Center(child: CircularProgressIndicator());
             }
             final myBooks = allSnap.data!
-                .where((b) => purchasedIds.contains(b.id))
-                .toList();
+                    .where((b) => purchasedIds.contains(b.id))
+                    .toList();
 
             if (myBooks.isEmpty) {
               return Center(
-                child: Text(
+                  child: Text(
                   '도서 정보를 불러오는 중...',
                   style: TextStyle(
-                    color: AppColors.textPrimary.withOpacity(0.6),
+                    color: AppColors.textSecondary,
                     fontSize: 14,
                   ),
                 ),
@@ -327,7 +323,7 @@ class _SavedHiraTab extends StatelessWidget {
                   '저장한 변경사항이 없습니다',
                   style: TextStyle(
                     fontSize: 14,
-                    color: AppColors.textPrimary.withOpacity(0.6),
+                    color: AppColors.textSecondary,
                   ),
                 ),
                 const SizedBox(height: AppSpacing.xs),
@@ -335,7 +331,7 @@ class _SavedHiraTab extends StatelessWidget {
                   '제도 변경 탭에서 항목을 저장하세요.',
                   style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.textPrimary.withOpacity(0.4),
+                    color: AppColors.textDisabled,
                   ),
                 ),
               ],
@@ -365,53 +361,53 @@ class _SavedHiraTile extends StatelessWidget {
     return AppMutedCard(
       padding: const EdgeInsets.all(AppSpacing.lg - 2),
       onTap: () => showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (context) => HiraUpdateDetailSheet(update: update),
-      ),
-      child: Row(
-        children: [
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (context) => HiraUpdateDetailSheet(update: update),
+        ),
+        child: Row(
+          children: [
           const Icon(
             Icons.info_outline,
             size: 20,
             color: AppColors.accent,
           ),
           const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  update.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    update.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
-                    height: 1.3,
+                      height: 1.3,
+                    ),
                   ),
-                ),
                 const SizedBox(height: AppSpacing.xs),
-                Text(
+                  Text(
                   '${update.publishedAt.year}.'
                   '${update.publishedAt.month.toString().padLeft(2, '0')}.'
                   '${update.publishedAt.day.toString().padLeft(2, '0')}',
                   style: const TextStyle(
-                    fontSize: 11,
+                      fontSize: 11,
                     color: AppColors.textDisabled,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
           const Icon(
             Icons.chevron_right,
             color: AppColors.textDisabled,
             size: 20,
           ),
-        ],
+          ],
       ),
     );
   }
@@ -428,11 +424,11 @@ class _MyBookTile extends StatelessWidget {
     return AppMutedCard(
       padding: const EdgeInsets.all(AppSpacing.md),
       onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => EbookDetailPage(ebook: book)),
-      ),
-      child: Row(
-        children: [
+            context,
+            MaterialPageRoute(builder: (_) => EbookDetailPage(ebook: book)),
+        ),
+        child: Row(
+          children: [
           // 커버: 화면 너비 13%, 최소44·최대68, 비율 3:4
           LayoutBuilder(
             builder: (ctx, constraints) {
@@ -441,11 +437,11 @@ class _MyBookTile extends StatelessWidget {
               final coverH = coverW * (4 / 3);
               return ClipRRect(
                 borderRadius: BorderRadius.circular(AppSpacing.sm),
-                child: Image.network(
-                  book.coverUrl,
+              child: Image.network(
+                book.coverUrl,
                   width: coverW,
                   height: coverH,
-                  fit: BoxFit.cover,
+                fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => Container(
                     width: coverW,
                     height: coverH,
@@ -454,43 +450,43 @@ class _MyBookTile extends StatelessWidget {
                       Icons.book,
                       color: AppColors.textDisabled,
                     ),
-                  ),
-                ),
+              ),
+            ),
               );
             },
           ),
           const SizedBox(width: AppSpacing.lg - 2),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  book.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    book.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: AppSpacing.xs),
-                Text(
-                  book.author,
+                  Text(
+                    book.author,
                   style: const TextStyle(
-                    fontSize: 12,
+                      fontSize: 12,
                     color: AppColors.textSecondary,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
           const Icon(
             Icons.chevron_right,
             color: AppColors.textDisabled,
             size: 20,
           ),
-        ],
+          ],
       ),
     );
   }
@@ -519,7 +515,7 @@ class _BookStoreBrowseView extends StatelessWidget {
             child: Text(
               '등록된 전자책이 없습니다.',
               style: TextStyle(
-                color: AppColors.textPrimary.withOpacity(0.6),
+                color: AppColors.textSecondary,
                 fontSize: 14,
               ),
             ),
@@ -548,44 +544,44 @@ class _BookGridTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+            return GestureDetector(
       onTap: () => Navigator.push(
-        context,
+                    context,
         MaterialPageRoute(builder: (_) => EbookDetailPage(ebook: book)),
-      ),
-      child: Column(
-        children: [
-          Expanded(
-            child: ClipRRect(
+                  ),
+              child: Column(
+                children: [
+                  Expanded(
+                      child: ClipRRect(
               borderRadius: BorderRadius.circular(AppSpacing.md),
-              child: Image.network(
+                        child: Image.network(
                 book.coverUrl,
-                fit: BoxFit.cover,
-                width: double.infinity,
+                          fit: BoxFit.cover,
+                          width: double.infinity,
                 errorBuilder: (_, __, ___) => Container(
                   color: AppColors.disabledBg,
                   child: const Icon(
-                    Icons.image,
+                                  Icons.image,
                     color: AppColors.textDisabled,
-                  ),
-                ),
-              ),
-            ),
-          ),
+                                ),
+                              ),
+                        ),
+                      ),
+                    ),
           const SizedBox(height: AppSpacing.sm),
-          Text(
+                  Text(
             book.title,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
               color: AppColors.textPrimary,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
     );
   }
 }

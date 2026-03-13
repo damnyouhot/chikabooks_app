@@ -3,14 +3,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/enthrone.dart';
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_tokens.dart';
 import 'billboard_card.dart';
-
-// ignore_for_file: avoid_print
-
-// ── 디자인 팔레트 ──
-const _kText = Color(0xFF5D6B6B);
-const _kShadow2 = Color(0xFFD5E5E5);
-const _kCardBg = Colors.white;
 
 /// 전광판 자동 순환 위젯 (가장 단순한 방식)
 /// 
@@ -63,11 +58,11 @@ class _BillboardCarouselState extends State<BillboardCarousel> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.error_outline, color: Colors.red, size: 32),
+                  const Icon(Icons.error_outline, color: AppColors.error, size: 32),
                   const SizedBox(height: 8),
                   Text(
                     'Billboard error: ${snap.error}',
-                    style: const TextStyle(color: Colors.red, fontSize: 12),
+                    style: const TextStyle(color: AppColors.error, fontSize: 12),
                     textAlign: TextAlign.center,
                   ),
                 ],
@@ -94,7 +89,7 @@ class _BillboardCarouselState extends State<BillboardCarousel> {
                     const SizedBox(height: 12),
                     Text(
                       'state=${snap.connectionState}\nhasData=${snap.hasData}',
-                      style: TextStyle(fontSize: 10, color: _kText.withOpacity(0.5)),
+                      style: const TextStyle(fontSize: 10, color: AppColors.textDisabled),
                       textAlign: TextAlign.center,
                     ),
                   ],
@@ -177,9 +172,9 @@ class _BillboardCarouselState extends State<BillboardCarousel> {
                     height: 8,
                     decoration: BoxDecoration(
                       color: isActive
-                          ? _kText.withOpacity(0.6)
-                          : _kShadow2,
-                      borderRadius: BorderRadius.circular(4),
+                          ? AppColors.textSecondary.withOpacity(0.6)
+                          : AppColors.divider,
+                      borderRadius: BorderRadius.circular(AppRadius.xs),
                     ),
                   );
                 }),
@@ -196,10 +191,10 @@ class _BillboardCarouselState extends State<BillboardCarousel> {
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: _kCardBg,
-        borderRadius: BorderRadius.circular(16),
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(
-          color: _kShadow2.withOpacity(0.3),
+          color: AppColors.divider.withOpacity(0.3),
         ),
       ),
       child: Column(
@@ -207,22 +202,22 @@ class _BillboardCarouselState extends State<BillboardCarousel> {
           Icon(
             Icons.auto_awesome_outlined,
             size: 32,
-            color: _kText.withOpacity(0.3),
+            color: AppColors.textDisabled.withOpacity(0.5),
           ),
           const SizedBox(height: 8),
           Text(
             '아직 추대된 글이 없어요',
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 13,
-              color: _kText.withOpacity(0.5),
+              color: AppColors.textSecondary,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             '좋은 글에 추대 버튼을 눌러보세요',
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 11,
-              color: _kText.withOpacity(0.4),
+              color: AppColors.textDisabled,
             ),
           ),
         ],

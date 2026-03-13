@@ -2,6 +2,9 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import '../models/user_public_profile.dart';
 import '../services/user_profile_service.dart';
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_tokens.dart';
+import '../core/widgets/app_primary_button.dart';
 
 /// Step A 게이트: 닉네임 / 지역 / 연차 입력
 ///
@@ -93,7 +96,7 @@ class _ProfileGateSheetState extends State<ProfileGateSheet> {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        color: Colors.white,
+        color: AppColors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: EdgeInsets.only(
@@ -111,7 +114,7 @@ class _ProfileGateSheetState extends State<ProfileGateSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey[300],
+                  color: AppColors.divider,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -125,16 +128,16 @@ class _ProfileGateSheetState extends State<ProfileGateSheet> {
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF6A5ACD),
+                  color: AppColors.accent,
                 ),
               ),
             ),
             const SizedBox(height: 6),
-            Center(
+            const Center(
               child: Text(
                 '서로를 너무 자세히는 몰라도 돼요.\n세 가지만 알려주세요. (20초)',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+                style: TextStyle(fontSize: 13, color: AppColors.textDisabled),
               ),
             ),
             const SizedBox(height: 24),
@@ -152,7 +155,7 @@ class _ProfileGateSheetState extends State<ProfileGateSheet> {
                       hintText: '2~10자',
                       counterText: '',
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 14, vertical: 12),
@@ -167,7 +170,7 @@ class _ProfileGateSheetState extends State<ProfileGateSheet> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 12, vertical: 12),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                     ),
                   ),
                   child: const Text('🎲', style: TextStyle(fontSize: 18)),
@@ -183,7 +186,7 @@ class _ProfileGateSheetState extends State<ProfileGateSheet> {
               value: _selectedRegion,
               decoration: InputDecoration(
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                 ),
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -207,7 +210,7 @@ class _ProfileGateSheetState extends State<ProfileGateSheet> {
                   label: Text(
                       UserPublicProfile.careerBucketLabels[bucket] ?? bucket),
                   selected: selected,
-                  selectedColor: const Color(0xFFE8DAFF),
+                  selectedColor: AppColors.accent.withOpacity(0.15),
                   onSelected: (_) =>
                       setState(() => _selectedCareer = bucket),
                 );
@@ -218,36 +221,16 @@ class _ProfileGateSheetState extends State<ProfileGateSheet> {
             // 에러 메시지
             if (_error != null) ...[
               Text(_error!,
-                  style:
-                      const TextStyle(color: Colors.redAccent, fontSize: 12)),
+                  style: const TextStyle(color: AppColors.error, fontSize: 12)),
               const SizedBox(height: 8),
             ],
 
             // ── 저장 버튼 ──
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                onPressed: _canSave ? _save : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF6A5ACD),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  disabledBackgroundColor: Colors.grey[300],
-                ),
-                child: _saving
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white),
-                      )
-                    : const Text('저장하고 계속',
-                        style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.bold)),
-              ),
+            AppPrimaryButton(
+              label: '저장하고 계속',
+              onPressed: _canSave ? _save : null,
+              isLoading: _saving,
+              radius: AppRadius.md,
             ),
             const SizedBox(height: 10),
 
@@ -255,8 +238,10 @@ class _ProfileGateSheetState extends State<ProfileGateSheet> {
             Center(
               child: TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: Text('나중에',
-                    style: TextStyle(color: Colors.grey[500], fontSize: 14)),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.textDisabled,
+                ),
+                child: const Text('나중에', style: TextStyle(fontSize: 14)),
               ),
             ),
           ],
@@ -271,11 +256,8 @@ class _ProfileGateSheetState extends State<ProfileGateSheet> {
       style: const TextStyle(
         fontSize: 14,
         fontWeight: FontWeight.w700,
-        color: Color(0xFF424242),
+        color: AppColors.textPrimary,
       ),
     );
   }
 }
-
-
-

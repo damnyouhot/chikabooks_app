@@ -1,15 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_style.dart';
-
-// ── 커리어 탭 디자인 팔레트: AppColors 참조 ──
-// 색상 변경 → app_colors.dart Primitive만 수정하면 자동 반영
-const kCText   = AppColors.textPrimary;   // Black
-const kCBg     = AppColors.appBg;         // Soft gray
-const kCAccent = AppColors.accent;        // Blue (버튼/카드 채움)
-const kCShadow = AppColors.accent;        // Blue 계열 (border 역할이었으나 제거)
-const kCCardBg = AppColors.surfaceMuted;  // Muted surface 카드 배경
-const kCMuted  = AppColors.textSecondary; // 진한 회색 (비활성)
+import '../../core/theme/app_tokens.dart';
+import '../../core/widgets/app_primary_card.dart';
 
 // ── 헬퍼 함수 ──────────────────────────────────────────────────
 String formatCareerMonths(int months) {
@@ -23,32 +15,24 @@ String formatCareerMonths(int months) {
 
 IconData iconFromSkillName(String name) {
   switch (name) {
-    case 'cleaning_services':
-      return Icons.cleaning_services_outlined;
-    case 'handyman':
-      return Icons.handyman_outlined;
-    case 'architecture':
-      return Icons.architecture_outlined;
-    case 'chat_bubble':
-      return Icons.chat_bubble_outline;
-    case 'receipt_long':
-      return Icons.receipt_long_outlined;
-    case 'build':
-      return Icons.build_outlined;
-    case 'child_care':
-      return Icons.child_care_outlined;
-    case 'sanitizer':
-      return Icons.sanitizer_outlined;
-    case 'phone':
-      return Icons.phone_outlined;
-    case 'radio':
-      return Icons.radio_outlined;
-    default:
-      return Icons.star_outline;
+    case 'cleaning_services': return Icons.cleaning_services_outlined;
+    case 'handyman':          return Icons.handyman_outlined;
+    case 'architecture':      return Icons.architecture_outlined;
+    case 'chat_bubble':       return Icons.chat_bubble_outline;
+    case 'receipt_long':      return Icons.receipt_long_outlined;
+    case 'build':             return Icons.build_outlined;
+    case 'child_care':        return Icons.child_care_outlined;
+    case 'sanitizer':         return Icons.sanitizer_outlined;
+    case 'phone':             return Icons.phone_outlined;
+    case 'radio':             return Icons.radio_outlined;
+    default:                  return Icons.star_outline;
   }
 }
 
 // ── 공통 위젯 ───────────────────────────────────────────────────
+
+/// Blue(Primary) 카드 — AppPrimaryCard 위임 래퍼
+/// 커리어 탭 내 카드들이 CareerCard를 참조하는 경우 호환 유지용
 class CareerCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
@@ -56,16 +40,12 @@ class CareerCard extends StatelessWidget {
   const CareerCard({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(16),
+    this.padding = const EdgeInsets.all(AppSpacing.lg),
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: padding,
-      decoration: AppStyle.primaryCardDecoration(radius: 16),
-      child: child,
-    );
+    return AppPrimaryCard(padding: padding, child: child);
   }
 }
 
@@ -78,8 +58,6 @@ class CareerSectionTitle extends StatelessWidget {
     return Text(
       text,
       style: const TextStyle(
-        // 앱 배경(#F7F8FA) 위에 직접 렌더링되므로 Black 텍스트 사용
-        // (카드 내부 제목은 각 섹션에서 onCardPrimary=White 직접 지정)
         color: AppColors.textPrimary,
         fontSize: 16,
         fontWeight: FontWeight.w700,
@@ -99,30 +77,30 @@ class CareerDatePickerTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return AppPrimaryCard(
+      radius: AppRadius.md,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg - 2,
+        vertical: 13,
+      ),
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-        decoration: AppStyle.primaryCardDecoration(radius: 12),
-        child: Row(
-          children: [
-            const Icon(
-              Icons.calendar_today_outlined,
-              size: 16,
+      child: Row(
+        children: [
+          const Icon(
+            Icons.calendar_today_outlined,
+            size: 16,
+            color: AppColors.onCardPrimary,
+          ),
+          const SizedBox(width: 10),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
               color: AppColors.onCardPrimary,
             ),
-            const SizedBox(width: 10),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: AppColors.onCardPrimary,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -164,26 +142,31 @@ class _CareerLoadingCardState extends State<CareerLoadingCard>
       animation: _anim,
       builder: (_, __) {
         final opacity = 0.4 + _anim.value * 0.3;
-        return Container(
-          height: widget.height,
-          padding: const EdgeInsets.all(16),
-          decoration: AppStyle.primaryCardDecoration(radius: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _ShimmerBar(width: 100, height: 14, opacity: opacity),
-              const SizedBox(height: 10),
-              _ShimmerBar(width: double.infinity, height: 12, opacity: opacity),
-              const SizedBox(height: 6),
-              _ShimmerBar(width: 200, height: 12, opacity: opacity),
-              const Spacer(),
-              _ShimmerBar(
-                width: double.infinity,
-                height: 38,
-                opacity: opacity,
-                radius: 12,
-              ),
-            ],
+        return AppPrimaryCard(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: SizedBox(
+            height: widget.height - AppSpacing.lg * 2,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _ShimmerBar(width: 100, height: 14, opacity: opacity),
+                const SizedBox(height: 10),
+                _ShimmerBar(
+                  width: double.infinity,
+                  height: 12,
+                  opacity: opacity,
+                ),
+                const SizedBox(height: 6),
+                _ShimmerBar(width: 200, height: 12, opacity: opacity),
+                const Spacer(),
+                _ShimmerBar(
+                  width: double.infinity,
+                  height: 38,
+                  opacity: opacity,
+                  radius: AppRadius.md,
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -200,11 +183,12 @@ class _ShimmerBar extends StatelessWidget {
     required this.width,
     required this.height,
     required this.opacity,
-    this.radius = 8,
+    this.radius = AppRadius.sm,
   });
 
   @override
   Widget build(BuildContext context) {
+    // shimmer 애니메이션 목적 — onCardPrimary(White) 반투명 사용은 예외 허용
     return Container(
       width: width,
       height: height,
@@ -229,14 +213,17 @@ class CareerErrorCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CareerCard(
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+      padding: const EdgeInsets.symmetric(
+        vertical: AppSpacing.xxl,
+        horizontal: AppSpacing.lg,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
+          const Icon(
             Icons.wifi_off_outlined,
             size: 32,
-            color: AppColors.onCardPrimary.withOpacity(0.6),
+            color: AppColors.onCardPrimary, // White on Blue — fade 불필요
           ),
           const SizedBox(height: 10),
           Text(
@@ -278,8 +265,10 @@ class CareerEditSheetTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       onTap: onTap,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      leading: Icon(icon, color: AppColors.textPrimary.withOpacity(0.75)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+      ),
+      leading: Icon(icon, color: AppColors.textSecondary),   // 이전 withOpacity(0.75)
       title: Text(
         title,
         style: const TextStyle(
@@ -288,7 +277,10 @@ class CareerEditSheetTile extends StatelessWidget {
           color: AppColors.textPrimary,
         ),
       ),
-      trailing: Icon(Icons.chevron_right, color: AppColors.textPrimary.withOpacity(0.45)),
+      trailing: const Icon(
+        Icons.chevron_right,
+        color: AppColors.textDisabled,                        // 이전 withOpacity(0.45)
+      ),
     );
   }
 }

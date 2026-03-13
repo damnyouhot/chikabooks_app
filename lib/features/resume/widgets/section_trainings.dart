@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../models/resume.dart';
-
-const _kText = Color(0xFF3D4A5C);
-const _kBlue = Color(0xFF4A90D9);
+import '../../../core/theme/app_colors.dart';
 
 /// G. 보수교육/세미나 섹션
 class SectionTrainings extends StatefulWidget {
@@ -53,13 +51,13 @@ class _SectionTrainingsState extends State<SectionTrainings> {
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w700,
-            color: _kText,
+            color: AppColors.textPrimary,
           ),
         ),
         const SizedBox(height: 4),
         Text(
           '이수한 보수교육, 세미나, 연수 등을 입력해주세요.',
-          style: TextStyle(fontSize: 12, color: _kText.withOpacity(0.4)),
+          style: TextStyle(fontSize: 12, color: AppColors.textDisabled),
         ),
         const SizedBox(height: 16),
 
@@ -76,7 +74,7 @@ class _SectionTrainingsState extends State<SectionTrainings> {
           icon: const Icon(Icons.add, size: 18),
           label: const Text('교육 추가'),
           style: OutlinedButton.styleFrom(
-            foregroundColor: _kBlue,
+            foregroundColor: AppColors.accent,
             padding: const EdgeInsets.symmetric(vertical: 12),
           ),
         ),
@@ -156,13 +154,13 @@ class _TrainingCardState extends State<_TrainingCard> {
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    color: _kText,
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 const Spacer(),
                 IconButton(
                   icon: const Icon(Icons.delete_outline, size: 18),
-                  color: Colors.red.withOpacity(0.6),
+                  color: AppColors.error.withOpacity(0.6),
                   onPressed: widget.onRemove,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
@@ -206,7 +204,7 @@ class _TrainingCardState extends State<_TrainingCard> {
         decoration: InputDecoration(
           labelText: label,
           hintText: hint,
-          hintStyle: TextStyle(color: _kText.withOpacity(0.2)),
+            hintStyle: TextStyle(color: AppColors.textDisabled),
           border: const OutlineInputBorder(),
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 12, vertical: 10),

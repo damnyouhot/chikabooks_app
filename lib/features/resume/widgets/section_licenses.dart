@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../models/resume.dart';
-
-const _kText = Color(0xFF3D4A5C);
-const _kBlue = Color(0xFF4A90D9);
+import '../../../core/theme/app_colors.dart';
 
 /// C. 면허/자격 섹션
 class SectionLicenses extends StatefulWidget {
@@ -62,13 +60,13 @@ class _SectionLicensesState extends State<SectionLicenses> {
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w700,
-            color: _kText,
+            color: AppColors.textPrimary,
           ),
         ),
         const SizedBox(height: 4),
         Text(
           '보유 여부만 체크하세요. 면허 번호 등 민감정보는 기본 비공개예요.',
-          style: TextStyle(fontSize: 12, color: _kText.withOpacity(0.4)),
+          style: TextStyle(fontSize: 12, color: AppColors.textDisabled),
         ),
         const SizedBox(height: 16),
         ...List.generate(_items.length, (i) {
@@ -78,12 +76,12 @@ class _SectionLicensesState extends State<SectionLicenses> {
               l.type,
               style: TextStyle(
                 fontSize: 14,
-                color: _kText,
+                color: AppColors.textPrimary,
                 fontWeight: l.has ? FontWeight.w600 : FontWeight.w400,
               ),
             ),
             value: l.has,
-            activeColor: _kBlue,
+            activeColor: AppColors.accent,
             controlAffinity: ListTileControlAffinity.leading,
             onChanged: (_) => _toggle(i),
             contentPadding: EdgeInsets.zero,

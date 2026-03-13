@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../models/inbox_card.dart';
 import '../services/partner_service.dart';
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_tokens.dart';
+import '../core/widgets/app_badge.dart';
 
 /// 파트너 인박스 요약 카드
 ///
@@ -28,7 +31,7 @@ class PartnerInboxCard extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF424242),
+                  color: AppColors.textPrimary,
                 ),
               ),
             ),
@@ -51,16 +54,9 @@ class _InboxCardItem extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE8DAFF), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFCE93D8).withOpacity(0.06),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: AppColors.divider, width: 1.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -68,9 +64,9 @@ class _InboxCardItem extends StatelessWidget {
           // 날짜
           Text(
             card.date,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 11,
-              color: Colors.grey[500],
+              color: AppColors.textDisabled,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -82,21 +78,10 @@ class _InboxCardItem extends StatelessWidget {
                 child: Row(
                   children: [
                     // 지역 · 경력
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF3E5F5),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        item.locationLabel,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF6A5ACD),
-                        ),
-                      ),
+                    AppBadge(
+                      label: item.locationLabel,
+                      bgColor: AppColors.accent.withOpacity(0.10),
+                      textColor: AppColors.accent,
                     ),
                     const SizedBox(width: 8),
                     // 활동 요약
@@ -105,7 +90,7 @@ class _InboxCardItem extends StatelessWidget {
                         item.lines.join(', '),
                         style: const TextStyle(
                           fontSize: 12,
-                          color: Color(0xFF424242),
+                          color: AppColors.textPrimary,
                         ),
                       ),
                     ),
@@ -122,6 +107,7 @@ class _InboxCardItem extends StatelessWidget {
                   await PartnerService.markInboxRead(card.id);
                 },
                 style: TextButton.styleFrom(
+                  foregroundColor: AppColors.accent,
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -130,7 +116,6 @@ class _InboxCardItem extends StatelessWidget {
                   '확인',
                   style: TextStyle(
                     fontSize: 11,
-                    color: Color(0xFF6A5ACD),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -141,6 +126,3 @@ class _InboxCardItem extends StatelessWidget {
     );
   }
 }
-
-
-

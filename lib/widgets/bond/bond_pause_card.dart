@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../services/user_profile_service.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
+import '../../core/widgets/app_muted_card.dart';
 
 /// 파트너 쉬기/활동 상태 관리 카드
-/// active/pause 상태에 따라 다른 UI 표시
 class BondPauseCard extends StatefulWidget {
   const BondPauseCard({super.key});
 
@@ -26,60 +28,48 @@ class _BondPauseCardState extends State<BondPauseCard> {
       final profile = await UserProfileService.getMyProfile(forceRefresh: true);
       if (mounted && profile != null) {
         setState(() {
-          _partnerStatus = profile.partnerStatus;
+          _partnerStatus    = profile.partnerStatus;
           _willMatchNextWeek = profile.willMatchNextWeek;
-          _loading = false;
+          _loading          = false;
         });
       }
     } catch (e) {
-      if (mounted) {
-        setState(() => _loading = false);
-      }
+      if (mounted) setState(() => _loading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const SizedBox.shrink();
-    }
-
-    if (_partnerStatus == 'active') {
-      return _buildActiveState();
-    } else {
-      return _buildPauseState();
-    }
+    if (_loading) return const SizedBox.shrink();
+    return _partnerStatus == 'active'
+        ? _buildActiveState()
+        : _buildPauseState();
   }
 
   Widget _buildActiveState() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[200]!),
-      ),
+    return AppMutedCard(
+      radius: AppRadius.md,
+      padding: const EdgeInsets.all(AppSpacing.lg),
       child: Row(
         children: [
-          const Icon(Icons.people, color: Color(0xFF1E88E5), size: 20),
+          const Icon(Icons.people, color: AppColors.accent, size: 20),
           const SizedBox(width: 12),
-          Expanded(
+          const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   '매주 월요일 09시에 자동 매칭',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF424242),
+                    color: AppColors.textPrimary,
                   ),
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: 4),
                 Text(
                   '알아서 새로운 파트너와 함께해요',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                 ),
               ],
             ),
@@ -87,12 +77,13 @@ class _BondPauseCardState extends State<BondPauseCard> {
           TextButton(
             onPressed: _showPauseDialog,
             style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              foregroundColor: AppColors.textSecondary,
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm,
+              ),
             ),
-            child: Text(
-              '쉬기',
-              style: TextStyle(color: Colors.grey[600]),
-            ),
+            child: const Text('쉬기'),
           ),
         ],
       ),
@@ -100,43 +91,39 @@ class _BondPauseCardState extends State<BondPauseCard> {
   }
 
   Widget _buildPauseState() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFF9E6),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Color(0xFFFFE082)),
-      ),
+    return AppMutedCard(
+      radius: AppRadius.md,
+      padding: const EdgeInsets.all(AppSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.pause_circle_outline, color: Colors.orange[700], size: 20),
+              const Icon(
+                Icons.pause_circle_outline,
+                color: AppColors.warning,
+                size: 20,
+              ),
               const SizedBox(width: 8),
               const Text(
                 '지금은 쉬는 중',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF424242),
+                  color: AppColors.textPrimary,
                 ),
               ),
               const Spacer(),
               TextButton(
                 onPressed: _resumeActive,
-                child: const Text(
-                  '다시 시작',
-                  style: TextStyle(color: Color(0xFF1E88E5)),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.accent,
                 ),
+                child: const Text('다시 시작'),
               ),
             ],
           ),
-          
-          Divider(height: 24, color: Colors.orange[200]),
-          
-          // 매칭 되기 스위치
+          const Divider(height: 24, color: AppColors.divider),
           Row(
             children: [
               Expanded(
@@ -148,7 +135,7 @@ class _BondPauseCardState extends State<BondPauseCard> {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
-                        color: Color(0xFF424242),
+                        color: AppColors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -156,9 +143,9 @@ class _BondPauseCardState extends State<BondPauseCard> {
                       _willMatchNextWeek
                           ? '다음 주엔 다시, 페이지를 펼칠래요'
                           : '조금 더 조용히 있을래요',
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 11,
-                        color: Colors.grey[600],
+                        color: AppColors.textSecondary,
                         fontStyle: FontStyle.italic,
                       ),
                     ),
@@ -168,16 +155,14 @@ class _BondPauseCardState extends State<BondPauseCard> {
               Switch(
                 value: _willMatchNextWeek,
                 onChanged: _updateWillMatch,
-                activeColor: const Color(0xFF1E88E5),
+                activeColor: AppColors.accent,
               ),
             ],
           ),
-          
           const SizedBox(height: 8),
-          
-          Text(
+          const Text(
             '💡 매칭 시간: 월요일 오전 9시',
-            style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+            style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
           ),
         ],
       ),
@@ -205,7 +190,9 @@ class _BondPauseCardState extends State<BondPauseCard> {
               _setPauseStatus();
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange[700],
+              backgroundColor: AppColors.warning,
+              foregroundColor: AppColors.white,
+              elevation: 0,
             ),
             child: const Text('쉬기'),
           ),
@@ -218,9 +205,7 @@ class _BondPauseCardState extends State<BondPauseCard> {
     try {
       await UserProfileService.updatePartnerStatus('pause');
       if (mounted) {
-        setState(() {
-          _partnerStatus = 'pause';
-        });
+        setState(() => _partnerStatus = 'pause');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('쉬기 상태로 변경되었어요'),
@@ -244,9 +229,7 @@ class _BondPauseCardState extends State<BondPauseCard> {
     try {
       await UserProfileService.updatePartnerStatus('active');
       if (mounted) {
-        setState(() {
-          _partnerStatus = 'active';
-        });
+        setState(() => _partnerStatus = 'active');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('다시 활동을 시작해요!'),
@@ -270,9 +253,7 @@ class _BondPauseCardState extends State<BondPauseCard> {
     try {
       await UserProfileService.updateWillMatchNextWeek(value);
       if (mounted) {
-        setState(() {
-          _willMatchNextWeek = value;
-        });
+        setState(() => _willMatchNextWeek = value);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -294,15 +275,3 @@ class _BondPauseCardState extends State<BondPauseCard> {
     }
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-

@@ -4,16 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import '../../../core/theme/app_colors.dart';
 import 'job_applicants_page.dart';
 import 'web_typography.dart';
-
-// ── 팔레트 ─────────────────────────────────────────────
-const _kText = Color(0xFF3D4A5C);
-const _kBlue = Color(0xFF4A90D9);
-const _kPinkDark = Color(0xFFE57373);
-const _kGreen = Color(0xFF66BB6A);
-const _kCardBg = Colors.white;
-const _kBorder = Color(0xFFE0D8E8);
 
 /// 공고 관리 탭 – Firestore `jobs` 컬렉션에서 현재 유저의 공고를 조회·관리
 class JobManageSection extends StatefulWidget {
@@ -85,13 +78,13 @@ class _JobManageSectionState extends State<JobManageSection> {
               width: 72,
               height: 72,
               decoration: BoxDecoration(
-                color: _kBlue.withOpacity(0.08),
+                color: AppColors.accent.withOpacity(0.08),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Icon(
                 Icons.business_center_rounded,
                 size: 36,
-                color: _kBlue.withOpacity(0.6),
+                color: AppColors.accent.withOpacity(0.6),
               ),
             ),
             const SizedBox(height: 20),
@@ -100,7 +93,7 @@ class _JobManageSectionState extends State<JobManageSection> {
               style: GoogleFonts.notoSansKr(
                 fontSize: 17,
                 fontWeight: FontWeight.w700,
-                color: _kText,
+                color: AppColors.textPrimary,
               ),
             ),
             const SizedBox(height: 10),
@@ -109,7 +102,7 @@ class _JobManageSectionState extends State<JobManageSection> {
               textAlign: TextAlign.center,
               style: GoogleFonts.notoSansKr(
                 fontSize: 14,
-                color: _kText.withOpacity(0.5),
+                color: AppColors.textSecondary,
                 height: 1.6,
               ),
             ),
@@ -121,8 +114,8 @@ class _JobManageSectionState extends State<JobManageSection> {
                 icon: const Icon(Icons.login, size: 18),
                 label: const Text('게시자 로그인'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _kBlue,
-                  foregroundColor: Colors.white,
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: AppColors.white,
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
@@ -142,7 +135,7 @@ class _JobManageSectionState extends State<JobManageSection> {
                 '계정이 없으신가요? 회원가입',
                 style: GoogleFonts.notoSansKr(
                   fontSize: 13,
-                  color: _kBlue.withOpacity(0.8),
+                  color: AppColors.accent.withOpacity(0.8),
                 ),
               ),
             ),
@@ -173,20 +166,20 @@ class _JobManageSectionState extends State<JobManageSection> {
               label: Text(f['label']!),
               selected: selected,
               onSelected: (_) => setState(() => _filter = key),
-              selectedColor: _kBlue.withOpacity(0.15),
-              checkmarkColor: _kBlue,
+              selectedColor: AppColors.accent.withOpacity(0.15),
+              checkmarkColor: AppColors.accent,
               labelStyle: GoogleFonts.notoSansKr(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: selected ? _kBlue : _kText.withOpacity(0.6),
+                color: selected ? AppColors.accent : AppColors.textSecondary,
               ),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
                 side: BorderSide(
-                  color: selected ? _kBlue.withOpacity(0.4) : _kBorder,
+                  color: selected ? AppColors.accent.withOpacity(0.4) : AppColors.divider,
                 ),
               ),
-              backgroundColor: Colors.white,
+              backgroundColor: AppColors.white,
             ),
           );
         }).toList(),
@@ -209,7 +202,7 @@ class _JobManageSectionState extends State<JobManageSection> {
           return Center(
             child: Text(
               '데이터를 불러오지 못했습니다.',
-              style: WebTypo.body(color: _kText.withOpacity(0.5)),
+              style: WebTypo.body(color: AppColors.textSecondary),
             ),
           );
         }
@@ -244,16 +237,16 @@ class _JobManageSectionState extends State<JobManageSection> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
+          const Icon(
             Icons.work_outline,
             size: 56,
-            color: _kText.withOpacity(0.2),
+            color: AppColors.textDisabled,
           ),
           const SizedBox(height: 16),
           Text(
             '등록된 공고가 없습니다.',
             style: WebTypo.body(
-              color: _kText.withOpacity(0.5),
+              color: AppColors.textSecondary,
               size: 15,
             ),
           ),
@@ -261,7 +254,7 @@ class _JobManageSectionState extends State<JobManageSection> {
           Text(
             '\'공고 등록\' 탭에서 새 공고를 등록해보세요.',
             style: WebTypo.caption(
-              color: _kText.withOpacity(0.4),
+              color: AppColors.textDisabled,
               size: 13,
             ),
           ),
@@ -284,16 +277,9 @@ class _JobManageSectionState extends State<JobManageSection> {
 
     return Container(
       decoration: BoxDecoration(
-        color: _kCardBg,
+        color: AppColors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _kBorder, width: 0.8),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFCFB8D8).withOpacity(0.06),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border.all(color: AppColors.divider, width: 0.8),
       ),
       padding: const EdgeInsets.all(18),
       child: Row(
@@ -312,7 +298,7 @@ class _JobManageSectionState extends State<JobManageSection> {
                       dateStr,
                       style: GoogleFonts.notoSansKr(
                         fontSize: 12,
-                        color: _kText.withOpacity(0.45),
+                        color: AppColors.textDisabled,
                       ),
                     ),
                   ],
@@ -324,7 +310,7 @@ class _JobManageSectionState extends State<JobManageSection> {
                   style: GoogleFonts.notoSansKr(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
-                    color: _kText,
+                    color: AppColors.textPrimary,
                     letterSpacing: -0.3,
                   ),
                   maxLines: 1,
@@ -336,7 +322,7 @@ class _JobManageSectionState extends State<JobManageSection> {
                   [clinicName, role].where((s) => s.isNotEmpty).join(' · '),
                   style: GoogleFonts.notoSansKr(
                     fontSize: 13,
-                    color: _kText.withOpacity(0.55),
+                    color: AppColors.textSecondary,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -351,7 +337,7 @@ class _JobManageSectionState extends State<JobManageSection> {
               _actionButton(
                 icon: Icons.people_outline,
                 label: '지원자',
-                color: _kBlue,
+                color: AppColors.accent,
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -367,28 +353,28 @@ class _JobManageSectionState extends State<JobManageSection> {
                 _actionButton(
                   icon: Icons.pause_circle_outline,
                   label: '마감',
-                  color: _kPinkDark,
+                  color: AppColors.error,
                   onTap: () => _updateStatus(doc.id, 'closed'),
                 ),
               if (status == 'closed')
                 _actionButton(
                   icon: Icons.refresh,
                   label: '재게시',
-                  color: _kGreen,
+                  color: AppColors.success,
                   onTap: () => _updateStatus(doc.id, 'pending'),
                 ),
               if (status == 'pending')
                 _actionButton(
                   icon: Icons.hourglass_top,
                   label: '대기중',
-                  color: _kText.withOpacity(0.35),
+                  color: AppColors.textDisabled,
                   onTap: null,
                 ),
               const SizedBox(height: 4),
               _actionButton(
                 icon: Icons.delete_outline,
                 label: '삭제',
-                color: Colors.red.withOpacity(0.6),
+                color: AppColors.error.withOpacity(0.6),
                 onTap: () => _confirmDelete(doc.id, title),
               ),
             ],
@@ -406,19 +392,19 @@ class _JobManageSectionState extends State<JobManageSection> {
 
     switch (status) {
       case 'active':
-        bg = _kGreen.withOpacity(0.15);
-        fg = _kGreen;
+        bg = AppColors.success.withOpacity(0.15);
+        fg = AppColors.success;
         label = '게시중';
         break;
       case 'closed':
-        bg = Colors.grey.withOpacity(0.15);
-        fg = Colors.grey;
+        bg = AppColors.textDisabled.withOpacity(0.15);
+        fg = AppColors.textDisabled;
         label = '마감';
         break;
       case 'pending':
       default:
-        bg = _kBlue.withOpacity(0.12);
-        fg = _kBlue;
+        bg = AppColors.accent.withOpacity(0.12);
+        fg = AppColors.accent;
         label = '검수중';
         break;
     }
@@ -501,7 +487,7 @@ class _JobManageSectionState extends State<JobManageSection> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
             child: const Text('삭제'),
           ),
         ],
@@ -524,4 +510,3 @@ class _JobManageSectionState extends State<JobManageSection> {
     }
   }
 }
-

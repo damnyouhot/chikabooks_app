@@ -10,13 +10,9 @@ import '../../../services/email_auth_service.dart';
 import '../../../services/sign_in_tracker.dart';
 import '../../publisher/services/clinic_auth_service.dart';
 import '../../publisher/pages/publisher_shared.dart';
+import '../../../core/theme/app_colors.dart';
 
-// ── 디자인 상수 ────────────────────────────────────────────
-const _kBg = Color(0xFFF8F6F9);
-const _kText = Color(0xFF3D4A5C);
-const _kBlue = Color(0xFF4A90D9);
-const _kGreen = Color(0xFF4CAF50);
-const _kNaver = Color(0xFF03C75A); // 네이버 그린
+const _kNaver = Color(0xFF03C75A); // 네이버 브랜드 그린 — 의도적 유지
 
 /// 통합 로그인 페이지 (/login)
 ///
@@ -34,7 +30,7 @@ class _WebLoginPageState extends State<WebLoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _kBg,
+      backgroundColor: AppColors.appBg,
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
@@ -82,7 +78,7 @@ class _WebLoginPageState extends State<WebLoginPage> {
                   children: [
                     Text(
                       '© 치카북스',
-                      style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                      style: TextStyle(fontSize: 12, color: AppColors.textDisabled),
                     ),
                     const SizedBox(width: 16),
                     _link('개인정보처리방침', '/privacy'),
@@ -105,13 +101,13 @@ class _WebLoginPageState extends State<WebLoginPage> {
           width: 56,
           height: 56,
           decoration: BoxDecoration(
-            color: _kBlue,
+            color: AppColors.accent,
             borderRadius: BorderRadius.circular(14),
           ),
           child: const Icon(
             Icons.local_hospital_outlined,
             size: 28,
-            color: Colors.white,
+            color: AppColors.white,
           ),
         ),
         const SizedBox(height: 14),
@@ -120,7 +116,7 @@ class _WebLoginPageState extends State<WebLoginPage> {
           style: GoogleFonts.notoSansKr(
             fontSize: 24,
             fontWeight: FontWeight.w800,
-            color: _kText,
+            color: AppColors.textPrimary,
             letterSpacing: -0.5,
           ),
         ),
@@ -129,7 +125,7 @@ class _WebLoginPageState extends State<WebLoginPage> {
           '치과 커뮤니티 & 구인구직 플랫폼',
           style: GoogleFonts.notoSansKr(
             fontSize: 13,
-            color: _kText.withOpacity(0.5),
+            color: AppColors.textSecondary,
           ),
         ),
       ],
@@ -146,9 +142,9 @@ class _WebLoginPageState extends State<WebLoginPage> {
           label,
           style: TextStyle(
             fontSize: 12,
-            color: Colors.grey[600],
+            color: AppColors.textSecondary,
             decoration: TextDecoration.underline,
-            decorationColor: Colors.grey[400],
+            decorationColor: AppColors.textDisabled,
           ),
         ),
       ),
@@ -158,7 +154,7 @@ class _WebLoginPageState extends State<WebLoginPage> {
   Widget _dot() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 6),
-      child: Text('·', style: TextStyle(color: Colors.grey[400])),
+      child: Text('·', style: TextStyle(color: AppColors.textDisabled)),
     );
   }
 }
@@ -402,15 +398,8 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
     return Container(
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.white,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -422,12 +411,12 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: _kGreen.withOpacity(0.1),
+                  color: AppColors.success.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
                   Icons.person_outline_rounded,
-                  color: _kGreen,
+                  color: AppColors.success,
                   size: 24,
                 ),
               ),
@@ -440,14 +429,14 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
                     style: GoogleFonts.notoSansKr(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
-                      color: _kText,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                   Text(
                     '이력서 작성 · 공고 지원',
                     style: GoogleFonts.notoSansKr(
                       fontSize: 12,
-                      color: _kText.withOpacity(0.5),
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ],
@@ -461,16 +450,16 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
               const Color(0xFFFEE500), Colors.black87, _loginKakao),
           const SizedBox(height: 10),
           _snsBtn('google', Icons.g_mobiledata, 'Google로 로그인',
-              Colors.white, Colors.black87, _loginGoogle,
-              border: Colors.grey[300]),
+              AppColors.white, Colors.black87, _loginGoogle,
+              border: AppColors.divider),
           const SizedBox(height: 10),
           _snsBtn('apple', Icons.apple, 'Apple로 로그인', Colors.black,
-              Colors.white, _loginApple),
+              AppColors.white, _loginApple),
           const SizedBox(height: 10),
 
           // 네이버 (비활성)
           _snsBtn('naver', Icons.language, '네이버로 로그인',
-              Colors.grey[200]!, Colors.grey[500]!, null,
+              AppColors.surfaceMuted, AppColors.textDisabled, null,
               trailingLabel: '앱에서만 가능해요'),
 
           const SizedBox(height: 12),
@@ -504,7 +493,7 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
               textAlign: TextAlign.center,
               style: GoogleFonts.notoSansKr(
                 fontSize: 11,
-                color: _kText.withOpacity(0.5),
+                color: AppColors.textSecondary,
                 height: 1.5,
               ),
             ),
@@ -514,19 +503,19 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                 decoration: BoxDecoration(
-                  color: _kGreen.withOpacity(0.08),
+                  color: AppColors.success.withOpacity(0.08),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.check_circle_outline, size: 16, color: _kGreen),
+                    const Icon(Icons.check_circle_outline, size: 16, color: AppColors.success),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         '재설정 링크를 이메일로 보냈어요.\n메일함을 확인해주세요.',
                         style: GoogleFonts.notoSansKr(
                           fontSize: 12,
-                          color: _kGreen,
+                          color: AppColors.success,
                           height: 1.5,
                         ),
                       ),
@@ -545,7 +534,7 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
                   }),
                   child: Text(
                     '로그인으로 돌아가기',
-                    style: TextStyle(fontSize: 12, color: _kText.withOpacity(0.5)),
+                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                   ),
                 ),
               ),
@@ -563,7 +552,7 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
                   onPressed: (_loadingProvider == 'reset') ? null : _sendPasswordReset,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _kNaver,
-                    foregroundColor: Colors.white,
+                    foregroundColor: AppColors.white,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
@@ -574,7 +563,7 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
                       ? const SizedBox(
                           width: 20,
                           height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.white),
                         )
                       : Text(
                           '비밀번호 설정 링크 보내기',
@@ -593,7 +582,7 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
                   }),
                   child: Text(
                     '취소',
-                    style: TextStyle(fontSize: 12, color: _kText.withOpacity(0.5)),
+                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                   ),
                 ),
               ),
@@ -605,15 +594,15 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
           // ── 구분선 ─────────────────────────
           Row(
             children: [
-              Expanded(child: Divider(color: Colors.grey[300])),
+              const Expanded(child: Divider(color: AppColors.divider)),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Text(
                   '또는',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[400]),
+                  style: TextStyle(fontSize: 12, color: AppColors.textDisabled),
                 ),
               ),
-              Expanded(child: Divider(color: Colors.grey[300])),
+              const Expanded(child: Divider(color: AppColors.divider)),
             ],
           ),
           const SizedBox(height: 14),
@@ -621,20 +610,20 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
           // ── 이메일 로그인 ──────────────────
           if (!_showEmailForm)
             OutlinedButton.icon(
-              icon: Icon(
+              icon: const Icon(
                 Icons.email_outlined,
                 size: 18,
-                color: _kText.withOpacity(0.6),
+                color: AppColors.textSecondary,
               ),
-              label: Text(
+              label: const Text(
                 '이메일로 로그인',
                 style: TextStyle(
                   fontSize: 14,
-                  color: _kText.withOpacity(0.7),
+                  color: AppColors.textSecondary,
                 ),
               ),
               style: OutlinedButton.styleFrom(
-                side: BorderSide(color: Colors.grey[300]!),
+                side: const BorderSide(color: AppColors.divider),
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -665,8 +654,8 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
               child: ElevatedButton(
                 onPressed: (_loadingProvider == 'email') ? null : _loginEmail,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _kGreen,
-                  foregroundColor: Colors.white,
+                  backgroundColor: AppColors.success,
+                  foregroundColor: AppColors.white,
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
@@ -679,7 +668,7 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
                         height: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: Colors.white,
+                          color: AppColors.white,
                         ),
                       )
                     : Text(
@@ -701,7 +690,7 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
                   _isSignUp ? '이미 계정이 있어요' : '아직 계정이 없어요 (회원가입)',
                   style: TextStyle(
                     fontSize: 12,
-                    color: _kText.withOpacity(0.5),
+                    color: AppColors.textSecondary,
                   ),
                 ),
               ),
@@ -793,14 +782,14 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.grey[300],
+                      color: AppColors.surfaceMuted,
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
                       trailingLabel,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 10,
-                        color: Colors.grey[600],
+                        color: AppColors.textSecondary,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -830,21 +819,14 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
               decoration: BoxDecoration(
-                color: _kGreen,
+                color: AppColors.success,
                 borderRadius: BorderRadius.circular(8),
-                boxShadow: [
-                  BoxShadow(
-                    color: _kGreen.withOpacity(0.3),
-                    blurRadius: 4,
-                    offset: const Offset(0, 1),
-                  ),
-                ],
               ),
               child: Text(
                 '마지막 로그인',
                 style: GoogleFonts.notoSansKr(
                   fontSize: 9,
-                  color: Colors.white,
+                  color: AppColors.white,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -859,14 +841,14 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
               decoration: BoxDecoration(
-                color: Colors.grey[500],
+                color: AppColors.textDisabled,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
                 '마지막 로그인 (앱)',
                 style: GoogleFonts.notoSansKr(
                   fontSize: 9,
-                  color: Colors.white,
+                  color: AppColors.white,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -958,15 +940,8 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
     return Container(
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.white,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
       ),
       child: Form(
         key: _formKey,
@@ -980,12 +955,12 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: _kBlue.withOpacity(0.1),
+                    color: AppColors.accent.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(
                     Icons.business_center_rounded,
-                    color: _kBlue,
+                    color: AppColors.accent,
                     size: 24,
                   ),
                 ),
@@ -998,14 +973,14 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
                       style: GoogleFonts.notoSansKr(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
-                        color: _kText,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                     Text(
                       '공고 등록 · 지원자 관리',
                       style: GoogleFonts.notoSansKr(
                         fontSize: 12,
-                        color: _kText.withOpacity(0.5),
+                        color: AppColors.textSecondary,
                       ),
                     ),
                   ],
@@ -1024,7 +999,7 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
                   style: GoogleFonts.notoSansKr(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: _kText,
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -1033,7 +1008,7 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
                   textAlign: TextAlign.center,
                   style: GoogleFonts.notoSansKr(
                     fontSize: 11,
-                    color: _kText.withOpacity(0.55),
+                    color: AppColors.textSecondary,
                   ),
                 ),
               ],
@@ -1064,7 +1039,7 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
                   _obscurePw
                       ? Icons.visibility_off_outlined
                       : Icons.visibility_outlined,
-                  color: _kText.withOpacity(0.4),
+                  color: AppColors.textDisabled,
                   size: 20,
                 ),
                 onPressed: () => setState(() => _obscurePw = !_obscurePw),
@@ -1129,8 +1104,8 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
                   style: GoogleFonts.notoSansKr(fontSize: 13),
                 ),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: _kBlue,
-                  side: BorderSide(color: _kBlue.withOpacity(0.4)),
+                  foregroundColor: AppColors.accent,
+                  side: BorderSide(color: AppColors.accent.withOpacity(0.4)),
                   padding: const EdgeInsets.symmetric(vertical: 10),
                 ),
               ),
@@ -1148,7 +1123,7 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
                     '비밀번호를 잊으셨나요?',
                     style: TextStyle(
                       fontSize: 12,
-                      color: _kText.withOpacity(0.5),
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ),
@@ -1160,7 +1135,7 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: _kBlue,
+                      color: AppColors.accent,
                     ),
                   ),
                 ),

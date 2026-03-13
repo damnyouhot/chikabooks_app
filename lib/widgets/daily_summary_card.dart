@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/daily_summary_service.dart';
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_tokens.dart';
+import '../core/widgets/app_primary_button.dart';
 
 /// 저녁 7시 요약 카드
 class DailySummaryCard extends StatelessWidget {
@@ -37,13 +40,13 @@ class DailySummaryCard extends StatelessWidget {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                const Color(0xFF6A5ACD).withOpacity(0.15),
-                const Color(0xFFF7CBCA).withOpacity(0.15),
+                AppColors.accent.withOpacity(0.15),
+                AppColors.accent.withOpacity(0.05),
               ],
             ),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(AppRadius.xl),
             border: Border.all(
-              color: const Color(0xFF6A5ACD).withOpacity(0.2),
+              color: AppColors.accent.withOpacity(0.2),
               width: 1,
             ),
           ),
@@ -57,12 +60,12 @@ class DailySummaryCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF6A5ACD).withOpacity(0.2),
+                      color: AppColors.accent.withOpacity(0.2),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
                       Icons.access_time,
-                      color: Color(0xFF6A5ACD),
+                      color: AppColors.accent,
                       size: 16,
                     ),
                   ),
@@ -73,7 +76,7 @@ class DailySummaryCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF6A5ACD),
+                      color: AppColors.accent,
                     ),
                   ),
 
@@ -81,9 +84,9 @@ class DailySummaryCard extends StatelessWidget {
 
                   Text(
                     '19:00',
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 11,
-                      color: Colors.grey[500],
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ],
@@ -97,7 +100,7 @@ class DailySummaryCard extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF333333),
+                  color: AppColors.textPrimary,
                   height: 1.4,
                 ),
               ),
@@ -110,28 +113,11 @@ class DailySummaryCard extends StatelessWidget {
               const SizedBox(height: 16),
 
               // CTA 버튼
-              SizedBox(
-                width: double.infinity,
-                height: 44,
-                child: ElevatedButton(
-                  onPressed: () {
-                    // TODO: 한 문장 작성 화면으로 이동
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF6A5ACD),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: Text(
-                    summary.ctaMessage,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
+              AppPrimaryButton(
+                label: summary.ctaMessage,
+                onPressed: () {
+                  // TODO: 한 문장 작성 화면으로 이동
+                },
               ),
             ],
           ),
@@ -148,17 +134,17 @@ class DailySummaryCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.7),
-        borderRadius: BorderRadius.circular(12),
+        color: AppColors.white.withOpacity(0.7),
+        borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          const Text(
             '오늘 활동',
             style: TextStyle(
               fontSize: 11,
-              color: Colors.grey[600],
+              color: AppColors.textSecondary,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -175,12 +161,12 @@ class DailySummaryCard extends StatelessWidget {
                   Container(
                     width: 4,
                     height: 4,
-                    decoration: BoxDecoration(
-                      color: count > 0 
-                          ? const Color(0xFF6A5ACD) 
-                          : Colors.grey[400],
-                      shape: BoxShape.circle,
-                    ),
+                  decoration: BoxDecoration(
+                    color: count > 0 
+                        ? AppColors.accent 
+                        : AppColors.textDisabled,
+                    shape: BoxShape.circle,
+                  ),
                   ),
                   const SizedBox(width: 8),
                   Text(
@@ -188,8 +174,8 @@ class DailySummaryCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       color: count > 0 
-                          ? const Color(0xFF333333) 
-                          : Colors.grey[500],
+                          ? AppColors.textPrimary 
+                          : AppColors.textSecondary,
                     ),
                   ),
                 ],

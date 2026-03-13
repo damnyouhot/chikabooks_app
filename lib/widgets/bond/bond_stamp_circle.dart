@@ -74,27 +74,18 @@ class _BondStampCircleState extends State<BondStampCircle>
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: widget.isFilled
-              ? AppColors.cardEmphasis                                     // Neon for filled
+              ? AppColors.cardEmphasis
               : widget.isToday
-                  ? AppColors.accent.withOpacity(0.15)                // Blue tint for today
-                  : AppColors.surfaceMuted.withOpacity(0.25),
+                  ? AppColors.accent.withOpacity(0.15)
+                  : AppColors.surfaceMuted,
           border: Border.all(
             color: widget.isToday
-                ? AppColors.accent.withOpacity(0.9)                   // Blue border today
+                ? AppColors.accent
                 : widget.isFilled
-                    ? AppColors.cardEmphasis.withOpacity(0.6)
-                    : AppColors.surfaceMuted.withOpacity(0.3),
+                    ? AppColors.cardEmphasis
+                    : AppColors.disabledBg,
             width: widget.isToday ? 2.0 : 0.8,
           ),
-          boxShadow: widget.isFilled
-              ? [
-                  BoxShadow(
-                    color: AppColors.cardEmphasis.withOpacity(0.55),
-                    blurRadius: 10,
-                    spreadRadius: 1,
-                  ),
-                ]
-              : null,
         ),
         child: Center(
           child: Text(
@@ -103,10 +94,10 @@ class _BondStampCircleState extends State<BondStampCircle>
               fontSize: 11,
               fontWeight: FontWeight.w700,
               color: widget.isFilled
-                  ? AppColors.onCardEmphasis                              // Black on Neon
+                  ? AppColors.onCardEmphasis
                   : widget.isToday
-                      ? AppColors.accent                             // Blue for today label
-                      : AppColors.textPrimary.withOpacity(0.45),
+                      ? AppColors.accent
+                      : AppColors.textDisabled,
             ),
           ),
         ),

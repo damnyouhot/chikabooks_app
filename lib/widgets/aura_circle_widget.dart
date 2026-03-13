@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import '../core/theme/app_colors.dart';
 
 /// 중앙 원 + 확산광(오라) 위젯 v3
 ///
@@ -125,7 +126,7 @@ class _AuraCircleWidgetState extends State<AuraCircleWidget>
                     style: const TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
-                      color: Color(0xFF424242),
+                      color: AppColors.textPrimary,
                       height: 1.5,
                       letterSpacing: -0.2,
                     ),
@@ -134,10 +135,10 @@ class _AuraCircleWidgetState extends State<AuraCircleWidget>
                     const SizedBox(height: 8),
                     Text(
                       widget.subText!,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w400,
-                        color: Colors.grey[400],
+                        color: AppColors.textDisabled,
                         letterSpacing: 0.5,
                       ),
                     ),
@@ -295,7 +296,7 @@ class _AuraWavePainter extends CustomPainter {
       center,
       circleRadius,
       Paint()
-        ..color = Colors.white
+        ..color = AppColors.white
         ..style = PaintingStyle.fill,
     );
 

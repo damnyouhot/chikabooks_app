@@ -2,6 +2,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../models/daily_slot.dart';
 import '../../services/partner_service.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
+import '../../core/widgets/app_muted_card.dart';
+import '../../core/widgets/app_primary_button.dart';
 
 /// 오늘의 말(슬롯) 카드
 ///
@@ -32,19 +36,9 @@ class _SlotCardState extends State<SlotCard> {
     final slotKey = PartnerService.currentSlotKey();
     final dateKey = PartnerService.todayDateKey();
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFCE93D8).withOpacity(0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+    return AppMutedCard(
+      radius: AppRadius.xl,
+      padding: const EdgeInsets.all(AppSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -52,21 +46,21 @@ class _SlotCardState extends State<SlotCard> {
           Row(
             children: [
               const Icon(Icons.chat_bubble_outline,
-                  color: Color(0xFFCE93D8), size: 20),
+                  color: AppColors.accent, size: 20),
               const SizedBox(width: 8),
               const Text(
                 '오늘의 말',
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF424242),
+                  color: AppColors.textPrimary,
                 ),
               ),
               const Spacer(),
               if (slotKey != null)
                 Text(
                   slotKey == '1230' ? '12:30 슬롯' : '19:00 슬롯',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                  style: const TextStyle(fontSize: 12, color: AppColors.textDisabled),
                 ),
             ],
           ),
@@ -107,7 +101,7 @@ class _SlotCardState extends State<SlotCard> {
       child: Center(
         child: Text(
           PartnerService.nextSlotGuide(),
-          style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+          style: const TextStyle(fontSize: 13, color: AppColors.textDisabled),
         ),
       ),
     );
@@ -126,12 +120,12 @@ class _SlotCardState extends State<SlotCard> {
       if (slot.claimedByUid == myUid) {
         return _buildWriteUI(slot);
       }
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
         child: Center(
           child: Text(
             '누군가 쓰는 중…',
-            style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+            style: TextStyle(fontSize: 13, color: AppColors.textDisabled),
           ),
         ),
       );
@@ -145,7 +139,8 @@ class _SlotCardState extends State<SlotCard> {
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
-        child: ElevatedButton(
+        child: AppPrimaryButton(
+          label: '내가 말할래 ✍️',
           onPressed: _claiming
               ? null
               : () async {
@@ -164,23 +159,8 @@ class _SlotCardState extends State<SlotCard> {
                     }
                   }
                 },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFFCE93D8),
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-          ),
-          child: _claiming
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child:
-                      CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-              : const Text('내가 말할래 ✍️',
-                  style: TextStyle(fontWeight: FontWeight.w600)),
+          isLoading: _claiming,
+          radius: AppRadius.full,
         ),
       ),
     );
@@ -196,7 +176,7 @@ class _SlotCardState extends State<SlotCard> {
             hintText: '60자 이내로 한마디',
             counterText: '${_textCtrl.text.length}/60',
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadius.md),
             ),
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -204,43 +184,29 @@ class _SlotCardState extends State<SlotCard> {
           onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: 8),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: _posting || _textCtrl.text.trim().isEmpty
-                ? null
-                : () async {
-                    setState(() => _posting = true);
-                    final ok = await PartnerService.postSlot(
-                      groupId: widget.groupId,
-                      dateKey: slot.dateKey,
-                      slotKey: slot.slotKey,
-                      text: _textCtrl.text,
-                    );
-                    if (mounted) {
-                      setState(() => _posting = false);
-                      if (ok) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('한마디 남겼어요 ✨')),
-                        );
-                      }
+        AppPrimaryButton(
+          label: '남기기',
+          onPressed: _posting || _textCtrl.text.trim().isEmpty
+              ? null
+              : () async {
+                  setState(() => _posting = true);
+                  final ok = await PartnerService.postSlot(
+                    groupId: widget.groupId,
+                    dateKey: slot.dateKey,
+                    slotKey: slot.slotKey,
+                    text: _textCtrl.text,
+                  );
+                  if (mounted) {
+                    setState(() => _posting = false);
+                    if (ok) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('한마디 남겼어요 ✨')),
+                      );
                     }
-                  },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF6A5ACD),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: _posting
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Colors.white))
-                : const Text('남기기'),
-          ),
+                  }
+                },
+          isLoading: _posting,
+          radius: AppRadius.md,
         ),
       ],
     );
@@ -254,8 +220,8 @@ class _SlotCardState extends State<SlotCard> {
           width: double.infinity,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: const Color(0xFFF3E5F5),
-            borderRadius: BorderRadius.circular(14),
+            color: AppColors.accent.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(AppRadius.md),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -325,14 +291,14 @@ class _ReactionRowState extends State<_ReactionRow> {
           },
           child: Container(
             padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
             decoration: BoxDecoration(
               color: selected
-                  ? const Color(0xFFE8DAFF)
-                  : Colors.grey[100],
-              borderRadius: BorderRadius.circular(16),
+                  ? AppColors.accent.withOpacity(0.12)
+                  : AppColors.surfaceMuted,
+              borderRadius: BorderRadius.circular(AppRadius.full),
               border: selected
-                  ? Border.all(color: const Color(0xFF6A5ACD), width: 1.5)
+                  ? Border.all(color: AppColors.accent, width: 1.5)
                   : null,
             ),
             child: Text(
@@ -340,9 +306,7 @@ class _ReactionRowState extends State<_ReactionRow> {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-                color: selected
-                    ? const Color(0xFF6A5ACD)
-                    : Colors.grey[600],
+                color: selected ? AppColors.accent : AppColors.textSecondary,
               ),
             ),
           ),
@@ -351,6 +315,3 @@ class _ReactionRowState extends State<_ReactionRow> {
     );
   }
 }
-
-
-

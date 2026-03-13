@@ -2,37 +2,32 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
+import '../../core/widgets/app_badge.dart';
 import '../../data/mock_jobs.dart';
 import '../../models/job.dart';
 import '../../notifiers/job_filter_notifier.dart';
+import '../../pages/settings/settings_page.dart';
 import '../../services/career_profile_service.dart';
 import '../../services/job_match_service.dart';
 import '../../services/job_service.dart';
-import '../../widgets/job/job_search_bar.dart';
+import '../../pages/career/career_tab.dart';
 import '../../widgets/job/job_level1_carousel.dart';
 import '../../widgets/job/filter_bottom_sheet.dart';
 import '../jobs/job_detail_screen.dart';
 
-// ── 디자인 팔레트 ──
-const _kText = Color(0xFF5D6B6B);
-const _kAccent = Color(0xFFF7CBCA);
-const _kShadow = Color(0xFFD5E5E5);
-const _kBg = Color(0xFFF5F0F2);
-
 /// 공고보기 소탭 - 목록 모드
 ///
 /// ## Sliver 구조
-/// - Sticky 1 (항상 고정): 검색 바 + 커리어 요약 + 필터
-/// - Level 1 (일반 스크롤): 프리미엄 캐러셀 (자동 롤링, 4초 주기)
-/// - Level 2 (일반 스크롤): 추천 2열 바둑판
-/// - Level 3 (일반 스크롤): 게시판형 리스트 + 12개마다 미니바
-///
-/// ## Sticky 2 동작
-/// Level 3 헤더가 검색 바 아래에 닿는 순간 Level 1 캐러셀이
-/// Stack 오버레이로 고정(Sticky 2)되고, Level 3 리스트 상단에
-/// 동일한 높이의 패딩이 추가되어 콘텐츠가 가려지지 않음.
+/// - 타이틀 섹션 (일반 스크롤, 스크롤 시 사라짐): 커리어 제목 + 인포/설정 + 커리어 요약
+/// - Level 1 A클래스 (SliverAppBar pinned): 프리미엄 PageView 캐러셀 (항상 상단 고정)
+/// - Level 2 B클래스 (일반 스크롤): 추천 2열 바둑판
+/// - Level 3 B클래스 (일반 스크롤): 게시판형 리스트 + 12개마다 미니바
+/// - 하단 검색 바 (Positioned): 필터 + 지도 버튼 포함
 class JobListingsScreen extends StatefulWidget {
   final LatLng? userLocation;
   final VoidCallback onMapToggle;
@@ -50,25 +45,16 @@ class JobListingsScreen extends StatefulWidget {
 class _JobListingsScreenState extends State<JobListingsScreen> {
   final _scrollController = ScrollController();
 
-  // Sticky 2 상태
-  final _level3Key = GlobalKey();
-  bool _showStickyCarousel = false;
-  double _level3Threshold = double.infinity;
-  bool _thresholdReady = false;
-
-  // Sticky 2 캐러셀 강조 트리거용 GlobalKey
-  final _stickyCarouselKey = GlobalKey<JobLevel1CarouselState>();
-
   // 검색
   String _searchQuery = '';
 
-  // ── 커리어 프로파일 (Stage 5) ────────────────────────────────────
+  // ── 커리어 프로파일 ───────────────────────────────────────────
   String _careerSummary = '';
   Map<String, dynamic>? _careerProfile;
   int _totalCareerMonths = 0;
   StreamSubscription<Map<String, dynamic>?>? _careerSub;
 
-  // ── Level 3 페이지네이션 상태 ────────────────────────────────────
+  // ── Level 3 페이지네이션 상태 ────────────────────────────────
   List<Job> _level3Jobs = [];
   bool _level3Loading = false;
   bool _level3HasMore = true;
@@ -84,8 +70,6 @@ class _JobListingsScreenState extends State<JobListingsScreen> {
     _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _measureThreshold();
-      // 필터 리스너 등록 + 초기 로드
       _filterNotifier = context.read<JobFilterNotifier>();
       _filterNotifier!.addListener(_onFilterChanged);
       _loadLevel3(reset: true);
@@ -118,32 +102,7 @@ class _JobListingsScreenState extends State<JobListingsScreen> {
 
   void _onFilterChanged() => _loadLevel3(reset: true);
 
-  // Level 3 헤더의 스크롤 임계값 계산
-  void _measureThreshold() {
-    final ctx = _level3Key.currentContext;
-    if (ctx == null) return;
-    final box = ctx.findRenderObject() as RenderBox?;
-    if (box == null) return;
-
-    // viewport 기준 현재 Y 위치 → 스크롤 content 좌표 변환
-    final viewportY = box.localToGlobal(Offset.zero).dy;
-    final contentY = viewportY + _scrollController.offset;
-
-    // Level 3 헤더 상단이 Sticky 1 아래(76px)에 닿는 스크롤 offset
-    _level3Threshold = contentY - JobSearchBarDelegate.height;
-    _thresholdReady = true;
-  }
-
   void _onScroll() {
-    if (!_thresholdReady) {
-      _measureThreshold();
-    } else {
-      final shouldStick = _scrollController.offset >= _level3Threshold;
-      if (shouldStick != _showStickyCarousel) {
-        setState(() => _showStickyCarousel = shouldStick);
-      }
-    }
-
     // 무한 스크롤: 하단 400px 이내 진입 시 다음 페이지 로드
     if (!_level3Loading && _level3HasMore && !_useMockData) {
       final pos = _scrollController.position;
@@ -153,7 +112,7 @@ class _JobListingsScreenState extends State<JobListingsScreen> {
     }
   }
 
-  // ── Level 3 페이지 로드 ────────────────────────────────────────
+  // ── Level 3 페이지 로드 ──────────────────────────────────────
   Future<void> _loadLevel3({bool reset = false}) async {
     if (_level3Loading) return;
     if (!reset && !_level3HasMore) return;
@@ -179,7 +138,6 @@ class _JobListingsScreenState extends State<JobListingsScreen> {
       if (!mounted) return;
 
       if (result.jobs.isEmpty && _level3Jobs.isEmpty) {
-        // Firestore 비어있으면 Mock 데이터로 폴백
         setState(() {
           _level3Jobs = generateMockLevel3Jobs(count: 30);
           _level3HasMore = false;
@@ -214,6 +172,7 @@ class _JobListingsScreenState extends State<JobListingsScreen> {
   @override
   Widget build(BuildContext context) {
     final jobFilter = context.watch<JobFilterNotifier>();
+    final safeBottom = MediaQuery.of(context).padding.bottom;
 
     // Level 2 dedup: Level 1에 이미 노출된 공고 제외
     final level1Ids = mockLevel1Jobs.map((j) => j.id).toSet();
@@ -226,45 +185,59 @@ class _JobListingsScreenState extends State<JobListingsScreen> {
         CustomScrollView(
           controller: _scrollController,
           slivers: [
-            // ── Sticky 1: 검색 바 (항상 고정) ──────────────────
-            SliverPersistentHeader(
-              pinned: true,
-              delegate: JobSearchBarDelegate(
-                searchQuery: _searchQuery,
+            // ── 타이틀 섹션 (스크롤로 사라짐) ──────────────────
+            SliverToBoxAdapter(
+              child: _TitleSection(
                 careerSummary: _careerSummary,
-                activeFilterCount: _activeFilterCount(jobFilter),
-                onSearchChanged: (q) => setState(() => _searchQuery = q),
-                onFilterPressed: () =>
-                    FilterBottomSheet.show(context, jobFilter),
-                onMapToggle: widget.onMapToggle,
               ),
             ),
 
-            // ── Level 1: 프리미엄 캐러셀 (일반 스크롤) ─────────
-            SliverToBoxAdapter(
-              child: JobLevel1Carousel(jobs: mockLevel1Jobs),
+            // ── 소탭바 (타이틀 사라지면 상단 고정) ─────────────
+            const SliverAppBar(
+              pinned: true,
+              automaticallyImplyLeading: false,
+              backgroundColor: AppColors.appBg,
+              surfaceTintColor: Colors.transparent,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              toolbarHeight: 0,
+              collapsedHeight: 52,
+              expandedHeight: 52,
+              flexibleSpace: FlexibleSpaceBar(
+                collapseMode: CollapseMode.none,
+                background: CareerTabHeader(),
+              ),
             ),
 
-            // ── Level 2: 추천 2열 그리드 (Level 1 중복 제거) ───
+            // ── Level 1 A클래스: 소탭 바로 아래 항상 고정 ──────
+            SliverAppBar(
+              pinned: true,
+              automaticallyImplyLeading: false,
+              backgroundColor: AppColors.white,
+              surfaceTintColor: Colors.transparent,
+              elevation: 0,
+              scrolledUnderElevation: 2,
+              toolbarHeight: 0,
+              collapsedHeight: JobLevel1Carousel.stickyHeight,
+              expandedHeight: JobLevel1Carousel.stickyHeight,
+              flexibleSpace: FlexibleSpaceBar(
+                collapseMode: CollapseMode.none,
+                background: JobLevel1Carousel(jobs: mockLevel1Jobs),
+              ),
+            ),
+
+            // ── Level 2: 추천 2열 그리드 ────────────────────────
             SliverToBoxAdapter(
               child: _Level2Section(jobs: deduped2),
             ),
 
-            // ── Level 3 헤더 (GlobalKey 부착) ───────────────────
-            SliverToBoxAdapter(
-              child: _Level3Header(sectionKey: _level3Key),
+            // ── Level 3 헤더 ─────────────────────────────────────
+            const SliverToBoxAdapter(
+              child: _Level3Header(),
             ),
 
-            // ── Level 3 리스트
-            // _showStickyCarousel 시 compactHeight만큼 상단 패딩 추가
-            SliverPadding(
-              padding: EdgeInsets.only(
-                top: _showStickyCarousel
-                    ? JobLevel1Carousel.compactHeight
-                    : 0,
-              ),
-              sliver: _buildLevel3Sliver(jobFilter),
-            ),
+            // ── Level 3 리스트 ───────────────────────────────────
+            _buildLevel3Sliver(jobFilter),
 
             // 로딩 인디케이터 (다음 페이지 로드 중)
             if (_level3Loading && _level3Jobs.isNotEmpty)
@@ -281,34 +254,27 @@ class _JobListingsScreenState extends State<JobListingsScreen> {
                 ),
               ),
 
-            const SliverPadding(padding: EdgeInsets.only(bottom: 80)),
+            // 하단 여백 (검색 바 + safe area)
+            SliverPadding(
+              padding: EdgeInsets.only(bottom: 76 + safeBottom),
+            ),
           ],
         ),
 
-        // ── Sticky 2: Level 1 캐러셀 오버레이 (Level 3 진입 시) ─
-        if (_showStickyCarousel)
-          Positioned(
-            top: JobSearchBarDelegate.height,
-            left: 0,
-            right: 0,
-            child: Material(
-              elevation: 3,
-              shadowColor: Colors.black.withOpacity(0.1),
-              color: Colors.white,
-              child: JobLevel1Carousel(
-                key: _stickyCarouselKey,
-                jobs: mockLevel1Jobs,
-                isCompact: true,
-              ),
-            ),
-          ),
+        // ── 하단 검색 바 (Positioned) ──────────────────────────
+        _BottomSearchBar(
+          searchQuery: _searchQuery,
+          activeFilterCount: _activeFilterCount(jobFilter),
+          onSearchChanged: (q) => setState(() => _searchQuery = q),
+          onFilterPressed: () => FilterBottomSheet.show(context, jobFilter),
+          onMapToggle: widget.onMapToggle,
+        ),
       ],
     );
   }
 
-  // ── Level 3 리스트 Sliver (상태 기반) ───────────────────────────
+  // ── Level 3 리스트 Sliver ────────────────────────────────────
   Widget _buildLevel3Sliver(JobFilterNotifier jobFilter) {
-    // 초기 로딩 (첫 페이지 로드 중)
     if (_level3Loading && _level3Jobs.isEmpty) {
       return const SliverToBoxAdapter(
         child: Padding(
@@ -334,14 +300,12 @@ class _JobListingsScreenState extends State<JobListingsScreen> {
       jobs = jobs.where((j) => j.type == jobFilter.positionFilter).toList();
     }
 
-    // 근무형태 필터
     if (jobFilter.employmentType != '전체') {
       jobs = jobs
           .where((j) => j.type.contains(jobFilter.employmentType))
           .toList();
     }
 
-    // 정렬
     switch (jobFilter.sortBy) {
       case '매칭높은순':
         jobs.sort((a, b) {
@@ -369,15 +333,20 @@ class _JobListingsScreenState extends State<JobListingsScreen> {
         );
       case '거리순':
         if (widget.userLocation != null) {
-          final svc = context.read<JobService>();
+          final userLat = widget.userLocation!.latitude;
+          final userLng = widget.userLocation!.longitude;
           jobs.sort((a, b) {
-            final da = svc.calculateDistance(
-              widget.userLocation!,
-              LatLng(a.lat, a.lng),
+            final da = Geolocator.distanceBetween(
+              userLat,
+              userLng,
+              a.lat,
+              a.lng,
             );
-            final db = svc.calculateDistance(
-              widget.userLocation!,
-              LatLng(b.lat, b.lng),
+            final db = Geolocator.distanceBetween(
+              userLat,
+              userLng,
+              b.lat,
+              b.lng,
             );
             return da.compareTo(db);
           });
@@ -399,26 +368,22 @@ class _JobListingsScreenState extends State<JobListingsScreen> {
               onTap: () => _navigateToDetail(jobs[i]),
             ),
             if (i < jobs.length - 1)
-              Divider(
+              const Divider(
                 height: 0.5,
                 thickness: 0.5,
                 indent: 16,
                 endIndent: 16,
-                color: _kShadow.withOpacity(0.5),
+                color: AppColors.divider,
               ),
-            // 12개마다 미니바 삽입
+            // 12개마다 미니바 삽입 (A클래스 확인하기 → 맨 위로 스크롤)
             if ((i + 1) % 12 == 0 && i < jobs.length - 1)
               _MiniBar(
                 onTap: () {
                   _scrollController.animateTo(
-                    _level3Threshold,
+                    0,
                     duration: const Duration(milliseconds: 400),
                     curve: Curves.easeOut,
                   );
-                  // Sticky 캐러셀 강조 애니메이션
-                  Future.delayed(const Duration(milliseconds: 420), () {
-                    _stickyCarouselKey.currentState?.triggerHighlight();
-                  });
                 },
               ),
           ],
@@ -435,6 +400,358 @@ class _JobListingsScreenState extends State<JobListingsScreen> {
   }
 }
 
+// ── 타이틀 섹션 (스크롤로 사라짐) ───────────────────────────────
+class _TitleSection extends StatelessWidget {
+  final String careerSummary;
+
+  const _TitleSection({required this.careerSummary});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 20, right: 4, top: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── 타이틀 행 ──
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const Text(
+                '커리어',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(
+                  Icons.info_outline,
+                  color: AppColors.textDisabled,
+                  size: 18,
+                ),
+                visualDensity: VisualDensity.compact,
+                onPressed: () => _showInfoDialog(context),
+              ),
+              IconButton(
+                icon: const Icon(
+                  Icons.settings_outlined,
+                  color: AppColors.textDisabled,
+                  size: 20,
+                ),
+                visualDensity: VisualDensity.compact,
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const SettingsPage()),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          // ── 커리어 요약 ──
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: careerSummary.isNotEmpty
+                ? Row(
+                    children: [
+                      const Icon(
+                        Icons.person_outline_rounded,
+                        size: 12,
+                        color: AppColors.textDisabled,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        careerSummary,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textSecondary,
+                          letterSpacing: -0.2,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  )
+                : const Text(
+                    '커리어 카드를 등록하면 맞춤 공고를 추천해드려요',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textDisabled,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+          ),
+          const SizedBox(height: 6),
+        ],
+      ),
+    );
+  }
+
+  void _showInfoDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text(
+          '공고보기',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        ),
+        content: const Text(
+          '치과 구인 공고를 지도와 목록으로 확인하세요.\n'
+          '프리미엄 · 추천 · 전체 공고를 필터로 정리하고\n'
+          '커리어 카드 기반 맞춤 공고를 받아볼 수 있어요.',
+          style: TextStyle(fontSize: 13, height: 1.6),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('닫기'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── 하단 검색 바 (Positioned) ────────────────────────────────────
+class _BottomSearchBar extends StatefulWidget {
+  final String searchQuery;
+  final int activeFilterCount;
+  final ValueChanged<String> onSearchChanged;
+  final VoidCallback onFilterPressed;
+  final VoidCallback onMapToggle;
+
+  const _BottomSearchBar({
+    required this.searchQuery,
+    required this.activeFilterCount,
+    required this.onSearchChanged,
+    required this.onFilterPressed,
+    required this.onMapToggle,
+  });
+
+  @override
+  State<_BottomSearchBar> createState() => _BottomSearchBarState();
+}
+
+class _BottomSearchBarState extends State<_BottomSearchBar> {
+  late final TextEditingController _ctrl;
+  final _focusNode = FocusNode();
+  bool _focused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: widget.searchQuery);
+    _focusNode.addListener(() {
+      if (mounted) setState(() => _focused = _focusNode.hasFocus);
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _BottomSearchBar old) {
+    super.didUpdateWidget(old);
+    if (old.searchQuery != widget.searchQuery &&
+        _ctrl.text != widget.searchQuery) {
+      _ctrl.text = widget.searchQuery;
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final keyboardH = MediaQuery.of(context).viewInsets.bottom;
+    final safeBottom = MediaQuery.of(context).padding.bottom;
+    final bottom = keyboardH > 0
+        ? keyboardH + AppSpacing.sm
+        : AppSpacing.md + safeBottom;
+
+    return Positioned(
+      left: AppSpacing.md,
+      right: AppSpacing.md,
+      bottom: bottom,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.10),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.search,
+                color: AppColors.textDisabled,
+                size: 17,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: TextField(
+                  controller: _ctrl,
+                  focusNode: _focusNode,
+                  onChanged: widget.onSearchChanged,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textPrimary,
+                  ),
+                  decoration: const InputDecoration(
+                    hintText: '치과명, 동네로 검색',
+                    hintStyle: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textDisabled,
+                    ),
+                    border: InputBorder.none,
+                    isDense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              if (_focused)
+                GestureDetector(
+                  onTap: () {
+                    _focusNode.unfocus();
+                    _ctrl.clear();
+                    widget.onSearchChanged('');
+                  },
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 4),
+                    child: Text(
+                      '취소',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                )
+              else ...[
+                // 필터 버튼 (활성 시 배지 표시)
+                _FilterBadgeButton(
+                  count: widget.activeFilterCount,
+                  onTap: widget.onFilterPressed,
+                ),
+                const SizedBox(width: 6),
+                // 지도 전환
+                _MapToggleChip(onTap: widget.onMapToggle),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── 필터 배지 버튼 ────────────────────────────────────────────────
+class _FilterBadgeButton extends StatelessWidget {
+  final int count;
+  final VoidCallback onTap;
+
+  const _FilterBadgeButton({required this.count, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+          child: Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: count > 0 ? AppColors.accent : AppColors.surfaceMuted,
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+            ),
+            child: Icon(
+              Icons.tune_rounded,
+              color: count > 0 ? AppColors.onAccent : AppColors.textSecondary,
+              size: 15,
+            ),
+          ),
+        ),
+        if (count > 0)
+          Positioned(
+            right: -4,
+            top: -4,
+            child: Container(
+              padding: const EdgeInsets.all(3),
+              decoration: const BoxDecoration(
+                color: AppColors.accent,
+                shape: BoxShape.circle,
+              ),
+              constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+              child: Text(
+                '$count',
+                style: const TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.onAccent,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// ── 지도 전환 칩 ──────────────────────────────────────────────────
+class _MapToggleChip extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _MapToggleChip({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadius.sm),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceMuted,
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.map_outlined,
+              size: 13,
+              color: AppColors.textSecondary,
+            ),
+            SizedBox(width: 3),
+            Text(
+              '지도',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textSecondary,
+                letterSpacing: -0.2,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // ── Level 2: 추천 바둑판 ──────────────────────────────────────────
 class _Level2Section extends StatelessWidget {
   final List<Job> jobs;
@@ -444,40 +761,45 @@ class _Level2Section extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: Colors.white,
-      margin: const EdgeInsets.only(top: 16),
+      color: AppColors.white,
+      margin: const EdgeInsets.only(top: AppSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 섹션 헤더
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.md,
+              AppSpacing.lg,
+              AppSpacing.sm + 2,
+            ),
             child: Row(
               children: [
                 Container(
                   width: 3,
                   height: 14,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF90CAF9),
+                    color: AppColors.accent,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Text(
+                const SizedBox(width: AppSpacing.sm),
+                const Text(
                   '추천 공고',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: _kText.withOpacity(0.8),
+                    color: AppColors.textSecondary,
                     letterSpacing: -0.3,
                   ),
                 ),
                 const SizedBox(width: 6),
-                Text(
+                const Text(
                   '커리어 카드 기반',
                   style: TextStyle(
                     fontSize: 11,
-                    color: _kText.withOpacity(0.4),
+                    color: AppColors.textDisabled,
                     letterSpacing: -0.2,
                   ),
                 ),
@@ -487,7 +809,12 @@ class _Level2Section extends StatelessWidget {
 
           // 2열 그리드
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              0,
+              AppSpacing.lg,
+              AppSpacing.md,
+            ),
             child: GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -496,7 +823,7 @@ class _Level2Section extends StatelessWidget {
                 crossAxisCount: 2,
                 crossAxisSpacing: 10,
                 mainAxisSpacing: 10,
-                childAspectRatio: 0.88,
+                mainAxisExtent: 206,
               ),
               itemCount: jobs.length,
               itemBuilder: (_, i) => _Level2Card(job: jobs[i]),
@@ -524,88 +851,90 @@ class _Level2Card extends StatelessWidget {
       ),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: _kShadow, width: 0.5),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.03),
-              blurRadius: 6,
-              offset: const Offset(0, 1),
-            ),
-          ],
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(AppRadius.md),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 상단: 이미지 (4:3 비율)
-            ClipRRect(
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(11)),
-              child: AspectRatio(
-                aspectRatio: 4 / 3,
+            // 상단: 이미지
+            SizedBox(
+              height: 118,
+              child: ClipRRect(
+                borderRadius: BorderRadius.vertical(
+                  top: Radius.circular(AppRadius.md),
+                ),
                 child: job.images.isNotEmpty
-                    ? Image.network(job.images.first, fit: BoxFit.cover)
+                    ? Image.network(
+                        job.images.first,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                      )
                     : Container(
-                        color: _kBg,
+                        color: AppColors.surfaceMuted,
+                        width: double.infinity,
                         child: Stack(
                           children: [
-                            Center(
+                            const Center(
                               child: Icon(
                                 Icons.business_outlined,
                                 size: 22,
-                                color: _kText.withOpacity(0.15),
+                                color: AppColors.textDisabled,
                               ),
                             ),
                             Positioned(
                               top: 6,
                               left: 6,
-                              child: _RecommendBadge(),
+                              child: AppBadge(
+                                label: '추천',
+                                bgColor:
+                                    AppColors.accent.withValues(alpha: 0.12),
+                                textColor: AppColors.accent,
+                              ),
                             ),
                           ],
                         ),
                       ),
               ),
             ),
-
             // 하단: 텍스트
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(8, 7, 8, 7),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      job.clinicName,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: _kText,
-                        letterSpacing: -0.3,
-                      ),
-                      overflow: TextOverflow.ellipsis,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    job.clinicName,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                      letterSpacing: -0.3,
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${_shortDistrict(job)} · ${job.type} · ${job.career}',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: _kText.withOpacity(0.5),
-                        letterSpacing: -0.2,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${_shortDistrict(job)} · ${job.type} · ${job.career}',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: AppColors.textDisabled,
+                      letterSpacing: -0.2,
                     ),
-                    const SizedBox(height: 4),
-                    Wrap(
-                      spacing: 3,
-                      children: job.benefits
-                          .take(2)
-                          .map((b) => _SmallChip(label: b))
-                          .toList(),
-                    ),
-                  ],
-                ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                  const SizedBox(height: 5),
+                  Wrap(
+                    spacing: 3,
+                    runSpacing: 0,
+                    children: job.benefits
+                        .take(2)
+                        .map((b) => _SmallChip(label: b))
+                        .toList(),
+                  ),
+                ],
               ),
             ),
           ],
@@ -625,49 +954,45 @@ class _Level2Card extends StatelessWidget {
 
 // ── Level 3 헤더 ──────────────────────────────────────────────────
 class _Level3Header extends StatelessWidget {
-  final GlobalKey? sectionKey;
-
-  const _Level3Header({this.sectionKey});
+  const _Level3Header();
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      key: sectionKey,
-      margin: const EdgeInsets.only(top: 16),
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(
-          top: BorderSide(color: _kShadow.withOpacity(0.5), width: 0.5),
-          bottom: BorderSide(color: _kShadow.withOpacity(0.5), width: 0.5),
-        ),
+      margin: const EdgeInsets.only(top: AppSpacing.lg),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.md,
+        AppSpacing.lg,
+        AppSpacing.md,
       ),
+      color: AppColors.white,
       child: Row(
         children: [
           Container(
             width: 3,
             height: 14,
             decoration: BoxDecoration(
-              color: _kShadow,
+              color: AppColors.divider,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          const SizedBox(width: 8),
-          Text(
+          const SizedBox(width: AppSpacing.sm),
+          const Text(
             '전체 공고',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,
-              color: _kText.withOpacity(0.8),
+              color: AppColors.textSecondary,
               letterSpacing: -0.3,
             ),
           ),
           const SizedBox(width: 6),
-          Text(
+          const Text(
             '최신 등록 순',
             style: TextStyle(
               fontSize: 11,
-              color: _kText.withOpacity(0.4),
+              color: AppColors.textDisabled,
               letterSpacing: -0.2,
             ),
           ),
@@ -702,8 +1027,13 @@ class _Level3Row extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Container(
-        color: Colors.white,
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        color: AppColors.white,
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          AppSpacing.md,
+          AppSpacing.lg,
+          AppSpacing.md,
+        ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -712,16 +1042,13 @@ class _Level3Row extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 프리미엄/추천 라벨 (Level 1·2 공고가 Level 3에도 노출될 때)
                   if (job.jobLevel == 1 || job.jobLevel == 2) ...[
                     Text(
                       job.jobLevel == 1 ? '프리미엄' : '추천',
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
-                        color: job.jobLevel == 1
-                            ? const Color(0xFFF48FB1)
-                            : const Color(0xFF90CAF9),
+                        color: AppColors.accent,
                         letterSpacing: -0.2,
                       ),
                     ),
@@ -732,7 +1059,7 @@ class _Level3Row extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: _kText,
+                      color: AppColors.textPrimary,
                       letterSpacing: -0.3,
                     ),
                     maxLines: 1,
@@ -741,52 +1068,51 @@ class _Level3Row extends StatelessWidget {
                   const SizedBox(height: 3),
                   Text(
                     job.clinicName,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
-                      color: _kText.withOpacity(0.65),
+                      color: AppColors.textSecondary,
                       letterSpacing: -0.2,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     '${job.type} · ${job.career}',
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 11,
-                      color: _kText.withOpacity(0.45),
+                      color: AppColors.textDisabled,
                       letterSpacing: -0.2,
                     ),
                   ),
                   const SizedBox(height: 5),
-                  // 위치 + 역세권
                   Row(
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.location_on_outlined,
                         size: 11,
-                        color: _kText.withOpacity(0.32),
+                        color: AppColors.textDisabled,
                       ),
                       const SizedBox(width: 2),
                       Text(
                         job.district.isNotEmpty
                             ? job.district
                             : job.address,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 10,
-                          color: _kText.withOpacity(0.4),
+                          color: AppColors.textDisabled,
                           letterSpacing: -0.2,
                         ),
                       ),
                       if (job.isNearStation) ...[
                         const SizedBox(width: 5),
-                        _StationChip(),
+                        const _StationChip(),
                       ],
                     ],
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: AppSpacing.sm),
 
             // 우: D-day + 즉시지원
             Column(
@@ -798,33 +1124,17 @@ class _Level3Row extends StatelessWidget {
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                     color: _isUrgent
-                        ? const Color(0xFFE57373)
-                        : _kText.withOpacity(0.42),
+                        ? AppColors.error
+                        : AppColors.textDisabled,
                     letterSpacing: -0.2,
                   ),
                 ),
                 if (job.canApplyNow) ...[
                   const SizedBox(height: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 7,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _kAccent.withOpacity(0.18),
-                      borderRadius: BorderRadius.circular(6),
-                      border:
-                          Border.all(color: _kAccent.withOpacity(0.45)),
-                    ),
-                    child: Text(
-                      '즉시지원',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: _kText.withOpacity(0.7),
-                        letterSpacing: -0.2,
-                      ),
-                    ),
+                  AppBadge(
+                    label: '즉시지원',
+                    bgColor: AppColors.accent.withValues(alpha: 0.12),
+                    textColor: AppColors.accent,
                   ),
                 ],
               ],
@@ -836,7 +1146,7 @@ class _Level3Row extends StatelessWidget {
   }
 }
 
-// ── 미니바 ──────────────────────────────────────────────────────────
+// ── 미니바 ───────────────────────────────────────────────────────
 class _MiniBar extends StatelessWidget {
   final VoidCallback onTap;
 
@@ -845,23 +1155,26 @@ class _MiniBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-      color: _kAccent.withOpacity(0.07),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: 11,
+      ),
+      color: AppColors.accent.withValues(alpha: 0.06),
       child: Row(
         children: [
           Icon(
             Icons.stars_rounded,
             size: 15,
-            color: _kAccent.withOpacity(0.9),
+            color: AppColors.accent,
           ),
-          const SizedBox(width: 8),
-          Expanded(
+          const SizedBox(width: AppSpacing.sm),
+          const Expanded(
             child: Text(
               '추천 공고 더 보기',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: _kText.withOpacity(0.7),
+                color: AppColors.textSecondary,
                 letterSpacing: -0.2,
               ),
             ),
@@ -869,18 +1182,20 @@ class _MiniBar extends StatelessWidget {
           GestureDetector(
             onTap: onTap,
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: _kAccent.withOpacity(0.22),
-                borderRadius: BorderRadius.circular(8),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 5,
               ),
-              child: Text(
+              decoration: BoxDecoration(
+                color: AppColors.accent.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(AppSpacing.sm),
+              ),
+              child: const Text(
                 '확인하기',
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: _kText.withOpacity(0.75),
+                  color: AppColors.accent,
                   letterSpacing: -0.2,
                 ),
               ),
@@ -893,32 +1208,9 @@ class _MiniBar extends StatelessWidget {
 }
 
 // ── 공통 소형 위젯 ────────────────────────────────────────────────
-class _RecommendBadge extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-      decoration: BoxDecoration(
-        color: const Color(0xFF90CAF9).withOpacity(0.25),
-        borderRadius: BorderRadius.circular(5),
-        border: Border.all(
-          color: const Color(0xFF90CAF9).withOpacity(0.5),
-        ),
-      ),
-      child: Text(
-        '추천',
-        style: TextStyle(
-          fontSize: 9,
-          fontWeight: FontWeight.w700,
-          color: _kText.withOpacity(0.65),
-          letterSpacing: -0.1,
-        ),
-      ),
-    );
-  }
-}
-
 class _StationChip extends StatelessWidget {
+  const _StationChip();
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -926,9 +1218,6 @@ class _StationChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFFE8F5E9),
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(
-          color: const Color(0xFF81C784).withOpacity(0.5),
-        ),
       ),
       child: const Text(
         '역세권',
@@ -953,15 +1242,14 @@ class _SmallChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
       decoration: BoxDecoration(
-        color: _kBg,
+        color: AppColors.surfaceMuted,
         borderRadius: BorderRadius.circular(5),
-        border: Border.all(color: _kShadow, width: 0.5),
       ),
       child: Text(
         label,
-        style: TextStyle(
+        style: const TextStyle(
           fontSize: 9,
-          color: _kText.withOpacity(0.55),
+          color: AppColors.textDisabled,
           letterSpacing: -0.2,
         ),
       ),
@@ -969,37 +1257,37 @@ class _SmallChip extends StatelessWidget {
   }
 }
 
-// ── 빈 상태 / 오류 상태 ──────────────────────────────────────────
+// ── 빈 상태 ──────────────────────────────────────────────────────
 class _Level3EmptyState extends StatelessWidget {
   const _Level3EmptyState();
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 48),
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 48),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
             Icons.search_off_rounded,
             size: 44,
-            color: _kText.withOpacity(0.22),
+            color: AppColors.textDisabled,
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           Text(
             '조건에 맞는 공고가 없어요.',
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w500,
-              color: _kText.withOpacity(0.5),
+              color: AppColors.textSecondary,
             ),
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: 6),
           Text(
             '검색어나 필터를 조정해보세요.',
             style: TextStyle(
               fontSize: 12,
-              color: _kText.withOpacity(0.35),
+              color: AppColors.textDisabled,
             ),
           ),
         ],
@@ -1007,4 +1295,3 @@ class _Level3EmptyState extends StatelessWidget {
     );
   }
 }
-

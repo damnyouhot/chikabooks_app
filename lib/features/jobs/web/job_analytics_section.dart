@@ -3,17 +3,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart' hide TextDirection;
+import '../../../core/theme/app_colors.dart';
 import '../../../models/job_stats_daily.dart';
 import '../../../services/job_stats_service.dart';
 import 'web_typography.dart';
-
-// ── 팔레트 ─────────────────────────────────────────────
-const _kText = Color(0xFF3D4A5C);
-const _kBlue = Color(0xFF4A90D9);
-const _kGreen = Color(0xFF66BB6A);
-const _kRed = Color(0xFFE57373);
-const _kOrange = Color(0xFFF57C00);
-const _kBorder = Color(0xFFE0D8E8);
 
 /// 공고 분석 탭 – 조회수 추이 그래프 + 공고 비교표
 ///
@@ -145,12 +138,12 @@ class _JobAnalyticsSectionState extends State<JobAnalyticsSection> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.analytics_outlined, size: 56,
-              color: _kText.withOpacity(0.2)),
+          const Icon(Icons.analytics_outlined, size: 56,
+              color: AppColors.textDisabled),
           const SizedBox(height: 16),
           Text(
             '로그인 후 공고 분석을 확인할 수 있어요.',
-            style: WebTypo.body(color: _kText.withOpacity(0.5)),
+            style: WebTypo.body(color: AppColors.textSecondary),
           ),
         ],
       ),
@@ -162,13 +155,13 @@ class _JobAnalyticsSectionState extends State<JobAnalyticsSection> {
       return Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: _kBorder),
+          border: Border.all(color: AppColors.divider),
         ),
         child: Text(
           '등록된 공고가 없습니다. 공고를 먼저 등록해주세요.',
-          style: WebTypo.body(color: _kText.withOpacity(0.5)),
+          style: WebTypo.body(color: AppColors.textSecondary),
         ),
       );
     }
@@ -176,16 +169,16 @@ class _JobAnalyticsSectionState extends State<JobAnalyticsSection> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _kBorder),
+        border: Border.all(color: AppColors.divider),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           isExpanded: true,
           value: _selectedJob?.id,
           hint: Text('공고를 선택하세요',
-              style: WebTypo.body(color: _kText.withOpacity(0.4))),
+              style: WebTypo.body(color: AppColors.textDisabled)),
           items: _jobs.map((j) {
             return DropdownMenuItem(
               value: j.id,
@@ -196,7 +189,7 @@ class _JobAnalyticsSectionState extends State<JobAnalyticsSection> {
                   Expanded(
                     child: Text(
                       j.title,
-                      style: WebTypo.body(color: _kText),
+                      style: WebTypo.body(color: AppColors.textPrimary),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -204,7 +197,7 @@ class _JobAnalyticsSectionState extends State<JobAnalyticsSection> {
                     Text(
                       j.clinicName,
                       style: WebTypo.caption(
-                          color: _kText.withOpacity(0.4), size: 12),
+                          color: AppColors.textDisabled, size: 12),
                     ),
                 ],
               ),
@@ -223,13 +216,13 @@ class _JobAnalyticsSectionState extends State<JobAnalyticsSection> {
     Color c;
     switch (status) {
       case 'active':
-        c = _kGreen;
+        c = AppColors.success;
         break;
       case 'closed':
-        c = Colors.grey;
+        c = AppColors.textDisabled;
         break;
       default:
-        c = _kBlue;
+        c = AppColors.accent;
     }
     return Container(
       width: 8,
@@ -251,28 +244,28 @@ class _JobAnalyticsSectionState extends State<JobAnalyticsSection> {
           label: '총 조회수',
           value: NumberFormat('#,###').format(views),
           icon: Icons.visibility_outlined,
-          color: _kBlue,
+          color: AppColors.accent,
         ),
         const SizedBox(width: 12),
         _SummaryCard(
           label: '유니크 조회',
           value: NumberFormat('#,###').format(unique),
           icon: Icons.person_outline,
-          color: _kOrange,
+          color: AppColors.warning,
         ),
         const SizedBox(width: 12),
         _SummaryCard(
           label: '지원 수',
           value: NumberFormat('#,###').format(applies),
           icon: Icons.send_outlined,
-          color: _kGreen,
+          color: AppColors.success,
         ),
         const SizedBox(width: 12),
         _SummaryCard(
           label: '전환율',
           value: '$conversion%',
           icon: Icons.trending_up,
-          color: _kRed,
+          color: AppColors.error,
         ),
       ],
     );
@@ -283,7 +276,7 @@ class _JobAnalyticsSectionState extends State<JobAnalyticsSection> {
       children: [
         Text(
           '조회수 추이',
-          style: WebTypo.sectionTitle(color: _kText),
+          style: WebTypo.sectionTitle(color: AppColors.textPrimary),
         ),
         const Spacer(),
         _periodChip('7일', 7),
@@ -304,10 +297,10 @@ class _JobAnalyticsSectionState extends State<JobAnalyticsSection> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
         decoration: BoxDecoration(
-          color: selected ? _kBlue.withOpacity(0.1) : Colors.white,
+          color: selected ? AppColors.accent.withOpacity(0.1) : AppColors.white,
           borderRadius: BorderRadius.circular(6),
           border: Border.all(
-            color: selected ? _kBlue.withOpacity(0.3) : _kBorder,
+            color: selected ? AppColors.accent.withOpacity(0.3) : AppColors.divider,
           ),
         ),
         child: Text(
@@ -315,7 +308,7 @@ class _JobAnalyticsSectionState extends State<JobAnalyticsSection> {
           style: GoogleFonts.notoSansKr(
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: selected ? _kBlue : _kText.withOpacity(0.5),
+            color: selected ? AppColors.accent : AppColors.textSecondary,
           ),
         ),
       ),
@@ -336,14 +329,14 @@ class _JobAnalyticsSectionState extends State<JobAnalyticsSection> {
       return Container(
         height: 200,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: _kBorder),
+          border: Border.all(color: AppColors.divider),
         ),
         alignment: Alignment.center,
         child: Text(
           '아직 데이터가 없습니다.',
-          style: WebTypo.body(color: _kText.withOpacity(0.4)),
+          style: WebTypo.body(color: AppColors.textDisabled),
         ),
       );
     }
@@ -352,16 +345,16 @@ class _JobAnalyticsSectionState extends State<JobAnalyticsSection> {
       height: 220,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _kBorder),
+        border: Border.all(color: AppColors.divider),
       ),
       child: CustomPaint(
         size: const Size(double.infinity, 188),
         painter: _BarChartPainter(
           stats: _dailyStats,
-          barColor: _kBlue,
-          applyColor: _kGreen,
+          barColor: AppColors.accent,
+          applyColor: AppColors.success,
         ),
       ),
     );
@@ -370,7 +363,7 @@ class _JobAnalyticsSectionState extends State<JobAnalyticsSection> {
   Widget _buildComparisonHeader() {
     return Text(
       '공고 비교표',
-      style: WebTypo.sectionTitle(color: _kText),
+      style: WebTypo.sectionTitle(color: AppColors.textPrimary),
     );
   }
 
@@ -392,25 +385,25 @@ class _JobAnalyticsSectionState extends State<JobAnalyticsSection> {
 
         return Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.white,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: _kBorder),
+            border: Border.all(color: AppColors.divider),
           ),
           clipBehavior: Clip.antiAlias,
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: DataTable(
               headingRowColor: WidgetStateProperty.all(
-                _kBlue.withOpacity(0.04),
+                AppColors.accent.withOpacity(0.04),
               ),
               headingTextStyle: GoogleFonts.notoSansKr(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
-                color: _kText,
+                color: AppColors.textPrimary,
               ),
               dataTextStyle: GoogleFonts.notoSansKr(
                 fontSize: 13,
-                color: _kText.withOpacity(0.75),
+                color: AppColors.textSecondary,
               ),
               columns: const [
                 DataColumn(label: Text('공고')),
@@ -452,12 +445,12 @@ class _JobAnalyticsSectionState extends State<JobAnalyticsSection> {
                               ? Icons.arrow_upward
                               : Icons.arrow_downward,
                           size: 14,
-                          color: change >= 0 ? _kGreen : _kRed,
+                          color: change >= 0 ? AppColors.success : AppColors.error,
                         ),
                         Text(
                           '${change.abs().toStringAsFixed(1)}%',
                           style: TextStyle(
-                            color: change >= 0 ? _kGreen : _kRed,
+                            color: change >= 0 ? AppColors.success : AppColors.error,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -514,9 +507,9 @@ class _SummaryCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: _kBorder),
+          border: Border.all(color: AppColors.divider),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -537,7 +530,7 @@ class _SummaryCard extends StatelessWidget {
                   label,
                   style: GoogleFonts.notoSansKr(
                     fontSize: 12,
-                    color: _kText.withOpacity(0.5),
+                    color: AppColors.textSecondary,
                   ),
                 ),
               ],
@@ -545,7 +538,7 @@ class _SummaryCard extends StatelessWidget {
             const SizedBox(height: 10),
             Text(
               value,
-              style: WebTypo.number(color: _kText, size: 20),
+              style: WebTypo.number(color: AppColors.textPrimary, size: 20),
             ),
           ],
         ),
@@ -662,4 +655,3 @@ class _BarChartPainter extends CustomPainter {
   bool shouldRepaint(covariant _BarChartPainter old) =>
       old.stats != stats;
 }
-

@@ -2,13 +2,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'job_post_form.dart';
-
-// ── 팔레트 ─────────────────────────────────────────────
-const _kBg = Color(0xFFF1F7F7);
-const _kText = Color(0xFF3D4A5C);
-const _kBlue = Color(0xFF4A90D9);
-const _kPink = Color(0xFFF7CBCA);
-const _kCardBg = Colors.white;
+import '../../../core/theme/app_colors.dart';
 
 /// 지원자 관점 공고 미리보기 (앱 화면 비율 모방)
 ///
@@ -29,11 +23,11 @@ class JobPostPreview extends StatelessWidget {
         height: mockupHeight,
         child: Container(
           decoration: BoxDecoration(
-            color: _kBg,
+            color: AppColors.appBg,
             borderRadius: BorderRadius.circular(46),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.18),
+                color: AppColors.black.withOpacity(0.18),
                 blurRadius: 40,
                 offset: const Offset(0, 10),
               ),
@@ -92,10 +86,10 @@ class JobPostPreview extends StatelessWidget {
                             Center(
                               child: Text(
                                 '미리보기 화면입니다. 실제 앱 화면과 다를 수 있어요.',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: _kText.withOpacity(0.35),
-                                ),
+                style: TextStyle(
+                  fontSize: 10,
+                  color: AppColors.textDisabled,
+                ),
                                 textAlign: TextAlign.center,
                               ),
                             ),
@@ -116,7 +110,7 @@ class JobPostPreview extends StatelessWidget {
 
   Widget _buildStatusBar() {
     return Container(
-      color: _kBlue.withOpacity(0.08),
+      color: AppColors.accent.withOpacity(0.08),
       // 상단 padding을 크게 주어 둥근 모서리 안으로 내용이 충분히 들어오게 함
       padding: const EdgeInsets.fromLTRB(28, 22, 28, 8),
       child: Row(
@@ -126,19 +120,19 @@ class JobPostPreview extends StatelessWidget {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: _kText.withOpacity(0.7),
+              color: AppColors.textSecondary,
             ),
           ),
           const Spacer(),
           Icon(
             Icons.signal_cellular_alt,
             size: 14,
-            color: _kText.withOpacity(0.5),
+            color: AppColors.textSecondary,
           ),
           const SizedBox(width: 4),
-          Icon(Icons.wifi, size: 14, color: _kText.withOpacity(0.5)),
+          Icon(Icons.wifi, size: 14, color: AppColors.textSecondary),
           const SizedBox(width: 4),
-          Icon(Icons.battery_full, size: 14, color: _kText.withOpacity(0.5)),
+          Icon(Icons.battery_full, size: 14, color: AppColors.textSecondary),
         ],
       ),
     );
@@ -146,11 +140,11 @@ class JobPostPreview extends StatelessWidget {
 
   Widget _buildAppBar() {
     return Container(
-      color: _kCardBg,
+      color: AppColors.white,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          Icon(Icons.arrow_back_ios, size: 18, color: _kText.withOpacity(0.6)),
+          Icon(Icons.arrow_back_ios, size: 18, color: AppColors.textSecondary),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -158,13 +152,13 @@ class JobPostPreview extends StatelessWidget {
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: _kText,
+                color: AppColors.textPrimary,
               ),
             ),
           ),
-          Icon(Icons.bookmark_border, size: 20, color: _kText.withOpacity(0.5)),
+          Icon(Icons.bookmark_border, size: 20, color: AppColors.textSecondary),
           const SizedBox(width: 12),
-          Icon(Icons.share_outlined, size: 20, color: _kText.withOpacity(0.5)),
+          Icon(Icons.share_outlined, size: 20, color: AppColors.textSecondary),
         ],
       ),
     );
@@ -174,25 +168,25 @@ class JobPostPreview extends StatelessWidget {
     if (data.images.isEmpty) {
       return Container(
         height: 180,
-        color: _kPink.withOpacity(0.25),
-        child: Center(
+        color: AppColors.error.withOpacity(0.25),
+      child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
                 Icons.business_outlined,
                 size: 40,
-                color: _kText.withOpacity(0.25),
+                color: AppColors.textDisabled,
               ),
               const SizedBox(height: 8),
               Text(
                 '대표 이미지',
-                style: TextStyle(fontSize: 13, color: _kText.withOpacity(0.35)),
+                style: TextStyle(fontSize: 13, color: AppColors.textDisabled),
               ),
             ],
           ),
         ),
-      );
+    );
     }
     return SizedBox(
       height: 180,
@@ -205,7 +199,7 @@ class JobPostPreview extends StatelessWidget {
                 errorBuilder:
                     (_, __, ___) => Container(
                       height: 180,
-                      color: _kPink.withOpacity(0.25),
+                      color: AppColors.error.withOpacity(0.25),
                       child: const Center(
                         child: Icon(Icons.broken_image_outlined),
                       ),
@@ -227,7 +221,7 @@ class JobPostPreview extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: _kPink.withOpacity(0.35),
+              color: AppColors.error.withOpacity(0.35),
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
@@ -235,7 +229,7 @@ class JobPostPreview extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: _kText,
+                color: AppColors.textPrimary,
               ),
             ),
           ),
@@ -245,7 +239,7 @@ class JobPostPreview extends StatelessWidget {
           style: TextStyle(
             fontSize: 19,
             fontWeight: FontWeight.w700,
-            color: data.title.isEmpty ? _kText.withOpacity(0.3) : _kText,
+            color: data.title.isEmpty ? AppColors.textDisabled : AppColors.textPrimary,
             height: 1.4,
           ),
         ),
@@ -275,7 +269,7 @@ class JobPostPreview extends StatelessWidget {
     if (rows.isEmpty) {
       return Text(
         '근무조건을 입력하면 여기에 표시돼요.',
-        style: TextStyle(fontSize: 13, color: _kText.withOpacity(0.35)),
+        style: TextStyle(fontSize: 13, color: AppColors.textDisabled),
       );
     }
 
@@ -288,13 +282,13 @@ class JobPostPreview extends StatelessWidget {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(r.icon, size: 16, color: _kBlue.withOpacity(0.7)),
+                      Icon(r.icon, size: 16, color: AppColors.accent.withOpacity(0.7)),
                       const SizedBox(width: 8),
                       Text(
                         '${r.label}  ',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 13,
-                          color: _kText.withOpacity(0.55),
+                          color: AppColors.textSecondary,
                         ),
                       ),
                       Expanded(
@@ -303,7 +297,7 @@ class JobPostPreview extends StatelessWidget {
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
-                            color: _kText,
+                            color: AppColors.textPrimary,
                           ),
                         ),
                       ),
@@ -321,10 +315,10 @@ class JobPostPreview extends StatelessWidget {
       children: [
         Text(
           '복리후생',
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: _kText.withOpacity(0.8),
+            color: AppColors.textSecondary,
           ),
         ),
         const SizedBox(height: 8),
@@ -340,14 +334,14 @@ class JobPostPreview extends StatelessWidget {
                         vertical: 5,
                       ),
                       decoration: BoxDecoration(
-                        color: _kBlue.withOpacity(0.08),
+                        color: AppColors.accent.withOpacity(0.08),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
                         b,
                         style: TextStyle(
                           fontSize: 12,
-                          color: _kBlue.withOpacity(0.9),
+                          color: AppColors.accent.withOpacity(0.9),
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -365,18 +359,18 @@ class JobPostPreview extends StatelessWidget {
       children: [
         Text(
           '상세 내용',
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: _kText.withOpacity(0.8),
+            color: AppColors.textSecondary,
           ),
         ),
         const SizedBox(height: 8),
         Text(
           data.description,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 13,
-            color: _kText.withOpacity(0.75),
+            color: AppColors.textSecondary,
             height: 1.6,
           ),
         ),
@@ -387,16 +381,16 @@ class JobPostPreview extends StatelessWidget {
   Widget _buildAddress() {
     return Row(
       children: [
-        Icon(
+        const Icon(
           Icons.location_on_outlined,
           size: 16,
-          color: _kText.withOpacity(0.45),
+          color: AppColors.textDisabled,
         ),
         const SizedBox(width: 6),
         Expanded(
           child: Text(
             data.address,
-            style: TextStyle(fontSize: 13, color: _kText.withOpacity(0.7)),
+            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
           ),
         ),
       ],
@@ -409,8 +403,8 @@ class JobPostPreview extends StatelessWidget {
       child: ElevatedButton(
         onPressed: null,
         style: ElevatedButton.styleFrom(
-          backgroundColor: _kBlue,
-          disabledBackgroundColor: _kBlue.withOpacity(0.35),
+          backgroundColor: AppColors.accent,
+          disabledBackgroundColor: AppColors.accent.withOpacity(0.35),
           padding: const EdgeInsets.symmetric(vertical: 14),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
@@ -421,7 +415,7 @@ class JobPostPreview extends StatelessWidget {
           style: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w700,
-            color: Colors.white,
+            color: AppColors.white,
           ),
         ),
       ),
@@ -432,17 +426,17 @@ class JobPostPreview extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: _kPink.withOpacity(0.2),
+        color: AppColors.error.withOpacity(0.2),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
         text,
-        style: TextStyle(fontSize: 11, color: _kText.withOpacity(0.75)),
+        style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
       ),
     );
   }
 
-  Widget _divider() => Divider(color: Colors.grey.withOpacity(0.15));
+  Widget _divider() => const Divider(color: AppColors.divider);
 }
 
 class _InfoRow {

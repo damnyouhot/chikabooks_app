@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/theme/app_colors.dart';
 import '../models/user_goal.dart';
 import '../models/routine_check.dart';
 import '../services/user_goal_service.dart';
@@ -25,11 +26,11 @@ class _UserGoalSheetContent extends StatefulWidget {
 
 class _UserGoalSheetContentState extends State<_UserGoalSheetContent>
     with SingleTickerProviderStateMixin {
-  // ── 디자인 컬러 팔레트 ──
-  static const _kAccent = Color(0xFFF7CBCA);
-  static const _kText = Color(0xFF5D6B6B);
-  static const _kShadow2 = Color(0xFFD5E5E5);
-  static const _kSuccess = Color(0xFFB8E6D5);
+  // ── 디자인 컬러 팔레트 → AppColors로 교체 ──
+  static const _kAccent = AppColors.accent;
+  static const _kText = AppColors.textPrimary;
+  static const _kShadow2 = AppColors.divider;
+  static const _kSuccess = AppColors.success;
 
   UserGoals? _goals;
   RoutineCheck? _todayCheck;
@@ -84,7 +85,7 @@ class _UserGoalSheetContentState extends State<_UserGoalSheetContent>
         maxHeight: MediaQuery.of(context).size.height * 0.85,
       ),
       decoration: const BoxDecoration(
-        color: Colors.white,
+        color: AppColors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
@@ -325,7 +326,7 @@ class _UserGoalSheetContentState extends State<_UserGoalSheetContent>
         child: TabBar(
           controller: _tabController,
           indicator: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.white,
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
@@ -501,7 +502,7 @@ class _UserGoalSheetContentState extends State<_UserGoalSheetContent>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isCheckedToday ? _kSuccess.withOpacity(0.1) : Colors.white,
+        color: isCheckedToday ? _kSuccess.withOpacity(0.1) : AppColors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isCheckedToday
@@ -660,7 +661,7 @@ class _UserGoalSheetContentState extends State<_UserGoalSheetContent>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: goal.isDone ? _kSuccess.withOpacity(0.1) : Colors.white,
+        color: goal.isDone ? _kSuccess.withOpacity(0.1) : AppColors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: goal.isDone
@@ -882,7 +883,7 @@ class _UserGoalSheetContentState extends State<_UserGoalSheetContent>
             ),
             TextButton(
               onPressed: () => Navigator.pop(ctx, true),
-              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              style: TextButton.styleFrom(foregroundColor: AppColors.error),
               child: const Text('삭제'),
             ),
           ],

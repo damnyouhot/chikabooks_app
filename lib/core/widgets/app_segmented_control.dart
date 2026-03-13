@@ -65,11 +65,11 @@ class AppSegmentedControl extends StatelessWidget {
         labelColor: AppColors.onSegmentSelected,
         unselectedLabelColor: AppColors.onSegmentUnselected,
         labelStyle: const TextStyle(
-          fontSize: 14,
+          fontSize: 12,
           fontWeight: FontWeight.w700,
         ),
         unselectedLabelStyle: const TextStyle(
-          fontSize: 14,
+          fontSize: 12,
           fontWeight: FontWeight.w400,
         ),
         tabs: labels.map((label) => Tab(text: label)).toList(),

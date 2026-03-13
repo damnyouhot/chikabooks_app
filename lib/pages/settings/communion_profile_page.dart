@@ -1,6 +1,8 @@
 import 'dart:math';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_primary_button.dart';
 import '../../models/user_public_profile.dart';
 import '../../services/user_profile_service.dart';
 
@@ -194,7 +196,7 @@ class _CommunionProfilePageState extends State<CommunionProfilePage> {
                               bucket,
                         ),
                         selected: selected,
-                        selectedColor: const Color(0xFFE8DAFF),
+                        selectedColor: AppColors.accent.withOpacity(0.15),
                         onSelected: (_) =>
                             setState(() => _selectedCareer = bucket),
                       );
@@ -219,10 +221,10 @@ class _CommunionProfilePageState extends State<CommunionProfilePage> {
                         style: TextStyle(
                           fontSize: 14,
                           color:
-                              disabled ? Colors.grey[400] : Colors.black87,
+                              disabled ? AppColors.textDisabled : AppColors.textPrimary,
                         ),
                       ),
-                      activeColor: const Color(0xFF6A5ACD),
+                      activeColor: AppColors.accent,
                       dense: true,
                       contentPadding: EdgeInsets.zero,
                       controlAffinity: ListTileControlAffinity.leading,
@@ -259,27 +261,11 @@ class _CommunionProfilePageState extends State<CommunionProfilePage> {
                   SizedBox(
                     width: double.infinity,
                     height: 48,
-                    child: ElevatedButton(
+                    child: AppPrimaryButton(
+                      label: '저장',
                       onPressed: _canSave ? _save : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF6A5ACD),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        disabledBackgroundColor: Colors.grey[300],
-                      ),
-                      child: _saving
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white),
-                            )
-                          : const Text('저장',
-                              style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold)),
+                      isEnabled: _canSave,
+                      isLoading: _saving,
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -294,7 +280,7 @@ class _CommunionProfilePageState extends State<CommunionProfilePage> {
                       icon: const Icon(Icons.logout, size: 18),
                       label: const Text('로그아웃'),
                       style: TextButton.styleFrom(
-                        foregroundColor: Colors.grey[600],
+                        foregroundColor: AppColors.textSecondary,
                       ),
                     ),
                   ),
@@ -311,7 +297,7 @@ class _CommunionProfilePageState extends State<CommunionProfilePage> {
       style: const TextStyle(
         fontSize: 14,
         fontWeight: FontWeight.w700,
-        color: Color(0xFF424242),
+        color: AppColors.textPrimary,
       ),
     );
   }

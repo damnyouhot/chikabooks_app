@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../core/theme/app_colors.dart';
 import '../models/store_item.dart';
 import '../services/store_service.dart';
 import '../services/user_action_service.dart';
@@ -32,18 +33,18 @@ class _DressUpPageState extends State<DressUpPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FE),
+      backgroundColor: AppColors.appBg,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_rounded, color: Color(0xFF424242)),
+          icon: const Icon(Icons.arrow_back_ios_rounded, color: AppColors.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           '꾸미기',
           style: TextStyle(
-            color: Color(0xFF424242),
+            color: AppColors.textPrimary,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -77,23 +78,16 @@ class _DressUpPageState extends State<DressUpPage> {
       child: Container(
         width: 160,
         height: 160,
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           shape: BoxShape.circle,
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF1E88E5).withOpacity(0.15),
-              blurRadius: 30,
-              spreadRadius: 5,
-            ),
-          ],
+          color: AppColors.white,
         ),
         child: Center(
           child: Text(
             _equippedSkinId != null ? '✨' : '○',
             style: TextStyle(
               fontSize: _equippedSkinId != null ? 40 : 48,
-              color: Colors.grey[300],
+              color: AppColors.textDisabled,
             ),
           ),
         ),
@@ -105,18 +99,18 @@ class _DressUpPageState extends State<DressUpPage> {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24),
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+      decoration: const BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.all(Radius.circular(16)),
       ),
       child: Row(
         children: [
-          Icon(Icons.palette_outlined, color: Colors.grey[400], size: 22),
+          Icon(Icons.palette_outlined, color: AppColors.textDisabled, size: 22),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               _equippedSkinId != null ? '스킨 장착중' : '장착 중인 스킨 없음',
-              style: TextStyle(color: Colors.grey[600], fontSize: 14),
+              style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
             ),
           ),
           if (_equippedSkinId != null)
@@ -127,7 +121,7 @@ class _DressUpPageState extends State<DressUpPage> {
               },
               child: Text(
                 '해제',
-                style: TextStyle(color: Colors.grey[400], fontSize: 13),
+                style: TextStyle(color: AppColors.textDisabled, fontSize: 13),
               ),
             ),
         ],
@@ -146,20 +140,20 @@ class _DressUpPageState extends State<DressUpPage> {
         }
 
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.inventory_2_outlined,
-                    color: Colors.grey[300], size: 48),
-                const SizedBox(height: 12),
-                Text(
-                  '보유한 아이템이 없습니다.',
-                  style: TextStyle(color: Colors.grey[400], fontSize: 14),
-                ),
-              ],
-            ),
-          );
+            return Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.inventory_2_outlined,
+                      color: AppColors.textDisabled, size: 48),
+                  const SizedBox(height: 12),
+                  const Text(
+                    '보유한 아이템이 없습니다.',
+                    style: TextStyle(color: AppColors.textDisabled, fontSize: 14),
+                  ),
+                ],
+              ),
+            );
         }
 
         final items = snapshot.data!;
@@ -187,11 +181,11 @@ class _DressUpPageState extends State<DressUpPage> {
               },
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: AppColors.white,
                   borderRadius: BorderRadius.circular(16),
                   border: isEquipped
                       ? Border.all(
-                          color: const Color(0xFF1E88E5).withOpacity(0.5),
+                          color: AppColors.accent,
                           width: 2,
                         )
                       : null,
@@ -207,7 +201,7 @@ class _DressUpPageState extends State<DressUpPage> {
                           fit: BoxFit.contain,
                           errorBuilder: (_, __, ___) => Icon(
                             Icons.image_not_supported_outlined,
-                            color: Colors.grey[300],
+                            color: AppColors.textDisabled,
                           ),
                         ),
                       ),
@@ -218,8 +212,8 @@ class _DressUpPageState extends State<DressUpPage> {
                         item.name,
                         style: TextStyle(
                           color: isEquipped
-                              ? const Color(0xFF1E88E5)
-                              : Colors.grey[600],
+                              ? AppColors.accent
+                              : AppColors.textSecondary,
                           fontSize: 11,
                         ),
                         maxLines: 1,

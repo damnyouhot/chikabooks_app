@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/theme/app_colors.dart';
 import 'publisher_shared.dart';
 import '../services/clinic_auth_service.dart';
 
@@ -116,7 +117,7 @@ class _ProgressHeader extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: AppColors.black.withOpacity(0.05),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -202,22 +203,22 @@ class _StepCard extends StatelessWidget {
   });
 
   Color get _cardColor {
-    if (isDone) return const Color(0xFFF0F7FF);
-    if (isPending) return const Color(0xFFFFFBF0);
-    if (isLocked) return const Color(0xFFF5F5F5);
+    if (isDone) return AppColors.accent.withOpacity(0.06);
+    if (isPending) return AppColors.warning.withOpacity(0.08);
+    if (isLocked) return AppColors.surfaceMuted;
     return kPubCard;
   }
 
   Color get _iconBg {
     if (isDone) return kPubBlue.withOpacity(0.15);
-    if (isPending) return const Color(0xFFFFE082).withOpacity(0.4);
+    if (isPending) return AppColors.warning.withOpacity(0.3);
     if (isLocked) return kPubBorder.withOpacity(0.4);
     return kPubBlue.withOpacity(0.08);
   }
 
   Color get _iconColor {
     if (isDone) return kPubBlue;
-    if (isPending) return const Color(0xFFF59E0B);
+    if (isPending) return AppColors.warning;
     if (isLocked) return kPubText.withOpacity(0.3);
     return kPubBlue.withOpacity(0.7);
   }
@@ -237,12 +238,12 @@ class _StepCard extends StatelessWidget {
                 isDone
                     ? kPubBlue.withOpacity(0.2)
                     : isPending
-                    ? const Color(0xFFFFE082)
+                    ? AppColors.warning.withOpacity(0.5)
                     : kPubBorder.withOpacity(0.5),
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.03),
+            color: AppColors.black.withOpacity(0.03),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -318,14 +319,14 @@ class _StepCard extends StatelessWidget {
                             vertical: 1,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFFE082).withOpacity(0.5),
+                            color: AppColors.warning.withOpacity(0.2),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: const Text(
                             '검토 중',
                             style: TextStyle(
                               fontSize: 9,
-                              color: Color(0xFFF59E0B),
+                              color: AppColors.warning,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -389,8 +390,8 @@ class _NextStepButton extends StatelessWidget {
               ? () => context.push('/publisher/pending')
               : () => context.push(status.nextRoute),
       style: ElevatedButton.styleFrom(
-        backgroundColor: isPending ? const Color(0xFFF59E0B) : kPubBlue,
-        foregroundColor: Colors.white,
+        backgroundColor: isPending ? AppColors.warning : kPubBlue,
+        foregroundColor: AppColors.white,
         elevation: 0,
         padding: const EdgeInsets.symmetric(vertical: 16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),

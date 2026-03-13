@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import '../../models/policy_update.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
+import '../../core/widgets/app_muted_card.dart';
 
 /// 🏥 급여 변경 임박 카드 (3초 간격 자동 로테이션)
 class SalaryUpdateCard extends StatefulWidget {
@@ -45,154 +48,106 @@ class _SalaryUpdateCardState extends State<SalaryUpdateCard> {
   Widget build(BuildContext context) {
     final updates = widget.updates;
 
-    // 로딩 상태
-    if (updates == null) {
-      return Card(
-        margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 1),
-        elevation: 1,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(8),
-          onTap: widget.onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    // 로딩·빈 상태 공통 헤더
+    Widget header({required String bodyText}) {
+      return AppMutedCard(
+        radius: AppRadius.sm,
+        padding: const EdgeInsets.all(AppSpacing.sm),
+        onTap: widget.onTap,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
               children: [
-                Row(
-                  children: [
-                    Text('🏥', style: TextStyle(fontSize: 13)),
-                    const SizedBox(width: 3),
-                    Text(
-                      '임박 제도 변경',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black87,
-                      ),
-                    ),
-                  ],
+                Text('🏥', style: TextStyle(fontSize: 13)),
+                SizedBox(width: 3),
+                Text(
+                  '임박 제도 변경',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
-                const SizedBox(height: 4),
-                Text('로딩 중...', style: TextStyle(fontSize: 12)),
               ],
             ),
-          ),
+            const SizedBox(height: 4),
+            Text(
+              bodyText,
+              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            ),
+          ],
         ),
       );
     }
 
-    // 데이터 없음
-    if (updates.isEmpty) {
-      return Card(
-        margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 1),
-        elevation: 1,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(8),
-          onTap: widget.onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text('🏥', style: TextStyle(fontSize: 13)),
-                    const SizedBox(width: 3),
-                    Text(
-                      '임박 제도 변경',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black87,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text('예정된 제도 변경 없음', style: TextStyle(fontSize: 12)),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
+    if (updates == null) return header(bodyText: '로딩 중...');
+    if (updates.isEmpty) return header(bodyText: '예정된 제도 변경 없음');
 
     final update = updates[_currentIndex];
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 1),
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: widget.onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return AppMutedCard(
+      radius: AppRadius.sm,
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      onTap: widget.onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
             children: [
-              // 타이틀
-              Row(
-                children: [
-                  Text('🏥', style: TextStyle(fontSize: 13)),
-                  const SizedBox(width: 3),
-                  Text(
-                    '임박 제도 변경',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              // 슬라이드 애니메이션 (위로 밀려나기)
-              ClipRect(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 400),
-                  transitionBuilder: (
-                    Widget child,
-                    Animation<double> animation,
-                  ) {
-                    return SlideTransition(
-                      position: Tween<Offset>(
-                        begin: const Offset(0, 1),
-                        end: Offset.zero,
-                      ).animate(animation),
-                      child: child,
-                    );
-                  },
-                  child: Column(
-                    key: ValueKey(_currentIndex),
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // 제목
-                      Text(
-                        update.title,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 2),
-                      // 시행일 + D-day
-                      Text(
-                        '시행일: ${update.effectiveDate?.month ?? '?'}월 ${update.effectiveDate?.day ?? '?'}일 (${update.ddayString})',
-                        style: TextStyle(fontSize: 10, color: Colors.black54),
-                      ),
-                    ],
-                  ),
+              Text('🏥', style: TextStyle(fontSize: 13)),
+              SizedBox(width: 3),
+              Text(
+                '임박 제도 변경',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
                 ),
               ),
             ],
           ),
-        ),
+          const SizedBox(height: 4),
+          // 슬라이드 애니메이션 (위로 밀려나기)
+          ClipRect(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 400),
+              transitionBuilder: (Widget child, Animation<double> animation) {
+                return SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0, 1),
+                    end: Offset.zero,
+                  ).animate(animation),
+                  child: child,
+                );
+              },
+              child: Column(
+                key: ValueKey(_currentIndex),
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    update.title,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '시행일: ${update.effectiveDate?.month ?? '?'}월 ${update.effectiveDate?.day ?? '?'}일 (${update.ddayString})',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/theme/app_colors.dart';
 import 'publisher_shared.dart';
 
 /// 게시자 사업자 인증 페이지 (/publisher/verify-business)
@@ -216,7 +217,7 @@ class _PublisherVerifyBusinessPageState
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: AppColors.black.withOpacity(0.04),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -305,7 +306,7 @@ class _PublisherVerifyBusinessPageState
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFEC4899),
-                foregroundColor: Colors.white,
+                foregroundColor: AppColors.white,
                 disabledBackgroundColor: kPubBorder.withOpacity(0.4),
                 elevation: 0,
                 padding: const EdgeInsets.symmetric(vertical: 14),
@@ -341,7 +342,7 @@ class _PublisherVerifyBusinessPageState
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: AppColors.black.withOpacity(0.04),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -411,7 +412,7 @@ class _PublisherVerifyBusinessPageState
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: AppColors.black.withOpacity(0.04),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -553,12 +554,12 @@ class _PublisherVerifyBusinessPageState
 
   Widget _loadingOverlay() {
     return Container(
-      color: Colors.black.withOpacity(0.3),
+      color: AppColors.black.withOpacity(0.3),
       child: Center(
         child: Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.white,
             borderRadius: BorderRadius.circular(16),
           ),
           child: Column(

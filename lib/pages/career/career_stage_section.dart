@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
+import '../../core/widgets/app_badge.dart';
 import 'career_shared.dart';
 
 // ── 커리어 단계 규칙 모델 ──────────────────────────────────────
@@ -18,15 +20,15 @@ class _StageRule {
 }
 
 const _kStageRules = <_StageRule>[
-  _StageRule(name: '시작 단계', minMonths: 0, minClinics: 0, minLv4: 0),
-  _StageRule(name: '적응 단계', minMonths: 6, minClinics: 1, minLv4: 0),
-  _StageRule(name: '자리잡음', minMonths: 18, minClinics: 1, minLv4: 0),
-  _StageRule(name: '안정기', minMonths: 30, minClinics: 1, minLv4: 1),
-  _StageRule(name: '확장기', minMonths: 42, minClinics: 2, minLv4: 1),
-  _StageRule(name: '깊어짐', minMonths: 54, minClinics: 2, minLv4: 2),
-  _StageRule(name: '단단함', minMonths: 72, minClinics: 3, minLv4: 2),
-  _StageRule(name: '중심 역할', minMonths: 84, minClinics: 3, minLv4: 4),
-  _StageRule(name: '영향력', minMonths: 96, minClinics: 4, minLv4: 4),
+  _StageRule(name: '시작 단계', minMonths: 0,   minClinics: 0, minLv4: 0),
+  _StageRule(name: '적응 단계', minMonths: 6,   minClinics: 1, minLv4: 0),
+  _StageRule(name: '자리잡음',  minMonths: 18,  minClinics: 1, minLv4: 0),
+  _StageRule(name: '안정기',   minMonths: 30,  minClinics: 1, minLv4: 1),
+  _StageRule(name: '확장기',   minMonths: 42,  minClinics: 2, minLv4: 1),
+  _StageRule(name: '깊어짐',   minMonths: 54,  minClinics: 2, minLv4: 2),
+  _StageRule(name: '단단함',   minMonths: 72,  minClinics: 3, minLv4: 2),
+  _StageRule(name: '중심 역할', minMonths: 84,  minClinics: 3, minLv4: 4),
+  _StageRule(name: '영향력',   minMonths: 96,  minClinics: 4, minLv4: 4),
   _StageRule(name: '멘토 단계', minMonths: 120, minClinics: 4, minLv4: 5),
 ];
 
@@ -133,23 +135,10 @@ class CareerStageCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.onCardPrimary.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  '${stageIdx + 1} / ${_kStageRules.length}단계',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.onCardPrimary,
-                  ),
-                ),
+              AppBadge(
+                label: '${stageIdx + 1} / ${_kStageRules.length}단계',
+                bgColor: AppColors.onCardPrimary.withOpacity(0.15),
+                textColor: AppColors.onCardPrimary,
               ),
             ],
           ),
@@ -160,8 +149,8 @@ class CareerStageCard extends StatelessWidget {
               value: progress,
               minHeight: 7,
               backgroundColor: AppColors.onCardPrimary.withOpacity(0.2),
-              valueColor: AlwaysStoppedAnimation<Color>(
-                isMax ? AppColors.cardEmphasis : AppColors.cardEmphasis,
+              valueColor: const AlwaysStoppedAnimation<Color>(
+                AppColors.cardEmphasis,
               ),
             ),
           ),
@@ -178,10 +167,13 @@ class CareerStageCard extends StatelessWidget {
           else if (stageIdx == 0 && totalCareerMonths == 0 && totalClinics == 0)
             // 첫 방문, 아무 데이터도 없는 상태
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm + 2,
+              ),
               decoration: BoxDecoration(
                 color: AppColors.onCardPrimary.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.md),
               ),
               child: Row(
                 children: [
@@ -283,8 +275,8 @@ class _ChecklistItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 체크박스: 화면 너비의 5%, 최소18·최대24 clamp
-    final checkSize = (MediaQuery.of(context).size.width * 0.05).clamp(18.0, 24.0);
+    final checkSize =
+        (MediaQuery.of(context).size.width * 0.05).clamp(18.0, 24.0);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -294,10 +286,9 @@ class _ChecklistItem extends StatelessWidget {
           margin: const EdgeInsets.only(top: 1),
           decoration: BoxDecoration(
             color: data.done
-                ? AppColors.cardEmphasis  // Neon (완료)
-                : AppColors.onCardPrimary.withOpacity(0.12), // White 반투명 (미완료)
-            borderRadius: BorderRadius.circular(6),
-            // border 없음
+                ? AppColors.cardEmphasis                        // Neon (완료)
+                : AppColors.onCardPrimary.withOpacity(0.12),   // White 반투명 (미완료)
+            borderRadius: BorderRadius.circular(AppRadius.xs),
           ),
           child: data.done
               ? Icon(
@@ -305,7 +296,7 @@ class _ChecklistItem extends StatelessWidget {
                   size: checkSize * 0.65,
                   color: AppColors.onCardEmphasis, // Black 체크 on Neon
                 )
-                  : null,
+              : null,
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -321,8 +312,8 @@ class _ChecklistItem extends StatelessWidget {
                       ? AppColors.onCardPrimary.withOpacity(0.45)
                       : AppColors.onCardPrimary.withOpacity(0.9),
                   decoration: data.done
-                          ? TextDecoration.lineThrough
-                          : TextDecoration.none,
+                      ? TextDecoration.lineThrough
+                      : TextDecoration.none,
                 ),
               ),
               if (!data.done)
@@ -347,150 +338,152 @@ void showCareerStageGuideSheet(BuildContext context) {
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder:
-        (_) => Container(
-          margin: const EdgeInsets.only(top: 60),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    builder: (_) => Container(
+      margin: const EdgeInsets.only(top: 60),
+      decoration: const BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 10),
+          // drag handle
+          Container(
+            width: 38,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppColors.disabledBg,             // 이전 kCShadow
+              borderRadius: BorderRadius.circular(4),
+            ),
           ),
-          child: Column(
-            children: [
-              const SizedBox(height: 10),
-              Container(
-                width: 38,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: kCShadow,
-                  borderRadius: BorderRadius.circular(4),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: const Text(
+                '커리어 단계 안내',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.textPrimary,
                 ),
               ),
-              const SizedBox(height: 16),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    '커리어 단계 안내',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                      color: kCText,
-                    ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+            child: const Text(
+              '총 경력, 치과 이력 수, Lv.4 이상 스킬 수에 따라 단계가 자동으로 결정됩니다.',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,        // 이전 kCText.withOpacity(0.5)
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: ListView.separated(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg, 0, AppSpacing.lg, AppSpacing.xxl,
+              ),
+              itemCount: _kStageRules.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 6),
+              itemBuilder: (ctx, i) {
+                final r = _kStageRules[i];
+                return Container(
+                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceMuted,     // 이전 kCCardBg
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                   ),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Text(
-                  '총 경력, 치과 이력 수, Lv.4 이상 스킬 수에 따라 단계가 자동으로 결정됩니다.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: kCText.withOpacity(0.5),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Expanded(
-                child: ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                  itemCount: _kStageRules.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 6),
-                  itemBuilder: (ctx, i) {
-                    final r = _kStageRules[i];
-                    return Container(
-                      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-                      decoration: BoxDecoration(
-                        color: kCCardBg,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        children: [
-                          // 단계 번호 배지: 화면 너비의 6.5%, 최소22·최대32 clamp
-                          Builder(
-                            builder: (ctx) {
-                              final badgeSize = (MediaQuery.of(ctx).size.width * 0.065)
+                  child: Row(
+                    children: [
+                      Builder(
+                        builder: (ctx) {
+                          final badgeSize =
+                              (MediaQuery.of(ctx).size.width * 0.065)
                                   .clamp(22.0, 32.0);
-                              return Container(
-                                width: badgeSize,
-                                height: badgeSize,
+                          return Container(
+                            width: badgeSize,
+                            height: badgeSize,
                             decoration: BoxDecoration(
-                              color: kCAccent.withOpacity(0.3),
-                              borderRadius: BorderRadius.circular(8),
+                              // 이전 kCAccent.withOpacity(0.3)
+                              color: AppColors.accent.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(AppRadius.sm),
                             ),
                             child: Center(
                               child: Text(
                                 '${i + 1}',
-                                    style: TextStyle(
-                                      fontSize: (badgeSize * 0.46).clamp(10.0, 14.0),
+                                style: TextStyle(
+                                  fontSize: (badgeSize * 0.46).clamp(10.0, 14.0),
                                   fontWeight: FontWeight.w900,
-                                  color: kCText,
+                                  color: AppColors.accent, // 이전 kCText
                                 ),
                               ),
                             ),
-                              );
-                            },
+                          );
+                        },
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          r.name,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textPrimary,
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              r.name,
+                        ),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          if (r.minMonths > 0)
+                            Text(
+                              '경력 ${formatCareerMonths(r.minMonths)}',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: AppColors.textSecondary, // 이전 kCText.withOpacity(0.5)
+                              ),
+                            ),
+                          if (r.minClinics > 0)
+                            Text(
+                              '치과 ${r.minClinics}곳',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          if (r.minLv4 > 0)
+                            Text(
+                              'Lv.4+ 스킬 ${r.minLv4}개',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          if (r.minMonths == 0 &&
+                              r.minClinics == 0 &&
+                              r.minLv4 == 0)
+                            const Text(
+                              '시작',
                               style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w800,
-                                color: kCText,
+                                fontSize: 11,
+                                color: AppColors.textDisabled, // 이전 kCText.withOpacity(0.4)
                               ),
                             ),
-                          ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              if (r.minMonths > 0)
-                                Text(
-                                  '경력 ${formatCareerMonths(r.minMonths)}',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: kCText.withOpacity(0.5),
-                                  ),
-                                ),
-                              if (r.minClinics > 0)
-                                Text(
-                                  '치과 ${r.minClinics}곳',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: kCText.withOpacity(0.5),
-                                  ),
-                                ),
-                              if (r.minLv4 > 0)
-                                Text(
-                                  'Lv.4+ 스킬 ${r.minLv4}개',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: kCText.withOpacity(0.5),
-                                  ),
-                                ),
-                              if (r.minMonths == 0 &&
-                                  r.minClinics == 0 &&
-                                  r.minLv4 == 0)
-                                Text(
-                                  '시작',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: kCText.withOpacity(0.4),
-                                  ),
-                                ),
-                            ],
-                          ),
                         ],
                       ),
-                    );
-                  },
-                ),
-              ),
-            ],
+                    ],
+                  ),
+                );
+              },
+            ),
           ),
-        ),
+        ],
+      ),
+    ),
   );
 }
-

@@ -2,6 +2,8 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../../core/theme/app_colors.dart';
 import 'package:pdfx/pdfx.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
@@ -29,6 +31,13 @@ class _PdfReaderPageState extends State<PdfReaderPage> {
   @override
   void initState() {
     super.initState();
+    // PDF 리더: 가로/세로 모두 허용 (가로형 책 지원)
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
     _loadPdf();
   }
 
@@ -108,13 +117,21 @@ class _PdfReaderPageState extends State<PdfReaderPage> {
       lastPage: _currentPage,
     );
     _pdfController?.dispose();
+    // 페이지 나갈 때 세로 고정 복원
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.appBg,
       appBar: AppBar(
+        backgroundColor: AppColors.appBg,
+        elevation: 0,
         title: Text(
           widget.ebook.title,
           style: const TextStyle(fontSize: 16),
@@ -164,12 +181,12 @@ class _PdfReaderPageState extends State<PdfReaderPage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error_outline, size: 64, color: Colors.red),
+              const Icon(Icons.error_outline, size: 64, color: AppColors.error),
               const SizedBox(height: 16),
               Text(
                 _errorMessage!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.red),
+                style: const TextStyle(color: AppColors.error),
               ),
               const SizedBox(height: 16),
               FilledButton(
@@ -198,7 +215,7 @@ class _PdfReaderPageState extends State<PdfReaderPage> {
           child: CircularProgressIndicator(),
         ),
         errorBuilder: (_, error) => Center(
-          child: Text('오류: $error', style: const TextStyle(color: Colors.red)),
+          child: Text('오류: $error', style: const TextStyle(color: AppColors.error)),
         ),
       ),
     );

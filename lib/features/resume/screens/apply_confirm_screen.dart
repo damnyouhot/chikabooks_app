@@ -6,15 +6,9 @@ import '../../../services/resume_service.dart';
 import '../../../services/application_service.dart';
 import '../../../services/bond_score_service.dart';
 import '../../../models/activity_log.dart';
+import '../../../core/theme/app_colors.dart';
 import 'resume_preview_screen.dart';
 import 'resume_home_screen.dart';
-
-// ── 디자인 상수 ──────────────────────────────────────────
-const _kBg = Color(0xFFF8F6F9);
-const _kText = Color(0xFF3D4A5C);
-const _kBlue = Color(0xFF4A90D9);
-const _kGreen = Color(0xFF4CAF50);
-const _kOrange = Color(0xFFF57C00);
 
 /// 지원 확인/수정 페이지
 ///
@@ -126,27 +120,27 @@ class _ApplyConfirmScreenState extends State<ApplyConfirmScreen> {
   Widget build(BuildContext context) {
     if (_loading) {
       return Scaffold(
-        backgroundColor: _kBg,
+        backgroundColor: AppColors.appBg,
         appBar: AppBar(title: const Text('지원하기')),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     return Scaffold(
-      backgroundColor: _kBg,
+      backgroundColor: AppColors.appBg,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.white,
         elevation: 0,
         title: const Text(
           '지원 확인',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w700,
-            color: _kText,
+            color: AppColors.textPrimary,
           ),
         ),
         centerTitle: false,
-        iconTheme: const IconThemeData(color: _kText),
+        iconTheme: const IconThemeData(color: AppColors.textPrimary),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -179,18 +173,18 @@ class _ApplyConfirmScreenState extends State<ApplyConfirmScreen> {
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: _kOrange.withOpacity(0.08),
+                color: AppColors.warning.withOpacity(0.08),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: _kOrange.withOpacity(0.2)),
+                border: Border.all(color: AppColors.warning.withOpacity(0.2)),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.info_outline, size: 18, color: _kOrange),
+                  Icon(Icons.info_outline, size: 18, color: AppColors.warning),
                   const SizedBox(width: 8),
                   const Expanded(
                     child: Text(
                       '이미 지원한 공고예요. 중복 지원은 불가합니다.',
-                      style: TextStyle(fontSize: 13, color: _kOrange),
+                      style: TextStyle(fontSize: 13, color: AppColors.warning),
                     ),
                   ),
                 ],
@@ -213,20 +207,20 @@ class _ApplyConfirmScreenState extends State<ApplyConfirmScreen> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: _kBlue.withOpacity(0.06),
+        color: AppColors.accent.withOpacity(0.06),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: _kBlue.withOpacity(0.15)),
+        border: Border.all(color: AppColors.accent.withOpacity(0.15)),
       ),
       child: Row(
         children: [
-          Icon(Icons.info_outline, size: 18, color: _kBlue),
+          Icon(Icons.info_outline, size: 18, color: AppColors.accent),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               '지금은 아직 제출 전이에요.\n이력서를 확인한 뒤 하단의 제출하기를 눌러주세요.',
               style: TextStyle(
                 fontSize: 12,
-                color: _kBlue.withOpacity(0.8),
+                color: AppColors.accent,
                 height: 1.5,
               ),
             ),
@@ -241,9 +235,9 @@ class _ApplyConfirmScreenState extends State<ApplyConfirmScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _kText.withOpacity(0.06)),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -253,7 +247,7 @@ class _ApplyConfirmScreenState extends State<ApplyConfirmScreen> {
             style: const TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w700,
-              color: _kText,
+              color: AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 4),
@@ -261,20 +255,20 @@ class _ApplyConfirmScreenState extends State<ApplyConfirmScreen> {
             job.title,
             style: TextStyle(
               fontSize: 13,
-              color: _kText.withOpacity(0.6),
+              color: AppColors.textSecondary,
             ),
           ),
           if (job.address.isNotEmpty) ...[
             const SizedBox(height: 4),
             Row(
               children: [
-                Icon(Icons.location_on, size: 13, color: _kText.withOpacity(0.35)),
+                Icon(Icons.location_on, size: 13, color: AppColors.textDisabled),
                 const SizedBox(width: 3),
                 Text(
                   job.address,
                   style: TextStyle(
                     fontSize: 12,
-                    color: _kText.withOpacity(0.4),
+                    color: AppColors.textDisabled,
                   ),
                 ),
               ],
@@ -291,27 +285,27 @@ class _ApplyConfirmScreenState extends State<ApplyConfirmScreen> {
       return Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.white,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _kOrange.withOpacity(0.2)),
+          border: Border.all(color: AppColors.warning.withOpacity(0.2)),
         ),
         child: Column(
           children: [
             Icon(Icons.description_outlined, size: 40,
-                color: _kText.withOpacity(0.2)),
+                color: AppColors.textDisabled),
             const SizedBox(height: 12),
             Text(
               '등록된 이력서가 없어요',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: _kText.withOpacity(0.5),
+                color: AppColors.textSecondary,
               ),
             ),
             const SizedBox(height: 4),
             Text(
               '이력서를 먼저 작성해야 지원할 수 있어요.',
-              style: TextStyle(fontSize: 12, color: _kText.withOpacity(0.35)),
+              style: TextStyle(fontSize: 12, color: AppColors.textDisabled),
             ),
             const SizedBox(height: 14),
             FilledButton.icon(
@@ -326,7 +320,7 @@ class _ApplyConfirmScreenState extends State<ApplyConfirmScreen> {
               icon: const Icon(Icons.add, size: 18),
               label: const Text('이력서 만들기'),
               style: FilledButton.styleFrom(
-                backgroundColor: _kBlue,
+                backgroundColor: AppColors.accent,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               ),
@@ -344,16 +338,16 @@ class _ApplyConfirmScreenState extends State<ApplyConfirmScreen> {
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w700,
-            color: _kText,
+            color: AppColors.textPrimary,
           ),
         ),
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.white,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: _kText.withOpacity(0.1)),
+            border: Border.all(color: AppColors.divider),
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
@@ -368,7 +362,7 @@ class _ApplyConfirmScreenState extends State<ApplyConfirmScreen> {
                       Expanded(
                         child: Text(
                           r.title,
-                          style: const TextStyle(fontSize: 14, color: _kText),
+                          style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -376,7 +370,7 @@ class _ApplyConfirmScreenState extends State<ApplyConfirmScreen> {
                         '$filled/8',
                         style: TextStyle(
                           fontSize: 11,
-                          color: _kText.withOpacity(0.35),
+                          color: AppColors.textDisabled,
                         ),
                       ),
                     ],
@@ -412,8 +406,8 @@ class _ApplyConfirmScreenState extends State<ApplyConfirmScreen> {
             icon: const Icon(Icons.visibility_outlined, size: 16),
             label: const Text('지원용 미리보기'),
             style: OutlinedButton.styleFrom(
-              foregroundColor: _kBlue,
-              side: BorderSide(color: _kBlue.withOpacity(0.3)),
+              foregroundColor: AppColors.accent,
+              side: BorderSide(color: AppColors.accent.withOpacity(0.3)),
               padding: const EdgeInsets.symmetric(vertical: 12),
             ),
           ),
@@ -437,8 +431,8 @@ class _ApplyConfirmScreenState extends State<ApplyConfirmScreen> {
             icon: const Icon(Icons.visibility_off_outlined, size: 16),
             label: const Text('익명 미리보기'),
             style: OutlinedButton.styleFrom(
-              foregroundColor: _kGreen,
-              side: BorderSide(color: _kGreen.withOpacity(0.3)),
+              foregroundColor: AppColors.success,
+              side: BorderSide(color: AppColors.success.withOpacity(0.3)),
               padding: const EdgeInsets.symmetric(vertical: 12),
             ),
           ),
@@ -454,23 +448,23 @@ class _ApplyConfirmScreenState extends State<ApplyConfirmScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _kGreen.withOpacity(0.12)),
+        border: Border.all(color: AppColors.success.withOpacity(0.12)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.visibility_off, size: 16, color: _kGreen),
+              Icon(Icons.visibility_off, size: 16, color: AppColors.success),
               const SizedBox(width: 6),
               const Text(
                 '병원에 보이는 익명 프로필',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  color: _kText,
+                  color: AppColors.textPrimary,
                 ),
               ),
             ],
@@ -495,7 +489,7 @@ class _ApplyConfirmScreenState extends State<ApplyConfirmScreen> {
             '* 이름, 연락처, 이메일은 지원 직후 병원에 공개되지 않아요.',
             style: TextStyle(
               fontSize: 11,
-              color: _kGreen.withOpacity(0.6),
+              color: AppColors.success.withOpacity(0.6),
               height: 1.5,
             ),
           ),
@@ -516,7 +510,7 @@ class _ApplyConfirmScreenState extends State<ApplyConfirmScreen> {
               label,
               style: TextStyle(
                 fontSize: 12,
-                color: _kText.withOpacity(0.4),
+                color: AppColors.textDisabled,
               ),
             ),
           ),
@@ -525,7 +519,7 @@ class _ApplyConfirmScreenState extends State<ApplyConfirmScreen> {
               value,
               style: TextStyle(
                 fontSize: 13,
-                color: _kText.withOpacity(0.75),
+                color: AppColors.textSecondary,
               ),
             ),
           ),
@@ -540,7 +534,7 @@ class _ApplyConfirmScreenState extends State<ApplyConfirmScreen> {
         !_submitting;
 
     return Container(
-      color: Colors.white,
+      color: AppColors.white,
       padding: EdgeInsets.fromLTRB(
         16,
         12,
@@ -550,8 +544,8 @@ class _ApplyConfirmScreenState extends State<ApplyConfirmScreen> {
       child: FilledButton(
         onPressed: canSubmit ? _submit : null,
         style: FilledButton.styleFrom(
-          backgroundColor: _kBlue,
-          disabledBackgroundColor: _kText.withOpacity(0.08),
+          backgroundColor: AppColors.accent,
+          disabledBackgroundColor: AppColors.disabledBg,
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
@@ -562,7 +556,7 @@ class _ApplyConfirmScreenState extends State<ApplyConfirmScreen> {
                 width: 22,
                 height: 22,
                 child: CircularProgressIndicator(
-                  color: Colors.white,
+                  color: AppColors.white,
                   strokeWidth: 2,
                 ),
               )

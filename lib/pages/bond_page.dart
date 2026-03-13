@@ -10,6 +10,7 @@ import '../models/partner_group.dart';
 import '../widgets/bond_post_sheet.dart';
 import '../widgets/profile_gate_sheet.dart';
 import '../core/theme/app_colors.dart';
+import '../core/widgets/glass_card.dart';
 
 import '../widgets/bond/bond_top_bar.dart';
 import '../widgets/bond/bond_week_header.dart';
@@ -24,6 +25,10 @@ import '../widgets/bond/bond_supplementation_listener.dart';
 import '../widgets/bond/bond_empty_state_widget.dart';
 import '../widgets/bond/bond_leave_sheet.dart';
 import 'debug_test_data_page.dart';
+
+/// 글래스모픽 테스트 플래그 — true: 그라디언트 배경 + 유리 카드
+/// false: 기존 soft gray 배경 + 불투명 카드
+const bool kBondGlassMode = false;
 
 /// ─────────────────────────────────────────────────
 /// 결 탭 — 주간 페이지 기반
@@ -428,110 +433,157 @@ class _BondPageState extends State<BondPage> {
         }
 
         return Scaffold(
-          backgroundColor: AppColors.appBg,  // soft gray
-          body: SafeArea(
-            child: CustomScrollView(
-              slivers: [
-                // ━━━ 1. 공통 헤더 ━━━
-                SliverToBoxAdapter(
-                  child: BondTopBar(
-                    onSettingsLongPress: _showTestDataDialog,
-                    weekLabel: weekLabel,
-                    onLeaveGroupTap: hasActivePartner ? _showLeaveSheet : null,
+          backgroundColor: kBondGlassMode
+              ? const Color(0xFF0A0A0A)   // 글래스 모드: 순수 검정
+              : AppColors.appBg,
+          body: Stack(
+            children: [
+              // ── 글래스 모드: 그라디언트 배경 레이어 ──
+              if (kBondGlassMode) ...[
+                // 메인 베이스: 검정 → 검정 (순수 다크)
+                Container(color: const Color(0xFF0A0A0A)),
+                // 글로우 블롭 1 — 우상단 형광 라임 (메인 포인트)
+                Positioned(
+                  top: -80,
+                  right: -60,
+                  child: GlowBlob(
+                    color: AppColors.lime,
+                    width: 320,
+                    height: 380,
+                    opacity: 0.55,
                   ),
                 ),
-
-                // ━━━ 1.5 [파트너 없음] 상태 카드 ━━━
-                if (!hasActivePartner)
-                  SliverToBoxAdapter(
-                    child: BondNoPartnerCard(bondScore: bondScore),
+                // 글로우 블롭 2 — 우상단 보조 (좀 더 작고 선명)
+                Positioned(
+                  top: 20,
+                  right: 10,
+                  child: GlowBlob(
+                    color: AppColors.lime,
+                    width: 160,
+                    height: 180,
+                    opacity: 0.35,
                   ),
-
-                // 보충 알림 리스너 (파트너 있을 때만
-                if (hasActivePartner)
-                  SliverToBoxAdapter(
-                    child: BondSupplementationListener(
-                      groupId: _partnerGroupId,
-                      onMemberJoined: _onMemberJoined,
-                    ),
+                ),
+                // 글로우 블롭 3 — 좌하단 은은한 형광 잔광
+                Positioned(
+                  bottom: 120,
+                  left: -80,
+                  child: GlowBlob(
+                    color: AppColors.lime,
+                    width: 240,
+                    height: 260,
+                    opacity: 0.12,
                   ),
-
-                // ━━━ 2. [파트너 있음] 섹션 ━━━
-                if (hasActivePartner) ...[
-                  const SliverToBoxAdapter(child: SizedBox(height: 8)),
-
-                  // 파트너 요약 (통합 버전 - MemberList + PartnerSummary 흡수)
-                  if (_groupMembers.isNotEmpty)
-                    SliverToBoxAdapter(
-                      child: BondSummarySection(
-                        isExpanded: true,
-                        onToggleExpand: () {},
-                        enableToggle: false,
-                        members: _groupMembers,
-                        myUid: uid,
-                        memberNicknames: _memberNicknames,
-                        weeklyPostCounts: _weeklyPostCounts,
-                        weeklyReactionCounts: _weeklyReactionCounts,
-                        topRightOverlay: BondScoreGauge(bondScore: bondScore),
-                      ),
-                    ),
-
-                  const SliverToBoxAdapter(child: SizedBox(height: 8)),
-
-                  // 주간 스탬프 (파트너 있을 때 항상 표시)
-                  SliverToBoxAdapter(
-                    child: BondStampSection(partnerGroupId: _partnerGroupId),
-                  ),
-
-                  const SliverToBoxAdapter(child: SizedBox(height: 16)),
-
-                  // 이어가기 섹션 (주말만)
-                  if (_partnerGroup != null &&
-                      _groupMembers.isNotEmpty &&
-                      BondStateHelper.canSelectContinue(_partnerGroup))
-                    SliverToBoxAdapter(
-                      child: BondContinueSection(
-                        groupId: _partnerGroup!.id,
-                        members: _groupMembers,
-                      ),
-                    ),
-
-                  // 오늘을 나누기 (파트너 모드)
-                  SliverToBoxAdapter(
-                    child: BondFeedSection(
-                      partnerGroupId: _partnerGroupId,
-                      memberNicknames: _memberNicknames,
-                      onOpenWrite: _openDailyWallWrite,
-                    ),
-                  ),
-                ],
-
-                // ━━━ 3. [파트너 없음] 섹션 ━━━
-                if (!hasActivePartner) ...[
-                  const SliverToBoxAdapter(child: SizedBox(height: 8)),
-
-                  // 오늘을 나누기 (개인 모드)
-                  SliverToBoxAdapter(
-                    child: BondFeedSection(
-                      partnerGroupId: null,
-                      memberNicknames: null,
-                      onOpenWrite: _openDailyWallWrite,
-                    ),
-                  ),
-                ],
-
-                const SliverToBoxAdapter(child: SizedBox(height: 16)),
-
-                // ━━━ 4. 공통 섹션 ━━━
-                const SliverToBoxAdapter(child: BondBillboardSection()),
-
-                const SliverToBoxAdapter(child: SizedBox(height: 16)),
-
-                const SliverToBoxAdapter(child: BondPollSection()),
-
-                const SliverToBoxAdapter(child: SizedBox(height: 40)),
+                ),
               ],
-            ),
+
+              // ── 콘텐츠 레이어 ──
+              SafeArea(
+                child: CustomScrollView(
+                  slivers: [
+                    // ━━━ 1. 공통 헤더 ━━━
+                    SliverToBoxAdapter(
+                      child: BondTopBar(
+                        onSettingsLongPress: _showTestDataDialog,
+                        weekLabel: weekLabel,
+                        onLeaveGroupTap: hasActivePartner ? _showLeaveSheet : null,
+                        glassMode: kBondGlassMode,
+                      ),
+                    ),
+
+                    // ━━━ 1.5 [파트너 없음] 상태 카드 ━━━
+                    if (!hasActivePartner)
+                      SliverToBoxAdapter(
+                        child: BondNoPartnerCard(
+                          bondScore: bondScore,
+                          glassMode: kBondGlassMode,
+                        ),
+                      ),
+
+                    // 보충 알림 리스너 (파트너 있을 때만)
+                    if (hasActivePartner)
+                      SliverToBoxAdapter(
+                        child: BondSupplementationListener(
+                          groupId: _partnerGroupId,
+                          onMemberJoined: _onMemberJoined,
+                        ),
+                      ),
+
+                    // ━━━ 2. [파트너 있음] 섹션 ━━━
+                    if (hasActivePartner) ...[
+                      const SliverToBoxAdapter(child: SizedBox(height: 8)),
+
+                      if (_groupMembers.isNotEmpty)
+                        SliverToBoxAdapter(
+                          child: BondSummarySection(
+                            isExpanded: true,
+                            onToggleExpand: () {},
+                            enableToggle: false,
+                            members: _groupMembers,
+                            myUid: uid,
+                            memberNicknames: _memberNicknames,
+                            weeklyPostCounts: _weeklyPostCounts,
+                            weeklyReactionCounts: _weeklyReactionCounts,
+                            topRightOverlay: BondScoreGauge(bondScore: bondScore),
+                          ),
+                        ),
+
+                      const SliverToBoxAdapter(child: SizedBox(height: 8)),
+
+                      SliverToBoxAdapter(
+                        child: BondStampSection(partnerGroupId: _partnerGroupId),
+                      ),
+
+                      const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+                      if (_partnerGroup != null &&
+                          _groupMembers.isNotEmpty &&
+                          BondStateHelper.canSelectContinue(_partnerGroup))
+                        SliverToBoxAdapter(
+                          child: BondContinueSection(
+                            groupId: _partnerGroup!.id,
+                            members: _groupMembers,
+                          ),
+                        ),
+
+                      SliverToBoxAdapter(
+                        child: BondFeedSection(
+                          partnerGroupId: _partnerGroupId,
+                          memberNicknames: _memberNicknames,
+                          onOpenWrite: _openDailyWallWrite,
+                          glassMode: kBondGlassMode,
+                        ),
+                      ),
+                    ],
+
+                    // ━━━ 3. [파트너 없음] 섹션 ━━━
+                    if (!hasActivePartner) ...[
+                      const SliverToBoxAdapter(child: SizedBox(height: 8)),
+
+                      SliverToBoxAdapter(
+                        child: BondFeedSection(
+                          partnerGroupId: null,
+                          memberNicknames: null,
+                          onOpenWrite: _openDailyWallWrite,
+                          glassMode: kBondGlassMode,
+                        ),
+                      ),
+                    ],
+
+                    const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+                    // ━━━ 4. 공통 섹션 ━━━
+                    const SliverToBoxAdapter(child: BondBillboardSection()),
+
+                    const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+                    const SliverToBoxAdapter(child: BondPollSection()),
+
+                    const SliverToBoxAdapter(child: SizedBox(height: 40)),
+                  ],
+                ),
+              ),
+            ],
           ),
         );
       },

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../services/partner_service.dart';
 import '../../services/user_profile_service.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
+import '../../core/widgets/app_muted_card.dart';
 import '../partner_gate_sheet.dart';
 import '../profile_gate_sheet.dart';
 
@@ -23,36 +26,33 @@ class _InviteCardState extends State<InviteCard> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-      ),
+    return AppMutedCard(
+      radius: AppRadius.xl,
+      padding: const EdgeInsets.all(AppSpacing.lg + 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Icon(Icons.all_inclusive,
-                  color: const Color(0xFF1E88E5).withOpacity(0.6), size: 20),
+                  color: AppColors.accent.withOpacity(0.6), size: 20),
               const SizedBox(width: 8),
               const Text(
                 '파트너 찾기',
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF424242),
+                  color: AppColors.textPrimary,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 6),
-          Text(
+          const Text(
             '비슷한 고민을 가진 3명이\n1주일간 서로의 하루를 나눕니다.',
             style: TextStyle(
               fontSize: 12,
-              color: Colors.grey[400],
+              color: AppColors.textDisabled,
               height: 1.5,
             ),
           ),
@@ -73,23 +73,21 @@ class _InviteCardState extends State<InviteCard> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 11),
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: const Color(0xFFE0E0E0),
-                      ),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                      border: Border.all(color: AppColors.divider),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(Icons.send_outlined,
-                            size: 14, color: Colors.grey[400]),
+                            size: 14, color: AppColors.textDisabled),
                         const SizedBox(width: 6),
-                        Text(
+                        const Text(
                           '직접 초대',
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
-                            color: Colors.grey[500],
+                            color: AppColors.textDisabled,
                           ),
                         ),
                       ],
@@ -106,17 +104,8 @@ class _InviteCardState extends State<InviteCard> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 11),
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF42A5F5), Color(0xFF1E88E5)],
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF1E88E5).withOpacity(0.15),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                      color: AppColors.accent,
                     ),
                     child: _isLoading
                         ? const Center(
@@ -125,7 +114,7 @@ class _InviteCardState extends State<InviteCard> {
                               height: 18,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: Colors.white,
+                                color: AppColors.white,
                               ),
                             ),
                           )
@@ -133,14 +122,14 @@ class _InviteCardState extends State<InviteCard> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Icon(Icons.auto_awesome,
-                                  size: 14, color: Colors.white),
+                                  size: 14, color: AppColors.onAccent),
                               SizedBox(width: 6),
                               Text(
                                 '추천으로 찾기',
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
-                                  color: Colors.white,
+                                  color: AppColors.onAccent,
                                 ),
                               ),
                             ],
@@ -164,7 +153,7 @@ class _InviteCardState extends State<InviteCard> {
       showModalBottomSheet(
         context: context,
         isScrollControlled: true,
-        backgroundColor: Colors.transparent,
+        backgroundColor: AppColors.white,
         builder: (_) => ProfileGateSheet(
           onComplete: () {
             if (context.mounted) _checkStepB(context);
@@ -185,7 +174,7 @@ class _InviteCardState extends State<InviteCard> {
       showModalBottomSheet(
         context: context,
         isScrollControlled: true,
-        backgroundColor: Colors.transparent,
+        backgroundColor: AppColors.white,
         builder: (_) => PartnerGateSheet(
           onComplete: () {
             if (context.mounted) _doMatch(context);
@@ -260,21 +249,14 @@ class _InviteCardState extends State<InviteCard> {
   }) {
     showDialog(
       context: context,
-      barrierColor: Colors.black12,
+      barrierColor: AppColors.black.withOpacity(0.12),
       builder: (_) => Center(
         child: Container(
           margin: const EdgeInsets.symmetric(horizontal: 40),
           padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF9E9EBE).withOpacity(0.1),
-                blurRadius: 24,
-                offset: const Offset(0, 8),
-              ),
-            ],
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(AppRadius.xl + 4),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -284,10 +266,10 @@ class _InviteCardState extends State<InviteCard> {
                 height: 56,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: const Color(0xFF1E88E5).withOpacity(0.08),
+                  color: AppColors.accent.withOpacity(0.08),
                 ),
                 child: Icon(icon, size: 28,
-                    color: const Color(0xFF1E88E5).withOpacity(0.7)),
+                    color: AppColors.accent.withOpacity(0.7)),
               ),
               const SizedBox(height: 16),
               Text(
@@ -295,16 +277,16 @@ class _InviteCardState extends State<InviteCard> {
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF424242),
+                  color: AppColors.textPrimary,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 subtitle,
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 13,
-                  color: Colors.grey[450],
+                  color: AppColors.textDisabled,
                   height: 1.5,
                 ),
               ),
@@ -315,10 +297,8 @@ class _InviteCardState extends State<InviteCard> {
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(14),
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF42A5F5), Color(0xFF1E88E5)],
-                    ),
+                    color: AppColors.accent,
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                   ),
                   child: Text(
                     buttonText,
@@ -326,7 +306,7 @@ class _InviteCardState extends State<InviteCard> {
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                      color: AppColors.onAccent,
                     ),
                   ),
                 ),

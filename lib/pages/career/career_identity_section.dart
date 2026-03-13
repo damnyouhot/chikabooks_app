@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../services/career_profile_service.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
+import '../../core/widgets/app_badge.dart';
 import 'career_shared.dart';
 
 // ── 커리어 아이덴티티 카드 (빈 상태) ────────────────────────────
@@ -11,7 +13,7 @@ class CareerIdentityEmptyCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: () => CareerIdentitySheet.show(context),
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(AppRadius.xl),
       child: CareerCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -23,28 +25,14 @@ class CareerIdentityEmptyCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.onCardPrimary, // White (Blue 카드 위)
+                    color: AppColors.onCardPrimary,
                   ),
                 ),
                 const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.onCardPrimary.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(999),
-                    // border 없음
-                  ),
-                  child: const Text(
-                    '채우기',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.onCardPrimary,
-                    ),
-                  ),
+                AppBadge(
+                  label: '채우기',
+                  bgColor: AppColors.onCardPrimary.withOpacity(0.2),
+                  textColor: AppColors.onCardPrimary,
                 ),
               ],
             ),
@@ -66,12 +54,12 @@ class CareerIdentityEmptyCard extends StatelessWidget {
               child: ElevatedButton(
                 onPressed: () => CareerIdentitySheet.show(context),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.cardEmphasis, // Neon 버튼
+                  backgroundColor: AppColors.cardEmphasis,   // Neon 버튼
                   foregroundColor: AppColors.onCardEmphasis, // Black 텍스트
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                   ),
                 ),
                 child: const Text(
@@ -111,7 +99,7 @@ class _PlaceholderRow extends StatelessWidget {
             height: 14,
             decoration: BoxDecoration(
               color: AppColors.onCardPrimary.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
             ),
           ),
         ),
@@ -224,23 +212,10 @@ class CareerIdentityFilledCard extends StatelessWidget {
               ),
               if (useOverride) ...[
                 const SizedBox(width: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.onCardPrimary.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    '직접입력',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.onCardPrimary.withOpacity(0.8),
-                    ),
-                  ),
+                AppBadge(
+                  label: '직접입력',
+                  bgColor: AppColors.onCardPrimary.withOpacity(0.2),
+                  textColor: AppColors.onCardPrimary.withOpacity(0.8),
                 ),
               ],
             ],
@@ -276,8 +251,7 @@ class CareerIdentityFilledCard extends StatelessWidget {
                     ),
                     decoration: BoxDecoration(
                       color: AppColors.onCardPrimary.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(999),
-                      // border 없음
+                      borderRadius: BorderRadius.circular(AppRadius.full),
                     ),
                     child: Text(
                       t,
@@ -305,7 +279,7 @@ class CareerIdentitySheet extends StatefulWidget {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -363,8 +337,9 @@ class _CareerIdentitySheetState extends State<CareerIdentitySheet> {
             );
           try {
             final ts = identity['currentStartDate'];
-            if (ts != null)
+            if (ts != null) {
               _currentStartDate = (ts as dynamic).toDate() as DateTime;
+            }
           } catch (_) {}
           _useOverride = identity['useTotalCareerMonthsOverride'] == true;
           _overrideCtrl.text = overrideM > 0 ? '$overrideM' : '';
@@ -413,9 +388,9 @@ class _CareerIdentitySheetState extends State<CareerIdentitySheet> {
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('저장 실패: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('저장 실패: $e')),
+      );
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -444,23 +419,25 @@ class _CareerIdentitySheetState extends State<CareerIdentitySheet> {
         top: false,
         child: ListView(
           shrinkWrap: true,
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, AppSpacing.lg,
+          ),
           children: [
-            Text(
+            const Text(
               '커리어 카드 수정',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w800,
-                color: kCText,
+                color: AppColors.textPrimary,
               ),
             ),
             const SizedBox(height: 12),
-            Text(
+            const Text(
               '현재 상태',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
-                color: kCText,
+                color: AppColors.textPrimary,
               ),
             ),
             const SizedBox(height: 8),
@@ -485,12 +462,12 @@ class _CareerIdentitySheetState extends State<CareerIdentitySheet> {
               ],
             ),
             const SizedBox(height: 14),
-            Text(
+            const Text(
               '현재 치과명',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
-                color: kCText,
+                color: AppColors.textPrimary,
               ),
             ),
             const SizedBox(height: 8),
@@ -499,46 +476,47 @@ class _CareerIdentitySheetState extends State<CareerIdentitySheet> {
               decoration: InputDecoration(
                 hintText: _status == 'unemployed' ? '미입력 가능' : '예: 서울 ○○치과',
                 filled: true,
-                fillColor: const Color(0xFFF7F9F9),
+                fillColor: AppColors.surfaceMuted,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: kCShadow, width: 0.8),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  borderSide: BorderSide(color: AppColors.divider, width: 0.8),
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: kCShadow, width: 0.8),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  borderSide: BorderSide(color: AppColors.divider, width: 0.8),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: kCAccent, width: 1.4),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  borderSide:
+                      const BorderSide(color: AppColors.accent, width: 1.4),
                 ),
               ),
             ),
             if (_status == 'employed') ...[
               const SizedBox(height: 14),
-              Text(
+              const Text(
                 '현재 치과 입사 연월',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: kCText,
+                  color: AppColors.textPrimary,
                 ),
               ),
               const SizedBox(height: 8),
               CareerDatePickerTile(
-                label:
-                    _currentStartDate == null
-                        ? '날짜 선택 (선택사항)'
-                        : '${_currentStartDate!.year}년 ${_currentStartDate!.month}월',
+                label: _currentStartDate == null
+                    ? '날짜 선택 (선택사항)'
+                    : '${_currentStartDate!.year}년 ${_currentStartDate!.month}월',
                 onTap: _pickStartDate,
               ),
             ],
             const SizedBox(height: 18),
+            // ── 총 경력 직접 입력 박스 ──
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: const Color(0xFFF5F5F5),
-                borderRadius: BorderRadius.circular(14),
+                color: AppColors.surfaceMuted,
+                borderRadius: BorderRadius.circular(AppRadius.lg),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -549,20 +527,20 @@ class _CareerIdentitySheetState extends State<CareerIdentitySheet> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
+                            const Text(
                               '총 경력 직접 입력',
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
-                                color: kCText,
+                                color: AppColors.textPrimary,
                               ),
                             ),
                             const SizedBox(height: 2),
-                            Text(
+                            const Text(
                               '치과 네트워크 자동 합산 대신 직접 입력',
                               style: TextStyle(
                                 fontSize: 11,
-                                color: kCText.withOpacity(0.5),
+                                color: AppColors.textSecondary, // 이전 kCText.withOpacity(0.5)
                               ),
                             ),
                           ],
@@ -571,7 +549,7 @@ class _CareerIdentitySheetState extends State<CareerIdentitySheet> {
                       Switch(
                         value: _useOverride,
                         onChanged: (v) => setState(() => _useOverride = v),
-                        activeColor: kCText,
+                        activeColor: AppColors.accent, // 이전 kCText(Black) → accent(Blue)
                       ),
                     ],
                   ),
@@ -586,31 +564,34 @@ class _CareerIdentitySheetState extends State<CareerIdentitySheet> {
                             decoration: InputDecoration(
                               hintText: '개월 수 입력 (예: 36)',
                               filled: true,
-                              fillColor: Colors.white,
+                              fillColor: AppColors.white,
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius:
+                                    BorderRadius.circular(AppRadius.md),
                                 borderSide: BorderSide(
-                                  color: kCShadow,
+                                  color: AppColors.divider,
                                   width: 0.8,
                                 ),
                               ),
                               enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius:
+                                    BorderRadius.circular(AppRadius.md),
                                 borderSide: BorderSide(
-                                  color: kCShadow,
+                                  color: AppColors.divider,
                                   width: 0.8,
                                 ),
                               ),
                               focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide: BorderSide(
-                                  color: kCAccent,
+                                borderRadius:
+                                    BorderRadius.circular(AppRadius.md),
+                                borderSide: const BorderSide(
+                                  color: AppColors.accent,
                                   width: 1.4,
                                 ),
                               ),
                               contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 10,
+                                horizontal: AppSpacing.md,
+                                vertical: AppSpacing.sm + 2,
                               ),
                               suffixText: '개월',
                             ),
@@ -622,12 +603,12 @@ class _CareerIdentitySheetState extends State<CareerIdentitySheet> {
                           _overrideCtrl.text.isEmpty
                               ? ''
                               : formatCareerMonths(
-                                int.tryParse(_overrideCtrl.text) ?? 0,
-                              ),
-                          style: TextStyle(
+                                  int.tryParse(_overrideCtrl.text) ?? 0,
+                                ),
+                          style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: kCText.withOpacity(0.65),
+                            color: AppColors.textSecondary, // 이전 kCText.withOpacity(0.65)
                           ),
                         ),
                       ],
@@ -637,12 +618,12 @@ class _CareerIdentitySheetState extends State<CareerIdentitySheet> {
               ),
             ),
             const SizedBox(height: 14),
-            Text(
+            const Text(
               '전문 분야(선택)',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
-                color: kCText,
+                color: AppColors.textPrimary,
               ),
             ),
             const SizedBox(height: 8),
@@ -663,11 +644,11 @@ class _CareerIdentitySheetState extends State<CareerIdentitySheet> {
                         }
                       });
                     },
-                    selectedColor: kCAccent.withOpacity(0.25),
-                    checkmarkColor: kCText,
-                    side: BorderSide(color: kCShadow, width: 0.8),
+                    selectedColor: AppColors.accent.withOpacity(0.2),
+                    checkmarkColor: AppColors.accent,
+                    side: BorderSide(color: AppColors.divider, width: 0.8),
                     labelStyle: TextStyle(
-                      color: kCText.withOpacity(0.85),
+                      color: AppColors.textPrimary.withOpacity(0.85),
                       fontWeight: FontWeight.w700,
                       fontSize: 12,
                     ),
@@ -678,12 +659,12 @@ class _CareerIdentitySheetState extends State<CareerIdentitySheet> {
             ElevatedButton(
               onPressed: _saving ? null : _save,
               style: ElevatedButton.styleFrom(
-                backgroundColor: kCAccent,
-                foregroundColor: kCText,
+                backgroundColor: AppColors.accent,      // 이전 kCAccent
+                foregroundColor: AppColors.onAccent,    // 이전 kCText(Black) → onAccent(White)
                 elevation: 0,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
                 ),
               ),
               child: Text(_saving ? '저장 중...' : '저장'),
@@ -710,21 +691,27 @@ class _ChoiceChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(999),
+      borderRadius: BorderRadius.circular(AppRadius.full),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
         decoration: BoxDecoration(
-          color:
-              selected ? kCAccent.withOpacity(0.35) : const Color(0xFFF1F3F3),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: kCShadow, width: 0.8),
+          color: selected
+              ? AppColors.accent.withOpacity(0.18) // 이전 kCAccent.withOpacity(0.35)
+              : AppColors.surfaceMuted,             // 이전 Color(0xFFF1F3F3)
+          borderRadius: BorderRadius.circular(AppRadius.full),
+          // border 제거 (이전 Border.all(color: kCShadow))
         ),
         child: Text(
           label,
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w800,
-            color: selected ? kCText : kCText.withOpacity(0.75),
+            color: selected
+                ? AppColors.accent          // 이전 kCText
+                : AppColors.textSecondary,  // 이전 kCText.withOpacity(0.75)
           ),
         ),
       ),
