@@ -2,14 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import '../models/hira_update.dart';
 import '../services/hira_update_service.dart';
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_tokens.dart';
+import '../core/widgets/app_muted_card.dart';
 import 'hira_update_card.dart';
 import 'hira_update_compact_item.dart';
 
-// ── 디자인 팔레트 (성장 탭과 통일) ──
-const _kText = Color(0xFF5D6B6B);
-const _kShadow2 = Color(0xFFD5E5E5);
-
 /// HIRA 수가/급여 변경 포인트 섹션
+///
+/// 디자인 원칙:
+///   - boxShadow 없음 / Border 없음
+///   - 빈 상태 카드: AppMutedCard
+///   - 텍스트: AppColors.textPrimary / textSecondary / textDisabled
 class HiraUpdateSection extends StatelessWidget {
   const HiraUpdateSection({super.key});
 
@@ -22,7 +26,7 @@ class HiraUpdateSection extends StatelessWidget {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
             child: Padding(
-              padding: EdgeInsets.all(20),
+              padding: EdgeInsets.all(AppSpacing.xl),
               child: CircularProgressIndicator(),
             ),
           );
@@ -36,24 +40,29 @@ class HiraUpdateSection extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 섹션 타이틀
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 4),
+            // ── 섹션 타이틀 ──
+            const Padding(
+              padding: EdgeInsets.fromLTRB(
+                AppSpacing.xl,
+                AppSpacing.xxl,
+                AppSpacing.xl,
+                AppSpacing.xs,
+              ),
               child: Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.info_outline,
                     size: 20,
-                    color: _kText,
+                    color: AppColors.textSecondary,
                   ),
-                  const SizedBox(width: 6),
-                  const Expanded(
+                  SizedBox(width: AppSpacing.sm - 2),
+                  Expanded(
                     child: Text(
                       '수가, 급여 변경 리스트(건강보험심사평가원)',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: _kText,
+                        color: AppColors.textSecondary,
                         height: 1.3,
                       ),
                     ),
@@ -62,19 +71,24 @@ class HiraUpdateSection extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.xl,
+                0,
+                AppSpacing.xl,
+                AppSpacing.lg,
+              ),
               child: Text(
                 '최근 3개월 간 ${updates.length}건의 변경사항',
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 12,
-                  color: _kText.withOpacity(0.5),
+                  color: AppColors.textDisabled,
                 ),
               ),
             ),
 
-            // 상위 3건: 전체 카드
+            // ── 상위 3건: 전체 카드 ──
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
               child: Column(
                 children: updates
                     .take(3)
@@ -83,23 +97,23 @@ class HiraUpdateSection extends StatelessWidget {
               ),
             ),
 
-            // 4건 이후: 간단한 리스트
+            // ── 4건 이후: 간단 리스트 ──
             if (updates.length > 3) ...[
-              const SizedBox(height: 16),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+              const SizedBox(height: AppSpacing.lg),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: AppSpacing.xl),
                 child: Text(
                   '이전 항목',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: _kText.withOpacity(0.6),
+                    color: AppColors.textDisabled,
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.sm),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
                 child: Column(
                   children: updates
                       .skip(3)
@@ -109,50 +123,43 @@ class HiraUpdateSection extends StatelessWidget {
               ),
             ],
 
-            const SizedBox(height: 20),
+            const SizedBox(height: AppSpacing.xl),
           ],
         );
       },
     );
   }
 
-  /// 빈 상태
   Widget _buildEmptyState() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.5),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: _kShadow2.withOpacity(0.5),
-            width: 0.5,
-          ),
-        ),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.xl,
+        vertical: AppSpacing.xxl,
+      ),
+      child: AppMutedCard(
+        padding: const EdgeInsets.all(AppSpacing.xxl),
         child: Column(
-          children: [
+          children: const [
             Icon(
               Icons.info_outline,
               size: 40,
-              color: _kText.withOpacity(0.3),
+              color: AppColors.textDisabled,
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: AppSpacing.md),
             Text(
               '최신 변경사항이 없습니다',
               style: TextStyle(
                 fontSize: 14,
-                color: _kText.withOpacity(0.5),
+                color: AppColors.textSecondary,
               ),
             ),
-            const SizedBox(height: 4),
+            SizedBox(height: AppSpacing.xs),
             Text(
               '새로운 수가·급여 변경사항이 발표되면\n자동으로 업데이트됩니다',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 12,
-                color: _kText.withOpacity(0.4),
+                color: AppColors.textDisabled,
                 height: 1.4,
               ),
             ),
@@ -162,4 +169,3 @@ class HiraUpdateSection extends StatelessWidget {
     );
   }
 }
-

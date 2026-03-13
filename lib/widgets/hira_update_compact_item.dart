@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/hira_update.dart';
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_tokens.dart';
+import '../core/widgets/app_muted_card.dart';
+import '../core/widgets/app_badge.dart';
 import 'hira_update_detail_sheet.dart';
 
-// ── 디자인 팔레트 ──
-const _kText = Color(0xFF5D6B6B);
-const _kShadow2 = Color(0xFFD5E5E5);
-const _kCardBg = Colors.white;
-const _kActiveRed = Color(0xFFE57373); // 🔴 시행 중
-const _kSoonOrange = Color(0xFFFFB74D); // 🟠 30일 이내
-const _kUpcomingYellow = Color(0xFFFDD835); // 🟡 90일 이내
-const _kNoticeGray = Color(0xFFBDBDBD); // ⚪ 사전공지
-
 /// HIRA 업데이트 간단 리스트 아이템 (4번째 이후)
+///
+/// 디자인 원칙:
+///   - boxShadow 없음 / Border 없음
+///   - 배경: AppMutedCard (surfaceMuted)
+///   - 텍스트: AppColors.textPrimary / textDisabled
+///   - 배지: AppStatusBadge
 class HiraUpdateCompactItem extends StatelessWidget {
   final HiraUpdate update;
 
@@ -23,26 +24,24 @@ class HiraUpdateCompactItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => _showDetail(context),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: _kCardBg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: _kShadow2.withOpacity(0.3),
-            width: 0.5,
-          ),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: AppMutedCard(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg - 2,
+          vertical: AppSpacing.sm + 2,
         ),
+        onTap: () => _showDetail(context),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             // 배지
-            _buildImpactBadge(),
-            const SizedBox(width: 10),
-            
+            AppStatusBadge(
+              badgeLevel: update.getBadgeLevel(),
+              badgeText: update.getBadgeText(),
+            ),
+            const SizedBox(width: AppSpacing.sm + 2),
+
             // 제목
             Expanded(
               child: Text(
@@ -51,29 +50,29 @@ class HiraUpdateCompactItem extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   fontSize: 13,
-                  color: _kText,
+                  color: AppColors.textPrimary,
                   fontWeight: FontWeight.w500,
                 ),
               ),
             ),
-            const SizedBox(width: 10),
-            
+            const SizedBox(width: AppSpacing.sm + 2),
+
             // 날짜
             Text(
               _formatDate(update.publishedAt),
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 11,
-                color: _kText.withOpacity(0.5),
+                color: AppColors.textDisabled,
                 fontWeight: FontWeight.w500,
               ),
             ),
-            const SizedBox(width: 4),
-            
+            const SizedBox(width: AppSpacing.xs),
+
             // 화살표
-            Icon(
+            const Icon(
               Icons.chevron_right,
               size: 16,
-              color: _kText.withOpacity(0.3),
+              color: AppColors.textDisabled,
             ),
           ],
         ),
@@ -81,53 +80,8 @@ class HiraUpdateCompactItem extends StatelessWidget {
     );
   }
 
-  /// 배지
-  Widget _buildImpactBadge() {
-    final badgeLevel = update.getBadgeLevel();
-    final badgeText = update.getBadgeText();
-    
-    Color badgeColor;
-    switch (badgeLevel) {
-      case 'ACTIVE':
-        badgeColor = _kActiveRed; // 🔴 시행 중
-        break;
-      case 'SOON':
-        badgeColor = _kSoonOrange; // 🟠 30일 이내
-        break;
-      case 'UPCOMING':
-        badgeColor = _kUpcomingYellow; // 🟡 90일 이내
-        break;
-      default:
-        badgeColor = _kNoticeGray; // ⚪ 사전공지
-    }
+  String _formatDate(DateTime date) => DateFormat('MM.dd').format(date);
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-      decoration: BoxDecoration(
-        color: badgeColor.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(
-          color: badgeColor.withOpacity(0.3),
-          width: 0.5,
-        ),
-      ),
-      child: Text(
-        badgeText,
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
-          color: badgeColor,
-        ),
-      ),
-    );
-  }
-
-  /// 날짜 포맷 (MM.DD)
-  String _formatDate(DateTime date) {
-    return DateFormat('MM.dd').format(date);
-  }
-
-  /// 상세 BottomSheet 열기
   void _showDetail(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -137,4 +91,3 @@ class HiraUpdateCompactItem extends StatelessWidget {
     );
   }
 }
-
