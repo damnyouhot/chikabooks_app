@@ -537,12 +537,12 @@ class _CaringPageState extends State<CaringPage>
                   maxHeight: (MediaQuery.of(context).size.height * 0.38)
                       .clamp(240.0, 320.0),
                 ),
-                child: Container(
-                  color: _colorBg,
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
+              child: Container(
+                color: _colorBg,
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                     _buildTopBar(titleVisible: false),
                     // 카드 4개 — 순차 페이드인 (온보딩 완료 후)
                     FadeTransition(
@@ -596,7 +596,7 @@ class _CaringPageState extends State<CaringPage>
                     ),
                   ],
                 ),
-              ),
+                ),
               ),
             ),
 
@@ -893,9 +893,9 @@ class _TapCard extends StatelessWidget {
                   flex: 5,
                   fit: FlexFit.tight,
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                       Text(
                         bigText,
                         maxLines: 1,
@@ -905,9 +905,9 @@ class _TapCard extends StatelessWidget {
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
                           color: AppColors.textPrimary,
-                        ),
                       ),
-                      if (subtitle.isNotEmpty)
+                    ),
+                    if (subtitle.isNotEmpty)
                         Text(
                           subtitle,
                           maxLines: 1,
@@ -916,9 +916,9 @@ class _TapCard extends StatelessWidget {
                           style: const TextStyle(
                             fontSize: 10,
                             color: AppColors.textSecondary,
-                          ),
                         ),
-                    ],
+                      ),
+                  ],
                   ),
                 ),
                 const SizedBox(width: 4),
@@ -976,88 +976,88 @@ class _PolicyRollingCard extends StatelessWidget {
                 final rightMaxW = (constraints.maxWidth * 0.55).clamp(0.0, 200.0);
 
                 return Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
                     // 왼쪽 타이틀: 남은 공간 차지
                     Expanded(
-                      child: Text(
-                        '🏥 임박 제도 변경',
+                  child: Text(
+                    '🏥 임박 제도 변경',
                         style: const TextStyle(
-                          fontSize: 13,
+                      fontSize: 13,
                           fontWeight: FontWeight.w700,
                           color: AppColors.accent,  // Blue (대비↑)
-                        ),
-                      ),
                     ),
-                    const SizedBox(width: 8),
+                  ),
+                ),
+                const SizedBox(width: 8),
                     // 오른쪽 롤링 영역: 화면 비율 기반 최대 너비 제한
-                    ClipRect(
+                ClipRect(
                       child: ConstrainedBox(
                         constraints: BoxConstraints(maxWidth: rightMaxW),
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 350),
-                          layoutBuilder: (current, previous) => Stack(
-                                alignment: Alignment.centerRight,
-                                children: [...previous, if (current != null) current],
-                              ),
-                          transitionBuilder: (child, animation) {
-                            final isLeaving =
-                                animation.status == AnimationStatus.reverse ||
-                                animation.status == AnimationStatus.dismissed;
-                            final offsetTween = Tween<Offset>(
-                              begin: isLeaving
-                                      ? const Offset(0, -1.0)
-                                      : const Offset(0, 1.0),
-                              end: Offset.zero,
-                            );
-                            return SlideTransition(
-                              position: offsetTween.animate(
-                                CurvedAnimation(
-                                  parent: animation,
-                                  curve: Curves.easeInOut,
-                                ),
-                              ),
-                              child: FadeTransition(opacity: animation, child: child),
-                            );
-                          },
-                          child: SizedBox(
-                            key: ValueKey(big),
-                            width: rightMaxW,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  big,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  textAlign: TextAlign.end,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.textPrimary,
-                                  ),
-                                ),
-                                if (sub.isNotEmpty)
-                                  Text(
-                                    sub,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    textAlign: TextAlign.end,
-                                    style: const TextStyle(
-                                      fontSize: 10,
-                                      color: AppColors.textSecondary,  // 진한 회색
-                                    ),
-                                  ),
-                              ],
-                            ),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 350),
+                    layoutBuilder: (current, previous) => Stack(
+                          alignment: Alignment.centerRight,
+                          children: [...previous, if (current != null) current],
+                        ),
+                    transitionBuilder: (child, animation) {
+                      final isLeaving =
+                          animation.status == AnimationStatus.reverse ||
+                          animation.status == AnimationStatus.dismissed;
+                      final offsetTween = Tween<Offset>(
+                        begin: isLeaving
+                                ? const Offset(0, -1.0)
+                                : const Offset(0, 1.0),
+                        end: Offset.zero,
+                      );
+                      return SlideTransition(
+                        position: offsetTween.animate(
+                          CurvedAnimation(
+                            parent: animation,
+                            curve: Curves.easeInOut,
                           ),
                         ),
+                        child: FadeTransition(opacity: animation, child: child),
+                      );
+                    },
+                    child: SizedBox(
+                      key: ValueKey(big),
+                            width: rightMaxW,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            big,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.end,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                                    color: AppColors.textPrimary,
+                            ),
+                          ),
+                          if (sub.isNotEmpty)
+                            Text(
+                              sub,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.end,
+                              style: const TextStyle(
+                                fontSize: 10,
+                                      color: AppColors.textSecondary,  // 진한 회색
+                              ),
+                            ),
+                        ],
+                            ),
                       ),
                     ),
-                    const SizedBox(width: 4),
+                  ),
+                ),
+                const SizedBox(width: 4),
                     const Icon(Icons.chevron_right, color: AppColors.accent, size: 20),
-                  ],
+              ],
                 );
               },
             ),
@@ -1092,34 +1092,34 @@ class _ActionBtn extends StatelessWidget {
           final iconSize = (btnSize * 0.43).clamp(20.0, 28.0);
 
           return Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
                 width: btnSize,
                 height: btnSize,
-                decoration: BoxDecoration(
+            decoration: BoxDecoration(
                   color: _colorAccent,   // Blue 채움 (대비 강화)
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
                       color: _colorAccent.withOpacity(0.30),
                       blurRadius: 8,
                       offset: const Offset(0, 3),
-                    ),
-                  ],
                 ),
+              ],
+            ),
                 child: Icon(icon, color: Colors.white, size: iconSize),  // White 아이콘
-              ),
-              const SizedBox(height: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
                   color: _colorText,
                   fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
+            ),
+          ),
+        ],
           );
         },
       ),

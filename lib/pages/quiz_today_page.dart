@@ -2,13 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
-
-// ── 디자인 팔레트: AppColors 참조 ──
-// 색상 변경 → app_colors.dart Primitive만 수정하면 자동 반영
-const _kText    = AppColors.textPrimary;   // Black
-const _kCardBg  = AppColors.surfaceMuted;  // Muted surface 카드 배경
-// 퀴즈 정답/오답: 의미 컬러
-const _kCorrect = AppColors.quizCorrect;
+import '../core/theme/app_tokens.dart';
+import '../core/widgets/app_muted_card.dart';
 
 /// 오늘의 퀴즈
 ///
@@ -89,7 +84,10 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.xl,
+        vertical: AppSpacing.lg,
+      ),
       children: [
         // ── 퀴즈 성적 카드 ──
         _QuizStatsCard(
@@ -101,7 +99,7 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
           totalUsers: _totalUsers,
           isLoaded: _statsLoaded,
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: AppSpacing.lg),
 
         // 퀴즈 카드 1
         _QuizCard(
@@ -111,7 +109,7 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
           correctIndex: 1,
           onAnswered: _onQuizAnswered,
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: AppSpacing.lg),
 
         // 퀴즈 카드 2
         _QuizCard(
@@ -122,11 +120,14 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
           onAnswered: _onQuizAnswered,
         ),
 
-        const SizedBox(height: 32),
+        const SizedBox(height: AppSpacing.xxl + 8),
         Center(
           child: Text(
             '퀴즈 콘텐츠는 곧 업데이트됩니다.',
-            style: TextStyle(fontSize: 12, color: _kText.withOpacity(0.4)),
+            style: TextStyle(
+              fontSize: 12,
+              color: AppColors.textPrimary.withOpacity(0.4),
+            ),
           ),
         ),
       ],
@@ -135,6 +136,7 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
 }
 
 // ── 퀴즈 성적 카드 ──────────────────────────────────────────
+
 class _QuizStatsCard extends StatelessWidget {
   final int totalCorrect;
   final int totalWrong;
@@ -164,12 +166,8 @@ class _QuizStatsCard extends StatelessWidget {
         ? (myRank / totalUsers * 100).clamp(1.0, 100.0)
         : 100.0;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: _kCardBg,
-        borderRadius: BorderRadius.circular(16),
-      ),
+    return AppMutedCard(
+      radius: AppRadius.xl,
       child: !isLoaded
           ? const SizedBox(
               height: 80,
@@ -177,70 +175,60 @@ class _QuizStatsCard extends StatelessWidget {
             )
           : IntrinsicHeight(
               child: Row(
-              children: [
-                // 이번 주 성적
-                Expanded(
-                  child: _statColumn(
-                    '이번 주',
-                    weekCorrect,
-                    weekWrong,
-                    weekRate,
+                children: [
+                  // 이번 주 성적
+                  Expanded(
+                    child: _statColumn('이번 주', weekCorrect, weekWrong, weekRate),
                   ),
-                ),
-                VerticalDivider(
-                  width: 1,
-                  thickness: 1,
-                  color: AppColors.surfaceMuted.withOpacity(0.5),
-                ),
-                // 통산 성적
-                Expanded(
-                  child: _statColumn(
-                    '통산',
-                    totalCorrect,
-                    totalWrong,
-                    totalRate,
+                  VerticalDivider(
+                    width: 1,
+                    thickness: 1,
+                    color: AppColors.divider,
                   ),
-                ),
-                VerticalDivider(
-                  width: 1,
-                  thickness: 1,
-                  color: AppColors.surfaceMuted.withOpacity(0.5),
-                ),
-                // 순위
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        '순위',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: _kText.withOpacity(0.5),
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        '상위 ${topPercent.toStringAsFixed(0)}%',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: _kCorrect,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '$myRank / $totalUsers명',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: _kText.withOpacity(0.4),
-                        ),
-                      ),
-                    ],
+                  // 통산 성적
+                  Expanded(
+                    child: _statColumn('통산', totalCorrect, totalWrong, totalRate),
                   ),
-                ),
-              ],
-            ),
+                  VerticalDivider(
+                    width: 1,
+                    thickness: 1,
+                    color: AppColors.divider,
+                  ),
+                  // 순위
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          '순위',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textPrimary.withOpacity(0.5),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          '상위 ${topPercent.toStringAsFixed(0)}%',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.quizCorrect,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '$myRank / $totalUsers명',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: AppColors.textPrimary.withOpacity(0.4),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
     );
   }
@@ -252,17 +240,17 @@ class _QuizStatsCard extends StatelessWidget {
           label,
           style: TextStyle(
             fontSize: 11,
-            color: _kText.withOpacity(0.5),
+            color: AppColors.textPrimary.withOpacity(0.5),
             fontWeight: FontWeight.w500,
           ),
         ),
         const SizedBox(height: 6),
         Text(
           '${rate.toStringAsFixed(0)}%',
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w700,
-            color: _kText,
+            color: AppColors.textPrimary,
           ),
         ),
         const SizedBox(height: 2),
@@ -270,7 +258,7 @@ class _QuizStatsCard extends StatelessWidget {
           '✓$correct / ✗$wrong',
           style: TextStyle(
             fontSize: 10,
-            color: _kText.withOpacity(0.4),
+            color: AppColors.textPrimary.withOpacity(0.4),
           ),
         ),
       ],
@@ -313,12 +301,9 @@ class _QuizCardState extends State<_QuizCard> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: _kCardBg,
-        borderRadius: BorderRadius.circular(16),
-      ),
+    return AppMutedCard(
+      radius: AppRadius.xl,
+      padding: const EdgeInsets.all(AppSpacing.xl),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -326,97 +311,89 @@ class _QuizCardState extends State<_QuizCard> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Q번호 원형 배지: 화면 너비의 7%, 최소24·최대34 clamp
+              // Q번호 원형 배지 — Border 없음, 배경만 사용
               Builder(
                 builder: (ctx) {
-                  final badgeSize = (MediaQuery.of(ctx).size.width * 0.07)
-                      .clamp(24.0, 34.0);
+                  final badgeSize =
+                      (MediaQuery.of(ctx).size.width * 0.07).clamp(24.0, 34.0);
                   return Container(
                     width: badgeSize,
                     height: badgeSize,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.accent.withOpacity(0.3),
-                  border: Border.all(color: AppColors.accent, width: 0.5),
-                ),
-                child: Center(
-                  child: Text(
-                    'Q${widget.index}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: _kText,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.accent.withOpacity(0.15),
                     ),
-                  ),
-                ),
+                    child: Center(
+                      child: Text(
+                        'Q${widget.index}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.accent,
+                        ),
+                      ),
+                    ),
                   );
                 },
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Text(
                   widget.question,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
-                    color: _kText,
+                    color: AppColors.textPrimary,
                     height: 1.5,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.lg),
 
           // 선택지
           ...List.generate(widget.options.length, (i) {
             final isCorrect = i == widget.correctIndex;
             final isSelected = i == _selectedIndex;
 
-            Color bgColor = AppColors.surfaceMuted.withOpacity(0.3);
-            Color textColor = _kText;
-            Color borderColor = Colors.transparent;
+            // 정답/오답 상태에 따른 색상 — Border 없이 배경색으로만 구분
+            Color bgColor = AppColors.surfaceMuted;
+            Color textColor = AppColors.textPrimary;
 
             if (_answered) {
               if (isCorrect) {
                 bgColor = AppColors.quizCorrectBg;
                 textColor = AppColors.quizCorrect;
-                borderColor = AppColors.quizCorrectBorder;
               } else if (isSelected && !isCorrect) {
                 bgColor = AppColors.quizWrongBg;
                 textColor = AppColors.quizWrong;
-                borderColor = AppColors.quizWrongBorder;
               }
             }
 
             return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
               child: GestureDetector(
                 onTap: () => _onSelect(i),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
+                    horizontal: AppSpacing.lg,
+                    vertical: AppSpacing.md,
                   ),
                   decoration: BoxDecoration(
                     color: bgColor,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: borderColor,
-                      width: borderColor == Colors.transparent ? 0.5 : 1.0,
-                    ),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                   ),
                   child: Text(
                     widget.options[i],
                     style: TextStyle(
                       fontSize: 13,
                       color: textColor,
-                      fontWeight:
-                          (_answered && isCorrect)
-                              ? FontWeight.w600
-                              : FontWeight.w400,
+                      fontWeight: (_answered && isCorrect)
+                          ? FontWeight.w600
+                          : FontWeight.w400,
                     ),
                   ),
                 ),
@@ -427,17 +404,16 @@ class _QuizCardState extends State<_QuizCard> {
           // 정답 피드백
           if (_answered)
             Padding(
-              padding: const EdgeInsets.only(top: 4),
+              padding: const EdgeInsets.only(top: AppSpacing.xs),
               child: Text(
                 _selectedIndex == widget.correctIndex
                     ? '정답이에요! 👏'
                     : '정답: ${widget.options[widget.correctIndex]}',
                 style: TextStyle(
                   fontSize: 13,
-                  color:
-                      _selectedIndex == widget.correctIndex
-                          ? AppColors.quizCorrect
-                          : _kText.withOpacity(0.6),
+                  color: _selectedIndex == widget.correctIndex
+                      ? AppColors.quizCorrect
+                      : AppColors.textSecondary,
                   fontWeight: FontWeight.w500,
                 ),
               ),

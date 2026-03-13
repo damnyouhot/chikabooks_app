@@ -125,15 +125,15 @@ class _CareerSkillCardState extends State<CareerSkillCard> {
                   return Container(
                     width: iconBox,
                     height: iconBox,
-                    decoration: BoxDecoration(
+                decoration: BoxDecoration(
                       color: AppColors.onCardPrimary.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(
-                      widget.info.icon,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  widget.info.icon,
                       color: AppColors.onCardPrimary,
                       size: iconBox * 0.53,
-                    ),
+                ),
                   );
                 },
               ),
@@ -198,11 +198,11 @@ class _CareerSkillCardState extends State<CareerSkillCard> {
               Expanded(
                 child: ElevatedButton(
                   onPressed: () => SkillQuizSheet.show(
-                    context,
-                    skillId: widget.info.id,
-                    skillTitle: widget.info.title,
-                    currentLevel: widget.info.level,
-                  ),
+                        context,
+                        skillId: widget.info.id,
+                        skillTitle: widget.info.title,
+                        currentLevel: widget.info.level,
+                      ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.onCardPrimary.withOpacity(0.15),
                     foregroundColor: AppColors.onCardPrimary,
@@ -441,15 +441,15 @@ class _CareerSkillEditSheetState extends State<CareerSkillEditSheet> {
                               return Container(
                                 width: badgeSize,
                                 height: badgeSize,
-                                decoration: BoxDecoration(
+                            decoration: BoxDecoration(
                                   color: enabled ? kCText : kCMuted,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Icon(
-                                  enabled ? Icons.check : Icons.add,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              enabled ? Icons.check : Icons.add,
                                   size: badgeSize * 0.6,
-                                  color: Colors.white,
-                                ),
+                              color: Colors.white,
+                            ),
                               );
                             },
                           ),
@@ -947,20 +947,20 @@ class _SkillQuizSheetState extends State<SkillQuizSheet> {
                       return Container(
                         width: circleSize,
                         height: circleSize,
-                        decoration: BoxDecoration(
-                          color: kCAccent.withOpacity(0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Center(
-                          child: Text(
-                            'Lv.$rec',
+                    decoration: BoxDecoration(
+                      color: kCAccent.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(
+                        'Lv.$rec',
                             style: TextStyle(
                               fontSize: (circleSize * 0.27).clamp(18.0, 26.0),
-                              fontWeight: FontWeight.w900,
-                              color: kCText,
-                            ),
-                          ),
+                          fontWeight: FontWeight.w900,
+                          color: kCText,
                         ),
+                      ),
+                    ),
                       );
                     },
                   ),

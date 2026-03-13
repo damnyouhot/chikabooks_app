@@ -5,17 +5,14 @@ import '../models/hira_update.dart';
 import '../services/ebook_service.dart';
 import '../services/hira_update_service.dart';
 import '../widgets/hira_update_detail_sheet.dart';
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_tokens.dart';
+import '../core/widgets/app_muted_card.dart';
+import '../core/widgets/app_segmented_control.dart';
 import 'ebook/ebook_detail_page.dart';
 import 'quiz_today_page.dart';
 import 'hira_update_page.dart';
 import 'settings/settings_page.dart';
-import '../core/theme/app_colors.dart';
-
-// ── 디자인 팔레트: AppColors 참조 ──
-// 색상 변경 → app_colors.dart Primitive만 수정하면 자동 반영
-const _kText    = AppColors.textPrimary;   // Black
-const _kBg      = AppColors.appBg;         // Soft gray
-const _kCardBg  = AppColors.surfaceMuted;  // Muted surface 카드 배경
 
 /// 성장 탭 (3탭)
 ///
@@ -25,7 +22,6 @@ const _kCardBg  = AppColors.surfaceMuted;  // Muted surface 카드 배경
 /// 3. 치과책방 — e-Book 스토어
 /// 4. 내 서재 — 구매한 e-Book 목록
 class GrowthPage extends StatefulWidget {
-  /// 서브탭 점프용 notifier (HomeShell에서 주입, 값이 바뀌면 해당 탭으로 이동)
   final ValueNotifier<int>? subTabNotifier;
 
   const GrowthPage({super.key, this.subTabNotifier});
@@ -62,17 +58,16 @@ class _GrowthPageState extends State<GrowthPage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _kBg,
+      backgroundColor: AppColors.appBg,
       body: SafeArea(
         child: Column(
           children: [
-            // ── 상단 헤더 ──
             _buildHeader(),
-
-            // ── 탭 바 ──
-            _buildTabBar(),
-
-            // ── 탭 뷰 ──
+            // 세그먼트 탭바 → AppSegmentedControl
+            AppSegmentedControl(
+              controller: _tabCtrl,
+              labels: const ['오늘 퀴즈', '제도 변경', '치과책방', '내 서재'],
+            ),
             Expanded(
               child: TabBarView(
                 controller: _tabCtrl,
@@ -95,13 +90,16 @@ class _GrowthPageState extends State<GrowthPage>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+            vertical: AppSpacing.xs - 2,
+          ),
           child: Row(
             children: [
               IconButton(
                 icon: Icon(
                   Icons.info_outline,
-                  color: _kText.withOpacity(0.5),
+                  color: AppColors.textPrimary.withOpacity(0.5),
                   size: 18,
                 ),
                 onPressed: () => _showConceptDialog(context),
@@ -110,38 +108,39 @@ class _GrowthPageState extends State<GrowthPage>
               IconButton(
                 icon: Icon(
                   Icons.settings_outlined,
-                  color: _kText.withOpacity(0.4),
+                  color: AppColors.textPrimary.withOpacity(0.4),
                   size: 20,
                 ),
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const SettingsPage()),
-                  );
-                },
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const SettingsPage()),
+                ),
               ),
             ],
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.only(left: 20),
+        const Padding(
+          padding: EdgeInsets.only(left: AppSpacing.xl),
           child: Text(
             '성장하기',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w700,
-              color: _kText,
+              color: AppColors.textPrimary,
             ),
           ),
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: AppSpacing.xs - 2),
         Padding(
-          padding: const EdgeInsets.only(left: 20),
+          padding: const EdgeInsets.only(left: AppSpacing.xl),
           child: Text(
             '오늘도 하나씩, 꾸준히 성장해요.',
-            style: TextStyle(fontSize: 12, color: _kText.withOpacity(0.55)),
+            style: TextStyle(
+              fontSize: 12,
+              color: AppColors.textPrimary.withOpacity(0.55),
+            ),
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.sm),
       ],
     );
   }
@@ -149,53 +148,19 @@ class _GrowthPageState extends State<GrowthPage>
   void _showConceptDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder:
-          (ctx) => AlertDialog(
-            title: const Text(
-              '성장하기 탭에 대해서',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-            content: const SingleChildScrollView(
-              child: Text('', style: TextStyle(fontSize: 13, height: 1.6)),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('닫기'),
-              ),
-            ],
+      builder: (ctx) => AlertDialog(
+        title: const Text(
+          '성장하기 탭에 대해서',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        ),
+        content: const SingleChildScrollView(
+          child: Text('', style: TextStyle(fontSize: 13, height: 1.6)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('닫기'),
           ),
-    );
-  }
-
-  Widget _buildTabBar() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceMuted,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: TabBar(
-        controller: _tabCtrl,
-        indicator: BoxDecoration(
-          color: AppColors.accent,  // Blue 인디케이터
-          borderRadius: BorderRadius.circular(10),
-        ),
-        indicatorSize: TabBarIndicatorSize.tab,
-        indicatorPadding: const EdgeInsets.all(3),
-        dividerColor: Colors.transparent,
-        labelColor: AppColors.onAccent,    // Blue 위 → White
-        unselectedLabelColor: AppColors.textSecondary,
-        labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-        unselectedLabelStyle: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w400,
-        ),
-        tabs: const [
-          Tab(text: '오늘 퀴즈'),
-          Tab(text: '제도 변경'),
-          Tab(text: '치과책방'),
-          Tab(text: '내 서재'),
         ],
       ),
     );
@@ -233,35 +198,13 @@ class _MyLibraryViewState extends State<_MyLibraryView>
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // 서브 탭바
-        Container(
-          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            color: AppColors.surfaceMuted.withOpacity(0.3),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: TabBar(
-            controller: _tabCtrl,
-            indicator: BoxDecoration(
-              color: _kCardBg,
-              borderRadius: BorderRadius.circular(10),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.surfaceMuted.withOpacity(0.1),
-                  blurRadius: 4,
-                  offset: const Offset(0, 1),
-                ),
-              ],
-            ),
-            indicatorSize: TabBarIndicatorSize.tab,
-            labelColor: _kText,
-            unselectedLabelColor: _kText.withOpacity(0.5),
-            labelStyle: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
-            tabs: const [Tab(text: '전자책'), Tab(text: '저장한 변경사항')],
+        // 서브 탭바 → AppSegmentedControl
+        AppSegmentedControl(
+          controller: _tabCtrl,
+          labels: const ['전자책', '저장한 변경사항'],
+          margin: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.xl,
+            vertical: AppSpacing.md,
           ),
         ),
         Expanded(
@@ -295,20 +238,24 @@ class _MyBooksTab extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.menu_book_outlined, size: 48, color: AppColors.textSecondary),
-                const SizedBox(height: 12),
+                const Icon(
+                  Icons.menu_book_outlined,
+                  size: 48,
+                  color: AppColors.textSecondary,
+                ),
+                const SizedBox(height: AppSpacing.md),
                 Text(
                   '구매한 도서가 없습니다.',
                   style: TextStyle(
-                    color: _kText.withOpacity(0.6),
+                    color: AppColors.textPrimary.withOpacity(0.6),
                     fontSize: 14,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: AppSpacing.xs),
                 Text(
                   '치과책방에서 도서를 만나보세요.',
                   style: TextStyle(
-                    color: _kText.withOpacity(0.4),
+                    color: AppColors.textPrimary.withOpacity(0.4),
                     fontSize: 12,
                   ),
                 ),
@@ -317,24 +264,22 @@ class _MyBooksTab extends StatelessWidget {
           );
         }
 
-        // 구매한 ebook 목록을 전체 ebook 스트림에서 필터
         return StreamBuilder<List<Ebook>>(
           stream: service.watchEbooks(),
           builder: (context, allSnap) {
             if (!allSnap.hasData) {
               return const Center(child: CircularProgressIndicator());
             }
-            final myBooks =
-                allSnap.data!
-                    .where((b) => purchasedIds.contains(b.id))
-                    .toList();
+            final myBooks = allSnap.data!
+                .where((b) => purchasedIds.contains(b.id))
+                .toList();
 
             if (myBooks.isEmpty) {
               return Center(
                 child: Text(
                   '도서 정보를 불러오는 중...',
                   style: TextStyle(
-                    color: _kText.withOpacity(0.6),
+                    color: AppColors.textPrimary.withOpacity(0.6),
                     fontSize: 14,
                   ),
                 ),
@@ -342,13 +287,10 @@ class _MyBooksTab extends StatelessWidget {
             }
 
             return ListView.separated(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(AppSpacing.xl),
               itemCount: myBooks.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (context, i) {
-                final book = myBooks[i];
-                return _MyBookTile(book: book);
-              },
+              separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.md),
+              itemBuilder: (context, i) => _MyBookTile(book: myBooks[i]),
             );
           },
         );
@@ -375,21 +317,25 @@ class _SavedHiraTab extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.bookmark_border, size: 48, color: AppColors.textSecondary),
-                const SizedBox(height: 12),
+                const Icon(
+                  Icons.bookmark_border,
+                  size: 48,
+                  color: AppColors.textSecondary,
+                ),
+                const SizedBox(height: AppSpacing.md),
                 Text(
                   '저장한 변경사항이 없습니다',
                   style: TextStyle(
                     fontSize: 14,
-                    color: _kText.withOpacity(0.6),
+                    color: AppColors.textPrimary.withOpacity(0.6),
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: AppSpacing.xs),
                 Text(
                   '제도 변경 탭에서 항목을 저장하세요.',
                   style: TextStyle(
                     fontSize: 12,
-                    color: _kText.withOpacity(0.4),
+                    color: AppColors.textPrimary.withOpacity(0.4),
                   ),
                 ),
               ],
@@ -398,18 +344,17 @@ class _SavedHiraTab extends StatelessWidget {
         }
 
         return ListView.separated(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(AppSpacing.xl),
           itemCount: savedUpdates.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 12),
-          itemBuilder: (context, i) {
-            final update = savedUpdates[i];
-            return _SavedHiraTile(update: update);
-          },
+          separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.md),
+          itemBuilder: (context, i) => _SavedHiraTile(update: savedUpdates[i]),
         );
       },
     );
   }
 }
+
+// ── 저장한 HIRA 타일 ──────────────────────────────────────────
 
 class _SavedHiraTile extends StatelessWidget {
   final HiraUpdate update;
@@ -417,58 +362,62 @@ class _SavedHiraTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        showModalBottomSheet(
-          context: context,
-          isScrollControlled: true,
-          backgroundColor: Colors.transparent,
-          builder: (context) => HiraUpdateDetailSheet(update: update),
-        );
-      },
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: _kCardBg,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.info_outline, size: 20, color: AppColors.accent),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    update.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: _kText,
-                      height: 1.3,
-                    ),
+    return AppMutedCard(
+      padding: const EdgeInsets.all(AppSpacing.lg - 2),
+      onTap: () => showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => HiraUpdateDetailSheet(update: update),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.info_outline,
+            size: 20,
+            color: AppColors.accent,
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  update.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                    height: 1.3,
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${update.publishedAt.year}.${update.publishedAt.month.toString().padLeft(2, '0')}.${update.publishedAt.day.toString().padLeft(2, '0')}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: _kText.withOpacity(0.5),
-                    ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  '${update.publishedAt.year}.'
+                  '${update.publishedAt.month.toString().padLeft(2, '0')}.'
+                  '${update.publishedAt.day.toString().padLeft(2, '0')}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textDisabled,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-            const Icon(Icons.chevron_right, color: AppColors.accent, size: 20),
-          ],
-        ),
+          ),
+          const Icon(
+            Icons.chevron_right,
+            color: AppColors.textDisabled,
+            size: 20,
+          ),
+        ],
       ),
     );
   }
 }
+
+// ── 내 e-Book 타일 ───────────────────────────────────────────
 
 class _MyBookTile extends StatelessWidget {
   final Ebook book;
@@ -476,80 +425,79 @@ class _MyBookTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap:
-          () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => EbookDetailPage(ebook: book)),
-          ),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: _kCardBg,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Row(
-          children: [
-            // 커버 이미지: 화면 너비의 13% 기준, 최소44·최대68 clamp, 비율 3:4 유지
-            LayoutBuilder(
-              builder: (ctx, constraints) {
-                final screenW = MediaQuery.of(ctx).size.width;
-                final coverW = (screenW * 0.13).clamp(44.0, 68.0);
-                final coverH = coverW * (4 / 3); // 3:4 비율
-                return ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.network(
-                book.coverUrl,
+    return AppMutedCard(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => EbookDetailPage(ebook: book)),
+      ),
+      child: Row(
+        children: [
+          // 커버: 화면 너비 13%, 최소44·최대68, 비율 3:4
+          LayoutBuilder(
+            builder: (ctx, constraints) {
+              final screenW = MediaQuery.of(ctx).size.width;
+              final coverW = (screenW * 0.13).clamp(44.0, 68.0);
+              final coverH = coverW * (4 / 3);
+              return ClipRRect(
+                borderRadius: BorderRadius.circular(AppSpacing.sm),
+                child: Image.network(
+                  book.coverUrl,
+                  width: coverW,
+                  height: coverH,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
                     width: coverW,
                     height: coverH,
-                fit: BoxFit.cover,
-                errorBuilder:
-                    (_, __, ___) => Container(
-                          width: coverW,
-                          height: coverH,
-                      color: AppColors.surfaceMuted,
-                      child: Icon(Icons.book, color: _kText.withOpacity(0.3)),
-                    ),
-              ),
-                );
-              },
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    book.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: _kText,
+                    color: AppColors.disabledBg,
+                    child: const Icon(
+                      Icons.book,
+                      color: AppColors.textDisabled,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    book.author,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: _kText.withOpacity(0.5),
-                    ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(width: AppSpacing.lg - 2),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  book.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  book.author,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
             ),
-            Icon(Icons.chevron_right, color: _kText.withOpacity(0.3), size: 20),
-          ],
-        ),
+          ),
+          const Icon(
+            Icons.chevron_right,
+            color: AppColors.textDisabled,
+            size: 20,
+          ),
+        ],
       ),
     );
   }
 }
 
 // ═══════════════════════════════════════════════════
-// 치과책방 (e-Book 스토어 — 기존 StoreTab 내용)
+// 치과책방 (e-Book 스토어)
 // ═══════════════════════════════════════════════════
 
 class _BookStoreBrowseView extends StatelessWidget {
@@ -570,13 +518,16 @@ class _BookStoreBrowseView extends StatelessWidget {
           return Center(
             child: Text(
               '등록된 전자책이 없습니다.',
-              style: TextStyle(color: _kText.withOpacity(0.6), fontSize: 14),
+              style: TextStyle(
+                color: AppColors.textPrimary.withOpacity(0.6),
+                fontSize: 14,
+              ),
             ),
           );
         }
 
         return GridView.builder(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(AppSpacing.lg),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
             mainAxisSpacing: 20,
@@ -584,59 +535,57 @@ class _BookStoreBrowseView extends StatelessWidget {
             childAspectRatio: 0.66,
           ),
           itemCount: books.length,
-          itemBuilder: (context, i) {
-            final b = books[i];
-            return GestureDetector(
-              onTap:
-                  () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => EbookDetailPage(ebook: b),
-                    ),
-                  ),
-              child: Column(
-                children: [
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Image.network(
-                          b.coverUrl,
-                          fit: BoxFit.cover,
-                          width: double.infinity,
-                          errorBuilder:
-                              (_, __, ___) => Container(
-                                color: AppColors.surfaceMuted,
-                                child: Icon(
-                                  Icons.image,
-                                  color: _kText.withOpacity(0.3),
-                                ),
-                              ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    b.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: _kText,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            );
-          },
+          itemBuilder: (context, i) => _BookGridTile(book: books[i]),
         );
       },
+    );
+  }
+}
+
+class _BookGridTile extends StatelessWidget {
+  final Ebook book;
+  const _BookGridTile({required this.book});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => EbookDetailPage(ebook: book)),
+      ),
+      child: Column(
+        children: [
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(AppSpacing.md),
+              child: Image.network(
+                book.coverUrl,
+                fit: BoxFit.cover,
+                width: double.infinity,
+                errorBuilder: (_, __, ___) => Container(
+                  color: AppColors.disabledBg,
+                  child: const Icon(
+                    Icons.image,
+                    color: AppColors.textDisabled,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            book.title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: AppColors.textPrimary,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
     );
   }
 }

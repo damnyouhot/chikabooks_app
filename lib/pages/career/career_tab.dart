@@ -539,16 +539,16 @@ class _ResumeShortcutCard extends StatelessWidget {
                 return Container(
                   width: iconBox,
                   height: iconBox,
-                  decoration: BoxDecoration(
+              decoration: BoxDecoration(
                     color: AppColors.onCardPrimary.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(12),
                     // border 없음
-                  ),
+              ),
                   child: Icon(
-                    Icons.description_outlined,
+                Icons.description_outlined,
                     color: AppColors.onCardPrimary, // White
                     size: iconBox * 0.55,
-                  ),
+              ),
                 );
               },
             ),
@@ -614,15 +614,15 @@ class _ApplicationsShortcutCard extends StatelessWidget {
                 return Container(
                   width: iconBox,
                   height: iconBox,
-                  decoration: BoxDecoration(
+              decoration: BoxDecoration(
                     color: AppColors.onCardPrimary.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                borderRadius: BorderRadius.circular(12),
+              ),
                   child: Icon(
-                    Icons.work_outline,
+                Icons.work_outline,
                     color: AppColors.onCardPrimary,
                     size: iconBox * 0.55,
-                  ),
+              ),
                 );
               },
             ),

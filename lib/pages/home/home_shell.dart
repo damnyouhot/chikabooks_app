@@ -169,13 +169,13 @@ class _HomeShellState extends State<HomeShell> {
             ListenableBuilder(
               listenable: _onboardingCtrl,
               builder: (_, __) => AppOnboardingOverlay(
-                key: const ValueKey('onboarding_overlay'),
-                controller: _onboardingCtrl,
-                onTabChangeRequest: (idx) {
+                    key: const ValueKey('onboarding_overlay'),
+                    controller: _onboardingCtrl,
+                    onTabChangeRequest: (idx) {
                   _setTab(idx);
-                },
-                onComplete: _onOnboardingComplete,
-              ),
+                    },
+                    onComplete: _onOnboardingComplete,
+                  ),
             ),
         ],
       ),

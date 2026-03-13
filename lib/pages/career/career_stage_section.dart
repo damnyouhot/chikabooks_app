@@ -305,7 +305,7 @@ class _ChecklistItem extends StatelessWidget {
                   size: checkSize * 0.65,
                   color: AppColors.onCardEmphasis, // Black 체크 on Neon
                 )
-              : null,
+                  : null,
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -321,8 +321,8 @@ class _ChecklistItem extends StatelessWidget {
                       ? AppColors.onCardPrimary.withOpacity(0.45)
                       : AppColors.onCardPrimary.withOpacity(0.9),
                   decoration: data.done
-                      ? TextDecoration.lineThrough
-                      : TextDecoration.none,
+                          ? TextDecoration.lineThrough
+                          : TextDecoration.none,
                 ),
               ),
               if (!data.done)
@@ -415,20 +415,20 @@ void showCareerStageGuideSheet(BuildContext context) {
                               return Container(
                                 width: badgeSize,
                                 height: badgeSize,
-                                decoration: BoxDecoration(
-                                  color: kCAccent.withOpacity(0.3),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    '${i + 1}',
+                            decoration: BoxDecoration(
+                              color: kCAccent.withOpacity(0.3),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Center(
+                              child: Text(
+                                '${i + 1}',
                                     style: TextStyle(
                                       fontSize: (badgeSize * 0.46).clamp(10.0, 14.0),
-                                      fontWeight: FontWeight.w900,
-                                      color: kCText,
-                                    ),
-                                  ),
+                                  fontWeight: FontWeight.w900,
+                                  color: kCText,
                                 ),
+                              ),
+                            ),
                               );
                             },
                           ),

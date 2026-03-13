@@ -90,6 +90,10 @@ class AppColors {
   /// Accent 위 텍스트/아이콘: White
   static const onAccent = white;
 
+  // ── 구분선 ───────────────────────────────────────────────────
+  /// 카드 내부 VerticalDivider / Divider 색상
+  static const divider = Color(0xFFDDDEE2);
+
   // ── 의미 컬러 (퀴즈, 상태) — 고정값 ──────────────────────────
   static const quizCorrect       = Color(0xFF00E676);
   static const quizCorrectBg     = Color(0xFFE8FFF0);
