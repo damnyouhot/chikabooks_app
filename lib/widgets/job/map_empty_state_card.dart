@@ -1,17 +1,15 @@
 import 'package:flutter/material.dart';
-
-// ── 디자인 팔레트 ──
-const _kAccent = Color(0xFFF7CBCA);
-const _kText = Color(0xFF5D6B6B);
-const _kShadow2 = Color(0xFFD5E5E5);
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
+import '../../core/widgets/app_muted_card.dart';
 
 /// 지도에 마커가 없을 때 표시되는 안내 카드
 ///
-/// 중앙에 배치되며 행동 유도 버튼 제공
+/// 원칙: Shadow 없음 / Border 없음 → AppMutedCard
 class MapEmptyStateCard extends StatelessWidget {
-  final VoidCallback onExpandRadius; // 반경 확장
-  final VoidCallback onEnableNotification; // 알림 켜기
-  final VoidCallback onCreateJob; // 공고 등록
+  final VoidCallback onExpandRadius;
+  final VoidCallback onEnableNotification;
+  final VoidCallback onCreateJob;
 
   const MapEmptyStateCard({
     super.key,
@@ -23,139 +21,142 @@ class MapEmptyStateCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 32),
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: _kShadow2, width: 0.5),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 20,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // 아이콘
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: _kShadow2.withOpacity(0.3),
-                shape: BoxShape.circle,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: AppMutedCard(
+          radius: AppRadius.xl + 4,
+          padding: const EdgeInsets.all(AppSpacing.xxl),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 아이콘 원형 배지
+              Container(
+                width: 56,
+                height: 56,
+                decoration: const BoxDecoration(
+                  color: AppColors.disabledBg,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.location_off_outlined,
+                  size: 28,
+                  color: AppColors.textPrimary.withOpacity(0.5),
+                ),
               ),
-              child: Icon(
-                Icons.location_off_outlined,
-                size: 28,
-                color: _kText.withOpacity(0.5),
-              ),
-            ),
-            const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.lg),
 
-            // 제목
-            const Text(
-              '근처에 공고가 아직 없어요',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: _kText,
+              // 제목
+              const Text(
+                '근처에 공고가 아직 없어요',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+                textAlign: TextAlign.center,
               ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.sm),
 
-            // 서브 텍스트
-            Text(
-              '반경을 넓히거나 알림을 켜두면\n바로 알려드릴게요',
-              style: TextStyle(
-                fontSize: 13,
-                color: _kText.withOpacity(0.6),
-                height: 1.5,
+              // 서브 텍스트
+              Text(
+                '반경을 넓히거나 알림을 켜두면\n바로 알려드릴게요',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textPrimary.withOpacity(0.6),
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
               ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 20),
+              const SizedBox(height: AppSpacing.xl),
 
-            // 버튼들
-            Column(
-              children: [
-                // 1. 반경 확장 버튼 (Primary)
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: onExpandRadius,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _kAccent,
-                      foregroundColor: _kText,
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+              // 버튼들
+              Column(
+                children: [
+                  // 1. 반경 확장 — 주요 액션 → accent (Blue)
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: onExpandRadius,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.accent,
+                        foregroundColor: AppColors.onAccent,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(
+                          vertical: AppSpacing.md,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius:
+                              BorderRadius.circular(AppRadius.md),
+                        ),
                       ),
-                    ),
-                    icon: const Icon(Icons.zoom_out_map, size: 18),
-                    label: const Text(
-                      '반경 10km로 보기',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                      icon: const Icon(Icons.zoom_out_map, size: 18),
+                      label: const Text(
+                        '반경 10km로 보기',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.sm),
 
-                // 2. 알림 켜기 버튼
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: onEnableNotification,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: _kText,
-                      side: BorderSide(color: _kShadow2, width: 1),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                  // 2. 알림 켜기 — 보조 액션 → surfaceMuted (Border 없음)
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: onEnableNotification,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.surfaceMuted,
+                        foregroundColor: AppColors.textSecondary,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(
+                          vertical: AppSpacing.md,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius:
+                              BorderRadius.circular(AppRadius.md),
+                        ),
+                      ),
+                      icon: const Icon(
+                        Icons.notifications_outlined,
+                        size: 18,
+                      ),
+                      label: const Text(
+                        '주변 구인 알림 켜기',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
-                    icon: const Icon(Icons.notifications_outlined, size: 18),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+
+                  // 3. 공고 등록 — 텍스트 버튼
+                  TextButton.icon(
+                    onPressed: onCreateJob,
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.textPrimary.withOpacity(0.7),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: AppSpacing.sm,
+                      ),
+                    ),
+                    icon: const Icon(Icons.add_circle_outline, size: 16),
                     label: const Text(
-                      '주변 구인 알림 켜기',
+                      '공고 등록하기',
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: 13,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 8),
-
-                // 3. 공고 등록 버튼
-                TextButton.icon(
-                  onPressed: onCreateJob,
-                  style: TextButton.styleFrom(
-                    foregroundColor: _kText.withOpacity(0.7),
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                  ),
-                  icon: const Icon(Icons.add_circle_outline, size: 16),
-                  label: const Text(
-                    '공고 등록하기',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-                  ),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
-
-
-

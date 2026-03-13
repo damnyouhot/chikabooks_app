@@ -1,18 +1,16 @@
 import 'package:flutter/material.dart';
-
-// ── 디자인 팔레트 ──
-const _kAccent = Color(0xFFF7CBCA);
-const _kText = Color(0xFF5D6B6B);
-const _kShadow2 = Color(0xFFD5E5E5);
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
 
 /// 도전하기 탭 빠른 액션 행
 ///
-/// [지도/목록] 전환 + 공고 등록 + 내 지원/스크랩
+/// [지도/목록] 세그먼트 전환 + 공고 등록 + 내 지원/스크랩
+/// 원칙: Shadow 없음 / Border 없음
 class QuickActionRow extends StatelessWidget {
-  final bool isMapView; // true: 지도, false: 목록
-  final VoidCallback onViewToggle; // 뷰 전환 콜백
-  final VoidCallback onCreateJob; // 공고 등록 콜백
-  final VoidCallback onMyApplications; // 내 지원/스크랩 콜백
+  final bool isMapView;
+  final VoidCallback onViewToggle;
+  final VoidCallback onCreateJob;
+  final VoidCallback onMyApplications;
 
   const QuickActionRow({
     super.key,
@@ -25,21 +23,24 @@ class QuickActionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      margin: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.md,
+      ),
       child: Row(
         children: [
-          // SegmentedButton: 지도/목록 전환
+          // 지도/목록 세그먼트 → surfaceMuted 컨테이너, 선택 시 white fill
           Expanded(
             child: Container(
               decoration: BoxDecoration(
-                color: _kShadow2.withOpacity(0.3),
-                borderRadius: BorderRadius.circular(12),
+                color: AppColors.surfaceMuted,
+                borderRadius: BorderRadius.circular(AppRadius.md),
               ),
-              padding: const EdgeInsets.all(4),
+              padding: const EdgeInsets.all(AppSpacing.xs),
               child: Row(
                 children: [
                   Expanded(
-                    child: _buildSegmentButton(
+                    child: _SegmentButton(
                       label: '지도',
                       icon: Icons.map_outlined,
                       isSelected: isMapView,
@@ -49,7 +50,7 @@ class QuickActionRow extends StatelessWidget {
                     ),
                   ),
                   Expanded(
-                    child: _buildSegmentButton(
+                    child: _SegmentButton(
                       label: '목록',
                       icon: Icons.list_alt,
                       isSelected: !isMapView,
@@ -62,19 +63,19 @@ class QuickActionRow extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.md),
 
-          // 공고 등록 버튼
-          _buildActionButton(
+          // 공고 등록 — 주요 액션 → accent
+          _ActionButton(
             icon: Icons.add_circle_outline,
             label: '공고등록',
             onPressed: onCreateJob,
             isPrimary: true,
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: AppSpacing.sm),
 
-          // 내 지원/스크랩 버튼
-          _buildActionButton(
+          // 내 활동 — 보조 액션 → surfaceMuted
+          _ActionButton(
             icon: Icons.folder_outlined,
             label: '내활동',
             onPressed: onMyApplications,
@@ -84,31 +85,34 @@ class QuickActionRow extends StatelessWidget {
       ),
     );
   }
+}
 
-  Widget _buildSegmentButton({
-    required String label,
-    required IconData icon,
-    required bool isSelected,
-    required VoidCallback onPressed,
-  }) {
+// ── 세그먼트 버튼 ────────────────────────────────────────────
+
+class _SegmentButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool isSelected;
+  final VoidCallback onPressed;
+
+  const _SegmentButton({
+    required this.label,
+    required this.icon,
+    required this.isSelected,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onPressed,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.white : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-          boxShadow:
-              isSelected
-                  ? [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 4,
-                      offset: const Offset(0, 1),
-                    ),
-                  ]
-                  : null,
+          // 선택 시 White fill (Shadow 없음)
+          color: isSelected ? AppColors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(AppRadius.sm),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -116,15 +120,20 @@ class QuickActionRow extends StatelessWidget {
             Icon(
               icon,
               size: 16,
-              color: isSelected ? _kText : _kText.withOpacity(0.5),
+              color: isSelected
+                  ? AppColors.textPrimary
+                  : AppColors.textPrimary.withOpacity(0.5),
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: AppSpacing.xs),
             Text(
               label,
               style: TextStyle(
                 fontSize: 13,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                color: isSelected ? _kText : _kText.withOpacity(0.5),
+                fontWeight:
+                    isSelected ? FontWeight.w600 : FontWeight.w400,
+                color: isSelected
+                    ? AppColors.textPrimary
+                    : AppColors.textPrimary.withOpacity(0.5),
               ),
             ),
           ],
@@ -132,42 +141,56 @@ class QuickActionRow extends StatelessWidget {
       ),
     );
   }
+}
 
-  Widget _buildActionButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback onPressed,
-    required bool isPrimary,
-  }) {
+// ── 액션 버튼 ────────────────────────────────────────────────
+
+class _ActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+  final bool isPrimary;
+
+  const _ActionButton({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+    required this.isPrimary,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return ElevatedButton(
       onPressed: onPressed,
       style: ElevatedButton.styleFrom(
-        backgroundColor: isPrimary ? _kAccent : Colors.white,
-        foregroundColor: _kText,
+        // 주요 → accent(Blue) / 보조 → surfaceMuted (Border 없음)
+        backgroundColor:
+            isPrimary ? AppColors.accent : AppColors.surfaceMuted,
+        foregroundColor:
+            isPrimary ? AppColors.onAccent : AppColors.textSecondary,
         elevation: 0,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: 10,
+        ),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side:
-              isPrimary
-                  ? BorderSide.none
-                  : BorderSide(color: _kShadow2, width: 0.5),
+          borderRadius: BorderRadius.circular(AppRadius.md),
         ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 16),
-          const SizedBox(width: 4),
+          const SizedBox(width: AppSpacing.xs),
           Text(
             label,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ),
     );
   }
 }
-
-
-
