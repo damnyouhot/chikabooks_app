@@ -54,16 +54,10 @@ class OnboardingService {
       final isPending = prefs.getBool(_pendingKey) ?? false;
       if (!isPending) return false;
 
-      // 이미 온보딩 완료한 계정은 재로그인해도 온보딩 생략
-      // (doughong@naver.com 테스트 계정만 매번 재실행, 일반 계정은 최초 1회만)
-      final doc = await _db.collection('users').doc(user.uid).get();
-      final isCompleted = doc.data()?['appOnboardingCompleted'] as bool? ?? false;
-      if (isCompleted) {
-        await prefs.remove(_pendingKey);
-        debugPrint('✅ OnboardingService: 온보딩 완료된 계정 → 온보딩 생략');
-        return false;
-      }
-
+      // ✅ pendingOnboarding=true이면 appOnboardingCompleted 체크 없이 바로 실행
+      // 이유: 계정 삭제 후 재가입 시 Firestore에 이전 문서(appOnboardingCompleted=true)가
+      //       남아있어도 온보딩이 실행되어야 함. pendingOnboarding 플래그 자체가
+      //       "이번 로그인에서 최초 HomeShell 진입" 여부를 이미 보장함.
       debugPrint('✅ OnboardingService: pendingOnboarding=true → 온보딩 실행');
       return true;
     } catch (e) {

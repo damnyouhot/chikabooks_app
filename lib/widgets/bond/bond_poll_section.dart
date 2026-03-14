@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
-import '../../core/widgets/app_primary_card.dart';
+import '../../core/widgets/app_muted_card.dart';
 import '../../core/widgets/app_badge.dart';
 
 /// 공감 투표 섹션
@@ -61,8 +61,8 @@ class _BondPollSectionState extends State<BondPollSection> {
           ),
           const SizedBox(height: 12),
 
-          // 투표 카드 — AppPrimaryCard (Dark 배경)
-          AppPrimaryCard(
+          // 투표 카드 — AppMutedCard (정보 카드)
+          AppMutedCard(
             padding: EdgeInsets.zero,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -86,7 +86,7 @@ class _BondPollSectionState extends State<BondPollSection> {
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
-                            color: AppColors.onCardPrimary,
+                            color: AppColors.textPrimary,
                             height: 1.4,
                           ),
                         ),
@@ -121,7 +121,7 @@ class _BondPollSectionState extends State<BondPollSection> {
                             decoration: BoxDecoration(
                               color: isSelected
                                   ? AppColors.cardEmphasis
-                                  : AppColors.onCardPrimary.withOpacity(0.08),
+                                  : AppColors.disabledBg.withOpacity(0.6),
                               borderRadius: BorderRadius.circular(AppRadius.md),
                             ),
                             child: Row(
@@ -137,7 +137,7 @@ class _BondPollSectionState extends State<BondPollSection> {
                                     border: Border.all(
                                       color: isSelected
                                           ? AppColors.onCardEmphasis.withOpacity(0.6)
-                                          : AppColors.onCardPrimary.withOpacity(0.3),
+                                          : AppColors.textDisabled.withOpacity(0.5),
                                       width: isSelected ? 1.5 : 0.8,
                                     ),
                                   ),
@@ -165,7 +165,7 @@ class _BondPollSectionState extends State<BondPollSection> {
                                           : FontWeight.w400,
                                       color: isSelected
                                           ? AppColors.onCardEmphasis
-                                          : AppColors.onCardPrimary,
+                                          : AppColors.textPrimary,
                                     ),
                                   ),
                                 ),
@@ -178,7 +178,7 @@ class _BondPollSectionState extends State<BondPollSection> {
                                       fontWeight: FontWeight.w600,
                                       color: isSelected
                                           ? AppColors.onCardEmphasis.withOpacity(0.7)
-                                          : AppColors.onCardPrimary.withOpacity(0.45),
+                                          : AppColors.textSecondary,
                                     ),
                                   ),
                                 ],
@@ -199,7 +199,7 @@ class _BondPollSectionState extends State<BondPollSection> {
                         '파트너 그룹 내 익명 결과',
                         style: TextStyle(
                           fontSize: 11,
-                          color: AppColors.onCardPrimary.withOpacity(0.35),
+                          color: AppColors.textDisabled,
                         ),
                       ),
                     ),
@@ -212,7 +212,7 @@ class _BondPollSectionState extends State<BondPollSection> {
                       '지난 질문 보기',
                       style: TextStyle(
                         fontSize: 11,
-                        color: AppColors.onCardPrimary.withOpacity(0.3),
+                        color: AppColors.textDisabled,
                       ),
                     ),
                   ),

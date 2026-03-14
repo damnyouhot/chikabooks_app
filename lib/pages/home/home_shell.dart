@@ -9,6 +9,7 @@ import '../../services/user_profile_service.dart';
 import '../../services/onboarding_service.dart';
 import '../../features/onboarding/app_onboarding_controller.dart';
 import '../../features/onboarding/app_onboarding_overlay.dart';
+import '../../core/theme/app_colors.dart';
 // TabThemeNotifier 제거: 단일 컬러 시스템으로 통일
 // BottomNavBar 색상은 AppTheme.light (bottomNavigationBarTheme) 에서 고정 관리
 
@@ -32,6 +33,8 @@ class _HomeShellState extends State<HomeShell> {
   final ValueNotifier<int> _growthSubTabNotifier = ValueNotifier<int>(-1);
 
   // ── 앱 온보딩 ──
+  // null = 아직 체크 중 (일반 화면 노출 방지), true = 체크 완료
+  bool _onboardingChecked = false;
   bool _onboardingActive = false;
   late final AppOnboardingController _onboardingCtrl;
 
@@ -68,14 +71,16 @@ class _HomeShellState extends State<HomeShell> {
   // 온보딩 체크 + 시작
   // ─────────────────────────────────────────────────────────
   Future<void> _checkOnboarding() async {
-    await Future.delayed(const Duration(milliseconds: 600));
     final should = await OnboardingService.shouldRunOnboarding();
-    if (!should || !mounted) return;
+    if (!mounted) return;
     setState(() {
-      _onboardingActive = true;
-      _selectedIndex = 0;
+      _onboardingChecked = true;
+      if (should) {
+        _onboardingActive = true;
+        _selectedIndex = 0;
+      }
     });
-    _onboardingCtrl.start();
+    if (should) _onboardingCtrl.start();
   }
 
   void _onOnboardingComplete() {
@@ -143,6 +148,11 @@ class _HomeShellState extends State<HomeShell> {
   // ─────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
+    // ── 온보딩 체크 완료 전: 빈 화면 표시 (일반 화면이 잠깐 노출되는 현상 방지) ──
+    if (!_onboardingChecked) {
+      return Scaffold(backgroundColor: AppColors.appBg);
+    }
+
     final pages = <Widget>[
       CaringPage(
         key: const ValueKey('caring'),

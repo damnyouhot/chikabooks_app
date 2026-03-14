@@ -63,6 +63,9 @@ int _computeStageIndex({
 }
 
 // ── 커리어 단계 카드 ───────────────────────────────────────────
+/// Gray(AppMutedCard) 배경 위에서 렌더되는 위젯.
+/// 이전에 사용하던 CareerCard(Blue) 래퍼는 제거되었으며,
+/// 텍스트/배지 색상이 textPrimary 계열로 변경됨.
 class CareerStageCard extends StatelessWidget {
   final int totalCareerMonths;
   final int totalClinics;
@@ -105,111 +108,109 @@ class CareerStageCard extends StatelessWidget {
               return total == 0 ? 1.0 : done / total;
             }();
 
-    return CareerCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '커리어 단계',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.onCardPrimary.withOpacity(0.6),
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      current.name,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.onCardPrimary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              AppBadge(
-                label: '${stageIdx + 1} / ${_kStageRules.length}단계',
-                bgColor: AppColors.onCardPrimary.withOpacity(0.15),
-                textColor: AppColors.onCardPrimary,
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 7,
-              backgroundColor: AppColors.onCardPrimary.withOpacity(0.2),
-              valueColor: const AlwaysStoppedAnimation<Color>(
-                AppColors.cardEmphasis,
-              ),
-            ),
-          ),
-          const SizedBox(height: 14),
-          if (isMax)
-            Text(
-              '최고 단계에 도달했어요! 지금까지 쌓아온 커리어가 빛나고 있어요.',
-              style: TextStyle(
-                fontSize: 13,
-                height: 1.5,
-                color: AppColors.onCardPrimary.withOpacity(0.8),
-              ),
-            )
-          else if (stageIdx == 0 && totalCareerMonths == 0 && totalClinics == 0)
-            // 첫 방문, 아무 데이터도 없는 상태
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md,
-                vertical: AppSpacing.sm + 2,
-              ),
-              decoration: BoxDecoration(
-                color: AppColors.onCardPrimary.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(AppRadius.md),
-              ),
-              child: Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    Icons.info_outline,
-                    size: 16,
-                    color: AppColors.onCardPrimary.withOpacity(0.55),
+                  const Text(
+                    '현재 단계',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      '커리어 카드와 치과 네트워크를 채우면\n단계가 자동으로 올라가요.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        height: 1.5,
-                        color: AppColors.onCardPrimary.withOpacity(0.7),
-                      ),
+                  const SizedBox(height: 2),
+                  Text(
+                    current.name,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                 ],
               ),
-            )
-          else ...[
-            Text(
-              '다음 단계(${next!.name})까지',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: AppColors.onCardPrimary.withOpacity(0.7),
-              ),
             ),
-            const SizedBox(height: 10),
-            _buildChecklist(current, next),
+            AppBadge(
+              label: '${stageIdx + 1} / ${_kStageRules.length}단계',
+              bgColor: AppColors.accent.withOpacity(0.10),
+              textColor: AppColors.accent,
+            ),
           ],
+        ),
+        const SizedBox(height: 12),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: LinearProgressIndicator(
+            value: progress,
+            minHeight: 7,
+            backgroundColor: AppColors.textDisabled.withOpacity(0.18),
+            valueColor: const AlwaysStoppedAnimation<Color>(
+              AppColors.accent,
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        if (isMax)
+          Text(
+            '최고 단계에 도달했어요! 지금까지 쌓아온 커리어가 빛나고 있어요.',
+            style: const TextStyle(
+              fontSize: 13,
+              height: 1.5,
+              color: AppColors.textSecondary,
+            ),
+          )
+        else if (stageIdx == 0 && totalCareerMonths == 0 && totalClinics == 0)
+          // 첫 방문, 아무 데이터도 없는 상태
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm + 2,
+            ),
+            decoration: BoxDecoration(
+              color: AppColors.accent.withOpacity(0.07),
+              borderRadius: BorderRadius.circular(AppRadius.md),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  size: 16,
+                  color: AppColors.accent.withOpacity(0.7),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '커리어 카드와 치과 네트워크를 채우면\n단계가 자동으로 올라가요.',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      height: 1.5,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else ...[
+          Text(
+            '다음 단계(${next!.name})까지',
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 10),
+          _buildChecklist(current, next),
         ],
-      ),
+      ],
     );
   }
 
@@ -286,15 +287,15 @@ class _ChecklistItem extends StatelessWidget {
           margin: const EdgeInsets.only(top: 1),
           decoration: BoxDecoration(
             color: data.done
-                ? AppColors.cardEmphasis                        // Neon (완료)
-                : AppColors.onCardPrimary.withOpacity(0.12),   // White 반투명 (미완료)
+                ? AppColors.accent                           // Blue (완료)
+                : AppColors.textDisabled.withOpacity(0.15), // Gray (미완료)
             borderRadius: BorderRadius.circular(AppRadius.xs),
           ),
           child: data.done
               ? Icon(
                   Icons.check,
                   size: checkSize * 0.65,
-                  color: AppColors.onCardEmphasis, // Black 체크 on Neon
+                  color: AppColors.onCardPrimary, // White 체크
                 )
               : null,
         ),
@@ -309,8 +310,8 @@ class _ChecklistItem extends StatelessWidget {
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: data.done
-                      ? AppColors.onCardPrimary.withOpacity(0.45)
-                      : AppColors.onCardPrimary.withOpacity(0.9),
+                      ? AppColors.textDisabled
+                      : AppColors.textPrimary,
                   decoration: data.done
                       ? TextDecoration.lineThrough
                       : TextDecoration.none,
@@ -319,9 +320,9 @@ class _ChecklistItem extends StatelessWidget {
               if (!data.done)
                 Text(
                   data.current,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 11,
-                    color: AppColors.onCardPrimary.withOpacity(0.5),
+                    color: AppColors.textSecondary,
                   ),
                 ),
             ],
@@ -352,16 +353,16 @@ void showCareerStageGuideSheet(BuildContext context) {
             width: 38,
             height: 4,
             decoration: BoxDecoration(
-              color: AppColors.disabledBg,             // 이전 kCShadow
+              color: AppColors.disabledBg,
               borderRadius: BorderRadius.circular(4),
             ),
           ),
           const SizedBox(height: 16),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-            child: Align(
+            child: const Align(
               alignment: Alignment.centerLeft,
-              child: const Text(
+              child: Text(
                 '커리어 단계 안내',
                 style: TextStyle(
                   fontSize: 18,
@@ -378,7 +379,7 @@ void showCareerStageGuideSheet(BuildContext context) {
               '총 경력, 치과 이력 수, Lv.4 이상 스킬 수에 따라 단계가 자동으로 결정됩니다.',
               style: TextStyle(
                 fontSize: 12,
-                color: AppColors.textSecondary,        // 이전 kCText.withOpacity(0.5)
+                color: AppColors.textSecondary,
               ),
             ),
           ),
@@ -395,7 +396,7 @@ void showCareerStageGuideSheet(BuildContext context) {
                 return Container(
                   padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
                   decoration: BoxDecoration(
-                    color: AppColors.surfaceMuted,     // 이전 kCCardBg
+                    color: AppColors.surfaceMuted,
                     borderRadius: BorderRadius.circular(AppRadius.md),
                   ),
                   child: Row(
@@ -409,7 +410,6 @@ void showCareerStageGuideSheet(BuildContext context) {
                             width: badgeSize,
                             height: badgeSize,
                             decoration: BoxDecoration(
-                              // 이전 kCAccent.withOpacity(0.3)
                               color: AppColors.accent.withOpacity(0.15),
                               borderRadius: BorderRadius.circular(AppRadius.sm),
                             ),
@@ -419,7 +419,7 @@ void showCareerStageGuideSheet(BuildContext context) {
                                 style: TextStyle(
                                   fontSize: (badgeSize * 0.46).clamp(10.0, 14.0),
                                   fontWeight: FontWeight.w900,
-                                  color: AppColors.accent, // 이전 kCText
+                                  color: AppColors.accent,
                                 ),
                               ),
                             ),
@@ -445,7 +445,7 @@ void showCareerStageGuideSheet(BuildContext context) {
                               '경력 ${formatCareerMonths(r.minMonths)}',
                               style: const TextStyle(
                                 fontSize: 11,
-                                color: AppColors.textSecondary, // 이전 kCText.withOpacity(0.5)
+                                color: AppColors.textSecondary,
                               ),
                             ),
                           if (r.minClinics > 0)
@@ -471,7 +471,7 @@ void showCareerStageGuideSheet(BuildContext context) {
                               '시작',
                               style: TextStyle(
                                 fontSize: 11,
-                                color: AppColors.textDisabled, // 이전 kCText.withOpacity(0.4)
+                                color: AppColors.textDisabled,
                               ),
                             ),
                         ],

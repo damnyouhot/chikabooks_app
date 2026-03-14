@@ -637,8 +637,10 @@ class _CaringPageState extends State<CaringPage>
                       // → 작은 폰/큰 폰 모두 동일한 시각 비율 유지
                       // clamp: 최소 1.7(너무 작아지지 않게) · 최대 2.5(너무 커지지 않게)
                       final baseH = 284.0;
-                      final scale = (constraints.maxHeight / baseH * 2.112)
+                      // 온보딩 중에는 캐릭터를 20% 축소
+                      final rawScale = (constraints.maxHeight / baseH * 2.112)
                           .clamp(1.7, 2.5);
+                      final scale = isOnboarding ? rawScale * 0.80 : rawScale;
 
                       return OverflowBox(
                         maxWidth: constraints.maxWidth * scale,
@@ -857,7 +859,7 @@ class _TapCard extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
       child: Material(
-        color: AppColors.surfaceMuted,  // muted surface 카드 배경
+        color: AppColors.cardPrimary,  // Primary 카드 배경 (Green)
         elevation: 0,
         borderRadius: radius,
         child: InkWell(
@@ -880,7 +882,7 @@ class _TapCard extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.accent,  // Blue 타이틀 (대비↑)
+                      color: AppColors.onCardPrimary,  // White 타이틀
                     ),
                   ),
                 ),
@@ -901,7 +903,7 @@ class _TapCard extends StatelessWidget {
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
+                          color: AppColors.onCardPrimary,  // White
                       ),
                     ),
                     if (subtitle.isNotEmpty)
@@ -910,16 +912,16 @@ class _TapCard extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           textAlign: TextAlign.end,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 10,
-                            color: AppColors.textSecondary,
+                            color: AppColors.onCardPrimary.withOpacity(0.7),
                         ),
                       ),
                   ],
                   ),
                 ),
                 const SizedBox(width: 4),
-                const Icon(Icons.chevron_right, color: AppColors.accent, size: 20),
+                const Icon(Icons.chevron_right, color: AppColors.onCardPrimary, size: 20),
               ],
             ),
           ),
@@ -956,7 +958,7 @@ class _PolicyRollingCard extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
       child: Material(
-        color: AppColors.surfaceMuted,  // muted surface 카드 배경
+        color: AppColors.cardPrimary,  // Primary 카드 배경 (Green)
         elevation: 0,
         borderRadius: radius,
         child: InkWell(
@@ -982,7 +984,7 @@ class _PolicyRollingCard extends StatelessWidget {
                         style: const TextStyle(
                       fontSize: 13,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.accent,  // Blue (대비↑)
+                          color: AppColors.onCardPrimary,  // White
                     ),
                   ),
                 ),
@@ -1032,7 +1034,7 @@ class _PolicyRollingCard extends StatelessWidget {
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
-                                    color: AppColors.textPrimary,
+                                    color: AppColors.onCardPrimary,  // White
                             ),
                           ),
                           if (sub.isNotEmpty)
@@ -1041,9 +1043,9 @@ class _PolicyRollingCard extends StatelessWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               textAlign: TextAlign.end,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 10,
-                                      color: AppColors.textSecondary,  // 진한 회색
+                                      color: AppColors.onCardPrimary.withOpacity(0.7),
                               ),
                             ),
                         ],
@@ -1053,7 +1055,7 @@ class _PolicyRollingCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 4),
-                    const Icon(Icons.chevron_right, color: AppColors.accent, size: 20),
+                    const Icon(Icons.chevron_right, color: AppColors.onCardPrimary, size: 20),
               ],
                 );
               },

@@ -103,6 +103,35 @@ class CareerProfileService {
     }
   }
 
+  /// 여러 스킬을 한 번의 Firestore 쓰기로 일괄 저장 (성능 최적화)
+  ///
+  /// [CareerSkillEditSheet]의 "저장" 버튼 시 사용.
+  /// 개별 await 루프 대신 단일 set() 호출로 네트워크 왕복 횟수를 1회로 줄임.
+  static Future<void> updateAllSkills(
+    Map<String, Map<String, dynamic>> skillsMap,
+  ) async {
+    try {
+      final ref = _userRef;
+      if (ref == null) throw Exception('로그인이 필요합니다.');
+
+      // 전체 스킬 맵을 한 번에 merge write
+      final skillsPayload = skillsMap.map(
+        (id, entry) => MapEntry(id, {
+          'enabled': entry['enabled'] as bool,
+          'level': entry['level'] as int,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }),
+      );
+
+      await ref.set({
+        'careerProfile': {'skills': skillsPayload},
+      }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('⚠️ CareerProfileService.updateAllSkills error: $e');
+      rethrow;
+    }
+  }
+
   // ── 치과 네트워크 ────────────────────────────────────────
   static CollectionReference<Map<String, dynamic>>? get _networkRef {
     final uid = _uid;

@@ -11,9 +11,9 @@ const _kText = Color(0xFF3D3535);
 
 /// 대사 텍스트 맵
 const Map<AppOnboardingStepId, String> kStepDialogue = {
-  AppOnboardingStepId.step1a: '안녕!\n난 여기서 언제나 너와 함께할 저니라고 해.',
+  AppOnboardingStepId.step1a: '안녕!\n\n난 여기서 언제나 너와 함께할 저니라고 해.',
   AppOnboardingStepId.step1b: '넌 이름이 뭐야?',
-  AppOnboardingStepId.step3:  '나는 멍멍 치과에서\n1년차로 일하고 있어.\n넌?',
+  AppOnboardingStepId.step3:  '나는 멍멍 치과에서\n1년차로 일하고 있어.\n\n넌?',
   AppOnboardingStepId.step5:  '아래 커리어 탭을 눌러봐!',
   AppOnboardingStepId.step6a: '여기서 너의 커리어를 관리할 수 있어.\n겁먹지마 천천히 하나씩 해도 되고,',
   AppOnboardingStepId.step6b: '나중에 이력서를 사진찍어 올리면\nAI가 자동으로 입력해줄거야.',
@@ -250,6 +250,7 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
             opacity: _fadeCtrl,
             child: _DialogueBubble(
               text: dialogue.replaceAll('{name}', _nickname ?? ''),
+              isAlert: true, // 주황 배경 + 크림 화이트 텍스트
             ),
           ),
         ),
@@ -258,7 +259,8 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
   }
 
   // ── 핀조명(spotlight) 오버레이 — 지정 탭 강조 ──────────────
-  // 탭바는 Scaffold body 밖이므로 탭 터치는 HomeShell._onTap에서 advance() 처리
+  // 탭바는 Scaffold body 밖이므로 body 오버레이로 탭 영역만 밝게 할 수 없음
+  // → 화면 전체 검정 + 화살표로 탭 위치 안내
   Widget _buildSpotlightOverlay(
     BuildContext context, {
     required int targetTabIdx,
@@ -271,19 +273,12 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
 
     return Stack(
       children: [
-        // 전체 어두운 배경 (타 탭 터치 차단, 지정 탭만 밝게)
+        // ── 화면 전체를 검정으로 덮음 (탭 터치는 탭바가 body 밖이므로 그대로 작동) ──
         Positioned.fill(
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: () {},
-            child: CustomPaint(
-              painter: _SpotlightPainter(
-                screenSize: screenSize,
-                spotlightLeft: spotlightLeft,
-                spotlightWidth: tabW,
-                bottomNavHeight: bottomNavHeight,
-              ),
-            ),
+            onTap: () {}, // body 터치 차단
+            child: Container(color: AppColors.black.withOpacity(0.85)),
           ),
         ),
 
@@ -295,12 +290,12 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
           child: FadeTransition(
             opacity: _fadeCtrl,
             child: IgnorePointer(
-              child: _DialogueBubble(text: hint, showTouchHint: false),
+              child: _DialogueBubble(text: hint, showTouchHint: false, isAlert: true),
             ),
           ),
         ),
 
-        // ↓ 바운스 화살표 (Scaffold body 하단 바로 위에 표시)
+        // ↓ 바운스 화살표 (주황색) — 탭 위치 직접 가리킴
         Positioned(
           bottom: 4,
           left: spotlightLeft,
@@ -325,15 +320,28 @@ class _DialogueBubble extends StatelessWidget {
   final String text;
   final bool showTouchHint;
 
-  const _DialogueBubble({required this.text, this.showTouchHint = true});
+  /// true: 타 탭 이동 후 알림 — 주황 배경 + 크림 화이트 텍스트
+  final bool isAlert;
+
+  const _DialogueBubble({
+    required this.text,
+    this.showTouchHint = true,
+    this.isAlert = false,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final bgColor    = isAlert ? AppColors.lime  : AppColors.white;
+    final textColor  = isAlert ? AppColors.appBg : _kText;
+    final hintColor  = isAlert
+        ? AppColors.appBg.withOpacity(0.65)
+        : _kText.withOpacity(0.4);
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: bgColor,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -351,7 +359,7 @@ class _DialogueBubble extends StatelessWidget {
             style: GoogleFonts.notoSansKr(
               fontSize: 15,
               fontWeight: FontWeight.w600,
-              color: _kText,
+              color: textColor,
               height: 1.6,
             ),
           ),
@@ -364,11 +372,11 @@ class _DialogueBubble extends StatelessWidget {
                   '화면을 터치하면 다음으로 넘어가요',
                   style: GoogleFonts.notoSansKr(
                     fontSize: 11,
-                    color: _kText.withOpacity(0.4),
+                    color: hintColor,
                   ),
                 ),
                 const SizedBox(width: 4),
-                Icon(Icons.touch_app_outlined, size: 13, color: _kText.withOpacity(0.35)),
+                Icon(Icons.touch_app_outlined, size: 13, color: hintColor),
               ],
             ),
           ],
@@ -376,63 +384,6 @@ class _DialogueBubble extends StatelessWidget {
       ),
     );
   }
-}
-
-// ─────────────────────────────────────────────────────────────
-// Spotlight CustomPainter — 커리어 탭 이외 어둡게
-// ─────────────────────────────────────────────────────────────
-class _SpotlightPainter extends CustomPainter {
-  final Size screenSize;
-  final double spotlightLeft;
-  final double spotlightWidth;
-  final double bottomNavHeight;
-
-  _SpotlightPainter({
-    required this.screenSize,
-    required this.spotlightLeft,
-    required this.spotlightWidth,
-    required this.bottomNavHeight,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = AppColors.black.withOpacity(0.70);
-
-    // 커리어 탭 영역을 제외한 나머지 전체를 어둡게 처리
-    final path =
-        Path()
-          ..addRect(Rect.fromLTWH(0, 0, size.width, size.height))
-          ..addRect(
-            Rect.fromLTWH(
-              spotlightLeft,
-              size.height - bottomNavHeight,
-              spotlightWidth,
-              bottomNavHeight,
-            ),
-          )
-          ..fillType = PathFillType.evenOdd;
-
-    canvas.drawPath(path, paint);
-
-    // 커리어 탭 주변에 밝은 테두리(glow)
-    final glowPaint =
-        Paint()
-          ..color = AppColors.white.withOpacity(0.25)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2;
-    canvas.drawRect(
-      Rect.fromLTWH(
-        spotlightLeft + 2,
-        size.height - bottomNavHeight + 2,
-        spotlightWidth - 4,
-        bottomNavHeight - 4,
-      ),
-      glowPaint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_SpotlightPainter old) => false;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -477,7 +428,7 @@ class _BouncingArrowState extends State<_BouncingArrow>
         child: const Center(
           child: Icon(
             Icons.keyboard_arrow_down_rounded,
-            color: AppColors.white,
+            color: AppColors.lime, // 주황색 (#FF7A00)
             size: 32,
           ),
         ),

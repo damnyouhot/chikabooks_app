@@ -10,7 +10,7 @@ class AppTheme {
       useMaterial3: true,
       fontFamily: 'NotoSansKR',
       fontFamilyFallback: const ['Apple SD Gothic Neo', 'Roboto'],
-      // Scaffold 배경: soft gray (카드와 시각적 분리)
+      // Scaffold 배경: 크림 화이트 (따뜻하고 부드러운 배경)
       scaffoldBackgroundColor: AppColors.appBg,
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
@@ -30,10 +30,15 @@ class AppTheme {
       // BottomNavigationBar 전역 테마 (Consumer 없이 고정)
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
         backgroundColor: AppColors.navBg,
-        selectedItemColor: AppColors.navSelected,
+        selectedItemColor: AppColors.cardEmphasis,   // 강조색 (주황)
         unselectedItemColor: AppColors.navUnselected,
         elevation: 0,
         type: BottomNavigationBarType.fixed,
+        // 선택 시 크기 변화 없이 볼드만
+        selectedLabelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+        unselectedLabelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w400),
+        selectedIconTheme: IconThemeData(size: 24),
+        unselectedIconTheme: IconThemeData(size: 24),
       ),
       // ElevatedButton: 기본값 Blue + White, shadow 없음
       elevatedButtonTheme: ElevatedButtonThemeData(

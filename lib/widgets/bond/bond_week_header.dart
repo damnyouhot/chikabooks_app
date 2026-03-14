@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
-import '../../core/widgets/app_muted_card.dart';
+import '../../core/widgets/app_primary_card.dart';
 import '../../core/widgets/glass_card.dart';
 
 /// 다음 월요일 09:00 KST 까지 남은 시간을 사람이 읽기 좋은 문자열로 반환
@@ -76,7 +76,7 @@ class BondScoreGauge extends StatelessWidget {
               strokeWidth: 4.0,
               backgroundColor: Colors.transparent,
               valueColor: AlwaysStoppedAnimation<Color>(
-                glassMode ? AppColors.white : AppColors.accent,
+                glassMode ? AppColors.white : AppColors.cardEmphasis,
               ),
             ),
           ),
@@ -122,8 +122,8 @@ class BondNoPartnerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textSecondary = glassMode ? AppColors.white.withOpacity(0.75) : AppColors.textSecondary;
-    final textDisabled  = glassMode ? AppColors.white.withOpacity(0.5)  : AppColors.textDisabled;
+    final textSecondary = glassMode ? AppColors.white.withOpacity(0.75) : AppColors.onCardPrimary.withOpacity(0.85);
+    final textDisabled  = glassMode ? AppColors.white.withOpacity(0.5)  : AppColors.onCardPrimary.withOpacity(0.6);
 
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -175,7 +175,7 @@ class BondNoPartnerCard extends StatelessWidget {
       );
     }
 
-    return AppMutedCard(
+    return AppPrimaryCard(
       radius: AppRadius.xl,
       margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
       padding: const EdgeInsets.all(AppSpacing.xl),
@@ -204,7 +204,7 @@ class BondWeekHeader extends StatelessWidget {
     final weekInfo  = _getWeekInfo();
     final hasPartner = partnerGroupId != null;
 
-    return AppMutedCard(
+    return AppPrimaryCard(
       radius: AppRadius.xl,
       margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
       padding: const EdgeInsets.all(AppSpacing.xl),
@@ -225,17 +225,17 @@ class BondWeekHeader extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
+                            color: AppColors.onCardPrimary,
                           ),
                         ),
                         if (onSettingsTap != null) ...[
                           const SizedBox(width: 8),
                           GestureDetector(
                             onTap: onSettingsTap,
-                            child: const Icon(
+                            child: Icon(
                               Icons.settings_outlined,
                               size: 16,
-                              color: AppColors.textDisabled,
+                              color: AppColors.onCardPrimary.withOpacity(0.6),
                             ),
                           ),
                         ],
@@ -244,9 +244,9 @@ class BondWeekHeader extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       weekInfo,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
-                        color: AppColors.textSecondary,
+                        color: AppColors.onCardPrimary.withOpacity(0.75),
                       ),
                     ),
                   ],
@@ -261,18 +261,18 @@ class BondWeekHeader extends StatelessWidget {
           const SizedBox(height: 14),
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.info_outline,
                 size: 14,
-                color: AppColors.textDisabled,
+                color: AppColors.onCardPrimary.withOpacity(0.5),
               ),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   _nextMatchingMessage(),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
-                    color: AppColors.textDisabled,
+                    color: AppColors.onCardPrimary.withOpacity(0.6),
                     height: 1.3,
                   ),
                 ),
@@ -297,18 +297,18 @@ class BondWeekHeader extends StatelessWidget {
       children: [
         Text(
           msg1,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
-            color: AppColors.textSecondary,
+            color: AppColors.onCardPrimary.withOpacity(0.85),
             height: 1.4,
           ),
         ),
         const SizedBox(height: 2),
         Text(
           msg2,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
-            color: AppColors.textSecondary,
+            color: AppColors.onCardPrimary.withOpacity(0.85),
             height: 1.4,
           ),
         ),

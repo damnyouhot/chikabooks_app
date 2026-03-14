@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_tokens.dart';
 import '../core/widgets/app_muted_card.dart';
+import '../core/widgets/app_primary_card.dart';
 import '../core/widgets/glass_card.dart';
 
 /// 퀴즈 탭 글래스 모드 플래그
@@ -247,7 +248,7 @@ class _QuizStatsCard extends StatelessWidget {
 
     final dividerColor = glassMode
         ? AppColors.white.withOpacity(0.15)
-        : AppColors.divider;
+        : AppColors.onCardPrimary.withOpacity(0.2);
 
     final inner = !isLoaded
         ? SizedBox(
@@ -276,7 +277,7 @@ class _QuizStatsCard extends StatelessWidget {
                           fontSize: 11,
                           color: glassMode
                               ? AppColors.white.withOpacity(0.6)
-                              : AppColors.textSecondary,
+                              : AppColors.onCardPrimary.withOpacity(0.7),
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -296,7 +297,7 @@ class _QuizStatsCard extends StatelessWidget {
                           fontSize: 10,
                           color: glassMode
                               ? AppColors.white.withOpacity(0.4)
-                              : AppColors.textDisabled,
+                              : AppColors.onCardPrimary.withOpacity(0.55),
                         ),
                       ),
                     ],
@@ -313,8 +314,9 @@ class _QuizStatsCard extends StatelessWidget {
       );
     }
 
-    return AppMutedCard(
+    return AppPrimaryCard(
       radius: AppRadius.xl,
+      padding: const EdgeInsets.all(AppSpacing.lg),
       child: inner,
     );
   }
@@ -322,11 +324,11 @@ class _QuizStatsCard extends StatelessWidget {
   Widget _statColumn(String label, int correct, int wrong, double rate) {
     final labelColor = glassMode
         ? AppColors.white.withOpacity(0.6)
-        : AppColors.textSecondary;
-    final valueColor = glassMode ? AppColors.white : AppColors.textPrimary;
+        : AppColors.onCardPrimary.withOpacity(0.7);
+    final valueColor = glassMode ? AppColors.white : AppColors.onCardPrimary;
     final subColor   = glassMode
         ? AppColors.white.withOpacity(0.4)
-        : AppColors.textDisabled;
+        : AppColors.onCardPrimary.withOpacity(0.55);
 
     return Column(
       children: [

@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import '../../core/theme/app_colors.dart';
+import '../../services/onboarding_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -300,6 +301,9 @@ class _SettingsPageState extends State<SettingsPage> {
       } catch (_) {
         // Auth 계정이 이미 삭제되어 실패할 수 있음 (무시)
       }
+
+      // ✅ 재가입 시 온보딩이 바로 뜨도록 플래그 설정
+      await OnboardingService.schedulePendingOnboarding();
 
       if (!mounted) return;
 

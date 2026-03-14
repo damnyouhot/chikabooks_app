@@ -20,6 +20,7 @@ class AppPrimaryCard extends StatelessWidget {
     required this.child,
     this.padding,
     this.radius,
+    this.margin,
     this.onTap,
   });
 
@@ -31,6 +32,9 @@ class AppPrimaryCard extends StatelessWidget {
   /// 카드 radius. 기본값: AppRadius.xl = 16
   final double? radius;
 
+  /// 외부 마진.
+  final EdgeInsetsGeometry? margin;
+
   /// 탭 콜백. null이면 InkWell 없이 렌더
   final VoidCallback? onTap;
 
@@ -41,6 +45,7 @@ class AppPrimaryCard extends StatelessWidget {
     final borderRadius = BorderRadius.circular(r);
 
     final content = Container(
+      margin: margin,
       padding: p,
       decoration: BoxDecoration(
         color: AppColors.cardPrimary,

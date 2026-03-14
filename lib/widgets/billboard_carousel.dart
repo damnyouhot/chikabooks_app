@@ -191,11 +191,8 @@ class _BillboardCarouselState extends State<BillboardCarousel> {
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: AppColors.surfaceMuted,
         borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(
-          color: AppColors.divider.withOpacity(0.3),
-        ),
       ),
       child: Column(
         children: [

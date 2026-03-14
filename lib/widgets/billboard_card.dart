@@ -37,15 +37,8 @@ class BillboardCard extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         margin: const EdgeInsets.only(bottom: 8),
         decoration: BoxDecoration(
-          color: AppColors.white,
+          color: AppColors.surfaceMuted,
           borderRadius: BorderRadius.circular(AppRadius.md),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.textDisabled.withOpacity(0.08),
-              blurRadius: 6,
-              offset: const Offset(0, 1),
-            ),
-          ],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.max,

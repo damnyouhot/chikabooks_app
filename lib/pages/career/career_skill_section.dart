@@ -85,6 +85,8 @@ class CareerSkillEmptyState extends StatelessWidget {
 }
 
 // ── 스킬 카드 ──────────────────────────────────────────────────
+/// Gray(AppMutedCard) 배경 위에서 렌더되는 위젯.
+/// 텍스트/아이콘 색상이 textPrimary 계열로 변경됨.
 class CareerSkillCard extends StatefulWidget {
   final CareerSkillInfo info;
   final Map<String, Map<String, dynamic>> skillsMap;
@@ -118,14 +120,19 @@ class _CareerSkillCardState extends State<CareerSkillCard> {
 
   @override
   Widget build(BuildContext context) {
-    return CareerCard(
+    return Container(
       padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.appBg,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.divider, width: 0.8),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              // 스킬 아이콘 컨테이너: 화면 너비의 8.5%, 최소30·최대40 clamp
+              // 스킬 아이콘 컨테이너
               Builder(
                 builder: (ctx) {
                   final iconBox =
@@ -134,12 +141,12 @@ class _CareerSkillCardState extends State<CareerSkillCard> {
                     width: iconBox,
                     height: iconBox,
                     decoration: BoxDecoration(
-                      color: AppColors.onCardPrimary.withOpacity(0.15),
+                      color: AppColors.accent.withOpacity(0.10),
                       borderRadius: BorderRadius.circular(AppRadius.md),
                     ),
                     child: Icon(
                       widget.info.icon,
-                      color: AppColors.onCardPrimary,
+                      color: AppColors.accent,
                       size: iconBox * 0.53,
                     ),
                   );
@@ -155,7 +162,7 @@ class _CareerSkillCardState extends State<CareerSkillCard> {
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.onCardPrimary,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                     if (widget.info.recommended != null) ...[
@@ -165,25 +172,25 @@ class _CareerSkillCardState extends State<CareerSkillCard> {
                           Icon(
                             Icons.auto_awesome,
                             size: 10,
-                            color: AppColors.onCardPrimary.withOpacity(0.7),
+                            color: AppColors.accent.withOpacity(0.7),
                           ),
                           const SizedBox(width: 3),
                           Text(
                             '추천 Lv.${widget.info.recommended}',
                             style: TextStyle(
                               fontSize: 11,
-                              color: AppColors.onCardPrimary.withOpacity(0.65),
+                              color: AppColors.accent.withOpacity(0.8),
                             ),
                           ),
                         ],
                       ),
                     ] else ...[
                       const SizedBox(height: 2),
-                      Text(
+                      const Text(
                         '체크 질문으로 측정해보세요',
                         style: TextStyle(
                           fontSize: 10,
-                          color: AppColors.onCardPrimary.withOpacity(0.45),
+                          color: AppColors.textDisabled,
                         ),
                       ),
                     ],
@@ -195,7 +202,7 @@ class _CareerSkillCardState extends State<CareerSkillCard> {
                 style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w900,
-                  color: AppColors.onCardPrimary,
+                  color: AppColors.textPrimary,
                 ),
               ),
             ],
@@ -212,8 +219,8 @@ class _CareerSkillCardState extends State<CareerSkillCard> {
                     currentLevel: widget.info.level,
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.onCardPrimary.withOpacity(0.15),
-                    foregroundColor: AppColors.onCardPrimary,
+                    backgroundColor: AppColors.accent.withOpacity(0.10),
+                    foregroundColor: AppColors.accent,
                     elevation: 0,
                     shadowColor: Colors.transparent,
                     padding: const EdgeInsets.symmetric(vertical: 10),
@@ -268,7 +275,7 @@ class _LevelAdjust extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.onCardPrimary.withOpacity(0.15),
+        color: AppColors.textDisabled.withOpacity(0.12),
         borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: Row(
@@ -277,7 +284,7 @@ class _LevelAdjust extends StatelessWidget {
           IconButton(
             onPressed: onMinus,
             icon: const Icon(Icons.remove, size: 18),
-            color: AppColors.onCardPrimary.withOpacity(0.8),
+            color: AppColors.textSecondary,
             constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
             padding: EdgeInsets.zero,
           ),
@@ -286,13 +293,13 @@ class _LevelAdjust extends StatelessWidget {
             style: const TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w900,
-              color: AppColors.onCardPrimary,
+              color: AppColors.textPrimary,
             ),
           ),
           IconButton(
             onPressed: onPlus,
             icon: const Icon(Icons.add, size: 18),
-            color: AppColors.onCardPrimary.withOpacity(0.8),
+            color: AppColors.textSecondary,
             constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
             padding: EdgeInsets.zero,
           ),
@@ -349,15 +356,8 @@ class _CareerSkillEditSheetState extends State<CareerSkillEditSheet> {
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
-      for (final m in CareerProfileService.skillMaster) {
-        final id = m['id'] as String;
-        final entry = _local[id]!;
-        await CareerProfileService.updateSkill(
-          skillId: id,
-          enabled: entry['enabled'] as bool,
-          level: entry['level'] as int,
-        );
-      }
+      // 단일 Firestore 쓰기로 전체 스킬 일괄 저장 (순차 루프 → 1회 write)
+      await CareerProfileService.updateAllSkills(_local);
       if (mounted) Navigator.of(context).pop();
     } catch (_) {
       if (mounted) setState(() => _saving = false);
