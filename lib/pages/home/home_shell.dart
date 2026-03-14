@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../bond_page.dart';
 import '../caring_page.dart';
 import '../growth_page.dart';
@@ -7,6 +8,7 @@ import '../job_page.dart';
 import '../onboarding/onboarding_profile_screen.dart';
 import '../../services/user_profile_service.dart';
 import '../../services/onboarding_service.dart';
+import '../../services/admin_activity_service.dart';
 import '../../features/onboarding/app_onboarding_controller.dart';
 import '../../features/onboarding/app_onboarding_overlay.dart';
 import '../../core/theme/app_colors.dart';
@@ -49,7 +51,10 @@ class _HomeShellState extends State<HomeShell> {
       if (mounted) setState(() {});
     });
 
-    WidgetsBinding.instance.addPostFrameCallback((_) => _checkOnboarding());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkOnboarding();
+      _recordAppOpen(); // 앱 실행 시 lastActiveAt 갱신 + 활동 기록
+    });
 
     FirebaseAuth.instance.authStateChanges().skip(1).listen((user) {
       if (!mounted) return;
@@ -65,6 +70,29 @@ class _HomeShellState extends State<HomeShell> {
     _growthSubTabNotifier.dispose();
     _onboardingCtrl.dispose();
     super.dispose();
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // 앱 실행 기록: lastActiveAt 갱신 + appOpen 이벤트
+  // ─────────────────────────────────────────────────────────
+  Future<void> _recordAppOpen() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .update({'lastActiveAt': FieldValue.serverTimestamp()});
+    } catch (_) {
+      // 문서가 없을 경우 무시 (가입 직후 race condition)
+    }
+
+    // 활동 이벤트 기록
+    await AdminActivityService.log(
+      ActivityEventType.appOpen,
+      page: 'home',
+    );
   }
 
   // ─────────────────────────────────────────────────────────
@@ -92,6 +120,18 @@ class _HomeShellState extends State<HomeShell> {
   // ─────────────────────────────────────────────────────────
   void _setTab(int idx) {
     setState(() => _selectedIndex = idx);
+
+    // 탭 진입 이벤트 기록
+    const tabEvents = [
+      ActivityEventType.viewHome,
+      ActivityEventType.viewBond,
+      ActivityEventType.viewGrowth,
+      ActivityEventType.viewJob,
+    ];
+    if (idx < tabEvents.length) {
+      const tabPages = ['home', 'bond', 'growth', 'job'];
+      AdminActivityService.log(tabEvents[idx], page: tabPages[idx]);
+    }
   }
 
   void _onTap(int idx) async {

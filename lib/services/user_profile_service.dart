@@ -328,4 +328,48 @@ class UserProfileService {
       rethrow;
     }
   }
+
+  // ═══════════════════════════════════════════════════════════════
+  // 관리자 / 통계 제어
+  // ═══════════════════════════════════════════════════════════════
+
+  /// 현재 유저가 관리자인지 확인
+  ///
+  /// users/{uid}.isAdmin == true 이면 관리자 대시보드 접근 허용
+  static Future<bool> isAdmin() async {
+    try {
+      final uid = _auth.currentUser?.uid;
+      if (uid == null) return false;
+
+      // 캐시에 있으면 캐시 사용
+      if (_cache != null) return _cache!.isAdmin;
+
+      final doc = await _db.collection('users').doc(uid).get();
+      return doc.data()?['isAdmin'] == true;
+    } catch (e) {
+      debugPrint('⚠️ UserProfileService.isAdmin error: $e');
+      return false;
+    }
+  }
+
+  /// 특정 유저의 통계 제외 여부 설정 (관리자 전용)
+  ///
+  /// [targetUid]  : 대상 유저 UID
+  /// [exclude]    : true이면 통계 제외, false이면 포함
+  static Future<void> setExcludeFromStats(
+    String targetUid, {
+    required bool exclude,
+  }) async {
+    try {
+      await _db.collection('users').doc(targetUid).update({
+        'excludeFromStats': exclude,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      // 자신에 대한 설정이면 캐시 초기화
+      if (targetUid == _auth.currentUser?.uid) _cache = null;
+    } catch (e) {
+      debugPrint('⚠️ UserProfileService.setExcludeFromStats error: $e');
+      rethrow;
+    }
+  }
 }

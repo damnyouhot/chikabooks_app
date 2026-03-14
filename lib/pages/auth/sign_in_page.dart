@@ -10,6 +10,7 @@ import '../../services/kakao_auth_service.dart';
 import '../../services/naver_auth_service.dart';
 import '../../services/sign_in_tracker.dart';
 import '../../services/onboarding_service.dart';
+import '../../services/admin_activity_service.dart';
 import '../../core/theme/app_colors.dart';
 
 /// 다중 소셜 로그인 페이지
@@ -93,6 +94,11 @@ class _SignInPageState extends State<SignInPage> {
       // provider 기록 (Firestore + 로컬)
       await SignInTracker.record('google');
       await OnboardingService.schedulePendingOnboarding();
+      // 가입/로그인 퍼널 이벤트 기록
+      await AdminActivityService.logFunnel(
+        FunnelEventType.signupComplete,
+        extra: {'provider': 'google'},
+      );
 
       // AuthGate가 자동으로 홈으로 보내므로 추가 라우팅 불필요
     } catch (e) {
@@ -121,6 +127,10 @@ class _SignInPageState extends State<SignInPage> {
         // 로컬 provider 기록 (배지용)
         await SignInTracker.record('apple');
         await OnboardingService.schedulePendingOnboarding();
+        await AdminActivityService.logFunnel(
+          FunnelEventType.signupComplete,
+          extra: {'provider': 'apple'},
+        );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -175,6 +185,10 @@ class _SignInPageState extends State<SignInPage> {
       // 로컬 provider 기록 (배지용, Firestore는 Function에서 이미 저장)
       await SignInTracker.record('kakao');
       await OnboardingService.schedulePendingOnboarding();
+      await AdminActivityService.logFunnel(
+        FunnelEventType.signupComplete,
+        extra: {'provider': 'kakao'},
+      );
 
       // AuthGate가 자동으로 홈으로 보내므로 추가 라우팅 불필요
     } catch (e) {
@@ -216,6 +230,10 @@ class _SignInPageState extends State<SignInPage> {
       // 로컬 provider 기록 (배지용)
       await SignInTracker.record('naver');
       await OnboardingService.schedulePendingOnboarding();
+      await AdminActivityService.logFunnel(
+        FunnelEventType.signupComplete,
+        extra: {'provider': 'naver'},
+      );
 
       // AuthGate가 자동으로 홈으로 보내므로 추가 라우팅 불필요
     } catch (e) {
@@ -392,6 +410,12 @@ class _SignInPageState extends State<SignInPage> {
                             // ✅ pop 전에 먼저 실행 — HomeShell 생성 전에 플래그 보장
                             await SignInTracker.record('email');
                             await OnboardingService.schedulePendingOnboarding();
+                            if (isSignUp) {
+                              await AdminActivityService.logFunnel(
+                                FunnelEventType.signupComplete,
+                                extra: {'provider': 'email'},
+                              );
+                            }
                             if (context.mounted) Navigator.pop(context);
                           }
                         }

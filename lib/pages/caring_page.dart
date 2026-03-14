@@ -17,6 +17,7 @@ import '../widgets/user_goal_sheet.dart';
 import '../pages/ebook/ebook_detail_page.dart';
 import 'settings/settings_page.dart';
 import '../core/theme/app_colors.dart';
+import '../services/admin_activity_service.dart';
 
 
 /// 기본 메시지 상태 머신 상태
@@ -418,7 +419,10 @@ class _CaringPageState extends State<CaringPage>
 
     _enqueueReaction(phrase);
     if (result.bondDelta > 0) _showFloatingDelta(result.bondDelta);
-    }
+
+    // 캐릭터 클릭 이벤트 기록 (fire-and-forget)
+    AdminActivityService.log(ActivityEventType.tapCharacter, page: 'home');
+  }
 
   void _onFeed() async {
     _tapTrigger?.fire(); // 밥먹기 애니메이션 재생
@@ -437,6 +441,8 @@ class _CaringPageState extends State<CaringPage>
   void _onLove() => _onCircleTap();
 
   void _onDiary() {
+    // 감정기록 시작 이벤트 기록
+    AdminActivityService.log(ActivityEventType.tapEmotionStart, page: 'home');
     DiaryInputSheet.show(context, (text) async {
       _bootstrap();
         });

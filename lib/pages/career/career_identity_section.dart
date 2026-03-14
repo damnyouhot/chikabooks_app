@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/career_profile_service.dart';
+import '../../services/admin_activity_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../core/widgets/app_badge.dart';
@@ -168,7 +169,15 @@ class CareerIdentityFilledCard extends StatelessWidget {
               ),
               const Spacer(),
               IconButton(
-                onPressed: () => CareerIdentitySheet.show(context),
+                onPressed: () {
+                  // 커리어 카드 수정 이벤트 기록
+                  AdminActivityService.log(
+                    ActivityEventType.tapCareerEdit,
+                    page: 'career',
+                    action: 'edit_identity',
+                  );
+                  CareerIdentitySheet.show(context);
+                },
                 icon: Icon(
                   Icons.edit_outlined,
                   color: AppColors.onCardPrimary.withOpacity(0.6),

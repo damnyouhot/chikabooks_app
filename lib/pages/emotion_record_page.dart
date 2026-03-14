@@ -1,6 +1,7 @@
 // lib/pages/emotion_record_page.dart
 import 'package:flutter/material.dart';
 import '../services/emotion_service.dart';
+import '../services/admin_activity_service.dart';
 import '../core/theme/app_colors.dart';
 import 'dart:developer' as developer;
 
@@ -35,12 +36,21 @@ class _EmotionRecordPageState extends State<EmotionRecordPage> {
         return;
       }
 
-      developer.log(
-        '3. Firestore에 감정 기록 시작 (점수: $_score)...',
-        name: 'EmotionDebug',
-      );
+      developer.log('3. Firestore에 감정 기록 시작 (점수: $_score)...', name: 'EmotionDebug',);
       await EmotionService.recordEmotion(_score);
       developer.log('4. Firestore에 감정 기록 성공!', name: 'EmotionDebug');
+
+      // 감정기록 완료 퍼널 이벤트 기록
+      await AdminActivityService.logFunnel(
+        FunnelEventType.firstEmotionComplete,
+        extra: {'score': _score},
+      );
+      // 감정기록 저장 클릭 이벤트 기록
+      await AdminActivityService.log(
+        ActivityEventType.tapEmotionSave,
+        page: 'emotion_record',
+        targetId: 'score_$_score',
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(

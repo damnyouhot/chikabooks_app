@@ -35,17 +35,31 @@ class SignInTracker {
             : FirebaseAuth.instance.currentUser?.email;
 
     try {
+      final userRef = _db.collection('users').doc(uid);
+
+      // 기존 문서 확인: createdAt이 없으면 신규 가입으로 간주
+      final existing = await userRef.get();
+      final isNewUser = !existing.exists || existing.data()?['createdAt'] == null;
+
       final data = <String, dynamic>{
         'provider': provider,
         'lastLoginAt': FieldValue.serverTimestamp(),
+        'lastActiveAt': FieldValue.serverTimestamp(), // 매 로그인마다 갱신
       };
+
+      // 신규 가입 시에만 createdAt 기록 (기존 데이터 덮어쓰기 방지)
+      if (isNewUser) {
+        data['createdAt'] = FieldValue.serverTimestamp();
+        debugPrint('✅ SignInTracker: 신규 가입 createdAt 기록');
+      }
+
       // 이메일이 있고, 기존에 없는 경우에만 덮어쓰도록 merge 사용
       // (애플: 첫 로그인 이후 null이 되어도 기존 값 유지)
       if (resolvedEmail != null && resolvedEmail.isNotEmpty) {
         data['email'] = resolvedEmail;
       }
 
-      await _db.collection('users').doc(uid).set(
+      await userRef.set(
         data,
         SetOptions(merge: true),
       );

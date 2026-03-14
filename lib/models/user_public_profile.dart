@@ -21,6 +21,10 @@ class UserPublicProfile {
   final bool willMatchNextWeek;    // 쉬는 중 매칭 되기 스위치 (기본값: true)
   final String? continueWithPartner; // 이어가기 선택한 상대 UID
 
+  // ─── 관리자 / 통계 제어 필드 ───
+  final bool isAdmin;              // 관리자 여부 (대시보드 접근 권한)
+  final bool excludeFromStats;     // true이면 모든 통계에서 제외 (테스터/내부 계정)
+
   const UserPublicProfile({
     this.nickname = '',
     this.region = '',
@@ -35,6 +39,8 @@ class UserPublicProfile {
     this.partnerStatus = 'active',
     this.willMatchNextWeek = true,
     this.continueWithPartner,
+    this.isAdmin = false,
+    this.excludeFromStats = false,
   });
 
   /// Step A(기본 프로필) 완료 여부
@@ -77,6 +83,8 @@ class UserPublicProfile {
       partnerStatus: m['partnerStatus'] ?? 'active',
       willMatchNextWeek: m['willMatchNextWeek'] ?? true,
       continueWithPartner: m['continueWithPartner'],
+      isAdmin: m['isAdmin'] == true,
+      excludeFromStats: m['excludeFromStats'] == true,
     );
   }
 

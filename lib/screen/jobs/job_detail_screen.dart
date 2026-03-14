@@ -8,6 +8,7 @@ import '../../models/job.dart';
 import '../../services/job_service.dart';
 import '../../features/resume/screens/apply_confirm_screen.dart';
 import '../../services/job_stats_service.dart';
+import '../../services/admin_activity_service.dart';
 
 class JobDetailScreen extends StatefulWidget {
   final String jobId;
@@ -38,6 +39,13 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
 
     // 조회수 기록
     JobStatsService.recordView(widget.jobId);
+
+    // 공고 상세 진입 이벤트 기록
+    AdminActivityService.log(
+      ActivityEventType.viewJobDetail,
+      page: 'job_detail',
+      targetId: widget.jobId,
+    );
 
     if (widget.autoOpenApply) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -81,15 +89,31 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                   color: bookmarked ? AppColors.warning : null,
                 ),
                 onPressed: () {
-                  bookmarked
-                      ? jobService.unbookmarkJob(widget.jobId)
-                      : jobService.bookmarkJob(widget.jobId);
+                  if (bookmarked) {
+                    jobService.unbookmarkJob(widget.jobId);
+                  } else {
+                    jobService.bookmarkJob(widget.jobId);
+                    // 공고 저장 이벤트 기록
+                    AdminActivityService.log(
+                      ActivityEventType.tapJobSave,
+                      page: 'job_detail',
+                      targetId: widget.jobId,
+                    );
+                  }
                 },
               ),
             ],
           ),
           floatingActionButton: FloatingActionButton.extended(
-            onPressed: () => _openApplyConfirm(context, job),
+            onPressed: () {
+              // 공고 지원 시도 이벤트 기록
+              AdminActivityService.log(
+                ActivityEventType.tapJobApply,
+                page: 'job_detail',
+                targetId: widget.jobId,
+              );
+              _openApplyConfirm(context, job);
+            },
             backgroundColor: AppColors.accent,
             foregroundColor: AppColors.onAccent,
             elevation: 0,

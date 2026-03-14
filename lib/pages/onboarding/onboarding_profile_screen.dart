@@ -4,6 +4,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_primary_button.dart';
 import '../../models/user_public_profile.dart';
 import '../../services/user_profile_service.dart';
+import '../../services/admin_activity_service.dart';
 
 const List<String> _randomNicknameSuggestions = [
   '스케일링중독자',
@@ -727,6 +728,15 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
         region: _selectedRegion!,
         careerGroup: _selectedCareer!,
         concernTags: _selectedConcerns.toList(),
+      );
+
+      // 파트너 프로필 완료 이벤트 기록
+      await AdminActivityService.logFunnel(
+        FunnelEventType.profilePartnerComplete,
+        extra: {
+          'careerGroup': _selectedCareer,
+          'region': _selectedRegion,
+        },
       );
 
       debugPrint('✅ [OnboardingProfile] 저장 완료!');
