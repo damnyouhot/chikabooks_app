@@ -639,32 +639,32 @@ class _CaringPageState extends State<CaringPage>
         // 캐릭터
         Positioned.fill(
           child: GestureDetector(
+            // 온보딩 중: 터치를 소비하되 실제 액션은 실행 안 함
+            // → 아래 overlay(GestureDetector)로 이벤트가 전달될 수 있도록
+            //   behavior를 translucent로 설정해 상위 overlay가 함께 감지
             onTap: isOnboarding ? null : _onCircleTap,
+            behavior: isOnboarding
+                ? HitTestBehavior.translucent
+                : HitTestBehavior.opaque,
             child: _dogController != null
                 ? LayoutBuilder(
                     builder: (ctx, constraints) {
                       // 기준 화면 높이(Pixel Pro 캐릭터 영역 ≈ 284dp) 대비
                       // 현재 캐릭터 영역 높이로 scale을 동적 계산
-                      // → 작은 폰/큰 폰 모두 동일한 시각 비율 유지
-                      // clamp: 최소 1.7(너무 작아지지 않게) · 최대 2.5(너무 커지지 않게)
+                      // clamp: 최소 0.85 · 최대 1.25
                       final baseH = 284.0;
-                      // 온보딩 중에는 캐릭터를 20% 축소
-                      // 전체 배율을 50%로 축소: 기존 2.112 → 1.056, clamp 1.7→0.85 / 2.5→1.25
                       final rawScale = (constraints.maxHeight / baseH * 1.056)
                           .clamp(0.85, 1.25);
-                      final scale = isOnboarding ? rawScale * 0.80 : rawScale;
+                      // 온보딩 중에는 캐릭터 60% 감소 (= 원래 크기의 40%)
+                      final scale = isOnboarding ? rawScale * 0.40 : rawScale;
 
-                      return OverflowBox(
-                        maxWidth: constraints.maxWidth * scale,
-                        maxHeight: constraints.maxHeight * scale,
-                        alignment: Alignment.center,
-                        child: SizedBox(
-                          width: constraints.maxWidth * scale,
-                          height: constraints.maxHeight * scale,
-                          child: RiveWidget(
-                            controller: _dogController!,
-                            fit: Fit.contain,
-                          ),
+                      // OverflowBox 대신 Transform.scale 사용
+                      // → BoxConstraints non-normalized 에러 방지
+                      return Transform.scale(
+                        scale: scale,
+                        child: RiveWidget(
+                          controller: _dogController!,
+                          fit: Fit.contain,
                         ),
                       );
                     },

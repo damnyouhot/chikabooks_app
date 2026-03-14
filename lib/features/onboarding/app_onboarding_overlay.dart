@@ -193,10 +193,11 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
       return const SizedBox.shrink();
     }
 
-    // 1번 탭 step은 오버레이 완전 투명 (CaringPage가 캐릭터 위에 대사 표시)
+    // 1번 탭 step은 오버레이가 화면 전체를 커버 (터치 어디든 메시지 진행)
+    // opaque: CaringPage의 캐릭터 GestureDetector보다 overlay가 우선 처리
     if (widget.controller.isTab0Step) {
       return GestureDetector(
-        behavior: HitTestBehavior.translucent,
+        behavior: HitTestBehavior.opaque,
         onTap: _onTap,
         child: const SizedBox.expand(),
       );
