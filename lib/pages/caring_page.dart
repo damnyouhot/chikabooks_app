@@ -534,7 +534,7 @@ class _CaringPageState extends State<CaringPage>
                 ),
               child: Container(
                 color: AppColors.appBg,
-                padding: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.only(bottom: 12),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -768,7 +768,7 @@ class _CaringPageState extends State<CaringPage>
               style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
         ],
       );
     } else {
@@ -853,9 +853,9 @@ class _TapCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(10);
+    final radius = BorderRadius.circular(12);
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
       child: Material(
         color: AppColors.surfaceMuted,  // muted surface 카드 배경
         elevation: 0,
@@ -942,7 +942,7 @@ class _PolicyRollingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(10);
+    final radius = BorderRadius.circular(12);
 
     String big = '예정된 변경 없음';
     String sub = '';
@@ -954,7 +954,7 @@ class _PolicyRollingCard extends StatelessWidget {
     }
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
       child: Material(
         color: AppColors.surfaceMuted,  // muted surface 카드 배경
         elevation: 0,

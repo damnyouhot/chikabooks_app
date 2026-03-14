@@ -147,42 +147,60 @@ class _JobPageTitleBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 20, right: 4, top: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          const Text(
-            '커리어',
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── 타이틀 + 아이콘 행 ──
+        Padding(
+          padding: const EdgeInsets.only(left: 20, right: 4, top: 4),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const Text(
+                '커리어',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(
+                  Icons.info_outline,
+                  color: AppColors.textDisabled,
+                  size: 18,
+                ),
+                visualDensity: VisualDensity.compact,
+                onPressed: () => _showInfoDialog(context),
+              ),
+              IconButton(
+                icon: const Icon(
+                  Icons.settings_outlined,
+                  color: AppColors.textDisabled,
+                  size: 20,
+                ),
+                visualDensity: VisualDensity.compact,
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const SettingsPage()),
+                ),
+              ),
+            ],
+          ),
+        ),
+        // ── 서브타이틀 ──
+        const Padding(
+          padding: EdgeInsets.only(left: 20),
+          child: Text(
+            '내 커리어를 관리하고 맞춤 공고를 받아보세요.',
             style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
+              fontSize: 12,
+              color: AppColors.textSecondary,
             ),
           ),
-          const Spacer(),
-          IconButton(
-            icon: const Icon(
-              Icons.info_outline,
-              color: AppColors.textDisabled,
-              size: 18,
-            ),
-            visualDensity: VisualDensity.compact,
-            onPressed: () => _showInfoDialog(context),
-          ),
-          IconButton(
-            icon: const Icon(
-              Icons.settings_outlined,
-              color: AppColors.textDisabled,
-              size: 20,
-            ),
-            visualDensity: VisualDensity.compact,
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const SettingsPage()),
-            ),
-          ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 4),
+      ],
     );
   }
 

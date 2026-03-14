@@ -304,7 +304,8 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
         Positioned(
           bottom: 4,
           left: spotlightLeft,
-          right: MediaQuery.of(context).size.width - spotlightLeft - tabW,
+          width: tabW,
+          height: 40,
           child: FadeTransition(
             opacity: _fadeCtrl,
             child: const IgnorePointer(
