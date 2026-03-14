@@ -42,20 +42,40 @@ class FeatureReactionItem {
   });
 
   /// activityLogs.type → 한국어 라벨 매핑
+  /// ※ Firestore에 저장되는 값은 ActivityEventType.value (snake_case)
   static String labelFor(String type) {
     const map = {
-      'tapCharacter': '캐릭터 클릭',
-      'tapEmotionStart': '감정기록 시작',
-      'tapEmotionSave': '감정기록 저장',
-      'viewJobDetail': '구직 공고 상세',
-      'tapJobSave': '공고 저장',
-      'tapJobApply': '공고 지원',
-      'tapCareerEdit': '커리어 카드 수정',
-      'viewHome': '홈 탭 이동',
-      'viewBond': '결속 탭 이동',
-      'viewGrowth': '성장 탭 이동',
-      'viewCareer': '커리어 탭 이동',
-      'loginSuccess': '로그인 성공',
+      // ── 화면 진입 ──────────────────────────────────────────
+      'view_sign_in_page':        '로그인 화면 진입',
+      'view_home':                '홈 탭',
+      'view_bond':                '교감 탭',
+      'view_growth':              '성장 탭',
+      'view_career':              '커리어 탭',
+      'view_job':                 '구직 탭',
+      'view_settings':            '설정 진입',
+      'view_emotion_record':      '감정기록 화면',
+      'view_job_detail':          '공고 상세',
+      'view_onboarding_profile':  '온보딩 프로필',
+      // ── 소셜 로그인 ────────────────────────────────────────
+      'tap_login_google':  'Google 로그인',
+      'tap_login_apple':   'Apple 로그인',
+      'tap_login_kakao':   '카카오 로그인',
+      'tap_login_naver':   '네이버 로그인',
+      'tap_login_email':   '이메일 로그인',
+      'login_success':     '로그인 성공',
+      // ── 기능 클릭 ──────────────────────────────────────────
+      'tap_character':      '캐릭터 클릭',
+      'tap_emotion_start':  '감정기록 시작',
+      'tap_emotion_save':   '감정기록 저장 시도',
+      'emotion_save_success': '감정기록 저장 성공',
+      'emotion_save_fail':  '감정기록 저장 실패',
+      'tap_profile_save':   '프로필 저장',
+      'tap_job_save':       '공고 관심 저장',
+      'tap_job_apply':      '공고 지원',
+      'tap_career_edit':    '커리어 카드 수정',
+      'tap_notification_allow': '알림 허용',
+      // ── 기타 ──────────────────────────────────────────────
+      'app_open': '앱 실행',
     };
     return map[type] ?? type;
   }
@@ -91,26 +111,62 @@ class AppErrorItem {
       page: m['page'] as String?,
       feature: m['feature'] as String?,
       appVersion: m['appVersion'] as String?,
-      uid: m['uid'] as String?,
+      uid: m['userId'] as String?,   // ← AppErrorLogger가 'userId'로 저장
       isFatal: m['isFatal'] as bool? ?? false,
+    );
+  }
+}
+
+// ─── 감정 기록 항목 (Emotion Feed) ───────────────────────────
+class EmotionLogItem {
+  final String id;
+  final String userId;
+  final DateTime timestamp;
+  final int? score;
+  final String? text;
+  final List<String> tags;
+  final String? careerGroupSnapshot;
+
+  const EmotionLogItem({
+    required this.id,
+    required this.userId,
+    required this.timestamp,
+    this.score,
+    this.text,
+    this.tags = const [],
+    this.careerGroupSnapshot,
+  });
+
+  factory EmotionLogItem.fromMap(String id, Map<String, dynamic> m) {
+    List<String> parsedTags = [];
+    final rawTags = m['tags'];
+    if (rawTags is List) {
+      parsedTags = rawTags.map((e) => e.toString()).toList();
+    }
+    return EmotionLogItem(
+      id: id,
+      userId: m['userId'] as String? ?? '',
+      timestamp: (m['timestamp'] as dynamic)?.toDate() ?? DateTime.now(),
+      score: (m['score'] as num?)?.toInt(),
+      text: m['text'] as String?,
+      tags: parsedTags,
+      careerGroupSnapshot: m['careerGroupSnapshot'] as String?,
     );
   }
 }
 
 // ─── 연차 분포 항목 ──────────────────────────────────────────
 class CareerGroupCount {
-  final String group; // student, 1y, 2_3y, 4_7y, 8y_plus
+  final String group; // careerBucket: '0-2', '3-5', '6+'
   final int count;
 
   const CareerGroupCount({required this.group, required this.count});
 
   String get label {
     const map = {
-      'student': '학생',
-      '1y': '1년차',
-      '2_3y': '2~3년차',
-      '4_7y': '4~7년차',
-      '8y_plus': '8년차+',
+      '0-2': '0~2년차',
+      '3-5': '3~5년차',
+      '6+':  '6년차+',
     };
     return map[group] ?? group;
   }

@@ -5,7 +5,8 @@ import '../../../services/admin_dashboard_service.dart';
 import '../widgets/admin_common_widgets.dart';
 
 class AdminUserFlowTab extends StatefulWidget {
-  const AdminUserFlowTab({super.key});
+  final DateTime since;
+  const AdminUserFlowTab({super.key, required this.since});
 
   @override
   State<AdminUserFlowTab> createState() => _AdminUserFlowTabState();
@@ -14,7 +15,7 @@ class AdminUserFlowTab extends StatefulWidget {
 class _AdminUserFlowTabState extends State<AdminUserFlowTab>
     with AutomaticKeepAliveClientMixin {
   @override
-  bool get wantKeepAlive => true;
+  bool get wantKeepAlive => false;
 
   bool _loading = true;
   String? _error;
@@ -26,16 +27,32 @@ class _AdminUserFlowTabState extends State<AdminUserFlowTab>
     _load();
   }
 
+  @override
+  void didUpdateWidget(AdminUserFlowTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.since != widget.since) _load();
+  }
+
   Future<void> _load() async {
     if (!mounted) return;
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
-      final steps = await AdminDashboardService.getFunnelSteps();
+      final steps =
+          await AdminDashboardService.getFunnelSteps(since: widget.since);
       if (!mounted) return;
-      setState(() { _steps = steps; _loading = false; });
+      setState(() {
+        _steps = steps;
+        _loading = false;
+      });
     } catch (e) {
       if (!mounted) return;
-      setState(() { _error = e.toString(); _loading = false; });
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
     }
   }
 

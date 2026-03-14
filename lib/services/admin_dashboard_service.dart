@@ -3,12 +3,17 @@ import 'package:flutter/foundation.dart';
 import '../models/admin_dashboard_models.dart';
 
 /// 관리자 대시보드 데이터를 Firestore에서 읽어오는 서비스
+///
+/// ── 기간 필터 ─────────────────────────────────────────────────
+/// [since] 파라미터로 기간을 제한합니다.
+/// null이면 전체 기간 데이터를 대상으로 합니다.
+/// ──────────────────────────────────────────────────────────────
 class AdminDashboardService {
   static final _db = FirebaseFirestore.instance;
 
   // ─── Overview ─────────────────────────────────────────────────
 
-  /// 전체 사용자 수 (excludeFromStats 제외)
+  /// 전체 사용자 수 (excludeFromStats 제외, 기간 무관)
   static Future<int> getTotalUserCount() async {
     try {
       final snap = await _db
@@ -23,10 +28,9 @@ class AdminDashboardService {
     }
   }
 
-  /// 최근 N일 신규 가입자 수
-  static Future<int> getRecentSignups(int days) async {
+  /// 신규 가입자 수 ([since] 이후 createdAt)
+  static Future<int> getRecentSignups({required DateTime since}) async {
     try {
-      final since = DateTime.now().subtract(Duration(days: days));
       final snap = await _db
           .collection('users')
           .where('createdAt', isGreaterThan: Timestamp.fromDate(since))
@@ -40,10 +44,9 @@ class AdminDashboardService {
     }
   }
 
-  /// 최근 N일 활성 유저 수 (lastActiveAt 기준)
-  static Future<int> getActiveUserCount(int days) async {
+  /// 활성 유저 수 ([since] 이후 lastActiveAt)
+  static Future<int> getActiveUserCount({required DateTime since}) async {
     try {
-      final since = DateTime.now().subtract(Duration(days: days));
       final snap = await _db
           .collection('users')
           .where('lastActiveAt', isGreaterThan: Timestamp.fromDate(since))
@@ -57,13 +60,13 @@ class AdminDashboardService {
     }
   }
 
-  /// 장기 미접속 유저 수 (lastActiveAt이 N일 이상 없거나 없는 유저)
-  static Future<int> getLongAbsentCount(int days) async {
+  /// 장기 미접속 유저 수 (lastActiveAt이 14일 이전, 기간 무관)
+  static Future<int> getLongAbsentCount({int days = 14}) async {
     try {
-      final since = DateTime.now().subtract(Duration(days: days));
+      final before = DateTime.now().subtract(Duration(days: days));
       final snap = await _db
           .collection('users')
-          .where('lastActiveAt', isLessThan: Timestamp.fromDate(since))
+          .where('lastActiveAt', isLessThan: Timestamp.fromDate(before))
           .where('excludeFromStats', isNotEqualTo: true)
           .count()
           .get();
@@ -74,30 +77,33 @@ class AdminDashboardService {
     }
   }
 
-  /// 연차별 사용자 분포
+  /// 연차별 사용자 분포 (careerBucket 기준, 기간 무관)
   static Future<List<CareerGroupCount>> getCareerGroupDistribution() async {
-    const groups = ['student', '1y', '2_3y', '4_7y', '8y_plus'];
+    const buckets = <(String, String)>[
+      ('0-2', '0~2년차'),
+      ('3-5', '3~5년차'),
+      ('6+', '6년차+'),
+    ];
     final result = <CareerGroupCount>[];
-    for (final g in groups) {
+    for (final (bucket, _) in buckets) {
       try {
         final snap = await _db
             .collection('users')
-            .where('careerYearGroup', isEqualTo: g)
+            .where('careerBucket', isEqualTo: bucket)
             .where('excludeFromStats', isNotEqualTo: true)
             .count()
             .get();
-        result.add(CareerGroupCount(group: g, count: snap.count ?? 0));
+        result.add(CareerGroupCount(group: bucket, count: snap.count ?? 0));
       } catch (_) {
-        result.add(CareerGroupCount(group: g, count: 0));
+        result.add(CareerGroupCount(group: bucket, count: 0));
       }
     }
     return result;
   }
 
-  /// 최근 24시간 오류 수
-  static Future<int> getRecentErrorCount() async {
+  /// [since] 이후 오류 수
+  static Future<int> getRecentErrorCount({required DateTime since}) async {
     try {
-      final since = DateTime.now().subtract(const Duration(hours: 24));
       final snap = await _db
           .collection('appErrors')
           .where('timestamp', isGreaterThan: Timestamp.fromDate(since))
@@ -110,19 +116,65 @@ class AdminDashboardService {
     }
   }
 
+  // ─── Emotion KPI ──────────────────────────────────────────────
+
+  /// [since] 이후 감정기록 수
+  static Future<int> getEmotionCount({required DateTime since}) async {
+    try {
+      final snap = await _db
+          .collection('emotionLogs')
+          .where('timestamp', isGreaterThan: Timestamp.fromDate(since))
+          .count()
+          .get();
+      return snap.count ?? 0;
+    } catch (e) {
+      debugPrint('⚠️ getEmotionCount: $e');
+      return 0;
+    }
+  }
+
+  /// [since] 이후 감정 평균 점수
+  ///
+  /// Firestore는 평균 집계를 지원하지 않으므로
+  /// 최근 200건을 읽어 클라이언트에서 계산합니다.
+  static Future<double?> getAverageEmotionScore({required DateTime since}) async {
+    try {
+      final snap = await _db
+          .collection('emotionLogs')
+          .where('timestamp', isGreaterThan: Timestamp.fromDate(since))
+          .orderBy('timestamp', descending: true)
+          .limit(200)
+          .get();
+      if (snap.docs.isEmpty) return null;
+      final scores = snap.docs
+          .map((d) => (d.data()['score'] as num?)?.toDouble())
+          .whereType<double>()
+          .toList();
+      if (scores.isEmpty) return null;
+      return scores.reduce((a, b) => a + b) / scores.length;
+    } catch (e) {
+      debugPrint('⚠️ getAverageEmotionScore: $e');
+      return null;
+    }
+  }
+
   // ─── User Flow (퍼널) ─────────────────────────────────────────
 
   /// 퍼널 단계별 도달자 수
   ///
-  /// activityLogs에서 isFunnel == true인 레코드를 type별로 집계
-  static Future<List<FunnelStep>> getFunnelSteps() async {
-    // 퍼널 단계 정의 (순서, key, 표시 라벨)
-    const steps = [
-      ('funnel_signup_complete', '회원가입 완료'),
-      ('funnel_profile_basic', '프로필 입력'),
-      ('funnel_profile_partner', '파트너 설정'),
-      ('funnel_first_emotion_start', '첫 감정기록 시작'),
-      ('funnel_first_emotion_complete', '첫 감정기록 완료'),
+  /// 4단계:
+  ///   1. view_sign_in_page           — 로그인 화면 진입
+  ///   2. login_success               — 로그인 성공
+  ///   3. tap_profile_save            — 프로필 저장 완료
+  ///   4. funnel_first_emotion_complete — 첫 감정기록 완료
+  ///
+  /// [since] 로 기간 제한 가능 (null이면 전체 기간)
+  static Future<List<FunnelStep>> getFunnelSteps({DateTime? since}) async {
+    const steps = <(String, String)>[
+      ('view_sign_in_page', '① 로그인 화면 진입'),
+      ('login_success', '② 로그인 성공'),
+      ('tap_profile_save', '③ 프로필 저장'),
+      ('funnel_first_emotion_complete', '④ 첫 감정기록 완료'),
     ];
 
     final result = <FunnelStep>[];
@@ -130,11 +182,12 @@ class AdminDashboardService {
 
     for (final (key, label) in steps) {
       try {
-        final snap = await _db
-            .collection('activityLogs')
-            .where('type', isEqualTo: key)
-            .count()
-            .get();
+        Query<Map<String, dynamic>> q =
+            _db.collection('activityLogs').where('type', isEqualTo: key);
+        if (since != null) {
+          q = q.where('timestamp', isGreaterThan: Timestamp.fromDate(since));
+        }
+        final snap = await q.count().get();
         final count = snap.count ?? 0;
         final rate = (prevCount != null && prevCount > 0)
             ? count / prevCount
@@ -152,18 +205,30 @@ class AdminDashboardService {
 
   // ─── Feature Reaction ─────────────────────────────────────────
 
-  /// 기능 클릭 TOP N (activityLogs 기반)
-  static Future<List<FeatureReactionItem>> getTopFeatures({int limit = 10}) async {
+  /// 기능 반응 TOP N
+  ///
+  /// Firestore group-by 미지원 → 최근 N건 읽어 클라이언트 집계
+  /// [since] 로 기간 제한 가능
+  static Future<List<FeatureReactionItem>> getTopFeatures({
+    int limit = 12,
+    DateTime? since,
+  }) async {
     try {
-      // Firestore는 group-by를 직접 지원하지 않으므로 최근 1000건을 읽어 클라이언트에서 집계
-      final snap = await _db
+      Query<Map<String, dynamic>> q = _db
           .collection('activityLogs')
           .where('isFunnel', isNotEqualTo: true)
           .orderBy('timestamp', descending: true)
-          .limit(2000)
-          .get();
+          .limit(2000);
+      if (since != null) {
+        q = _db
+            .collection('activityLogs')
+            .where('isFunnel', isNotEqualTo: true)
+            .where('timestamp', isGreaterThan: Timestamp.fromDate(since))
+            .orderBy('timestamp', descending: true)
+            .limit(2000);
+      }
+      final snap = await q.get();
 
-      // type → (clickCount, Set<uid>) 집계
       final typeMap = <String, ({int clicks, Set<String> users})>{};
       for (final doc in snap.docs) {
         final data = doc.data();
@@ -181,12 +246,14 @@ class AdminDashboardService {
         }
       }
 
-      final items = typeMap.entries.map((e) => FeatureReactionItem(
-        eventType: e.key,
-        label: FeatureReactionItem.labelFor(e.key),
-        clickCount: e.value.clicks,
-        userCount: e.value.users.length,
-      )).toList()
+      final items = typeMap.entries
+          .map((e) => FeatureReactionItem(
+                eventType: e.key,
+                label: FeatureReactionItem.labelFor(e.key),
+                clickCount: e.value.clicks,
+                userCount: e.value.users.length,
+              ))
+          .toList()
         ..sort((a, b) => b.clickCount.compareTo(a.clickCount));
 
       return items.take(limit).toList();
@@ -196,14 +263,58 @@ class AdminDashboardService {
     }
   }
 
-  /// 최근 오류 리스트
-  static Future<List<AppErrorItem>> getRecentErrors({int limit = 20}) async {
+  // ─── Emotion Feed ─────────────────────────────────────────────
+
+  /// 최근 감정 기록 리스트
+  ///
+  /// emotionLogs 최신순 [limit]건
+  /// [since] 로 기간 제한 가능
+  static Future<List<EmotionLogItem>> getRecentEmotionLogs({
+    int limit = 50,
+    DateTime? since,
+  }) async {
     try {
-      final snap = await _db
+      Query<Map<String, dynamic>> q = _db
+          .collection('emotionLogs')
+          .orderBy('timestamp', descending: true)
+          .limit(limit);
+      if (since != null) {
+        q = _db
+            .collection('emotionLogs')
+            .where('timestamp', isGreaterThan: Timestamp.fromDate(since))
+            .orderBy('timestamp', descending: true)
+            .limit(limit);
+      }
+      final snap = await q.get();
+      return snap.docs
+          .map((d) => EmotionLogItem.fromMap(d.id, d.data()))
+          .toList();
+    } catch (e) {
+      debugPrint('⚠️ getRecentEmotionLogs: $e');
+      return [];
+    }
+  }
+
+  // ─── Error Monitor ────────────────────────────────────────────
+
+  /// 최근 오류 리스트 ([since] 필터 포함)
+  static Future<List<AppErrorItem>> getRecentErrors({
+    int limit = 50,
+    DateTime? since,
+  }) async {
+    try {
+      Query<Map<String, dynamic>> q = _db
           .collection('appErrors')
           .orderBy('timestamp', descending: true)
-          .limit(limit)
-          .get();
+          .limit(limit);
+      if (since != null) {
+        q = _db
+            .collection('appErrors')
+            .where('timestamp', isGreaterThan: Timestamp.fromDate(since))
+            .orderBy('timestamp', descending: true)
+            .limit(limit);
+      }
+      final snap = await q.get();
       return snap.docs
           .map((d) => AppErrorItem.fromMap(d.id, d.data()))
           .toList();
@@ -213,13 +324,21 @@ class AdminDashboardService {
     }
   }
 
-  /// 페이지별 오류 발생 빈도 TOP N
-  static Future<List<MapEntry<String, int>>> getTopErrorPages({int limit = 5}) async {
+  /// 페이지별 오류 빈도 TOP N ([since] 필터 포함)
+  static Future<List<MapEntry<String, int>>> getTopErrorPages({
+    int limit = 5,
+    DateTime? since,
+  }) async {
     try {
-      final snap = await _db
-          .collection('appErrors')
-          .limit(500)
-          .get();
+      Query<Map<String, dynamic>> q =
+          _db.collection('appErrors').limit(500);
+      if (since != null) {
+        q = _db
+            .collection('appErrors')
+            .where('timestamp', isGreaterThan: Timestamp.fromDate(since))
+            .limit(500);
+      }
+      final snap = await q.get();
       final pageMap = <String, int>{};
       for (final doc in snap.docs) {
         final page = doc.data()['page'] as String? ?? '(알 수 없음)';
@@ -234,4 +353,5 @@ class AdminDashboardService {
     }
   }
 }
+
 

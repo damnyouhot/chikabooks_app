@@ -5,7 +5,8 @@ import '../../../services/admin_dashboard_service.dart';
 import '../widgets/admin_common_widgets.dart';
 
 class AdminFeatureTab extends StatefulWidget {
-  const AdminFeatureTab({super.key});
+  final DateTime since;
+  const AdminFeatureTab({super.key, required this.since});
 
   @override
   State<AdminFeatureTab> createState() => _AdminFeatureTabState();
@@ -14,7 +15,7 @@ class AdminFeatureTab extends StatefulWidget {
 class _AdminFeatureTabState extends State<AdminFeatureTab>
     with AutomaticKeepAliveClientMixin {
   @override
-  bool get wantKeepAlive => true;
+  bool get wantKeepAlive => false;
 
   bool _loading = true;
   String? _error;
@@ -29,25 +30,37 @@ class _AdminFeatureTabState extends State<AdminFeatureTab>
     _load();
   }
 
+  @override
+  void didUpdateWidget(AdminFeatureTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.since != widget.since) _load();
+  }
+
   Future<void> _load() async {
     if (!mounted) return;
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final results = await Future.wait([
-        AdminDashboardService.getTopFeatures(limit: 12),
-        AdminDashboardService.getRecentErrors(limit: 10),
-        AdminDashboardService.getTopErrorPages(limit: 5),
+        AdminDashboardService.getTopFeatures(limit: 12, since: widget.since),
+        AdminDashboardService.getRecentErrors(limit: 10, since: widget.since),
+        AdminDashboardService.getTopErrorPages(limit: 5, since: widget.since),
       ]);
       if (!mounted) return;
       setState(() {
-        _features      = results[0] as List<FeatureReactionItem>;
-        _errors        = results[1] as List<AppErrorItem>;
+        _features = results[0] as List<FeatureReactionItem>;
+        _errors = results[1] as List<AppErrorItem>;
         _topErrorPages = results[2] as List<MapEntry<String, int>>;
         _loading = false;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() { _error = e.toString(); _loading = false; });
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
     }
   }
 
@@ -87,11 +100,13 @@ class _AdminFeatureTabState extends State<AdminFeatureTab>
             const AdminEmptyState(message: '최근 오류가 없어요 👍')
           else
             ..._errors.map((e) => AdminErrorTile(
-              message: e.errorMessage,
-              timestamp: e.timestamp,
-              page: e.page,
-              feature: e.feature,
-            )),
+                  message: e.errorMessage,
+                  timestamp: e.timestamp,
+                  page: e.page,
+                  feature: e.feature,
+                  isFatal: e.isFatal,
+                  appVersion: e.appVersion,
+                )),
 
           const SizedBox(height: 32),
         ],

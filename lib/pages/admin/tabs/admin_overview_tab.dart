@@ -5,7 +5,14 @@ import '../../../services/admin_dashboard_service.dart';
 import '../widgets/admin_common_widgets.dart';
 
 class AdminOverviewTab extends StatefulWidget {
-  const AdminOverviewTab({super.key});
+  final DateTime since;
+  final String period; // 표시용 라벨 (예: '7일')
+
+  const AdminOverviewTab({
+    super.key,
+    required this.since,
+    required this.period,
+  });
 
   @override
   State<AdminOverviewTab> createState() => _AdminOverviewTabState();
@@ -14,7 +21,7 @@ class AdminOverviewTab extends StatefulWidget {
 class _AdminOverviewTabState extends State<AdminOverviewTab>
     with AutomaticKeepAliveClientMixin {
   @override
-  bool get wantKeepAlive => true;
+  bool get wantKeepAlive => false; // 기간 변경 시 항상 재로드
 
   bool _loading = true;
   String? _error;
@@ -22,10 +29,12 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
 
   // KPI 데이터
   int _totalUsers = 0;
-  int _newUsers7d = 0;
-  int _activeUsers7d = 0;
+  int _newUsers = 0;
+  int _activeUsers = 0;
   int _longAbsent = 0;
   int _recentErrors = 0;
+  int _emotionCount = 0;
+  double? _avgEmotionScore;
 
   // 연차 분포
   List<CareerGroupCount> _careerGroups = [];
@@ -36,32 +45,48 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
     _load();
   }
 
+  @override
+  void didUpdateWidget(AdminOverviewTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.since != widget.since) _load();
+  }
+
   Future<void> _load() async {
     if (!mounted) return;
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final results = await Future.wait([
         AdminDashboardService.getTotalUserCount(),
-        AdminDashboardService.getRecentSignups(7),
-        AdminDashboardService.getActiveUserCount(7),
-        AdminDashboardService.getLongAbsentCount(14),
-        AdminDashboardService.getRecentErrorCount(),
+        AdminDashboardService.getRecentSignups(since: widget.since),
+        AdminDashboardService.getActiveUserCount(since: widget.since),
+        AdminDashboardService.getLongAbsentCount(),
+        AdminDashboardService.getRecentErrorCount(since: widget.since),
+        AdminDashboardService.getEmotionCount(since: widget.since),
+        AdminDashboardService.getAverageEmotionScore(since: widget.since),
         AdminDashboardService.getCareerGroupDistribution(),
       ]);
       if (!mounted) return;
       setState(() {
-        _totalUsers    = results[0] as int;
-        _newUsers7d    = results[1] as int;
-        _activeUsers7d = results[2] as int;
-        _longAbsent    = results[3] as int;
-        _recentErrors  = results[4] as int;
-        _careerGroups  = results[5] as List<CareerGroupCount>;
+        _totalUsers      = results[0] as int;
+        _newUsers        = results[1] as int;
+        _activeUsers     = results[2] as int;
+        _longAbsent      = results[3] as int;
+        _recentErrors    = results[4] as int;
+        _emotionCount    = results[5] as int;
+        _avgEmotionScore = results[6] as double?;
+        _careerGroups    = results[7] as List<CareerGroupCount>;
         _lastSync = DateTime.now();
         _loading = false;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() { _error = e.toString(); _loading = false; });
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
     }
   }
 
@@ -83,29 +108,47 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
               padding: const EdgeInsets.only(bottom: 12),
               child: Text(
                 '마지막 동기화: ${_formatTime(_lastSync!)}',
-                style: const TextStyle(fontSize: 11, color: AppColors.textDisabled),
+                style: const TextStyle(
+                    fontSize: 11, color: AppColors.textDisabled),
               ),
             ),
 
-          // ── KPI 카드 그리드 ────────────────────────────────────
-          const AdminSectionTitle('핵심 지표'),
+          // ── KPI 카드 그리드 ──────────────────────────────────
+          AdminSectionTitle('핵심 지표 (${widget.period})'),
           _KpiGrid(kpis: [
             DashboardKpi(label: '총 사용자', value: '$_totalUsers명'),
-            DashboardKpi(label: '최근 7일 신규', value: '+$_newUsers7d명', sublabel: '7일 기준'),
-            DashboardKpi(label: '활성 사용자', value: '$_activeUsers7d명', sublabel: '최근 7일'),
-            DashboardKpi(label: '장기 미접속', value: '$_longAbsent명', sublabel: '14일 이상'),
+            DashboardKpi(
+                label: '기간 신규 가입',
+                value: '+$_newUsers명',
+                sublabel: widget.period),
+            DashboardKpi(
+                label: '활성 유저',
+                value: '$_activeUsers명',
+                sublabel: widget.period),
+            DashboardKpi(
+                label: '감정기록 수',
+                value: '$_emotionCount건',
+                sublabel: widget.period),
+            DashboardKpi(
+                label: '감정 평균 점수',
+                value: _avgEmotionScore != null
+                    ? _avgEmotionScore!.toStringAsFixed(1)
+                    : '-',
+                sublabel: widget.period),
+            DashboardKpi(label: '장기 미접속', value: '$_longAbsent명', sublabel: '14일+'),
           ]),
 
           const SizedBox(height: 8),
 
           // 오류 KPI — 강조 색상
-          _ErrorKpiCard(count: _recentErrors),
+          _ErrorKpiCard(count: _recentErrors, period: widget.period),
 
           const SizedBox(height: 20),
 
-          // ── 연차별 분포 ────────────────────────────────────────
+          // ── 연차별 분포 ──────────────────────────────────────
           const AdminSectionTitle('연차별 사용자 분포'),
-          _CareerGroupChart(groups: _careerGroups, totalUsers: _totalUsers),
+          _CareerGroupChart(
+              groups: _careerGroups, totalUsers: _totalUsers),
 
           const SizedBox(height: 32),
         ],
@@ -149,7 +192,8 @@ class _KpiGrid extends StatelessWidget {
 // ─── 오류 KPI 카드 (강조) ──────────────────────────────────────
 class _ErrorKpiCard extends StatelessWidget {
   final int count;
-  const _ErrorKpiCard({required this.count});
+  final String period;
+  const _ErrorKpiCard({required this.count, required this.period});
 
   @override
   Widget build(BuildContext context) {
@@ -181,11 +225,12 @@ class _ErrorKpiCard extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
-                  color: isAlert ? AppColors.error : AppColors.textPrimary,
+                  color:
+                      isAlert ? AppColors.error : AppColors.textPrimary,
                 ),
               ),
               Text(
-                '최근 24시간 오류',
+                '$period 오류 발생',
                 style: const TextStyle(
                   fontSize: 12,
                   color: AppColors.textSecondary,
@@ -196,7 +241,8 @@ class _ErrorKpiCard extends StatelessWidget {
           if (isAlert) ...[
             const Spacer(),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: AppColors.error,
                 borderRadius: BorderRadius.circular(99),
@@ -217,7 +263,8 @@ class _ErrorKpiCard extends StatelessWidget {
 class _CareerGroupChart extends StatelessWidget {
   final List<CareerGroupCount> groups;
   final int totalUsers;
-  const _CareerGroupChart({required this.groups, required this.totalUsers});
+  const _CareerGroupChart(
+      {required this.groups, required this.totalUsers});
 
   @override
   Widget build(BuildContext context) {
@@ -235,7 +282,7 @@ class _CareerGroupChart extends StatelessWidget {
           child: Row(
             children: [
               SizedBox(
-                width: 60,
+                width: 68,
                 child: Text(
                   g.label,
                   style: const TextStyle(
@@ -251,13 +298,14 @@ class _CareerGroupChart extends StatelessWidget {
                     value: ratio.toDouble(),
                     minHeight: 14,
                     backgroundColor: AppColors.surfaceMuted,
-                    valueColor: const AlwaysStoppedAnimation(AppColors.accent),
+                    valueColor:
+                        const AlwaysStoppedAnimation(AppColors.accent),
                   ),
                 ),
               ),
               const SizedBox(width: 8),
               SizedBox(
-                width: 60,
+                width: 72,
                 child: Text(
                   '${g.count}명 ($pct%)',
                   style: const TextStyle(
@@ -273,4 +321,3 @@ class _CareerGroupChart extends StatelessWidget {
     );
   }
 }
-

@@ -233,6 +233,10 @@ class AdminErrorTile extends StatelessWidget {
   final String? page;
   final String? feature;
   final DateTime timestamp;
+  final bool isFatal;
+  final String? appVersion;
+  final String? careerGroup;
+  final String? region;
 
   const AdminErrorTile({
     super.key,
@@ -240,26 +244,46 @@ class AdminErrorTile extends StatelessWidget {
     required this.timestamp,
     this.page,
     this.feature,
+    this.isFatal = false,
+    this.appVersion,
+    this.careerGroup,
+    this.region,
   });
 
   @override
   Widget build(BuildContext context) {
     final time =
-        '${timestamp.month}/${timestamp.day} ${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}';
+        '${timestamp.month}/${timestamp.day} '
+        '${timestamp.hour.toString().padLeft(2, '0')}:'
+        '${timestamp.minute.toString().padLeft(2, '0')}';
+
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.surfaceMuted,
+        color: isFatal
+            ? AppColors.error.withOpacity(0.06)
+            : AppColors.surfaceMuted,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.error.withOpacity(0.2)),
+        border: Border.all(
+          color: isFatal
+              ? AppColors.error.withOpacity(0.35)
+              : AppColors.error.withOpacity(0.15),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.error_outline, size: 14, color: AppColors.error),
+              Icon(
+                isFatal
+                    ? Icons.dangerous_outlined
+                    : Icons.error_outline,
+                size: 14,
+                color: AppColors.error,
+              ),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
@@ -273,16 +297,35 @@ class AdminErrorTile extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
+              if (isFatal)
+                Container(
+                  margin: const EdgeInsets.only(left: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.error,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    'FATAL',
+                    style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white),
+                  ),
+                ),
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Wrap(
             spacing: 8,
+            runSpacing: 2,
             children: [
-              if (page != null)
-                _badge('📄 $page'),
-              if (feature != null)
-                _badge('🔧 $feature'),
+              if (page != null) _badge('📄 $page'),
+              if (feature != null) _badge('🔧 $feature'),
+              if (careerGroup != null) _badge('👤 $careerGroup'),
+              if (region != null) _badge('📍 $region'),
+              if (appVersion != null) _badge('v$appVersion'),
               _badge('🕐 $time'),
             ],
           ),
@@ -292,8 +335,8 @@ class AdminErrorTile extends StatelessWidget {
   }
 
   Widget _badge(String text) => Text(
-    text,
-    style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
-  );
+        text,
+        style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+      );
 }
 
