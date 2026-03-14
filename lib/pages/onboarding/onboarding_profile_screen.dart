@@ -633,6 +633,11 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
   void initState() {
     super.initState();
     _loadExistingProfile(); // ✅ 기존 프로필 로드
+    // 온보딩 프로필 화면 진입 이벤트
+    AdminActivityService.log(
+      ActivityEventType.viewOnboardingProfile,
+      page: 'onboarding_profile',
+    );
   }
 
   @override
@@ -738,6 +743,13 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
           'region': _selectedRegion,
         },
       );
+      // 프로필 저장 성공 이벤트
+      await AdminActivityService.log(
+        ActivityEventType.tapProfileSave,
+        page: 'onboarding_profile',
+      );
+      // 스냅샷 캐시 갱신 (프로필 저장 후 careerGroup 등 최신화)
+      await AdminActivityService.refreshSnapshot();
 
       debugPrint('✅ [OnboardingProfile] 저장 완료!');
 

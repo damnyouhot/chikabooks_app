@@ -31,6 +31,11 @@ class _SignInPageState extends State<SignInPage> {
   void initState() {
     super.initState();
     _loadLastProvider();
+    // 로그인 화면 진입 이벤트
+    AdminActivityService.log(
+      ActivityEventType.viewSignInPage,
+      page: 'sign_in',
+    );
   }
 
   Future<void> _loadLastProvider() async {
@@ -40,6 +45,7 @@ class _SignInPageState extends State<SignInPage> {
 
   /// Google 로그인
   Future<void> _signInWithGoogle() async {
+    AdminActivityService.log(ActivityEventType.tapLoginGoogle, page: 'sign_in');
     setState(() => _isLoading = true);
     try {
       debugPrint('🔑 Google 로그인 시작');
@@ -94,6 +100,8 @@ class _SignInPageState extends State<SignInPage> {
       // provider 기록 (Firestore + 로컬)
       await SignInTracker.record('google');
       await OnboardingService.schedulePendingOnboarding();
+      // 로그인 성공 이벤트
+      await AdminActivityService.log(ActivityEventType.loginSuccess, page: 'sign_in', extra: {'provider': 'google'});
       // 가입/로그인 퍼널 이벤트 기록
       await AdminActivityService.logFunnel(
         FunnelEventType.signupComplete,
@@ -116,6 +124,7 @@ class _SignInPageState extends State<SignInPage> {
 
   /// Apple 로그인
   Future<void> _signInWithApple() async {
+    AdminActivityService.log(ActivityEventType.tapLoginApple, page: 'sign_in');
     setState(() => _isLoading = true);
     try {
       final user = await AppleAuthService.signInWithApple();
@@ -127,6 +136,7 @@ class _SignInPageState extends State<SignInPage> {
         // 로컬 provider 기록 (배지용)
         await SignInTracker.record('apple');
         await OnboardingService.schedulePendingOnboarding();
+        await AdminActivityService.log(ActivityEventType.loginSuccess, page: 'sign_in', extra: {'provider': 'apple'});
         await AdminActivityService.logFunnel(
           FunnelEventType.signupComplete,
           extra: {'provider': 'apple'},
@@ -139,6 +149,7 @@ class _SignInPageState extends State<SignInPage> {
 
   /// 카카오 로그인
   Future<void> _signInWithKakao() async {
+    AdminActivityService.log(ActivityEventType.tapLoginKakao, page: 'sign_in');
     // 웹에서는 kakao_flutter_sdk가 정상 동작하지 않아 안내 메시지 표시
     if (kIsWeb) {
       showDialog(
@@ -185,6 +196,7 @@ class _SignInPageState extends State<SignInPage> {
       // 로컬 provider 기록 (배지용, Firestore는 Function에서 이미 저장)
       await SignInTracker.record('kakao');
       await OnboardingService.schedulePendingOnboarding();
+      await AdminActivityService.log(ActivityEventType.loginSuccess, page: 'sign_in', extra: {'provider': 'kakao'});
       await AdminActivityService.logFunnel(
         FunnelEventType.signupComplete,
         extra: {'provider': 'kakao'},
@@ -206,6 +218,7 @@ class _SignInPageState extends State<SignInPage> {
 
   /// 네이버 로그인
   Future<void> _signInWithNaver() async {
+    AdminActivityService.log(ActivityEventType.tapLoginNaver, page: 'sign_in');
     setState(() => _isLoading = true);
     try {
       debugPrint('🔑 네이버 로그인 시작');
@@ -230,6 +243,7 @@ class _SignInPageState extends State<SignInPage> {
       // 로컬 provider 기록 (배지용)
       await SignInTracker.record('naver');
       await OnboardingService.schedulePendingOnboarding();
+      await AdminActivityService.log(ActivityEventType.loginSuccess, page: 'sign_in', extra: {'provider': 'naver'});
       await AdminActivityService.logFunnel(
         FunnelEventType.signupComplete,
         extra: {'provider': 'naver'},
@@ -251,6 +265,7 @@ class _SignInPageState extends State<SignInPage> {
 
   /// 이메일/비밀번호 로그인 (다이얼로그)
   Future<void> _showEmailSignInDialog() async {
+    AdminActivityService.log(ActivityEventType.tapLoginEmail, page: 'sign_in');
     final emailController = TextEditingController();
     final passwordController = TextEditingController();
     final passwordConfirmController = TextEditingController();
@@ -410,6 +425,7 @@ class _SignInPageState extends State<SignInPage> {
                             // ✅ pop 전에 먼저 실행 — HomeShell 생성 전에 플래그 보장
                             await SignInTracker.record('email');
                             await OnboardingService.schedulePendingOnboarding();
+                            await AdminActivityService.log(ActivityEventType.loginSuccess, page: 'sign_in', extra: {'provider': 'email', 'isSignUp': isSignUp});
                             if (isSignUp) {
                               await AdminActivityService.logFunnel(
                                 FunnelEventType.signupComplete,

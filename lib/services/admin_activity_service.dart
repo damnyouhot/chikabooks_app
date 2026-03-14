@@ -5,39 +5,50 @@ import 'package:flutter/foundation.dart';
 /// 관리자 대시보드용 사용자 행동 기록 서비스
 ///
 /// 컬렉션: `activityLogs`
-///   - userId       : 행동한 유저 UID
-///   - type         : 이벤트 타입 (ActivityEventType.value)
-///   - page         : 이벤트 발생 페이지
-///   - action       : 세부 액션 설명 (선택)
-///   - targetId     : 관련 리소스 ID (선택, 예: jobId, emotionLogId)
-///   - timestamp    : 서버 타임스탬프
+///   - userId                 : 행동한 유저 UID
+///   - type                   : 이벤트 타입 (ActivityEventType.value)
+///   - page                   : 이벤트 발생 페이지
+///   - timestamp              : 서버 타임스탬프
+///   - careerGroupSnapshot    : 기록 시점 연차 (분석용)
+///   - careerBucketSnapshot   : 기록 시점 연차 버킷 (분석용)
+///   - regionSnapshot         : 기록 시점 지역 (분석용)
+///   - workplaceTypeSnapshot  : 기록 시점 근무지 유형 (분석용)
+///   - partnerStatusSnapshot  : 기록 시점 파트너 상태 (분석용)
 ///
 /// ── 설계 원칙 ─────────────────────────────────────────────────
 /// 1. UI 코드에서 직접 Firestore를 쓰지 않고 이 서비스만 호출
 /// 2. 실패해도 앱 동작에 영향 없도록 try-catch 내부 처리
 /// 3. excludeFromStats == true 유저는 기록하지 않음
+/// 4. 프로필 스냅샷은 세션 캐시로 관리 — Firestore 읽기 최소화
 /// ──────────────────────────────────────────────────────────────
 class AdminActivityService {
   static final _db = FirebaseFirestore.instance;
   static final _auth = FirebaseAuth.instance;
 
-  // 세션 내 제외 계정 캐시 (매번 Firestore 조회 방지)
+  // ── 세션 캐시 ────────────────────────────────────────────────
+  /// 통계 제외 계정 여부 캐시
   static bool? _excludedCache;
 
-  /// 캐시 초기화 (로그아웃 시 호출)
-  static void clearCache() => _excludedCache = null;
+  /// 유저 스냅샷 캐시 (Firestore 읽기 최소화)
+  static _UserSnapshot? _snapshotCache;
+
+  /// 캐시 초기화 (로그아웃 / 계정 전환 시 반드시 호출)
+  static void clearCache() {
+    _excludedCache = null;
+    _snapshotCache = null;
+  }
+
+  // ── 공개 메서드 ───────────────────────────────────────────────
 
   /// 행동 이벤트 기록
   ///
   /// [type]     : [ActivityEventType] 열거형
   /// [page]     : 이벤트 발생 페이지명 (예: 'home', 'career', 'job_list')
-  /// [action]   : 세부 액션 (선택, 예: 'tap_save_button')
-  /// [targetId] : 관련 리소스 ID (선택)
+  /// [targetId] : 관련 리소스 ID (선택, 예: jobId)
   /// [extra]    : 추가 메타데이터 (선택)
   static Future<void> log(
     ActivityEventType type, {
     required String page,
-    String? action,
     String? targetId,
     Map<String, dynamic>? extra,
   }) async {
@@ -45,30 +56,27 @@ class AdminActivityService {
       final uid = _auth.currentUser?.uid;
       if (uid == null) return;
 
-      // 제외 계정 확인 (세션 캐시 활용)
       if (await _isExcluded(uid)) return;
 
+      final snapshot = await _getSnapshot(uid);
       final data = <String, dynamic>{
         'userId': uid,
         'type': type.value,
         'page': page,
         'timestamp': FieldValue.serverTimestamp(),
+        ...snapshot.toMap(),
       };
 
-      if (action != null) data['action'] = action;
       if (targetId != null) data['targetId'] = targetId;
       if (extra != null) data.addAll(extra);
 
       await _db.collection('activityLogs').add(data);
     } catch (e) {
-      // 기록 실패는 무시 (앱 동작에 영향 없어야 함)
       debugPrint('⚠️ AdminActivityService.log 실패: $e');
     }
   }
 
   /// 퍼널 이벤트 기록 (특정 단계 도달)
-  ///
-  /// 가입 퍼널, 감정기록 퍼널 등 단계별 전환율 측정에 사용
   static Future<void> logFunnel(
     FunnelEventType type, {
     Map<String, dynamic>? extra,
@@ -79,12 +87,14 @@ class AdminActivityService {
 
       if (await _isExcluded(uid)) return;
 
+      final snapshot = await _getSnapshot(uid);
       final data = <String, dynamic>{
         'userId': uid,
         'type': type.value,
         'page': type.page,
         'timestamp': FieldValue.serverTimestamp(),
         'isFunnel': true,
+        ...snapshot.toMap(),
       };
 
       if (extra != null) data.addAll(extra);
@@ -95,17 +105,78 @@ class AdminActivityService {
     }
   }
 
-  /// 제외 계정 여부 확인 (세션 캐시 적용)
+  /// 스냅샷 캐시 수동 갱신 (프로필 수정 후 호출)
+  static Future<void> refreshSnapshot() async {
+    _snapshotCache = null;
+    final uid = _auth.currentUser?.uid;
+    if (uid != null) await _getSnapshot(uid);
+  }
+
+  // ── 내부 메서드 ───────────────────────────────────────────────
+
+  /// 통계 제외 계정 여부 (세션 캐시)
   static Future<bool> _isExcluded(String uid) async {
     if (_excludedCache != null) return _excludedCache!;
-
     try {
       final doc = await _db.collection('users').doc(uid).get();
       _excludedCache = doc.data()?['excludeFromStats'] == true;
+      // 첫 로드 시 스냅샷도 함께 캐시
+      if (_snapshotCache == null) {
+        _snapshotCache = _UserSnapshot.fromMap(doc.data() ?? {});
+      }
       return _excludedCache!;
     } catch (_) {
       return false;
     }
+  }
+
+  /// 유저 스냅샷 가져오기 (세션 캐시 우선)
+  static Future<_UserSnapshot> _getSnapshot(String uid) async {
+    if (_snapshotCache != null) return _snapshotCache!;
+    try {
+      final doc = await _db.collection('users').doc(uid).get();
+      _excludedCache ??= doc.data()?['excludeFromStats'] == true;
+      _snapshotCache = _UserSnapshot.fromMap(doc.data() ?? {});
+      return _snapshotCache!;
+    } catch (_) {
+      return const _UserSnapshot();
+    }
+  }
+}
+
+// ── 유저 스냅샷 내부 모델 ──────────────────────────────────────
+/// 이벤트 로그에 첨부되는 유저 특성 스냅샷
+class _UserSnapshot {
+  final String careerGroup;
+  final String careerBucket;
+  final String region;
+  final String workplaceType;
+  final String partnerStatus;
+
+  const _UserSnapshot({
+    this.careerGroup = '',
+    this.careerBucket = '',
+    this.region = '',
+    this.workplaceType = '',
+    this.partnerStatus = '',
+  });
+
+  factory _UserSnapshot.fromMap(Map<String, dynamic> m) => _UserSnapshot(
+    careerGroup:    m['careerGroup']    as String? ?? '',
+    careerBucket:   m['careerBucket']   as String? ?? '',
+    region:         m['region']         as String? ?? '',
+    workplaceType:  m['workplaceType']  as String? ?? '',
+    partnerStatus:  m['partnerStatus']  as String? ?? '',
+  );
+
+  Map<String, dynamic> toMap() {
+    final map = <String, dynamic>{};
+    if (careerGroup.isNotEmpty)   map['careerGroupSnapshot']   = careerGroup;
+    if (careerBucket.isNotEmpty)  map['careerBucketSnapshot']  = careerBucket;
+    if (region.isNotEmpty)        map['regionSnapshot']        = region;
+    if (workplaceType.isNotEmpty) map['workplaceTypeSnapshot'] = workplaceType;
+    if (partnerStatus.isNotEmpty) map['partnerStatusSnapshot'] = partnerStatus;
+    return map;
   }
 }
 
@@ -114,11 +185,9 @@ class AdminActivityService {
 // ═══════════════════════════════════════════════════════════════
 
 /// 행동 이벤트 타입
-///
-/// [value]  : Firestore에 저장되는 문자열 키
-/// [label]  : 대시보드 표시용 한글 라벨
 enum ActivityEventType {
   // ── 화면 진입 ──────────────────────────────────────────────
+  viewSignInPage('view_sign_in_page', '로그인 화면 진입'),
   viewHome('view_home', '홈 진입'),
   viewCareer('view_career', '커리어 탭 진입'),
   viewJob('view_job', '구직 탭 진입'),
@@ -127,11 +196,23 @@ enum ActivityEventType {
   viewSettings('view_settings', '설정 진입'),
   viewEmotionRecord('view_emotion_record', '감정기록 화면 진입'),
   viewJobDetail('view_job_detail', '공고 상세 진입'),
+  viewOnboardingProfile('view_onboarding_profile', '온보딩 프로필 화면 진입'),
+
+  // ── 소셜 로그인 버튼 ────────────────────────────────────────
+  tapLoginGoogle('tap_login_google', 'Google 로그인 버튼'),
+  tapLoginApple('tap_login_apple', 'Apple 로그인 버튼'),
+  tapLoginKakao('tap_login_kakao', 'Kakao 로그인 버튼'),
+  tapLoginNaver('tap_login_naver', 'Naver 로그인 버튼'),
+  tapLoginEmail('tap_login_email', '이메일 로그인 버튼'),
+  loginSuccess('login_success', '로그인 성공'),
 
   // ── 버튼/기능 클릭 ─────────────────────────────────────────
   tapCharacter('tap_character', '캐릭터 클릭'),
   tapEmotionStart('tap_emotion_start', '감정기록 시작'),
-  tapEmotionSave('tap_emotion_save', '감정기록 저장'),
+  tapEmotionSave('tap_emotion_save', '감정기록 저장 시도'),
+  emotionSaveSuccess('emotion_save_success', '감정기록 저장 성공'),
+  emotionSaveFail('emotion_save_fail', '감정기록 저장 실패'),
+  tapProfileSave('tap_profile_save', '프로필 저장'),
   tapJobSave('tap_job_save', '공고 관심 저장'),
   tapJobApply('tap_job_apply', '공고 지원'),
   tapCareerEdit('tap_career_edit', '커리어 카드 수정'),
@@ -153,11 +234,6 @@ enum ActivityEventType {
 }
 
 /// 퍼널 단계 이벤트 타입
-///
-/// [value]  : Firestore 저장 키
-/// [page]   : 발생 페이지
-/// [label]  : 대시보드 표시용 라벨
-/// [order]  : 퍼널 순서 (낮을수록 앞 단계)
 enum FunnelEventType {
   signupComplete('funnel_signup_complete', 'auth', '회원가입 완료', 1),
   profileBasicComplete('funnel_profile_basic', 'onboarding', '기본 프로필 완료', 2),
@@ -171,4 +247,3 @@ enum FunnelEventType {
   final int order;
   const FunnelEventType(this.value, this.page, this.label, this.order);
 }
-

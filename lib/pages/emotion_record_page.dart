@@ -16,6 +16,16 @@ class _EmotionRecordPageState extends State<EmotionRecordPage> {
   int _score = 3;
   bool _loading = false;
 
+  @override
+  void initState() {
+    super.initState();
+    // 감정기록 화면 진입 이벤트
+    AdminActivityService.log(
+      ActivityEventType.viewEmotionRecord,
+      page: 'emotion_record',
+    );
+  }
+
   Future<void> _submit() async {
     developer.log('--- 감정 기록 시작 ---', name: 'EmotionDebug');
     setState(() => _loading = true);
@@ -45,11 +55,11 @@ class _EmotionRecordPageState extends State<EmotionRecordPage> {
         FunnelEventType.firstEmotionComplete,
         extra: {'score': _score},
       );
-      // 감정기록 저장 클릭 이벤트 기록
+      // 감정기록 저장 성공 이벤트
       await AdminActivityService.log(
-        ActivityEventType.tapEmotionSave,
+        ActivityEventType.emotionSaveSuccess,
         page: 'emotion_record',
-        targetId: 'score_$_score',
+        extra: {'score': _score},
       );
 
       if (mounted) {
@@ -65,6 +75,12 @@ class _EmotionRecordPageState extends State<EmotionRecordPage> {
         name: 'EmotionDebug',
         error: e,
         stackTrace: s,
+      );
+      // 감정기록 저장 실패 이벤트
+      AdminActivityService.log(
+        ActivityEventType.emotionSaveFail,
+        page: 'emotion_record',
+        extra: {'error': e.toString()},
       );
       if (mounted) {
         ScaffoldMessenger.of(
