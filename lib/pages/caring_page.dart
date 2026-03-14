@@ -644,8 +644,9 @@ class _CaringPageState extends State<CaringPage>
                       // clamp: 최소 1.7(너무 작아지지 않게) · 최대 2.5(너무 커지지 않게)
                       final baseH = 284.0;
                       // 온보딩 중에는 캐릭터를 20% 축소
-                      final rawScale = (constraints.maxHeight / baseH * 2.112)
-                          .clamp(1.7, 2.5);
+                      // 전체 배율을 50%로 축소: 기존 2.112 → 1.056, clamp 1.7→0.85 / 2.5→1.25
+                      final rawScale = (constraints.maxHeight / baseH * 1.056)
+                          .clamp(0.85, 1.25);
                       final scale = isOnboarding ? rawScale * 0.80 : rawScale;
 
                       return OverflowBox(
