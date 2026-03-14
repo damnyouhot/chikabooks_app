@@ -1,34 +1,74 @@
 import 'package:flutter/material.dart';
-import '../ebook/ebook_list_page.dart';
-import 'admin_ebook_create_page.dart';
-import 'admin_item_create_page.dart'; // 아이템 등록 페이지 import
-import 'admin_quiz_create_page.dart';
+import '../../core/theme/app_colors.dart';
+import 'tabs/admin_overview_tab.dart';
+import 'tabs/admin_userflow_tab.dart';
+import 'tabs/admin_feature_tab.dart';
 
+/// 관리자 전용 운영 대시보드
+///
+/// 3탭 구조:
+///   - Overview     : 핵심 KPI + 연차 분포
+///   - User Flow    : 가입 퍼널 + 전환율
+///   - Feature      : 기능 클릭 TOP + 오류 리스트
+///
+/// 진입 경로: 설정 → 운영 대시보드 (isAdmin == true 계정만 노출)
+/// 라우트 가드: /admin 경로는 app_router에서 isAdmin 검증 후 허용
 class AdminDashboardPage extends StatelessWidget {
   const AdminDashboardPage({super.key});
 
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 4, // 탭 개수 3개 -> 4개로 변경
+      length: 3,
       child: Scaffold(
+        backgroundColor: AppColors.appBg,
         appBar: AppBar(
-          title: const Text('관리자 대시보드'),
-          bottom: const TabBar(
-            tabs: [
-              Tab(text: '전자책 목록'),
-              Tab(text: '전자책 등록'),
-              Tab(text: '퀴즈 등록'),
-              Tab(text: '아이템 등록'), // 아이템 등록 탭 추가
-            ],
+          backgroundColor: AppColors.appBg,
+          elevation: 0,
+          title: const Text(
+            '운영 대시보드',
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(46),
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceMuted,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: TabBar(
+                indicator: BoxDecoration(
+                  color: AppColors.accent,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                indicatorSize: TabBarIndicatorSize.tab,
+                indicatorPadding: const EdgeInsets.all(3),
+                labelColor: AppColors.onAccent,
+                unselectedLabelColor: AppColors.textSecondary,
+                labelStyle: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+                dividerColor: Colors.transparent,
+                tabs: const [
+                  Tab(text: 'Overview'),
+                  Tab(text: 'User Flow'),
+                  Tab(text: 'Feature'),
+                ],
+              ),
+            ),
           ),
         ),
         body: const TabBarView(
           children: [
-            EbookListPage(),
-            AdminEbookCreatePage(),
-            AdminQuizCreatePage(),
-            AdminItemCreatePage(), // 아이템 등록 페이지 연결
+            AdminOverviewTab(),
+            AdminUserFlowTab(),
+            AdminFeatureTab(),
           ],
         ),
       ),

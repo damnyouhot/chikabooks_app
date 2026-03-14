@@ -3,10 +3,12 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '../../core/theme/app_colors.dart';
 import '../../services/onboarding_service.dart';
+import '../../services/user_profile_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -522,6 +524,9 @@ class _SettingsPageState extends State<SettingsPage> {
 
           const SizedBox(height: 12),
 
+          // 관리자 전용 섹션
+          _AdminSection(user: user),
+
           // 4) 계정 삭제 (Apple 심사 필수)
           const _SectionTitle(title: '계정'),
           ListTile(
@@ -644,6 +649,52 @@ class _AccountCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// 관리자 전용 섹션 — isAdmin == true인 계정에만 보임
+class _AdminSection extends StatefulWidget {
+  final User? user;
+  const _AdminSection({required this.user});
+
+  @override
+  State<_AdminSection> createState() => _AdminSectionState();
+}
+
+class _AdminSectionState extends State<_AdminSection> {
+  bool _isAdmin = false;
+  bool _checked = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _check();
+  }
+
+  Future<void> _check() async {
+    if (widget.user == null) return;
+    final result = await UserProfileService.isAdmin();
+    if (mounted) setState(() { _isAdmin = result; _checked = true; });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_checked || !_isAdmin) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionTitle(title: '관리자'),
+        ListTile(
+          leading: const Icon(Icons.bar_chart_rounded),
+          title: const Text('운영 대시보드'),
+          subtitle: const Text('사용자 통계 · 기능 반응 · 퍼널 분석'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => context.push('/admin'),
+        ),
+        const SizedBox(height: 12),
+      ],
     );
   }
 }

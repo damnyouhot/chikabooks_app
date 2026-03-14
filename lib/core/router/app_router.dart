@@ -5,6 +5,7 @@ import '../../pages/job_page.dart';
 import '../../pages/hira_update_page.dart';
 import '../../pages/ebook/ebook_list_page.dart';
 import '../../pages/quiz_today_page.dart';
+import '../../pages/admin/admin_dashboard_page.dart';
 import '../../features/jobs/web/job_post_web_page.dart';
 import '../../features/jobs/web/legal_page.dart';
 import '../../features/jobs/ui/clinic_verify_page.dart';
@@ -20,22 +21,28 @@ import '../../features/publisher/pages/publisher_done_page.dart';
 import '../../features/resume/screens/resume_home_screen.dart';
 import '../../features/resume/screens/resume_edit_screen.dart';
 import '../../features/resume/screens/ocr_review_screen.dart';
+import '../../services/user_profile_service.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/',
 
   // ── 글로벌 리다이렉트: 인증 필요 경로 가드 ──────────────────
-  redirect: (context, state) {
+  redirect: (context, state) async {
     final user = FirebaseAuth.instance.currentUser;
     final path = state.uri.path;
 
     // 인증 필요 경로 목록
     const guardedPrefixes = ['/post-job', '/applicant', '/clinic-verify'];
-
     final needsAuth = guardedPrefixes.any((p) => path.startsWith(p));
-
     if (needsAuth && user == null) {
       return '/login?next=$path';
+    }
+
+    // 관리자 대시보드 접근 가드
+    if (path.startsWith('/admin')) {
+      if (user == null) return '/';
+      final isAdmin = await UserProfileService.isAdmin();
+      if (!isAdmin) return '/'; // 비관리자 차단 → 홈으로
     }
 
     return null;
@@ -52,6 +59,12 @@ final appRouter = GoRouter(
     GoRoute(path: '/policy', builder: (_, __) => const HiraUpdatePage()),
     GoRoute(path: '/books', builder: (_, __) => const EbookListPage()),
     GoRoute(path: '/quiz', builder: (_, __) => const QuizTodayPage()),
+
+    // ── 관리자 대시보드 ──────────────────────────────────────
+    GoRoute(
+      path: '/admin',
+      builder: (_, __) => const AdminDashboardPage(),
+    ),
 
     // ── 로그인 불필요 — 법적 문서 페이지 ──────────────────
     GoRoute(path: '/privacy', builder: (_, __) => buildPrivacyPage()),
