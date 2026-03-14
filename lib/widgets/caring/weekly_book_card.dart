@@ -14,6 +14,7 @@ class WeeklyBookCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final bookTitle    = data?['title']        as String? ?? '';
     final bookSubtitle = data?['subtitle']     as String? ?? '';
+    final bookAuthor   = data?['author']       as String? ?? '';
     final thumbnailUrl = data?['thumbnailUrl'] as String?;
 
     return AppMutedCard(
@@ -31,7 +32,7 @@ class WeeklyBookCard extends StatelessWidget {
               Text(
                 '이주의 책',
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
                 ),
@@ -98,6 +99,18 @@ class WeeklyBookCard extends StatelessWidget {
                         const SizedBox(height: 1),
                         Text(
                           '― $bookSubtitle',
+                          style: const TextStyle(
+                            fontSize: 9,
+                            color: AppColors.textSecondary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                      if (bookAuthor.isNotEmpty) ...[
+                        const SizedBox(height: 1),
+                        Text(
+                          '저자: $bookAuthor',
                           style: const TextStyle(
                             fontSize: 9,
                             color: AppColors.textSecondary,

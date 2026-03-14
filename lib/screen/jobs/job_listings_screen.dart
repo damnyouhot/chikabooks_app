@@ -11,11 +11,9 @@ import '../../core/widgets/app_badge.dart';
 import '../../data/mock_jobs.dart';
 import '../../models/job.dart';
 import '../../notifiers/job_filter_notifier.dart';
-import '../../pages/settings/settings_page.dart';
 import '../../services/career_profile_service.dart';
 import '../../services/job_match_service.dart';
 import '../../services/job_service.dart';
-import '../../pages/career/career_tab.dart';
 import '../../widgets/job/job_level1_carousel.dart';
 import '../../widgets/job/filter_bottom_sheet.dart';
 import '../jobs/job_detail_screen.dart';
@@ -185,28 +183,9 @@ class _JobListingsScreenState extends State<JobListingsScreen> {
         CustomScrollView(
           controller: _scrollController,
           slivers: [
-            // ── 타이틀 섹션 (스크롤로 사라짐) ──────────────────
+            // ── 커리어 요약 (스크롤로 사라짐) ──────────────────
             SliverToBoxAdapter(
-              child: _TitleSection(
-                careerSummary: _careerSummary,
-              ),
-            ),
-
-            // ── 소탭바 (타이틀 사라지면 상단 고정) ─────────────
-            const SliverAppBar(
-              pinned: true,
-              automaticallyImplyLeading: false,
-              backgroundColor: AppColors.appBg,
-              surfaceTintColor: Colors.transparent,
-              elevation: 0,
-              scrolledUnderElevation: 0,
-              toolbarHeight: 0,
-              collapsedHeight: 52,
-              expandedHeight: 52,
-              flexibleSpace: FlexibleSpaceBar(
-                collapseMode: CollapseMode.none,
-                background: CareerTabHeader(),
-              ),
+              child: _CareerSummarySection(careerSummary: _careerSummary),
             ),
 
             // ── Level 1 A클래스: 소탭 바로 아래 항상 고정 ──────
@@ -400,117 +379,48 @@ class _JobListingsScreenState extends State<JobListingsScreen> {
   }
 }
 
-// ── 타이틀 섹션 (스크롤로 사라짐) ───────────────────────────────
-class _TitleSection extends StatelessWidget {
+// ── 커리어 요약 섹션 (스크롤로 사라짐, 타이틀은 job_page 공통 헤더에서 표시) ──
+class _CareerSummarySection extends StatelessWidget {
   final String careerSummary;
 
-  const _TitleSection({required this.careerSummary});
+  const _CareerSummarySection({required this.careerSummary});
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(left: 20, right: 4, top: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ── 타이틀 행 ──
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const Text(
-                '커리어',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const Spacer(),
-              IconButton(
-                icon: const Icon(
-                  Icons.info_outline,
+      padding: const EdgeInsets.only(left: 20, right: 16, top: 2, bottom: 6),
+      child: careerSummary.isNotEmpty
+          ? Row(
+              children: [
+                const Icon(
+                  Icons.person_outline_rounded,
+                  size: 12,
                   color: AppColors.textDisabled,
-                  size: 18,
                 ),
-                visualDensity: VisualDensity.compact,
-                onPressed: () => _showInfoDialog(context),
-              ),
-              IconButton(
-                icon: const Icon(
-                  Icons.settings_outlined,
-                  color: AppColors.textDisabled,
-                  size: 20,
-                ),
-                visualDensity: VisualDensity.compact,
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const SettingsPage()),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 2),
-          // ── 커리어 요약 ──
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: careerSummary.isNotEmpty
-                ? Row(
-                    children: [
-                      const Icon(
-                        Icons.person_outline_rounded,
-                        size: 12,
-                        color: AppColors.textDisabled,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        careerSummary,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textSecondary,
-                          letterSpacing: -0.2,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  )
-                : const Text(
-                    '커리어 카드를 등록하면 맞춤 공고를 추천해드려요',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textDisabled,
-                      letterSpacing: -0.2,
-                    ),
+                const SizedBox(width: 4),
+                Text(
+                  careerSummary,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                    letterSpacing: -0.2,
                   ),
-          ),
-          const SizedBox(height: 6),
-        ],
-      ),
-    );
-  }
-
-  void _showInfoDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text(
-          '공고보기',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-        ),
-        content: const Text(
-          '치과 구인 공고를 지도와 목록으로 확인하세요.\n'
-          '프리미엄 · 추천 · 전체 공고를 필터로 정리하고\n'
-          '커리어 카드 기반 맞춤 공고를 받아볼 수 있어요.',
-          style: TextStyle(fontSize: 13, height: 1.6),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('닫기'),
-          ),
-        ],
-      ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            )
+          : const Text(
+              '커리어 카드를 등록하면 맞춤 공고를 추천해드려요',
+              style: TextStyle(
+                fontSize: 11,
+                color: AppColors.textDisabled,
+                letterSpacing: -0.2,
+              ),
+            ),
     );
   }
 }
+
 
 // ── 하단 검색 바 (Positioned) ────────────────────────────────────
 class _BottomSearchBar extends StatefulWidget {

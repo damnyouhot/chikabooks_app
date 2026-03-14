@@ -216,7 +216,7 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
     return _buildTextOverlay(context, step);
   }
 
-  // ── 타탭 텍스트 오버레이: 앱 화면이 보이면서 상단에 말풍선만 표시 ──────
+  // ── 타탭 텍스트 오버레이: 앱 화면이 보이면서 하단에 말풍선만 표시 ──────
   Widget _buildTextOverlay(BuildContext context, AppOnboardingStepId step) {
     final dialogue = kStepDialogue[step];
     if (dialogue == null) {
@@ -228,7 +228,7 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
       );
     }
 
-    final topPad = MediaQuery.of(context).padding.top + 8;
+    final bottomNavHeight = 56.0 + MediaQuery.of(context).padding.bottom;
 
     return Stack(
       children: [
@@ -241,9 +241,9 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
           ),
         ),
 
-        // ── 상단 말풍선 (앱 화면 위에 float) — 0.5초 페이드인 ──
+        // ── 하단 말풍선 (탭바 바로 위) — spotlight와 동일한 위치, 0.5초 페이드인 ──
         Positioned(
-          top: topPad,
+          bottom: bottomNavHeight + 16,
           left: 16,
           right: 16,
           child: FadeTransition(
@@ -296,6 +296,19 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
             opacity: _fadeCtrl,
             child: IgnorePointer(
               child: _DialogueBubble(text: hint, showTouchHint: false),
+            ),
+          ),
+        ),
+
+        // ↓ 바운스 화살표 (Scaffold body 하단 바로 위에 표시)
+        Positioned(
+          bottom: 4,
+          left: spotlightLeft,
+          right: MediaQuery.of(context).size.width - spotlightLeft - tabW,
+          child: FadeTransition(
+            opacity: _fadeCtrl,
+            child: const IgnorePointer(
+              child: _BouncingArrow(),
             ),
           ),
         ),
@@ -419,5 +432,56 @@ class _SpotlightPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_SpotlightPainter old) => false;
+}
+
+// ─────────────────────────────────────────────────────────────
+// 바운스 화살표 위젯 (spotlight 탭 위에 표시)
+// ─────────────────────────────────────────────────────────────
+class _BouncingArrow extends StatefulWidget {
+  const _BouncingArrow();
+
+  @override
+  State<_BouncingArrow> createState() => _BouncingArrowState();
+}
+
+class _BouncingArrowState extends State<_BouncingArrow>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    )..repeat(reverse: true);
+    _anim = Tween<double>(begin: 0, end: 8).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _anim,
+      builder: (_, __) => Transform.translate(
+        offset: Offset(0, _anim.value),
+        child: const Center(
+          child: Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: AppColors.white,
+            size: 32,
+          ),
+        ),
+      ),
+    );
+  }
 }
 

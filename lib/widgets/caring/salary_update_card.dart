@@ -64,16 +64,16 @@ class _SalaryUpdateCardState extends State<SalaryUpdateCard> {
                 Text(
                   '임박 제도 변경',
                   style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                  ),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
                 ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              bodyText,
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            bodyText,
               style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
             ),
           ],
@@ -100,7 +100,7 @@ class _SalaryUpdateCardState extends State<SalaryUpdateCard> {
               Text(
                 '임박 제도 변경',
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
                 ),

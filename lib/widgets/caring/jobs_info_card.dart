@@ -31,7 +31,7 @@ class JobsInfoCard extends StatelessWidget {
               Text(
                 '내 주변 신규 구인',
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
                 ),

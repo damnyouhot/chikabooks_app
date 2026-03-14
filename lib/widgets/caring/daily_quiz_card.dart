@@ -29,7 +29,7 @@ class DailyQuizCard extends StatelessWidget {
               const Text(
                 '오늘의 1문제',
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
                 ),

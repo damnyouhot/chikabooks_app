@@ -571,7 +571,10 @@ class _CaringPageState extends State<CaringPage>
                       child: _TapCard(
                         title: '📖 이주의 책',
                         bigText: _weeklyBook?.title ?? '이번 주 추천 책이 없어요',
-                        subtitle: '',
+                        subtitle: (_weeklyBook != null &&
+                                _weeklyBook!.author.isNotEmpty)
+                            ? '저자: ${_weeklyBook!.author}'
+                            : '',
                         onTap: _goBookDetail,
                       ),
                     ),
