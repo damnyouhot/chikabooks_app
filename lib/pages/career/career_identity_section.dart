@@ -174,7 +174,7 @@ class CareerIdentityFilledCard extends StatelessWidget {
                   AdminActivityService.log(
                     ActivityEventType.tapCareerEdit,
                     page: 'career',
-                    action: 'edit_identity',
+                    targetId: 'identity',
                   );
                   CareerIdentitySheet.show(context);
                 },
