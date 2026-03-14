@@ -284,10 +284,12 @@ class _QuizStatsCard extends StatelessWidget {
                       const SizedBox(height: 6),
                       Text(
                         '상위 ${topPercent.toStringAsFixed(0)}%',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.quizCorrect,
+                          // Green 카드 배경 위 크림화이트: creamWhite 토큰 사용
+                          // (glassMode는 이미 white가 자연스럽게 보임)
+                          color: glassMode ? AppColors.white : AppColors.creamWhite,
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -409,11 +411,12 @@ class _QuizCardState extends State<_QuizCard> {
                 return Container(
                   width: badgeSize,
                   height: badgeSize,
-                  decoration: BoxDecoration(
+                    decoration: BoxDecoration(
                     shape: BoxShape.circle,
+                    // 2번탭 공감투표 '이번 주' 배지와 동일 법칙: quizBadgeBg = cardEmphasis
                     color: widget.glassMode
                         ? AppColors.white.withOpacity(0.20)
-                        : AppColors.accent.withOpacity(0.15),
+                        : AppColors.quizBadgeBg.withOpacity(0.15),
                   ),
                   child: Center(
                     child: Text(
@@ -421,7 +424,7 @@ class _QuizCardState extends State<_QuizCard> {
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
-                        color: widget.glassMode ? AppColors.white : AppColors.accent,
+                        color: widget.glassMode ? AppColors.white : AppColors.quizBadgeBg,
                       ),
                     ),
                   ),

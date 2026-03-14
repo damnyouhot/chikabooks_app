@@ -182,21 +182,26 @@ class _CaringPageState extends State<CaringPage>
 
   Future<void> _loadRiveFile() async {
     try {
+      debugPrint('🐶 dog.riv 로드 시작...');
       final file = await File.asset(
         'assets/dog.riv',
         riveFactory: Factory.rive,
       );
+      debugPrint('🐶 dog.riv 로드 결과: file=${file != null}');
       if (file == null || !mounted) return;
       final controller = RiveWidgetController(file);
       _tapTrigger = controller.stateMachine.trigger('tap');
+      debugPrint('🐶 RiveWidgetController 생성 완료, tapTrigger=${_tapTrigger != null}');
       if (mounted) {
         setState(() {
           _riveFile = file;
           _dogController = controller;
         });
       }
-    } catch (e) {
+    } catch (e, st) {
+      // 실기기(갤럭시 S26 등)에서 Rive 로드 실패 시 상세 로그 출력
       debugPrint('❌ dog.riv 로드 실패: $e');
+      debugPrint('❌ StackTrace: $st');
     }
   }
 
@@ -664,7 +669,14 @@ class _CaringPageState extends State<CaringPage>
                       );
                     },
                   )
-                : const SizedBox.shrink(),
+                : Center(
+                    // Rive 로드 실패 시 fallback (실기기 디버그용)
+                    child: Icon(
+                      Icons.pets_outlined,
+                      size: 80,
+                      color: AppColors.textDisabled.withOpacity(0.3),
+                    ),
+                  ),
           ),
         ),
 

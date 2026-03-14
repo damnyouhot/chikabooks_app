@@ -94,6 +94,19 @@ class AppColors {
   /// 카드 내부 VerticalDivider / Divider 색상
   static const divider = Color(0xFFE2DDD6);
 
+  // ── 크림 화이트 (진한 배경 위 부드러운 강조 텍스트) ──────────────
+  /// Green/Orange 카드 등 진한 배경 위 부드러운 화이트 텍스트
+  /// 나중에 색상 변경 시 이 토큰 한 곳만 수정하면 전체 반영됨
+  static const creamWhite = Color(0xFFFDFAF5);
+
+  // ── 퀴즈 배지 (공감투표 '이번 주'와 동일 법칙) ───────────────────
+  /// 퀴즈 Q1/Q2 배지 배경 = cardEmphasis (주황)
+  /// → 2번탭 공감투표 '이번 주' 배지와 동일 토큰 참조
+  /// 나중에 cardEmphasis 색 바꾸면 두 곳 모두 자동 반영
+  static const quizBadgeBg   = cardEmphasis;   // 주황
+  /// 퀴즈 Q1/Q2 배지 텍스트 = onCardEmphasis (검정)
+  static const quizBadgeText = onCardEmphasis; // 검정
+
   // ── 의미 컬러 (퀴즈, 상태) — 고정값 ──────────────────────────
   static const quizCorrect       = Color(0xFF00E676);
   static const quizCorrectBg     = Color(0xFFE8FFF0);

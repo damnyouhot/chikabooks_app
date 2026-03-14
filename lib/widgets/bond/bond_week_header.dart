@@ -46,8 +46,10 @@ class BondScoreGauge extends StatelessWidget {
     final scoreText  = bondScore.toStringAsFixed(1);
     final labelColor = glassMode
         ? AppColors.white.withOpacity(0.7)
-        : AppColors.textSecondary;
-    final scoreColor = glassMode ? AppColors.white : AppColors.textPrimary;
+        : AppColors.onCardPrimary.withOpacity(0.7);
+    // Green/Dark 배경 위 부드러운 크림화이트: creamWhite 토큰 사용
+    // 나중에 색 변경 시 AppColors.creamWhite 한 곳만 수정하면 자동 반영
+    final scoreColor = glassMode ? AppColors.white : AppColors.creamWhite;
     final trackColor = glassMode
         ? AppColors.white.withOpacity(0.2)
         : AppColors.disabledBg;
