@@ -268,9 +268,20 @@ class _BondPostCardState extends State<BondPostCard> {
           postId: widget.postId,
         );
         if (success && mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('✨ 추대했어요!')));
+          if (_isMyPost) {
+            // 작성자 본인이 추대한 경우 전국구 게시판 등록 안내
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('나머지 멤버들도 모두 추대하면 전국구 게시판에 등록돼요!'),
+                behavior: SnackBarBehavior.floating,
+                duration: Duration(seconds: 4),
+              ),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('✨ 추대했어요!')),
+            );
+          }
           final groupId =
               widget.bondGroupId ?? widget.post['bondGroupId'] as String?;
           final authorUid = widget.post['uid'] as String?;
@@ -373,6 +384,8 @@ class _BondPostCardState extends State<BondPostCard> {
   }
 
   void _showEditDialog() {
+    final groupId = widget.bondGroupId ?? widget.post['bondGroupId'] as String?;
+    if (groupId == null) return; // groupId 없으면 수정 불가
     final controller = TextEditingController(text: widget.post['text']);
 
     showDialog(
@@ -400,7 +413,12 @@ class _BondPostCardState extends State<BondPostCard> {
                   ).showSnackBar(const SnackBar(content: Text('내용을 입력해 주세요.')));
                   return;
                 }
-                await _db.collection('bondPosts').doc(widget.postId).update({
+                await _db
+                    .collection('partnerGroups')
+                    .doc(groupId)
+                    .collection('posts')
+                    .doc(widget.postId)
+                    .update({
                   'text': text,
                   'updatedAt': FieldValue.serverTimestamp(),
                 });
@@ -420,6 +438,8 @@ class _BondPostCardState extends State<BondPostCard> {
   }
 
   void _confirmDelete() {
+    final groupId = widget.bondGroupId ?? widget.post['bondGroupId'] as String?;
+    if (groupId == null) return; // groupId 없으면 삭제 불가
     showDialog(
       context: context,
       builder: (context) {
@@ -433,7 +453,12 @@ class _BondPostCardState extends State<BondPostCard> {
             ),
             TextButton(
               onPressed: () async {
-                await _db.collection('bondPosts').doc(widget.postId).delete();
+                await _db
+                    .collection('partnerGroups')
+                    .doc(groupId)
+                    .collection('posts')
+                    .doc(widget.postId)
+                    .delete();
                 if (context.mounted) {
                   Navigator.pop(context);
                   ScaffoldMessenger.of(

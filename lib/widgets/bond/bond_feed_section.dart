@@ -3,7 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../bond_post_card.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
-import '../../core/widgets/app_primary_card.dart';
 import '../../core/widgets/app_muted_card.dart';
 import '../../core/widgets/glass_card.dart';
 
@@ -12,14 +11,18 @@ class BondFeedSection extends StatefulWidget {
   final String? partnerGroupId;
   final Map<String, String>? memberNicknames;
   final VoidCallback onOpenWrite;
+  final VoidCallback? onFindPartnerTap; // 파트너 없을 때 '매칭하기' 버튼 콜백
   final bool glassMode;
+  final bool isMatching; // 매칭 요청 중 로딩 상태
 
   const BondFeedSection({
     super.key,
     required this.partnerGroupId,
     required this.memberNicknames,
     required this.onOpenWrite,
+    this.onFindPartnerTap,
     this.glassMode = false,
+    this.isMatching = false,
   });
 
   @override
@@ -175,11 +178,15 @@ class _BondFeedSectionState extends State<BondFeedSection> {
             }
 
             if (!_hasPartnerGroup) {
+              // 매칭 중이면 로딩 카드, 아니면 매칭하기 버튼
+              if (widget.isMatching) {
+                return _buildMatchingLoadingCard();
+              }
               return _buildEmptyState(
                 icon: Icons.group_outlined,
                 text: '파트너와 함께할 때만\n기록할 수 있어요',
-                subtitle: '매칭을 시작해보세요',
-                onTap: null,
+                subtitle: '매칭하기',
+                onTap: widget.onFindPartnerTap,
                 isPersonalMode: true,
               );
             }
@@ -202,6 +209,7 @@ class _BondFeedSectionState extends State<BondFeedSection> {
                   ...docs.map((doc) {
                     final data = doc.data() as Map<String, dynamic>;
                     return BondPostCard(
+                      key: ValueKey(doc.id),
                       post: data,
                       postId: doc.id,
                       bondGroupId: widget.partnerGroupId,
@@ -214,6 +222,50 @@ class _BondFeedSectionState extends State<BondFeedSection> {
           },
         ),
       ],
+    );
+  }
+
+  /// 매칭 처리 중 로딩 카드
+  Widget _buildMatchingLoadingCard() {
+    return SizedBox(
+      width: double.infinity,
+      child: AppMutedCard(
+        radius: AppRadius.xl,
+        margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+        padding: const EdgeInsets.all(AppSpacing.xxl),
+        child: const Column(
+          children: [
+            SizedBox(
+              width: 32,
+              height: 32,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                color: AppColors.accent,
+              ),
+            ),
+            SizedBox(height: 12),
+            Text(
+              '파트너를 연결하고 있어요',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
+                height: 1.4,
+              ),
+            ),
+            SizedBox(height: 4),
+            Text(
+              '잠시만 기다려주세요',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.textDisabled,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -252,18 +304,49 @@ class _BondFeedSectionState extends State<BondFeedSection> {
               decoration: BoxDecoration(
                 color: widget.glassMode
                     ? AppColors.white.withOpacity(0.25)
-                    : AppColors.accent,
+                    : (widget.isMatching
+                        ? AppColors.accent.withOpacity(0.5)
+                        : AppColors.accent),
                 borderRadius: BorderRadius.circular(AppRadius.full),
               ),
-              child: Text(
-                subtitle,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: widget.glassMode ? AppColors.white : AppColors.onAccent,
-                ),
-              ),
+              child: widget.isMatching
+                  ? const SizedBox(
+                      width: 80,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 12,
+                            height: 12,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 1.5,
+                              color: Colors.white,
+                            ),
+                          ),
+                          SizedBox(width: 6),
+                          Text(
+                            '매칭 설정 중',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : Text(
+                      subtitle,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: widget.glassMode
+                            ? AppColors.white
+                            : AppColors.onAccent,
+                      ),
+                    ),
             ),
           ],
         ],
@@ -272,39 +355,45 @@ class _BondFeedSectionState extends State<BondFeedSection> {
       if (widget.glassMode) {
         return SizedBox(
           width: double.infinity,
-          child: GlassCard(
-            margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-            padding: const EdgeInsets.all(AppSpacing.xxl),
-            child: content,
+          child: GestureDetector(
+            onTap: onTap,
+            child: GlassCard(
+              margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+              padding: const EdgeInsets.all(AppSpacing.xxl),
+              child: content,
+            ),
           ),
         );
       }
 
       return SizedBox(
         width: double.infinity,
-        child: AppMutedCard(
-          radius: AppRadius.xl,
-          margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-          padding: const EdgeInsets.all(AppSpacing.xxl),
-          child: content,
+        child: GestureDetector(
+          onTap: onTap,
+          child: AppMutedCard(
+            radius: AppRadius.xl,
+            margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+            padding: const EdgeInsets.all(AppSpacing.xxl),
+            child: content,
+          ),
         ),
       );
     }
 
-    // 파트너 있음 - 빈 피드 카드
+    // 파트너 있음 - 빈 피드 카드 (AppMutedCard 스타일로 통일)
     final partnerContent = Column(
       children: [
         Icon(icon, size: 40,
             color: widget.glassMode
                 ? AppColors.white.withOpacity(0.7)
-                : AppColors.onCardPrimary.withOpacity(0.7)),
+                : AppColors.textDisabled),
         const SizedBox(height: 8),
         Text(
           text,
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 14,
-            color: widget.glassMode ? AppColors.white : AppColors.onCardPrimary,
+            color: widget.glassMode ? AppColors.white : AppColors.textSecondary,
             height: 1.4,
           ),
         ),
@@ -329,13 +418,11 @@ class _BondFeedSectionState extends State<BondFeedSection> {
       width: double.infinity,
       child: GestureDetector(
         onTap: onTap,
-        child: Container(
+        child: AppMutedCard(
+          radius: AppRadius.xl,
           margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-          child: AppPrimaryCard(
-            radius: AppRadius.xl,
-            padding: const EdgeInsets.all(AppSpacing.xxl),
-            child: partnerContent,
-          ),
+          padding: const EdgeInsets.all(AppSpacing.xxl),
+          child: partnerContent,
         ),
       ),
     );

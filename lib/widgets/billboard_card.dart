@@ -13,19 +13,13 @@ class BillboardCard extends StatelessWidget {
 
   const BillboardCard({super.key, required this.post, this.onTap});
 
-  String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    final diff = now.difference(date);
-
-    if (diff.inDays > 0) {
-      return '${diff.inDays}일 전';
-    } else if (diff.inHours > 0) {
-      return '${diff.inHours}시간 전';
-    } else if (diff.inMinutes > 0) {
-      return '${diff.inMinutes}분 전';
-    } else {
-      return '방금';
+  String _formatRemaining(DateTime expiresAt) {
+    final remaining = expiresAt.difference(DateTime.now());
+    if (remaining.isNegative) return '노출 종료';
+    if (remaining.inHours >= 1) {
+      return '${remaining.inHours}시간 ${remaining.inMinutes % 60}분 남음';
     }
+    return '${remaining.inMinutes.clamp(0, 59)}분 남음';
   }
 
   @override
@@ -61,7 +55,7 @@ class BillboardCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  _formatDate(post.createdAt),
+                  _formatRemaining(post.expiresAt),
                   style: const TextStyle(fontSize: 10, color: AppColors.textDisabled),
                 ),
               ],

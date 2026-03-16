@@ -122,7 +122,7 @@ class _BillboardCarouselState extends State<BillboardCarousel> {
 
         // 타이머 시작 (2개 이상일 때만)
         if (posts.length > 1 && _timer == null) {
-          _timer = Timer.periodic(const Duration(seconds: 3), (timer) {
+          _timer = Timer.periodic(const Duration(seconds: 4), (timer) {
             if (mounted) {
               setState(() {
                 _currentIndex = (_currentIndex + 1) % posts.length;

@@ -3,19 +3,21 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_tokens.dart';
+import '../core/widgets/app_badge.dart';
 import '../core/widgets/app_muted_card.dart';
 import '../core/widgets/app_primary_card.dart';
 import '../core/widgets/glass_card.dart';
+import '../models/quiz_schedule.dart';
+import '../services/quiz_pool_service.dart';
 
 /// 퀴즈 탭 글래스 모드 플래그
-/// true: 검정+블루(우상단)+형광(좌하단) 그라디언트 배경
-/// false: 기존 soft gray 배경
 const bool kQuizGlassMode = false;
 
-/// 오늘의 퀴즈
+/// 오늘의 퀴즈 페이지
 ///
-/// 매일 2문제 노출 예정. 현재는 뼈대/placeholder UI.
-/// 퀴즈 콘텐츠/데이터 모델은 추후 기획 확정 후 구현.
+/// quiz_schedule/{dateKey} 기반 데이터 연동.
+/// - 오늘의 퀴즈 2문제 표시
+/// - 지난 3일간 퀴즈 보기 섹션
 class QuizTodayPage extends StatefulWidget {
   const QuizTodayPage({super.key});
 
@@ -24,19 +26,37 @@ class QuizTodayPage extends StatefulWidget {
 }
 
 class _QuizTodayPageState extends State<QuizTodayPage> {
-  // ── 성적 데이터 (Firestore 연동 준비) ──
+  // ── 성적 데이터 ──
   int _totalCorrect = 0;
   int _totalWrong = 0;
   int _weekCorrect = 0;
   int _weekWrong = 0;
-  int _totalUsers = 1; // 전체 유저 수 (순위 계산용)
-  int _myRank = 1; // 내 순위
+  int _totalUsers = 1;
+  int _myRank = 1;
   bool _statsLoaded = false;
+  Map<String, int> _scoreDistribution = {};
+
+  // ── 오늘 스케줄 & 유저 기록 ──
+  QuizSchedule? _todaySchedule;
+  UserQuizHistory? _todayHistory;
+  bool _scheduleLoaded = false;
+
+  // ── 지난 3일 ──
+  List<QuizSchedule> _recentSchedules = [];
+  Map<String, UserQuizHistory> _recentHistories = {};
+  bool _recentLoaded = false;
+
+  // ── 지난 퀴즈 펼치기 여부 ──
+  bool _recentExpanded = false;
 
   @override
   void initState() {
     super.initState();
-    _loadStats();
+    _loadAll();
+  }
+
+  Future<void> _loadAll() async {
+    await Future.wait([_loadStats(), _loadTodaySchedule()]);
   }
 
   Future<void> _loadStats() async {
@@ -47,26 +67,90 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
         return;
       }
 
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .collection('quizStats')
-          .doc('summary')
-          .get();
+      // 유저 개인 통계 + 글로벌 집계 병렬 로드 (서버 우선 → 최신 순위 보장)
+      final results = await Future.wait([
+        FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .collection('quizStats')
+            .doc('summary')
+            .get(const GetOptions(source: Source.server)),
+        FirebaseFirestore.instance
+            .collection('quiz_global')
+            .doc('stats')
+            .get(const GetOptions(source: Source.server)),
+      ]);
 
-      if (doc.exists && mounted) {
-        final data = doc.data() ?? {};
+      final userDoc = results[0];
+      final globalDoc = results[1];
+      if (!mounted) return;
+
+      // 글로벌 집계에서 참여자 수 · 점수 분포 추출
+      int totalParticipants = 1;
+      Map<String, dynamic> distribution = {};
+      if (globalDoc.exists) {
+        final gData = globalDoc.data() ?? {};
+        totalParticipants = (gData['totalParticipants'] as num?)?.toInt() ?? 1;
+        if (totalParticipants < 1) totalParticipants = 1;
+        distribution = Map<String, dynamic>.from(
+          gData['scoreDistribution'] as Map<String, dynamic>? ?? {},
+        );
+        debugPrint(
+          '📊 [LoadStats] global exists: participants=$totalParticipants, dist=$distribution',
+        );
+      } else {
+        debugPrint('📊 [LoadStats] quiz_global/stats 문서 없음');
+      }
+
+      if (userDoc.exists) {
+        final data = userDoc.data() ?? {};
+
+        // 이번 주 월요일 dateKey (KST 기준)
+        final nowKst = DateTime.now().toUtc().add(const Duration(hours: 9));
+        final monday = nowKst.subtract(Duration(days: nowKst.weekday - 1));
+        final thisWeekKey =
+            '${monday.year}-${monday.month.toString().padLeft(2, '0')}-${monday.day.toString().padLeft(2, '0')}';
+        final storedWeekKey = data['weekKey'] as String?;
+        final isSameWeek = storedWeekKey == thisWeekKey;
+
+        final totalCorrect = (data['totalCorrect'] as num?)?.toInt() ?? 0;
+
+        // 순위 계산: 내 totalCorrect보다 높은 사람 수 + 1
+        int peopleAboveMe = 0;
+        for (final entry in distribution.entries) {
+          final score = int.tryParse(entry.key) ?? 0;
+          if (score > totalCorrect) {
+            peopleAboveMe += (entry.value as num?)?.toInt() ?? 0;
+          }
+        }
+
+        debugPrint(
+          '📊 [LoadStats] myTotalCorrect=$totalCorrect, '
+          'peopleAboveMe=$peopleAboveMe, '
+          'rank=${peopleAboveMe + 1}/$totalParticipants',
+        );
+
         setState(() {
-          _totalCorrect = (data['totalCorrect'] as int?) ?? 0;
-          _totalWrong = (data['totalWrong'] as int?) ?? 0;
-          _weekCorrect = (data['weekCorrect'] as int?) ?? 0;
-          _weekWrong = (data['weekWrong'] as int?) ?? 0;
-          _myRank = (data['rank'] as int?) ?? 1;
-          _totalUsers = (data['totalUsers'] as int?) ?? 1;
+          _totalCorrect = totalCorrect;
+          _totalWrong = (data['totalWrong'] as num?)?.toInt() ?? 0;
+          _weekCorrect =
+              isSameWeek ? ((data['weekCorrect'] as num?)?.toInt() ?? 0) : 0;
+          _weekWrong =
+              isSameWeek ? ((data['weekWrong'] as num?)?.toInt() ?? 0) : 0;
+          _myRank = peopleAboveMe + 1;
+          _totalUsers = totalParticipants;
+          _scoreDistribution = distribution.map(
+            (k, v) => MapEntry(k, (v as num).toInt()),
+          );
           _statsLoaded = true;
         });
       } else {
-        if (mounted) setState(() => _statsLoaded = true);
+        // 퀴즈 미참여자: 점수 0 → 모든 참여자보다 아래
+        setState(() {
+          _myRank = totalParticipants;
+          _totalUsers = totalParticipants;
+          _statsLoaded = true;
+        });
       }
     } catch (e) {
       debugPrint('⚠️ 퀴즈 성적 로드 실패: $e');
@@ -74,8 +158,57 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
     }
   }
 
-  /// 퀴즈 정답/오답 결과 콜백
-  void _onQuizAnswered(bool isCorrect) {
+  Future<void> _loadTodaySchedule() async {
+    try {
+      final dateKey = QuizPoolService.todayKey;
+      final results = await Future.wait([
+        QuizPoolService.getTodaySchedule(),
+        QuizPoolService.getHistory(dateKey),
+      ]);
+
+      if (mounted) {
+        setState(() {
+          _todaySchedule = results[0] as QuizSchedule?;
+          _todayHistory = results[1] as UserQuizHistory?;
+          _scheduleLoaded = true;
+        });
+      }
+    } catch (e) {
+      debugPrint('⚠️ 오늘 퀴즈 로드 실패: $e');
+      if (mounted) setState(() => _scheduleLoaded = true);
+    }
+  }
+
+  Future<void> _loadRecentSchedules() async {
+    if (_recentLoaded) return;
+    try {
+      final results = await Future.wait([
+        QuizPoolService.getRecentSchedules(days: 3),
+        QuizPoolService.getRecentHistories(days: 4),
+      ]);
+
+      if (mounted) {
+        setState(() {
+          _recentSchedules = results[0] as List<QuizSchedule>;
+          _recentHistories = results[1] as Map<String, UserQuizHistory>;
+          _recentLoaded = true;
+        });
+      }
+    } catch (e) {
+      debugPrint('⚠️ 지난 퀴즈 로드 실패: $e');
+      if (mounted) setState(() => _recentLoaded = true);
+    }
+  }
+
+  void _onQuizAnswered({
+    required String dateKey,
+    required String quizId,
+    required int selectedIndex,
+    required bool isCorrect,
+    required List<String> allIds,
+  }) {
+    final prevTotalCorrect = _totalCorrect;
+
     setState(() {
       if (isCorrect) {
         _totalCorrect++;
@@ -84,8 +217,50 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
         _totalWrong++;
         _weekWrong++;
       }
+
+      // 로컬 history 즉시 반영
+      final prev = _todayHistory;
+      final prevAnswers = Map<String, int>.from(prev?.answers ?? {});
+      prevAnswers[quizId] = selectedIndex;
+      _todayHistory = UserQuizHistory(
+        dateKey: dateKey,
+        quizIds: allIds,
+        answers: prevAnswers,
+        correctCount: (prev?.correctCount ?? 0) + (isCorrect ? 1 : 0),
+        rewardGranted: prev?.rewardGranted ?? false,
+      );
+
+      // 로컬 순위 즉시 반영 (서버 왕복 대기 없이)
+      if (isCorrect && _scoreDistribution.isNotEmpty) {
+        final oldKey = prevTotalCorrect.toString();
+        final newKey = _totalCorrect.toString();
+        final oldCount = (_scoreDistribution[oldKey] ?? 0) - 1;
+        if (oldCount > 0) {
+          _scoreDistribution[oldKey] = oldCount;
+        } else {
+          _scoreDistribution.remove(oldKey);
+        }
+        _scoreDistribution[newKey] = (_scoreDistribution[newKey] ?? 0) + 1;
+
+        int peopleAboveMe = 0;
+        for (final entry in _scoreDistribution.entries) {
+          final score = int.tryParse(entry.key) ?? 0;
+          if (score > _totalCorrect) {
+            peopleAboveMe += entry.value;
+          }
+        }
+        _myRank = peopleAboveMe + 1;
+      }
     });
-    // TODO: Firestore에 결과 저장
+
+    // Firestore 저장 → 서버 동기화 (백업)
+    QuizPoolService.saveAnswer(
+      dateKey: dateKey,
+      quizId: quizId,
+      selectedIndex: selectedIndex,
+      allQuizIds: allIds,
+      isCorrect: isCorrect,
+    ).then((_) => _loadStats());
   }
 
   @override
@@ -100,13 +275,9 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
       );
     }
 
-    // ── 글래스 모드: 검정 + 블루(우상단) + 형광(좌하단) ──
     return Stack(
       children: [
-        // 1. 순수 검정 베이스
         Container(color: const Color(0xFF080808)),
-
-        // 2. 우상단 블루 — 큰 글로우
         Positioned(
           top: -60,
           right: -40,
@@ -117,8 +288,6 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
             opacity: 0.55,
           ),
         ),
-
-        // 3. 우상단 블루 — 집중 하이라이트
         Positioned(
           top: 30,
           right: 20,
@@ -129,8 +298,6 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
             opacity: 0.35,
           ),
         ),
-
-        // 4. 좌하단 형광 라임 — 큰 글로우
         Positioned(
           bottom: 60,
           left: -60,
@@ -141,8 +308,6 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
             opacity: 0.50,
           ),
         ),
-
-        // 5. 좌하단 형광 라임 — 집중 하이라이트
         Positioned(
           bottom: 100,
           left: 20,
@@ -153,8 +318,6 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
             opacity: 0.30,
           ),
         ),
-
-        // 6. 콘텐츠 레이어
         ListView(
           padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.xl,
@@ -166,9 +329,9 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
     );
   }
 
-  /// 리스트 콘텐츠 (글래스/일반 공용)
   List<Widget> _buildChildren() {
     return [
+      // ── 성적 카드 ──
       _QuizStatsCard(
         totalCorrect: _totalCorrect,
         totalWrong: _totalWrong,
@@ -180,41 +343,106 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
         glassMode: kQuizGlassMode,
       ),
       const SizedBox(height: AppSpacing.lg),
-      _QuizCard(
-        index: 1,
-        question: '치주낭 측정 시 사용하는 기구는?',
-        options: const ['익스플로러', '치주 프로브', '스케일러', '큐렛'],
-        correctIndex: 1,
-        onAnswered: _onQuizAnswered,
-        glassMode: kQuizGlassMode,
-      ),
-      const SizedBox(height: AppSpacing.lg),
-      _QuizCard(
-        index: 2,
-        question: '치석 제거 후 치근면을 매끄럽게 하는 시술은?',
-        options: const ['스케일링', '루트 플레이닝', '폴리싱', '불소 도포'],
-        correctIndex: 1,
-        onAnswered: _onQuizAnswered,
-        glassMode: kQuizGlassMode,
-      ),
-      const SizedBox(height: AppSpacing.xxl + 8),
-      Center(
-        child: Text(
-          '퀴즈 콘텐츠는 곧 업데이트됩니다.',
-          style: TextStyle(
-            fontSize: 12,
-            color: kQuizGlassMode
-                ? AppColors.white.withOpacity(0.35)
-                : AppColors.textDisabled,
+
+      // ── 오늘의 퀴즈 ──
+      if (!_scheduleLoaded)
+        const Center(
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: 32),
+            child: CircularProgressIndicator(strokeWidth: 2),
           ),
-        ),
+        )
+      else if (_todaySchedule == null)
+        _buildNoScheduleBanner()
+      else
+        ..._buildTodayQuizCards(),
+
+      const SizedBox(height: AppSpacing.xl),
+
+      // ── 지난 3일간 퀴즈보기 ──
+      _RecentQuizSection(
+        expanded: _recentExpanded,
+        loaded: _recentLoaded,
+        schedules: _recentSchedules,
+        histories: _recentHistories,
+        glassMode: kQuizGlassMode,
+        onToggle: () async {
+          if (!_recentExpanded) await _loadRecentSchedules();
+          if (mounted) setState(() => _recentExpanded = !_recentExpanded);
+        },
       ),
+
+      const SizedBox(height: AppSpacing.xxl + 8),
     ];
+  }
+
+  Widget _buildNoScheduleBanner() {
+    return AppMutedCard(
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      child: Column(
+        children: [
+          Icon(Icons.quiz_outlined, size: 40, color: AppColors.textDisabled),
+          const SizedBox(height: AppSpacing.md),
+          const Text(
+            '오늘의 퀴즈 준비 중',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          const Text(
+            '매일 자정에 새로운 문제가 업데이트됩니다.',
+            style: TextStyle(fontSize: 12, color: AppColors.textDisabled),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildTodayQuizCards() {
+    final schedule = _todaySchedule!;
+    final dateKey = schedule.dateKey;
+    final allIds = schedule.quizIds;
+
+    return List.generate(schedule.items.length, (i) {
+      final item = schedule.items[i];
+      final savedAnswer = _todayHistory?.answers[item.id];
+
+      return Padding(
+        padding: EdgeInsets.only(
+          bottom: i < schedule.items.length - 1 ? AppSpacing.lg : 0,
+        ),
+        child: _QuizCard(
+          index: i + 1,
+          quizId: item.id,
+          question: item.question,
+          options: item.options,
+          correctIndex: item.correctIndex,
+          explanation: item.explanation,
+          sourceBook: item.sourceBook,
+          sourcePage: item.sourcePage,
+          savedAnswer: savedAnswer,
+          glassMode: kQuizGlassMode,
+          onAnswered:
+              (idx, isCorrect) => _onQuizAnswered(
+                dateKey: dateKey,
+                quizId: item.id,
+                selectedIndex: idx,
+                isCorrect: isCorrect,
+                allIds: allIds,
+              ),
+        ),
+      );
+    });
   }
 }
 
-// ── 퀴즈 성적 카드 ──────────────────────────────────────────
-
+// ══════════════════════════════════════════════════════════════
+// 성적 카드
+// ══════════════════════════════════════════════════════════════
 class _QuizStatsCard extends StatelessWidget {
   final int totalCorrect;
   final int totalWrong;
@@ -239,75 +467,84 @@ class _QuizStatsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final totalTotal = totalCorrect + totalWrong;
-    final weekTotal  = weekCorrect + weekWrong;
-    final totalRate  = totalTotal > 0 ? (totalCorrect / totalTotal * 100) : 0.0;
-    final weekRate   = weekTotal  > 0 ? (weekCorrect  / weekTotal  * 100) : 0.0;
-    final topPercent = totalUsers > 0
-        ? (myRank / totalUsers * 100).clamp(1.0, 100.0)
-        : 100.0;
+    final weekTotal = weekCorrect + weekWrong;
+    final totalRate = totalTotal > 0 ? (totalCorrect / totalTotal * 100) : 0.0;
+    final weekRate = weekTotal > 0 ? (weekCorrect / weekTotal * 100) : 0.0;
+    final topPercent =
+        totalUsers > 0 ? (myRank / totalUsers * 100).clamp(1.0, 100.0) : 100.0;
 
-    final dividerColor = glassMode
-        ? AppColors.white.withOpacity(0.15)
-        : AppColors.onCardPrimary.withOpacity(0.2);
+    final dividerColor =
+        glassMode
+            ? AppColors.white.withValues(alpha: 0.15)
+            : AppColors.onCardPrimary.withValues(alpha: 0.2);
 
-    final inner = !isLoaded
-        ? SizedBox(
-            height: 80,
-            child: Center(
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: glassMode ? AppColors.white : null,
-              ),
-            ),
-          )
-        : IntrinsicHeight(
-            child: Row(
-              children: [
-                Expanded(child: _statColumn('이번 주', weekCorrect,  weekWrong,  weekRate)),
-                VerticalDivider(width: 1, thickness: 1, color: dividerColor),
-                Expanded(child: _statColumn('통산',    totalCorrect, totalWrong, totalRate)),
-                VerticalDivider(width: 1, thickness: 1, color: dividerColor),
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        '순위',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: glassMode
-                              ? AppColors.white.withOpacity(0.6)
-                              : AppColors.onCardPrimary.withOpacity(0.7),
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        '상위 ${topPercent.toStringAsFixed(0)}%',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          // Green 카드 배경 위 크림화이트: creamWhite 토큰 사용
-                          // (glassMode는 이미 white가 자연스럽게 보임)
-                          color: glassMode ? AppColors.white : AppColors.creamWhite,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '$myRank / $totalUsers명',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: glassMode
-                              ? AppColors.white.withOpacity(0.4)
-                              : AppColors.onCardPrimary.withOpacity(0.55),
-                        ),
-                      ),
-                    ],
-                  ),
+    final inner =
+        !isLoaded
+            ? SizedBox(
+              height: 80,
+              child: Center(
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: glassMode ? AppColors.white : null,
                 ),
-              ],
-            ),
-          );
+              ),
+            )
+            : IntrinsicHeight(
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _statColumn(
+                      '이번 주',
+                      weekCorrect,
+                      weekWrong,
+                      weekRate,
+                    ),
+                  ),
+                  VerticalDivider(width: 1, thickness: 1, color: dividerColor),
+                  Expanded(
+                    child: _statColumn(
+                      '통산',
+                      totalCorrect,
+                      totalWrong,
+                      totalRate,
+                    ),
+                  ),
+                  VerticalDivider(width: 1, thickness: 1, color: dividerColor),
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          '순위',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color:
+                                glassMode
+                                    ? AppColors.white.withValues(alpha: 0.6)
+                                    : AppColors.onCardPrimary.withValues(
+                                      alpha: 0.7,
+                                    ),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          '상위 ${topPercent.toStringAsFixed(1)}%',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color:
+                                glassMode
+                                    ? AppColors.white
+                                    : AppColors.creamWhite,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
 
     if (glassMode) {
       return GlassCard(
@@ -315,7 +552,6 @@ class _QuizStatsCard extends StatelessWidget {
         child: inner,
       );
     }
-
     return AppPrimaryCard(
       radius: AppRadius.xl,
       padding: const EdgeInsets.all(AppSpacing.lg),
@@ -324,51 +560,363 @@ class _QuizStatsCard extends StatelessWidget {
   }
 
   Widget _statColumn(String label, int correct, int wrong, double rate) {
-    final labelColor = glassMode
-        ? AppColors.white.withOpacity(0.6)
-        : AppColors.onCardPrimary.withOpacity(0.7);
+    final labelColor =
+        glassMode
+            ? AppColors.white.withValues(alpha: 0.6)
+            : AppColors.onCardPrimary.withValues(alpha: 0.7);
     final valueColor = glassMode ? AppColors.white : AppColors.onCardPrimary;
-    final subColor   = glassMode
-        ? AppColors.white.withOpacity(0.4)
-        : AppColors.onCardPrimary.withOpacity(0.55);
+    final subColor =
+        glassMode
+            ? AppColors.white.withValues(alpha: 0.4)
+            : AppColors.onCardPrimary.withValues(alpha: 0.55);
 
     return Column(
       children: [
         Text(
           label,
-          style: TextStyle(fontSize: 11, color: labelColor, fontWeight: FontWeight.w500),
+          style: TextStyle(
+            fontSize: 11,
+            color: labelColor,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         const SizedBox(height: 6),
         Text(
           '${rate.toStringAsFixed(0)}%',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: valueColor),
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: valueColor,
+          ),
         ),
         const SizedBox(height: 2),
         Text(
           '✓$correct / ✗$wrong',
-          style: TextStyle(fontSize: 10, color: subColor),
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w500,
+            color: subColor,
+          ),
         ),
       ],
     );
   }
 }
 
+// ══════════════════════════════════════════════════════════════
+// 지난 3일간 퀴즈보기 섹션
+// ══════════════════════════════════════════════════════════════
+class _RecentQuizSection extends StatelessWidget {
+  final bool expanded;
+  final bool loaded;
+  final List<QuizSchedule> schedules;
+  final Map<String, UserQuizHistory> histories;
+  final bool glassMode;
+  final VoidCallback onToggle;
+
+  const _RecentQuizSection({
+    required this.expanded,
+    required this.loaded,
+    required this.schedules,
+    required this.histories,
+    required this.glassMode,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── 헤더 탭 ──
+        GestureDetector(
+          onTap: onToggle,
+          behavior: HitTestBehavior.opaque,
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg,
+              vertical: AppSpacing.md,
+            ),
+            decoration: BoxDecoration(
+              color:
+                  glassMode
+                      ? AppColors.white.withValues(alpha: 0.06)
+                      : AppColors.surfaceMuted,
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.history_rounded,
+                  size: 18,
+                  color:
+                      glassMode
+                          ? AppColors.white.withValues(alpha: 0.7)
+                          : AppColors.textSecondary,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '지난 3일간 퀴즈보기',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color:
+                        glassMode
+                            ? AppColors.white.withValues(alpha: 0.85)
+                            : AppColors.textPrimary,
+                  ),
+                ),
+                const Spacer(),
+                AnimatedRotation(
+                  turns: expanded ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: Icon(
+                    Icons.expand_more_rounded,
+                    size: 20,
+                    color:
+                        glassMode
+                            ? AppColors.white.withValues(alpha: 0.5)
+                            : AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // ── 펼쳐진 내용 ──
+        AnimatedSize(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeInOut,
+          child:
+              expanded
+                  ? Padding(
+                    padding: const EdgeInsets.only(top: AppSpacing.lg),
+                    child: _buildContent(context),
+                  )
+                  : const SizedBox.shrink(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
+    if (!loaded) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 24),
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
+
+    if (schedules.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 24),
+          child: Text(
+            '지난 퀴즈 기록이 없습니다.',
+            style: TextStyle(
+              fontSize: 13,
+              color:
+                  glassMode
+                      ? AppColors.white.withValues(alpha: 0.4)
+                      : AppColors.textDisabled,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children:
+          schedules.map((schedule) {
+            final history = histories[schedule.dateKey];
+            return _RecentDayQuizGroup(
+              schedule: schedule,
+              history: history,
+              glassMode: glassMode,
+            );
+          }).toList(),
+    );
+  }
+}
+
+// ── 날짜별 퀴즈 그룹 ──
+class _RecentDayQuizGroup extends StatelessWidget {
+  final QuizSchedule schedule;
+  final UserQuizHistory? history;
+  final bool glassMode;
+
+  const _RecentDayQuizGroup({
+    required this.schedule,
+    required this.history,
+    required this.glassMode,
+  });
+
+  String _formatDateLabel(String dateKey) {
+    // '2026-03-15' → '3월 15일'
+    final parts = dateKey.split('-');
+    if (parts.length != 3) return dateKey;
+    return '${int.tryParse(parts[1]) ?? parts[1]}월 ${int.tryParse(parts[2]) ?? parts[2]}일';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final correctCount = history?.correctCount ?? 0;
+    final answered = history?.answers.length ?? 0;
+    final total = schedule.items.length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── 날짜 헤더 ──
+        Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+          child: Row(
+            children: [
+              Text(
+                _formatDateLabel(schedule.dateKey),
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color:
+                      glassMode
+                          ? AppColors.white.withValues(alpha: 0.7)
+                          : AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(width: 8),
+              if (answered >= total && total > 0)
+                _ScoreBadge(
+                  correct: correctCount,
+                  total: total,
+                  glassMode: glassMode,
+                )
+              else if (answered > 0)
+                Text(
+                  '$answered/$total 풀이',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color:
+                        glassMode
+                            ? AppColors.white.withValues(alpha: 0.4)
+                            : AppColors.textDisabled,
+                  ),
+                )
+              else
+                Text(
+                  '미풀이',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color:
+                        glassMode
+                            ? AppColors.white.withValues(alpha: 0.3)
+                            : AppColors.textDisabled,
+                  ),
+                ),
+            ],
+          ),
+        ),
+
+        // ── 퀴즈 카드들 (읽기 전용) ──
+        ...List.generate(schedule.items.length, (i) {
+          final item = schedule.items[i];
+          final savedAnswer = history?.answers[item.id];
+          return Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.md),
+            child: _QuizCard(
+              index: i + 1,
+              quizId: item.id,
+              question: item.question,
+              options: item.options,
+              correctIndex: item.correctIndex,
+              explanation: item.explanation,
+              sourceBook: item.sourceBook,
+              sourcePage: item.sourcePage,
+              savedAnswer: savedAnswer,
+              readOnly: true, // 지난 퀴즈: 답 변경 불가
+              glassMode: glassMode,
+            ),
+          );
+        }),
+
+        const SizedBox(height: AppSpacing.lg),
+      ],
+    );
+  }
+}
+
+// ── 점수 배지 ──
+class _ScoreBadge extends StatelessWidget {
+  final int correct;
+  final int total;
+  final bool glassMode;
+
+  const _ScoreBadge({
+    required this.correct,
+    required this.total,
+    required this.glassMode,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final allCorrect = correct == total;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: allCorrect ? AppColors.quizCorrectBg : AppColors.quizWrongBg,
+        borderRadius: BorderRadius.circular(AppRadius.full),
+      ),
+      child: Text(
+        '$correct/$total 정답',
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: allCorrect ? AppColors.quizCorrect : AppColors.quizWrongText,
+        ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// 퀴즈 카드
+// ══════════════════════════════════════════════════════════════
+
 /// 퀴즈 카드 위젯
+///
+/// - [readOnly]: true면 이미 선택된 답을 보여주기만 함 (지난 퀴즈)
+/// - [savedAnswer]: 이전에 저장된 답 인덱스
+/// - 색상은 AppColors.quiz* / AppColors.poll* 시맨틱 토큰 사용
 class _QuizCard extends StatefulWidget {
   final int index;
+  final String quizId;
   final String question;
   final List<String> options;
   final int correctIndex;
-  final ValueChanged<bool>? onAnswered;
+  final String explanation;
+  final String sourceBook; // 출처 책 이름
+  final String sourcePage; // 출처 페이지
+  final int? savedAnswer;
+  final bool readOnly;
   final bool glassMode;
+  final void Function(int selectedIndex, bool isCorrect)? onAnswered;
 
   const _QuizCard({
     required this.index,
+    required this.quizId,
     required this.question,
     required this.options,
     required this.correctIndex,
-    this.onAnswered,
+    required this.explanation,
+    this.sourceBook = '',
+    this.sourcePage = '',
+    this.savedAnswer,
+    this.readOnly = false,
     this.glassMode = false,
+    this.onAnswered,
   });
 
   @override
@@ -379,153 +927,306 @@ class _QuizCardState extends State<_QuizCard> {
   int? _selectedIndex;
   bool _answered = false;
 
+  @override
+  void initState() {
+    super.initState();
+    // 이전에 저장된 답 복원 (readOnly 또는 앱 재시작 후 복구)
+    if (widget.savedAnswer != null) {
+      _selectedIndex = widget.savedAnswer;
+      _answered = true;
+    }
+  }
+
   void _onSelect(int idx) {
-    if (_answered) return;
+    if (_answered || widget.readOnly) return;
     setState(() {
       _selectedIndex = idx;
       _answered = true;
     });
-    widget.onAnswered?.call(idx == widget.correctIndex);
+    widget.onAnswered?.call(idx, idx == widget.correctIndex);
   }
 
   @override
   Widget build(BuildContext context) {
-    final questionColor = widget.glassMode ? AppColors.white : AppColors.textPrimary;
-    final feedbackColor = _selectedIndex == widget.correctIndex
-        ? AppColors.quizCorrect
-        : (widget.glassMode
-            ? AppColors.white.withOpacity(0.7)
-            : AppColors.textSecondary);
+    final questionColor =
+        widget.glassMode ? AppColors.white : AppColors.textPrimary;
+
+    final feedbackColor =
+        _selectedIndex == widget.correctIndex
+            ? AppColors.quizCorrect
+            : (widget.glassMode
+                ? AppColors.white.withValues(alpha: 0.7)
+                : AppColors.textSecondary);
+
+    final optionList = Column(
+      children: List.generate(widget.options.length, (i) {
+        final isCorrect = i == widget.correctIndex;
+        final isSelected = i == _selectedIndex;
+
+        Color bgColor;
+        Color textColor;
+
+        if (_answered) {
+          if (isCorrect) {
+            bgColor = AppColors.quizCorrectBg;
+            textColor = AppColors.quizCorrect;
+          } else if (isSelected) {
+            bgColor = AppColors.quizWrongBg;
+            textColor = AppColors.quizWrong;
+          } else {
+            bgColor =
+                widget.glassMode
+                    ? AppColors.white.withValues(alpha: 0.12)
+                    : AppColors.pollOptionBg;
+            textColor =
+                widget.glassMode ? AppColors.white : AppColors.pollOptionText;
+          }
+        } else if (isSelected) {
+          bgColor =
+              widget.glassMode
+                  ? AppColors.white.withValues(alpha: 0.25)
+                  : AppColors.pollOptionSelectedBg;
+          textColor =
+              widget.glassMode
+                  ? AppColors.white
+                  : AppColors.pollOptionSelectedText;
+        } else {
+          bgColor =
+              widget.glassMode
+                  ? AppColors.white.withValues(alpha: 0.12)
+                  : AppColors.pollOptionBg;
+          textColor =
+              widget.glassMode ? AppColors.white : AppColors.pollOptionText;
+        }
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+          child: GestureDetector(
+            onTap: () => _onSelect(i),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 280),
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg,
+                vertical: 13,
+              ),
+              decoration: BoxDecoration(
+                color: bgColor,
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+              child: Row(
+                children: [
+                  // 라디오 아이콘 또는 정오답 아이콘
+                  _buildOptionIcon(i, isCorrect, isSelected),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      widget.options[i],
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight:
+                            (!_answered && isSelected) ||
+                                    (_answered && isCorrect)
+                                ? FontWeight.w700
+                                : FontWeight.w400,
+                        color: textColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }),
+    );
 
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 문제 번호 + 질문
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Builder(
-              builder: (ctx) {
-                final badgeSize =
-                    (MediaQuery.of(ctx).size.width * 0.07).clamp(24.0, 34.0);
-                return Container(
-                  width: badgeSize,
-                  height: badgeSize,
-                    decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    // 2번탭 공감투표 '이번 주' 배지와 동일 법칙: quizBadgeBg = cardEmphasis
-                    color: widget.glassMode
-                        ? AppColors.white.withOpacity(0.20)
-                        : AppColors.quizBadgeBg.withOpacity(0.15),
-                  ),
-                  child: Center(
-                    child: Text(
-                      'Q${widget.index}',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: widget.glassMode ? AppColors.white : AppColors.quizBadgeBg,
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Text(
-                widget.question,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  color: questionColor,
-                  height: 1.5,
-                ),
+        // 질문 헤더
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.xl,
+            AppSpacing.xl,
+            AppSpacing.xl,
+            AppSpacing.lg,
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AppBadge(
+                label: 'Q${widget.index}',
+                bgColor:
+                    widget.glassMode
+                        ? AppColors.white.withValues(alpha: 0.20)
+                        : AppColors.pollBadgeBg,
+                textColor:
+                    widget.glassMode
+                        ? AppColors.white
+                        : AppColors.pollBadgeText,
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.lg),
-
-        // 선택지
-        ...List.generate(widget.options.length, (i) {
-          final isCorrect  = i == widget.correctIndex;
-          final isSelected = i == _selectedIndex;
-
-          Color bgColor   = widget.glassMode
-              ? AppColors.white.withOpacity(0.12)
-              : AppColors.surfaceMuted;
-          Color textColor = widget.glassMode ? AppColors.white : AppColors.textPrimary;
-
-          if (_answered) {
-            if (isCorrect) {
-              bgColor   = AppColors.quizCorrectBg;
-              textColor = AppColors.quizCorrect;
-            } else if (isSelected && !isCorrect) {
-              bgColor   = AppColors.quizWrongBg;
-              textColor = AppColors.quizWrong;
-            }
-          }
-
-          return Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-            child: GestureDetector(
-              onTap: () => _onSelect(i),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.lg,
-                  vertical: AppSpacing.md,
-                ),
-                decoration: BoxDecoration(
-                  color: bgColor,
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                ),
+              const SizedBox(width: 10),
+              Expanded(
                 child: Text(
-                  widget.options[i],
+                  widget.question,
                   style: TextStyle(
-                    fontSize: 13,
-                    color: textColor,
-                    fontWeight: (_answered && isCorrect)
-                        ? FontWeight.w600
-                        : FontWeight.w400,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: questionColor,
+                    height: 1.4,
                   ),
                 ),
               ),
-            ),
-          );
-        }),
+            ],
+          ),
+        ),
 
-        // 정답 피드백
+        // 선택지 목록
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+          child: optionList,
+        ),
+
+        // 정답 피드백 + 해설
         if (_answered)
           Padding(
-            padding: const EdgeInsets.only(top: AppSpacing.xs),
-            child: Text(
-              _selectedIndex == widget.correctIndex
-                  ? '정답이에요! 👏'
-                  : '정답: ${widget.options[widget.correctIndex]}',
-              style: TextStyle(
-                fontSize: 13,
-                color: feedbackColor,
-                fontWeight: FontWeight.w500,
-              ),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.xl,
+              0,
+              AppSpacing.xl,
+              AppSpacing.lg,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _selectedIndex == widget.correctIndex
+                      ? '정답이에요! 👏'
+                      : '정답: ${widget.options[widget.correctIndex]}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: feedbackColor,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                if (widget.explanation.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    widget.explanation,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color:
+                          widget.glassMode
+                              ? AppColors.white.withValues(alpha: 0.55)
+                              : AppColors.textSecondary,
+                      height: 1.5,
+                    ),
+                  ),
+                ],
+                // 출처 표시
+                if (widget.sourceBook.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.menu_book_outlined,
+                        size: 11,
+                        color:
+                            widget.glassMode
+                                ? AppColors.white.withValues(alpha: 0.35)
+                                : AppColors.textDisabled,
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          widget.sourcePage.isNotEmpty
+                              ? '출처: ${widget.sourceBook} p.${widget.sourcePage}'
+                              : '출처: ${widget.sourceBook}',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color:
+                                widget.glassMode
+                                    ? AppColors.white.withValues(alpha: 0.35)
+                                    : AppColors.textDisabled,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
             ),
           ),
       ],
     );
 
     if (widget.glassMode) {
-      return GlassCard(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: content,
-      );
+      return GlassCard(padding: EdgeInsets.zero, child: content);
     }
-
     return AppMutedCard(
       radius: AppRadius.xl,
-      padding: const EdgeInsets.all(AppSpacing.xl),
+      padding: EdgeInsets.zero,
       child: content,
+    );
+  }
+
+  Widget _buildOptionIcon(int i, bool isCorrect, bool isSelected) {
+    if (_answered) {
+      if (isCorrect) {
+        return const Icon(
+          Icons.check_circle_rounded,
+          size: 18,
+          color: AppColors.quizCorrect,
+        );
+      } else if (isSelected) {
+        return Icon(Icons.cancel_rounded, size: 18, color: AppColors.quizWrong);
+      } else {
+        return Container(
+          width: 18,
+          height: 18,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: AppColors.textDisabled.withValues(alpha: 0.4),
+              width: 0.8,
+            ),
+          ),
+        );
+      }
+    }
+
+    // 미응답 상태
+    return Container(
+      width: 18,
+      height: 18,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color:
+            isSelected
+                ? AppColors.pollOptionSelectedText.withValues(alpha: 0.15)
+                : Colors.transparent,
+        border: Border.all(
+          color:
+              isSelected
+                  ? AppColors.pollOptionSelectedText.withValues(alpha: 0.6)
+                  : AppColors.textDisabled.withValues(alpha: 0.5),
+          width: isSelected ? 1.5 : 0.8,
+        ),
+      ),
+      child:
+          isSelected
+              ? Center(
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.pollOptionSelectedText,
+                  ),
+                ),
+              )
+              : null,
     );
   }
 }

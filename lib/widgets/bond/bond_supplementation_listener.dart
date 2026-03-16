@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_tokens.dart';
-import '../../core/widgets/app_muted_card.dart';
 
-/// 주중 보충 상태 실시간 표시
+/// 주중 보충 멤버 합류 감지 (UI 없음, 콜백만)
 class BondSupplementationListener extends StatefulWidget {
   final String? groupId;
   final Function()? onMemberJoined;
@@ -45,10 +42,10 @@ class _BondSupplementationListenerState
         final data = snapshot.data!.data() as Map<String, dynamic>?;
         if (data == null) return const SizedBox.shrink();
 
-        final needsSupplementation = data['needsSupplementation'] ?? false;
         final memberUids = List<String>.from(data['memberUids'] ?? []);
         final currentMemberCount = memberUids.length;
 
+        // 멤버 수 증가 감지 → 콜백 호출
         if (_previousMemberCount > 0 &&
             currentMemberCount > _previousMemberCount) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -59,54 +56,8 @@ class _BondSupplementationListenerState
         }
         _previousMemberCount = currentMemberCount;
 
-        if (needsSupplementation && currentMemberCount < 3) {
-          return _buildWaitingCard(currentMemberCount);
-        }
         return const SizedBox.shrink();
       },
-    );
-  }
-
-  Widget _buildWaitingCard(int currentCount) {
-    return AppMutedCard(
-      radius: AppRadius.md,
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      child: Row(
-        children: [
-          const SizedBox(
-            width: 24,
-            height: 24,
-            child: CircularProgressIndicator(
-              strokeWidth: 2.5,
-              valueColor: AlwaysStoppedAnimation<Color>(AppColors.warning),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  '새 파트너를 기다리는 중',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  currentCount == 1 ? '곧 2명이 함께할 거예요' : '곧 3명이 완성될 거예요',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
