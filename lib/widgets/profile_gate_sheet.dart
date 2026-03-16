@@ -74,10 +74,19 @@ class _ProfileGateSheetState extends State<ProfileGateSheet> {
     });
 
     try {
+      // careerBucket → careerGroup 역산 (매칭 서버 호환)
+      final bucket = _selectedCareer!;
+      final careerGroup = bucket == '0-2'
+          ? '0-2년차'
+          : bucket == '3-5'
+              ? '3-5년차'
+              : '6년차 이상';
+
       await UserProfileService.updateBasicProfile(
         nickname: _nicknameCtrl.text.trim(),
         region: _selectedRegion!,
         careerBucket: _selectedCareer!,
+        careerGroup: careerGroup,
       );
       if (mounted) {
         Navigator.pop(context);

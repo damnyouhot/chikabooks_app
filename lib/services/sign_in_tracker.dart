@@ -50,7 +50,10 @@ class SignInTracker {
       // 신규 가입 시에만 createdAt 기록 (기존 데이터 덮어쓰기 방지)
       if (isNewUser) {
         data['createdAt'] = FieldValue.serverTimestamp();
-        debugPrint('✅ SignInTracker: 신규 가입 createdAt 기록');
+        // excludeFromStats 필드를 명시적으로 false로 저장
+        // (없으면 isEqualTo: false 쿼리에서 제외되어 대시보드 집계 누락)
+        data['excludeFromStats'] = false;
+        debugPrint('✅ SignInTracker: 신규 가입 createdAt + excludeFromStats 기록');
       }
 
       // 이메일이 있고, 기존에 없는 경우에만 덮어쓰도록 merge 사용

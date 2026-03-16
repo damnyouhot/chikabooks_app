@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../utils/add_test_data.dart';
 import '../services/partner_service.dart';
-import 'imweb_api_test_page.dart';
 
 /// 디버그용 테스트 데이터 추가 페이지
 class DebugTestDataPage extends StatefulWidget {
@@ -659,26 +658,6 @@ class _DebugTestDataPageState extends State<DebugTestDataPage> {
                   ),
                 );
               },
-            ),
-
-            const SizedBox(height: 12),
-
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const ImwebApiTestPage(),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.api),
-              label: const Text('아임웹 API 테스트 (관리자 전용)'),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.all(16),
-                backgroundColor: const Color(0xFF5D6B6B),
-                foregroundColor: Colors.white,
-              ),
             ),
 
             const SizedBox(height: 20),

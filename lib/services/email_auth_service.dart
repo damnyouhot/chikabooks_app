@@ -7,6 +7,7 @@ class EmailAuthService {
   static final _auth = FirebaseAuth.instance;
 
   /// 이메일/비밀번호로 회원가입
+  /// 실패 시 사용자 친화적 메시지와 함께 [Exception]을 throw함
   static Future<User?> signUp({
     required String email,
     required String password,
@@ -28,20 +29,13 @@ class EmailAuthService {
       return credential.user;
     } on FirebaseAuthException catch (e) {
       debugPrint('⚠️ 이메일 회원가입 실패: ${e.code}');
-      switch (e.code) {
-        case 'weak-password':
-          debugPrint('비밀번호가 너무 약합니다');
-          break;
-        case 'email-already-in-use':
-          debugPrint('이미 사용 중인 이메일입니다');
-          break;
-        case 'invalid-email':
-          debugPrint('유효하지 않은 이메일입니다');
-          break;
-        default:
-          debugPrint('알 수 없는 오류: ${e.message}');
-      }
-      return null;
+      final msg = switch (e.code) {
+        'email-already-in-use' => '이미 가입된 이메일입니다. 로그인을 시도해 주세요.',
+        'weak-password'        => '비밀번호가 너무 약합니다. 더 강한 비밀번호를 사용해 주세요.',
+        'invalid-email'        => '유효하지 않은 이메일 형식입니다.',
+        _                      => '회원가입 중 오류가 발생했습니다. (${e.code})',
+      };
+      throw Exception(msg);
     }
   }
 

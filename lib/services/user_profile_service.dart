@@ -73,14 +73,16 @@ class UserProfileService {
     required String nickname,
     required String region,
     required String careerBucket,
+    String? careerGroup, // 원본 연차 텍스트도 함께 저장
   }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) throw Exception('로그인이 필요합니다.');
 
-    final data = {
+    final data = <String, dynamic>{
       'nickname': nickname.trim(),
       'region': region,
       'careerBucket': careerBucket,
+      if (careerGroup != null) 'careerGroup': careerGroup,
     };
 
     await _db.collection('users').doc(uid).update(data);
@@ -114,6 +116,36 @@ class UserProfileService {
     await _db.collection('users').doc(uid).update(profile.toMap());
     await _ensurePublicProfile(uid, profile);
     _cache = profile;
+
+    // 현재 활성 파트너 그룹의 memberMeta도 최신 관심사로 업데이트
+    await _syncMemberMetaConcerns(uid, profile.mainConcerns);
+  }
+
+  /// 파트너 그룹 memberMeta의 관심사를 최신 값으로 동기화
+  static Future<void> _syncMemberMetaConcerns(
+    String uid,
+    List<String> mainConcerns,
+  ) async {
+    try {
+      final userDoc = await _db.collection('users').doc(uid).get();
+      final groupId = userDoc.data()?['partnerGroupId'] as String?;
+      if (groupId == null || groupId.isEmpty) return;
+
+      final concerns = mainConcerns.take(2).toList();
+      await _db
+          .collection('partnerGroups')
+          .doc(groupId)
+          .collection('memberMeta')
+          .doc(uid)
+          .update({
+            'mainConcerns': concerns,
+            'mainConcernShown': concerns.isNotEmpty ? concerns[0] : null,
+          });
+      debugPrint('✅ [UserProfileService] memberMeta 관심사 동기화 완료');
+    } catch (e) {
+      // memberMeta 업데이트 실패는 치명적이지 않으므로 로그만 남김
+      debugPrint('⚠️ [UserProfileService] memberMeta 동기화 실패 (무시): $e');
+    }
   }
 
   /// 현재 결 점수 (마이그레이션 포함, 0~100 범위)
@@ -178,7 +210,10 @@ class UserProfileService {
       careerBucket = '6+';
     }
 
-    final data = {
+    // bondScore가 없는 신규 계정은 20.0으로 초기화
+    final existingDoc = await _db.collection('users').doc(uid).get();
+    final existingData = existingDoc.data();
+    final Map<String, dynamic> data = {
       'nickname': nickname.trim(),
       'region': region,
       'careerGroup': careerGroup, // 원본도 저장
@@ -186,6 +221,10 @@ class UserProfileService {
       'mainConcerns': concernTags,
       'isProfileCompleted': true,
       'updatedAt': FieldValue.serverTimestamp(),
+      // 파트너 매칭 기본값 (없는 경우에만 설정)
+      if (existingData?['partnerStatus'] == null) 'partnerStatus': 'active',
+      if (existingData?['bondScore'] == null) 'bondScore': 20.0,
+      if (existingData?['bondScore'] == null) 'bondScoreVersion': 2,
     };
 
     debugPrint('🔍 [completeOnboarding] Firestore 업데이트 시작...');
@@ -312,19 +351,40 @@ class UserProfileService {
     }
   }
 
-  /// 이어가기 파트너 선택
-  static Future<void> selectContinuePartner(String? partnerUid) async {
+  /// 이어가기 파트너 선택 (리스트 저장, 구버전 단일 필드도 함께 유지)
+  static Future<void> selectContinuePartners(List<String> partnerUids) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) throw Exception('로그인이 필요합니다.');
 
     try {
       await _db.collection('users').doc(uid).update({
-        'continueWithPartner': partnerUid,
+        'continueWithPartners': partnerUids,
+        // 구버전 호환: 첫 번째 UID를 단일 필드에도 저장
+        'continueWithPartner':
+            partnerUids.isNotEmpty ? partnerUids.first : null,
         'updatedAt': FieldValue.serverTimestamp(),
       });
       _cache = null;
     } catch (e) {
-      debugPrint('⚠️ selectContinuePartner error: $e');
+      debugPrint('⚠️ selectContinuePartners error: $e');
+      rethrow;
+    }
+  }
+
+  /// 이어가기 선택 취소
+  static Future<void> cancelContinuePartners() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) throw Exception('로그인이 필요합니다.');
+
+    try {
+      await _db.collection('users').doc(uid).update({
+        'continueWithPartners': [],
+        'continueWithPartner': null,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      _cache = null;
+    } catch (e) {
+      debugPrint('⚠️ cancelContinuePartners error: $e');
       rethrow;
     }
   }

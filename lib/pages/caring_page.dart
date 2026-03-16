@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:rive/rive.dart' hide Animation;
 import '../services/caring_state_service.dart';
 import '../services/bond_score_service.dart';
@@ -34,12 +35,16 @@ class CaringPage extends StatefulWidget {
   /// 온보딩 중 캐릭터 위에 표시할 대사 (null이면 표시 안 함)
   final String? onboardingDialogue;
 
+  /// 현재 선택된 하단 탭 인덱스 (0=돌보기). Overlay 애니메이션을 현재 탭에서만 표시하기 위해 사용.
+  final int currentTabIndex;
+
   const CaringPage({
     super.key,
     this.onTabRequested,
     this.onGrowthSubTabRequested,
     this.isOnboardingActive = false,
     this.onboardingDialogue,
+    this.currentTabIndex = 0,
   });
 
   @override
@@ -48,8 +53,9 @@ class CaringPage extends StatefulWidget {
 
 class _CaringPageState extends State<CaringPage>
     with TickerProviderStateMixin {
-  // ── 로딩 ──
-  bool _loading = true;
+  // ── 카드별 독립 로딩 (전체 스피너 없이 스켈레톤 표시) ──
+  bool _jobLoading  = true;   // Jobs 카드
+  bool _bookLoading = true;   // Weekly Book 카드
 
   // ── 온보딩 완료 후 카드/버튼 순차 페이드인 ──
   // 카드 4개(0~400ms) + 버튼 4개(500~900ms), 전체 1200ms 컨트롤러
@@ -89,6 +95,12 @@ class _CaringPageState extends State<CaringPage>
   File? _riveFile;
   RiveWidgetController? _dogController;
   TriggerInput? _tapTrigger;
+
+  // ── 결 점수 플로팅 애니메이션 ──
+  // GlobalKey로 캐릭터 영역 좌표를 정확하게 추적
+  final GlobalKey _characterAreaKey = GlobalKey();
+  // 현재 활성화된 OverlayEntry 목록 (dispose 시 일괄 제거)
+  final List<OverlayEntry> _activeOverlayEntries = [];
 
   // 터치 리액션 fallback 문구
   static const List<String> _neutralPhrases = [
@@ -140,16 +152,22 @@ class _CaringPageState extends State<CaringPage>
     if (!widget.isOnboardingActive) {
       _revealCtrl.value = 1.0;
     }    _loadRiveFile();
-    _bootstrap();
+    // ① CaringState(캐릭터 데이터) + BondScore → 완료 즉시 메시지 루프 시작
+    _loadCaringState().then((_) {
+      if (mounted && !widget.isOnboardingActive) _startMsgLoop();
+    });
+    // ② Jobs 카드: 독립 비동기 (가장 느린 항목 → 먼저 분리)
+    _loadJobCard();
+    // ③ Weekly Book 카드: 독립 비동기
+    _loadBookCard();
+    // ④ dailySettle + detectOpenEvents: UI 렌더링과 무관하므로 백그라운드 실행
     Future.microtask(() async {
       await CaringActionService.dailySettle();
-      // 이벤트 감지 (Firestore) → 큐에 적재 → 루프 시작
+      // 이벤트 감지 (Firestore) → 큐에 적재 (루프가 다음 사이클에 자동 소비)
       final detectedEvents = await CaringActionService.detectOpenEvents();
       for (final eventId in detectedEvents) {
         _queueEventIfNew(eventId);
       }
-      // 온보딩 중이면 메시지 루프 시작 안 함
-      if (mounted && !widget.isOnboardingActive) _startMsgLoop();
     });
   }
 
@@ -173,6 +191,11 @@ class _CaringPageState extends State<CaringPage>
     _dogController?.dispose();
     _riveFile?.dispose();
     _revealCtrl.dispose();
+    // 미제거 OverlayEntry 일괄 정리 (탭 전환 등으로 dispose될 때 안전 제거)
+    for (final entry in _activeOverlayEntries) {
+      try { entry.remove(); } catch (_) {}
+    }
+    _activeOverlayEntries.clear();
     super.dispose();
   }
 
@@ -205,45 +228,70 @@ class _CaringPageState extends State<CaringPage>
     }
   }
 
-  Future<void> _bootstrap({bool showLoader = true}) async {
-    if (showLoader) setState(() => _loading = true);
-
+  // ── ① CaringState + BondScore (캐릭터 동작에 필요한 최소 데이터) ──
+  Future<void> _loadCaringState() async {
     try {
-      // ── 병렬 로드: CaringState / BondScore / 구인 / 전자책 동시 요청 ──
-      final futures = await Future.wait<dynamic>([
-        CaringStateService.loadState(),                                        // [0] CaringState
-        BondScoreService.applyCenterGravity(),                                 // [1] void → null
-        JobService().getRecentJobsSummary(),                                   // [2] Map
-        EbookService().watchEbooks().first.catchError((_) => <Ebook>[]),       // [3] List<Ebook>
+      await Future.wait<dynamic>([
+        CaringStateService.loadState(),
+        BondScoreService.applyCenterGravity(),
       ]);
-
-      final jobData = futures[2] as Map<String, dynamic>;
-      final jobCount = (jobData['count'] as int?) ?? 0;
-      final clinicName = (jobData['clinicName'] as String?) ?? '';
-
-      final ebooks = futures[3] as List<Ebook>;
-      final featuredBook = ebooks.isNotEmpty ? ebooks.first : null;
-
+      // Policy / Quiz 카드는 정적 데이터 → CaringState 완료 직후 세팅
       final policies = [
-        {'title': '2026 스케일링 급여 개정', 'dday': 'D-12', 'date': '3월 1일'},
-        {'title': '치주질환 급여 인정 기준 변경', 'dday': 'D-21', 'date': '3월 10일'},
-        {'title': '근관치료 행위 산정 지침 개정', 'dday': 'D-26', 'date': '3월 15일'},
+        {'title': '2026 스케일링 급여 개정',       'dday': 'D-12', 'date': '3월 1일'},
+        {'title': '치주질환 급여 인정 기준 변경',   'dday': 'D-21', 'date': '3월 10일'},
+        {'title': '근관치료 행위 산정 지침 개정',   'dday': 'D-26', 'date': '3월 15일'},
       ];
+      if (!mounted) return;
+      setState(() {
+        _upcomingPolicies = policies;
+        _quizSummary = '치주낭 측정 시 올바른 탐침 방향은?';
+      });
+      _startPolicyRolling();
+    } catch (e) {
+      debugPrint('❌ _loadCaringState 실패: $e');
+    }
+  }
+
+  // ── ② Jobs 카드 (네트워크 최다 소요 → 독립) ──
+  Future<void> _loadJobCard() async {
+    try {
+      final jobData = await JobService().getRecentJobsSummary();
+      final count      = (jobData['count']      as int?)    ?? 0;
+      final hasMore    = (jobData['hasMore']     as bool?)   ?? false;
+      final clinicName = (jobData['clinicName']  as String?) ?? '';
 
       if (!mounted) return;
       setState(() {
-        _jobsSummary = jobCount > 0 ? '오늘 새로 올라온 $jobCount건' : '새로운 구인 공고가 없어요';
-        _jobsSub = jobCount > 0 && clinicName.isNotEmpty ? clinicName : '';
-        _upcomingPolicies = policies;
-        _weeklyBook = featuredBook;
-        _quizSummary = '치주낭 측정 시 올바른 탐침 방향은?';
-        _loading = false;
+        if (count == 0) {
+          _jobsSummary = '새로운 구인 공고가 없어요';
+          _jobsSub     = '';
+        } else if (hasMore) {
+          _jobsSummary = '최근 구인 $count건+';
+          _jobsSub     = clinicName.isNotEmpty ? clinicName : '';
+        } else {
+          _jobsSummary = '최근 구인 $count건';
+          _jobsSub     = clinicName.isNotEmpty ? clinicName : '';
+        }
+        _jobLoading = false;
       });
-
-      _startPolicyRolling();
     } catch (e) {
-      debugPrint('❌ 데이터 로드 실패: $e');
-      if (mounted) setState(() => _loading = false);
+      debugPrint('❌ _loadJobCard 실패: $e');
+      if (mounted) setState(() { _jobsSummary = '구인 정보를 불러오지 못했어요'; _jobLoading = false; });
+    }
+  }
+
+  // ── ③ Weekly Book 카드 ──
+  Future<void> _loadBookCard() async {
+    try {
+      final ebooks = await EbookService().fetchAllEbooks().catchError((_) => <Ebook>[]);
+      if (!mounted) return;
+      setState(() {
+        _weeklyBook  = ebooks.isNotEmpty ? ebooks.first : null;
+        _bookLoading = false;
+      });
+    } catch (e) {
+      debugPrint('❌ _loadBookCard 실패: $e');
+      if (mounted) setState(() => _bookLoading = false);
     }
   }
 
@@ -440,7 +488,8 @@ class _CaringPageState extends State<CaringPage>
 
     _enqueueReaction(msg);
     if (result.success && result.bondDelta > 0) _showFloatingDelta(result.bondDelta);
-    if (result.success) _bootstrap(showLoader: false);
+    // 터치 성공 → CaringState만 재로드 (구인/책 카드는 변화 없음)
+    if (result.success) _loadCaringState();
   }
 
   void _onLove() => _onCircleTap();
@@ -449,7 +498,7 @@ class _CaringPageState extends State<CaringPage>
     // 감정기록 시작 이벤트 기록
     AdminActivityService.log(ActivityEventType.tapEmotionStart, page: 'home');
     DiaryInputSheet.show(context, (text) async {
-      _bootstrap();
+      _loadCaringState();
         });
       }
 
@@ -458,48 +507,76 @@ class _CaringPageState extends State<CaringPage>
   }
 
   void _showFloatingDelta(double delta) {
-    final overlay = Overlay.of(context);
-    final renderBox = context.findRenderObject() as RenderBox?;
-    if (renderBox == null) return;
+    if (!mounted) return;
+    if (widget.currentTabIndex != 0) return;
 
-    final size = renderBox.size;
-    final offsetX = (size.width / 2) + 30 + (Random().nextDouble() * 40 - 20);
-    final offsetY = (size.height * 0.52) + (Random().nextDouble() * 20 - 10);
-    final label = '결+${delta.toStringAsFixed(2)}';
+    // ── 캐릭터 영역 GlobalKey로 정확한 화면 좌표 계산 ──
+    final keyContext = _characterAreaKey.currentContext;
+    Offset baseOffset;
+    String _coordSrc; // ── 진단용 (원인 확인 후 제거) ──
 
-    final entry = OverlayEntry(
-      builder: (ctx) => Positioned(
-            left: offsetX,
-            top: offsetY,
-            child: TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0.0, end: 1.0),
-              duration: const Duration(milliseconds: 1500),
-              builder: (_, value, child) {
-                return Transform.translate(
-                  offset: Offset(0, -value * 50),
-                  child: Opacity(
-                    opacity: 1.0 - value,
-                    child: Material(
-                      type: MaterialType.transparency,
-                      child: Text(
-                        label,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.accent.withOpacity(1.0 - value),
-                          decoration: TextDecoration.none,
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
+    if (keyContext != null) {
+      final box = keyContext.findRenderObject() as RenderBox?;
+      if (box != null && box.hasSize) {
+        final topLeft = box.localToGlobal(Offset.zero);
+        final size = box.size;
+        baseOffset = Offset(
+          topLeft.dx + size.width * 0.55 + (Random().nextDouble() * 30 - 15),
+          topLeft.dy + size.height * 0.28 + (Random().nextDouble() * 20 - 10),
+        );
+        _coordSrc = 'key(tl=$topLeft, sz=$size)';
+      } else {
+        baseOffset = _fallbackDeltaOffset();
+        _coordSrc = 'fallback(box=${box != null}, hasSize=${box?.hasSize})';
+      }
+    } else {
+      baseOffset = _fallbackDeltaOffset();
+      _coordSrc = 'fallback(keyCtx=null)';
+    }
+
+    // ── 진단 로그 (원인 확인 후 제거) ──
+    final screen = MediaQuery.of(context).size;
+    debugPrint('🎯 Delta: offset=$baseOffset, screen=$screen, src=$_coordSrc');
+
+    final label = '결 +${delta.toStringAsFixed(2)}';
+    OverlayEntry? entry;
+
+    entry = OverlayEntry(
+      builder: (ctx) => _FloatingDeltaWidget(
+        label: label,
+        startOffset: baseOffset,
+        onFinished: () {
+          debugPrint('🎯 Delta: onFinished → remove'); // 진단용
+          try { entry?.remove(); } catch (_) {}
+          _activeOverlayEntries.remove(entry);
+        },
+      ),
     );
 
-    overlay.insert(entry);
-    Future.delayed(const Duration(milliseconds: 1500), () => entry.remove());
+    _activeOverlayEntries.add(entry);
+
+    // postFrameCallback: rebuild 중 삽입 방지
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        debugPrint('🎯 Delta: postFrame SKIP (unmounted)'); // 진단용
+        try { entry?.remove(); } catch (_) {}
+        _activeOverlayEntries.remove(entry);
+        return;
+      }
+      try {
+        Overlay.of(context).insert(entry!);
+        debugPrint('🎯 Delta: ✅ inserted'); // 진단용
+      } catch (e) {
+        debugPrint('🎯 Delta: ❌ insert failed: $e'); // 진단용
+        _activeOverlayEntries.remove(entry);
+      }
+    });
+  }
+
+  Offset _fallbackDeltaOffset() {
+    // GlobalKey 사용 불가 시 화면 중앙 상단 fallback
+    final size = MediaQuery.of(context).size;
+    return Offset(size.width * 0.55, size.height * 0.40);
   }
 
   // ══════════════════════════════════════════════
@@ -508,13 +585,6 @@ class _CaringPageState extends State<CaringPage>
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return Scaffold(
-        backgroundColor: AppColors.appBg,
-        body: const Center(child: CircularProgressIndicator()),
-      );
-    }
-
     final isOnboarding = widget.isOnboardingActive;
 
     return Scaffold(
@@ -556,10 +626,11 @@ class _CaringPageState extends State<CaringPage>
                           ? const AlwaysStoppedAnimation(0.0)
                           : _cardAnims[0],
                       child: _TapCard(
-                        title: '📍 내 주변 구인 치과',
+                        title: 'Jobs',
                         bigText: _jobsSummary,
                         subtitle: _jobsSub,
                         onTap: () => widget.onTabRequested?.call(3),
+                        isLoading: _jobLoading,
                       ),
                     ),
                     FadeTransition(
@@ -580,13 +651,14 @@ class _CaringPageState extends State<CaringPage>
                           ? const AlwaysStoppedAnimation(0.0)
                           : _cardAnims[2],
                       child: _TapCard(
-                        title: '📖 이주의 책',
+                        title: 'Weekly Book',
                         bigText: _weeklyBook?.title ?? '이번 주 추천 책이 없어요',
                         subtitle: (_weeklyBook != null &&
                                 _weeklyBook!.author.isNotEmpty)
                             ? '저자: ${_weeklyBook!.author}'
                             : '',
                         onTap: _goBookDetail,
+                        isLoading: _bookLoading,
                       ),
                     ),
                     FadeTransition(
@@ -594,7 +666,7 @@ class _CaringPageState extends State<CaringPage>
                           ? const AlwaysStoppedAnimation(0.0)
                           : _cardAnims[3],
                       child: _TapCard(
-                        title: '🧠 오늘의 1문제',
+                        title: 'Daily Quiz',
                         bigText: _quizSummary,
                         subtitle: '터치해서 풀기',
                         onTap: () {
@@ -638,6 +710,7 @@ class _CaringPageState extends State<CaringPage>
       children: [
         // 캐릭터
         Positioned.fill(
+          key: _characterAreaKey,
           child: GestureDetector(
             // 온보딩 중: 터치를 소비하되 실제 액션은 실행 안 함
             // → 아래 overlay(GestureDetector)로 이벤트가 전달될 수 있도록
@@ -649,14 +722,17 @@ class _CaringPageState extends State<CaringPage>
             child: _dogController != null
                 ? LayoutBuilder(
                     builder: (ctx, constraints) {
-                      // 기준 화면 높이(Pixel Pro 캐릭터 영역 ≈ 284dp) 대비
-                      // 현재 캐릭터 영역 높이로 scale을 동적 계산
-                      // clamp: 최소 0.85 · 최대 1.25
-                      final baseH = 284.0;
-                      final rawScale = (constraints.maxHeight / baseH * 1.056)
-                          .clamp(0.85, 1.25);
-                      // 온보딩 중에는 캐릭터 60% 감소 (= 원래 크기의 40%)
-                      final scale = isOnboarding ? rawScale * 0.40 : rawScale;
+                      // ── 캐릭터 크기: 전체 화면 높이 기준으로 고정 ──
+                      // constraints.maxHeight(남은 공간) 대신 screenH를 기준으로 사용
+                      // → 카드/버튼 높이 변동에 무관하게 일관된 크기 유지
+                      // clamp를 좁혀(±10%) 폰마다 편차 최소화
+                      final screenH = MediaQuery.of(ctx).size.height;
+                      final baseH = 284.0;           // 기준 캐릭터 영역 높이 (dp)
+                      final targetH = screenH * 0.32; // 화면 높이의 32%를 캐릭터 크기 기준으로 고정
+                      final rawScale = (targetH / baseH).clamp(0.90, 1.10);
+                      // 일반 모드: 0.81 * 1.5 * 0.9 = 1.09 (이전 대비 10% 축소)
+                      // 온보딩 중: 일반 크기의 90% = 1.09 * 0.9 ≈ 0.98
+                      final scale = isOnboarding ? rawScale * 0.98 : rawScale * 1.09;
 
                       // OverflowBox 대신 Transform.scale 사용
                       // → BoxConstraints non-normalized 에러 방지
@@ -865,12 +941,14 @@ class _TapCard extends StatelessWidget {
     required this.bigText,
     required this.subtitle,
     required this.onTap,
+    this.isLoading = false,
   });
 
   final String title;
   final String bigText;
   final String subtitle;
   final VoidCallback onTap;
+  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -898,10 +976,12 @@ class _TapCard extends StatelessWidget {
                   fit: FlexFit.tight,
                   child: Text(
                     title,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.onCardPrimary,  // White 타이틀
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,          // 18 * 0.8 = 14.4 → 14 (-20%)
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.onCardPrimary,
+                      letterSpacing: -0.5,   // tracking 좁게
+                      height: 1.1,
                     ),
                   ),
                 ),
@@ -910,7 +990,33 @@ class _TapCard extends StatelessWidget {
                 Flexible(
                   flex: 5,
                   fit: FlexFit.tight,
-                  child: Column(
+                  child: isLoading
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // 스켈레톤 — 굵은 텍스트 자리
+                            Container(
+                              height: 12,
+                              width: 100,
+                              decoration: BoxDecoration(
+                                color: AppColors.onCardPrimary.withOpacity(0.25),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            // 스켈레톤 — 서브 텍스트 자리
+                            Container(
+                              height: 9,
+                              width: 64,
+                              decoration: BoxDecoration(
+                                color: AppColors.onCardPrimary.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(5),
+                              ),
+                            ),
+                          ],
+                        )
+                      : Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -999,11 +1105,13 @@ class _PolicyRollingCard extends StatelessWidget {
                     // 왼쪽 타이틀: 남은 공간 차지
                     Expanded(
                   child: Text(
-                    '🏥 임박 제도 변경',
-                        style: const TextStyle(
-                      fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.onCardPrimary,  // White
+                    'Policy Updates',
+                        style: GoogleFonts.poppins(
+                      fontSize: 14,          // 18 * 0.8 = 14 (-20%)
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.onCardPrimary,
+                          letterSpacing: -0.5,
+                          height: 1.1,
                     ),
                   ),
                 ),
@@ -1133,6 +1241,125 @@ class _ActionBtn extends StatelessWidget {
         ],
           );
         },
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// 결 점수 플로팅 애니메이션 위젯
+// - GlobalKey 기반 좌표로 캐릭터 위에 정확히 배치
+// - fade-in(30%) → 유지(50%) → fade-out(20%) 패턴
+// - 완료 후 onFinished 콜백으로 OverlayEntry 안전 제거
+// ══════════════════════════════════════════════════════════════
+class _FloatingDeltaWidget extends StatefulWidget {
+  final String label;
+  final Offset startOffset;
+  final VoidCallback onFinished;
+
+  const _FloatingDeltaWidget({
+    required this.label,
+    required this.startOffset,
+    required this.onFinished,
+  });
+
+  @override
+  State<_FloatingDeltaWidget> createState() => _FloatingDeltaWidgetState();
+}
+
+class _FloatingDeltaWidgetState extends State<_FloatingDeltaWidget>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _offsetY;
+  late Animation<double> _opacity;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800),
+    );
+
+    // 위로 60px 이동
+    _offsetY = Tween<double>(begin: 0.0, end: -60.0).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeOut),
+    );
+
+    // fade-in(0~30%) → 유지(30~80%) → fade-out(80~100%)
+    _opacity = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween(begin: 0.0, end: 1.0)
+            .chain(CurveTween(curve: Curves.easeIn)),
+        weight: 30,
+      ),
+      TweenSequenceItem(
+        tween: ConstantTween(1.0),
+        weight: 50,
+      ),
+      TweenSequenceItem(
+        tween: Tween(begin: 1.0, end: 0.0)
+            .chain(CurveTween(curve: Curves.easeOut)),
+        weight: 20,
+      ),
+    ]).animate(_ctrl);
+
+    // ── 진단용 (원인 확인 후 제거) ──
+    debugPrint('🎯 DeltaWidget: initState, offset=${widget.startOffset}');
+    _ctrl.forward().then((_) {
+      debugPrint('🎯 DeltaWidget: anim done → onFinished'); // 진단용
+      widget.onFinished();
+    });
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // IgnorePointer: 전체 화면 overlay가 터치를 가로채지 않도록
+    // SizedBox.expand + Stack: Positioned에 올바른 Stack 부모 제공
+    return IgnorePointer(
+      child: SizedBox.expand(
+        child: AnimatedBuilder(
+          animation: _ctrl,
+          builder: (_, child) {
+            return Stack(
+              children: [
+                Positioned(
+                  left: widget.startOffset.dx,
+                  top: widget.startOffset.dy + _offsetY.value,
+                  child: Opacity(
+                    opacity: _opacity.value,
+                    child: child!,
+                  ),
+                ),
+              ],
+            );
+          },
+          child: Material(
+            type: MaterialType.transparency,
+            child: Text(
+              widget.label,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: AppColors.cardEmphasis,
+                decoration: TextDecoration.none,
+                shadows: [
+                  Shadow(
+                    color: Color(0x33000000),
+                    blurRadius: 4,
+                    offset: Offset(0, 1),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

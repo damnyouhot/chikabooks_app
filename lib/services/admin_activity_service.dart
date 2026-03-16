@@ -40,76 +40,92 @@ class AdminActivityService {
 
   // ── 공개 메서드 ───────────────────────────────────────────────
 
-  /// 행동 이벤트 기록
+  /// 행동 이벤트 기록 — fire-and-forget (UI 블로킹 없음)
   ///
   /// [type]     : [ActivityEventType] 열거형
   /// [page]     : 이벤트 발생 페이지명 (예: 'home', 'career', 'job_list')
   /// [targetId] : 관련 리소스 ID (선택, 예: jobId)
   /// [extra]    : 추가 메타데이터 (선택)
-  static Future<void> log(
+  static void log(
     ActivityEventType type, {
     required String page,
     String? targetId,
     Map<String, dynamic>? extra,
-  }) async {
-    try {
-      final uid = _auth.currentUser?.uid;
-      if (uid == null) return;
+  }) {
+    // 다음 이벤트 루프로 넘겨 UI 렌더링을 블로킹하지 않음
+    Future.delayed(Duration.zero, () async {
+      try {
+        final uid = _auth.currentUser?.uid;
+        if (uid == null) return;
 
-      if (await _isExcluded(uid)) return;
+        if (await _isExcluded(uid)) return;
 
-      final snapshot = await _getSnapshot(uid);
-      final data = <String, dynamic>{
-        'userId': uid,
-        'type': type.value,
-        'page': page,
-        'timestamp': FieldValue.serverTimestamp(),
-        ...snapshot.toMap(),
-      };
+        final snapshot = await _getSnapshot(uid);
+        final data = <String, dynamic>{
+          'userId': uid,
+          'type': type.value,
+          'page': page,
+          'timestamp': FieldValue.serverTimestamp(),
+          'isFunnel': false, // Feature 탭 쿼리에서 퍼널 이벤트 제외용
+          ...snapshot.toMap(),
+        };
 
-      if (targetId != null) data['targetId'] = targetId;
-      if (extra != null) data.addAll(extra);
+        if (targetId != null) data['targetId'] = targetId;
+        if (extra != null) data.addAll(extra);
 
-      await _db.collection('activityLogs').add(data);
-    } catch (e) {
-      debugPrint('⚠️ AdminActivityService.log 실패: $e');
-    }
+        await _db.collection('activityLogs').add(data);
+      } catch (e) {
+        debugPrint('⚠️ AdminActivityService.log 실패: $e');
+      }
+    });
   }
 
-  /// 퍼널 이벤트 기록 (특정 단계 도달)
-  static Future<void> logFunnel(
+  /// 퍼널 이벤트 기록 — fire-and-forget (UI 블로킹 없음)
+  static void logFunnel(
     FunnelEventType type, {
     Map<String, dynamic>? extra,
-  }) async {
-    try {
+  }) {
+    Future.delayed(Duration.zero, () async {
+      try {
+        final uid = _auth.currentUser?.uid;
+        if (uid == null) return;
+
+        if (await _isExcluded(uid)) return;
+
+        final snapshot = await _getSnapshot(uid);
+        final data = <String, dynamic>{
+          'userId': uid,
+          'type': type.value,
+          'page': type.page,
+          'timestamp': FieldValue.serverTimestamp(),
+          'isFunnel': true,
+          ...snapshot.toMap(),
+        };
+
+        if (extra != null) data.addAll(extra);
+
+        await _db.collection('activityLogs').add(data);
+      } catch (e) {
+        debugPrint('⚠️ AdminActivityService.logFunnel 실패: $e');
+      }
+    });
+  }
+
+  /// 세션 시작 시 유저 스냅샷 캐시를 미리 채워둠 — 이후 로그 기록 시 Firestore 읽기 생략
+  static void warmupCache() {
+    Future.delayed(Duration.zero, () async {
       final uid = _auth.currentUser?.uid;
-      if (uid == null) return;
-
-      if (await _isExcluded(uid)) return;
-
-      final snapshot = await _getSnapshot(uid);
-      final data = <String, dynamic>{
-        'userId': uid,
-        'type': type.value,
-        'page': type.page,
-        'timestamp': FieldValue.serverTimestamp(),
-        'isFunnel': true,
-        ...snapshot.toMap(),
-      };
-
-      if (extra != null) data.addAll(extra);
-
-      await _db.collection('activityLogs').add(data);
-    } catch (e) {
-      debugPrint('⚠️ AdminActivityService.logFunnel 실패: $e');
-    }
+      if (uid != null) await _getSnapshot(uid);
+    });
   }
 
   /// 스냅샷 캐시 수동 갱신 (프로필 수정 후 호출)
-  static Future<void> refreshSnapshot() async {
+  static void refreshSnapshot() {
     _snapshotCache = null;
-    final uid = _auth.currentUser?.uid;
-    if (uid != null) await _getSnapshot(uid);
+    Future.delayed(Duration.zero, () async {
+      final uid = _auth.currentUser?.uid;
+      if (uid != null) await _getSnapshot(uid);
+    });
   }
 
   // ── 내부 메서드 ───────────────────────────────────────────────

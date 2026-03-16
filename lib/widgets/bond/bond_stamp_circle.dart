@@ -74,7 +74,7 @@ class _BondStampCircleState extends State<BondStampCircle>
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: widget.isFilled
-              ? AppColors.cardEmphasis
+              ? AppColors.cardPrimary
               : widget.isToday
                   ? AppColors.accent.withOpacity(0.15)
                   : AppColors.surfaceMuted,
@@ -82,7 +82,7 @@ class _BondStampCircleState extends State<BondStampCircle>
             color: widget.isToday
                 ? AppColors.accent
                 : widget.isFilled
-                    ? AppColors.cardEmphasis
+                    ? AppColors.cardPrimary
                     : AppColors.disabledBg,
             width: widget.isToday ? 2.0 : 0.8,
           ),
@@ -94,7 +94,7 @@ class _BondStampCircleState extends State<BondStampCircle>
               fontSize: 11,
               fontWeight: FontWeight.w700,
               color: widget.isFilled
-                  ? AppColors.onCardEmphasis
+                  ? AppColors.onCardPrimary
                   : widget.isToday
                       ? AppColors.accent
                       : AppColors.textDisabled,

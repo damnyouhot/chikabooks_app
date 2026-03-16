@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import '../models/ebook.dart';
 
 class EbookService {
@@ -12,6 +14,15 @@ class EbookService {
         .orderBy('publishedAt', descending: true)
         .snapshots()
         .map((qs) => qs.docs.map((doc) => Ebook.fromDoc(doc)).toList());
+  }
+
+  /// 전체 전자책 1회 조회 (스트림 대신 — 리스트/카드용)
+  Future<List<Ebook>> fetchAllEbooks() async {
+    final qs = await _db
+        .collection('ebooks')
+        .orderBy('publishedAt', descending: true)
+        .get();
+    return qs.docs.map((doc) => Ebook.fromDoc(doc)).toList();
   }
 
   Future<Ebook> fetchEbook(String id) async {
@@ -89,6 +100,19 @@ class EbookService {
         .map((qs) => qs.docs.map((doc) => doc.id).toList());
   }
 
+  /// 구매한 도서 ID 1회 조회 (스트림 대신)
+  Future<List<String>> fetchPurchasedEbookIds() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return [];
+
+    final qs = await _db
+        .collection('users')
+        .doc(uid)
+        .collection('purchases')
+        .get();
+    return qs.docs.map((doc) => doc.id).toList();
+  }
+
   /// 읽기 진행도 저장 (PDF: lastPage, EPUB: lastCfi)
   Future<void> saveReadingProgress(
     String ebookId, {
@@ -122,5 +146,31 @@ class EbookService {
         .collection('bookmarks')
         .orderBy('createdAt')
         .snapshots();
+  }
+
+  // ── 아임웹 구매내역 동기화 ──────────────────────────────────
+  /// Cloud Function syncImwebPurchases를 호출해 아임웹 구매내역을 Firestore에 저장.
+  ///
+  /// 반환: { synced: int, skipped: int, message: String }
+  Future<Map<String, dynamic>> syncImwebPurchases() async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('로그인이 필요합니다.');
+
+    final email = user.email;
+    if (email == null || email.isEmpty) {
+      throw Exception('계정에 이메일이 연결되어 있지 않습니다.');
+    }
+
+    try {
+      final callable = FirebaseFunctions.instance
+          .httpsCallable('syncImwebPurchases');
+      final result = await callable.call({'email': email});
+      final data = Map<String, dynamic>.from(result.data as Map);
+      debugPrint('✅ syncImwebPurchases 완료: $data');
+      return data;
+    } on FirebaseFunctionsException catch (e) {
+      debugPrint('❌ syncImwebPurchases 오류: ${e.code} - ${e.message}');
+      rethrow;
+    }
   }
 }

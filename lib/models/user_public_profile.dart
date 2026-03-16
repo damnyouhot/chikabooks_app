@@ -19,7 +19,8 @@ class UserPublicProfile {
   // ─── 매칭 설정 필드 (v1 설계) ───
   final String partnerStatus;      // 'active' | 'pause' (기본값: 'active')
   final bool willMatchNextWeek;    // 쉬는 중 매칭 되기 스위치 (기본값: true)
-  final String? continueWithPartner; // 이어가기 선택한 상대 UID
+  final String? continueWithPartner; // 이어가기 선택한 상대 UID (구버전 호환)
+  final List<String> continueWithPartners; // 이어가기 선택 목록 (신버전)
 
   // ─── 관리자 / 통계 제어 필드 ───
   final bool isAdmin;              // 관리자 여부 (대시보드 접근 권한)
@@ -39,6 +40,7 @@ class UserPublicProfile {
     this.partnerStatus = 'active',
     this.willMatchNextWeek = true,
     this.continueWithPartner,
+    this.continueWithPartners = const [],
     this.isAdmin = false,
     this.excludeFromStats = false,
   });
@@ -83,6 +85,7 @@ class UserPublicProfile {
       partnerStatus: m['partnerStatus'] ?? 'active',
       willMatchNextWeek: m['willMatchNextWeek'] ?? true,
       continueWithPartner: m['continueWithPartner'],
+      continueWithPartners: List<String>.from(m['continueWithPartners'] ?? []),
       isAdmin: m['isAdmin'] == true,
       excludeFromStats: m['excludeFromStats'] == true,
     );
@@ -92,6 +95,7 @@ class UserPublicProfile {
         'nickname': nickname,
         'region': region,
         'careerBucket': careerBucket,
+        'careerGroup': careerGroup,
         'mainConcerns': mainConcerns,
         'workplaceType': workplaceType,
       };

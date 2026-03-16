@@ -13,18 +13,24 @@ String _nextMatchingMessage() {
     daysUntilMonday = 7;
   }
   if (daysUntilMonday == 0) daysUntilMonday = 7;
-  final nextMonday = DateTime(now.year, now.month, now.day + daysUntilMonday, 9, 0);
+  final nextMonday = DateTime(
+    now.year,
+    now.month,
+    now.day + daysUntilMonday,
+    9,
+    0,
+  );
   final todayIsMonday = now.weekday == DateTime.monday;
   final before9am = now.hour < 9;
   if (todayIsMonday && before9am) {
     final diff = DateTime(now.year, now.month, now.day, 9, 0).difference(now);
     final hours = diff.inHours;
-    final mins  = diff.inMinutes % 60;
+    final mins = diff.inMinutes % 60;
     if (hours > 0) return '다음 매칭까지 약 $hours시간 $mins분 남았습니다';
     return '다음 매칭까지 약 $mins분 남았습니다';
   }
-  final diff  = nextMonday.difference(now);
-  final days  = diff.inDays;
+  final diff = nextMonday.difference(now);
+  final days = diff.inDays;
   final hours = diff.inHours % 24;
   if (days > 0) return '다음 매칭까지 약 $days일 $hours시간 남았습니다';
   return '다음 매칭까지 약 $hours시간 남았습니다';
@@ -42,17 +48,17 @@ class BondScoreGauge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final progress   = (bondScore / 100).clamp(0.0, 1.0);
-    final scoreText  = bondScore.toStringAsFixed(1);
-    final labelColor = glassMode
-        ? AppColors.white.withOpacity(0.7)
-        : AppColors.onCardPrimary.withOpacity(0.7);
+    final progress = (bondScore / 100).clamp(0.0, 1.0);
+    final scoreText = bondScore.toStringAsFixed(1);
+    final labelColor =
+        glassMode
+            ? AppColors.white.withOpacity(0.7)
+            : AppColors.onCardPrimary.withOpacity(0.7);
     // Green/Dark 배경 위 부드러운 크림화이트: creamWhite 토큰 사용
     // 나중에 색 변경 시 AppColors.creamWhite 한 곳만 수정하면 자동 반영
     final scoreColor = glassMode ? AppColors.white : AppColors.creamWhite;
-    final trackColor = glassMode
-        ? AppColors.white.withOpacity(0.2)
-        : AppColors.disabledBg;
+    final trackColor =
+        glassMode ? AppColors.white.withOpacity(0.2) : AppColors.disabledBg;
 
     return SizedBox(
       width: 60,
@@ -88,8 +94,8 @@ class BondScoreGauge extends StatelessWidget {
               Text(
                 '결 점수',
                 style: TextStyle(
-                  fontSize: 8,
-                  fontWeight: FontWeight.w500,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
                   color: labelColor,
                   height: 1.0,
                 ),
@@ -98,7 +104,7 @@ class BondScoreGauge extends StatelessWidget {
               Text(
                 scoreText,
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: 18,
                   fontWeight: FontWeight.w700,
                   color: scoreColor,
                   height: 1.0,
@@ -124,8 +130,14 @@ class BondNoPartnerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textSecondary = glassMode ? AppColors.white.withOpacity(0.75) : AppColors.onCardPrimary.withOpacity(0.85);
-    final textDisabled  = glassMode ? AppColors.white.withOpacity(0.5)  : AppColors.onCardPrimary.withOpacity(0.6);
+    final textSecondary =
+        glassMode
+            ? AppColors.white.withOpacity(0.75)
+            : AppColors.onCardPrimary.withOpacity(0.85);
+    final textDisabled =
+        glassMode
+            ? AppColors.white.withOpacity(0.5)
+            : AppColors.onCardPrimary.withOpacity(0.6);
 
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -139,12 +151,22 @@ class BondNoPartnerCard extends StatelessWidget {
                 children: [
                   Text(
                     '아직 동료와 만나지 않았어요.',
-                    style: TextStyle(fontSize: 13, color: textSecondary, height: 1.4),
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: textSecondary,
+                      height: 1.4,
+                    ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     '함께 걸을 사람을 찾아보세요',
-                    style: TextStyle(fontSize: 13, color: textSecondary, height: 1.4),
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: textSecondary,
+                      height: 1.4,
+                    ),
                   ),
                 ],
               ),
@@ -153,15 +175,19 @@ class BondNoPartnerCard extends StatelessWidget {
             BondScoreGauge(bondScore: bondScore, glassMode: glassMode),
           ],
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 10),
         Row(
           children: [
-            Icon(Icons.info_outline, size: 14, color: textDisabled),
-            const SizedBox(width: 6),
+            Icon(Icons.info_outline, size: 13, color: textDisabled),
+            const SizedBox(width: 4),
             Expanded(
               child: Text(
                 _nextMatchingMessage(),
-                style: TextStyle(fontSize: 11, color: textDisabled, height: 1.3),
+                style: TextStyle(
+                  fontSize: 11,
+                  color: textDisabled,
+                  height: 1.3,
+                ),
               ),
             ),
           ],
@@ -203,7 +229,7 @@ class BondWeekHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final weekInfo  = _getWeekInfo();
+    final weekInfo = _getWeekInfo();
     final hasPartner = partnerGroupId != null;
 
     return AppPrimaryCard(
@@ -213,70 +239,72 @@ class BondWeekHeader extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 타이틀 행 (게이지 제거 — 하단으로 이동)
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              const Text(
+                '이번 주 동행 기록',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.onCardPrimary,
+                ),
+              ),
+              if (onSettingsTap != null) ...[
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: onSettingsTap,
+                  child: Icon(
+                    Icons.settings_outlined,
+                    size: 16,
+                    color: AppColors.onCardPrimary.withOpacity(0.6),
+                  ),
+                ),
+              ],
+              const Spacer(),
+              Text(
+                weekInfo,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.onCardPrimary.withOpacity(0.65),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          _buildStatusMessage(hasPartner),
+          const SizedBox(height: 14),
+          // 하단 인포 행: 결점수 게이지 + 다음 매칭 정보
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              BondScoreGauge(bondScore: bondScore),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        const Text(
-                          '이번 주 동행 기록',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.onCardPrimary,
-                          ),
+                        Icon(
+                          Icons.info_outline,
+                          size: 13,
+                          color: AppColors.onCardPrimary.withOpacity(0.5),
                         ),
-                        if (onSettingsTap != null) ...[
-                          const SizedBox(width: 8),
-                          GestureDetector(
-                            onTap: onSettingsTap,
-                            child: Icon(
-                              Icons.settings_outlined,
-                              size: 16,
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            _nextMatchingMessage(),
+                            style: TextStyle(
+                              fontSize: 11,
                               color: AppColors.onCardPrimary.withOpacity(0.6),
+                              height: 1.3,
                             ),
                           ),
-                        ],
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      weekInfo,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppColors.onCardPrimary.withOpacity(0.75),
-                      ),
-                    ),
                   ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              BondScoreGauge(bondScore: bondScore),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          _buildStatusMessage(hasPartner),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Icon(
-                Icons.info_outline,
-                size: 14,
-                color: AppColors.onCardPrimary.withOpacity(0.5),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  _nextMatchingMessage(),
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: AppColors.onCardPrimary.withOpacity(0.6),
-                    height: 1.3,
-                  ),
                 ),
               ),
             ],
@@ -287,12 +315,8 @@ class BondWeekHeader extends StatelessWidget {
   }
 
   Widget _buildStatusMessage(bool hasPartner) {
-    final msg1 = hasPartner
-        ? '이번 주, 파트너와 함께 버티는 시간입니다'
-        : '아직 매칭이 시작되지 않았어요';
-    final msg2 = hasPartner
-        ? '7일 동안 조용히 이어집니다'
-        : '함께 걸을 사람을 찾아보세요';
+    final msg1 = hasPartner ? '이번 주, 파트너와 함께 버티는 시간입니다' : '아직 매칭이 시작되지 않았어요';
+    final msg2 = hasPartner ? '7일 동안 조용히 이어집니다' : '함께 걸을 사람을 찾아보세요';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -300,7 +324,8 @@ class BondWeekHeader extends StatelessWidget {
         Text(
           msg1,
           style: TextStyle(
-            fontSize: 13,
+            fontSize: 16, // 13 → 16
+            fontWeight: FontWeight.w700, // 추가
             color: AppColors.onCardPrimary.withOpacity(0.85),
             height: 1.4,
           ),
@@ -309,7 +334,8 @@ class BondWeekHeader extends StatelessWidget {
         Text(
           msg2,
           style: TextStyle(
-            fontSize: 13,
+            fontSize: 16, // 13 → 16
+            fontWeight: FontWeight.w700, // 추가
             color: AppColors.onCardPrimary.withOpacity(0.85),
             height: 1.4,
           ),
@@ -322,11 +348,11 @@ class BondWeekHeader extends StatelessWidget {
     final kst = DateTime.now().toUtc().add(const Duration(hours: 9));
     final month = kst.month;
     final firstDayOfMonth = DateTime(kst.year, kst.month, 1);
-    final daysDiff    = kst.difference(firstDayOfMonth).inDays;
+    final daysDiff = kst.difference(firstDayOfMonth).inDays;
     final weekOfMonth = (daysDiff / 7).floor() + 1;
-    final weekday     = kst.weekday;
-    final monday      = kst.subtract(Duration(days: weekday - 1));
-    final sunday      = monday.add(const Duration(days: 6));
+    final weekday = kst.weekday;
+    final monday = kst.subtract(Duration(days: weekday - 1));
+    final sunday = monday.add(const Duration(days: 6));
     return '$month월 ${weekOfMonth}주차 · ${monday.day}~${sunday.day}일';
   }
 }

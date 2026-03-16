@@ -90,7 +90,9 @@ class AppBadge extends StatelessWidget {
 /// ══════════════════════════════════════════════════════════════
 /// AppStatusBadge — HIRA 카드용 상태 뱃지 (시행 중 / 30일 이내 / 90일 이내 / 사전공지)
 ///
-/// badgeLevel에 따라 배경/텍스트 색이 자동으로 설정됩니다.
+/// 앱 포인트 2색 기반:
+///   긴급(ACTIVE/SOON)  → cardEmphasis (Lobster Red) + onCardEmphasis 텍스트
+///   예정(UPCOMING/NOTICE) → cardPrimary (Steel Marine) + onCardPrimary 텍스트
 /// ══════════════════════════════════════════════════════════════
 class AppStatusBadge extends StatelessWidget {
   const AppStatusBadge({
@@ -103,27 +105,13 @@ class AppStatusBadge extends StatelessWidget {
   final String badgeLevel;
   final String badgeText;
 
-  static const _activeColor   = Color(0xFFE57373); // 🔴 시행 중
-  static const _soonColor     = Color(0xFFFFB74D); // 🟠 30일 이내
-  static const _upcomingColor = Color(0xFFFDD835); // 🟡 90일 이내
-  static const _noticeColor   = Color(0xFFBDBDBD); // ⚪ 사전공지
-
   @override
   Widget build(BuildContext context) {
-    final Color baseColor;
-    switch (badgeLevel) {
-      case 'ACTIVE':
-        baseColor = _activeColor;
-        break;
-      case 'SOON':
-        baseColor = _soonColor;
-        break;
-      case 'UPCOMING':
-        baseColor = _upcomingColor;
-        break;
-      default:
-        baseColor = _noticeColor;
-    }
+    // 긴급: cardEmphasis (Lobster Red) — 시행 중·30일 이내
+    // 예정: cardPrimary (Steel Marine) — 90일 이내·사전공지
+    final bool isUrgent = badgeLevel == 'ACTIVE' || badgeLevel == 'SOON';
+    final Color bg   = isUrgent ? AppColors.cardEmphasis : AppColors.cardPrimary;
+    final Color text = isUrgent ? AppColors.onCardEmphasis : AppColors.onCardPrimary;
 
     return Container(
       padding: const EdgeInsets.symmetric(
@@ -131,8 +119,7 @@ class AppStatusBadge extends StatelessWidget {
         vertical: AppSpacing.xs,
       ),
       decoration: BoxDecoration(
-        // 의미 컬러 배경 (투명도 적용 — 이 경우는 의미상 필요)
-        color: baseColor.withOpacity(0.15),
+        color: bg,
         borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: Text(
@@ -140,7 +127,7 @@ class AppStatusBadge extends StatelessWidget {
         style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w600,
-          color: baseColor,
+          color: text,
         ),
       ),
     );

@@ -223,8 +223,8 @@ export async function getMatchableUsers(): Promise<UserProfile[]> {
         continue; // 이미 그룹이 있으면 제외
       }
 
-      // 프로필 완성 체크
-      if (!data.nickname || !data.careerGroup || !data.mainConcerns?.length) {
+      // 프로필 완성 체크 — careerBucket 또는 careerGroup 중 하나만 있어도 허용
+      if (!data.nickname || (!data.careerGroup && !data.careerBucket) || !data.mainConcerns?.length) {
         continue; // 프로필 미완성 제외
       }
 

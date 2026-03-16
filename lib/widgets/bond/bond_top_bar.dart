@@ -4,8 +4,11 @@ import '../../core/theme/app_colors.dart';
 
 /// 결 탭 상단 타이틀 바
 class BondTopBar extends StatelessWidget {
+  /// 개발자 전용 롱프레스 (테스트 데이터 페이지) — 내부적으로만 사용
   final VoidCallback onSettingsLongPress;
   final String weekLabel;
+
+  /// 파트너가 있을 때 소모임 나가기 콜백 — null이면 다이얼로그에 버튼 미노출
   final VoidCallback? onLeaveGroupTap;
 
   /// 글래스 모드: true면 텍스트/아이콘을 흰색 계열로 렌더
@@ -47,55 +50,16 @@ class BondTopBar extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              // ℹ️ Info 버튼 (우측으로 이동)
+              // ℹ️ Info 버튼 — 소모임 나가기 기능도 여기서 접근 가능
               IconButton(
                 icon: Icon(Icons.info_outline, color: iconColor, size: 18),
                 onPressed: () => _showConceptDialog(context),
               ),
-              // ⚙️ 설정 버튼 (settings_outlined 으로 통일)
-              GestureDetector(
-                onLongPress: onSettingsLongPress,
-                child: PopupMenuButton<String>(
-                  icon: Icon(Icons.settings_outlined, color: iconColor, size: 20),
-                  tooltip: '메뉴',
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  onSelected: (value) {
-                    if (value == 'settings') {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const SettingsPage()),
-                      );
-                    } else if (value == 'leave') {
-                      onLeaveGroupTap?.call();
-                    }
-                  },
-                  itemBuilder: (_) => [
-                    const PopupMenuItem(
-                      value: 'settings',
-                      child: Row(
-                        children: [
-                          Icon(Icons.settings_outlined, size: 18),
-                          SizedBox(width: 8),
-                          Text('설정', style: TextStyle(fontSize: 13)),
-                        ],
-                      ),
-                    ),
-                    if (onLeaveGroupTap != null)
-                      const PopupMenuItem(
-                        value: 'leave',
-                        child: Row(
-                          children: [
-                            Icon(Icons.logout_rounded, size: 18, color: AppColors.error),
-                            SizedBox(width: 8),
-                            Text(
-                              '소모임 나가기',
-                              style: TextStyle(fontSize: 13, color: AppColors.error),
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
+              // ⚙️ 설정 버튼 — 다른 탭과 동일하게 바로 SettingsPage로 이동
+              IconButton(
+                icon: Icon(Icons.settings_outlined, color: iconColor, size: 20),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const SettingsPage()),
                 ),
               ),
             ],
@@ -162,6 +126,18 @@ class BondTopBar extends StatelessWidget {
           ),
         ),
         actions: [
+          // 소모임 나가기 — 파트너가 있을 때만 표시
+          if (onLeaveGroupTap != null)
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                onLeaveGroupTap?.call();
+              },
+              child: const Text(
+                '소모임 나가기',
+                style: TextStyle(color: AppColors.error),
+              ),
+            ),
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('닫기'),

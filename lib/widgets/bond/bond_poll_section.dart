@@ -76,8 +76,8 @@ class _BondPollSectionState extends State<BondPollSection> {
                     children: [
                       AppBadge(
                         label: '이번 주',
-                        bgColor: AppColors.cardEmphasis,
-                        textColor: AppColors.onCardEmphasis,
+                        bgColor: AppColors.pollBadgeBg,
+                        textColor: AppColors.pollBadgeText,
                       ),
                       const SizedBox(width: 10),
                       const Expanded(
@@ -120,8 +120,8 @@ class _BondPollSectionState extends State<BondPollSection> {
                             ),
                             decoration: BoxDecoration(
                               color: isSelected
-                                  ? AppColors.cardEmphasis
-                                  : AppColors.disabledBg.withOpacity(0.6),
+                                  ? AppColors.pollOptionSelectedBg
+                                  : AppColors.pollOptionBg.withValues(alpha: 0.85),
                               borderRadius: BorderRadius.circular(AppRadius.md),
                             ),
                             child: Row(
@@ -132,12 +132,12 @@ class _BondPollSectionState extends State<BondPollSection> {
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
                                     color: isSelected
-                                        ? AppColors.onCardEmphasis.withOpacity(0.15)
+                                        ? AppColors.pollOptionSelectedText.withValues(alpha: 0.15)
                                         : Colors.transparent,
                                     border: Border.all(
                                       color: isSelected
-                                          ? AppColors.onCardEmphasis.withOpacity(0.6)
-                                          : AppColors.textDisabled.withOpacity(0.5),
+                                          ? AppColors.pollOptionSelectedText.withValues(alpha: 0.6)
+                                          : AppColors.textDisabled.withValues(alpha: 0.5),
                                       width: isSelected ? 1.5 : 0.8,
                                     ),
                                   ),
@@ -146,9 +146,9 @@ class _BondPollSectionState extends State<BondPollSection> {
                                           child: Container(
                                             width: 8,
                                             height: 8,
-                                            decoration: const BoxDecoration(
+                                            decoration: BoxDecoration(
                                               shape: BoxShape.circle,
-                                              color: AppColors.onCardEmphasis,
+                                              color: AppColors.pollOptionSelectedText,
                                             ),
                                           ),
                                         )
@@ -164,8 +164,8 @@ class _BondPollSectionState extends State<BondPollSection> {
                                           ? FontWeight.w700
                                           : FontWeight.w400,
                                       color: isSelected
-                                          ? AppColors.onCardEmphasis
-                                          : AppColors.textPrimary,
+                                          ? AppColors.pollOptionSelectedText
+                                          : AppColors.pollOptionText,
                                     ),
                                   ),
                                 ),
@@ -177,7 +177,8 @@ class _BondPollSectionState extends State<BondPollSection> {
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
                                       color: isSelected
-                                          ? AppColors.onCardEmphasis.withOpacity(0.7)
+                                          ? AppColors.pollOptionSelectedText
+                                              .withValues(alpha: 0.7)
                                           : AppColors.textSecondary,
                                     ),
                                   ),

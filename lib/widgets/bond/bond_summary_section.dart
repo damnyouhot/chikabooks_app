@@ -7,6 +7,7 @@ import '../../core/widgets/app_primary_card.dart';
 /// 파트너 요약 섹션 (통합 버전)
 /// - 접힌 상태: 아바타 + 1줄 요약
 /// - 확장 상태: 파트너별 감정 해석
+/// - stampWidget: 카드 하단에 스탬프 섹션 종속 표시 (선택적)
 class BondSummarySection extends StatelessWidget {
   final bool isExpanded;
   final VoidCallback onToggleExpand;
@@ -17,6 +18,7 @@ class BondSummarySection extends StatelessWidget {
   final Map<String, int>? weeklyPostCounts;
   final Map<String, int>? weeklyReactionCounts;
   final Widget? topRightOverlay;
+  final Widget? stampWidget; // 카드 내 하단에 종속될 스탬프 위젯
 
   const BondSummarySection({
     super.key,
@@ -29,6 +31,7 @@ class BondSummarySection extends StatelessWidget {
     this.weeklyPostCounts,
     this.weeklyReactionCounts,
     this.topRightOverlay,
+    this.stampWidget,
   });
 
   @override
@@ -41,75 +44,78 @@ class BondSummarySection extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
       child: AppPrimaryCard(
         padding: EdgeInsets.zero,
-        child: Stack(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Blue 헤더 배너
-                Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    AppSpacing.lg + 2,
-                    AppSpacing.lg + 2,
-                    topRightOverlay != null ? 80 : AppSpacing.lg + 2,
-                    14,
-                  ),
-                  child: Row(
-                    children: [
-                      _buildPartnerAvatars(),
-                      const SizedBox(width: 12),
-                      const Expanded(
-                        child: Text(
-                          '동행 파트너',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.onCardPrimary,
-                          ),
-                        ),
-                      ),
-                      if (enableToggle)
-                        Icon(
-                          isExpanded ? Icons.expand_less : Icons.expand_more,
-                          color: AppColors.onCardPrimary.withOpacity(0.7),
-                        ),
-                    ],
-                  ),
-                ),
-
-                // 1줄 요약 (접힘 상태에서만)
-                if (enableToggle && !isExpanded) ...[
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.lg + 2, 0, AppSpacing.lg + 2, AppSpacing.lg),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.onCardPrimary.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                      ),
-                      child: Text(
-                        _getOneLinerSummary(),
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: AppColors.onCardPrimary,
-                          fontStyle: FontStyle.italic,
-                        ),
+            // 헤더 행 (아바타 + 타이틀 + 결점수)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg + 2,
+                AppSpacing.lg + 2,
+                AppSpacing.lg + 2,
+                14,
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  _buildPartnerAvatars(),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      '동행 파트너',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.onCardPrimary,
                       ),
                     ),
                   ),
+                  if (topRightOverlay != null) ...[
+                    topRightOverlay!,
+                  ],
+                  if (enableToggle)
+                    Icon(
+                      isExpanded ? Icons.expand_less : Icons.expand_more,
+                      color: AppColors.onCardPrimary.withOpacity(0.7),
+                    ),
                 ],
+              ),
+            ),
+
+            // 1줄 요약 (접힘 상태에서만)
+            if (enableToggle && !isExpanded) ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg + 2, 0, AppSpacing.lg + 2, AppSpacing.lg),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.onCardPrimary.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                  ),
+                  child: Text(
+                    _getOneLinerSummary(),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppColors.onCardPrimary,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+              ),
+            ],
 
                 // 확장 시: 내부 카드
                 if (isExpanded) ...[
                   Container(
                     margin: const EdgeInsets.fromLTRB(
                       AppSpacing.md, 0, AppSpacing.md, AppSpacing.md),
-                    padding: const EdgeInsets.all(14),
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.lg, 14, AppSpacing.lg, 14),
                     decoration: BoxDecoration(
                       color: AppColors.white.withOpacity(0.92),
                       borderRadius: BorderRadius.circular(AppRadius.md),
@@ -117,14 +123,15 @@ class BondSummarySection extends StatelessWidget {
                     child: _buildExpandedPartnerDetails(),
                   ),
                 ],
-              ],
-            ),
-            if (topRightOverlay != null)
-              Positioned(
-                top: 0,
-                right: 0,
-                child: IgnorePointer(child: topRightOverlay!),
+
+            // 스탬프 위젯 종속 (있을 때만)
+            if (stampWidget != null) ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md, 0, AppSpacing.md, AppSpacing.md),
+                child: stampWidget!,
               ),
+            ],
           ],
         ),
       ),
@@ -195,6 +202,7 @@ class BondSummarySection extends StatelessWidget {
 
   Widget _buildExpandedPartnerDetails() {
     final partners = members!.where((m) => m.uid != myUid).toList();
+    if (partners.isEmpty) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -208,90 +216,82 @@ class BondSummarySection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        ...partners.map((partner) => _buildPartnerCard(partner)),
+        // Row + Expanded: 파트너 수에 관계없이 좌우로 균등 분할
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: partners
+              .map((p) => Expanded(child: _buildPartnerCard(p)))
+              .toList(),
+        ),
       ],
     );
   }
 
   Widget _buildPartnerCard(GroupMemberMeta partner) {
-    final nickname      = memberNicknames?[partner.uid] ?? '파트너';
-    final postCount     = weeklyPostCounts?[partner.uid] ?? 0;
-    final reactionCount = weeklyReactionCounts?[partner.uid] ?? 0;
-    final statusMsg     = _generateStatusMessage(postCount, reactionCount);
+    final nickname = memberNicknames?[partner.uid] ?? '파트너';
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.lg),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppColors.surfaceMuted,
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            color: AppColors.surfaceMuted,
+          ),
+          child: Center(
+            child: Text(
+              nickname.isNotEmpty ? nickname[0] : 'P',
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
             ),
-            child: Center(
-              child: Text(
-                nickname.isNotEmpty ? nickname[0] : 'P',
+          ),
+        ),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                nickname,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  fontSize: 16,
+                  fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
                 ),
               ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      nickname,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    if (partner.mainConcernShown != null &&
-                        partner.mainConcernShown!.isNotEmpty) ...[
-                      const SizedBox(width: 6),
-                      Text(
-                        '· ${partner.mainConcernShown}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textDisabled,
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 4),
+              // 관심사 최대 2개 표시 (mainConcerns 우선, 없으면 mainConcernShown 하위호환)
+              if (partner.mainConcerns.isNotEmpty)
                 Text(
-                  statusMsg,
+                  partner.mainConcerns.take(2).map((t) => '#$t').join('  '),
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                    height: 1.4,
+                    fontSize: 11,
+                    color: AppColors.textDisabled,
+                  ),
+                )
+              else if (partner.mainConcernShown != null &&
+                  partner.mainConcernShown!.isNotEmpty)
+                Text(
+                  '#${partner.mainConcernShown!}',
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textDisabled,
                   ),
                 ),
-              ],
-            ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
-  String _generateStatusMessage(int postCount, int reactionCount) {
-    final totalActivity = postCount + reactionCount;
-    if (totalActivity == 0) return '조용히 이어지고 있어요';
-    if (totalActivity <= 2) return '이번 주 함께 버티고 있어요';
-    return '이번 주 ${totalActivity}번 대화를 나눴어요';
-  }
 }

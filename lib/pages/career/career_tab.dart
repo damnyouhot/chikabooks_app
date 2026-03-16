@@ -231,7 +231,7 @@ class _IdentityEmptyInner extends StatelessWidget {
             const Text(
               '내 커리어 카드',
               style: TextStyle(
-                fontSize: 16,
+                fontSize: 16,            // 기존 16 유지 (동일)
                 fontWeight: FontWeight.w800,
                 color: AppColors.onCardPrimary,
               ),
@@ -347,30 +347,41 @@ class _IdentityFilledInner extends StatelessWidget {
 
     final titleLine = switch (status) {
       'leave' =>
-        clinicName.isEmpty ? '현재: 잠시 쉬는 중' : '현재: $clinicName · 잠시 쉬는 중',
-      'unemployed' => '현재: 다음 치과를 기다리는 중',
+        clinicName.isEmpty ? '잠시 쉬는 중' : '$clinicName · 잠시 쉬는 중',
+      'unemployed' => '다음 치과를 기다리는 중',
       _ =>
         clinicName.isEmpty
-            ? '현재: (미입력)'
+            ? '(미입력)'
             : currentDuration != null
-            ? '현재: $clinicName · $currentDuration째'
-            : '현재: $clinicName',
+            ? '$clinicName · $currentDuration째'
+            : clinicName,
     };
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // ── 타이틀 행: titleLine + 유저분류 배지 + 수정 아이콘 ──
         Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Text(
-              '치과위생사',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: AppColors.onCardPrimary.withOpacity(0.85),
+            Expanded(
+              child: Text(
+                titleLine,
+                style: const TextStyle(
+                  fontSize: 16,            // 14 → 16 (다른 카드 타이틀과 통일)
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.onCardPrimary,
+                ),
               ),
             ),
-            const Spacer(),
+            const SizedBox(width: 8),
+            // '치과위생사' 분류 배지 (기존 위 줄에서 이동)
+            AppBadge(
+              label: '치과위생사',
+              bgColor: AppColors.onCardPrimary.withOpacity(0.15),
+              textColor: AppColors.onCardPrimary,
+            ),
+            const SizedBox(width: 4),
             IconButton(
               onPressed: () => CareerIdentitySheet.show(context),
               icon: Icon(
@@ -383,15 +394,6 @@ class _IdentityFilledInner extends StatelessWidget {
               constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
             ),
           ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          titleLine,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w900,
-            color: AppColors.onCardPrimary,
-          ),
         ),
         const SizedBox(height: 6),
         Row(
@@ -594,8 +596,8 @@ class _SkillSection extends StatelessWidget {
                 onTap: () => CareerSkillEditSheet.show(context),
                 child: AppBadge(
                   label: '관리',
-                  bgColor: AppColors.accent.withOpacity(0.10),
-                  textColor: AppColors.textSecondary,
+                  bgColor: AppColors.emphasisBadgeBg,
+                  textColor: AppColors.emphasisBadgeText,
                 ),
               ),
             ],

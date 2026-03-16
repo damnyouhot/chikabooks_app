@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import '../../core/theme/app_colors.dart';
+import '../../services/admin_activity_service.dart';
+import '../../services/app_error_logger.dart';
 import '../../services/onboarding_service.dart';
 import '../../services/user_profile_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -122,26 +124,7 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _confirmLogout() async {
-    // ── 테스트 계정(doughong@naver.com)은 로그아웃 시 회원탈퇴로 처리 ──
-    // 이렇게 하면 재로그인 시 항상 새 계정으로 온보딩 시작
-    final currentUser = _auth.currentUser;
-    final currentEmail = currentUser?.email;
-    bool isDoughong = currentEmail == 'doughong@naver.com';
-    if (!isDoughong && currentUser != null) {
-      // Naver 커스텀 토큰은 Auth email이 null → Firestore에서 확인
-      try {
-        final doc = await _firestore.collection('users').doc(currentUser.uid).get();
-        final fsEmail = doc.data()?['email'] as String?;
-        if (fsEmail == 'doughong@naver.com') isDoughong = true;
-      } catch (_) {}
-    }
-
-    if (isDoughong) {
-      // 로그아웃 대신 회원탈퇴 처리 → 재로그인 시 온보딩 재시작
-      await _confirmAndDeleteAccount();
-      return;
-    }
-
+    // 모든 계정에 대해 동일하게 일반 로그아웃 처리
     final result = await showDialog<bool>(
       context: context,
       builder:
@@ -162,6 +145,11 @@ class _SettingsPageState extends State<SettingsPage> {
     );
 
     if (result == true) {
+      // 세션 캐시 초기화 (excludeFromStats 캐시가 다음 계정까지 잔류하는 문제 방지)
+      AdminActivityService.clearCache();
+      AppErrorLogger.clearCache();
+      UserProfileService.clearCache();
+
       // Firebase Auth + Google Sign-In 로그아웃
       await GoogleSignIn().signOut();
       await _auth.signOut();
@@ -296,16 +284,22 @@ class _SettingsPageState extends State<SettingsPage> {
 
       await callable.call();
 
-      // 5단계: 로컬 로그아웃 (Auth는 서버에서 이미 삭제됨)
+      // 5단계: 재가입 시 온보딩 플래그를 signOut 전에 설정
+      // (signOut 후에는 currentUser가 null이 되어 schedulePendingOnboarding이 실패함)
+      await OnboardingService.forceSchedule();
+
+      // 5.5단계: 세션 캐시 초기화 (excludeFromStats 캐시 잔류 방지)
+      AdminActivityService.clearCache();
+      AppErrorLogger.clearCache();
+      UserProfileService.clearCache();
+
+      // 6단계: 로컬 로그아웃 (Auth는 서버에서 이미 삭제됨)
       try {
         await GoogleSignIn().signOut();
         await _auth.signOut();
       } catch (_) {
         // Auth 계정이 이미 삭제되어 실패할 수 있음 (무시)
       }
-
-      // ✅ 재가입 시 온보딩이 바로 뜨도록 플래그 설정
-      await OnboardingService.schedulePendingOnboarding();
 
       if (!mounted) return;
 

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import '../models/ebook.dart';
 import '../models/hira_update.dart';
@@ -9,6 +11,7 @@ import '../core/theme/app_colors.dart';
 import '../core/theme/app_tokens.dart';
 import '../core/widgets/app_muted_card.dart';
 import '../core/widgets/app_segmented_control.dart';
+import 'ebook/ebook_list_page.dart';
 import 'ebook/ebook_detail_page.dart';
 import 'quiz_today_page.dart';
 import 'hira_update_page.dart';
@@ -74,7 +77,7 @@ class _GrowthPageState extends State<GrowthPage>
                 children: const [
                   QuizTodayPage(),
                   HiraUpdatePage(),
-                  _BookStoreBrowseView(),
+                  const EbookListPage(),
                   _MyLibraryView(),
                 ],
               ),
@@ -118,9 +121,10 @@ class _GrowthPageState extends State<GrowthPage>
                   color: AppColors.textDisabled,
                   size: 20,
                 ),
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const SettingsPage()),
-                ),
+                onPressed:
+                    () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const SettingsPage()),
+                    ),
               ),
             ],
           ),
@@ -130,10 +134,7 @@ class _GrowthPageState extends State<GrowthPage>
           padding: const EdgeInsets.only(left: AppSpacing.xl),
           child: Text(
             '오늘도 하나씩, 꾸준히 성장해요.',
-            style: TextStyle(
-              fontSize: 12,
-              color: AppColors.textSecondary,
-            ),
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
@@ -144,7 +145,8 @@ class _GrowthPageState extends State<GrowthPage>
   void _showConceptDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder:
+          (ctx) => AlertDialog(
             title: const Text(
               '성장하기 탭에 대해서',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
@@ -157,8 +159,8 @@ class _GrowthPageState extends State<GrowthPage>
                 onPressed: () => Navigator.pop(ctx),
                 child: const Text('닫기'),
               ),
-        ],
-      ),
+            ],
+          ),
     );
   }
 }
@@ -196,7 +198,7 @@ class _MyLibraryViewState extends State<_MyLibraryView>
       children: [
         // 서브 탭바 → AppSegmentedControl
         AppSegmentedControl(
-            controller: _tabCtrl,
+          controller: _tabCtrl,
           labels: const ['전자책', '저장한 변경사항'],
           margin: const EdgeInsets.symmetric(
             horizontal: AppSpacing.xl,
@@ -214,83 +216,313 @@ class _MyLibraryViewState extends State<_MyLibraryView>
   }
 }
 
-class _MyBooksTab extends StatelessWidget {
+class _MyBooksTab extends StatefulWidget {
   const _MyBooksTab();
 
   @override
-  Widget build(BuildContext context) {
-    final service = context.read<EbookService>();
+  State<_MyBooksTab> createState() => _MyBooksTabState();
+}
 
-    return StreamBuilder<List<String>>(
-      stream: service.watchPurchasedEbookIds(),
-      builder: (context, purchaseSnap) {
-        if (purchaseSnap.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
+class _MyBooksTabState extends State<_MyBooksTab> {
+  bool _syncing = false;
+  bool _loading = true;
+  List<Ebook> _myBooks = [];
 
-        final purchasedIds = purchaseSnap.data ?? [];
-        if (purchasedIds.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.menu_book_outlined,
-                  size: 48,
-                  color: AppColors.textSecondary,
-                ),
-                const SizedBox(height: AppSpacing.md),
-                Text(
-                  '구매한 도서가 없습니다.',
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  '치과책방에서 도서를 만나보세요.',
-                  style: TextStyle(
-                    color: AppColors.textDisabled,
-                    fontSize: 12,
-                  ),
+  bool _initialized = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      _initialized = true;
+      _loadMyBooks();
+      _checkAliasNotification();
+    }
+  }
+
+  /// alias 이메일로 구매내역이 연결된 경우 1회 안내 다이얼로그 표시
+  Future<void> _checkAliasNotification() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      final doc =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .get();
+      final data = doc.data();
+      if (data == null) return;
+
+      // aliasNotified == false 이고 emailAliases 가 있을 때만 표시
+      final notified = data['aliasNotified'] as bool? ?? true;
+      if (notified) return;
+
+      final aliases = List<String>.from(data['emailAliases'] as List? ?? []);
+      if (aliases.isEmpty) return;
+
+      // 안내 후 즉시 true 로 업데이트 (중복 표시 방지)
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).update(
+        {'aliasNotified': true},
+      );
+
+      if (!mounted) return;
+
+      // 안내 다이얼로그 표시
+      final aliasEmail = aliases.first;
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder:
+            (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: const Text(
+                '구매 이메일 안내',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+              ),
+              content: Text(
+                "치과책방에서 '$aliasEmail' 이메일로\n구매된 기록이 확인되었습니다.\n\n"
+                '구매 내역은 정상적으로 연결되어 있습니다.\n'
+                '앞으로는 현재 로그인한 이메일로 이용해 주세요.',
+                style: const TextStyle(fontSize: 14, height: 1.6),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('확인'),
                 ),
               ],
             ),
-          );
+      );
+    } catch (e) {
+      debugPrint('⚠️ alias 알림 확인 오류: $e');
+    }
+  }
+
+  Future<void> _loadMyBooks() async {
+    try {
+      final service = context.read<EbookService>();
+      final purchasedIds = await service.fetchPurchasedEbookIds();
+      if (purchasedIds.isEmpty) {
+        if (mounted) setState(() => _loading = false);
+        return;
+      }
+      final allBooks = await service.fetchAllEbooks();
+      final myBooks =
+          allBooks.where((b) => purchasedIds.contains(b.id)).toList();
+      if (mounted) {
+        setState(() {
+          _myBooks = myBooks;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('⚠️ _MyBooksTab._loadMyBooks error: $e');
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  /// 아임웹 구매내역 수동 동기화
+  Future<void> _syncPurchases() async {
+    if (_syncing) return;
+    setState(() => _syncing = true);
+
+    String? warning;
+    final email =
+        FirebaseAuth.instance.currentUser?.email?.trim().toLowerCase();
+    if (email?.isNotEmpty == true) {
+      try {
+        final doc =
+            await FirebaseFirestore.instance
+                .collection('imweb_sync_issues')
+                .doc(email!)
+                .get();
+        if (doc.exists) {
+          warning = doc.data()?['message'] as String?;
         }
+      } catch (e) {
+        debugPrint('⚠️ imweb_sync_issues 조회 실패: $e');
+      }
+    }
 
-        return StreamBuilder<List<Ebook>>(
-          stream: service.watchEbooks(),
-          builder: (context, allSnap) {
-            if (!allSnap.hasData) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            final myBooks = allSnap.data!
-                    .where((b) => purchasedIds.contains(b.id))
-                    .toList();
+    if (warning != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(warning),
+          backgroundColor: AppColors.warning,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
 
-            if (myBooks.isEmpty) {
-              return Center(
-                  child: Text(
-                  '도서 정보를 불러오는 중...',
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 14,
-                  ),
-                ),
-              );
-            }
+    try {
+      final service = context.read<EbookService>();
+      final result = await service.syncImwebPurchases();
+      final synced = result['synced'] as int? ?? 0;
+      final message = result['message'] as String? ?? '동기화 완료';
 
-            return ListView.separated(
-              padding: const EdgeInsets.all(AppSpacing.xl),
-              itemCount: myBooks.length,
-              separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.md),
-              itemBuilder: (context, i) => _MyBookTile(book: myBooks[i]),
-            );
-          },
+      if (!mounted) return;
+
+      if (synced > 0) {
+        // 새 구매내역 발견 → 스낵바
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ $message'),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
-      },
+      } else {
+        // 내역 없음 → 이메일 확인 안내 다이얼로그
+        showDialog(
+          context: context,
+          builder:
+              (_) => AlertDialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                title: const Text(
+                  '구매내역을 찾지 못했습니다',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+                content: const Text(
+                  '치과책방에서 사용한 이메일 주소로\n로그인하셨나요?\n\n'
+                  '구매 시 사용한 이메일 계정으로\n로그인하면 자동으로 연결됩니다.',
+                  style: TextStyle(fontSize: 14, height: 1.55),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('확인'),
+                  ),
+                ],
+              ),
+        );
+      }
+    } on Exception catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('동기화 실패: $e'),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _syncing = false);
+        _loadMyBooks(); // 동기화 후 목록 새로고침
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // ── 동기화 버튼 배너 ──────────────────────────────
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.xl,
+            AppSpacing.md,
+            AppSpacing.xl,
+            0,
+          ),
+          child: InkWell(
+            onTap: _syncing ? null : _syncPurchases,
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceMuted,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: AppColors.textDisabled.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.sync_rounded, size: 16, color: AppColors.accent),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '치과책방 구매내역이 보이지 않나요?',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                  if (_syncing)
+                    const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  else
+                    Text(
+                      '동기화',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.accent,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        // ── 구매 도서 목록 ──────────────────────────────
+        Expanded(
+          child:
+              _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _myBooks.isEmpty
+                  ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.menu_book_outlined,
+                          size: 48,
+                          color: AppColors.textSecondary,
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        Text(
+                          '구매한 도서가 없습니다.',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          '치과책방에서 도서를 만나보세요.',
+                          style: TextStyle(
+                            color: AppColors.textDisabled,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                  : RefreshIndicator(
+                    onRefresh: _loadMyBooks,
+                    child: ListView.separated(
+                      padding: const EdgeInsets.all(AppSpacing.xl),
+                      itemCount: _myBooks.length,
+                      separatorBuilder:
+                          (_, __) => const SizedBox(height: AppSpacing.md),
+                      itemBuilder:
+                          (context, i) => _MyBookTile(book: _myBooks[i]),
+                    ),
+                  ),
+        ),
+      ],
     );
   }
 }
@@ -329,10 +561,7 @@ class _SavedHiraTab extends StatelessWidget {
                 const SizedBox(height: AppSpacing.xs),
                 Text(
                   '제도 변경 탭에서 항목을 저장하세요.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textDisabled,
-                  ),
+                  style: TextStyle(fontSize: 12, color: AppColors.textDisabled),
                 ),
               ],
             ),
@@ -360,54 +589,51 @@ class _SavedHiraTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppMutedCard(
       padding: const EdgeInsets.all(AppSpacing.lg - 2),
-      onTap: () => showModalBottomSheet(
-          context: context,
-          isScrollControlled: true,
-          backgroundColor: Colors.transparent,
-          builder: (context) => HiraUpdateDetailSheet(update: update),
-        ),
-        child: Row(
-          children: [
-          const Icon(
-            Icons.info_outline,
-            size: 20,
-            color: AppColors.accent,
+      onTap:
+          () => showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (context) => HiraUpdateDetailSheet(update: update),
           ),
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline, size: 20, color: AppColors.accent),
           const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    update.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  update.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
-                      height: 1.3,
-                    ),
+                    height: 1.3,
                   ),
+                ),
                 const SizedBox(height: AppSpacing.xs),
-                  Text(
+                Text(
                   '${update.publishedAt.year}.'
                   '${update.publishedAt.month.toString().padLeft(2, '0')}.'
                   '${update.publishedAt.day.toString().padLeft(2, '0')}',
                   style: const TextStyle(
-                      fontSize: 11,
+                    fontSize: 11,
                     color: AppColors.textDisabled,
-                    ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
+          ),
           const Icon(
             Icons.chevron_right,
             color: AppColors.textDisabled,
             size: 20,
           ),
-          ],
+        ],
       ),
     );
   }
@@ -423,12 +649,13 @@ class _MyBookTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppMutedCard(
       padding: const EdgeInsets.all(AppSpacing.md),
-      onTap: () => Navigator.push(
+      onTap:
+          () => Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => EbookDetailPage(ebook: book)),
-        ),
-        child: Row(
-          children: [
+          ),
+      child: Row(
+        children: [
           // 커버: 화면 너비 13%, 최소44·최대68, 비율 3:4
           LayoutBuilder(
             builder: (ctx, constraints) {
@@ -437,151 +664,58 @@ class _MyBookTile extends StatelessWidget {
               final coverH = coverW * (4 / 3);
               return ClipRRect(
                 borderRadius: BorderRadius.circular(AppSpacing.sm),
-              child: Image.network(
-                book.coverUrl,
+                child: Image.network(
+                  book.coverUrl,
                   width: coverW,
                   height: coverH,
-                fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    width: coverW,
-                    height: coverH,
-                    color: AppColors.disabledBg,
-                    child: const Icon(
-                      Icons.book,
-                      color: AppColors.textDisabled,
-                    ),
-              ),
-            ),
+                  fit: BoxFit.cover,
+                  errorBuilder:
+                      (_, __, ___) => Container(
+                        width: coverW,
+                        height: coverH,
+                        color: AppColors.disabledBg,
+                        child: const Icon(
+                          Icons.book,
+                          color: AppColors.textDisabled,
+                        ),
+                      ),
+                ),
               );
             },
           ),
           const SizedBox(width: AppSpacing.lg - 2),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    book.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  book.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    book.author,
+                Text(
+                  book.author,
                   style: const TextStyle(
-                      fontSize: 12,
+                    fontSize: 12,
                     color: AppColors.textSecondary,
-                    ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
+          ),
           const Icon(
             Icons.chevron_right,
             color: AppColors.textDisabled,
             size: 20,
           ),
-          ],
+        ],
       ),
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════
-// 치과책방 (e-Book 스토어)
-// ═══════════════════════════════════════════════════
-
-class _BookStoreBrowseView extends StatelessWidget {
-  const _BookStoreBrowseView();
-
-  @override
-  Widget build(BuildContext context) {
-    final service = context.read<EbookService>();
-
-    return StreamBuilder<List<Ebook>>(
-      stream: service.watchEbooks(),
-      builder: (context, snap) {
-        if (snap.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        final books = snap.data ?? [];
-        if (books.isEmpty) {
-          return Center(
-            child: Text(
-              '등록된 전자책이 없습니다.',
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 14,
-              ),
-            ),
-          );
-        }
-
-        return GridView.builder(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            mainAxisSpacing: 20,
-            crossAxisSpacing: 20,
-            childAspectRatio: 0.66,
-          ),
-          itemCount: books.length,
-          itemBuilder: (context, i) => _BookGridTile(book: books[i]),
-        );
-      },
-    );
-  }
-}
-
-class _BookGridTile extends StatelessWidget {
-  final Ebook book;
-  const _BookGridTile({required this.book});
-
-  @override
-  Widget build(BuildContext context) {
-            return GestureDetector(
-      onTap: () => Navigator.push(
-                    context,
-        MaterialPageRoute(builder: (_) => EbookDetailPage(ebook: book)),
-                  ),
-              child: Column(
-                children: [
-                  Expanded(
-                      child: ClipRRect(
-              borderRadius: BorderRadius.circular(AppSpacing.md),
-                        child: Image.network(
-                book.coverUrl,
-                          fit: BoxFit.cover,
-                          width: double.infinity,
-                errorBuilder: (_, __, ___) => Container(
-                  color: AppColors.disabledBg,
-                  child: const Icon(
-                                  Icons.image,
-                    color: AppColors.textDisabled,
-                                ),
-                              ),
-                        ),
-                      ),
-                    ),
-          const SizedBox(height: AppSpacing.sm),
-                  Text(
-            book.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-              color: AppColors.textPrimary,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
     );
   }
 }

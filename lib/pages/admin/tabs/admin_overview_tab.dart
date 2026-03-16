@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../models/admin_dashboard_models.dart';
+import '../../../models/quiz_schedule.dart';
 import '../../../services/admin_dashboard_service.dart';
 import '../widgets/admin_common_widgets.dart';
 
@@ -19,7 +20,7 @@ class AdminOverviewTab extends StatefulWidget {
 }
 
 class _AdminOverviewTabState extends State<AdminOverviewTab>
-    with AutomaticKeepAliveClientMixin {
+    with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
   @override
   bool get wantKeepAlive => false; // 기간 변경 시 항상 재로드
 
@@ -36,13 +37,31 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
   int _emotionCount = 0;
   double? _avgEmotionScore;
 
+  // 퀴즈 풀 데이터
+  QuizMetaState? _quizMeta;
+
   // 연차 분포
   List<CareerGroupCount> _careerGroups = [];
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this); // 앱 생명주기 감지 등록
     _load();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this); // 등록 해제
+    super.dispose();
+  }
+
+  /// 앱이 백그라운드 → 포그라운드 복귀 시 자동 새로고침
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      _load();
+    }
   }
 
   @override
@@ -53,10 +72,15 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
 
   Future<void> _load() async {
     if (!mounted) return;
+
+    debugPrint('🔄 [Overview] _load() 진입 — ${DateTime.now()}');
+
     setState(() {
       _loading = true;
       _error = null;
+      _lastSync = DateTime.now(); // 진입 즉시 갱신 (화면에서 시각 변화 확인용)
     });
+
     try {
       final results = await Future.wait([
         AdminDashboardService.getTotalUserCount(),
@@ -67,8 +91,14 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
         AdminDashboardService.getEmotionCount(since: widget.since),
         AdminDashboardService.getAverageEmotionScore(since: widget.since),
         AdminDashboardService.getCareerGroupDistribution(),
+        AdminDashboardService.getQuizMetaState(),
       ]);
-      if (!mounted) return;
+
+      if (!mounted) {
+        debugPrint('⚠️ [Overview] _load() 완료 but unmounted — 렌더 스킵');
+        return;
+      }
+
       setState(() {
         _totalUsers      = results[0] as int;
         _newUsers        = results[1] as int;
@@ -78,13 +108,22 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
         _emotionCount    = results[5] as int;
         _avgEmotionScore = results[6] as double?;
         _careerGroups    = results[7] as List<CareerGroupCount>;
+        _quizMeta        = results[8] as QuizMetaState?;
         _lastSync = DateTime.now();
         _loading = false;
       });
-    } catch (e) {
+
+      debugPrint('✅ [Overview] _load() 완료 — _lastSync=$_lastSync');
+
+    } catch (e, stack) {
+      debugPrint('❌ [Overview] _load() 예외 발생!');
+      debugPrint('❌ error: $e');
+      debugPrint('❌ stack: $stack');
+
       if (!mounted) return;
       setState(() {
         _error = e.toString();
+        _lastSync = DateTime.now(); // 에러여도 시각은 갱신
         _loading = false;
       });
     }
@@ -145,6 +184,12 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
 
           const SizedBox(height: 20),
 
+          // ── 퀴즈 풀 현황 ─────────────────────────────────────
+          const AdminSectionTitle('퀴즈 풀 현황'),
+          _QuizPoolCard(meta: _quizMeta),
+
+          const SizedBox(height: 20),
+
           // ── 연차별 분포 ──────────────────────────────────────
           const AdminSectionTitle('연차별 사용자 분포'),
           _CareerGroupChart(
@@ -159,7 +204,8 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
   String _formatTime(DateTime dt) {
     return '${dt.month}/${dt.day} '
         '${dt.hour.toString().padLeft(2, '0')}:'
-        '${dt.minute.toString().padLeft(2, '0')}';
+        '${dt.minute.toString().padLeft(2, '0')}:'
+        '${dt.second.toString().padLeft(2, '0')}';
   }
 }
 
@@ -318,6 +364,148 @@ class _CareerGroupChart extends StatelessWidget {
           ),
         );
       }).toList(),
+    );
+  }
+}
+
+// ─── 퀴즈 풀 현황 카드 ─────────────────────────────────────────
+class _QuizPoolCard extends StatelessWidget {
+  final QuizMetaState? meta;
+  const _QuizPoolCard({required this.meta});
+
+  @override
+  Widget build(BuildContext context) {
+    if (meta == null) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceMuted,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: const Text(
+          '퀴즈 풀 데이터 없음',
+          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+        ),
+      );
+    }
+
+    final total     = meta!.totalActiveCount;
+    // usedCount = 이번 사이클에서 배포된 문제 수 (CF의 usedQuizIds.length)
+    // 풀 소진(사이클 리셋) 시 0으로 초기화되므로 "이번 사이클 기준"임
+    final served    = meta!.usedCount;
+    final remaining = (total - served).clamp(0, total);
+    final cycle     = meta!.cycleCount;
+    final daily     = meta!.dailyCount;
+    // 남은 날수 (하루 dailyCount 문제 배포 기준)
+    final daysLeft  = daily > 0 ? (remaining / daily).ceil() : 0;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 진행률 바
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '${cycle}사이클 진행 중',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              Text(
+                '$served / $total',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: total > 0 ? served / total : 0.0,
+              minHeight: 8,
+              backgroundColor: AppColors.surfaceMuted,
+              valueColor: const AlwaysStoppedAnimation(AppColors.accent),
+            ),
+          ),
+          const SizedBox(height: 14),
+          // 3개 수치 행
+          Row(
+            children: [
+              _QuizStat(label: '전체 문제', value: '$total문제'),
+              _QuizDivider(),
+              _QuizStat(label: '이번 사이클 배포', value: '$served문제'),
+              _QuizDivider(),
+              _QuizStat(label: '남은 문제', value: '$remaining문제\n(약 ${daysLeft}일치)'),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            '마지막 스케줄: ${meta!.lastScheduledDate}  ·  하루 $daily문제 배포',
+            style: const TextStyle(
+              fontSize: 11,
+              color: AppColors.textDisabled,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuizStat extends StatelessWidget {
+  final String label;
+  final String value;
+  const _QuizStat({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(
+            value,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuizDivider extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 1,
+      height: 32,
+      color: AppColors.divider,
+      margin: const EdgeInsets.symmetric(horizontal: 4),
     );
   }
 }

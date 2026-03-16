@@ -932,14 +932,29 @@ export const verifyNaverToken = functions.https.onCall(
           // 기존 UID로 토큰 발급 (하위 호환성 유지)
           const customToken = await admin.auth().createCustomToken(legacyUid);
           
-          // Firestore 업데이트
-          await db.collection("users").doc(legacyUid).set({
-            email: email || null,
-            displayName: displayName || null,
-            provider: "naver",
-            providerId: naverId,
-            lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
-          }, {merge: true});
+          // Firestore 업데이트 (레거시 계정 — 조건부 필드 보호)
+          const naverLegacyUserRef = db.collection("users").doc(legacyUid);
+          await db.runTransaction(async (transaction) => {
+            const snap = await transaction.get(naverLegacyUserRef);
+            const existing = snap.data() ?? {};
+
+            const baseData: Record<string, unknown> = {
+              email: email || null,
+              displayName: displayName || null,
+              provider: "naver",
+              providerId: naverId,
+              lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
+            };
+
+            if (!snap.exists || existing["createdAt"] == null) {
+              baseData["createdAt"] = admin.firestore.FieldValue.serverTimestamp();
+            }
+            if (existing["excludeFromStats"] == null) {
+              baseData["excludeFromStats"] = false;
+            }
+
+            transaction.set(naverLegacyUserRef, baseData, {merge: true});
+          });
 
           console.log(`✅ 기존 사용자 로그인 완료 (UID: ${legacyUid})`);
 
@@ -975,13 +990,29 @@ export const verifyNaverToken = functions.https.onCall(
       });
 
       // ========== 8. Firestore users 컬렉션에 저장 ==========
-      await db.collection("users").doc(uid).set({
-        email: email || null,
-        displayName: displayName || null,
-        provider: "naver",
-        providerId: naverId,
-        lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
-      }, {merge: true});
+      // 조건부 필드(createdAt, excludeFromStats)는 트랜잭션으로 "없을 때만" 기록
+      const naverNewUserRef = db.collection("users").doc(uid);
+      await db.runTransaction(async (transaction) => {
+        const snap = await transaction.get(naverNewUserRef);
+        const existing = snap.data() ?? {};
+
+        const baseData: Record<string, unknown> = {
+          email: email || null,
+          displayName: displayName || null,
+          provider: "naver",
+          providerId: naverId,
+          lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
+
+        if (!snap.exists || existing["createdAt"] == null) {
+          baseData["createdAt"] = admin.firestore.FieldValue.serverTimestamp();
+        }
+        if (existing["excludeFromStats"] == null) {
+          baseData["excludeFromStats"] = false;
+        }
+
+        transaction.set(naverNewUserRef, baseData, {merge: true});
+      });
 
       // ========== 9. Custom Token 발급 ==========
       const customToken = await admin.auth().createCustomToken(uid);
@@ -1154,14 +1185,29 @@ export const verifyKakaoToken = functions.https.onCall(
           // 기존 UID로 토큰 발급 (하위 호환성 유지)
           const customToken = await admin.auth().createCustomToken(legacyUid);
           
-          // Firestore 업데이트
-          await db.collection("users").doc(legacyUid).set({
-            email: email || null,
-            displayName: displayName || null,
-            provider: "kakao",
-            providerId: kakaoId,
-            lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
-          }, {merge: true});
+          // Firestore 업데이트 (레거시 계정 — 조건부 필드 보호)
+          const kakaoLegacyUserRef = db.collection("users").doc(legacyUid);
+          await db.runTransaction(async (transaction) => {
+            const snap = await transaction.get(kakaoLegacyUserRef);
+            const existing = snap.data() ?? {};
+
+            const baseData: Record<string, unknown> = {
+              email: email || null,
+              displayName: displayName || null,
+              provider: "kakao",
+              providerId: kakaoId,
+              lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
+            };
+
+            if (!snap.exists || existing["createdAt"] == null) {
+              baseData["createdAt"] = admin.firestore.FieldValue.serverTimestamp();
+            }
+            if (existing["excludeFromStats"] == null) {
+              baseData["excludeFromStats"] = false;
+            }
+
+            transaction.set(kakaoLegacyUserRef, baseData, {merge: true});
+          });
 
           console.log(`✅ 기존 사용자 로그인 완료 (UID: ${legacyUid})`);
 
@@ -1176,44 +1222,94 @@ export const verifyKakaoToken = functions.https.onCall(
         console.log(`✅ 신규 사용자, 새 UID 형식 사용: ${uid}`);
       }
 
-      // ========== 7. Firebase Auth 사용자 생성/업데이트 ==========
-      const updateData: admin.auth.UpdateRequest = {};
-      if (displayName) {
-        updateData.displayName = displayName;
-      }
-      if (email && email.trim().length > 0) {
-        updateData.email = email;
+      // ========== 7. Firebase Auth 사용자 생성/조회 (email-already-exists 방지) ==========
+      let resolvedUid = uid; // 기본값: kakao:{kakaoId}
+
+      // 7-1. 먼저 kakao: UID로 기존 계정 존재 여부 확인
+      let userExists = false;
+      try {
+        await admin.auth().getUser(uid);
+        userExists = true;
+        console.log(`✅ 기존 카카오 계정 확인 (UID: ${uid})`);
+      } catch {
+        userExists = false;
       }
 
-      await admin.auth().updateUser(uid, updateData).catch(async () => {
-        const createData: admin.auth.CreateRequest = {uid};
-        if (displayName) {
-          createData.displayName = displayName;
+      if (userExists) {
+        // 7-2. 기존 계정 업데이트 — 이메일 충돌 시 이메일 제외하고 재시도
+        try {
+          const updateData: admin.auth.UpdateRequest = {};
+          if (displayName) updateData.displayName = displayName;
+          if (email && email.trim().length > 0) updateData.email = email;
+          await admin.auth().updateUser(uid, updateData);
+        } catch (updateError: any) {
+          if (updateError.code === "auth/email-already-exists") {
+            // 이메일 충돌 시 이메일 제외하고 이름만 업데이트
+            const safeUpdate: admin.auth.UpdateRequest = {};
+            if (displayName) safeUpdate.displayName = displayName;
+            await admin.auth().updateUser(uid, safeUpdate).catch(() => {});
+            console.log(`⚠️ 이메일 충돌로 이름만 업데이트 (UID: ${uid})`);
+          } else {
+            throw updateError;
+          }
         }
-        if (email && email.trim().length > 0) {
-          createData.email = email;
+      } else {
+        // 7-3. 신규 계정 생성 — 이메일이 이미 다른 계정에 존재하면 그 계정 UID 사용
+        try {
+          const createData: admin.auth.CreateRequest = {uid};
+          if (displayName) createData.displayName = displayName;
+          if (email && email.trim().length > 0) createData.email = email;
+          await admin.auth().createUser(createData);
+          console.log(`✅ 신규 카카오 계정 생성 완료 (UID: ${uid})`);
+        } catch (createError: any) {
+          if (createError.code === "auth/email-already-exists" && email) {
+            // 동일 이메일의 기존 계정(구글, 이메일 등) UID를 사용
+            console.log(`⚠️ 이메일(${email}) 이미 존재 → 기존 계정 UID 사용`);
+            const existingUser = await admin.auth().getUserByEmail(email);
+            resolvedUid = existingUser.uid;
+            console.log(`✅ 기존 계정 UID로 연결: ${resolvedUid}`);
+          } else {
+            throw createError;
+          }
         }
-        await admin.auth().createUser(createData);
-      });
+      }
 
       // ========== 8. Firestore users 컬렉션에 저장 ==========
-      await db.collection("users").doc(uid).set({
-        email: email || null,
-        displayName: displayName || null,
-        provider: "kakao",
-        providerId: kakaoId,
-        lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
-      }, {merge: true});
+      // 조건부 필드(createdAt, excludeFromStats)는 트랜잭션으로 "없을 때만" 기록
+      // → createdAt: 기존 값 절대 덮어쓰지 않음
+      // → excludeFromStats: 기존 true(관리자/테스트 계정) 유지
+      const kakaoNewUserRef = db.collection("users").doc(resolvedUid);
+      await db.runTransaction(async (transaction) => {
+        const snap = await transaction.get(kakaoNewUserRef);
+        const existing = snap.data() ?? {};
+
+        const baseData: Record<string, unknown> = {
+          email: email || null,
+          displayName: displayName || null,
+          provider: "kakao",
+          providerId: kakaoId,
+          lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
+
+        if (!snap.exists || existing["createdAt"] == null) {
+          baseData["createdAt"] = admin.firestore.FieldValue.serverTimestamp();
+        }
+        if (existing["excludeFromStats"] == null) {
+          baseData["excludeFromStats"] = false;
+        }
+
+        transaction.set(kakaoNewUserRef, baseData, {merge: true});
+      });
 
       // ========== 9. Custom Token 발급 ==========
-      const customToken = await admin.auth().createCustomToken(uid);
+      const customToken = await admin.auth().createCustomToken(resolvedUid);
 
-      console.log(`✅ 카카오 Custom Token 발급 완료 (UID: ${uid})`);
+      console.log(`✅ 카카오 Custom Token 발급 완료 (UID: ${resolvedUid})`);
 
       return {
         success: true,
         customToken,
-        uid,
+        uid: resolvedUid,
       };
     } catch (error: any) {
       console.error("⚠️ verifyKakaoToken error:", error.message);
@@ -1542,3 +1638,622 @@ export const submitClinicVerification = functions.https.onCall(
     };
   }
 );
+
+// ================================================================
+// syncImwebPurchases (v4 - imweb_orders 통합)
+// ================================================================
+// 아임웹 구매내역을 Firestore users/{uid}/purchases/ 에 동기화한다.
+//
+// 전략:
+//   A) imweb_orders 컬렉션 검색 (CSV 과거 주문 보관소)
+//      - email + emailAliases 로 검색
+//      - linkedUid == null 인 항목만 처리 (코드 필터)
+//
+//   B) 아임웹 API (최근 3개월, 신규 주문 감지)
+//      - 위 A에서 못 찾은 경우 보완
+//
+// 입력: { email: string }
+// 출력: { synced: number, skipped: number, message: string }
+// ================================================================
+
+// 아임웹 응답에서 리스트 추출 헬퍼
+function extractImwebList(body: Record<string, unknown>): Record<string, unknown>[] {
+  const dataField = body?.data;
+  if (Array.isArray(dataField)) return dataField as Record<string, unknown>[];
+  if (dataField && typeof dataField === "object" && !Array.isArray(dataField)) {
+    const list = (dataField as Record<string, unknown>)["list"];
+    if (Array.isArray(list)) return list as Record<string, unknown>[];
+  }
+  return [];
+}
+
+// Rate Limit 방지: API 호출 간 딜레이 (1.5초)
+function imwebDelay(ms = 1500): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export const syncImwebPurchases = functions
+  .region("us-central1")
+  .runWith({ timeoutSeconds: 60, memory: "256MB" })
+  .https.onCall(async (data, context) => {
+    // ── 인증 확인 ───────────────────────────────────────────
+    if (!context.auth) {
+      throw new functions.https.HttpsError(
+        "unauthenticated",
+        "로그인이 필요합니다."
+      );
+    }
+
+    const uid = context.auth.uid;
+    const email = (data.email as string | undefined)?.trim().toLowerCase();
+
+    if (!email) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "이메일이 필요합니다."
+      );
+    }
+
+    functions.logger.info("syncImwebPurchases 시작", { uid, email });
+
+    // ── 이 사용자의 emailAliases 조회 ───────────────────────
+    const userDoc = await db.collection("users").doc(uid).get();
+    const userData = userDoc.data() ?? {};
+    const emailAliases: string[] = Array.isArray(userData.emailAliases)
+      ? (userData.emailAliases as string[])
+      : [];
+    const searchEmails = [email, ...emailAliases];
+
+    functions.logger.info("검색 이메일 목록", { searchEmails });
+
+    // ── ebooks 맵 사전 로드 ──────────────────────────────────
+    const ebooksSnap = await db.collection("ebooks").get();
+    const ebookMap = new Map<string, string>(); // imwebProductCode → docId
+    for (const doc of ebooksSnap.docs) {
+      const code = doc.data().imwebProductCode as string | undefined;
+      if (code) ebookMap.set(code, doc.id);
+    }
+
+    // ── 기존 purchases 로드 ──────────────────────────────────
+    const purchasesRef = db.collection("users").doc(uid).collection("purchases");
+    const existingSnap = await purchasesRef.get();
+    const existingIds = new Set(existingSnap.docs.map((d) => d.id));
+
+    const writeBatch = db.batch();
+    let synced = 0;
+    let skipped = 0;
+
+    // ──────────────────────────────────────────────────────────
+    // A) imweb_orders 컬렉션에서 검색 (CSV 과거 주문 보관소)
+    //    email in searchEmails 로 조회 → linkedUid == null 인 것만 처리
+    // ──────────────────────────────────────────────────────────
+    const processedProductCodes = new Set<string>(); // 이미 처리한 상품코드 추적
+
+    // Firestore 'in' 쿼리는 최대 10개 → 분할 조회
+    const chunkSize = 10;
+    for (let i = 0; i < searchEmails.length; i += chunkSize) {
+      const chunk = searchEmails.slice(i, i + chunkSize);
+      const ordersSnap = await db
+        .collection("imweb_orders")
+        .where("email", "in", chunk)
+        .get();
+
+      for (const doc of ordersSnap.docs) {
+        const orderData = doc.data();
+
+        // linkedUid == null 인 것만 처리 (코드 레벨 필터)
+        if (orderData.linkedUid !== null && orderData.linkedUid !== undefined) {
+          // 이미 다른 uid 와 연결된 주문은 스킵
+          if (orderData.linkedUid !== uid) {
+            functions.logger.info("타 uid 연결 주문 스킵", {
+              docId: doc.id,
+              linkedUid: orderData.linkedUid,
+            });
+            continue;
+          }
+          // 이미 이 uid 와 연결됐으면 상품코드 처리는 하되 linkedUid 재설정 불필요
+        }
+
+        const productCode = String(orderData.productCode ?? "");
+        if (!productCode || processedProductCodes.has(productCode)) continue;
+        processedProductCodes.add(productCode);
+
+        const ebookId = ebookMap.get(productCode);
+        if (!ebookId) {
+          functions.logger.info("imweb_orders: 미매핑 상품코드", { productCode });
+          continue;
+        }
+
+        if (existingIds.has(ebookId)) {
+          skipped++;
+          // linkedUid 연결은 업데이트
+          writeBatch.update(doc.ref, { linkedUid: uid });
+          continue;
+        }
+
+        // purchases 생성
+        writeBatch.set(
+          purchasesRef.doc(ebookId),
+          {
+            ebookId,
+            purchasedAt: orderData.purchasedAt ?? admin.firestore.FieldValue.serverTimestamp(),
+            source: orderData.source ?? "imweb_orders",
+            syncedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+
+        // linkedUid 업데이트
+        writeBatch.update(doc.ref, { linkedUid: uid });
+
+        existingIds.add(ebookId);
+        synced++;
+
+        functions.logger.info("imweb_orders 매칭", {
+          docId: doc.id,
+          productCode,
+          ebookId,
+          orderEmail: orderData.email,
+        });
+      }
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // B) 아임웹 API — 최근 3개월 신규 주문 감지
+    // ──────────────────────────────────────────────────────────
+    try {
+      const keysSnap = await db.collection("api_keys").doc("imweb_keys").get();
+      if (keysSnap.exists) {
+        const keysData = keysSnap.data()!;
+        const imwebKey = keysData.key as string;
+        const imwebSecret = keysData.secret_key as string;
+
+        const authRes = await axios.get(
+          `https://api.imweb.me/v2/auth?key=${imwebKey}&secret=${imwebSecret}`
+        );
+        const accessToken: string = authRes.data?.access_token;
+
+        if (accessToken) {
+          const headers = { "access-token": accessToken };
+          const nowSec = Math.floor(Date.now() / 1000);
+          const threeMonthsAgoSec = nowSec - (90 * 24 * 60 * 60);
+
+          const myOrders: Record<string, unknown>[] = [];
+          const seenOrderNos = new Set<string>();
+          let page = 1;
+
+          while (page <= 10) {
+            const ordersUrl =
+              `https://api.imweb.me/v2/shop/orders` +
+              `?order_date_from=${threeMonthsAgoSec}` +
+              `&order_date_to=${nowSec}` +
+              `&order_version=v2` +
+              `&page=${page}` +
+              `&limit=100`;
+
+            if (page > 1) await imwebDelay();
+
+            const ordersRes = await axios.get(ordersUrl, { headers });
+            const orderList = extractImwebList(ordersRes.data);
+
+            if (orderList.length === 0) break;
+
+            for (const order of orderList) {
+              const orderNo = String(order["order_no"] ?? "");
+              if (seenOrderNos.has(orderNo)) continue;
+
+              const orderer = order["orderer"] as Record<string, unknown> | undefined;
+              const ordererEmail = (orderer?.["email"] as string | undefined)
+                ?.trim().toLowerCase();
+
+              // searchEmails 중 하나와 매칭
+              if (ordererEmail && searchEmails.includes(ordererEmail)) {
+                myOrders.push(order);
+                seenOrderNos.add(orderNo);
+              }
+            }
+
+            if (orderList.length < 100) break;
+            page++;
+          }
+
+          functions.logger.info("API 주문 매칭", {
+            email, matchedOrders: myOrders.length,
+          });
+
+          for (const order of myOrders) {
+            const orderNo = String(order["order_no"] ?? "");
+            if (!orderNo) continue;
+
+            await imwebDelay();
+
+            const prodRes = await axios.get(
+              `https://api.imweb.me/v2/shop/orders/${orderNo}/prod-orders`,
+              { headers }
+            );
+            const prodOrderList = extractImwebList(prodRes.data);
+
+            for (const prodOrder of prodOrderList) {
+              const items = prodOrder["items"];
+              if (!Array.isArray(items)) continue;
+
+              for (const item of items) {
+                const itemObj = item as Record<string, unknown>;
+                const prodNo = String(itemObj["prod_no"] ?? "");
+                if (!prodNo || processedProductCodes.has(prodNo)) continue;
+                processedProductCodes.add(prodNo);
+
+                const ebookId = ebookMap.get(prodNo);
+                if (!ebookId) {
+                  functions.logger.info("API: 미매핑 상품코드", { prodNo });
+                  continue;
+                }
+                if (existingIds.has(ebookId)) {
+                  skipped++;
+                  continue;
+                }
+
+                writeBatch.set(
+                  purchasesRef.doc(ebookId),
+                  {
+                    ebookId,
+                    purchasedAt: admin.firestore.FieldValue.serverTimestamp(),
+                    source: "imweb",
+                    syncedAt: admin.firestore.FieldValue.serverTimestamp(),
+                  },
+                  { merge: true }
+                );
+                existingIds.add(ebookId);
+                synced++;
+
+                functions.logger.info("API 상품 발견", { orderNo, prodNo, ebookId });
+              }
+            }
+          }
+        }
+      }
+    } catch (apiErr) {
+      // API 오류는 로그만 남기고 계속 진행 (imweb_orders 결과는 유지)
+      functions.logger.warn("아임웹 API 조회 실패 (무시하고 계속)", { error: String(apiErr) });
+    }
+
+    // ── 배치 커밋 ────────────────────────────────────────────
+    if (synced > 0 || skipped > 0) {
+      await writeBatch.commit();
+    }
+
+    functions.logger.info("syncImwebPurchases 완료", { uid, synced, skipped });
+
+    return {
+      synced,
+      skipped,
+      message:
+        synced > 0
+          ? `${synced}권의 구매내역을 불러왔습니다.`
+          : "이미 모두 동기화되어 있습니다.",
+    };
+  });
+
+// ══════════════════════════════════════════════════════════════
+// 퀴즈 풀 자동 스케줄러
+//
+// 배포 규칙:
+//   1. 완전 랜덤 선정 (order 무관)
+//   2. 하루 2문제는 반드시 서로 다른 책(sourceBook)에서 1개씩
+//   3. 현재 사이클에서 이미 출제된 문제는 제외 (usedQuizIds)
+//   4. 각 책의 미출제 문제가 소진되면 → 사이클 증가, usedQuizIds 초기화
+//
+// Firestore 컬렉션:
+//   quiz_pool/{autoId}          — 원본 문제 은행
+//   quiz_schedule/{dateKey}     — 날짜별 배포 스케줄
+//   quiz_meta/state             — 진행 상태
+// ══════════════════════════════════════════════════════════════
+
+/** Fisher-Yates 셔플 */
+function shuffleArray<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/** 날짜 → 'YYYY-MM-DD' */
+function toDateKey(date: Date): string {
+  const yyyy = date.getFullYear();
+  const mm   = String(date.getMonth() + 1).padStart(2, "0");
+  const dd   = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+/**
+ * 핵심 선정 로직:
+ * quiz_pool에서 오늘의 2문제를 선정한다.
+ *   - 각기 다른 책(sourceBook)에서 1문제씩
+ *   - 현재 사이클 내에서 이미 출제된 문제(usedQuizIds) 제외
+ *   - 미출제 문제 중 완전 랜덤 선택
+ *   - 어느 책이든 미출제 문제가 없으면 사이클 증가 후 풀 전체 재사용
+ */
+async function pickTodayQuizzes(meta: FirebaseFirestore.DocumentData): Promise<{
+  selectedDocs: FirebaseFirestore.QueryDocumentSnapshot[];
+  nextCycleCount: number;
+  nextUsedQuizIds: string[];
+  wasReset: boolean;
+}> {
+  const usedQuizIds: string[]   = meta.usedQuizIds   ?? [];
+  const cycleCount:  number     = meta.cycleCount     ?? 1;
+  const bookRotation: string[]  = meta.bookRotation   ?? [];
+
+  // ── 1. 전체 풀 조회 ──
+  const poolSnap = await db
+    .collection("quiz_pool")
+    .where("isActive", "==", true)
+    .get();
+
+  const allDocs = poolSnap.docs;
+
+  // ── 2. 사용 가능한 책 목록 추출 ──
+  const bookSet = new Set(allDocs.map((d) => d.data().sourceBook as string));
+  const books   = bookRotation.filter((b) => bookSet.has(b));
+  // bookRotation에 없는 책도 포함
+  bookSet.forEach((b) => { if (!books.includes(b)) books.push(b); });
+
+  // ── 3. 각 책에서 미출제 문제 그룹화 ──
+  const unusedByBook: Record<string, FirebaseFirestore.QueryDocumentSnapshot[]> = {};
+  for (const book of books) {
+    unusedByBook[book] = shuffleArray(
+      allDocs.filter(
+        (d) => d.data().sourceBook === book && !usedQuizIds.includes(d.id)
+      )
+    );
+  }
+
+  // ── 4. 서로 다른 책에서 1문제씩 선정 ──
+  //    books 중 미출제 문제가 있는 책 2개를 우선 선택 (셔플로 매일 다른 조합)
+  const shuffledBooks = shuffleArray(books);
+  const selected: FirebaseFirestore.QueryDocumentSnapshot[] = [];
+  const usedBooksToday: string[] = [];
+
+  for (const book of shuffledBooks) {
+    if (selected.length >= 2) break;
+    const candidates = unusedByBook[book];
+    if (candidates && candidates.length > 0) {
+      selected.push(candidates[0]);
+      usedBooksToday.push(book);
+    }
+  }
+
+  // ── 5. 사이클 소진 처리 ──
+  //    2문제를 채우지 못하면(어느 책이든 미출제 문제 없음) → 사이클 초기화
+  let wasReset     = false;
+  let nextCycle    = cycleCount;
+  let nextUsedIds  = [...usedQuizIds];
+
+  if (selected.length < 2) {
+    functions.logger.info("🔄 풀 소진 → 사이클 증가 및 usedQuizIds 초기화", {
+      cycleCount: cycleCount + 1,
+    });
+    wasReset   = true;
+    nextCycle  = cycleCount + 1;
+    nextUsedIds = [];
+
+    // 초기화 후 재선정
+    const freshSelected: FirebaseFirestore.QueryDocumentSnapshot[] = [];
+    const freshShuffled = shuffleArray(books);
+    for (const book of freshShuffled) {
+      if (freshSelected.length >= 2) break;
+      const freshCandidates = shuffleArray(
+        allDocs.filter((d) => d.data().sourceBook === book)
+      );
+      if (freshCandidates.length > 0) {
+        freshSelected.push(freshCandidates[0]);
+      }
+    }
+    selected.splice(0, selected.length, ...freshSelected);
+  }
+
+  // 선정된 문제를 usedQuizIds에 추가
+  nextUsedIds = [...new Set([...nextUsedIds, ...selected.map((d) => d.id)])];
+
+  return {
+    selectedDocs:    selected,
+    nextCycleCount:  nextCycle,
+    nextUsedQuizIds: nextUsedIds,
+    wasReset,
+  };
+}
+
+export const scheduleQuizzes = functions
+  .region("us-central1")
+  .pubsub.schedule("0 0 * * *")   // 매일 자정 UTC (= 한국 오전 9시)
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    functions.logger.info("🗓️ scheduleQuizzes: 실행 시작");
+
+    const dateKey     = toDateKey(new Date());
+    const scheduleRef = db.collection("quiz_schedule").doc(dateKey);
+    const metaRef     = db.doc("quiz_meta/state");
+
+    // ── 이미 생성됐으면 스킵 ──
+    if ((await scheduleRef.get()).exists) {
+      functions.logger.info("⏭️ 이미 스케줄 생성됨", { dateKey });
+      return null;
+    }
+
+    // ── meta 조회 ──
+    const metaDoc  = await metaRef.get();
+    const meta     = metaDoc.exists ? metaDoc.data()! : {};
+    const dailyCount: number = meta.dailyCount ?? 2;
+
+    // ── 오늘의 문제 선정 ──
+    const { selectedDocs, nextCycleCount, nextUsedQuizIds, wasReset } =
+      await pickTodayQuizzes(meta);
+
+    if (selectedDocs.length === 0) {
+      functions.logger.warn("⚠️ 선정된 문제 없음 — quiz_pool을 확인하세요");
+      return null;
+    }
+
+    const quizIds = selectedDocs.map((d) => d.id);
+    const items   = selectedDocs.map((d) => ({
+      id:             d.id,
+      order:          d.data().order          ?? 0,
+      question:       d.data().question       ?? "",
+      options:        d.data().options        ?? [],
+      correctIndex:   d.data().correctIndex   ?? 0,
+      explanation:    d.data().explanation    ?? "",
+      category:       d.data().category       ?? "",
+      difficulty:     d.data().difficulty     ?? "basic",
+      sourceBook:     d.data().sourceBook     ?? "",
+      sourceFileName: d.data().sourceFileName ?? "",
+      sourcePage:     d.data().sourcePage     ?? "",
+      isActive:       true,
+      lastCycleServed: nextCycleCount,
+    }));
+
+    // ── quiz_schedule/{dateKey} 저장 ──
+    await scheduleRef.set({
+      quizIds,
+      items,
+      cycleCount:  nextCycleCount,
+      startOrder:  items[0].order,
+      endOrder:    items[items.length - 1].order,
+      createdAt:   admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // ── quiz_pool lastCycleServed 업데이트 ──
+    const batch = db.batch();
+    for (const doc of selectedDocs) {
+      batch.update(doc.ref, {
+        lastCycleServed: nextCycleCount,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+    await batch.commit();
+
+    // ── quiz_meta/state 업데이트 ──
+    const poolSnap     = await db.collection("quiz_pool").where("isActive", "==", true).get();
+    const totalActive  = poolSnap.size;
+
+    await metaRef.set({
+      cycleCount:         nextCycleCount,
+      totalActiveCount:   totalActive,
+      lastScheduledDate:  dateKey,
+      dailyCount,
+      usedQuizIds:        nextUsedQuizIds,
+    }, { merge: true });
+
+    functions.logger.info("✅ scheduleQuizzes 완료", {
+      dateKey,
+      quizIds,
+      books: selectedDocs.map((d) => d.data().sourceBook),
+      wasReset,
+      cycleCount: nextCycleCount,
+      usedCount:  nextUsedQuizIds.length,
+      totalActive,
+    });
+
+    return null;
+  });
+
+// ── 수동 트리거 버전 (테스트/보충용) ──
+// Admin이 특정 날짜의 스케줄을 수동으로 생성하거나 재생성할 때 사용
+export const manualScheduleQuiz = functions
+  .region("us-central1")
+  .https.onCall(async (data, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "로그인 필요");
+    }
+    const callerDoc = await db.collection("users").doc(context.auth.uid).get();
+    if (callerDoc.data()?.isAdmin !== true) {
+      throw new functions.https.HttpsError("permission-denied", "어드민 권한 필요");
+    }
+
+    const { targetDate, forceReplace } = data as {
+      targetDate?: string;
+      forceReplace?: boolean;
+    };
+
+    const dateKey     = targetDate ?? toDateKey(new Date());
+    const scheduleRef = db.collection("quiz_schedule").doc(dateKey);
+    const metaRef     = db.doc("quiz_meta/state");
+
+    if (!forceReplace) {
+      const existing = await scheduleRef.get();
+      if (existing.exists) {
+        return {
+          success: false,
+          message: `${dateKey} 스케줄이 이미 존재합니다. forceReplace: true로 재요청하세요.`,
+        };
+      }
+    }
+
+    const metaDoc  = await metaRef.get();
+    const meta     = metaDoc.exists ? metaDoc.data()! : {};
+    const dailyCount: number = meta.dailyCount ?? 2;
+
+    const { selectedDocs, nextCycleCount, nextUsedQuizIds, wasReset } =
+      await pickTodayQuizzes(meta);
+
+    if (selectedDocs.length === 0) {
+      return { success: false, message: "quiz_pool에 활성화된 문제 없음" };
+    }
+
+    const quizIds = selectedDocs.map((d) => d.id);
+    const items   = selectedDocs.map((d) => ({
+      id:             d.id,
+      order:          d.data().order          ?? 0,
+      question:       d.data().question       ?? "",
+      options:        d.data().options        ?? [],
+      correctIndex:   d.data().correctIndex   ?? 0,
+      explanation:    d.data().explanation    ?? "",
+      category:       d.data().category       ?? "",
+      difficulty:     d.data().difficulty     ?? "basic",
+      sourceBook:     d.data().sourceBook     ?? "",
+      sourceFileName: d.data().sourceFileName ?? "",
+      sourcePage:     d.data().sourcePage     ?? "",
+      isActive:       true,
+      lastCycleServed: nextCycleCount,
+    }));
+
+    await scheduleRef.set({
+      quizIds,
+      items,
+      cycleCount:  nextCycleCount,
+      startOrder:  items[0].order,
+      endOrder:    items[items.length - 1].order,
+      createdAt:   admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    const batch = db.batch();
+    for (const doc of selectedDocs) {
+      batch.update(doc.ref, {
+        lastCycleServed: nextCycleCount,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+    await batch.commit();
+
+    const poolSnap    = await db.collection("quiz_pool").where("isActive", "==", true).get();
+    const totalActive = poolSnap.size;
+
+    await metaRef.set({
+      cycleCount:        nextCycleCount,
+      totalActiveCount:  totalActive,
+      lastScheduledDate: dateKey,
+      dailyCount,
+      usedQuizIds:       nextUsedQuizIds,
+    }, { merge: true });
+
+    return {
+      success: true,
+      dateKey,
+      quizIds,
+      books:   selectedDocs.map((d) => d.data().sourceBook),
+      wasReset,
+      message: `${dateKey} 스케줄 생성 완료 (${quizIds.length}문제, ${wasReset ? "사이클 초기화" : "정상"})`,
+    };
+  });
+
+

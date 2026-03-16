@@ -9,10 +9,13 @@ import 'bond_stamp_circle.dart';
 /// 이번 주 우리 스탬프 섹션
 class BondStampSection extends StatefulWidget {
   final String? partnerGroupId;
+  /// true: 다른 카드 내부에 종속 (외부 padding/배경 없음)
+  final bool embedded;
 
   const BondStampSection({
     super.key,
     required this.partnerGroupId,
+    this.embedded = false,
   });
 
   @override
@@ -57,36 +60,65 @@ class _BondStampSectionState extends State<BondStampSection> {
             WeeklyStampState.empty(WeeklyStampService.currentWeekKey());
         final todayIdx = WeeklyStampService.todayDayOfWeek();
 
-        return Padding(
+        return widget.embedded
+            ? _buildEmbeddedStamp(stamp, todayIdx)
+            : _buildStandaloneStamp(stamp, todayIdx);
+      },
+    );
+  }
+
+  /// 독립 카드 스타일 (기존)
+  Widget _buildStandaloneStamp(WeeklyStampState stamp, int todayIdx) {
+    return Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
           child: Container(
             width: double.infinity,
             decoration: BoxDecoration(
-              color: AppColors.cardEmphasis,
+              color: AppColors.cardPrimary,
               borderRadius: BorderRadius.circular(AppRadius.xl),
             ),
-            child: Column(
+            child: _buildContent(stamp, todayIdx),
+          ),
+        );
+  }
+
+  /// 내부 종속 스타일 (BondSummarySection 카드 안)
+  Widget _buildEmbeddedStamp(WeeklyStampState stamp, int todayIdx) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: AppColors.onCardPrimary.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+      ),
+      child: _buildContent(stamp, todayIdx),
+    );
+  }
+
+  Widget _buildContent(WeeklyStampState stamp, int todayIdx) {
+    return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Neon 헤더
+                // 헤더
                 Padding(
                   padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.xl, 18, AppSpacing.xl, 14),
+                    AppSpacing.xl, 14, AppSpacing.xl, 10),
                   child: Row(
                     children: [
-                      const Text(
-                        '이번 주 우리 스탬프',
+                      Text(
+                        '이번 주 스탬프',
                         style: TextStyle(
-                          fontSize: 15,
+                          fontSize: 13,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.onCardEmphasis,
+                          color: widget.embedded
+                              ? AppColors.onCardPrimary.withOpacity(0.85)
+                              : AppColors.onCardPrimary,
                         ),
                       ),
                       const Spacer(),
                       AppBadge(
                         label: '${stamp.filledCount}/7',
-                        bgColor: AppColors.onCardEmphasis.withOpacity(0.15),
-                        textColor: AppColors.onCardEmphasis,
+                        bgColor: AppColors.onCardPrimary.withOpacity(0.15),
+                        textColor: AppColors.onCardPrimary,
                         isCircle: false,
                       ),
                     ],
@@ -94,11 +126,11 @@ class _BondStampSectionState extends State<BondStampSection> {
                 ),
                 // 스탬프 원 7개
                 Container(
-                  margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                  margin: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
                   decoration: BoxDecoration(
                     color: AppColors.white.withOpacity(0.65),
-                    borderRadius: BorderRadius.circular(AppRadius.lg),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -114,10 +146,6 @@ class _BondStampSectionState extends State<BondStampSection> {
                   ),
                 ),
               ],
-            ),
-          ),
-        );
-      },
-    );
+            );
   }
 }

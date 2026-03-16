@@ -31,11 +31,8 @@ class _SignInPageState extends State<SignInPage> {
   void initState() {
     super.initState();
     _loadLastProvider();
-    // 로그인 화면 진입 이벤트
-    AdminActivityService.log(
-      ActivityEventType.viewSignInPage,
-      page: 'sign_in',
-    );
+    // ※ view_sign_in_page는 로그인 전이라 uid가 null → 기록 불가
+    // → 로그인 성공 시 _logPostLogin()에서 함께 기록
   }
 
   Future<void> _loadLastProvider() async {
@@ -72,6 +69,9 @@ class _SignInPageState extends State<SignInPage> {
         idToken: googleAuth.idToken,
       );
 
+      // ✅ auth 상태 변경 전에 온보딩 플래그 설정 (race condition 방지)
+      await OnboardingService.forceSchedule();
+
       await FirebaseAuth.instance.signInWithCredential(credential);
 
       debugPrint('✅ Firebase Auth signInWithCredential 성공');
@@ -99,11 +99,10 @@ class _SignInPageState extends State<SignInPage> {
 
       // provider 기록 (Firestore + 로컬)
       await SignInTracker.record('google');
-      await OnboardingService.schedulePendingOnboarding();
-      // 로그인 성공 이벤트
-      await AdminActivityService.log(ActivityEventType.loginSuccess, page: 'sign_in', extra: {'provider': 'google'});
-      // 가입/로그인 퍼널 이벤트 기록
-      await AdminActivityService.logFunnel(
+      // 퍼널 이벤트: 로그인 화면 진입 + 로그인 성공 (로그인 전에는 uid 없으므로 여기서 함께 기록)
+      AdminActivityService.log(ActivityEventType.viewSignInPage, page: 'sign_in');
+      AdminActivityService.log(ActivityEventType.loginSuccess, page: 'sign_in', extra: {'provider': 'google'});
+      AdminActivityService.logFunnel(
         FunnelEventType.signupComplete,
         extra: {'provider': 'google'},
       );
@@ -127,6 +126,9 @@ class _SignInPageState extends State<SignInPage> {
     AdminActivityService.log(ActivityEventType.tapLoginApple, page: 'sign_in');
     setState(() => _isLoading = true);
     try {
+      // ✅ auth 상태 변경 전에 온보딩 플래그 설정 (race condition 방지)
+      await OnboardingService.forceSchedule();
+
       final user = await AppleAuthService.signInWithApple();
       if (user == null && mounted) {
         ScaffoldMessenger.of(
@@ -135,9 +137,9 @@ class _SignInPageState extends State<SignInPage> {
       } else if (user != null) {
         // 로컬 provider 기록 (배지용)
         await SignInTracker.record('apple');
-        await OnboardingService.schedulePendingOnboarding();
-        await AdminActivityService.log(ActivityEventType.loginSuccess, page: 'sign_in', extra: {'provider': 'apple'});
-        await AdminActivityService.logFunnel(
+        AdminActivityService.log(ActivityEventType.viewSignInPage, page: 'sign_in');
+        AdminActivityService.log(ActivityEventType.loginSuccess, page: 'sign_in', extra: {'provider': 'apple'});
+        AdminActivityService.logFunnel(
           FunnelEventType.signupComplete,
           extra: {'provider': 'apple'},
         );
@@ -177,6 +179,9 @@ class _SignInPageState extends State<SignInPage> {
 
     setState(() => _isLoading = true);
     try {
+      // ✅ auth 상태 변경 전에 온보딩 플래그 설정 (race condition 방지)
+      await OnboardingService.forceSchedule();
+
       debugPrint('🔑 카카오 로그인 시작');
       final user = await KakaoAuthService.signInWithKakao();
 
@@ -195,9 +200,9 @@ class _SignInPageState extends State<SignInPage> {
 
       // 로컬 provider 기록 (배지용, Firestore는 Function에서 이미 저장)
       await SignInTracker.record('kakao');
-      await OnboardingService.schedulePendingOnboarding();
-      await AdminActivityService.log(ActivityEventType.loginSuccess, page: 'sign_in', extra: {'provider': 'kakao'});
-      await AdminActivityService.logFunnel(
+      AdminActivityService.log(ActivityEventType.viewSignInPage, page: 'sign_in');
+      AdminActivityService.log(ActivityEventType.loginSuccess, page: 'sign_in', extra: {'provider': 'kakao'});
+      AdminActivityService.logFunnel(
         FunnelEventType.signupComplete,
         extra: {'provider': 'kakao'},
       );
@@ -221,6 +226,9 @@ class _SignInPageState extends State<SignInPage> {
     AdminActivityService.log(ActivityEventType.tapLoginNaver, page: 'sign_in');
     setState(() => _isLoading = true);
     try {
+      // ✅ auth 상태 변경 전에 온보딩 플래그 설정 (race condition 방지)
+      await OnboardingService.forceSchedule();
+
       debugPrint('🔑 네이버 로그인 시작');
       final user = await NaverAuthService.signInWithNaver();
 
@@ -242,9 +250,9 @@ class _SignInPageState extends State<SignInPage> {
 
       // 로컬 provider 기록 (배지용)
       await SignInTracker.record('naver');
-      await OnboardingService.schedulePendingOnboarding();
-      await AdminActivityService.log(ActivityEventType.loginSuccess, page: 'sign_in', extra: {'provider': 'naver'});
-      await AdminActivityService.logFunnel(
+      AdminActivityService.log(ActivityEventType.viewSignInPage, page: 'sign_in');
+      AdminActivityService.log(ActivityEventType.loginSuccess, page: 'sign_in', extra: {'provider': 'naver'});
+      AdminActivityService.logFunnel(
         FunnelEventType.signupComplete,
         extra: {'provider': 'naver'},
       );
@@ -400,17 +408,26 @@ class _SignInPageState extends State<SignInPage> {
                           }
                         }
 
+                        // ✅ auth 상태 변경 전에 온보딩 플래그 설정
+                        await OnboardingService.forceSchedule();
+
                         User? user;
-                        if (isSignUp) {
-                          user = await EmailAuthService.signUp(
-                            email: email,
-                            password: password,
-                          );
-                        } else {
-                          user = await EmailAuthService.signIn(
-                            email: email,
-                            password: password,
-                          );
+                        String? authError;
+                        try {
+                          if (isSignUp) {
+                            user = await EmailAuthService.signUp(
+                              email: email,
+                              password: password,
+                            );
+                          } else {
+                            user = await EmailAuthService.signIn(
+                              email: email,
+                              password: password,
+                            );
+                          }
+                        } catch (e) {
+                          // Exception 메시지에서 'Exception: ' 접두사 제거
+                          authError = e.toString().replaceFirst('Exception: ', '');
                         }
 
                         if (context.mounted) {
@@ -418,16 +435,16 @@ class _SignInPageState extends State<SignInPage> {
                             Navigator.pop(context);
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text(isSignUp ? '회원가입 실패' : '로그인 실패'),
+                                content: Text(authError ?? (isSignUp ? '회원가입 실패' : '로그인 실패')),
                               ),
                             );
                           } else {
                             // ✅ pop 전에 먼저 실행 — HomeShell 생성 전에 플래그 보장
                             await SignInTracker.record('email');
-                            await OnboardingService.schedulePendingOnboarding();
-                            await AdminActivityService.log(ActivityEventType.loginSuccess, page: 'sign_in', extra: {'provider': 'email', 'isSignUp': isSignUp});
+                            AdminActivityService.log(ActivityEventType.viewSignInPage, page: 'sign_in');
+                            AdminActivityService.log(ActivityEventType.loginSuccess, page: 'sign_in', extra: {'provider': 'email', 'isSignUp': isSignUp});
                             if (isSignUp) {
-                              await AdminActivityService.logFunnel(
+                              AdminActivityService.logFunnel(
                                 FunnelEventType.signupComplete,
                                 extra: {'provider': 'email'},
                               );
@@ -492,6 +509,41 @@ class _SignInPageState extends State<SignInPage> {
                       children: [
                         // 마지막 로그인 버튼을 맨 위로 올리고 나머지 순서 유지
                         ..._buildOrderedButtons(),
+
+                        const SizedBox(height: 24),
+
+                        // ── 치과책방 구매내역 안내 ──
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.white.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.menu_book_rounded,
+                                size: 15,
+                                color: AppColors.white.withValues(alpha: 0.7),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  '치과책방 구매자는 구매 이메일 계정으로 로그인하세요.',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color:
+                                        AppColors.white.withValues(alpha: 0.8),
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                 ],
@@ -623,3 +675,4 @@ class _BtnDef {
     this.onPressed,
   );
 }
+

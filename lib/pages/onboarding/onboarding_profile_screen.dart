@@ -736,7 +736,7 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
       );
 
       // 파트너 프로필 완료 이벤트 기록
-      await AdminActivityService.logFunnel(
+      AdminActivityService.logFunnel(
         FunnelEventType.profilePartnerComplete,
         extra: {
           'careerGroup': _selectedCareer,
@@ -744,12 +744,14 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
         },
       );
       // 프로필 저장 성공 이벤트
-      await AdminActivityService.log(
+      AdminActivityService.log(
         ActivityEventType.tapProfileSave,
         page: 'onboarding_profile',
       );
       // 스냅샷 캐시 갱신 (프로필 저장 후 careerGroup 등 최신화)
-      await AdminActivityService.refreshSnapshot();
+      AdminActivityService.refreshSnapshot();
+      // 캐시 초기화 → 결 탭 복귀 시 publicProfiles에서 최신 닉네임 재조회
+      UserProfileService.clearCache();
 
       debugPrint('✅ [OnboardingProfile] 저장 완료!');
 
@@ -1072,5 +1074,6 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
     );
   }
 }
+
 
 

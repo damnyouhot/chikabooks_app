@@ -9,13 +9,13 @@ import '../services/bond_post_service.dart';
 import '../models/partner_group.dart';
 import '../widgets/bond_post_sheet.dart';
 import '../widgets/profile_gate_sheet.dart';
+import '../widgets/partner_gate_sheet.dart';
 import '../core/theme/app_colors.dart';
 import '../core/widgets/glass_card.dart';
 
 import '../widgets/bond/bond_top_bar.dart';
 import '../widgets/bond/bond_week_header.dart';
 import '../widgets/bond/bond_summary_section.dart';
-import '../widgets/bond/bond_stamp_section.dart';
 import '../widgets/bond/bond_feed_section.dart';
 import '../widgets/bond/bond_billboard_section.dart';
 import '../widgets/bond/bond_poll_section.dart';
@@ -51,10 +51,11 @@ class BondPage extends StatefulWidget {
   const BondPage({super.key});
 
   @override
-  State<BondPage> createState() => _BondPageState();
+  State<BondPage> createState() => BondPageState();
 }
 
-class _BondPageState extends State<BondPage> {
+// ignore: library_private_types_in_public_api
+class BondPageState extends State<BondPage> with WidgetsBindingObserver {
   // ── 데이터 ──
   String? _partnerGroupId; // 추후 파트너 데이터 연결용
   PartnerGroup? _partnerGroup; // 파트너 그룹 정보
@@ -69,6 +70,9 @@ class _BondPageState extends State<BondPage> {
   // ── 첫 로드 플래그: 탭 마운트 시 1회만 forceRefresh ──
   bool _firstLoad = true;
 
+  // ── 매칭 중 로딩 상태 ──
+  bool _isMatching = false;
+
   // ── Firestore 스트림 (initState에서 1회 생성) ──
   Stream<DocumentSnapshot>? _userStream;
 
@@ -78,6 +82,7 @@ class _BondPageState extends State<BondPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // 스트림을 initState에서 1회만 생성 → build()에서 매번 새로 만들지 않음
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid != null) {
@@ -85,9 +90,53 @@ class _BondPageState extends State<BondPage> {
           .collection('users')
           .doc(uid)
           .snapshots();
+
+      // 스트림 첫 이벤트에서 partnerGroupId를 즉시 읽어 캐시보다 빠르게 상태 세팅
+      // → 앱 재시작 시 Firestore 로컬 캐시가 먼저 반환되므로 초기 UI가 올바르게 표시됨
+      _userStream!.first.then((snap) {
+        if (!mounted) return;
+        final data = snap.data() as Map<String, dynamic>?;
+        if (data == null) return;
+        final firestoreGroupId = data['partnerGroupId'] as String?;
+        final firestoreStatus = data['partnerStatus'] as String? ?? 'active';
+        // _loadData()가 아직 완료되지 않은 경우에만 즉시 반영
+        if (_partnerGroupId != firestoreGroupId) {
+          setState(() {
+            _partnerGroupId = firestoreGroupId;
+            _partnerStatus = firestoreStatus;
+          });
+          // 그룹이 있으면 전체 데이터 로드 트리거
+          if (firestoreGroupId != null) {
+            _firstLoad = false;
+            _loadData();
+          }
+        }
+      });
     }
     _loadData();
     _checkAndShowNewWeekToast();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// 앱이 foreground로 돌아올 때 닉네임 등 최신 데이터 갱신
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      // publicProfiles 포함한 닉네임 재조회를 위해 _firstLoad 리셋
+      _firstLoad = true;
+      _loadData();
+    }
+  }
+
+  /// 탭 복귀 등 외부에서 데이터 새로고침이 필요할 때 호출
+  void refreshData() {
+    _firstLoad = true;
+    _loadData();
   }
 
   Future<void> _loadData() async {
@@ -135,8 +184,46 @@ class _BondPageState extends State<BondPage> {
       debugPrint('🔍 [BondPage] members.length: ${members.length}');
 
       // ✅ 만료된 그룹 자동 정리
+      // group==null 이거나 isGroupActive==false인 경우,
+      // 캐시 타이밍 이슈일 수 있으므로 반드시 서버에서 재확인 후 정리
       if (group == null || !BondStateHelper.isGroupActive(group)) {
-        debugPrint('⚠️ [BondPage] 그룹 만료됨 → partnerGroupId 정리');
+        debugPrint('⚠️ [BondPage] group 비활성 감지 (group=${group?.id}, isActive=${group?.isActive}) → 서버 재확인');
+
+        // 서버에서 직접 그룹 문서 재확인 (캐시 무시)
+        try {
+          final snap = await FirebaseFirestore.instance
+              .collection('partnerGroups')
+              .doc(groupId)
+              .get(const GetOptions(source: Source.server));
+          if (snap.exists) {
+            final serverData = snap.data();
+            final serverIsActive = serverData?['isActive'] as bool? ?? false;
+            final serverEndsAt = (serverData?['endsAt'] as Timestamp?)?.toDate();
+            final serverNotExpired = serverEndsAt != null && serverEndsAt.toUtc().isAfter(DateTime.now().toUtc());
+            final serverMemberUids = List<String>.from(serverData?['memberUids'] ?? []);
+
+            debugPrint('🔍 [BondPage] 서버 재확인 결과: isActive=$serverIsActive, expired=${!serverNotExpired}, members=${serverMemberUids.length}');
+
+            if (serverIsActive && serverNotExpired && serverMemberUids.isNotEmpty) {
+              // 서버에 그룹이 활성으로 존재 → 캐시 이슈이므로 정리하지 않고 재시도
+              debugPrint('⚠️ [BondPage] 서버에서는 활성 그룹 → 정리 스킵, 재시도');
+              UserProfileService.clearCache();
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) {
+                  _firstLoad = true;
+                  _loadData();
+                }
+              });
+              return;
+            }
+          }
+        } catch (e) {
+          debugPrint('⚠️ [BondPage] 그룹 서버 재확인 실패: $e');
+          // 네트워크 에러 시에는 정리하지 않고 그냥 리턴 (다음 시도 때 다시 확인)
+          return;
+        }
+
+        debugPrint('⚠️ [BondPage] 서버 확인 후에도 비활성 → partnerGroupId 정리');
         final uid = FirebaseAuth.instance.currentUser?.uid;
         if (uid != null) {
           await FirebaseFirestore.instance
@@ -161,23 +248,23 @@ class _BondPageState extends State<BondPage> {
       }
 
       // ③ 닉네임 조회 + 주간 활동 데이터 병렬 처리
-      // 닉네임: metaNick이 없는 멤버만 Firestore 병렬 조회
-      final membersNeedingFetch =
-          members.where((m) => (m.nickname?.trim() ?? '').isEmpty).toList();
-
-      // 닉네임 Future와 활동 데이터 Future를 동시에 실행
+      // 닉네임: publicProfiles에서 항상 최신 값으로 조회 (설정 변경 즉시 반영)
       final nicknamesFuture = Future.wait<MapEntry<String, String>>(
-        membersNeedingFetch.map((m) async {
+        members.map((m) async {
           try {
             final doc = await FirebaseFirestore.instance
                 .collection('publicProfiles')
                 .doc(m.uid)
                 .get();
             final nick = (doc.data()?['nickname'] as String?)?.trim();
-            return MapEntry(m.uid, nick?.isNotEmpty == true ? nick! : m.uid);
+            // publicProfiles에 없으면 memberMeta 닉네임 폴백
+            if (nick != null && nick.isNotEmpty) return MapEntry(m.uid, nick);
+            final metaNick = m.nickname?.trim();
+            return MapEntry(m.uid, metaNick?.isNotEmpty == true ? metaNick! : m.uid);
           } catch (e) {
             debugPrint('⚠️ 닉네임 조회 실패 (${m.uid}): $e');
-            return MapEntry(m.uid, m.uid);
+            final metaNick = m.nickname?.trim();
+            return MapEntry(m.uid, metaNick?.isNotEmpty == true ? metaNick! : m.uid);
           }
         }),
       );
@@ -188,14 +275,7 @@ class _BondPageState extends State<BondPage> {
       final activityData = await activityFuture;
 
       final nicknames = <String, String>{};
-      // metaNick 있는 멤버 먼저
-      for (final m in members) {
-        final metaNick = m.nickname?.trim();
-        if (metaNick != null && metaNick.isNotEmpty) {
-          nicknames[m.uid] = metaNick;
-        }
-      }
-      // Firestore에서 조회한 멤버 추가
+      // publicProfiles에서 가져온 최신 닉네임으로 덮어쓰기
       for (final entry in fetchedEntries) {
         nicknames[entry.key] = entry.value;
       }
@@ -304,6 +384,93 @@ class _BondPageState extends State<BondPage> {
     final sunday = monday.add(const Duration(days: 6));
 
     return '$month월 ${weekOfMonth}주차: ${monday.day}~${sunday.day}일';
+  }
+
+  // ── 파트너 매칭 요청 ──
+  void _onFindPartner() async {
+    final hasBasic = await UserProfileService.hasBasicProfile();
+    if (!mounted) return;
+
+    if (!hasBasic) {
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => ProfileGateSheet(
+          onComplete: () {
+            Navigator.pop(context);
+            if (mounted) _checkStepBAndMatch();
+          },
+        ),
+      );
+      return;
+    }
+    _checkStepBAndMatch();
+  }
+
+  void _checkStepBAndMatch() async {
+    final hasPartner = await UserProfileService.hasPartnerProfile();
+    if (!mounted) return;
+
+    if (!hasPartner) {
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => PartnerGateSheet(
+          onComplete: () {
+            Navigator.pop(context);
+            if (mounted) _doMatch();
+          },
+        ),
+      );
+      return;
+    }
+    _doMatch();
+  }
+
+  void _doMatch() async {
+    setState(() => _isMatching = true);
+    final result = await PartnerService.requestMatching();
+    if (!mounted) return;
+
+    switch (result.status) {
+      case MatchingStatus.matched:
+        // 캐시 초기화 후 데이터 갱신, 완료 시점에 _isMatching 해제
+        UserProfileService.clearCache();
+        _firstLoad = true;
+        await _loadData();
+        if (mounted) {
+          setState(() => _isMatching = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('🎉 파트너를 찾았어요! 1주일간 서로의 하루를 나눠보세요.'),
+              behavior: SnackBarBehavior.floating,
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
+        break;
+      case MatchingStatus.waiting:
+        setState(() => _isMatching = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.message ?? '아직 함께할 사람이 부족해요. 매칭 대기 중이에요.'),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+        break;
+      case MatchingStatus.error:
+        setState(() => _isMatching = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.message ?? '매칭 요청 중 문제가 생겼어요.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        break;
+    }
   }
 
   // ── 한줄 멘트 작성 ──
@@ -430,6 +597,38 @@ class _BondPageState extends State<BondPage> {
         if (snapshot.hasData && snapshot.data?.data() != null) {
           final data = snapshot.data!.data() as Map<String, dynamic>;
           bondScore = (data['bondScore'] as num?)?.toDouble() ?? 50.0;
+
+          // ── Firestore 실시간 변경 감지 ──
+          // 1) 다른 사람의 매칭으로 내 그룹이 생성된 경우 즉시 UI 갱신
+          // 2) 파트너 그룹이 있을 때 닉네임 변경 감지
+          final firestoreGroupId = data['partnerGroupId'] as String?;
+          final groupChanged = firestoreGroupId != _partnerGroupId;
+
+          // 닉네임 변경 감지: 파트너 그룹이 있고 멤버가 로드된 경우에만 비교
+          // (그룹 없을 때는 _memberNicknames가 비어있어 항상 null → 무한 루프 방지)
+          final myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+          final firestoreNickname = data['nickname'] as String?;
+          final cachedNickname = _groupMembers.isNotEmpty
+              ? _memberNicknames[myUid]
+              : null; // 그룹 없으면 비교 자체를 안 함
+          final nicknameChanged = _partnerGroupId != null &&
+              firestoreNickname != null &&
+              cachedNickname != null &&
+              firestoreNickname != cachedNickname;
+
+          if ((groupChanged || nicknameChanged) && !_isMatching) {
+            // build() 중 setState 금지 → 다음 프레임에 실행
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                debugPrint('🔄 [BondPage] Firestore 변경 감지'
+                    '${groupChanged ? " (그룹: $_partnerGroupId→$firestoreGroupId)" : ""}'
+                    '${nicknameChanged ? " (닉네임 변경)" : ""}');
+                UserProfileService.clearCache();
+                _firstLoad = true;
+                _loadData();
+              }
+            });
+          }
         }
 
         return Scaffold(
@@ -528,12 +727,6 @@ class _BondPageState extends State<BondPage> {
                           ),
                         ),
 
-                      const SliverToBoxAdapter(child: SizedBox(height: 8)),
-
-                      SliverToBoxAdapter(
-                        child: BondStampSection(partnerGroupId: _partnerGroupId),
-                      ),
-
                       const SliverToBoxAdapter(child: SizedBox(height: 16)),
 
                       if (_partnerGroup != null &&
@@ -552,6 +745,7 @@ class _BondPageState extends State<BondPage> {
                           memberNicknames: _memberNicknames,
                           onOpenWrite: _openDailyWallWrite,
                           glassMode: kBondGlassMode,
+                          isMatching: _isMatching,
                         ),
                       ),
                     ],
@@ -565,7 +759,9 @@ class _BondPageState extends State<BondPage> {
                           partnerGroupId: null,
                           memberNicknames: null,
                           onOpenWrite: _openDailyWallWrite,
+                          onFindPartnerTap: _onFindPartner,
                           glassMode: kBondGlassMode,
+                          isMatching: _isMatching,
                         ),
                       ),
                     ],

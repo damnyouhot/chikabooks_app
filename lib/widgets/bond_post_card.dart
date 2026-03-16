@@ -34,7 +34,8 @@ class _BondPostCardState extends State<BondPostCard> {
   bool _loadingEnthrone = false;
 
   // 리플 관련
-  Map<String, String> _replies = {}; // uid -> reply text
+  Map<String, Map<String, dynamic>> _replies = {}; // uid -> {text, createdAt}
+  bool _showingReplies = false; // 댓글 드롭다운 표시 여부
 
   // 이모지 리액션
   Map<String, String> _reactions = {}; // uid -> emoji
@@ -74,7 +75,10 @@ class _BondPostCardState extends State<BondPostCard> {
         setState(() {
           _replies = {
             for (var doc in snapshot.docs)
-              doc.id: doc.data()['text'] as String? ?? '',
+              doc.id: {
+                'text': doc.data()['text'] as String? ?? '',
+                'createdAt': doc.data()['createdAt'] as Timestamp?,
+              },
           };
         });
       }
@@ -659,15 +663,28 @@ class _BondPostCardState extends State<BondPostCard> {
                 ),
               ),
 
-              // 리플 개수만 표시
+              // 리플 개수 (탭하면 댓글 인라인 드롭다운)
               if (_replies.isNotEmpty)
-                  Padding(
-                  padding: const EdgeInsets.only(left: 4),
-                  child: Text(
-                    '💬 ${_replies.length}',
-                    style: TextStyle(
-                      fontSize: 11, // 작게
-                      color: AppColors.textSecondary,
+                GestureDetector(
+                  onTap: () => setState(() => _showingReplies = !_showingReplies),
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '💬 ${_replies.length}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: _showingReplies ? AppColors.accent : AppColors.textSecondary,
+                          ),
+                        ),
+                        Icon(
+                          _showingReplies ? Icons.expand_less : Icons.expand_more,
+                          size: 14,
+                          color: _showingReplies ? AppColors.accent : AppColors.textSecondary,
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -741,6 +758,37 @@ class _BondPostCardState extends State<BondPostCard> {
               ],
             ],
           ),
+
+          // 댓글 인라인 드롭다운
+          AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+            alignment: Alignment.topCenter,
+            child: _showingReplies && _replies.isNotEmpty
+                ? Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceMuted.withOpacity(0.5),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: _replies.entries.map((entry) {
+                          final uid = entry.key;
+                          final text = entry.value['text'] as String? ?? '';
+                          final createdAt = entry.value['createdAt'] as Timestamp?;
+                          final nickname = widget.memberNicknames?[uid] ?? '파트너';
+                          final isMe = uid == _currentUid;
+                          return _buildReplyItem(nickname, text, createdAt, isMe);
+                        }).toList(),
+                      ),
+                    ),
+                  )
+                : const SizedBox.shrink(),
+          ),
         ],
       ),
     );
@@ -780,6 +828,59 @@ class _BondPostCardState extends State<BondPostCard> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildReplyItem(String nickname, String text, Timestamp? createdAt, bool isMe) {
+    String timeStr = '';
+    if (createdAt != null) {
+      final dt = createdAt.toDate();
+      final diff = DateTime.now().difference(dt);
+      if (diff.inMinutes < 1) {
+        timeStr = '방금';
+      } else if (diff.inHours < 1) {
+        timeStr = '${diff.inMinutes}분 전';
+      } else if (diff.inDays < 1) {
+        timeStr = '${diff.inHours}시간 전';
+      } else {
+        timeStr = '${diff.inDays}일 전';
+      }
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                isMe ? '$nickname (나)' : nickname,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: isMe ? AppColors.accent : AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(width: 6),
+              if (timeStr.isNotEmpty)
+                Text(
+                  timeStr,
+                  style: const TextStyle(fontSize: 10, color: AppColors.textDisabled),
+                ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text(
+            text,
+            style: const TextStyle(
+              fontSize: 13,
+              height: 1.4,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ],
+      ),
     );
   }
 

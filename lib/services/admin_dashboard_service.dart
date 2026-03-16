@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../models/admin_dashboard_models.dart';
+import '../models/quiz_schedule.dart';
 
 /// 관리자 대시보드 데이터를 Firestore에서 읽어오는 서비스
 ///
@@ -18,12 +19,14 @@ class AdminDashboardService {
     try {
       final snap = await _db
           .collection('users')
-          .where('excludeFromStats', isNotEqualTo: true)
+          .where('excludeFromStats', isEqualTo: false)
           .count()
           .get();
+      debugPrint('📊 getTotalUserCount: ${snap.count}');
       return snap.count ?? 0;
-    } catch (e) {
-      debugPrint('⚠️ getTotalUserCount: $e');
+    } catch (e, st) {
+      debugPrint('⚠️ getTotalUserCount 실패: $e');
+      debugPrint('⚠️ stack: $st');
       return 0;
     }
   }
@@ -31,15 +34,22 @@ class AdminDashboardService {
   /// 신규 가입자 수 ([since] 이후 createdAt)
   static Future<int> getRecentSignups({required DateTime since}) async {
     try {
+      debugPrint('📊 getRecentSignups since=$since');
       final snap = await _db
           .collection('users')
+          .where('excludeFromStats', isEqualTo: false)
           .where('createdAt', isGreaterThan: Timestamp.fromDate(since))
-          .where('excludeFromStats', isNotEqualTo: true)
           .count()
           .get();
+      debugPrint('📊 getRecentSignups result: ${snap.count}');
       return snap.count ?? 0;
-    } catch (e) {
-      debugPrint('⚠️ getRecentSignups: $e');
+    } catch (e, st) {
+      debugPrint('❌ getRecentSignups 실패: $e');
+      debugPrint('❌ stack: $st');
+      // 인덱스 미배포 시 에러 메시지에 "indexes" 포함 → 사용자에게 알림
+      if (e.toString().contains('index')) {
+        debugPrint('💡 복합 인덱스 배포 필요: (excludeFromStats, createdAt)');
+      }
       return 0;
     }
   }
@@ -47,15 +57,21 @@ class AdminDashboardService {
   /// 활성 유저 수 ([since] 이후 lastActiveAt)
   static Future<int> getActiveUserCount({required DateTime since}) async {
     try {
+      debugPrint('📊 getActiveUserCount since=$since');
       final snap = await _db
           .collection('users')
+          .where('excludeFromStats', isEqualTo: false)
           .where('lastActiveAt', isGreaterThan: Timestamp.fromDate(since))
-          .where('excludeFromStats', isNotEqualTo: true)
           .count()
           .get();
+      debugPrint('📊 getActiveUserCount result: ${snap.count}');
       return snap.count ?? 0;
-    } catch (e) {
-      debugPrint('⚠️ getActiveUserCount: $e');
+    } catch (e, st) {
+      debugPrint('❌ getActiveUserCount 실패: $e');
+      debugPrint('❌ stack: $st');
+      if (e.toString().contains('index')) {
+        debugPrint('💡 복합 인덱스 배포 필요: (excludeFromStats, lastActiveAt)');
+      }
       return 0;
     }
   }
@@ -64,15 +80,21 @@ class AdminDashboardService {
   static Future<int> getLongAbsentCount({int days = 14}) async {
     try {
       final before = DateTime.now().subtract(Duration(days: days));
+      debugPrint('📊 getLongAbsentCount before=$before');
       final snap = await _db
           .collection('users')
+          .where('excludeFromStats', isEqualTo: false)
           .where('lastActiveAt', isLessThan: Timestamp.fromDate(before))
-          .where('excludeFromStats', isNotEqualTo: true)
           .count()
           .get();
+      debugPrint('📊 getLongAbsentCount result: ${snap.count}');
       return snap.count ?? 0;
-    } catch (e) {
-      debugPrint('⚠️ getLongAbsentCount: $e');
+    } catch (e, st) {
+      debugPrint('❌ getLongAbsentCount 실패: $e');
+      debugPrint('❌ stack: $st');
+      if (e.toString().contains('index')) {
+        debugPrint('💡 복합 인덱스 배포 필요: (excludeFromStats, lastActiveAt)');
+      }
       return 0;
     }
   }
@@ -90,7 +112,7 @@ class AdminDashboardService {
         final snap = await _db
             .collection('users')
             .where('careerBucket', isEqualTo: bucket)
-            .where('excludeFromStats', isNotEqualTo: true)
+            .where('excludeFromStats', isEqualTo: false)
             .count()
             .get();
         result.add(CareerGroupCount(group: bucket, count: snap.count ?? 0));
@@ -158,15 +180,33 @@ class AdminDashboardService {
     }
   }
 
+  // ─── Quiz Pool ────────────────────────────────────────────────
+
+  /// quiz_meta/state 문서 읽기 (1 read)
+  static Future<QuizMetaState?> getQuizMetaState() async {
+    try {
+      final doc = await _db.doc('quiz_meta/state').get();
+      if (!doc.exists) return null;
+      return QuizMetaState.fromFirestore(doc);
+    } catch (e) {
+      debugPrint('⚠️ getQuizMetaState: $e');
+      return null;
+    }
+  }
+
   // ─── User Flow (퍼널) ─────────────────────────────────────────
 
-  /// 퍼널 단계별 도달자 수
+  /// 퍼널 단계별 **고유 유저 수** (distinct userId)
   ///
   /// 4단계:
   ///   1. view_sign_in_page           — 로그인 화면 진입
   ///   2. login_success               — 로그인 성공
   ///   3. tap_profile_save            — 프로필 저장 완료
   ///   4. funnel_first_emotion_complete — 첫 감정기록 완료
+  ///
+  /// Firestore count()는 distinct를 지원하지 않으므로
+  /// 문서를 읽어 클라이언트에서 고유 userId 수를 계산합니다.
+  /// (퍼널 이벤트는 유저당 소수이므로 비용 부담 적음)
   ///
   /// [since] 로 기간 제한 가능 (null이면 전체 기간)
   static Future<List<FunnelStep>> getFunnelSteps({DateTime? since}) async {
@@ -180,6 +220,7 @@ class AdminDashboardService {
     final result = <FunnelStep>[];
     int? prevCount;
 
+    debugPrint('📊 getFunnelSteps since=$since');
     for (final (key, label) in steps) {
       try {
         Query<Map<String, dynamic>> q =
@@ -187,14 +228,27 @@ class AdminDashboardService {
         if (since != null) {
           q = q.where('timestamp', isGreaterThan: Timestamp.fromDate(since));
         }
-        final snap = await q.count().get();
-        final count = snap.count ?? 0;
+        // userId만 읽으면 되므로 select로 최소화
+        final snap = await q.get();
+        // 고유 userId 집합으로 중복 제거
+        final uniqueUsers = <String>{};
+        for (final doc in snap.docs) {
+          final uid = doc.data()['userId'] as String?;
+          if (uid != null && uid.isNotEmpty) uniqueUsers.add(uid);
+        }
+        final count = uniqueUsers.length;
+        debugPrint('📊 funnel [$key]: $count명 (문서 ${snap.docs.length}건)');
         final rate = (prevCount != null && prevCount > 0)
             ? count / prevCount
             : null;
         result.add(FunnelStep(label: label, count: count, conversionRate: rate));
         prevCount = count;
-      } catch (_) {
+      } catch (e, st) {
+        debugPrint('❌ funnel [$key] 실패: $e');
+        debugPrint('❌ stack: $st');
+        if (e.toString().contains('index')) {
+          debugPrint('💡 복합 인덱스 배포 필요: activityLogs(type, timestamp)');
+        }
         result.add(FunnelStep(label: label, count: 0));
         prevCount = 0;
       }
@@ -214,24 +268,28 @@ class AdminDashboardService {
     DateTime? since,
   }) async {
     try {
+      // isFunnel 필터를 Firestore 쿼리에서 제거 → 클라이언트에서 필터링
+      // (기존 문서에 isFunnel 필드 자체가 없어서 isEqualTo: false 매치 불가)
       Query<Map<String, dynamic>> q = _db
           .collection('activityLogs')
-          .where('isFunnel', isNotEqualTo: true)
           .orderBy('timestamp', descending: true)
           .limit(2000);
       if (since != null) {
         q = _db
             .collection('activityLogs')
-            .where('isFunnel', isNotEqualTo: true)
             .where('timestamp', isGreaterThan: Timestamp.fromDate(since))
             .orderBy('timestamp', descending: true)
             .limit(2000);
       }
+      debugPrint('📊 getTopFeatures: since=$since');
       final snap = await q.get();
+      debugPrint('📊 getTopFeatures result: ${snap.docs.length}건');
 
       final typeMap = <String, ({int clicks, Set<String> users})>{};
       for (final doc in snap.docs) {
         final data = doc.data();
+        // 클라이언트에서 퍼널 이벤트 제외
+        if (data['isFunnel'] == true) continue;
         final type = data['type'] as String? ?? '';
         final uid = data['userId'] as String? ?? '';
         if (type.isEmpty) continue;

@@ -174,18 +174,22 @@ class JobService {
     }
   }
 
-  /// ★ 신규 추가: 주변 구인 치과 요약 (카드용) - 기간 제한 없음
+  /// 홈 카드용 구인 요약 — 최신 8개만 조회 (빠른 로드)
+  ///
+  /// 100개 전체 다운로드 → 8개로 교체:
+  ///   - count < 8 이면 정확한 수 표시
+  ///   - count == 8 이면 "8개 이상" 으로 표시 (hasMore=true 반환)
   Future<Map<String, dynamic>> getRecentJobsSummary({
     LatLng? userLocation,
     double radiusKm = 10.0,
   }) async {
+    const kPreviewLimit = 8;
     try {
-      // 전체 공고 조회 (기간 필터 없음)
       final snapshot =
           await _db
               .collection('jobs')
               .orderBy('postedAt', descending: true)
-              .limit(100)
+              .limit(kPreviewLimit)
               .get();
 
       List<Job> jobs = snapshot.docs.map((d) => Job.fromDoc(d)).toList();
@@ -203,7 +207,8 @@ class JobService {
             }).toList();
       }
 
-      final count = jobs.length;
+      final count    = jobs.length;
+      final hasMore  = count >= kPreviewLimit; // 8개 채워졌으면 더 있을 수 있음
       final clinicName =
           jobs.isNotEmpty
               ? (jobs.first.clinicName.isNotEmpty
@@ -211,10 +216,10 @@ class JobService {
                   : '치과')
               : '치과';
 
-      return {'count': count, 'clinicName': clinicName};
+      return {'count': count, 'hasMore': hasMore, 'clinicName': clinicName};
     } catch (e) {
       debugPrint('❌ getRecentJobsSummary 에러: $e');
-      return {'count': 0, 'clinicName': '치과'};
+      return {'count': 0, 'hasMore': false, 'clinicName': '치과'};
     }
   }
 

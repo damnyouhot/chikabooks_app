@@ -152,7 +152,7 @@ class _JobPageTitleBar extends StatelessWidget {
       children: [
         // ── 타이틀 + 아이콘 행 ──
         Padding(
-          padding: const EdgeInsets.only(left: 20, right: 4, top: 4),
+          padding: const EdgeInsets.only(left: 20, right: 4),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -168,10 +168,9 @@ class _JobPageTitleBar extends StatelessWidget {
               IconButton(
                 icon: const Icon(
                   Icons.info_outline,
-                  color: AppColors.textDisabled,
+                  color: AppColors.textSecondary,
                   size: 18,
                 ),
-                visualDensity: VisualDensity.compact,
                 onPressed: () => _showInfoDialog(context),
               ),
               IconButton(
@@ -180,7 +179,6 @@ class _JobPageTitleBar extends StatelessWidget {
                   color: AppColors.textDisabled,
                   size: 20,
                 ),
-                visualDensity: VisualDensity.compact,
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const SettingsPage()),
                 ),

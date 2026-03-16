@@ -84,7 +84,18 @@ class BondMemberCard extends StatelessWidget {
                 ),
             ],
           ),
-          if (member.mainConcernShown != null) ...[
+          if (member.mainConcerns.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: member.mainConcerns.take(2).map((tag) => AppBadge(
+                label: '#$tag',
+                bgColor: AppColors.surfaceMuted,
+                textColor: AppColors.textSecondary,
+              )).toList(),
+            ),
+          ] else if (member.mainConcernShown != null) ...[
             const SizedBox(height: 12),
             Wrap(
               spacing: 6,

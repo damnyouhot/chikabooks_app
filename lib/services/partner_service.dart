@@ -48,8 +48,20 @@ class PartnerService {
         return null;
       }
 
-      debugPrint('🔍 [getMyGroup] Firestore 조회: partnerGroups/$groupId');
-      final doc = await _db.collection('partnerGroups').doc(groupId).get();
+      debugPrint('🔍 [getMyGroup] Firestore 조회: partnerGroups/$groupId (서버 우선)');
+      // 서버 우선 조회 → 캐시 stale 데이터로 인한 매칭 풀림 방지
+      DocumentSnapshot<Map<String, dynamic>> doc;
+      try {
+        doc = await _db.collection('partnerGroups').doc(groupId).get(
+          const GetOptions(source: Source.server),
+        );
+      } catch (_) {
+        // 네트워크 실패 시 캐시 폴백
+        debugPrint('⚠️ [getMyGroup] 서버 조회 실패 → 캐시 폴백');
+        doc = await _db.collection('partnerGroups').doc(groupId).get(
+          const GetOptions(source: Source.cache),
+        );
+      }
 
       debugPrint('🔍 [getMyGroup] doc.exists: ${doc.exists}');
       if (!doc.exists) {
@@ -577,6 +589,13 @@ class PartnerService {
         return MatchingResult.matched(groupId);
       }
 
+      // 이미 활성 그룹이 있는 경우 — matched로 처리하여 페이지 갱신
+      if (status == 'already_in_group' && groupId != null) {
+        debugPrint('ℹ️ [requestMatching] 이미 활성 그룹 있음 → matched로 처리: $groupId');
+        UserProfileService.clearCache();
+        return MatchingResult.matched(groupId);
+      }
+
       debugPrint('⏳ [requestMatching] 대기 중: $message');
       return MatchingResult.waiting(message ?? '아직 함께할 사람이 부족해요.');
     } on FirebaseFunctionsException catch (e) {
@@ -640,6 +659,11 @@ class PartnerService {
         final userData = userDoc.data() ?? {};
 
         final memberRef = groupRef.collection('memberMeta').doc(uid);
+        final rawConcerns = (userData['mainConcerns'] as List?)
+                ?.cast<String>()
+                .take(2)
+                .toList() ??
+            [];
         batch.set(
           memberRef,
           GroupMemberMeta(
@@ -648,10 +672,8 @@ class PartnerService {
             region: userData['region'] ?? '',
             careerBucket: userData['careerBucket'] ?? '',
             careerGroup: userData['careerGroup'] ?? '',
-            mainConcernShown:
-                (userData['mainConcerns'] as List?)?.isNotEmpty == true
-                    ? (userData['mainConcerns'] as List).first as String
-                    : null,
+            mainConcerns: rawConcerns,
+            mainConcernShown: rawConcerns.isNotEmpty ? rawConcerns[0] : null,
             workplaceType: userData['workplaceType'] as String?,
             joinedAt: now,
           ).toMap(),

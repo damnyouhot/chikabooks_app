@@ -8,11 +8,10 @@ class HiraUpdatePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // HiraUpdateSection 내부에서 RefreshIndicator + SingleChildScrollView 처리
     return const ColoredBox(
       color: AppColors.appBg,
-      child: SingleChildScrollView(
-        child: HiraUpdateSection(),
-      ),
+      child: HiraUpdateSection(),
     );
   }
 }

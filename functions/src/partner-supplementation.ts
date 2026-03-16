@@ -168,6 +168,8 @@ async function addMemberToGroup(
       userData.careerBucket ||
       mapCareerGroupToBucket(userData.careerGroup || ""),
     careerGroup: userData.careerGroup || "",
+    // 관심사 최대 2개 저장 (리스트) + 하위 호환용 첫 번째 항목
+    mainConcerns: (userData.mainConcerns || []).slice(0, 2),
     mainConcernShown:
       userData.mainConcerns && userData.mainConcerns.length > 0
         ? userData.mainConcerns[0]

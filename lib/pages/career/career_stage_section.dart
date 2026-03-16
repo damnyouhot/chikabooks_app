@@ -139,8 +139,8 @@ class CareerStageCard extends StatelessWidget {
             ),
             AppBadge(
               label: '${stageIdx + 1} / ${_kStageRules.length}단계',
-              bgColor: AppColors.accent.withOpacity(0.10),
-              textColor: AppColors.accent,
+              bgColor: AppColors.emphasisBadgeBg,
+              textColor: AppColors.emphasisBadgeText,
             ),
           ],
         ),

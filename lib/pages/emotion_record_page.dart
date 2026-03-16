@@ -51,12 +51,12 @@ class _EmotionRecordPageState extends State<EmotionRecordPage> {
       developer.log('4. Firestore에 감정 기록 성공!', name: 'EmotionDebug');
 
       // 감정기록 완료 퍼널 이벤트 기록
-      await AdminActivityService.logFunnel(
+      AdminActivityService.logFunnel(
         FunnelEventType.firstEmotionComplete,
         extra: {'score': _score},
       );
       // 감정기록 저장 성공 이벤트
-      await AdminActivityService.log(
+      AdminActivityService.log(
         ActivityEventType.emotionSaveSuccess,
         page: 'emotion_record',
         extra: {'score': _score},
@@ -147,6 +147,7 @@ class _EmotionRecordPageState extends State<EmotionRecordPage> {
     );
   }
 }
+
 
 
 

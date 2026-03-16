@@ -8,6 +8,10 @@ import '../../core/widgets/app_muted_card.dart';
 import '../../core/widgets/app_primary_button.dart';
 
 /// 이어가기 선택 섹션 (주말에만 표시)
+///
+/// 규칙:
+/// - 2인 그룹: 서로 선택해야 이어가기 성사
+/// - 3인 그룹: 전원(나 포함 3명 모두)이 나머지 2명을 선택해야 성사
 class BondContinueSection extends StatefulWidget {
   final String groupId;
   final List<GroupMemberMeta> members;
@@ -26,7 +30,9 @@ class _BondContinueSectionState extends State<BondContinueSection> {
   Set<String> _selectedPartnerUids = {};
   String? _myUid;
   bool _loading = true;
+  bool _saving = false;
   bool _isCollapsed = true;
+  bool _saved = false; // 저장 완료 여부
 
   @override
   void initState() {
@@ -37,7 +43,16 @@ class _BondContinueSectionState extends State<BondContinueSection> {
 
   Future<void> _loadCurrentSelection() async {
     try {
-      if (mounted) setState(() => _loading = false);
+      // 기존 저장된 선택값 불러오기
+      final profile = await UserProfileService.getMyProfile(forceRefresh: false);
+      if (mounted) {
+        final saved = profile?.continueWithPartners ?? [];
+        setState(() {
+          _selectedPartnerUids = saved.toSet();
+          _saved = saved.isNotEmpty;
+          _loading = false;
+        });
+      }
     } catch (e) {
       if (mounted) setState(() => _loading = false);
     }
@@ -52,6 +67,9 @@ class _BondContinueSectionState extends State<BondContinueSection> {
       return const SizedBox.shrink();
     }
     if (_loading) return const SizedBox.shrink();
+
+    final isGroupOf3 = otherMembers.length == 2; // 나 포함 3명
+    final requiredCount = isGroupOf3 ? 2 : 1;    // 선택해야 할 최소 인원
 
     return AppMutedCard(
       radius: AppRadius.xl,
@@ -83,12 +101,16 @@ class _BondContinueSectionState extends State<BondContinueSection> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        _selectedPartnerUids.isEmpty
-                            ? '선택하지 않아도 괜찮아'
-                            : '${_selectedPartnerUids.length}명 선택함',
-                        style: const TextStyle(
+                        _saved
+                            ? '✓ ${_selectedPartnerUids.length}명 선택 완료'
+                            : _selectedPartnerUids.isEmpty
+                                ? '선택하지 않아도 괜찮아'
+                                : '${_selectedPartnerUids.length}명 선택 중',
+                        style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.textDisabled,
+                          color: _saved
+                              ? AppColors.accent
+                              : AppColors.textDisabled,
                         ),
                       ),
                     ],
@@ -106,6 +128,7 @@ class _BondContinueSectionState extends State<BondContinueSection> {
             const SizedBox(height: 16),
             ...otherMembers.map((member) => _buildPartnerCard(member)),
             const SizedBox(height: 12),
+            // 안내 메시지
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(AppSpacing.sm + 2),
@@ -114,11 +137,7 @@ class _BondContinueSectionState extends State<BondContinueSection> {
                 borderRadius: BorderRadius.circular(AppRadius.sm),
               ),
               child: Text(
-                _selectedPartnerUids.isEmpty
-                    ? '선택하지 않으면 새로운 만남으로 시작해요'
-                    : _selectedPartnerUids.length == 1
-                        ? '한 사람을 선택했어요'
-                        : '두 사람 모두 선택했어요',
+                _getGuideText(isGroupOf3, requiredCount),
                 style: const TextStyle(
                   fontSize: 11,
                   color: AppColors.textSecondary,
@@ -127,11 +146,16 @@ class _BondContinueSectionState extends State<BondContinueSection> {
                 textAlign: TextAlign.center,
               ),
             ),
+            const SizedBox(height: 12),
+            // 완료 / 취소 버튼
             if (_selectedPartnerUids.isNotEmpty) ...[
-              const SizedBox(height: 12),
               AppPrimaryButton(
-                label: '완료',
-                onPressed: _completeSelection,
+                label: _saving
+                    ? '저장 중...'
+                    : _saved
+                        ? '✓ 저장됨'
+                        : '완료',
+                onPressed: (_saving || _saved) ? null : () => _completeSelection(requiredCount),
                 padding: const EdgeInsets.symmetric(
                   vertical: AppSpacing.md,
                 ),
@@ -140,7 +164,7 @@ class _BondContinueSectionState extends State<BondContinueSection> {
               const SizedBox(height: 8),
               Center(
                 child: TextButton(
-                  onPressed: _cancelAllSelections,
+                  onPressed: _saving ? null : _cancelAllSelections,
                   style: TextButton.styleFrom(
                     foregroundColor: AppColors.textDisabled,
                     padding: const EdgeInsets.symmetric(
@@ -158,11 +182,25 @@ class _BondContinueSectionState extends State<BondContinueSection> {
     );
   }
 
+  String _getGuideText(bool isGroupOf3, int requiredCount) {
+    if (_selectedPartnerUids.isEmpty) {
+      return isGroupOf3
+          ? '3명 그룹은 모두 선택해야 이어가기가 성사돼요'
+          : '선택하지 않으면 새로운 만남으로 시작해요';
+    }
+    if (_selectedPartnerUids.length < requiredCount) {
+      return '${requiredCount}명 모두 선택해야 이어가기 신청이 완료돼요';
+    }
+    return _saved
+        ? '이어가기 신청 완료! 상대방도 선택하면 다음 주에 이어져요'
+        : '${_selectedPartnerUids.length}명 모두 선택했어요. 완료를 눌러주세요';
+  }
+
   Widget _buildPartnerCard(GroupMemberMeta member) {
     final isSelected = _selectedPartnerUids.contains(member.uid);
 
     return GestureDetector(
-      onTap: () => _togglePartner(member.uid),
+      onTap: _saved ? null : () => _togglePartner(member.uid),
       child: Container(
         margin: const EdgeInsets.only(bottom: AppSpacing.sm),
         padding: const EdgeInsets.all(AppSpacing.md),
@@ -209,7 +247,15 @@ class _BondContinueSectionState extends State<BondContinueSection> {
                       color: AppColors.textPrimary,
                     ),
                   ),
-                  if (member.mainConcernShown != null)
+                  if (member.mainConcerns.isNotEmpty)
+                    Text(
+                      member.mainConcerns.take(2).map((t) => '#$t').join('  '),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textDisabled,
+                      ),
+                    )
+                  else if (member.mainConcernShown != null)
                     Text(
                       '#${member.mainConcernShown}',
                       style: const TextStyle(
@@ -252,21 +298,64 @@ class _BondContinueSectionState extends State<BondContinueSection> {
     });
   }
 
-  void _completeSelection() {
-    setState(() => _isCollapsed = true);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('${_selectedPartnerUids.length}명을 선택했어요!'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+  Future<void> _completeSelection(int requiredCount) async {
+    // 3명 그룹은 나머지 2명 모두 선택해야 함
+    if (_selectedPartnerUids.length < requiredCount) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            requiredCount == 2
+                ? '3명 그룹은 두 사람 모두 선택해야 이어가기가 돼요'
+                : '한 사람을 선택해주세요',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _saving = true);
+
+    try {
+      await UserProfileService.selectContinuePartners(
+        _selectedPartnerUids.toList(),
+      );
+      if (mounted) {
+        setState(() {
+          _saved = true;
+          _saving = false;
+          _isCollapsed = true;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${_selectedPartnerUids.length}명과 이어가기 신청했어요! 🌱'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('저장에 실패했어요. 다시 시도해주세요'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _cancelAllSelections() async {
+    setState(() => _saving = true);
     try {
-      await UserProfileService.selectContinuePartner(null);
+      await UserProfileService.cancelContinuePartners();
       if (mounted) {
-        setState(() => _selectedPartnerUids.clear());
+        setState(() {
+          _selectedPartnerUids.clear();
+          _saved = false;
+          _saving = false;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('선택을 모두 취소했어요'),
@@ -276,6 +365,7 @@ class _BondContinueSectionState extends State<BondContinueSection> {
       }
     } catch (e) {
       if (mounted) {
+        setState(() => _saving = false);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('취소에 실패했어요'),
@@ -286,6 +376,3 @@ class _BondContinueSectionState extends State<BondContinueSection> {
     }
   }
 }
-
-
-

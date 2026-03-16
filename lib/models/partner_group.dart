@@ -142,8 +142,13 @@ class PartnerGroup {
   bool get isActive {
     // Firestore 필드가 false면 무조건 false
     if (!isActiveGroup) return false;
-    // Firestore 필드가 true면 최소 인원도 체크
-    return activeMemberUids.length >= minMembers;
+    // activeMemberUids는 구 members 배열 기반
+    // 백엔드 생성 그룹은 members 배열이 없고 memberUids만 있을 수 있으므로
+    // activeMemberUids가 비어있으면 memberUids를 폴백으로 사용
+    final activeCount = activeMemberUids.isNotEmpty
+        ? activeMemberUids.length
+        : memberUids.length;
+    return activeCount >= minMembers;
   }
 
   /// 멤버 추가 가능 여부
@@ -322,7 +327,8 @@ class GroupMemberMeta {
   final String region;
   final String careerBucket;
   final String careerGroup;
-  final String? mainConcernShown;
+  final String? mainConcernShown;      // 하위 호환용 (첫 번째 관심사)
+  final List<String> mainConcerns;     // 관심사 전체 목록 (최대 2개)
   final String? workplaceType;
   final DateTime joinedAt;
   final bool isSupplemented; // 보충 멤버 여부
@@ -334,6 +340,7 @@ class GroupMemberMeta {
     required this.careerBucket,
     required this.careerGroup,
     this.mainConcernShown,
+    this.mainConcerns = const [],
     this.workplaceType,
     required this.joinedAt,
     this.isSupplemented = false,
@@ -347,6 +354,7 @@ class GroupMemberMeta {
       'careerBucket': careerBucket,
       'careerGroup': careerGroup,
       'mainConcernShown': mainConcernShown,
+      'mainConcerns': mainConcerns,
       'workplaceType': workplaceType,
       'joinedAt': Timestamp.fromDate(joinedAt),
       'isSupplemented': isSupplemented,
@@ -356,12 +364,20 @@ class GroupMemberMeta {
 
   factory GroupMemberMeta.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data()!;
+    // mainConcerns 리스트 우선, 없으면 mainConcernShown에서 복원
+    final rawList = data['mainConcerns'];
+    final List<String> concerns = rawList != null
+        ? List<String>.from(rawList)
+        : (data['mainConcernShown'] != null
+            ? [data['mainConcernShown'] as String]
+            : []);
     return GroupMemberMeta(
       uid: data['uid'] as String,
       region: data['region'] as String? ?? '',
       careerBucket: data['careerBucket'] as String? ?? '',
       careerGroup: data['careerGroup'] as String? ?? '',
       mainConcernShown: data['mainConcernShown'] as String?,
+      mainConcerns: concerns,
       workplaceType: data['workplaceType'] as String?,
       joinedAt: (data['joinedAt'] as Timestamp).toDate(),
       isSupplemented: data['isSupplemented'] as bool? ?? false,

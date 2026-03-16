@@ -159,13 +159,10 @@ class CareerIdentityFilledCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text(
-                '치과위생사',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.onCardPrimary.withOpacity(0.85),
-                ),
+              AppBadge(
+                label: '치과위생사',
+                bgColor: AppColors.emphasisBadgeBg,
+                textColor: AppColors.emphasisBadgeText,
               ),
               const Spacer(),
               IconButton(

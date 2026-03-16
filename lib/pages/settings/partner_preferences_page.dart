@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_primary_button.dart';
 import '../../models/partner_preferences.dart';
@@ -14,13 +14,17 @@ class PartnerPreferencesPage extends StatefulWidget {
 
 class _PartnerPreferencesPageState extends State<PartnerPreferencesPage> {
   bool _loading = true;
-  
+
+  // ── 매칭 활성화 상태 ──
+  bool _matchingEnabled = true; // true = active, false = pause
+  bool _savingStatus = false;
+
   PreferenceType _priority1Type = PreferenceType.career;
   String _priority1Value = 'similar';
-  
+
   PreferenceType _priority2Type = PreferenceType.tags;
   String _priority2Value = 'similar';
-  
+
   PreferenceType _priority3Type = PreferenceType.region;
   String _priority3Value = 'any';
 
@@ -33,6 +37,7 @@ class _PartnerPreferencesPageState extends State<PartnerPreferencesPage> {
   Future<void> _loadPreferences() async {
     try {
       final prefs = await UserProfileService.getPartnerPreferences();
+      final profile = await UserProfileService.getMyProfile(forceRefresh: false);
       if (mounted) {
         setState(() {
           _priority1Type = prefs.priority1.type;
@@ -41,6 +46,8 @@ class _PartnerPreferencesPageState extends State<PartnerPreferencesPage> {
           _priority2Value = prefs.priority2.value;
           _priority3Type = prefs.priority3.type;
           _priority3Value = prefs.priority3.value;
+          // pause 상태면 비활성화
+          _matchingEnabled = (profile?.partnerStatus ?? 'active') != 'pause';
           _loading = false;
         });
       }
@@ -60,7 +67,7 @@ class _PartnerPreferencesPageState extends State<PartnerPreferencesPage> {
       _priority3Type = preset.priority3.type;
       _priority3Value = preset.priority3.value;
     });
-    
+
     await _savePreferences();
   }
 
@@ -71,9 +78,9 @@ class _PartnerPreferencesPageState extends State<PartnerPreferencesPage> {
         priority2: PreferenceItem(type: _priority2Type, value: _priority2Value),
         priority3: PreferenceItem(type: _priority3Type, value: _priority3Value),
       );
-      
+
       await UserProfileService.updatePartnerPreferences(newPrefs);
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -94,6 +101,40 @@ class _PartnerPreferencesPageState extends State<PartnerPreferencesPage> {
     }
   }
 
+  Future<void> _toggleMatchingEnabled(bool enabled) async {
+    setState(() => _savingStatus = true);
+    try {
+      final newStatus = enabled ? 'active' : 'pause';
+      await UserProfileService.updatePartnerStatus(newStatus);
+      if (mounted) {
+        setState(() {
+          _matchingEnabled = enabled;
+          _savingStatus = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              enabled
+                  ? '다음 회차부터 자동 매칭에 포함돼요'
+                  : '다음 회차부터 매칭하지 않을래요 설정됨',
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _savingStatus = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('설정 변경에 실패했어요'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -107,24 +148,147 @@ class _PartnerPreferencesPageState extends State<PartnerPreferencesPage> {
               child: Column(
                 children: [
                   const SizedBox(height: 8),
-                  
-                  // 섹션 1: 프리셋
-                  _buildPresetSection(),
-                  
-                  const Divider(height: 32),
-                  
-                  // 섹션 2: 우선순위
-                  _buildPrioritySection(),
-                  
-                  const Divider(height: 32),
-                  
-                  // 섹션 3: 안전 안내
-                  _buildSafetyNotice(),
-                  
+
+                  // 섹션 0: 매칭 활성화 토글 (최상단)
+                  _buildMatchingToggleSection(),
+
+                  // 매칭 비활성화 시 하단 섹션 숨김
+                  if (_matchingEnabled) ...[
+                    const Divider(height: 32),
+
+                    // 섹션 1: 프리셋
+                    _buildPresetSection(),
+
+                    const Divider(height: 32),
+
+                    // 섹션 2: 우선순위
+                    _buildPrioritySection(),
+
+                    const Divider(height: 32),
+
+                    // 섹션 3: 안전 안내
+                    _buildSafetyNotice(),
+                  ] else ...[
+                    // 비활성화 안내 메시지
+                    _buildPausedNotice(),
+                  ],
+
                   const SizedBox(height: 32),
                 ],
               ),
             ),
+    );
+  }
+
+  /// 매칭 활성화 토글 섹션
+  Widget _buildMatchingToggleSection() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: _matchingEnabled
+            ? AppColors.accent.withOpacity(0.07)
+            : AppColors.surfaceMuted,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: _matchingEnabled
+              ? AppColors.accent.withOpacity(0.20)
+              : AppColors.divider,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            _matchingEnabled
+                ? Icons.people_alt_outlined
+                : Icons.person_off_outlined,
+            size: 22,
+            color: _matchingEnabled ? AppColors.accent : AppColors.textDisabled,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '매칭 활성화',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: _matchingEnabled
+                        ? AppColors.textPrimary
+                        : AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _matchingEnabled
+                      ? '다음 회차 자동 매칭에 포함돼요'
+                      : '다음 회차부터 매칭하지 않을래요',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: _matchingEnabled
+                        ? AppColors.textSecondary
+                        : AppColors.textDisabled,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          _savingStatus
+              ? const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Switch(
+                  value: _matchingEnabled,
+                  onChanged: _toggleMatchingEnabled,
+                  activeColor: AppColors.accent,
+                ),
+        ],
+      ),
+    );
+  }
+
+  /// 매칭 비활성화 시 표시하는 안내 카드
+  Widget _buildPausedNotice() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceMuted,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        children: [
+          const Icon(
+            Icons.pause_circle_outline,
+            size: 40,
+            color: AppColors.textDisabled,
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            '다음 회차부터 매칭하지 않을래요',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            '매칭 활성화를 켜면\n다음 회차 자동 매칭에 다시 포함돼요',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              color: AppColors.textDisabled,
+              height: 1.5,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -143,25 +307,25 @@ class _PartnerPreferencesPageState extends State<PartnerPreferencesPage> {
             ),
           ),
           const SizedBox(height: 12),
-          
+
           _buildPresetButton(
             icon: '💛',
             title: '편한 공감형',
             subtitle: '연차 가깝게 → 태그 비슷하게 → 지역 상관없음',
             onTap: () => _applyPreset(PartnerPreferences.comfortPreset()),
           ),
-          
+
           const SizedBox(height: 8),
-          
+
           _buildPresetButton(
             icon: '✨',
             title: '현실 조언형',
             subtitle: '높은 연차 우선 → 태그 비슷하게 → 지역 상관없음',
             onTap: () => _applyPreset(PartnerPreferences.advicePreset()),
           ),
-          
+
           const SizedBox(height: 8),
-          
+
           _buildPresetButton(
             icon: '🏘️',
             title: '동네 동행형',
@@ -217,7 +381,7 @@ class _PartnerPreferencesPageState extends State<PartnerPreferencesPage> {
                 ],
               ),
             ),
-            Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.textDisabled),
+            const Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.textDisabled),
           ],
         ),
       ),
@@ -239,7 +403,7 @@ class _PartnerPreferencesPageState extends State<PartnerPreferencesPage> {
             ),
           ),
           const SizedBox(height: 12),
-          
+
           _buildPriorityDropdown(
             label: '우선순위 1',
             currentType: _priority1Type,
@@ -251,9 +415,9 @@ class _PartnerPreferencesPageState extends State<PartnerPreferencesPage> {
               });
             },
           ),
-          
+
           const SizedBox(height: 12),
-          
+
           _buildPriorityDropdown(
             label: '우선순위 2',
             currentType: _priority2Type,
@@ -265,9 +429,9 @@ class _PartnerPreferencesPageState extends State<PartnerPreferencesPage> {
               });
             },
           ),
-          
+
           const SizedBox(height: 12),
-          
+
           _buildPriorityDropdown(
             label: '우선순위 3',
             currentType: _priority3Type,
@@ -279,9 +443,9 @@ class _PartnerPreferencesPageState extends State<PartnerPreferencesPage> {
               });
             },
           ),
-          
+
           const SizedBox(height: 20),
-          
+
           SizedBox(
             width: double.infinity,
             child: AppPrimaryButton(
@@ -326,7 +490,7 @@ class _PartnerPreferencesPageState extends State<PartnerPreferencesPage> {
                 ],
                 onChanged: (type) {
                   if (type != null) {
-                    String defaultValue = type == PreferenceType.tags ? 'similar' : 'any';
+                    final defaultValue = type == PreferenceType.tags ? 'similar' : 'any';
                     onChanged(type, defaultValue);
                   }
                 },
@@ -386,27 +550,26 @@ class _PartnerPreferencesPageState extends State<PartnerPreferencesPage> {
         color: AppColors.surfaceMuted,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Row(
+      child: const Row(
         children: [
-            const Icon(
-              Icons.shield_outlined,
-              size: 20,
-              color: AppColors.accent,
-            ),
-          const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                '지역은 크게만 참고해요.\n서로 안전한 거리가 더 중요해요.',
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textSecondary,
-                  height: 1.5,
-                ),
+          Icon(
+            Icons.shield_outlined,
+            size: 20,
+            color: AppColors.accent,
+          ),
+          SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              '지역은 크게만 참고해요.\n서로 안전한 거리가 더 중요해요.',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+                height: 1.5,
               ),
             ),
+          ),
         ],
       ),
     );
   }
 }
-

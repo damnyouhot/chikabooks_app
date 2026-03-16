@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_primary_button.dart';
 import '../../models/user_public_profile.dart';
+import '../../services/admin_activity_service.dart';
+import '../../services/app_error_logger.dart';
 import '../../services/user_profile_service.dart';
 
 /// 교감 프로필 수정 페이지 (설정 > 교감 프로필)
@@ -18,6 +20,7 @@ class _CommunionProfilePageState extends State<CommunionProfilePage> {
   final _nicknameCtrl = TextEditingController();
   String? _selectedRegion;
   String? _selectedCareer;
+  String _existingCareerGroup = ''; // 기존 careerGroup 보존용
   final Set<String> _selectedConcerns = {};
   String? _selectedWorkplace;
 
@@ -40,6 +43,7 @@ class _CommunionProfilePageState extends State<CommunionProfilePage> {
             profile.region.isNotEmpty ? profile.region : null;
         _selectedCareer =
             profile.careerBucket.isNotEmpty ? profile.careerBucket : null;
+        _existingCareerGroup = profile.careerGroup; // 기존 값 보존
         _selectedConcerns.addAll(profile.mainConcerns);
         _selectedWorkplace = profile.workplaceType;
       });
@@ -82,14 +86,22 @@ class _CommunionProfilePageState extends State<CommunionProfilePage> {
     setState(() => _saving = true);
 
     try {
+      // careerGroup: 기존 값 보존. careerBucket이 바뀌었으면 라벨 맵에서 파생
+      final careerGroup = _existingCareerGroup.isNotEmpty
+          ? _existingCareerGroup
+          : (UserPublicProfile.careerBucketLabels[_selectedCareer!] ?? _selectedCareer!);
+
       final profile = UserPublicProfile(
         nickname: _nicknameCtrl.text.trim(),
         region: _selectedRegion!,
         careerBucket: _selectedCareer!,
+        careerGroup: careerGroup,
         mainConcerns: _selectedConcerns.toList(),
         workplaceType: _selectedWorkplace,
       );
       await UserProfileService.updateFullProfile(profile);
+      // 캐시 초기화 → 결 탭 복귀 시 publicProfiles에서 최신 닉네임 재조회
+      UserProfileService.clearCache();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('프로필이 저장되었어요 ✨')),
@@ -274,6 +286,8 @@ class _CommunionProfilePageState extends State<CommunionProfilePage> {
                   Center(
                     child: TextButton.icon(
                       onPressed: () async {
+                        AdminActivityService.clearCache();
+                        AppErrorLogger.clearCache();
                         UserProfileService.clearCache();
                         await FirebaseAuth.instance.signOut();
                       },

@@ -12,7 +12,7 @@ class BondScoreService {
   static final _db = FirebaseFirestore.instance;
 
   // ─── 범위 상수 (0~100) ───
-  static const double _initialScore = 50.0;
+  static const double _initialScore = 20.0;  // 기본 시작 점수 (50 → 20)
   static const double _min = 0.0;
   static const double _max = 100.0;
   static const double _center = 50.0;
@@ -109,7 +109,8 @@ class BondScoreService {
   }
 
   /// 중심 회귀: 하루 1회 앱 실행 시 미세 조정
-  /// score < 40 → +0.3, score > 60 → -0.3
+  /// score > 60 → -0.3 (60 초과 시에만 감소, 40 미만 증가 없음)
+  /// 하루 1회 제한: lastCenterGravityDate 필드로 날짜 체크
   static Future<void> applyCenterGravity() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
@@ -117,23 +118,35 @@ class BondScoreService {
     try {
       final userRef = _db.collection('users').doc(uid);
       final snap = await userRef.get();
-      final raw = snap.data()?['bondScore'];
-      double current = _migrateIfNeeded(raw, snap.data());
+      final data = snap.data();
+      final raw = data?['bondScore'];
+      double current = _migrateIfNeeded(raw, data);
 
-      double adjustment = 0.0;
-      if (current < 40.0) {
-        adjustment = 0.3;
-      } else if (current > 60.0) {
-        adjustment = -0.3;
-      }
+      // 하루 1회 제한 체크
+      final todayKey = _todayKey();
+      final lastDate = data?['lastCenterGravityDate'] as String?;
+      if (lastDate == todayKey) return; // 오늘 이미 실행됨
 
-      if (adjustment != 0.0) {
-        final newScore = (current + adjustment).clamp(_min, _max);
-        await userRef.update({'bondScore': newScore, 'bondScoreVersion': 2});
+      // 60 초과 시에만 감소 (40 미만 증가 없음)
+      if (current > 60.0) {
+        final newScore = (current - 0.3).clamp(_min, _max);
+        await userRef.update({
+          'bondScore': newScore,
+          'bondScoreVersion': 2,
+          'lastCenterGravityDate': todayKey,
+        });
+      } else {
+        // 점수 변경 없이 날짜만 기록 (다음 진입 시 재체크 방지)
+        await userRef.update({'lastCenterGravityDate': todayKey});
       }
     } catch (e) {
       debugPrint('⚠️ BondScoreService.applyCenterGravity error: $e');
     }
+  }
+
+  static String _todayKey() {
+    final now = DateTime.now();
+    return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
   }
 
   /// 결 점수 라벨 (0~100 기준)
