@@ -64,6 +64,7 @@ class FeatureReactionItem {
       'tap_login_email':   '이메일 로그인',
       'login_success':     '로그인 성공',
       // ── 기능 클릭 ──────────────────────────────────────────
+      'quiz_completed':     '퀴즈 풀이 완료',
       'tap_character':      '캐릭터 클릭',
       'tap_emotion_start':  '감정기록 시작',
       'tap_emotion_save':   '감정기록 저장 시도',
@@ -76,6 +77,14 @@ class FeatureReactionItem {
       'tap_notification_allow': '알림 허용',
       // ── 기타 ──────────────────────────────────────────────
       'app_open': '앱 실행',
+      // ── 공고자(Publisher) 이벤트 ─────────────────────────
+      'publisher_signup_submitted': '공고자 가입 신청',
+      'publisher_login':            '공고자 로그인',
+      'publisher_phone_verified':   '공고자 휴대폰 인증',
+      'publisher_profile_saved':    '공고자 프로필 저장',
+      'publisher_biz_submitted':    '공고자 사업자 인증 제출',
+      'publisher_approved':         '공고자 승인 완료',
+      'publisher_job_created':      '공고 작성 완료',
     };
     return map[type] ?? type;
   }
@@ -117,7 +126,24 @@ class AppErrorItem {
   }
 }
 
-// ─── 감정 기록 항목 (Emotion Feed) ───────────────────────────
+// ─── 기록하기 항목 — 대시보드 피드용 ──────────────────────────────
+class NoteFeedItem {
+  final String id;
+  final String userId;
+  final String text;
+  final DateTime createdAt;
+  final List<String> imageUrls;
+
+  const NoteFeedItem({
+    required this.id,
+    required this.userId,
+    required this.text,
+    required this.createdAt,
+    this.imageUrls = const [],
+  });
+}
+
+// ─── 감정 기록 항목 (EmotionLog — emotionLogs 컬렉션용, 레거시) ─
 class EmotionLogItem {
   final String id;
   final String userId;

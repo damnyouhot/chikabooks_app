@@ -25,7 +25,7 @@ class CaringActionService {
   }
 
   static Future<String?> _ensureUidReady({
-    Duration timeout = const Duration(seconds: 5),
+    Duration timeout = const Duration(seconds: 2),
   }) async {
     final current = _auth.currentUser?.uid;
     if (current != null) return current;
@@ -140,12 +140,17 @@ class CaringActionService {
       final now = DateTime.now();
       final todayKey = _dateKey(now);
 
-      // 날짜 변경 체크 (정산이 안 된 상태라면 먼저 정산)
+      // 날짜 변경: 정산은 백그라운드, 밥주기는 리셋 상태로 즉시 처리
       if (state.lastActionDate != todayKey) {
-        await dailySettle();
-        // 정산 후 다시 로드
-        final newState = await CaringStateService.loadState();
-        return _processFeed(newState, now, todayKey, uid);
+        unawaited(dailySettle());
+        final resetState = state.copyWith(
+          touchCountToday: 0,
+          fedCountToday: 0,
+          diaryCountToday: 0,
+          lastFedSlots: [],
+          lastActionDate: todayKey,
+        );
+        return _processFeed(resetState, now, todayKey, uid);
       }
 
       return _processFeed(state, now, todayKey, uid);
@@ -174,23 +179,27 @@ class CaringActionService {
     final newSlots = [...state.lastFedSlots, slotId];
     final newCount = state.fedCountToday + 1;
 
-    await _saveState(
-      state.copyWith(
-        lastFedSlots: newSlots,
-        fedCountToday: newCount,
-        skipDaysStreak: 0, // 밥 주면 스트릭 리셋
-        lastActionDate: todayKey,
-      ),
-    );
+    // Firestore 쓰기는 백그라운드 (UI 응답성 우선)
+    unawaited(Future(() async {
+      try {
+        await _saveState(
+          state.copyWith(
+            lastFedSlots: newSlots,
+            fedCountToday: newCount,
+            skipDaysStreak: 0,
+            lastActionDate: todayKey,
+          ),
+        );
+        await BondScoreService.applyEvent(
+          uid,
+          ActivityType.slotPost,
+          customDelta: 0.1,
+        );
+      } catch (e) {
+        debugPrint('⚠️ _processFeed background write: $e');
+      }
+    }));
 
-    // 결 점수 +0.1
-    await BondScoreService.applyEvent(
-      uid,
-      ActivityType.slotPost,
-      customDelta: 0.1,
-    );
-
-    // 멘트 선택 (skipStreak 반영)
     final ment = _pickFeedSuccessMent(state.skipDaysStreak);
 
     return FeedResult(success: true, ment: ment, bondDelta: 0.1);
@@ -224,11 +233,17 @@ class CaringActionService {
       final now = DateTime.now();
       final todayKey = _dateKey(now);
 
-      // 날짜 변경 체크
+      // 날짜 변경: 정산은 백그라운드, 터치는 카운트 리셋 상태로 즉시 처리
       if (state.lastActionDate != todayKey) {
-        await dailySettle();
-        final newState = await CaringStateService.loadState();
-        return _processTouch(newState, todayKey, uid);
+        unawaited(dailySettle());
+        final resetState = state.copyWith(
+          touchCountToday: 0,
+          fedCountToday: 0,
+          diaryCountToday: 0,
+          lastFedSlots: [],
+          lastActionDate: todayKey,
+        );
+        return _processTouch(resetState, todayKey, uid);
       }
 
       return _processTouch(state, todayKey, uid);
@@ -253,18 +268,22 @@ class CaringActionService {
 
     final newCount = state.touchCountToday + 1;
 
-    await _saveState(
-      state.copyWith(touchCountToday: newCount, lastActionDate: todayKey),
-    );
+    // Firestore 쓰기는 백그라운드 (UI 응답성 우선)
+    unawaited(Future(() async {
+      try {
+        await _saveState(
+          state.copyWith(touchCountToday: newCount, lastActionDate: todayKey),
+        );
+        await BondScoreService.applyEvent(
+          uid,
+          ActivityType.slotPost,
+          customDelta: 0.05,
+        );
+      } catch (e) {
+        debugPrint('⚠️ _processTouch background write: $e');
+      }
+    }));
 
-    // 결 점수 +0.05
-    await BondScoreService.applyEvent(
-      uid,
-      ActivityType.slotPost,
-      customDelta: 0.05,
-    );
-
-    // 멘트 선택 (컨텍스트 기반)
     final ment = _pickTouchMent(state);
 
     return TouchResult(ment: ment, bondDelta: 0.05);
@@ -309,11 +328,17 @@ class CaringActionService {
       final now = DateTime.now();
       final todayKey = _dateKey(now);
 
-      // 날짜 변경 체크
+      // 날짜 변경: 정산은 백그라운드
       if (state.lastActionDate != todayKey) {
-        await dailySettle();
-        final newState = await CaringStateService.loadState();
-        return _processDiary(newState, todayKey, uid);
+        unawaited(dailySettle());
+        final resetState = state.copyWith(
+          touchCountToday: 0,
+          fedCountToday: 0,
+          diaryCountToday: 0,
+          lastFedSlots: [],
+          lastActionDate: todayKey,
+        );
+        return _processDiary(resetState, todayKey, uid);
       }
 
       return _processDiary(state, todayKey, uid);
@@ -339,19 +364,24 @@ class CaringActionService {
 
     final newCount = state.diaryCountToday + 1;
 
-    await _saveState(
-      state.copyWith(diaryCountToday: newCount, lastActionDate: todayKey),
-    );
+    // Firestore 쓰기는 백그라운드 (UI 응답성 우선)
+    unawaited(Future(() async {
+      try {
+        await _saveState(
+          state.copyWith(diaryCountToday: newCount, lastActionDate: todayKey),
+        );
+        if (bondDelta > 0.0) {
+          await BondScoreService.applyEvent(
+            uid,
+            ActivityType.slotPost,
+            customDelta: bondDelta,
+          );
+        }
+      } catch (e) {
+        debugPrint('⚠️ _processDiary background write: $e');
+      }
+    }));
 
-    if (bondDelta > 0.0) {
-      await BondScoreService.applyEvent(
-        uid,
-        ActivityType.slotPost,
-        customDelta: bondDelta,
-      );
-    }
-
-    // 멘트 선택 (단순 랜덤)
     final ment = _pickRandom(CaringMents.diary);
 
     return DiaryResult(ment: ment, bondDelta: bondDelta);

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
+import 'resume_ocr_prompt.dart';
 import '../../../core/theme/app_tokens.dart';
 
 /// B. Professional Summary 섹션
@@ -52,7 +53,8 @@ class _SectionSummaryState extends State<SectionSummary> {
           '3~5줄로 자신을 소개해주세요.',
           style: TextStyle(fontSize: 12, color: AppColors.textDisabled),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
+        const ResumeOcrPrompt(),
 
         // 템플릿 버튼
         Text(

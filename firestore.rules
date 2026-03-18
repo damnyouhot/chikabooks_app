@@ -91,6 +91,28 @@ service cloud.firestore {
     }
 
     // ══════════════════════════════════════════════════
+    // 공고자(치과) 계정
+    // ══════════════════════════════════════════════════
+    match /clinics_accounts/{uid} {
+      // 읽기: 본인만
+      allow read: if request.auth != null && request.auth.uid == uid;
+
+      // 생성: 본인만 + 승인 관련 필드는 초기값 고정
+      allow create: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.approvalStatus == 'pending'
+        && request.resource.data.canPost == false;
+
+      // 수정: 본인만 + 승인 관련 필드 변경 불가 (서버만 가능)
+      allow update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.approvalStatus == resource.data.approvalStatus
+        && request.resource.data.canPost == resource.data.canPost
+        && request.resource.data.clinicVerified == resource.data.clinicVerified;
+
+      // 삭제: 금지 (서버만)
+      allow delete: if false;
+    }
+
+    // ══════════════════════════════════════════════════
     // 공개 프로필 (닉네임 등 최소 필드만)
     // ══════════════════════════════════════════════════
     match /publicProfiles/{uid} {
@@ -282,6 +304,25 @@ service cloud.firestore {
     }
 
     // ══════════════════════════════════════════════════
+    // 📁 업로드 원본 이력서 파일 (Resume Files)
+    // ══════════════════════════════════════════════════
+    match /resumeFiles/{fileId} {
+      // 읽기: 본인만
+      allow read: if request.auth != null &&
+        resource.data.userId == request.auth.uid;
+      // 생성: 본인 uid로만
+      allow create: if request.auth != null &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.fileType in ['pdf', 'jpg', 'jpeg', 'png'];
+      // 수정: 본인만 (displayName, isPrimary, status만 변경 가능)
+      allow update: if request.auth != null &&
+        resource.data.userId == request.auth.uid;
+      // 삭제: 본인만
+      allow delete: if request.auth != null &&
+        resource.data.userId == request.auth.uid;
+    }
+
+    // ══════════════════════════════════════════════════
     // 🖼️ 이력서 OCR 가져오기 드래프트 (Resume Import Drafts)
     // ══════════════════════════════════════════════════
     match /resumeImportDrafts/{draftId} {
@@ -359,6 +400,81 @@ service cloud.firestore {
         resource.data.ownerUid == request.auth.uid;
       allow write: if request.auth != null &&
         request.resource.data.ownerUid == request.auth.uid;
+    }
+
+    // ══════════════════════════════════════════════════
+    // 📋 피드백 게시판 (Feedbacks)
+    // ══════════════════════════════════════════════════
+    function isAdminUser() {
+      return request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    match /feedbacks/{feedbackId} {
+      // 읽기: public 글은 로그인한 모든 유저, private는 관리자 또는 작성자만
+      allow read: if request.auth != null && (
+        resource.data.visibility == 'public' ||
+        isAdminUser() ||
+        resource.data.uid == request.auth.uid
+      );
+
+      // 생성: 로그인한 본인 uid로만
+      allow create: if request.auth != null &&
+        request.resource.data.uid == request.auth.uid &&
+        request.resource.data.text is string &&
+        request.resource.data.text.size() > 0 &&
+        request.resource.data.text.size() <= 1000 &&
+        request.resource.data.visibility in ['public', 'private'] &&
+        request.resource.data.type in ['improvement', 'positive'] &&
+        request.resource.data.priority in ['high', 'medium', 'low'];
+
+      // 수정: 작성자(text/type/priority/visibility 변경) 또는 관리자(adminStatus 포함 전체)
+      allow update: if request.auth != null && (
+        isAdminUser() ||
+        (
+          resource.data.uid == request.auth.uid &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['text', 'type', 'priority', 'visibility', 'updatedAt'])
+        )
+      );
+
+      // 삭제: 작성자 또는 관리자
+      allow delete: if request.auth != null && (
+        resource.data.uid == request.auth.uid || isAdminUser()
+      );
+
+      // ── 댓글 서브컬렉션 ──
+      match /comments/{commentId} {
+        // 읽기: 부모 피드백 읽기 권한과 동일
+        allow read: if request.auth != null && (
+          get(/databases/$(database)/documents/feedbacks/$(feedbackId)).data.visibility == 'public' ||
+          isAdminUser() ||
+          get(/databases/$(database)/documents/feedbacks/$(feedbackId)).data.uid == request.auth.uid
+        );
+
+        // 생성: 로그인한 본인 uid로만, 텍스트 최대 500자
+        allow create: if request.auth != null &&
+          request.resource.data.uid == request.auth.uid &&
+          request.resource.data.text is string &&
+          request.resource.data.text.size() > 0 &&
+          request.resource.data.text.size() <= 500;
+
+        // 수정: 불가
+        allow update: if false;
+
+        // 삭제: 댓글 작성자 또는 관리자
+        allow delete: if request.auth != null && (
+          resource.data.uid == request.auth.uid || isAdminUser()
+        );
+      }
+    }
+
+    // ══════════════════════════════════════════════════
+    // 📊 행동 분석 일별 집계 (Analytics Daily)
+    // ══════════════════════════════════════════════════
+    match /analytics_daily/{dateKey} {
+      allow read: if request.auth != null && isAdminUser();
+      allow write: if false; // Cloud Functions만
     }
 
     // ══════════════════════════════════════════════════

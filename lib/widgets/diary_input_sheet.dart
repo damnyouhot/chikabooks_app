@@ -1,24 +1,26 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:image_picker/image_picker.dart';
 import 'dart:math';
+
 import '../core/theme/app_colors.dart';
 import '../pages/diary_timeline_page.dart';
+import '../services/diary_image_service.dart';
 
-/// 나만 보는 한 줄 기록 (BottomSheet)
-/// 
-/// 디자인 큐:
-/// - 아래에서 올라오는 작은 팝업 (BottomSheet)
-/// - 제목: "오늘 한마디"
-/// - 서브: "나만 보는 기록이에요"
-/// - 입력창: 1~2줄, 최대 140자
-/// - 버튼: 왼쪽 "취소", 오른쪽 "저장"
+/// 나만 보는 기록 (BottomSheet)
+///
+/// - 본문 입력 (최대 500자)
+/// - 사진 첨부 (최대 3장, 업로드 전 압축)
+/// - 사진 없이 글만 저장 가능
 class DiaryInputSheet extends StatefulWidget {
   final Function(String) onSaved;
-  
+
   const DiaryInputSheet({super.key, required this.onSaved});
 
-  /// BottomSheet 표시
   static Future<void> show(BuildContext context, Function(String) onSaved) {
     return showModalBottomSheet(
       context: context,
@@ -34,6 +36,7 @@ class DiaryInputSheet extends StatefulWidget {
 
 class _DiaryInputSheetState extends State<DiaryInputSheet> {
   final _controller = TextEditingController();
+  final _selectedImages = <XFile>[];
   bool _isSaving = false;
 
   @override
@@ -42,9 +45,35 @@ class _DiaryInputSheetState extends State<DiaryInputSheet> {
     super.dispose();
   }
 
+  // ── 사진 선택 ──
+  Future<void> _pickImages() async {
+    final remaining = DiaryImageService.maxImages - _selectedImages.length;
+    if (remaining <= 0) {
+      _showSnack('사진은 최대 ${DiaryImageService.maxImages}장까지 첨부할 수 있어요.');
+      return;
+    }
+
+    final picked = await DiaryImageService.pickImages(remaining: remaining);
+    if (picked.isEmpty) return;
+
+    final total = _selectedImages.length + picked.length;
+    if (total > DiaryImageService.maxImages) {
+      _showSnack('사진은 최대 ${DiaryImageService.maxImages}장까지 첨부할 수 있어요.');
+      final allowed = DiaryImageService.maxImages - _selectedImages.length;
+      setState(() => _selectedImages.addAll(picked.take(allowed)));
+    } else {
+      setState(() => _selectedImages.addAll(picked));
+    }
+  }
+
+  void _removeImage(int index) {
+    setState(() => _selectedImages.removeAt(index));
+  }
+
+  // ── 저장 ──
   Future<void> _save() async {
     final text = _controller.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty && _selectedImages.isEmpty) return;
 
     setState(() => _isSaving = true);
 
@@ -52,13 +81,28 @@ class _DiaryInputSheetState extends State<DiaryInputSheet> {
       final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid == null) throw Exception('로그인 필요');
 
-      // Firestore 저장: users/{uid}/notes/{noteId}
-      await FirebaseFirestore.instance
+      // 1) Firestore 문서 먼저 생성 (noteId 확보)
+      final docRef = FirebaseFirestore.instance
           .collection('users')
           .doc(uid)
           .collection('notes')
-          .add({
+          .doc();
+      final noteId = docRef.id;
+
+      // 2) 사진 업로드
+      List<String> imageUrls = [];
+      if (_selectedImages.isNotEmpty) {
+        imageUrls = await DiaryImageService.uploadAll(
+          uid: uid,
+          noteId: noteId,
+          files: _selectedImages,
+        );
+      }
+
+      // 3) Firestore 저장
+      await docRef.set({
         'text': text,
+        'imageUrls': imageUrls,
         'createdAt': FieldValue.serverTimestamp(),
         'visibility': 'private',
       });
@@ -68,18 +112,24 @@ class _DiaryInputSheetState extends State<DiaryInputSheet> {
         widget.onSaved(text);
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('저장 실패: $e')),
-        );
-      }
+      debugPrint('❌ [DiaryInput] 저장 실패: $e');
+      if (mounted) _showSnack('저장 실패: $e');
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
   }
 
+  void _showSnack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final hasContent =
+        _controller.text.trim().isNotEmpty || _selectedImages.isNotEmpty;
+
     return Padding(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -94,7 +144,7 @@ class _DiaryInputSheetState extends State<DiaryInputSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 제목 + 기록 보기 버튼
+            // ── 제목 + 기록 보기 ──
             Row(
               children: [
                 const Text(
@@ -106,7 +156,6 @@ class _DiaryInputSheetState extends State<DiaryInputSheet> {
                   ),
                 ),
                 const Spacer(),
-                // 기록 보기 버튼
                 GestureDetector(
                   onTap: () {
                     Navigator.pop(context);
@@ -118,18 +167,15 @@ class _DiaryInputSheetState extends State<DiaryInputSheet> {
                     );
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: AppColors.accent.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.history,
-                          size: 16,
-                          color: AppColors.accent,
-                        ),
+                        Icon(Icons.history, size: 16, color: AppColors.accent),
                         const SizedBox(width: 4),
                         const Text(
                           '어제',
@@ -146,37 +192,32 @@ class _DiaryInputSheetState extends State<DiaryInputSheet> {
               ],
             ),
             const SizedBox(height: 6),
-            // 서브타이틀
             Text(
-              '나만 보는 기록이에요',
-              style: TextStyle(
-                fontSize: 13,
-                color: AppColors.textSecondary,
-              ),
+              '오늘 하루를 가볍게 남겨보세요.',
+              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
             ),
-            const SizedBox(height: 20),
-            // 입력창
+            const SizedBox(height: 16),
+
+            // ── 본문 입력 ──
             TextField(
               controller: _controller,
-              maxLength: 140,
-              maxLines: 2,
+              maxLength: 500,
+              maxLines: 4,
+              minLines: 2,
               autofocus: true,
+              onChanged: (_) => setState(() {}),
               decoration: InputDecoration(
                 hintText: '지금 마음을 한 문장으로 남겨볼까?',
-                hintStyle: TextStyle(
-                  color: AppColors.textDisabled,
-                  fontSize: 14,
-                ),
+                hintStyle:
+                    TextStyle(color: AppColors.textDisabled, fontSize: 14),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(color: AppColors.divider),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(
-                    color: AppColors.accent,
-                    width: 1.5,
-                  ),
+                  borderSide:
+                      const BorderSide(color: AppColors.accent, width: 1.5),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -184,42 +225,94 @@ class _DiaryInputSheetState extends State<DiaryInputSheet> {
                 ),
               ),
             ),
+
+            // ── 사진 미리보기 ──
+            if (_selectedImages.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 80,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _selectedImages.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (context, i) => _ImageThumb(
+                    file: _selectedImages[i],
+                    onRemove: () => _removeImage(i),
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+
+            // ── 사진 추가 + 안내문구 ──
+            Row(
+              children: [
+                GestureDetector(
+                  onTap: _isSaving ? null : _pickImages,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceMuted,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.camera_alt_outlined,
+                            size: 18, color: AppColors.textSecondary),
+                        const SizedBox(width: 6),
+                        Text(
+                          '사진 ${_selectedImages.length}/${DiaryImageService.maxImages}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                if (_selectedImages.length >= DiaryImageService.maxImages)
+                  Text(
+                    '최대 ${DiaryImageService.maxImages}장',
+                    style: const TextStyle(
+                        fontSize: 11, color: AppColors.textDisabled),
+                  ),
+              ],
+            ),
             const SizedBox(height: 16),
-            // 버튼들
+
+            // ── 버튼 ──
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text(
-                    '취소',
-                    style: TextStyle(
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
+                  onPressed: _isSaving ? null : () => Navigator.pop(context),
+                  child: const Text('취소',
+                      style: TextStyle(color: AppColors.textPrimary)),
                 ),
                 const SizedBox(width: 8),
                 ElevatedButton(
-                  onPressed: _isSaving ? null : _save,
+                  onPressed: _isSaving || !hasContent ? null : _save,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.accent,
                     foregroundColor: AppColors.white,
+                    disabledBackgroundColor: AppColors.disabledBg,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 12,
-                    ),
+                        horizontal: 24, vertical: 12),
                   ),
                   child: _isSaving
                       ? const SizedBox(
                           width: 16,
                           height: 16,
                           child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: AppColors.white,
-                          ),
+                              strokeWidth: 2, color: AppColors.white),
                         )
                       : const Text('저장'),
                 ),
@@ -232,9 +325,55 @@ class _DiaryInputSheetState extends State<DiaryInputSheet> {
   }
 }
 
+/// 선택한 사진 썸네일 (삭제 버튼 포함)
+class _ImageThumb extends StatelessWidget {
+  final XFile file;
+  final VoidCallback onRemove;
+  const _ImageThumb({required this.file, required this.onRemove});
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: kIsWeb
+              ? FutureBuilder<Uint8List>(
+                  future: file.readAsBytes(),
+                  builder: (ctx, snap) {
+                    if (!snap.hasData) {
+                      return const SizedBox(
+                          width: 80, height: 80, child: Placeholder());
+                    }
+                    return Image.memory(snap.data!,
+                        width: 80, height: 80, fit: BoxFit.cover);
+                  },
+                )
+              : Image.file(File(file.path),
+                  width: 80, height: 80, fit: BoxFit.cover),
+        ),
+        Positioned(
+          top: 2,
+          right: 2,
+          child: GestureDetector(
+            onTap: onRemove,
+            child: Container(
+              padding: const EdgeInsets.all(2),
+              decoration: const BoxDecoration(
+                color: Colors.black54,
+                shape: BoxShape.circle,
+              ),
+              child:
+                  const Icon(Icons.close, size: 14, color: Colors.white),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// 저장 후 캐릭터 응답 멘트 선택
-/// 
-/// 입력 내용 키워드 분석 → 적절한 응답 반환
 class DiaryResponseService {
   static final List<String> _responses = [
     "좋아, 이 문장… 오늘의 너를 잘 담았어.",
@@ -263,18 +402,15 @@ class DiaryResponseService {
     "적어둔 건 사라지지 않아. 너의 편이 되어줄 거야.",
   ];
 
-  /// 입력 텍스트 분석 → 응답 멘트 반환
   static String getRandomResponse(String inputText) {
     final text = inputText.toLowerCase();
-    
-    // 짧은 문장
+
     if (inputText.length < 10) {
       return "짧게 말했지만 마음이 느껴져.";
     }
-    
-    // 스트레스/힘듦 키워드
-    if (text.contains('힘들') || 
-        text.contains('지쳐') || 
+
+    if (text.contains('힘들') ||
+        text.contains('지쳐') ||
         text.contains('불안') ||
         text.contains('우울') ||
         text.contains('슬프')) {
@@ -288,10 +424,9 @@ class DiaryResponseService {
       ];
       return stressedPool[Random().nextInt(stressedPool.length)];
     }
-    
-    // 긍정 키워드
-    if (text.contains('좋아') || 
-        text.contains('행복') || 
+
+    if (text.contains('좋아') ||
+        text.contains('행복') ||
         text.contains('뿌듯') ||
         text.contains('기쁘') ||
         text.contains('감사')) {
@@ -302,9 +437,7 @@ class DiaryResponseService {
       ];
       return positivePool[Random().nextInt(positivePool.length)];
     }
-    
-    // 기본 랜덤
+
     return _responses[Random().nextInt(_responses.length)];
   }
 }
-

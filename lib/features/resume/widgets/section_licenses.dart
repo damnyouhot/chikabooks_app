@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../models/resume.dart';
 import '../../../core/theme/app_colors.dart';
+import 'resume_ocr_prompt.dart';
 
 /// C. 면허/자격 섹션
 class SectionLicenses extends StatefulWidget {
@@ -68,7 +69,8 @@ class _SectionLicensesState extends State<SectionLicenses> {
           '보유 여부만 체크하세요. 면허 번호 등 민감정보는 기본 비공개예요.',
           style: TextStyle(fontSize: 12, color: AppColors.textDisabled),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
+        const ResumeOcrPrompt(),
         ...List.generate(_items.length, (i) {
           final l = _items[i];
           return CheckboxListTile(

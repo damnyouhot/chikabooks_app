@@ -37,8 +37,9 @@ class PartnerService {
     try {
       debugPrint('🔍 [getMyGroup] 시작');
 
-      // 항상 최신 프로필을 읽어야 매칭 직후에도 groupId 반영됨
-      final profile = await UserProfileService.getMyProfile(forceRefresh: true);
+      // 캐시 우선: bond_page._loadData()에서 이미 프로필을 조회하므로
+      // 여기서는 중복 서버 왕복을 피함 (매칭 직후에는 caller가 clearCache 호출)
+      final profile = await UserProfileService.getMyProfile();
       final groupId = profile?.partnerGroupId;
 
       debugPrint('🔍 [getMyGroup] profile.partnerGroupId: $groupId');
@@ -80,13 +81,19 @@ class PartnerService {
       try {
         final group = PartnerGroup.fromDoc(doc);
         debugPrint('✅ [getMyGroup] PartnerGroup 파싱 성공');
-        debugPrint('🔍 [getMyGroup] group.isActive: ${group.isActive}');
+        debugPrint('🔍 [getMyGroup] group.isActive: ${group.isActive}, endsAt: ${group.endsAt}');
 
-        // 닉네임 자동 보정 (memberMeta에 nickname 없으면 users에서 가져와서 저장)
-        if (group.isActive) {
-          await _supplementMemberNicknamesIfMissing(groupId);
+        // 만료되지 않은 그룹은 isActive와 관계없이 반환
+        // (isActive가 일시적으로 false일 수 있으므로 caller가 판단)
+        final notExpired = group.endsAt.toUtc().isAfter(DateTime.now().toUtc());
+        if (notExpired) {
+          if (group.isActive) {
+            await _supplementMemberNicknamesIfMissing(groupId);
+          }
+          return group;
         }
 
+        debugPrint('⚠️ [getMyGroup] 그룹 만료됨 (endsAt=${group.endsAt})');
         return group.isActive ? group : null;
       } catch (parseError) {
         debugPrint('❌ [getMyGroup] PartnerGroup.fromDoc 파싱 실패: $parseError');

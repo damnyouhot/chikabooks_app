@@ -115,6 +115,12 @@ class _BillboardCarouselState extends State<BillboardCarousel> {
             .take(5)
             .toList();
 
+        // isActive 조건을 통과한 게시물이 없으면 빈 상태 표시
+        if (posts.isEmpty) {
+          _timer?.cancel();
+          return _buildEmptyState();
+        }
+
         // 인덱스 범위 체크
         if (_currentIndex >= posts.length) {
           _currentIndex = 0;

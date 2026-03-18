@@ -668,13 +668,13 @@ class _BondPostCardState extends State<BondPostCard> {
                 GestureDetector(
                   onTap: () => setState(() => _showingReplies = !_showingReplies),
                   child: Padding(
-                    padding: const EdgeInsets.only(left: 4),
+                  padding: const EdgeInsets.only(left: 4),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          '💬 ${_replies.length}',
-                          style: TextStyle(
+                    '💬 ${_replies.length}',
+                    style: TextStyle(
                             fontSize: 11,
                             color: _showingReplies ? AppColors.accent : AppColors.textSecondary,
                           ),

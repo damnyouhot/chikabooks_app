@@ -68,13 +68,41 @@ class ResumeService {
 
   // ── 생성 ────────────────────────────────────────────────
 
+  static bool _creating = false;
+
   /// 새 이력서 생성 → 생성된 resumeId 반환
+  /// 빈 이력서(제목만 있고 내용 없음)가 있으면 재사용
   static Future<String?> createResume({String title = '기본 이력서'}) async {
     final uid = _uid;
     if (uid == null) return null;
+
+    // 더블클릭 방지
+    if (_creating) {
+      debugPrint('⚠️ createResume: 이미 생성 중 — 무시');
+      return null;
+    }
+    _creating = true;
+
     try {
+      // 빈 이력서가 있으면 재사용
+      final existing = await _col
+          .where('ownerUid', isEqualTo: uid)
+          .orderBy('updatedAt', descending: true)
+          .limit(20)
+          .get();
+
+      for (final doc in existing.docs) {
+        final r = Resume.fromDoc(doc);
+        if (_isEmpty(r)) {
+          debugPrint('♻️ 빈 이력서 재사용: ${doc.id}');
+          _creating = false;
+          return doc.id;
+        }
+      }
+
+      // 빈 이력서가 없으면 새로 생성
       final resume = Resume(
-        id: '', // Firestore가 자동 생성
+        id: '',
         ownerUid: uid,
         title: title,
       );
@@ -84,6 +112,51 @@ class ResumeService {
     } catch (e) {
       debugPrint('⚠️ createResume error: $e');
       return null;
+    } finally {
+      _creating = false;
+    }
+  }
+
+  /// 이력서가 비어있는지 판별 (제목/기본값만 있는 상태)
+  static bool _isEmpty(Resume r) {
+    return (r.profile == null || r.profile!.name.isEmpty) &&
+        r.licenses.isEmpty &&
+        r.experiences.isEmpty &&
+        r.skills.isEmpty &&
+        r.education.isEmpty &&
+        r.trainings.isEmpty &&
+        r.attachments.isEmpty;
+  }
+
+  /// 빈 이력서 일괄 삭제 (현재 사용자의 빈 이력서 중 1개만 남기고 삭제)
+  static Future<int> cleanupEmptyResumes() async {
+    final uid = _uid;
+    if (uid == null) return 0;
+    try {
+      final snap = await _col
+          .where('ownerUid', isEqualTo: uid)
+          .get();
+
+      int deleted = 0;
+      bool keptOne = false;
+
+      for (final doc in snap.docs) {
+        final r = Resume.fromDoc(doc);
+        if (_isEmpty(r)) {
+          if (!keptOne) {
+            keptOne = true;
+            continue;
+          }
+          await doc.reference.delete();
+          deleted++;
+        }
+      }
+
+      debugPrint('🧹 빈 이력서 $deleted건 삭제 완료');
+      return deleted;
+    } catch (e) {
+      debugPrint('⚠️ cleanupEmptyResumes error: $e');
+      return 0;
     }
   }
 

@@ -14,12 +14,16 @@ class FloatingSearchBar extends StatefulWidget {
   final VoidCallback onFilterPressed;
   final String filterSummary;
 
+  /// null이면 목록 버튼 숨김
+  final VoidCallback? onListToggle;
+
   const FloatingSearchBar({
     super.key,
     required this.searchQuery,
     required this.onSearchChanged,
     required this.onFilterPressed,
     required this.filterSummary,
+    this.onListToggle,
   });
 
   @override
@@ -133,8 +137,53 @@ class _FloatingSearchBarState extends State<FloatingSearchBar> {
                     ),
                   ),
                 ),
+              if (!_focused && widget.onListToggle != null) ...[
+                const SizedBox(width: 6),
+                _ListToggleChip(onTap: widget.onListToggle!),
+              ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── 목록 전환 칩 ──────────────────────────────────────────────────
+class _ListToggleChip extends StatelessWidget {
+  final VoidCallback onTap;
+  const _ListToggleChip({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadius.sm),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        decoration: BoxDecoration(
+          color: AppColors.accent,
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.list_alt_rounded,
+              size: 13,
+              color: AppColors.onAccent,
+            ),
+            SizedBox(width: 3),
+            Text(
+              '목록',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: AppColors.onAccent,
+                letterSpacing: -0.2,
+              ),
+            ),
+          ],
         ),
       ),
     );

@@ -337,16 +337,16 @@ class _BondFeedSectionState extends State<BondFeedSection> {
                       ),
                     )
                   : Text(
-                      subtitle,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
+                subtitle,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
                         color: widget.glassMode
                             ? AppColors.white
                             : AppColors.onAccent,
-                      ),
-                    ),
+                ),
+              ),
             ),
           ],
         ],
@@ -357,10 +357,10 @@ class _BondFeedSectionState extends State<BondFeedSection> {
           width: double.infinity,
           child: GestureDetector(
             onTap: onTap,
-            child: GlassCard(
-              margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-              padding: const EdgeInsets.all(AppSpacing.xxl),
-              child: content,
+          child: GlassCard(
+            margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+            padding: const EdgeInsets.all(AppSpacing.xxl),
+            child: content,
             ),
           ),
         );
@@ -370,11 +370,11 @@ class _BondFeedSectionState extends State<BondFeedSection> {
         width: double.infinity,
         child: GestureDetector(
           onTap: onTap,
-          child: AppMutedCard(
-            radius: AppRadius.xl,
-            margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-            padding: const EdgeInsets.all(AppSpacing.xxl),
-            child: content,
+        child: AppMutedCard(
+          radius: AppRadius.xl,
+          margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+          padding: const EdgeInsets.all(AppSpacing.xxl),
+          child: content,
           ),
         ),
       );
@@ -421,8 +421,8 @@ class _BondFeedSectionState extends State<BondFeedSection> {
         child: AppMutedCard(
           radius: AppRadius.xl,
           margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-          padding: const EdgeInsets.all(AppSpacing.xxl),
-          child: partnerContent,
+            padding: const EdgeInsets.all(AppSpacing.xxl),
+            child: partnerContent,
         ),
       ),
     );

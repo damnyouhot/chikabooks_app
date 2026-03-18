@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../models/resume.dart';
 import '../../../core/theme/app_colors.dart';
+import 'resume_ocr_prompt.dart';
 
 /// H. 첨부파일 섹션
 class SectionAttachments extends StatefulWidget {
@@ -66,7 +67,8 @@ class _SectionAttachmentsState extends State<SectionAttachments> {
           '자격증, 수료증, 경력증명서 등을 첨부해주세요.',
           style: TextStyle(fontSize: 12, color: AppColors.textDisabled),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
+        const ResumeOcrPrompt(),
 
         if (_items.isEmpty)
           Container(

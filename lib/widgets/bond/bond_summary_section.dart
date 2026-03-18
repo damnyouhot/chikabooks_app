@@ -48,66 +48,66 @@ class BondSummarySection extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // 헤더 행 (아바타 + 타이틀 + 결점수)
-            Padding(
+                Padding(
               padding: const EdgeInsets.fromLTRB(
                 AppSpacing.lg + 2,
-                AppSpacing.lg + 2,
-                AppSpacing.lg + 2,
-                14,
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  _buildPartnerAvatars(),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Text(
-                      '동행 파트너',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.onCardPrimary,
-                      ),
-                    ),
+                    AppSpacing.lg + 2,
+                    AppSpacing.lg + 2,
+                    14,
                   ),
+                  child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      _buildPartnerAvatars(),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          '동행 파트너',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.onCardPrimary,
+                          ),
+                        ),
+                      ),
                   if (topRightOverlay != null) ...[
                     topRightOverlay!,
                   ],
-                  if (enableToggle)
-                    Icon(
-                      isExpanded ? Icons.expand_less : Icons.expand_more,
-                      color: AppColors.onCardPrimary.withOpacity(0.7),
-                    ),
-                ],
-              ),
-            ),
-
-            // 1줄 요약 (접힘 상태에서만)
-            if (enableToggle && !isExpanded) ...[
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.lg + 2, 0, AppSpacing.lg + 2, AppSpacing.lg),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.onCardPrimary.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                  ),
-                  child: Text(
-                    _getOneLinerSummary(),
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: AppColors.onCardPrimary,
-                      fontStyle: FontStyle.italic,
-                    ),
+                      if (enableToggle)
+                        Icon(
+                          isExpanded ? Icons.expand_less : Icons.expand_more,
+                          color: AppColors.onCardPrimary.withOpacity(0.7),
+                        ),
+                    ],
                   ),
                 ),
-              ),
-            ],
+
+                // 1줄 요약 (접힘 상태에서만)
+                if (enableToggle && !isExpanded) ...[
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.lg + 2, 0, AppSpacing.lg + 2, AppSpacing.lg),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.onCardPrimary.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                      ),
+                      child: Text(
+                        _getOneLinerSummary(),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppColors.onCardPrimary,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
 
                 // 확장 시: 내부 카드
                 if (isExpanded) ...[
@@ -117,7 +117,7 @@ class BondSummarySection extends StatelessWidget {
                     padding: const EdgeInsets.fromLTRB(
                       AppSpacing.lg, 14, AppSpacing.lg, 14),
                     decoration: BoxDecoration(
-                      color: AppColors.white.withOpacity(0.92),
+                      color: AppColors.appBg,
                       borderRadius: BorderRadius.circular(AppRadius.md),
                     ),
                     child: _buildExpandedPartnerDetails(),
@@ -233,49 +233,49 @@ class BondSummarySection extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Container(
+        children: [
+          Container(
           width: 40,
           height: 40,
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            color: AppColors.surfaceMuted,
-          ),
-          child: Center(
-            child: Text(
-              nickname.isNotEmpty ? nickname[0] : 'P',
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.surfaceMuted,
             ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Flexible(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                nickname,
-                overflow: TextOverflow.ellipsis,
+            child: Center(
+              child: Text(
+                nickname.isNotEmpty ? nickname[0] : 'P',
                 style: const TextStyle(
-                  fontSize: 13,
+                fontSize: 15,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
                 ),
               ),
+            ),
+          ),
+        const SizedBox(width: 8),
+        Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      nickname,
+                overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                  fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
               // 관심사 최대 2개 표시 (mainConcerns 우선, 없으면 mainConcernShown 하위호환)
               if (partner.mainConcerns.isNotEmpty)
-                Text(
+                      Text(
                   partner.mainConcerns.take(2).map((t) => '#$t').join('  '),
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                        style: const TextStyle(
                     fontSize: 11,
-                    color: AppColors.textDisabled,
-                  ),
+                          color: AppColors.textDisabled,
+                        ),
                 )
               else if (partner.mainConcernShown != null &&
                   partner.mainConcernShown!.isNotEmpty)
@@ -287,10 +287,10 @@ class BondSummarySection extends StatelessWidget {
                     color: AppColors.textDisabled,
                   ),
                 ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
     );
   }
 

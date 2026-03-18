@@ -118,8 +118,10 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
   /// 이력서 전체 저장 (확정)
   Future<void> _save() async {
     if (_resume == null) return;
+    debugPrint('💾 [ResumeEdit] _save() 진입 — resumeId: ${widget.resumeId}');
     setState(() => _saving = true);
-    await ResumeService.updateResume(_resume!);
+    final success = await ResumeService.updateResume(_resume!);
+    debugPrint('💾 [ResumeEdit] updateResume 결과: $success');
 
     // 확정 저장 후 드래프트 삭제
     if (_draftId != null) {
@@ -131,9 +133,9 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
     if (mounted) {
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('저장되었어요.'),
-          duration: Duration(seconds: 1),
+        SnackBar(
+          content: Text(success ? '저장되었어요.' : '저장에 실패했어요. 다시 시도해주세요.'),
+          duration: const Duration(seconds: 2),
         ),
       );
     }
@@ -193,7 +195,23 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
           _buildSectionBar(),
 
           // ── 현재 섹션 폼 ──
-          Expanded(child: _buildCurrentSection()),
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final targetWidth = constraints.maxWidth > 680
+                    ? 680.0
+                    : constraints.maxWidth;
+                return Align(
+                  alignment: Alignment.topCenter,
+                  child: SizedBox(
+                    width: targetWidth,
+                    height: constraints.maxHeight,
+                    child: _buildCurrentSection(),
+                  ),
+                );
+              },
+            ),
+          ),
         ],
       ),
       bottomNavigationBar: _buildBottomBar(),
@@ -228,6 +246,24 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
       centerTitle: false,
       iconTheme: const IconThemeData(color: AppColors.textPrimary),
       actions: [
+        // 저장 버튼 (모든 섹션에서 항상 표시)
+        TextButton(
+          onPressed: _saving ? null : _save,
+          child: _saving
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text(
+                  '저장',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.accent,
+                  ),
+                ),
+        ),
         TextButton(
           onPressed: () {
             Navigator.push(
@@ -239,7 +275,7 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
           },
           child: const Text(
             '미리보기',
-            style: TextStyle(fontSize: 13, color: AppColors.accent),
+            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
           ),
         ),
       ],
@@ -378,12 +414,15 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
   }
 
   Widget _buildBottomBar() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final horizontal = screenWidth > 680 ? (screenWidth - 680) / 2 : 0.0;
+    final side = horizontal > AppSpacing.xl ? horizontal : AppSpacing.xl;
     return Container(
       color: AppColors.white,
       padding: EdgeInsets.fromLTRB(
-        AppSpacing.xl,
+        side,
         AppSpacing.md,
-        AppSpacing.xl,
+        side,
         AppSpacing.md + MediaQuery.of(context).padding.bottom,
       ),
       child: Row(

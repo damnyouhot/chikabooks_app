@@ -331,27 +331,9 @@ class _SignInPageState extends State<SignInPage> {
                     ),
                     if (!isSignUp)
                       TextButton(
-                        onPressed: () async {
-                          final email = emailController.text.trim();
-                          if (email.isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('이메일을 먼저 입력해주세요')),
-                            );
-                            return;
-                          }
-                          final sent = await EmailAuthService.sendPasswordResetEmail(email);
-                          if (context.mounted) {
-                            Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  sent
-                                      ? '비밀번호 재설정 이메일을 보냈습니다'
-                                      : '이메일 발송에 실패했습니다. 이메일 주소를 확인해주세요',
-                                ),
-                              ),
-                            );
-                          }
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _showPasswordResetDialog();
                         },
                         child: const Text('비밀번호 찾기'),
                       ),
@@ -414,16 +396,16 @@ class _SignInPageState extends State<SignInPage> {
                         User? user;
                         String? authError;
                         try {
-                          if (isSignUp) {
-                            user = await EmailAuthService.signUp(
-                              email: email,
-                              password: password,
-                            );
-                          } else {
-                            user = await EmailAuthService.signIn(
-                              email: email,
-                              password: password,
-                            );
+                        if (isSignUp) {
+                          user = await EmailAuthService.signUp(
+                            email: email,
+                            password: password,
+                          );
+                        } else {
+                          user = await EmailAuthService.signIn(
+                            email: email,
+                            password: password,
+                          );
                           }
                         } catch (e) {
                           // Exception 메시지에서 'Exception: ' 접두사 제거
@@ -459,6 +441,156 @@ class _SignInPageState extends State<SignInPage> {
                 ),
           ),
     );
+  }
+
+  Future<void> _showPasswordResetDialog() async {
+    final emailCtrl = TextEditingController();
+    bool isSending = false;
+    bool isSent = false;
+    String? errorMsg;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: !isSending,
+      builder:
+          (ctx) => StatefulBuilder(
+            builder:
+                (ctx, setDialogState) => AlertDialog(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  title: Row(
+                    children: const [
+                      Icon(Icons.lock_reset_rounded, size: 22),
+                      SizedBox(width: 8),
+                      Text('비밀번호 설정 링크 보내기'),
+                    ],
+                  ),
+                  content: isSent
+                      ? Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.mark_email_read_rounded,
+                              size: 48,
+                              color: Colors.green,
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              '${emailCtrl.text.trim()}으로\n비밀번호 설정 링크를 보냈어요.',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontSize: 14, height: 1.5),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              '메일함을 확인해주세요.\n스팸함에 있을 수도 있어요.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                                height: 1.5,
+                              ),
+                            ),
+                          ],
+                        )
+                      : Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              '가입 시 사용한 이메일을 입력하면\n비밀번호 설정 링크를 보내드려요.',
+                              style: TextStyle(fontSize: 13, height: 1.5),
+                            ),
+                            const SizedBox(height: 16),
+                            TextField(
+                              controller: emailCtrl,
+                              keyboardType: TextInputType.emailAddress,
+                              decoration: InputDecoration(
+                                labelText: '이메일',
+                                hintText: 'email@example.com',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                prefixIcon: const Icon(Icons.email_outlined),
+                              ),
+                            ),
+                            if (errorMsg != null) ...[
+                              const SizedBox(height: 10),
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.withOpacity(0.07),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  errorMsg!,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.red,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                  actions: isSent
+                      ? [
+                          ElevatedButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            child: const Text('확인'),
+                          ),
+                        ]
+                      : [
+                          TextButton(
+                            onPressed: isSending ? null : () => Navigator.pop(ctx),
+                            child: const Text('취소'),
+                          ),
+                          ElevatedButton(
+                            onPressed: isSending
+                                ? null
+                                : () async {
+                                    final email = emailCtrl.text.trim();
+                                    if (email.isEmpty || !email.contains('@')) {
+                                      setDialogState(
+                                        () => errorMsg = '올바른 이메일 주소를 입력해주세요.',
+                                      );
+                                      return;
+                                    }
+                                    setDialogState(() {
+                                      isSending = true;
+                                      errorMsg = null;
+                                    });
+                                    try {
+                                      await FirebaseAuth.instance
+                                          .sendPasswordResetEmail(email: email);
+                                      if (ctx.mounted) {
+                                        setDialogState(() => isSent = true);
+                                      }
+                                    } on FirebaseAuthException catch (e) {
+                                      setDialogState(() {
+                                        isSending = false;
+                                        errorMsg = e.code == 'user-not-found'
+                                            ? '등록되지 않은 이메일이에요.'
+                                            : '발송 중 오류가 발생했어요. 다시 시도해주세요.';
+                                      });
+                                    }
+                                  },
+                            child: isSending
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Text('링크 보내기'),
+                          ),
+                        ],
+                ),
+          ),
+    );
+    emailCtrl.dispose();
   }
 
   @override

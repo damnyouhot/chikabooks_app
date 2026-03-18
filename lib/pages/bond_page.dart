@@ -73,6 +73,9 @@ class BondPageState extends State<BondPage> with WidgetsBindingObserver {
   // ── 매칭 중 로딩 상태 ──
   bool _isMatching = false;
 
+  // ── 파트너 데이터 로딩 중 (로딩 완료 전 "파트너 없음" 표시 방지) ──
+  bool _isPartnerLoading = true;
+
   // ── Firestore 스트림 (initState에서 1회 생성) ──
   Stream<DocumentSnapshot>? _userStream;
 
@@ -140,6 +143,7 @@ class BondPageState extends State<BondPage> with WidgetsBindingObserver {
   }
 
   Future<void> _loadData() async {
+    if (mounted) setState(() => _isPartnerLoading = true);
     try {
       debugPrint('🔍 [BondPage] ━━━ 데이터 로딩 시작 ━━━');
 
@@ -148,7 +152,8 @@ class BondPageState extends State<BondPage> with WidgetsBindingObserver {
         forceRefresh: _firstLoad,
       );
       _firstLoad = false;
-      final groupId = profile?.partnerGroupId;
+      // StreamBuilder가 이미 설정한 _partnerGroupId가 있으면 유지 (서버 stale 방지)
+      final groupId = profile?.partnerGroupId ?? _partnerGroupId;
 
       debugPrint('🔍 [BondPage] groupId: $groupId');
       debugPrint('🔍 [BondPage] partnerStatus: ${profile?.partnerStatus}');
@@ -167,15 +172,15 @@ class BondPageState extends State<BondPage> with WidgetsBindingObserver {
 
       debugPrint('🔍 [BondPage] 그룹 정보 조회 시작...');
 
-      // ② 그룹 + 멤버 목록 병렬 조회
-      final PartnerGroup? group;
-      final List<GroupMemberMeta> members;
-      final groupResult = await Future.wait<dynamic>([
+      // ② 그룹 + 멤버 + 주간 활동 데이터 병렬 조회 (워터폴 → 병렬)
+      final results = await Future.wait<dynamic>([
         PartnerService.getMyGroup(),
         PartnerService.getGroupMembers(groupId),
+        WeeklyActivityService.getWeeklyActivityData(groupId),
       ]);
-      group = groupResult[0] as PartnerGroup?;
-      members = groupResult[1] as List<GroupMemberMeta>;
+      final group = results[0] as PartnerGroup?;
+      final members = results[1] as List<GroupMemberMeta>;
+      final activityData = results[2] as Map<String, Map<String, int>>;
 
       debugPrint('🔍 [BondPage] group: ${group?.id}');
       debugPrint('🔍 [BondPage] group.endsAt: ${group?.endsAt}');
@@ -183,101 +188,26 @@ class BondPageState extends State<BondPage> with WidgetsBindingObserver {
       debugPrint('🔍 [BondPage] group.memberUids: ${group?.memberUids}');
       debugPrint('🔍 [BondPage] members.length: ${members.length}');
 
-      // ✅ 만료된 그룹 자동 정리
-      // group==null 이거나 isGroupActive==false인 경우,
-      // 캐시 타이밍 이슈일 수 있으므로 반드시 서버에서 재확인 후 정리
+      // 그룹 비활성 감지 → 로컬 UI만 "파트너 없음"으로 전환
+      // Firestore 문서 정리는 서버(expirePartnerGroups Cloud Function)가 담당
       if (group == null || !BondStateHelper.isGroupActive(group)) {
-        debugPrint('⚠️ [BondPage] group 비활성 감지 (group=${group?.id}, isActive=${group?.isActive}) → 서버 재확인');
-
-        // 서버에서 직접 그룹 문서 재확인 (캐시 무시)
-        try {
-          final snap = await FirebaseFirestore.instance
-              .collection('partnerGroups')
-              .doc(groupId)
-              .get(const GetOptions(source: Source.server));
-          if (snap.exists) {
-            final serverData = snap.data();
-            final serverIsActive = serverData?['isActive'] as bool? ?? false;
-            final serverEndsAt = (serverData?['endsAt'] as Timestamp?)?.toDate();
-            final serverNotExpired = serverEndsAt != null && serverEndsAt.toUtc().isAfter(DateTime.now().toUtc());
-            final serverMemberUids = List<String>.from(serverData?['memberUids'] ?? []);
-
-            debugPrint('🔍 [BondPage] 서버 재확인 결과: isActive=$serverIsActive, expired=${!serverNotExpired}, members=${serverMemberUids.length}');
-
-            if (serverIsActive && serverNotExpired && serverMemberUids.isNotEmpty) {
-              // 서버에 그룹이 활성으로 존재 → 캐시 이슈이므로 정리하지 않고 재시도
-              debugPrint('⚠️ [BondPage] 서버에서는 활성 그룹 → 정리 스킵, 재시도');
-              UserProfileService.clearCache();
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted) {
-                  _firstLoad = true;
-                  _loadData();
-                }
-              });
-              return;
-            }
-          }
-        } catch (e) {
-          debugPrint('⚠️ [BondPage] 그룹 서버 재확인 실패: $e');
-          // 네트워크 에러 시에는 정리하지 않고 그냥 리턴 (다음 시도 때 다시 확인)
-          return;
-        }
-
-        debugPrint('⚠️ [BondPage] 서버 확인 후에도 비활성 → partnerGroupId 정리');
-        final uid = FirebaseAuth.instance.currentUser?.uid;
-        if (uid != null) {
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(uid)
-              .update({
-                'partnerGroupId': FieldValue.delete(),
-                'partnerGroupEndsAt': FieldValue.delete(),
-              });
-        }
+        debugPrint('⚠️ [BondPage] group 비활성 (group=${group?.id}, isActive=${group?.isActive}) → UI만 개인 모드 전환 (Firestore 미삭제)');
         if (mounted) {
           setState(() {
-            _partnerGroupId = null;
             _partnerGroup = null;
             _groupMembers = [];
             _memberNicknames = {};
           });
         }
-        debugPrint('✅ [BondPage] 만료 그룹 정리 완료 → 개인 모드');
         debugPrint('✅ [BondPage] ━━━ 데이터 로딩 완료 ━━━');
         return;
       }
 
-      // ③ 닉네임 조회 + 주간 활동 데이터 병렬 처리
-      // 닉네임: publicProfiles에서 항상 최신 값으로 조회 (설정 변경 즉시 반영)
-      final nicknamesFuture = Future.wait<MapEntry<String, String>>(
-        members.map((m) async {
-          try {
-            final doc = await FirebaseFirestore.instance
-                .collection('publicProfiles')
-                .doc(m.uid)
-                .get();
-            final nick = (doc.data()?['nickname'] as String?)?.trim();
-            // publicProfiles에 없으면 memberMeta 닉네임 폴백
-            if (nick != null && nick.isNotEmpty) return MapEntry(m.uid, nick);
-            final metaNick = m.nickname?.trim();
-            return MapEntry(m.uid, metaNick?.isNotEmpty == true ? metaNick! : m.uid);
-          } catch (e) {
-            debugPrint('⚠️ 닉네임 조회 실패 (${m.uid}): $e');
-            final metaNick = m.nickname?.trim();
-            return MapEntry(m.uid, metaNick?.isNotEmpty == true ? metaNick! : m.uid);
-          }
-        }),
-      );
-      final activityFuture =
-          WeeklyActivityService.getWeeklyActivityData(groupId);
-
-      final fetchedEntries = await nicknamesFuture;
-      final activityData = await activityFuture;
-
+      // ③ 닉네임: memberMeta에서 즉시 추출 (개별 Firestore 조회 제거)
       final nicknames = <String, String>{};
-      // publicProfiles에서 가져온 최신 닉네임으로 덮어쓰기
-      for (final entry in fetchedEntries) {
-        nicknames[entry.key] = entry.value;
+      for (final m in members) {
+        final metaNick = m.nickname?.trim();
+        nicknames[m.uid] = (metaNick != null && metaNick.isNotEmpty) ? metaNick : m.uid;
       }
 
       if (!mounted) return;
@@ -296,6 +226,8 @@ class BondPageState extends State<BondPage> with WidgetsBindingObserver {
       debugPrint('✅ [BondPage] ━━━ 데이터 로딩 완료 ━━━');
     } catch (e) {
       debugPrint('⚠️ _loadData error: $e');
+    } finally {
+      if (mounted) setState(() => _isPartnerLoading = false);
     }
   }
 
@@ -598,36 +530,24 @@ class BondPageState extends State<BondPage> with WidgetsBindingObserver {
           final data = snapshot.data!.data() as Map<String, dynamic>;
           bondScore = (data['bondScore'] as num?)?.toDouble() ?? 50.0;
 
-          // ── Firestore 실시간 변경 감지 ──
-          // 1) 다른 사람의 매칭으로 내 그룹이 생성된 경우 즉시 UI 갱신
-          // 2) 파트너 그룹이 있을 때 닉네임 변경 감지
-          final firestoreGroupId = data['partnerGroupId'] as String?;
-          final groupChanged = firestoreGroupId != _partnerGroupId;
+          // ── Firestore 실시간 변경 감지 (그룹 변경만) ──
+          // 로딩 중에는 감지하지 않음 (setState → rebuild → 재감지 무한 루프 방지)
+          if (!_isPartnerLoading && !_isMatching) {
+            final firestoreGroupId = data['partnerGroupId'] as String?;
+            final groupChanged = firestoreGroupId != _partnerGroupId;
 
-          // 닉네임 변경 감지: 파트너 그룹이 있고 멤버가 로드된 경우에만 비교
-          // (그룹 없을 때는 _memberNicknames가 비어있어 항상 null → 무한 루프 방지)
-          final myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
-          final firestoreNickname = data['nickname'] as String?;
-          final cachedNickname = _groupMembers.isNotEmpty
-              ? _memberNicknames[myUid]
-              : null; // 그룹 없으면 비교 자체를 안 함
-          final nicknameChanged = _partnerGroupId != null &&
-              firestoreNickname != null &&
-              cachedNickname != null &&
-              firestoreNickname != cachedNickname;
+            if (groupChanged) {
+              _partnerGroupId = firestoreGroupId;
 
-          if ((groupChanged || nicknameChanged) && !_isMatching) {
-            // build() 중 setState 금지 → 다음 프레임에 실행
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) {
-                debugPrint('🔄 [BondPage] Firestore 변경 감지'
-                    '${groupChanged ? " (그룹: $_partnerGroupId→$firestoreGroupId)" : ""}'
-                    '${nicknameChanged ? " (닉네임 변경)" : ""}');
-                UserProfileService.clearCache();
-                _firstLoad = true;
-                _loadData();
-              }
-            });
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) {
+                  debugPrint('🔄 [BondPage] Firestore 그룹 변경 감지→$firestoreGroupId');
+                  UserProfileService.clearCache();
+                  _firstLoad = true;
+                  _loadData();
+                }
+              });
+            }
           }
         }
 
@@ -691,7 +611,8 @@ class BondPageState extends State<BondPage> with WidgetsBindingObserver {
                     ),
 
                     // ━━━ 1.5 [파트너 없음] 상태 카드 ━━━
-                    if (!hasActivePartner)
+                    // 로딩 중에는 "파트너 없음"을 표시하지 않음
+                    if (!hasActivePartner && !_isPartnerLoading)
                       SliverToBoxAdapter(
                         child: BondNoPartnerCard(
                           bondScore: bondScore,
@@ -725,7 +646,7 @@ class BondPageState extends State<BondPage> with WidgetsBindingObserver {
                             weeklyReactionCounts: _weeklyReactionCounts,
                             topRightOverlay: BondScoreGauge(bondScore: bondScore),
                           ),
-                        ),
+                      ),
 
                       const SliverToBoxAdapter(child: SizedBox(height: 16)),
 
@@ -751,7 +672,7 @@ class BondPageState extends State<BondPage> with WidgetsBindingObserver {
                     ],
 
                     // ━━━ 3. [파트너 없음] 섹션 ━━━
-                    if (!hasActivePartner) ...[
+                    if (!hasActivePartner && !_isPartnerLoading) ...[
                       const SliverToBoxAdapter(child: SizedBox(height: 8)),
 
                       SliverToBoxAdapter(
@@ -773,7 +694,7 @@ class BondPageState extends State<BondPage> with WidgetsBindingObserver {
 
                     const SliverToBoxAdapter(child: SizedBox(height: 16)),
 
-                    const SliverToBoxAdapter(child: BondPollSection()),
+                    // const SliverToBoxAdapter(child: BondPollSection()), // 준비중 — 숨김
 
                     const SliverToBoxAdapter(child: SizedBox(height: 40)),
                   ],

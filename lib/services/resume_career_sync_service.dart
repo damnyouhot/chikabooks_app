@@ -148,7 +148,6 @@ class ResumeCareerSyncService {
 
       updates['careerProfile.skills.$masterId'] = {
         'enabled': true,
-        'level': skill.level,
         'syncedFromResume': true,
         'updatedAt': FieldValue.serverTimestamp(),
       };

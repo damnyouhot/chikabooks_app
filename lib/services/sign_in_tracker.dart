@@ -3,7 +3,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// 로그인 provider / lastLoginAt / email 기록 유틸
+/// 위생사(지원자) 로그인 provider / lastLoginAt / email 기록 유틸
+///
+/// 대상 컬렉션: `users/{uid}` (위생사 전용)
+/// 공고자 로그인 기록은 `ClinicAuthService.recordLogin()`으로 별도 처리
 ///
 /// - Firestore `users/{uid}` 에 `provider`, `lastLoginAt`, `email` 저장
 ///   (카카오/네이버/애플은 Cloud Function에서 이미 저장하지만,

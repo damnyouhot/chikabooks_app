@@ -128,6 +128,46 @@ class AdminActivityService {
     });
   }
 
+  /// Publisher(공고자) 이벤트 기록 — fire-and-forget
+  ///
+  /// 위생사 이벤트와 달리 `clinics_accounts`에서 스냅샷을 수집합니다.
+  static void logPublisher(
+    ActivityEventType type, {
+    required String page,
+    String? targetId,
+    Map<String, dynamic>? extra,
+  }) {
+    Future.delayed(Duration.zero, () async {
+      try {
+        final uid = _auth.currentUser?.uid;
+        if (uid == null) return;
+
+        final doc = await _db.collection('clinics_accounts').doc(uid).get();
+        final clinicData = doc.data() ?? {};
+
+        final data = <String, dynamic>{
+          'userId': uid,
+          'type': type.value,
+          'page': page,
+          'timestamp': FieldValue.serverTimestamp(),
+          'isFunnel': false,
+          'accountType': 'publisher',
+          if (clinicData['approvalStatus'] != null)
+            'approvalStatusSnapshot': clinicData['approvalStatus'],
+          if (clinicData['clinic'] is Map)
+            'clinicNameSnapshot': (clinicData['clinic'] as Map)['name'],
+        };
+
+        if (targetId != null) data['targetId'] = targetId;
+        if (extra != null) data.addAll(extra);
+
+        await _db.collection('activityLogs').add(data);
+      } catch (e) {
+        debugPrint('⚠️ AdminActivityService.logPublisher 실패: $e');
+      }
+    });
+  }
+
   // ── 내부 메서드 ───────────────────────────────────────────────
 
   /// 통계 제외 계정 여부 (세션 캐시)
@@ -234,8 +274,20 @@ enum ActivityEventType {
   tapCareerEdit('tap_career_edit', '커리어 카드 수정'),
   tapNotificationAllow('tap_notification_allow', '알림 허용'),
 
+  // ── 퀴즈 ──────────────────────────────────────────────────
+  quizCompleted('quiz_completed', '퀴즈 풀이 완료'),
+
   // ── 기타 ──────────────────────────────────────────────────
-  appOpen('app_open', '앱 실행');
+  appOpen('app_open', '앱 실행'),
+
+  // ── 공고자(Publisher) 이벤트 ─────────────────────────────
+  publisherSignupSubmitted('publisher_signup_submitted', '공고자 가입 신청'),
+  publisherLogin('publisher_login', '공고자 로그인'),
+  publisherPhoneVerified('publisher_phone_verified', '공고자 휴대폰 인증'),
+  publisherProfileSaved('publisher_profile_saved', '공고자 프로필 저장'),
+  publisherBizSubmitted('publisher_biz_submitted', '공고자 사업자 인증 제출'),
+  publisherApproved('publisher_approved', '공고자 승인 완료'),
+  publisherJobCreated('publisher_job_created', '공고 작성 완료');
 
   final String value;
   final String label;

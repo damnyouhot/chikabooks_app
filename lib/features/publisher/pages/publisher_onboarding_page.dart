@@ -74,15 +74,32 @@ class PublisherOnboardingPage extends StatelessWidget {
                                   context.push('/publisher/verify-business'),
                     ),
 
+                    // ── 거절/정지 안내 ─────────────────
+                    if (status.approvalStatus == 'rejected') ...[
+                      const SizedBox(height: 16),
+                      _StatusBanner(
+                        icon: Icons.cancel_outlined,
+                        color: AppColors.error,
+                        message: '사업자 인증이 반려되었습니다.\n서류를 재제출해주세요.',
+                      ),
+                    ] else if (status.approvalStatus == 'suspended') ...[
+                      const SizedBox(height: 16),
+                      _StatusBanner(
+                        icon: Icons.block_rounded,
+                        color: AppColors.error,
+                        message: '계정이 정지 상태입니다.\n문의: support@chikabooks.com',
+                      ),
+                    ],
+
                     const SizedBox(height: 32),
 
                     // ── CTA ───────────────────────────
-                    if (status.canPost)
+                    if (status.isApprovedAndCanPost)
                       PubPrimaryButton(
                         label: '공고 작성 시작하기',
                         onPressed: () => context.go('/post-job'),
                       )
-                    else
+                    else if (status.approvalStatus != 'suspended')
                       _NextStepButton(status: status),
                   ],
                 ),
@@ -130,7 +147,7 @@ class _ProgressHeader extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  status.canPost
+                  status.isApprovedAndCanPost
                       ? '인증 완료! 공고를 작성할 수 있어요.'
                       : '인증을 완료해 공고를 게시하세요.',
                   style: const TextStyle(
@@ -147,7 +164,7 @@ class _ProgressHeader extends StatelessWidget {
                 ),
                 decoration: BoxDecoration(
                   color:
-                      status.canPost
+                      status.isApprovedAndCanPost
                           ? kPubBlue.withOpacity(0.1)
                           : kPubBorder.withOpacity(0.5),
                   borderRadius: BorderRadius.circular(20),
@@ -158,7 +175,9 @@ class _ProgressHeader extends StatelessWidget {
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                     color:
-                        status.canPost ? kPubBlue : kPubText.withOpacity(0.5),
+                        status.isApprovedAndCanPost
+                            ? kPubBlue
+                            : kPubText.withOpacity(0.5),
                   ),
                 ),
               ),
@@ -399,6 +418,47 @@ class _NextStepButton extends StatelessWidget {
       child: Text(
         _label,
         style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+      ),
+    );
+  }
+}
+
+// ── 상태 안내 배너 (거절/정지) ─────────────────────────────
+class _StatusBanner extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String message;
+
+  const _StatusBanner({
+    required this.icon,
+    required this.color,
+    required this.message,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 24),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                fontSize: 13,
+                color: kPubText.withOpacity(0.8),
+                height: 1.5,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

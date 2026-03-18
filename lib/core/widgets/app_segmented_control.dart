@@ -24,6 +24,7 @@ class AppSegmentedControl extends StatelessWidget {
     this.margin,
     this.containerRadius,
     this.indicatorRadius,
+    this.wipIndices = const {},
   });
 
   final TabController controller;
@@ -37,6 +38,9 @@ class AppSegmentedControl extends StatelessWidget {
 
   /// 인디케이터 radius. 기본값: AppRadius.sm = 8
   final double? indicatorRadius;
+
+  /// '작업중' 뱃지를 표시할 탭 인덱스 집합
+  final Set<int> wipIndices;
 
   @override
   Widget build(BuildContext context) {
@@ -72,7 +76,40 @@ class AppSegmentedControl extends StatelessWidget {
           fontSize: 12,
           fontWeight: FontWeight.w400,
         ),
-        tabs: labels.map((label) => Tab(text: label)).toList(),
+        tabs: labels.asMap().entries.map((entry) {
+          final i = entry.key;
+          final label = entry.value;
+          if (!wipIndices.contains(i)) return Tab(text: label);
+          return Tab(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(label),
+                const SizedBox(width: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 1,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2E7D32).withOpacity(0.9),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    '준비중',
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.onCardEmphasis,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
       ),
     );
   }

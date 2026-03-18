@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../models/resume.dart';
 import '../../../core/theme/app_colors.dart';
+import 'resume_ocr_prompt.dart';
 
 /// G. 보수교육/세미나 섹션
 class SectionTrainings extends StatefulWidget {
@@ -59,7 +60,8 @@ class _SectionTrainingsState extends State<SectionTrainings> {
           '이수한 보수교육, 세미나, 연수 등을 입력해주세요.',
           style: TextStyle(fontSize: 12, color: AppColors.textDisabled),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
+        const ResumeOcrPrompt(),
 
         ...List.generate(_items.length, (i) => _TrainingCard(
               index: i,

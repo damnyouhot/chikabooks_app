@@ -104,7 +104,7 @@ class _BondContinueSectionState extends State<BondContinueSection> {
                         _saved
                             ? '✓ ${_selectedPartnerUids.length}명 선택 완료'
                             : _selectedPartnerUids.isEmpty
-                                ? '선택하지 않아도 괜찮아'
+                            ? '선택하지 않아도 괜찮아'
                                 : '${_selectedPartnerUids.length}명 선택 중',
                         style: TextStyle(
                           fontSize: 12,
@@ -326,8 +326,8 @@ class _BondContinueSectionState extends State<BondContinueSection> {
           _saving = false;
           _isCollapsed = true;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
             content: Text('${_selectedPartnerUids.length}명과 이어가기 신청했어요! 🌱'),
             behavior: SnackBarBehavior.floating,
           ),
@@ -339,9 +339,9 @@ class _BondContinueSectionState extends State<BondContinueSection> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('저장에 실패했어요. 다시 시도해주세요'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
       }
     }
   }

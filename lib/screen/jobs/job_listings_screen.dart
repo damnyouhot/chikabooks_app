@@ -634,7 +634,7 @@ class _MapToggleChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
         decoration: BoxDecoration(
-          color: AppColors.surfaceMuted,
+          color: AppColors.accent,
           borderRadius: BorderRadius.circular(AppRadius.sm),
         ),
         child: const Row(
@@ -643,7 +643,7 @@ class _MapToggleChip extends StatelessWidget {
             Icon(
               Icons.map_outlined,
               size: 13,
-              color: AppColors.textSecondary,
+              color: AppColors.onAccent,
             ),
             SizedBox(width: 3),
             Text(
@@ -651,7 +651,7 @@ class _MapToggleChip extends StatelessWidget {
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w500,
-                color: AppColors.textSecondary,
+                color: AppColors.onAccent,
                 letterSpacing: -0.2,
               ),
             ),

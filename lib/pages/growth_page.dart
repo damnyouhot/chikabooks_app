@@ -152,7 +152,29 @@ class _GrowthPageState extends State<GrowthPage>
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
             content: const SingleChildScrollView(
-              child: Text('', style: TextStyle(fontSize: 13, height: 1.6)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('퀴즈, 제도 변경, 책으로 치과 직무를 배우고 기록하는 공간이에요.', style: TextStyle(fontSize: 13, height: 1.5)),
+                  SizedBox(height: 16),
+                  Text('📝 오늘 퀴즈', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  SizedBox(height: 8),
+                  Text('매일 치과 관련 퀴즈를 풀어요.', style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
+                  SizedBox(height: 16),
+                  Text('📋 제도 변경', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  SizedBox(height: 8),
+                  Text('HIRA 급여·수가 등 변경 소식을 확인하고 저장해요.', style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
+                  SizedBox(height: 16),
+                  Text('📖 치과책방', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  SizedBox(height: 8),
+                  Text('치과책방에 올라온 책들을 볼 수 있는 공간이에요.', style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
+                  SizedBox(height: 16),
+                  Text('📗 내 서재', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  SizedBox(height: 8),
+                  Text('치과책방 공식 홈페이지에서 구매한 책들을 볼 수 있는 곳이에요.', style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
+                ],
+              ),
             ),
             actions: [
               TextButton(

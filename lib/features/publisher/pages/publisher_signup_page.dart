@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -50,11 +51,41 @@ class _PublisherSignupPageState extends State<PublisherSignupPage> {
       _errorMsg = null;
     });
     try {
+      final email = _emailCtrl.text.trim();
+      final normalizedEmail = email.toLowerCase();
+
+      // Auth 계정 생성 전: 이메일 기준으로 위생사 계정 중복 체크
+      final existingApplicant = await FirebaseFirestore.instance
+          .collection('users')
+          .where('normalizedEmail', isEqualTo: normalizedEmail)
+          .limit(1)
+          .get();
+      if (existingApplicant.docs.isNotEmpty) {
+        setState(() {
+          _errorMsg = '이 이메일은 이미 위생사 계정으로 가입되어 있어\n'
+              '공고자 계정으로 사용할 수 없습니다.\n'
+              '공고자 가입은 별도의 이메일로 진행해 주세요.';
+        });
+        return;
+      }
+
+      // Firebase Auth 계정 생성
       await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: _emailCtrl.text.trim(),
+        email: email,
         password: _pwCtrl.text,
       );
-      await ClinicAuthService.initClinicRole();
+
+      // Auth 계정 생성 후: uid 기준 중복 체크 + clinics_accounts 문서 생성
+      final dupMsg = await ClinicAuthService.checkDuplicateForClinicSignup(email);
+      if (dupMsg != null) {
+        // 위생사 계정이 이미 같은 uid로 존재 → Auth 계정 삭제 후 안내
+        await FirebaseAuth.instance.currentUser?.delete();
+        if (!mounted) return;
+        setState(() => _errorMsg = dupMsg);
+        return;
+      }
+
+      await ClinicAuthService.initClinicAccount();
       if (!mounted) return;
       context.go('/publisher/onboarding');
     } on FirebaseAuthException catch (e) {

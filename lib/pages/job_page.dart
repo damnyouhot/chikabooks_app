@@ -210,10 +210,30 @@ class _JobPageTitleBar extends StatelessWidget {
           '커리어',
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
-        content: const Text(
-          '나의 커리어 정보를 관리하고\n맞춤 공고를 추천받아보세요.\n'
-          '커리어 카드 기반으로 지원까지 바로 할 수 있어요.',
-          style: TextStyle(fontSize: 13, height: 1.6),
+        content: const SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('이력서와 구인 공고를 관리하는 공간이에요.', style: TextStyle(fontSize: 13, height: 1.5)),
+              SizedBox(height: 16),
+              Text('📍 공고 보기', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              SizedBox(height: 8),
+              Text('근처 치과 구인 공고를 목록·지도로 확인해요.', style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
+              SizedBox(height: 16),
+              Text('📄 커리어 카드', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              SizedBox(height: 8),
+              Text('이력서를 작성하고 관리해요. 완성된 이력서로 바로 지원할 수 있어요.', style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
+              SizedBox(height: 16),
+              Text('🌐 웹에서도 이용 가능', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              SizedBox(height: 8),
+              Text('PC에서 같은 계정으로 접속해 작업할 수 있어요.\nhttps://chikabooks3rd.web.app', style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
+              SizedBox(height: 16),
+              Text('📎 웹 전용 기능', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              SizedBox(height: 8),
+              Text('이력서에 자격증·수료증·경력증명서 등 첨부 파일을 추가할 수 있어요.', style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
+            ],
+          ),
         ),
         actions: [
           TextButton(

@@ -10,6 +10,10 @@ import '../../features/jobs/web/job_post_web_page.dart';
 import '../../features/jobs/web/legal_page.dart';
 import '../../features/jobs/ui/clinic_verify_page.dart';
 import '../../features/auth/web/web_login_page.dart';
+import '../../features/auth/web/set_password_page.dart';
+import '../../features/feedback/feedback_list_page.dart';
+import '../../features/feedback/feedback_write_page.dart';
+import '../../features/feedback/feedback_detail_page.dart';
 import '../../features/publisher/pages/publisher_signup_page.dart';
 import '../../features/publisher/pages/publisher_forgot_page.dart';
 import '../../features/publisher/pages/publisher_onboarding_page.dart';
@@ -18,6 +22,7 @@ import '../../features/publisher/pages/publisher_profile_page.dart';
 import '../../features/publisher/pages/publisher_verify_business_page.dart';
 import '../../features/publisher/pages/publisher_pending_page.dart';
 import '../../features/publisher/pages/publisher_done_page.dart';
+import '../../features/publisher/services/clinic_auth_service.dart';
 import '../../features/resume/screens/resume_home_screen.dart';
 import '../../features/resume/screens/resume_edit_screen.dart';
 import '../../features/resume/screens/ocr_review_screen.dart';
@@ -38,11 +43,34 @@ final appRouter = GoRouter(
       return '/login?next=$path';
     }
 
+    // Publisher 온보딩 경로 가드 (signup/forgot 제외)
+    const publisherGuarded = [
+      '/publisher/onboarding',
+      '/publisher/verify-phone',
+      '/publisher/profile',
+      '/publisher/verify-business',
+      '/publisher/pending',
+      '/publisher/done',
+    ];
+    if (publisherGuarded.contains(path)) {
+      if (user == null) return '/login';
+      final status = await ClinicAuthService.getStatus();
+      if (!status.exists) return '/login';
+    }
+
+    // 공고 작성 경로 가드: 승인된 공고자만 접근
+    if (path == '/post-job' && user != null) {
+      final status = await ClinicAuthService.getStatus();
+      if (status.exists && !status.isApprovedAndCanPost) {
+        return '/publisher/onboarding';
+      }
+    }
+
     // 관리자 대시보드 접근 가드
     if (path.startsWith('/admin')) {
       if (user == null) return '/';
       final isAdmin = await UserProfileService.isAdmin();
-      if (!isAdmin) return '/'; // 비관리자 차단 → 홈으로
+      if (!isAdmin) return '/';
     }
 
     return null;
@@ -66,9 +94,43 @@ final appRouter = GoRouter(
       builder: (_, __) => const AdminDashboardPage(),
     ),
 
+    // ── 피드백 게시판 ────────────────────────────────────────
+    GoRoute(
+      path: '/feedback',
+      builder: (_, __) => const FeedbackListPage(),
+    ),
+    GoRoute(
+      path: '/feedback/write',
+      builder: (_, state) {
+        final label = state.uri.queryParameters['label'] ?? '';
+        final route = state.uri.queryParameters['route'] ?? '/feedback/write';
+        return FeedbackWritePage(
+          sourceScreenLabel: label,
+          sourceRoute: route,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/feedback/:id',
+      builder: (_, state) =>
+          FeedbackDetailPage(feedbackId: state.pathParameters['id']!),
+    ),
+
     // ── 로그인 불필요 — 법적 문서 페이지 ──────────────────
     GoRoute(path: '/privacy', builder: (_, __) => buildPrivacyPage()),
     GoRoute(path: '/terms', builder: (_, __) => buildTermsPage()),
+
+    // ── Firebase 이메일 액션 링크 (비밀번호 재설정) ──────────
+    GoRoute(
+      path: '/set-password',
+      builder: (_, state) {
+        final oobCode = state.uri.queryParameters['oobCode'] ?? '';
+        if (oobCode.isNotEmpty) {
+          return SetPasswordPage(oobCode: oobCode);
+        }
+        return const WebLoginPage(nextRoute: null);
+      },
+    ),
 
     // ── 통합 로그인 페이지 ────────────────────────────────
     GoRoute(

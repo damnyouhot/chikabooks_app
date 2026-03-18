@@ -138,45 +138,67 @@ class AdminDashboardService {
     }
   }
 
-  // ─── Emotion KPI ──────────────────────────────────────────────
+  // ─── 기록하기(한 줄 기록) KPI & Feed ───────────────────────────
 
-  /// [since] 이후 감정기록 수
-  static Future<int> getEmotionCount({required DateTime since}) async {
+  /// [since] 이후 기록하기(한 줄 기록) 수
+  ///
+  /// 1번 탭 '기록하기'에서 사용자가 작성한 notes 개수
+  static Future<int> getNoteCount({required DateTime since}) async {
     try {
       final snap = await _db
-          .collection('emotionLogs')
-          .where('timestamp', isGreaterThan: Timestamp.fromDate(since))
+          .collectionGroup('notes')
+          .where('createdAt', isGreaterThan: Timestamp.fromDate(since))
           .count()
           .get();
       return snap.count ?? 0;
     } catch (e) {
-      debugPrint('⚠️ getEmotionCount: $e');
+      debugPrint('⚠️ getNoteCount: $e');
       return 0;
     }
   }
 
-  /// [since] 이후 감정 평균 점수
+  /// 최근 기록하기(한 줄 기록) 리스트 — 트위터 타임라인 형태
   ///
-  /// Firestore는 평균 집계를 지원하지 않으므로
-  /// 최근 200건을 읽어 클라이언트에서 계산합니다.
-  static Future<double?> getAverageEmotionScore({required DateTime since}) async {
+  /// 1번 탭 '기록하기'에서 작성한 notes를 최신순 [limit]건
+  static Future<List<NoteFeedItem>> getRecentNotes({
+    int limit = 50,
+    DateTime? since,
+  }) async {
     try {
+      final fetchLimit = since != null ? 200 : limit;
       final snap = await _db
-          .collection('emotionLogs')
-          .where('timestamp', isGreaterThan: Timestamp.fromDate(since))
-          .orderBy('timestamp', descending: true)
-          .limit(200)
+          .collectionGroup('notes')
+          .orderBy('createdAt', descending: true)
+          .limit(fetchLimit)
           .get();
-      if (snap.docs.isEmpty) return null;
-      final scores = snap.docs
-          .map((d) => (d.data()['score'] as num?)?.toDouble())
-          .whereType<double>()
-          .toList();
-      if (scores.isEmpty) return null;
-      return scores.reduce((a, b) => a + b) / scores.length;
-    } catch (e) {
-      debugPrint('⚠️ getAverageEmotionScore: $e');
-      return null;
+
+      var items = snap.docs.map((d) {
+        final userId = d.reference.parent.parent?.id ?? '';
+        final data = d.data();
+        final rawUrls = data['imageUrls'];
+        final imageUrls = rawUrls is List
+            ? rawUrls.cast<String>()
+            : <String>[];
+        return NoteFeedItem(
+          id: d.id,
+          userId: userId,
+          text: data['text'] as String? ?? '',
+          createdAt: (data['createdAt'] as dynamic)?.toDate() ?? DateTime.now(),
+          imageUrls: imageUrls,
+        );
+      }).toList();
+
+      if (since != null) {
+        items = items
+            .where((e) => e.createdAt.isAfter(since))
+            .take(limit)
+            .toList();
+      }
+      return items;
+    } catch (e, st) {
+      debugPrint('⚠️ getRecentNotes: $e');
+      debugPrint('$st');
+      rethrow;
     }
   }
 
@@ -321,35 +343,36 @@ class AdminDashboardService {
     }
   }
 
-  // ─── Emotion Feed ─────────────────────────────────────────────
+  // ─── Emotion Logs (emotionLogs 컬렉션, 레거시) ─────────────────
 
-  /// 최근 감정 기록 리스트
-  ///
-  /// emotionLogs 최신순 [limit]건
-  /// [since] 로 기간 제한 가능
   static Future<List<EmotionLogItem>> getRecentEmotionLogs({
     int limit = 50,
     DateTime? since,
   }) async {
     try {
-      Query<Map<String, dynamic>> q = _db
+      // where 없이 orderBy만 사용 → 복합 인덱스 없이 동작
+      final fetchLimit = since != null ? 200 : limit;
+      final snap = await _db
           .collection('emotionLogs')
           .orderBy('timestamp', descending: true)
-          .limit(limit);
-      if (since != null) {
-        q = _db
-            .collection('emotionLogs')
-            .where('timestamp', isGreaterThan: Timestamp.fromDate(since))
-            .orderBy('timestamp', descending: true)
-            .limit(limit);
-      }
-      final snap = await q.get();
-      return snap.docs
+          .limit(fetchLimit)
+          .get();
+
+      var items = snap.docs
           .map((d) => EmotionLogItem.fromMap(d.id, d.data()))
           .toList();
-    } catch (e) {
+
+      if (since != null) {
+        items = items
+            .where((e) => e.timestamp.isAfter(since))
+            .take(limit)
+            .toList();
+      }
+      return items;
+    } catch (e, st) {
       debugPrint('⚠️ getRecentEmotionLogs: $e');
-      return [];
+      debugPrint('$st');
+      rethrow;
     }
   }
 
@@ -381,6 +404,75 @@ class AdminDashboardService {
       return [];
     }
   }
+
+  // ─── Publisher (공고자) KPI ──────────────────────────────────
+
+  /// 전체 공고자 수
+  static Future<int> getTotalPublisherCount() async {
+    try {
+      final snap = await _db.collection('clinics_accounts').count().get();
+      return snap.count ?? 0;
+    } catch (e) {
+      debugPrint('⚠️ getTotalPublisherCount: $e');
+      return 0;
+    }
+  }
+
+  /// 신규 공고자 가입 수 ([since] 이후)
+  static Future<int> getRecentPublisherSignups({
+    required DateTime since,
+  }) async {
+    try {
+      final snap = await _db
+          .collection('clinics_accounts')
+          .where('createdAt', isGreaterThan: Timestamp.fromDate(since))
+          .count()
+          .get();
+      return snap.count ?? 0;
+    } catch (e) {
+      debugPrint('⚠️ getRecentPublisherSignups: $e');
+      return 0;
+    }
+  }
+
+  /// 승인 상태별 공고자 수
+  static Future<Map<String, int>> getPublisherApprovalCounts() async {
+    final result = <String, int>{
+      'pending': 0,
+      'approved': 0,
+      'rejected': 0,
+      'suspended': 0,
+    };
+    for (final status in result.keys.toList()) {
+      try {
+        final snap = await _db
+            .collection('clinics_accounts')
+            .where('approvalStatus', isEqualTo: status)
+            .count()
+            .get();
+        result[status] = snap.count ?? 0;
+      } catch (_) {}
+    }
+    return result;
+  }
+
+  /// 공고 작성 가능한 공고자 수 (approved + canPost)
+  static Future<int> getActivePublisherCount() async {
+    try {
+      final snap = await _db
+          .collection('clinics_accounts')
+          .where('approvalStatus', isEqualTo: 'approved')
+          .where('canPost', isEqualTo: true)
+          .count()
+          .get();
+      return snap.count ?? 0;
+    } catch (e) {
+      debugPrint('⚠️ getActivePublisherCount: $e');
+      return 0;
+    }
+  }
+
+  // ─── Error Monitor ────────────────────────────────────────────
 
   /// 페이지별 오류 빈도 TOP N ([since] 필터 포함)
   static Future<List<MapEntry<String, int>>> getTopErrorPages({

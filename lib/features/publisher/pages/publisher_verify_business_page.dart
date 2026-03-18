@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -161,6 +162,16 @@ class _PublisherVerifyBusinessPageState
         },
         'confirmed': true,
       });
+
+      // clinics_accounts 온보딩 상태 업데이트
+      await FirebaseFirestore.instance
+          .collection('clinics_accounts')
+          .doc(uid)
+          .set({
+            'onboarding': {'business': 'pending'},
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+
       if (!mounted) return;
       setState(() => _submitted = true);
     } catch (_) {

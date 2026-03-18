@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../models/resume.dart';
 import '../../../core/theme/app_colors.dart';
+import 'resume_ocr_prompt.dart';
 
 /// D. 경력 섹션 (근무지별)
 class SectionExperiences extends StatefulWidget {
@@ -74,7 +75,8 @@ class _SectionExperiencesState extends State<SectionExperiences> {
           '최신 경력부터 입력해주세요.',
           style: TextStyle(fontSize: 12, color: AppColors.textDisabled),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
+        const ResumeOcrPrompt(),
 
         ...List.generate(_items.length, (i) => _ExperienceCard(
               index: i,

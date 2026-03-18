@@ -34,8 +34,7 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
   int _activeUsers = 0;
   int _longAbsent = 0;
   int _recentErrors = 0;
-  int _emotionCount = 0;
-  double? _avgEmotionScore;
+  int _noteCount = 0;
 
   // 퀴즈 풀 데이터
   QuizMetaState? _quizMeta;
@@ -88,8 +87,7 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
         AdminDashboardService.getActiveUserCount(since: widget.since),
         AdminDashboardService.getLongAbsentCount(),
         AdminDashboardService.getRecentErrorCount(since: widget.since),
-        AdminDashboardService.getEmotionCount(since: widget.since),
-        AdminDashboardService.getAverageEmotionScore(since: widget.since),
+        AdminDashboardService.getNoteCount(since: widget.since),
         AdminDashboardService.getCareerGroupDistribution(),
         AdminDashboardService.getQuizMetaState(),
       ]);
@@ -100,15 +98,14 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
       }
 
       setState(() {
-        _totalUsers      = results[0] as int;
-        _newUsers        = results[1] as int;
-        _activeUsers     = results[2] as int;
-        _longAbsent      = results[3] as int;
-        _recentErrors    = results[4] as int;
-        _emotionCount    = results[5] as int;
-        _avgEmotionScore = results[6] as double?;
-        _careerGroups    = results[7] as List<CareerGroupCount>;
-        _quizMeta        = results[8] as QuizMetaState?;
+        _totalUsers   = results[0] as int;
+        _newUsers     = results[1] as int;
+        _activeUsers  = results[2] as int;
+        _longAbsent   = results[3] as int;
+        _recentErrors = results[4] as int;
+        _noteCount    = results[5] as int;
+        _careerGroups = results[6] as List<CareerGroupCount>;
+        _quizMeta     = results[7] as QuizMetaState?;
         _lastSync = DateTime.now();
         _loading = false;
       });
@@ -165,14 +162,8 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
                 value: '$_activeUsers명',
                 sublabel: widget.period),
             DashboardKpi(
-                label: '감정기록 수',
-                value: '$_emotionCount건',
-                sublabel: widget.period),
-            DashboardKpi(
-                label: '감정 평균 점수',
-                value: _avgEmotionScore != null
-                    ? _avgEmotionScore!.toStringAsFixed(1)
-                    : '-',
+                label: '기록하기 수',
+                value: '$_noteCount건',
                 sublabel: widget.period),
             DashboardKpi(label: '장기 미접속', value: '$_longAbsent명', sublabel: '14일+'),
           ]),

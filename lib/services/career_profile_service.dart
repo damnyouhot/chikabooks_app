@@ -40,17 +40,32 @@ class CareerProfileService {
   }
 
   // ── 스킬 마스터 리스트 (앱 상수) ──
+  // 이력서 임상스킬(_clinicalPresets) + 소프트스킬(_softPresets)과 동일하게 유지
   static const skillMaster = <Map<String, dynamic>>[
-    {'id': 'scaling', 'title': '스케일링', 'icon': 'cleaning_services'},
-    {'id': 'prostho', 'title': '보철 어시', 'icon': 'handyman'},
-    {'id': 'ortho', 'title': '교정 어시', 'icon': 'architecture'},
-    {'id': 'consult', 'title': '상담/커뮤니케이션', 'icon': 'chat_bubble'},
-    {'id': 'insurance', 'title': '보험청구', 'icon': 'receipt_long'},
-    {'id': 'implant', 'title': '임플란트 어시', 'icon': 'build'},
-    {'id': 'pediatric', 'title': '소아진료 보조', 'icon': 'child_care'},
-    {'id': 'sterile', 'title': '멸균/소독', 'icon': 'sanitizer'},
-    {'id': 'reception', 'title': '데스크', 'icon': 'phone'},
-    {'id': 'xray', 'title': 'X-ray 보조', 'icon': 'radio'},
+    // ── 임상 스킬 ──
+    {'id': 'scaling',        'title': '스케일링',          'icon': 'cleaning_services'},
+    {'id': 'perio',          'title': '치주 관리',          'icon': 'favorite'},
+    {'id': 'fluoride',       'title': '불소도포',           'icon': 'water_drop'},
+    {'id': 'xray',           'title': '방사선 촬영',        'icon': 'radio'},
+    {'id': 'prostho',        'title': '인상 채득',          'icon': 'handyman'},
+    {'id': 'temp_crown',     'title': '임시치아 제작',      'icon': 'build_circle'},
+    {'id': 'ortho',          'title': '교정 와이어 교체',   'icon': 'architecture'},
+    {'id': 'implant',        'title': '임플란트 보조',      'icon': 'build'},
+    {'id': 'endo',           'title': '근관치료 보조',      'icon': 'medical_services'},
+    {'id': 'pediatric',      'title': '소아 진료 보조',     'icon': 'child_care'},
+    {'id': 'resin',          'title': '레진/실란트',        'icon': 'colorize'},
+    {'id': 'whitening',      'title': '치아미백',           'icon': 'auto_awesome'},
+    {'id': 'scanner',        'title': '구강스캐너',         'icon': 'document_scanner'},
+    {'id': 'photo',          'title': '구내,구외 포토',     'icon': 'photo_camera'},
+    // ── 소프트 스킬 ──
+    {'id': 'consult',        'title': '환자 상담',          'icon': 'chat_bubble'},
+    {'id': 'insurance',      'title': '보험청구',           'icon': 'receipt_long'},
+    {'id': 'chart',          'title': '차트 관리',          'icon': 'description'},
+    {'id': 'sterile',        'title': '감염 관리',          'icon': 'sanitizer'},
+    {'id': 'inventory',      'title': '재고 관리',          'icon': 'inventory'},
+    {'id': 'leadership',     'title': '팀 리더십',          'icon': 'groups'},
+    {'id': 'training',       'title': '신규 직원 교육',     'icon': 'school'},
+    {'id': 'reception',      'title': '고객 CS',            'icon': 'phone'},
   ];
 
   static Future<Map<String, Map<String, dynamic>>> getMySkills() async {
@@ -78,20 +93,16 @@ class CareerProfileService {
   static Future<void> updateSkill({
     required String skillId,
     required bool enabled,
-    required int level,
-    int? recommendedLevel,
+    int? level,
   }) async {
     try {
       final ref = _userRef;
       if (ref == null) throw Exception('로그인이 필요합니다.');
       final data = <String, dynamic>{
         'enabled': enabled,
-        'level': level,
         'updatedAt': FieldValue.serverTimestamp(),
       };
-      if (recommendedLevel != null) {
-        data['recommendedLevel'] = recommendedLevel;
-      }
+      if (level != null) data['level'] = level;
       await ref.set({
         'careerProfile': {
           'skills': {skillId: data},
@@ -103,10 +114,50 @@ class CareerProfileService {
     }
   }
 
-  /// 여러 스킬을 한 번의 Firestore 쓰기로 일괄 저장 (성능 최적화)
-  ///
-  /// [CareerSkillEditSheet]의 "저장" 버튼 시 사용.
-  /// 개별 await 루프 대신 단일 set() 호출로 네트워크 왕복 횟수를 1회로 줄임.
+  /// 커스텀 스킬의 title을 Firestore에 저장 (skillMaster에 없는 직접 입력 스킬)
+  static Future<void> updateSkillTitle({
+    required String skillId,
+    required String title,
+  }) async {
+    try {
+      final ref = _userRef;
+      if (ref == null) throw Exception('로그인이 필요합니다.');
+      await ref.set({
+        'careerProfile': {
+          'skills': {
+            skillId: {'title': title},
+          },
+        },
+      }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('⚠️ CareerProfileService.updateSkillTitle error: $e');
+      rethrow;
+    }
+  }
+
+  /// enabled 여부만 일괄 저장 (레벨 없이 체크 여부만 관리)
+  static Future<void> updateAllSkillsEnabled(
+    Map<String, Map<String, dynamic>> skillsMap,
+  ) async {
+    try {
+      final ref = _userRef;
+      if (ref == null) throw Exception('로그인이 필요합니다.');
+      final skillsPayload = skillsMap.map(
+        (id, entry) => MapEntry(id, {
+          'enabled': entry['enabled'] as bool,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }),
+      );
+      await ref.set({
+        'careerProfile': {'skills': skillsPayload},
+      }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('⚠️ CareerProfileService.updateAllSkillsEnabled error: $e');
+      rethrow;
+    }
+  }
+
+  /// 여러 스킬을 한 번의 Firestore 쓰기로 일괄 저장 (하위 호환 유지)
   static Future<void> updateAllSkills(
     Map<String, Map<String, dynamic>> skillsMap,
   ) async {

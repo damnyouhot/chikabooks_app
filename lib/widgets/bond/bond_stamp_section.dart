@@ -69,7 +69,7 @@ class _BondStampSectionState extends State<BondStampSection> {
 
   /// 독립 카드 스타일 (기존)
   Widget _buildStandaloneStamp(WeeklyStampState stamp, int todayIdx) {
-    return Padding(
+        return Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
           child: Container(
             width: double.infinity,
@@ -146,6 +146,6 @@ class _BondStampSectionState extends State<BondStampSection> {
                   ),
                 ),
               ],
-            );
+    );
   }
 }

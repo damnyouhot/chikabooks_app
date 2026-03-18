@@ -20,12 +20,18 @@ class CaringStateService {
   // ═══════════════════════ 읽기 ═══════════════════════
 
   /// 현재 돌보기 상태 로드
+  /// 캐시 우선 → 서버 폴백: 콜드 스타트 시 Firestore 연결 대기 없이 즉시 반환
   static Future<CaringState> loadState() async {
     try {
       final ref = _userRef;
       if (ref == null) return CaringState.initial();
 
-      final doc = await ref.get();
+      DocumentSnapshot<Map<String, dynamic>> doc;
+      try {
+        doc = await ref.get(const GetOptions(source: Source.cache));
+      } catch (_) {
+        doc = await ref.get();
+      }
       final data = doc.data();
       if (data == null) return CaringState.initial();
 

@@ -185,12 +185,22 @@ class JobService {
   }) async {
     const kPreviewLimit = 8;
     try {
-      final snapshot =
-          await _db
-              .collection('jobs')
-              .orderBy('postedAt', descending: true)
-              .limit(kPreviewLimit)
-              .get();
+      // 캐시 우선: 콜드 스타트 시 Firestore 연결 대기 없이 즉시 반환
+      QuerySnapshot<Map<String, dynamic>> snapshot;
+      try {
+        snapshot = await _db
+            .collection('jobs')
+            .orderBy('postedAt', descending: true)
+            .limit(kPreviewLimit)
+            .get(const GetOptions(source: Source.cache));
+        if (snapshot.docs.isEmpty) throw Exception('cache empty');
+      } catch (_) {
+        snapshot = await _db
+            .collection('jobs')
+            .orderBy('postedAt', descending: true)
+            .limit(kPreviewLimit)
+            .get();
+      }
 
       List<Job> jobs = snapshot.docs.map((d) => Job.fromDoc(d)).toList();
 

@@ -25,6 +25,7 @@ class CareerTabHeader extends StatelessWidget {
     return AppSegmentedControl(
       controller: DefaultTabController.of(context),
       labels: const ['공고 보기', '커리어 카드'],
+      wipIndices: const {0},
       margin: const EdgeInsets.symmetric(
         horizontal: AppSpacing.xl,
         vertical: AppSpacing.xs,
@@ -124,13 +125,6 @@ class CareerTab extends StatelessWidget {
                 _StageAndNetworkCard(
                   totalCareerMonths: totalCareerMonths,
                   totalClinics: entries.length,
-                  skillsLv4Count: skillsMap.values
-                      .where(
-                        (s) =>
-                            s['enabled'] == true &&
-                            ((s['level'] as int?) ?? 1) >= 4,
-                      )
-                      .length,
                   entries: entries,
                 ),
               ],
@@ -611,9 +605,6 @@ class _SkillSection extends StatelessWidget {
             )
           else ...[
             ...previewSkills.map((m) {
-              final state = skillsMap[m['id']] ?? {};
-              final level = (state['level'] as int?) ?? 1;
-              final recommended = state['recommendedLevel'] as int?;
               return Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: CareerSkillCard(
@@ -621,10 +612,7 @@ class _SkillSection extends StatelessWidget {
                     id: m['id'] as String,
                     title: m['title'] as String,
                     icon: iconFromSkillName(m['icon'] as String),
-                    level: level,
-                    recommended: recommended,
                   ),
-                  skillsMap: skillsMap,
                 ),
               );
             }),
@@ -708,13 +696,11 @@ class _SkillEmptyState extends StatelessWidget {
 class _StageAndNetworkCard extends StatelessWidget {
   final int totalCareerMonths;
   final int totalClinics;
-  final int skillsLv4Count;
   final List<DentalNetworkEntry> entries;
 
   const _StageAndNetworkCard({
     required this.totalCareerMonths,
     required this.totalClinics,
-    required this.skillsLv4Count,
     required this.entries,
   });
 
@@ -725,13 +711,11 @@ class _StageAndNetworkCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── 커리어 단계 ──
           const CareerSectionTitle('커리어 단계'),
           const SizedBox(height: 12),
           _StageContent(
             totalCareerMonths: totalCareerMonths,
             totalClinics: totalClinics,
-            skillsLv4Count: skillsLv4Count,
           ),
           const SizedBox(height: AppSpacing.xl),
           // ── 구분선 ──
@@ -745,16 +729,13 @@ class _StageAndNetworkCard extends StatelessWidget {
   }
 }
 
-/// 커리어 단계 내용 (Muted 배경 위에서 렌더)
 class _StageContent extends StatelessWidget {
   final int totalCareerMonths;
   final int totalClinics;
-  final int skillsLv4Count;
 
   const _StageContent({
     required this.totalCareerMonths,
     required this.totalClinics,
-    required this.skillsLv4Count,
   });
 
   @override
@@ -762,7 +743,6 @@ class _StageContent extends StatelessWidget {
     return CareerStageCard(
       totalCareerMonths: totalCareerMonths,
       totalClinics: totalClinics,
-      skillsLv4Count: skillsLv4Count,
     );
   }
 }

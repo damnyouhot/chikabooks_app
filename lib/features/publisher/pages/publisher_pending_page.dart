@@ -34,8 +34,10 @@ class _PublisherPendingPageState extends State<PublisherPendingPage> {
   Future<void> _checkApproval() async {
     final status = await ClinicAuthService.getStatus();
     if (!mounted) return;
-    if (status.clinicVerified) {
+    if (status.isApprovedAndCanPost) {
       context.go('/publisher/done');
+    } else if (status.approvalStatus == 'rejected') {
+      context.go('/publisher/onboarding');
     }
   }
 

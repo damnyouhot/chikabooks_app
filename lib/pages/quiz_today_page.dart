@@ -9,6 +9,7 @@ import '../core/widgets/app_primary_card.dart';
 import '../core/widgets/glass_card.dart';
 import '../models/quiz_schedule.dart';
 import '../services/quiz_pool_service.dart';
+import '../services/admin_activity_service.dart';
 
 /// 퀴즈 탭 글래스 모드 플래그
 const bool kQuizGlassMode = false;
@@ -253,7 +254,8 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
       }
     });
 
-    // Firestore 저장 → 서버 동기화 (백업)
+    AdminActivityService.log(ActivityEventType.quizCompleted, page: 'growth');
+
     QuizPoolService.saveAnswer(
       dateKey: dateKey,
       quizId: quizId,
@@ -423,6 +425,7 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
           correctIndex: item.correctIndex,
           explanation: item.explanation,
           sourceBook: item.sourceBook,
+          sourceFileName: item.sourceFileName,
           sourcePage: item.sourcePage,
           savedAnswer: savedAnswer,
           glassMode: kQuizGlassMode,
@@ -834,6 +837,7 @@ class _RecentDayQuizGroup extends StatelessWidget {
               correctIndex: item.correctIndex,
               explanation: item.explanation,
               sourceBook: item.sourceBook,
+              sourceFileName: item.sourceFileName,
               sourcePage: item.sourcePage,
               savedAnswer: savedAnswer,
               readOnly: true, // 지난 퀴즈: 답 변경 불가
@@ -897,8 +901,9 @@ class _QuizCard extends StatefulWidget {
   final List<String> options;
   final int correctIndex;
   final String explanation;
-  final String sourceBook; // 출처 책 이름
-  final String sourcePage; // 출처 페이지
+  final String sourceBook;     // 출처 책 이름
+  final String sourceFileName; // 출처 파일명 (e.g. 치과책방_신입을_위한_친절한_임상문답.pdf)
+  final String sourcePage;     // 출처 페이지
   final int? savedAnswer;
   final bool readOnly;
   final bool glassMode;
@@ -912,6 +917,7 @@ class _QuizCard extends StatefulWidget {
     required this.correctIndex,
     required this.explanation,
     this.sourceBook = '',
+    this.sourceFileName = '',
     this.sourcePage = '',
     this.savedAnswer,
     this.readOnly = false,
@@ -1125,7 +1131,7 @@ class _QuizCardState extends State<_QuizCard> {
                   ),
                 ],
                 // 출처 표시
-                if (widget.sourceBook.isNotEmpty) ...[
+                if (widget.sourceBook.isNotEmpty || widget.sourceFileName.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Row(
                     children: [
@@ -1140,9 +1146,27 @@ class _QuizCardState extends State<_QuizCard> {
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
-                          widget.sourcePage.isNotEmpty
-                              ? '출처: ${widget.sourceBook} p.${widget.sourcePage}'
-                              : '출처: ${widget.sourceBook}',
+                          () {
+                            // sourceFileName에서 .pdf 제거 후
+                            // 첫 번째 '_' 이후의 '_'만 공백으로 변환
+                            // 예: 치과책방_신입을_위한_친절한_임상문답.pdf
+                            //   → 치과책방_신입을 위한 친절한 임상문답
+                            String bookName = widget.sourceFileName.isNotEmpty
+                                ? widget.sourceFileName.replaceAll(
+                                    RegExp(r'\.pdf$', caseSensitive: false), '')
+                                : widget.sourceBook;
+
+                            if (bookName.isNotEmpty) {
+                              bookName = bookName.replaceAll('_', ' ');
+                              if (!bookName.startsWith('치과책방')) {
+                                bookName = '치과책방 $bookName';
+                              }
+                            }
+
+                            return widget.sourcePage.isNotEmpty
+                                ? '출처: $bookName p.${widget.sourcePage}'
+                                : '출처: $bookName';
+                          }(),
                           style: TextStyle(
                             fontSize: 10,
                             color:

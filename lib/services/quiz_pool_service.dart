@@ -226,7 +226,7 @@ class QuizPoolService {
           'weekWrong':       prevWeekWrong    + (isCorrect ? 0 : 1),
           'countedInGlobal': true,
           'lastAnsweredAt':  FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
+      }, SetOptions(merge: true));
 
         // ── 6. 글로벌 순위 집계 (quiz_global/stats) ──
         final globalData = globalSnap.data() ?? <String, dynamic>{};

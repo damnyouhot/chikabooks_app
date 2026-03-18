@@ -56,11 +56,12 @@ class UserPublicProfile {
       hasBasicProfile && mainConcerns.isNotEmpty;
 
   /// 현재 파트너 그룹이 활성 상태인지
+  /// UTC 기준 비교로 시간대 차이 문제 방지
   bool get hasActiveGroup =>
       partnerGroupId != null &&
       partnerGroupId!.isNotEmpty &&
       partnerGroupEndsAt != null &&
-      partnerGroupEndsAt!.isAfter(DateTime.now());
+      partnerGroupEndsAt!.toUtc().isAfter(DateTime.now().toUtc());
 
   factory UserPublicProfile.fromMap(Map<String, dynamic> m) {
     DateTime? endsAt;

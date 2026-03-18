@@ -52,8 +52,8 @@ class BondScoreGauge extends StatelessWidget {
     final scoreText = bondScore.toStringAsFixed(1);
     final labelColor =
         glassMode
-            ? AppColors.white.withOpacity(0.7)
-            : AppColors.onCardPrimary.withOpacity(0.7);
+        ? AppColors.white.withOpacity(0.7)
+        : AppColors.onCardPrimary.withOpacity(0.7);
     // Green/Dark 배경 위 부드러운 크림화이트: creamWhite 토큰 사용
     // 나중에 색 변경 시 AppColors.creamWhite 한 곳만 수정하면 자동 반영
     final scoreColor = glassMode ? AppColors.white : AppColors.creamWhite;
@@ -240,35 +240,35 @@ class BondWeekHeader extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 타이틀 행 (게이지 제거 — 하단으로 이동)
-          Row(
-            children: [
-              const Text(
-                '이번 주 동행 기록',
-                style: TextStyle(
+                    Row(
+                      children: [
+                        const Text(
+                          '이번 주 동행 기록',
+                          style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.onCardPrimary,
-                ),
-              ),
-              if (onSettingsTap != null) ...[
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: onSettingsTap,
-                  child: Icon(
-                    Icons.settings_outlined,
-                    size: 16,
-                    color: AppColors.onCardPrimary.withOpacity(0.6),
-                  ),
-                ),
-              ],
+                            color: AppColors.onCardPrimary,
+                          ),
+                        ),
+                        if (onSettingsTap != null) ...[
+                          const SizedBox(width: 8),
+                          GestureDetector(
+                            onTap: onSettingsTap,
+                            child: Icon(
+                              Icons.settings_outlined,
+                              size: 16,
+                              color: AppColors.onCardPrimary.withOpacity(0.6),
+                            ),
+                          ),
+                        ],
               const Spacer(),
-              Text(
-                weekInfo,
-                style: TextStyle(
+                    Text(
+                      weekInfo,
+                      style: TextStyle(
                   fontSize: 12,
                   color: AppColors.onCardPrimary.withOpacity(0.65),
-                ),
-              ),
+                      ),
+                    ),
             ],
           ),
           const SizedBox(height: AppSpacing.lg),
@@ -284,22 +284,22 @@ class BondWeekHeader extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.info_outline,
+          Row(
+            children: [
+              Icon(
+                Icons.info_outline,
                           size: 13,
-                          color: AppColors.onCardPrimary.withOpacity(0.5),
-                        ),
+                color: AppColors.onCardPrimary.withOpacity(0.5),
+              ),
                         const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            _nextMatchingMessage(),
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: AppColors.onCardPrimary.withOpacity(0.6),
-                              height: 1.3,
-                            ),
+              Expanded(
+                child: Text(
+                  _nextMatchingMessage(),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppColors.onCardPrimary.withOpacity(0.6),
+                    height: 1.3,
+                  ),
                           ),
                         ),
                       ],

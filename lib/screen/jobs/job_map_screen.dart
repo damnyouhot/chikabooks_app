@@ -454,13 +454,13 @@ class _JobMapScreenState extends State<JobMapScreen> {
                   onSearchChanged: (q) => _jobFilter.setSearchQuery(q),
                   onFilterPressed: () {},
                   filterSummary: _filterSummary(),
+                  onListToggle: widget.onListToggle,
                 ),
 
-                // 반경 칩 + 목록 버튼
+                // 반경 칩
                 RadiusChipRow(
                   selectedRadius: _jobFilter.radiusKm,
                   onRadiusChanged: _onRadiusChanged,
-                  onListToggle: widget.onListToggle,
                 ),
 
                 // Edge Indicators (화면 밖 프리미엄 방향 표시)

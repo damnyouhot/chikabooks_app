@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../models/resume.dart';
 import '../../../core/theme/app_colors.dart';
+import 'resume_ocr_prompt.dart';
 
 /// A. 기본정보 섹션
 class SectionProfile extends StatefulWidget {
@@ -69,7 +70,8 @@ class _SectionProfileState extends State<SectionProfile> {
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
       children: [
         _sectionTitle('기본정보', '이름과 연락처는 지원 시 익명 처리돼요.'),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
+        const ResumeOcrPrompt(),
 
         _field('이름 *', _nameCtrl, '홍길동'),
         _field('휴대폰 *', _phoneCtrl, '010-0000-0000',

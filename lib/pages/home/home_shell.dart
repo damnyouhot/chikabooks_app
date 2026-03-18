@@ -13,6 +13,7 @@ import '../../services/admin_activity_service.dart';
 import '../../services/ebook_service.dart';
 import '../../features/onboarding/app_onboarding_controller.dart';
 import '../../features/onboarding/app_onboarding_overlay.dart';
+import '../../features/feedback/widgets/feedback_fab.dart';
 import '../../core/theme/app_colors.dart';
 
 /// 메인 홈 (탭 네비게이션)
@@ -30,6 +31,10 @@ class _HomeShellState extends State<HomeShell> {
 
   /// Bond 탭 인덱스
   static const int _bondTabIndex = 1;
+
+  // 탭 인덱스 → 화면 레이블 맵
+  static const _tabLabels = ['나(캐릭터)', '같이(파트너)', '성장하기', '커리어'];
+  static const _tabRoutes = ['/', '/bond', '/growth', '/career'];
 
   // ── 탭 위젯 캐시 (JobPage는 온보딩 상태에 따라 build에서 생성) ──
   final _bondKey = GlobalKey<BondPageState>();
@@ -258,6 +263,12 @@ class _HomeShellState extends State<HomeShell> {
                     },
                     onComplete: _onOnboardingComplete,
                   ),
+            ),
+          // 피드백 플로팅 버튼 (온보딩 중에는 숨김)
+          if (!_onboardingActive)
+            FeedbackFab(
+              sourceScreenLabel: _tabLabels[_selectedIndex],
+              sourceRoute: _tabRoutes[_selectedIndex],
             ),
         ],
       ),

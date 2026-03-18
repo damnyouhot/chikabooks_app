@@ -34,7 +34,18 @@ class ReportService {
   static final _auth = FirebaseAuth.instance;
 
   /// 자동 비노출 기준 신고 횟수
-  static const int autoHideThreshold = 3;
+  static const int _defaultAutoHideThreshold = 3;
+
+  /// 신고 누적 기준 (털어놔: 2회, 전국구 게시판: 5회, 그 외: 기본 3회)
+  static int _autoHideThresholdFor(String documentPath) {
+    if (documentPath.startsWith('partnerGroups/')) {
+      return 2;
+    }
+    if (documentPath.startsWith('bondPosts/')) {
+      return 5;
+    }
+    return _defaultAutoHideThreshold;
+  }
 
   /// 게시물 신고하기
   ///
@@ -82,6 +93,7 @@ class ReportService {
       // 신고 수가 임계값 이상이면 자동 비노출 처리
       final postDoc = await postRef.get();
       final reportCount = postDoc.data()?['reports'] as int? ?? 0;
+      final autoHideThreshold = _autoHideThresholdFor(documentPath);
 
       final authorUid = postDoc.data()?['uid'] as String?;
       if (authorUid != null) {

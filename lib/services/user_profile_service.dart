@@ -28,7 +28,20 @@ class UserProfileService {
     if (uid == null) return null;
 
     try {
-      final doc = await _db.collection('users').doc(uid).get();
+      DocumentSnapshot<Map<String, dynamic>> doc;
+      if (forceRefresh) {
+        doc = await _db.collection('users').doc(uid).get();
+      } else {
+        // 캐시 우선: 콜드 스타트 시 Firestore 연결 대기 없이 즉시 반환
+        try {
+          doc = await _db.collection('users').doc(uid).get(
+            const GetOptions(source: Source.cache),
+          );
+          if (!doc.exists) throw Exception('cache miss');
+        } catch (_) {
+          doc = await _db.collection('users').doc(uid).get();
+        }
+      }
       if (!doc.exists) return null;
       _cache = UserPublicProfile.fromMap(doc.data() ?? {});
       await _ensurePublicProfile(uid, _cache);

@@ -95,7 +95,7 @@ class _PublisherForgotPageState extends State<PublisherForgotPage> {
             ),
             const SizedBox(height: 6),
             Text(
-              '가입 시 사용한 이메일을 입력하면\n재설정 링크를 보내드려요.',
+              '가입 시 사용한 이메일을 입력하면\n비밀번호 설정 링크를 보내드려요.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 13,
@@ -137,7 +137,7 @@ class _PublisherForgotPageState extends State<PublisherForgotPage> {
             ],
             const SizedBox(height: 20),
             PubPrimaryButton(
-              label: '재설정 링크 보내기',
+              label: '비밀번호 설정 링크 보내기',
               isLoading: _isLoading,
               onPressed: _sendReset,
             ),
@@ -202,7 +202,7 @@ class _PublisherForgotPageState extends State<PublisherForgotPage> {
           ),
           const SizedBox(height: 10),
           Text(
-            '${_emailCtrl.text.trim()}으로\n재설정 링크를 보냈어요.\n메일함을 확인해주세요.',
+            '${_emailCtrl.text.trim()}으로\n비밀번호 설정 링크를 보냈어요.\n메일함을 확인해주세요.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 13,

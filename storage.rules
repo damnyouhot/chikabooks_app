@@ -1,8 +1,46 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+    // 업로드 이력서 파일: 본인만 읽기/쓰기
+    match /resumeFiles/{userId}/{fileId}/{fileName} {
+      allow read:   if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null &&
+                       request.auth.uid == userId &&
+                       request.resource.size < 20 * 1024 * 1024 &&
+                       request.resource.contentType.matches('(application/pdf|image/jpeg|image/jpg|image/png)');
+      allow delete: if request.auth != null && request.auth.uid == userId;
+      allow update: if false;
+    }
+
+    // 구인공고 이미지: 로그인한 사용자만
+    match /jobImages/{allPaths=**} {
+      allow read:  if request.auth != null;
+      allow write: if request.auth != null &&
+                      request.resource.size < 10 * 1024 * 1024;
+    }
+
+    // 사업자 인증 이미지: 로그인한 사용자만
+    match /clinicVerifications/{allPaths=**} {
+      allow read:  if request.auth != null;
+      allow write: if request.auth != null &&
+                      request.resource.size < 10 * 1024 * 1024;
+    }
+
+    // 기록하기 사진: 본인 경로만 읽기/쓰기/삭제
+    match /diary_posts/{userId}/{postId}/{fileName} {
+      allow read:   if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null &&
+                       request.auth.uid == userId &&
+                       request.resource.size < 2 * 1024 * 1024 &&
+                       request.resource.contentType.matches('image/(jpeg|jpg|png)');
+      allow delete: if request.auth != null && request.auth.uid == userId;
+      allow update: if false;
+    }
+
+    // 나머지: 로그인한 사용자 읽기만 허용, 쓰기는 금지
     match /{allPaths=**} {
-      allow read, write: if true;
+      allow read:  if request.auth != null;
+      allow write: if false;
     }
   }
 }

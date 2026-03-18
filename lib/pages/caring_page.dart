@@ -463,15 +463,17 @@ class _CaringPageState extends State<CaringPage>
   /// 캐릭터 터치 (사랑하기)
   void _onCircleTap() async {
     _tapTrigger?.fire();
+
     final result = await CaringActionService.tryTouch();
     if (!mounted) return;
+
+    if (result.bondDelta > 0) _showFloatingDelta(result.bondDelta);
 
     final phrase = result.ment.isNotEmpty
             ? result.ment
             : _neutralPhrases[Random().nextInt(_neutralPhrases.length)];
 
     _enqueueReaction(phrase);
-    if (result.bondDelta > 0) _showFloatingDelta(result.bondDelta);
 
     // 캐릭터 클릭 이벤트 기록 (fire-and-forget)
     AdminActivityService.log(ActivityEventType.tapCharacter, page: 'home');
@@ -479,15 +481,17 @@ class _CaringPageState extends State<CaringPage>
 
   void _onFeed() async {
     _tapTrigger?.fire(); // 밥먹기 애니메이션 재생
+
     final result = await CaringActionService.tryFeed();
     if (!mounted) return;
+
+    if (result.success && result.bondDelta > 0) _showFloatingDelta(result.bondDelta);
 
     final msg = result.success
         ? (result.ment ?? '밥을 줬어요')
         : (result.rejectMent ?? '나중에 다시 시도하세요');
 
     _enqueueReaction(msg);
-    if (result.success && result.bondDelta > 0) _showFloatingDelta(result.bondDelta);
     // 터치 성공 → CaringState만 재로드 (구인/책 카드는 변화 없음)
     if (result.success) _loadCaringState();
   }
@@ -495,12 +499,11 @@ class _CaringPageState extends State<CaringPage>
   void _onLove() => _onCircleTap();
 
   void _onDiary() {
-    // 감정기록 시작 이벤트 기록
     AdminActivityService.log(ActivityEventType.tapEmotionStart, page: 'home');
     DiaryInputSheet.show(context, (text) async {
       _loadCaringState();
-        });
-      }
+    });
+  }
 
   void _onGoal() {
     UserGoalSheet.show(context);
@@ -878,9 +881,9 @@ class _CaringPageState extends State<CaringPage>
     // 버튼 정의 목록
     final buttons = [
       _ActionBtn(icon: Icons.restaurant_outlined, label: '밥먹기', onTap: _onFeed),
-      _ActionBtn(icon: Icons.favorite_outline,    label: '사랑하기', onTap: _onLove),
-      _ActionBtn(icon: Icons.edit_outlined,        label: '기록하기', onTap: _onDiary),
-      _ActionBtn(icon: Icons.flag_outlined,        label: '목표',    onTap: _onGoal),
+      _ActionBtn(icon: Icons.favorite_outline, label: '사랑하기', onTap: _onLove),
+      _ActionBtn(icon: Icons.edit_outlined, label: '기록하기', onTap: _onDiary),
+      _ActionBtn(icon: Icons.flag_outlined, label: '목표', onTap: _onGoal),
     ];
 
     return Row(
@@ -903,21 +906,32 @@ class _CaringPageState extends State<CaringPage>
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
             content: const SingleChildScrollView(
-              child: Text(
-                "📱 캐릭터\n"
-                "• 터치하면 작은 교감이 쌓입니다.\n\n"
-                "🍚 밥먹기\n"
-                "• 하루 한 번, 캐릭터에게 밥을 줄 수 있습니다.\n\n"
-                "💕 사랑하기\n"
-                "• 캐릭터에게 사랑을 주는 것은 터치면 충분합니다.\n\n"
-                "📝 기록하기\n"
-                "• 오늘 하루를 한 줄로 기록합니다.\n\n"
-                "🎯 목표달성하기\n"
-                "• 주간 목표를 설정하고 체크합니다.\n\n"
-                "💖 결 점수\n"
-                "• 결은 당신과 앱(또는 파트너)과의 깊이를 나타냅니다.\n"
-                "• 교감이 쌓일수록 결이 깊어져요.",
-                style: TextStyle(fontSize: 13, height: 1.6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('나와 함께하는 캐릭터를 돌보며 결을 쌓는 공간이에요.', style: TextStyle(fontSize: 13, height: 1.5)),
+                  SizedBox(height: 16),
+                  Text('💕 사랑하기', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  SizedBox(height: 8),
+                  Text('캐릭터를 터치하면 작은 교감이 쌓여요. 하루 3번까지 가능해요.', style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
+                  SizedBox(height: 16),
+                  Text('🍚 밥먹기', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  SizedBox(height: 8),
+                  Text('아침·점심·저녁·밤 시간대마다 한 번씩, 하루 4번 밥을 줄 수 있어요.', style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
+                  SizedBox(height: 16),
+                  Text('📝 기록하기', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  SizedBox(height: 8),
+                  Text('오늘 하루를 한 줄로 기록해요.', style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
+                  SizedBox(height: 16),
+                  Text('🎯 목표달성', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  SizedBox(height: 8),
+                  Text('주간 목표를 세우고 체크해요.', style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
+                  SizedBox(height: 16),
+                  Text('💖 결 점수', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  SizedBox(height: 8),
+                  Text('교감·기록·목표가 모여 쌓이는 나와의 깊이를 나타내요.', style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
+                ],
               ),
             ),
             actions: [
@@ -1325,42 +1339,42 @@ class _FloatingDeltaWidgetState extends State<_FloatingDeltaWidget>
     return IgnorePointer(
       child: SizedBox.expand(
         child: AnimatedBuilder(
-          animation: _ctrl,
+      animation: _ctrl,
           builder: (_, child) {
             return Stack(
               children: [
                 Positioned(
-                  left: widget.startOffset.dx,
-                  top: widget.startOffset.dy + _offsetY.value,
-                  child: Opacity(
-                    opacity: _opacity.value,
+          left: widget.startOffset.dx,
+          top: widget.startOffset.dy + _offsetY.value,
+          child: Opacity(
+            opacity: _opacity.value,
                     child: child!,
                   ),
                 ),
               ],
             );
           },
-          child: Material(
-            type: MaterialType.transparency,
-            child: Text(
-              widget.label,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
+            child: Material(
+              type: MaterialType.transparency,
+              child: Text(
+                widget.label,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
                 color: AppColors.cardEmphasis,
-                decoration: TextDecoration.none,
-                shadows: [
-                  Shadow(
-                    color: Color(0x33000000),
-                    blurRadius: 4,
-                    offset: Offset(0, 1),
-                  ),
-                ],
+                  decoration: TextDecoration.none,
+                  shadows: [
+                    Shadow(
+                      color: Color(0x33000000),
+                      blurRadius: 4,
+                      offset: Offset(0, 1),
+                    ),
+                  ],
+              ),
+                ),
               ),
             ),
           ),
-        ),
-      ),
     );
   }
 }

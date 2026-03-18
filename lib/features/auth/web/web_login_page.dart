@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../services/kakao_auth_service.dart';
 import '../../../services/apple_auth_service.dart';
 import '../../../services/email_auth_service.dart';
@@ -11,8 +12,7 @@ import '../../../services/sign_in_tracker.dart';
 import '../../publisher/services/clinic_auth_service.dart';
 import '../../publisher/pages/publisher_shared.dart';
 import '../../../core/theme/app_colors.dart';
-
-const _kNaver = Color(0xFF03C75A); // 네이버 브랜드 그린 — 의도적 유지
+import '../../../core/theme/app_tokens.dart';
 
 /// 통합 로그인 페이지 (/login)
 ///
@@ -33,13 +33,16 @@ class _WebLoginPageState extends State<WebLoginPage> {
       backgroundColor: AppColors.appBg,
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.xxl,
+            vertical: AppSpacing.xxl,
+          ),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 960),
             child: Column(
               children: [
                 _buildLogo(),
-                const SizedBox(height: 36),
+                const SizedBox(height: AppSpacing.xxl),
 
                 // ── 좌(지원자) / 우(치과) ────────────────
                 LayoutBuilder(
@@ -70,21 +73,27 @@ class _WebLoginPageState extends State<WebLoginPage> {
                   },
                 ),
 
-                const SizedBox(height: 24),
+                const SizedBox(height: AppSpacing.xxl),
 
                 // ── 하단 링크 ────────────────────────────
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      '© 치카북스',
-                      style: TextStyle(fontSize: 12, color: AppColors.textDisabled),
-                    ),
-                    const SizedBox(width: 16),
-                    _link('개인정보처리방침', '/privacy'),
-                    _dot(),
-                    _link('이용약관', '/terms'),
-                  ],
+                Padding(
+                  padding: const EdgeInsets.only(top: AppSpacing.md),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        '© 치카북스',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textDisabled,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      _link('개인정보처리방침', '/privacy'),
+                      _dot(),
+                      _link('이용약관', '/terms'),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -120,7 +129,7 @@ class _WebLoginPageState extends State<WebLoginPage> {
             letterSpacing: -0.5,
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: AppSpacing.sm),
         Text(
           '치과 커뮤니티 & 구인구직 플랫폼',
           style: GoogleFonts.notoSansKr(
@@ -175,14 +184,20 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
   String? _loadingProvider;
   String? _errorMsg;
   bool _showEmailForm = false;
-  bool _isPasswordReset = false; // 비밀번호 만들기(재설정) 모드
   bool _isSignUp = false;
   String? _lastProvider;
-  bool _resetSent = false; // 재설정 이메일 발송 완료 여부
+
+  // 네이버 비밀번호 설정 링크 전송 폼
+  bool _showNaverResetForm = false;
+  bool _naverResetSent = false;
+  bool _naverResetLoading = false;
+  final _naverEmailCtrl = TextEditingController();
+
+  // 네이버 비밀번호 설정 완료 기록 (SharedPreferences)
+  String? _naverPwSetEmail;
 
   final _emailCtrl = TextEditingController();
   final _pwCtrl = TextEditingController();
-  final _resetEmailCtrl = TextEditingController();
 
   @override
   void initState() {
@@ -192,43 +207,54 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
 
   Future<void> _loadBadge() async {
     final p = await SignInTracker.getLocalLastProvider();
-    if (mounted && p != null) setState(() => _lastProvider = p);
+    final prefs = await SharedPreferences.getInstance();
+    final naverEmail = prefs.getString('naver_pw_set_email');
+    if (mounted) {
+      setState(() {
+        _lastProvider = p;
+        _naverPwSetEmail = naverEmail;
+        if (naverEmail != null) {
+          _showEmailForm = true;
+          _emailCtrl.text = naverEmail;
+        }
+      });
+    }
   }
 
   @override
   void dispose() {
     _emailCtrl.dispose();
     _pwCtrl.dispose();
+    _naverEmailCtrl.dispose();
     super.dispose();
   }
 
   // ── 로그인 후 공통 라우팅 ──────────────────────────────────
   Future<void> _handlePostLogin(String provider) async {
-    await SignInTracker.record(provider);
     if (!mounted) return;
 
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
     try {
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
+      // 공고자 계정인지 확인 → clinics_accounts 문서 존재 시 차단
+      final clinicDoc = await FirebaseFirestore.instance
+          .collection('clinics_accounts')
           .doc(uid)
           .get();
-      final role = doc.data()?['role'] as String?;
-      if (!mounted) return;
-
-      if (role == 'clinic') {
-        final status = await ClinicAuthService.getStatus();
+      if (clinicDoc.exists) {
+        await FirebaseAuth.instance.signOut();
         if (!mounted) return;
-        context.go(
-          status.canPost
-              ? (widget.nextRoute ?? '/post-job')
-              : '/publisher/onboarding',
+        _showError(
+          '이 계정은 공고자 계정으로 등록되어 있어 위생사 로그인을 할 수 없습니다.\n'
+          '오른쪽의 치과 로그인을 이용해주세요.',
         );
-      } else {
-        context.go(widget.nextRoute ?? '/applicant/resumes');
+        return;
       }
+
+      await SignInTracker.record(provider);
+      if (!mounted) return;
+      context.go(widget.nextRoute ?? '/applicant/resumes');
     } catch (_) {
       if (mounted) context.go(widget.nextRoute ?? '/applicant/resumes');
     }
@@ -260,8 +286,9 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
       googleProvider.addScope('email');
       googleProvider.addScope('profile');
 
-      final userCredential =
-          await FirebaseAuth.instance.signInWithPopup(googleProvider);
+      final userCredential = await FirebaseAuth.instance.signInWithPopup(
+        googleProvider,
+      );
 
       if (userCredential.user == null) {
         _showError('Google 로그인에 실패했어요.');
@@ -292,23 +319,45 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
     }
   }
 
-  // ── 비밀번호 재설정 이메일 발송 ───────────────────────────
-  Future<void> _sendPasswordReset() async {
-    final email = _resetEmailCtrl.text.trim();
-    if (email.isEmpty) {
-      _showError('이메일을 입력해주세요.');
+  // ── 네이버 웹 비밀번호 설정 링크 발송 ──────────────────────
+  Future<void> _sendNaverPasswordReset() async {
+    final email = _naverEmailCtrl.text.trim();
+    if (email.isEmpty || !email.contains('@')) {
+      setState(() => _errorMsg = '올바른 이메일 주소를 입력해주세요.');
       return;
     }
-    _setLoading('reset');
+    setState(() {
+      _naverResetLoading = true;
+      _errorMsg = null;
+    });
     try {
       await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
-      if (mounted) setState(() => _resetSent = true);
+      if (mounted) {
+        // SharedPreferences에 네이버 이메일 저장 → 다음 방문 시 안내
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('naver_pw_set_email', email);
+        setState(() {
+          _naverResetSent = true;
+          _naverResetLoading = false;
+          _naverPwSetEmail = email;
+        });
+      }
     } on FirebaseAuthException catch (e) {
-      _showError(e.code == 'user-not-found' ? '등록되지 않은 이메일이에요.' : '오류가 발생했어요. 다시 시도해주세요.');
+      if (mounted) {
+        setState(() {
+          _naverResetLoading = false;
+          _errorMsg = e.code == 'user-not-found'
+              ? '등록된 이메일이 아니에요. 가입한 네이버 이메일을 다시 확인해주세요.'
+              : '발송 중 오류가 발생했어요. 다시 시도해주세요.';
+        });
+      }
     } catch (_) {
-      _showError('오류가 발생했어요. 다시 시도해주세요.');
-    } finally {
-      _clearLoading();
+      if (mounted) {
+        setState(() {
+          _naverResetLoading = false;
+          _errorMsg = '발송 중 오류가 발생했어요. 다시 시도해주세요.';
+        });
+      }
     }
   }
 
@@ -328,15 +377,16 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
           _showError('비밀번호는 8자 이상이어야 해요.');
           return;
         }
-        user = await EmailAuthService.signUp(
-          email: email,
-          password: password,
-        );
+        // 회원가입 전: 공고자 계정 중복 체크 (normalizedEmail 기준)
+        final dupMsg =
+            await ClinicAuthService.checkDuplicateForApplicantSignup(email);
+        if (dupMsg != null) {
+          _showError(dupMsg);
+          return;
+        }
+        user = await EmailAuthService.signUp(email: email, password: password);
       } else {
-        user = await EmailAuthService.signIn(
-          email: email,
-          password: password,
-        );
+        user = await EmailAuthService.signIn(email: email, password: password);
       }
       if (user == null) {
         _showError(_isSignUp ? '회원가입에 실패했어요.' : '로그인에 실패했어요.');
@@ -396,10 +446,18 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(28),
+      padding: const EdgeInsets.all(AppSpacing.xl),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        border: Border.all(color: AppColors.divider),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.divider.withOpacity(0.25),
+            blurRadius: 30,
+            offset: const Offset(0, 20),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -443,197 +501,257 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
               ),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: AppSpacing.xl),
 
           // ── 소셜 로그인 버튼들 ──────────────
-          _snsBtn('kakao', Icons.chat_bubble, '카카오로 로그인',
-              const Color(0xFFFEE500), Colors.black87, _loginKakao),
-          const SizedBox(height: 10),
-          _snsBtn('google', Icons.g_mobiledata, 'Google로 로그인',
-              AppColors.white, Colors.black87, _loginGoogle,
-              border: AppColors.divider),
-          const SizedBox(height: 10),
-          _snsBtn('apple', Icons.apple, 'Apple로 로그인', Colors.black,
-              AppColors.white, _loginApple),
-          const SizedBox(height: 10),
+          _snsBtn(
+            'kakao',
+            Icons.chat_bubble,
+            '카카오로 로그인',
+            const Color(0xFFFEE500),
+            Colors.black87,
+            _loginKakao,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          _snsBtn(
+            'google',
+            Icons.g_mobiledata,
+            'Google로 로그인',
+            AppColors.white,
+            Colors.black87,
+            _loginGoogle,
+            border: AppColors.divider,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          _snsBtn(
+            'apple',
+            Icons.apple,
+            'Apple로 로그인',
+            Colors.black,
+            AppColors.white,
+            _loginApple,
+          ),
+          const SizedBox(height: AppSpacing.sm),
 
-          // 네이버 (비활성)
-          _snsBtn('naver', Icons.language, '네이버로 로그인',
-              AppColors.surfaceMuted, AppColors.textDisabled, null,
-              trailingLabel: '앱에서만 가능해요'),
+          // 네이버 (웹: 비밀번호 설정 링크 방식)
+          _snsBtn(
+            'naver',
+            Icons.language,
+            '네이버로 로그인',
+            _naverPwSetEmail != null
+                ? AppColors.textDisabled
+                : const Color(0xFF03C75A),
+            AppColors.white,
+            _naverPwSetEmail != null
+                ? null
+                : () {
+                    setState(() {
+                      _showNaverResetForm = !_showNaverResetForm;
+                      _naverResetSent = false;
+                      _naverEmailCtrl.clear();
+                      _errorMsg = null;
+                    });
+                  },
+            trailingLabel: _naverPwSetEmail != null
+                ? '이메일+비밀번호로 로그인하세요'
+                : '웹에서는 비밀번호 설정이 필요해요',
+            trailingBadgeBg: _naverPwSetEmail != null
+                ? AppColors.textDisabled.withOpacity(0.25)
+                : const Color(0xFF03C75A).withOpacity(0.3),
+          ),
+
+          // 네이버 비밀번호 설정 완료 시 이메일 폼 안내
+          if (_naverPwSetEmail != null && _showEmailForm) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF03C75A).withOpacity(0.07),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: const Color(0xFF03C75A).withOpacity(0.25),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.info_outline_rounded,
+                    size: 15,
+                    color: Color(0xFF03C75A),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '네이버 이메일 + 설정한 비밀번호로 로그인하세요.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textPrimary.withOpacity(0.75),
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () async {
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.remove('naver_pw_set_email');
+                      if (mounted) {
+                        setState(() {
+                          _naverPwSetEmail = null;
+                          _emailCtrl.clear();
+                          _showEmailForm = false;
+                        });
+                      }
+                    },
+                    child: Text(
+                      '초기화',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textSecondary.withOpacity(0.6),
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          // 네이버 비밀번호 설정 링크 폼 (토글)
+          if (_showNaverResetForm) ...[
+            const SizedBox(height: 12),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF03C75A).withOpacity(0.06),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFF03C75A).withOpacity(0.25),
+                ),
+              ),
+              child: _naverResetSent
+                  ? Column(
+                      children: [
+                        const Icon(
+                          Icons.mark_email_read_outlined,
+                          color: Color(0xFF03C75A),
+                          size: 28,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '비밀번호 설정 링크를 보냈어요!\n메일함을 확인해주세요.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textPrimary,
+                            height: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        TextButton(
+                          onPressed: () => setState(() {
+                            _naverResetSent = false;
+                            _naverEmailCtrl.clear();
+                          }),
+                          style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                          child: const Text(
+                            '다시 입력하기',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF03C75A),
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          '네이버로 가입한 이메일 주소를 입력하면\n비밀번호 설정 링크를 보내드려요.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                            height: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        PubTextField(
+                          controller: _naverEmailCtrl,
+                          label: '가입한 네이버 이메일',
+                          hint: 'example@naver.com',
+                          keyboardType: TextInputType.emailAddress,
+                        ),
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _naverResetLoading
+                                ? null
+                                : _sendNaverPasswordReset,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF03C75A),
+                              foregroundColor: AppColors.white,
+                              elevation: 0,
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 13),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            child: _naverResetLoading
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: AppColors.white,
+                                    ),
+                                  )
+                                : const Text(
+                                    '메일로 비밀번호 설정 링크 보내기',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+          ],
 
           const SizedBox(height: 12),
 
-          // ── 네이버 이용자 비밀번호 만들기 안내 ────────────
-          if (!_isPasswordReset && !_showEmailForm) ...[
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () => setState(() {
-                  _isPasswordReset = true;
-                  _showEmailForm = false;
-                  _resetSent = false;
-                  _errorMsg = null;
-                }),
-                icon: const Icon(Icons.lock_reset, size: 15),
-                label: Text(
-                  '네이버 로그인 가입자 비밀번호 만들기',
-                  style: GoogleFonts.notoSansKr(fontSize: 13),
-                ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: _kNaver,
-                  side: BorderSide(color: _kNaver.withOpacity(0.5)),
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                ),
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              '비밀번호 만들기 후 이메일 로그인으로 이용해주세요.',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.notoSansKr(
-                fontSize: 11,
-                color: AppColors.textSecondary,
-                height: 1.5,
-              ),
-            ),
-          ] else if (_isPasswordReset) ...[
-            // ── 비밀번호 재설정 폼 ─────────────────────────
-            if (_resetSent) ...[
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                decoration: BoxDecoration(
-                  color: AppColors.success.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.check_circle_outline, size: 16, color: AppColors.success),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        '재설정 링크를 이메일로 보냈어요.\n메일함을 확인해주세요.',
-                        style: GoogleFonts.notoSansKr(
-                          fontSize: 12,
-                          color: AppColors.success,
-                          height: 1.5,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.center,
-                child: TextButton(
-                  onPressed: () => setState(() {
-                    _isPasswordReset = false;
-                    _resetSent = false;
-                    _resetEmailCtrl.clear();
-                  }),
-                  child: Text(
-                    '로그인으로 돌아가기',
-                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                  ),
-                ),
-              ),
-            ] else ...[
-              PubTextField(
-                controller: _resetEmailCtrl,
-                label: '가입한 이메일',
-                hint: 'email@example.com',
-                keyboardType: TextInputType.emailAddress,
-              ),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: (_loadingProvider == 'reset') ? null : _sendPasswordReset,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _kNaver,
-                    foregroundColor: AppColors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: (_loadingProvider == 'reset')
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.white),
-                        )
-                      : Text(
-                          '비밀번호 설정 링크 보내기',
-                          style: GoogleFonts.notoSansKr(fontSize: 14, fontWeight: FontWeight.w700),
-                        ),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Align(
-                alignment: Alignment.center,
-                child: TextButton(
-                  onPressed: () => setState(() {
-                    _isPasswordReset = false;
-                    _resetEmailCtrl.clear();
-                    _errorMsg = null;
-                  }),
-                  child: Text(
-                    '취소',
-                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                  ),
-                ),
-              ),
-            ],
-          ],
-
-          const SizedBox(height: 18),
-
-          // ── 구분선 ─────────────────────────
-          Row(
-            children: [
-              const Expanded(child: Divider(color: AppColors.divider)),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Text(
-                  '또는',
-                  style: TextStyle(fontSize: 12, color: AppColors.textDisabled),
-                ),
-              ),
-              const Expanded(child: Divider(color: AppColors.divider)),
-            ],
-          ),
-          const SizedBox(height: 14),
-
           // ── 이메일 로그인 ──────────────────
           if (!_showEmailForm)
-            OutlinedButton.icon(
-              icon: const Icon(
-                Icons.email_outlined,
-                size: 18,
-                color: AppColors.textSecondary,
-              ),
-              label: const Text(
-                '이메일로 로그인',
-                style: TextStyle(
-                  fontSize: 14,
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: OutlinedButton.icon(
+                icon: const Icon(
+                  Icons.email_outlined,
+                  size: 18,
                   color: AppColors.textSecondary,
                 ),
-              ),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: AppColors.divider),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                label: const Text(
+                  '이메일로 로그인',
+                  style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
                 ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: AppColors.divider),
+                  padding: EdgeInsets.zero,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed:
+                    () => setState(() {
+                      _showEmailForm = true;
+                      _errorMsg = null;
+                    }),
               ),
-              onPressed: () => setState(() {
-                _showEmailForm = true;
-                _isPasswordReset = false;
-                _errorMsg = null;
-              }),
             )
           else ...[
             PubTextField(
@@ -642,12 +760,8 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
               hint: 'email@example.com',
               keyboardType: TextInputType.emailAddress,
             ),
-            const SizedBox(height: 10),
-            PubTextField(
-              controller: _pwCtrl,
-              label: '비밀번호',
-              obscure: true,
-            ),
+            const SizedBox(height: AppSpacing.sm),
+            PubTextField(controller: _pwCtrl, label: '비밀번호', obscure: true),
             const SizedBox(height: 14),
             SizedBox(
               width: double.infinity,
@@ -662,25 +776,26 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: (_loadingProvider == 'email')
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: AppColors.white,
+                child:
+                    (_loadingProvider == 'email')
+                        ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.white,
+                          ),
+                        )
+                        : Text(
+                          _isSignUp ? '회원가입' : '로그인',
+                          style: GoogleFonts.notoSansKr(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      )
-                    : Text(
-                        _isSignUp ? '회원가입' : '로그인',
-                        style: GoogleFonts.notoSansKr(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: AppSpacing.sm),
             Align(
               alignment: Alignment.centerRight,
               child: TextButton(
@@ -699,11 +814,11 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
 
           // ── 에러 메시지 ────────────────────
           if (_errorMsg != null) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.md),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: kPubPinkDark.withOpacity(0.08),
+                color: AppColors.error.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -711,7 +826,7 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
                   Icon(
                     Icons.error_outline,
                     size: 16,
-                    color: kPubPinkDark.withOpacity(0.8),
+                    color: AppColors.error.withOpacity(0.8),
                   ),
                   const SizedBox(width: 6),
                   Expanded(
@@ -719,7 +834,7 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
                       _errorMsg!,
                       style: TextStyle(
                         fontSize: 12,
-                        color: kPubPinkDark.withOpacity(0.9),
+                        color: AppColors.error.withOpacity(0.9),
                       ),
                     ),
                   ),
@@ -742,6 +857,7 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
     VoidCallback? onPressed, {
     Color? border,
     String? trailingLabel,
+    Color? trailingBadgeBg,
   }) {
     final isLast = _lastProvider == provider;
     final busy = _loadingProvider == provider;
@@ -753,16 +869,17 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
           width: double.infinity,
           height: 48,
           child: ElevatedButton.icon(
-            icon: busy
-                ? SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: fgColor,
-                    ),
-                  )
-                : Icon(icon, color: fgColor, size: 22),
+            icon:
+                busy
+                    ? SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: fgColor,
+                      ),
+                    )
+                    : Icon(icon, color: fgColor, size: 22),
             label: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -782,14 +899,16 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.surfaceMuted,
+                      color: trailingBadgeBg ?? AppColors.surfaceMuted,
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
                       trailingLabel,
-                      style: const TextStyle(
-                        fontSize: 10,
-                        color: AppColors.textSecondary,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: trailingBadgeBg != null
+                            ? fgColor.withOpacity(0.85)
+                            : AppColors.textSecondary,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -802,9 +921,10 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
               elevation: 0,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
-                side: border != null
-                    ? BorderSide(color: border)
-                    : BorderSide.none,
+                side:
+                    border != null
+                        ? BorderSide(color: border)
+                        : BorderSide.none,
               ),
             ),
             onPressed: _isLoading ? null : onPressed,
@@ -897,14 +1017,27 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
         password: _pwCtrl.text,
       );
 
-      // provider 기록
-      await SignInTracker.record('email');
-
       if (!mounted) return;
       final status = await ClinicAuthService.getStatus();
       if (!mounted) return;
 
-      if (status.canPost) {
+      if (!status.exists) {
+        // clinics_accounts 문서 없음 → 공고자 계정이 아님
+        await FirebaseAuth.instance.signOut();
+        if (!mounted) return;
+        setState(() {
+          _errorMsg = '이 이메일은 공고자 계정으로 등록되어 있지 않습니다.\n'
+              '위생사(지원자) 계정이라면 왼쪽의 지원자 로그인을 이용해주세요.\n'
+              '공고자 계정이 없다면 아래 회원가입을 진행해주세요.';
+        });
+        return;
+      }
+
+      await SignInTracker.record('email');
+      await ClinicAuthService.recordLogin();
+
+      if (!mounted) return;
+      if (status.isApprovedAndCanPost) {
         context.go(widget.nextRoute ?? '/post-job');
       } else {
         context.go('/publisher/onboarding');
@@ -938,10 +1071,18 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(28),
+      padding: const EdgeInsets.all(AppSpacing.xl),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        border: Border.all(color: AppColors.divider),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.divider.withOpacity(0.25),
+            blurRadius: 30,
+            offset: const Offset(0, 20),
+          ),
+        ],
       ),
       child: Form(
         key: _formKey,
@@ -990,28 +1131,13 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
             const SizedBox(height: 24),
 
             // ── 안내 문구 ─────────────────────────────
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Text(
-                  '치과 계정은 SNS 로그인을 지원하지 않습니다.',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.notoSansKr(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'SNS로 가입했다면 비밀번호를 만들어 주세요.',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.notoSansKr(
-                    fontSize: 11,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
+            Text(
+              '치과 계정은 기존 일반유저 계정으로 가입할 수 없습니다.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.notoSansKr(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+              ),
             ),
             const SizedBox(height: 16),
 
@@ -1027,7 +1153,7 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
                 return null;
               },
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.md),
 
             // 비밀번호
             PubTextField(
@@ -1052,14 +1178,14 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
 
             // 에러
             if (_errorMsg != null) ...[
-              const SizedBox(height: 10),
+              const SizedBox(height: AppSpacing.sm),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
                   vertical: 8,
                 ),
                 decoration: BoxDecoration(
-                  color: kPubPinkDark.withOpacity(0.08),
+                  color: AppColors.error.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
@@ -1067,7 +1193,7 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
                     Icon(
                       Icons.error_outline,
                       size: 16,
-                      color: kPubPinkDark.withOpacity(0.8),
+                      color: AppColors.error.withOpacity(0.8),
                     ),
                     const SizedBox(width: 6),
                     Expanded(
@@ -1075,7 +1201,7 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
                         _errorMsg!,
                         style: TextStyle(
                           fontSize: 12,
-                          color: kPubPinkDark.withOpacity(0.9),
+                          color: AppColors.error.withOpacity(0.9),
                         ),
                       ),
                     ),
@@ -1091,26 +1217,7 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
               onPressed: _login,
             ),
 
-            const SizedBox(height: 12),
-
-            // 비밀번호 만들기 버튼 (SNS 가입자 대상)
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () => context.push('/publisher/forgot'),
-                icon: const Icon(Icons.lock_reset, size: 15),
-                label: Text(
-                  'SNS가입자 비밀번호 만들기',
-                  style: GoogleFonts.notoSansKr(fontSize: 13),
-                ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.accent,
-                  side: BorderSide(color: AppColors.accent.withOpacity(0.4)),
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                ),
-              ),
-            ),
-            const SizedBox(height: 4),
+            const SizedBox(height: AppSpacing.md),
 
             // 비밀번호 찾기 + 회원가입
             Row(

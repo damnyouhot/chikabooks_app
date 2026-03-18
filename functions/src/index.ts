@@ -80,6 +80,42 @@ function maskToken(token: string): string {
 }
 
 /**
+ * 역할 중복 가입 차단 헬퍼
+ *
+ * 위생사(applicant) 가입/로그인 시 호출:
+ * clinics_accounts에 같은 uid 또는 같은 normalizedEmail이 있으면 차단
+ */
+async function checkApplicantRoleDuplicate(
+  uid: string,
+  email: string | null
+): Promise<void> {
+  // 1) uid 기준
+  const clinicDoc = await db.collection("clinics_accounts").doc(uid).get();
+  if (clinicDoc.exists) {
+    throw new functions.https.HttpsError(
+      "permission-denied",
+      "이 계정은 이미 공고자 계정으로 가입되어 있어 위생사 계정으로 사용할 수 없습니다."
+    );
+  }
+
+  // 2) normalizedEmail 기준
+  if (email && email.trim().length > 0) {
+    const normalized = email.trim().toLowerCase();
+    const emailSnap = await db
+      .collection("clinics_accounts")
+      .where("normalizedEmail", "==", normalized)
+      .limit(1)
+      .get();
+    if (!emailSnap.empty) {
+      throw new functions.https.HttpsError(
+        "permission-denied",
+        "이 이메일은 이미 공고자 계정으로 가입되어 있어 위생사 계정으로 사용할 수 없습니다."
+      );
+    }
+  }
+}
+
+/**
  * 추대 트리거: enthrone 서브컬렉션에 문서 생성 시
  * 3개 달성 시 billboardPosts에 자동 등록
  */
@@ -929,6 +965,10 @@ export const verifyNaverToken = functions.https.onCall(
         const legacyUser = await admin.auth().getUser(legacyUid);
         if (legacyUser) {
           console.log(`⚠️ 기존 사용자 발견 (${legacyUid}), 하위 호환 유지`);
+
+          // 역할 중복 체크: 공고자 계정이면 위생사 로그인 차단
+          await checkApplicantRoleDuplicate(legacyUid, email);
+
           // 기존 UID로 토큰 발급 (하위 호환성 유지)
           const customToken = await admin.auth().createCustomToken(legacyUid);
           
@@ -940,6 +980,7 @@ export const verifyNaverToken = functions.https.onCall(
 
             const baseData: Record<string, unknown> = {
               email: email || null,
+              normalizedEmail: email ? email.trim().toLowerCase() : null,
               displayName: displayName || null,
               provider: "naver",
               providerId: naverId,
@@ -965,9 +1006,13 @@ export const verifyNaverToken = functions.https.onCall(
           };
         }
       } catch (error: any) {
+        if (error instanceof functions.https.HttpsError) throw error;
         // 기존 사용자가 없으면 새 형식으로 생성
         console.log(`✅ 신규 사용자, 새 UID 형식 사용: ${uid}`);
       }
+
+      // ========== 6-2. 신규 사용자 역할 중복 체크 ==========
+      await checkApplicantRoleDuplicate(uid, email);
 
       // ========== 7. Firebase Auth 사용자 생성/업데이트 ==========
       const updateData: admin.auth.UpdateRequest = {};
@@ -990,7 +1035,6 @@ export const verifyNaverToken = functions.https.onCall(
       });
 
       // ========== 8. Firestore users 컬렉션에 저장 ==========
-      // 조건부 필드(createdAt, excludeFromStats)는 트랜잭션으로 "없을 때만" 기록
       const naverNewUserRef = db.collection("users").doc(uid);
       await db.runTransaction(async (transaction) => {
         const snap = await transaction.get(naverNewUserRef);
@@ -998,6 +1042,7 @@ export const verifyNaverToken = functions.https.onCall(
 
         const baseData: Record<string, unknown> = {
           email: email || null,
+          normalizedEmail: email ? email.trim().toLowerCase() : null,
           displayName: displayName || null,
           provider: "naver",
           providerId: naverId,
@@ -1182,6 +1227,10 @@ export const verifyKakaoToken = functions.https.onCall(
         const legacyUser = await admin.auth().getUser(legacyUid);
         if (legacyUser) {
           console.log(`⚠️ 기존 사용자 발견 (${legacyUid}), 하위 호환 유지`);
+
+          // 역할 중복 체크: 공고자 계정이면 위생사 로그인 차단
+          await checkApplicantRoleDuplicate(legacyUid, email);
+
           // 기존 UID로 토큰 발급 (하위 호환성 유지)
           const customToken = await admin.auth().createCustomToken(legacyUid);
           
@@ -1193,6 +1242,7 @@ export const verifyKakaoToken = functions.https.onCall(
 
             const baseData: Record<string, unknown> = {
               email: email || null,
+              normalizedEmail: email ? email.trim().toLowerCase() : null,
               displayName: displayName || null,
               provider: "kakao",
               providerId: kakaoId,
@@ -1218,9 +1268,13 @@ export const verifyKakaoToken = functions.https.onCall(
           };
         }
       } catch (error: any) {
+        if (error instanceof functions.https.HttpsError) throw error;
         // 기존 사용자가 없으면 새 형식으로 생성
         console.log(`✅ 신규 사용자, 새 UID 형식 사용: ${uid}`);
       }
+
+      // ========== 6-2. 신규 사용자 역할 중복 체크 ==========
+      await checkApplicantRoleDuplicate(uid, email);
 
       // ========== 7. Firebase Auth 사용자 생성/조회 (email-already-exists 방지) ==========
       let resolvedUid = uid; // 기본값: kakao:{kakaoId}
@@ -1267,6 +1321,8 @@ export const verifyKakaoToken = functions.https.onCall(
             console.log(`⚠️ 이메일(${email}) 이미 존재 → 기존 계정 UID 사용`);
             const existingUser = await admin.auth().getUserByEmail(email);
             resolvedUid = existingUser.uid;
+            // 연결되는 기존 UID에 대해서도 역할 중복 체크
+            await checkApplicantRoleDuplicate(resolvedUid, email);
             console.log(`✅ 기존 계정 UID로 연결: ${resolvedUid}`);
           } else {
             throw createError;
@@ -1275,9 +1331,6 @@ export const verifyKakaoToken = functions.https.onCall(
       }
 
       // ========== 8. Firestore users 컬렉션에 저장 ==========
-      // 조건부 필드(createdAt, excludeFromStats)는 트랜잭션으로 "없을 때만" 기록
-      // → createdAt: 기존 값 절대 덮어쓰지 않음
-      // → excludeFromStats: 기존 true(관리자/테스트 계정) 유지
       const kakaoNewUserRef = db.collection("users").doc(resolvedUid);
       await db.runTransaction(async (transaction) => {
         const snap = await transaction.get(kakaoNewUserRef);
@@ -1285,6 +1338,7 @@ export const verifyKakaoToken = functions.https.onCall(
 
         const baseData: Record<string, unknown> = {
           email: email || null,
+          normalizedEmail: email ? email.trim().toLowerCase() : null,
           displayName: displayName || null,
           provider: "kakao",
           providerId: kakaoId,
@@ -1379,6 +1433,9 @@ export { leavePartnerGroup } from "./partner-leave";
 // ========== 계정 삭제 ==========
 export { deleteMyAccount } from "./account-deletion";
 
+// ========== 행동 분석 일별 집계 ==========
+export { aggregateAnalyticsDaily } from "./scheduled-analytics";
+
 // ========== 구인공고: 이미지 → 폼 자동채우기 (AI Vision) ==========
 /**
  * parseJobImagesToForm
@@ -1468,10 +1525,22 @@ export const createJobPosting = functions.https.onCall(
       }
     }
 
-    // clinicId는 users/{uid}.clinicId에서 가져오기
-    const userDoc = await db.collection("users").doc(uid).get();
-    const userData = userDoc.data() || {};
-    const clinicId = userData.clinicId || uid;
+    // clinics_accounts/{uid}에서 공고자 승인 상태 확인
+    const clinicAccDoc = await db.collection("clinics_accounts").doc(uid).get();
+    if (!clinicAccDoc.exists) {
+      throw new functions.https.HttpsError(
+        "permission-denied",
+        "공고자 계정이 아닙니다. 공고자 가입을 먼저 진행해주세요."
+      );
+    }
+    const clinicAccData = clinicAccDoc.data() || {};
+    if (clinicAccData.approvalStatus !== "approved" || clinicAccData.canPost !== true) {
+      throw new functions.https.HttpsError(
+        "permission-denied",
+        "공고 작성 권한이 없습니다. 사업자 인증 승인 후 공고를 작성할 수 있습니다."
+      );
+    }
+    const clinicId = clinicAccData.clinicId || uid;
 
     const jobData = {
       createdBy: uid,
@@ -1557,12 +1626,12 @@ export const submitClinicVerification = functions.https.onCall(
         reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      // 승인 시 clinics + users 문서 업데이트
+      // 승인 시 clinics + clinics_accounts 문서 업데이트
       if (ntsResult.valid) {
-        // 1) clinics/{clinicId} 생성 (clinicId = uid를 기본값으로 사용)
         const clinicId = uid;
         const clinicAddress = String(data.address ?? "").trim();
 
+        // 1) clinics/{clinicId} 생성/갱신
         await db.collection("clinics").doc(clinicId).set(
           {
             name: clinicName,
@@ -1576,13 +1645,17 @@ export const submitClinicVerification = functions.https.onCall(
           { merge: true }
         );
 
-        // 2) users/{uid} role: "clinic" + clinicId 저장
-        await db.collection("users").doc(uid).set(
+        // 2) clinics_accounts/{uid} 승인 상태 업데이트
+        await db.collection("clinics_accounts").doc(uid).set(
           {
-            role: "clinic",
             clinicId,
             clinicVerified: true,
+            approvalStatus: "approved",
+            canPost: true,
             clinic: { name: clinicName, bizNo },
+            onboarding: { business: "done" },
+            approvedAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           },
           { merge: true }
         );
@@ -1804,23 +1877,23 @@ export const syncImwebPurchases = functions
     try {
       const keysSnap = await db.collection("api_keys").doc("imweb_keys").get();
       if (keysSnap.exists) {
-        const keysData = keysSnap.data()!;
-        const imwebKey = keysData.key as string;
-        const imwebSecret = keysData.secret_key as string;
+    const keysData = keysSnap.data()!;
+    const imwebKey = keysData.key as string;
+    const imwebSecret = keysData.secret_key as string;
 
-        const authRes = await axios.get(
-          `https://api.imweb.me/v2/auth?key=${imwebKey}&secret=${imwebSecret}`
-        );
-        const accessToken: string = authRes.data?.access_token;
+    const authRes = await axios.get(
+      `https://api.imweb.me/v2/auth?key=${imwebKey}&secret=${imwebSecret}`
+    );
+    const accessToken: string = authRes.data?.access_token;
 
         if (accessToken) {
-          const headers = { "access-token": accessToken };
+    const headers = { "access-token": accessToken };
           const nowSec = Math.floor(Date.now() / 1000);
           const threeMonthsAgoSec = nowSec - (90 * 24 * 60 * 60);
 
           const myOrders: Record<string, unknown>[] = [];
           const seenOrderNos = new Set<string>();
-          let page = 1;
+    let page = 1;
 
           while (page <= 10) {
             const ordersUrl =
@@ -1838,7 +1911,7 @@ export const syncImwebPurchases = functions
 
             if (orderList.length === 0) break;
 
-            for (const order of orderList) {
+      for (const order of orderList) {
               const orderNo = String(order["order_no"] ?? "");
               if (seenOrderNos.has(orderNo)) continue;
 
@@ -1854,12 +1927,12 @@ export const syncImwebPurchases = functions
             }
 
             if (orderList.length < 100) break;
-            page++;
-          }
+      page++;
+    }
 
           functions.logger.info("API 주문 매칭", {
             email, matchedOrders: myOrders.length,
-          });
+    });
 
           for (const order of myOrders) {
             const orderNo = String(order["order_no"] ?? "");
@@ -1888,23 +1961,23 @@ export const syncImwebPurchases = functions
                   functions.logger.info("API: 미매핑 상품코드", { prodNo });
                   continue;
                 }
-                if (existingIds.has(ebookId)) {
-                  skipped++;
-                  continue;
-                }
+      if (existingIds.has(ebookId)) {
+        skipped++;
+        continue;
+      }
 
                 writeBatch.set(
-                  purchasesRef.doc(ebookId),
-                  {
-                    ebookId,
-                    purchasedAt: admin.firestore.FieldValue.serverTimestamp(),
+        purchasesRef.doc(ebookId),
+        {
+          ebookId,
+          purchasedAt: admin.firestore.FieldValue.serverTimestamp(),
                     source: "imweb",
-                    syncedAt: admin.firestore.FieldValue.serverTimestamp(),
-                  },
-                  { merge: true }
-                );
+          syncedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
                 existingIds.add(ebookId);
-                synced++;
+      synced++;
 
                 functions.logger.info("API 상품 발견", { orderNo, prodNo, ebookId });
               }
@@ -1961,9 +2034,11 @@ function shuffleArray<T>(arr: T[]): T[] {
 
 /** 날짜 → 'YYYY-MM-DD' */
 function toDateKey(date: Date): string {
-  const yyyy = date.getFullYear();
-  const mm   = String(date.getMonth() + 1).padStart(2, "0");
-  const dd   = String(date.getDate()).padStart(2, "0");
+  // Asia/Seoul(UTC+9) 기준 날짜 계산
+  const kst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+  const yyyy = kst.getUTCFullYear();
+  const mm   = String(kst.getUTCMonth() + 1).padStart(2, "0");
+  const dd   = String(kst.getUTCDate()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}`;
 }
 
@@ -2066,7 +2141,7 @@ async function pickTodayQuizzes(meta: FirebaseFirestore.DocumentData): Promise<{
 
 export const scheduleQuizzes = functions
   .region("us-central1")
-  .pubsub.schedule("0 0 * * *")   // 매일 자정 UTC (= 한국 오전 9시)
+  .pubsub.schedule("0 0 * * *")   // 매일 자정 00:00 (Asia/Seoul 기준)
   .timeZone("Asia/Seoul")
   .onRun(async () => {
     functions.logger.info("🗓️ scheduleQuizzes: 실행 시작");
@@ -2255,5 +2330,3 @@ export const manualScheduleQuiz = functions
       message: `${dateKey} 스케줄 생성 완료 (${quizIds.length}문제, ${wasReset ? "사이클 초기화" : "정상"})`,
     };
   });
-
-

@@ -9,27 +9,25 @@ class _StageRule {
   final String name;
   final int minMonths;
   final int minClinics;
-  final int minLv4;
 
   const _StageRule({
     required this.name,
     required this.minMonths,
     required this.minClinics,
-    required this.minLv4,
   });
 }
 
 const _kStageRules = <_StageRule>[
-  _StageRule(name: '시작 단계', minMonths: 0,   minClinics: 0, minLv4: 0),
-  _StageRule(name: '적응 단계', minMonths: 6,   minClinics: 1, minLv4: 0),
-  _StageRule(name: '자리잡음',  minMonths: 18,  minClinics: 1, minLv4: 0),
-  _StageRule(name: '안정기',   minMonths: 30,  minClinics: 1, minLv4: 1),
-  _StageRule(name: '확장기',   minMonths: 42,  minClinics: 2, minLv4: 1),
-  _StageRule(name: '깊어짐',   minMonths: 54,  minClinics: 2, minLv4: 2),
-  _StageRule(name: '단단함',   minMonths: 72,  minClinics: 3, minLv4: 2),
-  _StageRule(name: '중심 역할', minMonths: 84,  minClinics: 3, minLv4: 4),
-  _StageRule(name: '영향력',   minMonths: 96,  minClinics: 4, minLv4: 4),
-  _StageRule(name: '멘토 단계', minMonths: 120, minClinics: 4, minLv4: 5),
+  _StageRule(name: '시작 단계', minMonths: 0,   minClinics: 0),
+  _StageRule(name: '적응 단계', minMonths: 6,   minClinics: 1),
+  _StageRule(name: '자리잡음',  minMonths: 18,  minClinics: 1),
+  _StageRule(name: '안정기',   minMonths: 30,  minClinics: 1),
+  _StageRule(name: '확장기',   minMonths: 42,  minClinics: 2),
+  _StageRule(name: '깊어짐',   minMonths: 54,  minClinics: 2),
+  _StageRule(name: '단단함',   minMonths: 72,  minClinics: 3),
+  _StageRule(name: '중심 역할', minMonths: 84,  minClinics: 3),
+  _StageRule(name: '영향력',   minMonths: 96,  minClinics: 4),
+  _StageRule(name: '멘토 단계', minMonths: 120, minClinics: 4),
 ];
 
 // 모든 단계 규칙을 외부에서 참조할 수 있도록 노출
@@ -40,7 +38,6 @@ List<Map<String, dynamic>> get careerStageRules =>
             'name': r.name,
             'minMonths': r.minMonths,
             'minClinics': r.minClinics,
-            'minLv4': r.minLv4,
           },
         )
         .toList();
@@ -48,14 +45,11 @@ List<Map<String, dynamic>> get careerStageRules =>
 int _computeStageIndex({
   required int totalMonths,
   required int totalClinics,
-  required int lv4Count,
 }) {
   int idx = 0;
   for (int i = 0; i < _kStageRules.length; i++) {
     final r = _kStageRules[i];
-    if (totalMonths >= r.minMonths &&
-        totalClinics >= r.minClinics &&
-        lv4Count >= r.minLv4) {
+    if (totalMonths >= r.minMonths && totalClinics >= r.minClinics) {
       idx = i;
     }
   }
@@ -69,13 +63,11 @@ int _computeStageIndex({
 class CareerStageCard extends StatelessWidget {
   final int totalCareerMonths;
   final int totalClinics;
-  final int skillsLv4Count;
 
   const CareerStageCard({
     super.key,
     required this.totalCareerMonths,
     required this.totalClinics,
-    required this.skillsLv4Count,
   });
 
   @override
@@ -83,7 +75,6 @@ class CareerStageCard extends StatelessWidget {
     final stageIdx = _computeStageIndex(
       totalMonths: totalCareerMonths,
       totalClinics: totalClinics,
-      lv4Count: skillsLv4Count,
     );
     final current = _kStageRules[stageIdx];
     final isMax = stageIdx == _kStageRules.length - 1;
@@ -98,12 +89,10 @@ class CareerStageCard extends StatelessWidget {
               int done = 0;
               if (totalCareerMonths >= nx.minMonths) done++;
               if (totalClinics >= nx.minClinics) done++;
-              if (skillsLv4Count >= nx.minLv4) done++;
               final total =
                   [
                     nx.minMonths > cur.minMonths,
                     nx.minClinics > cur.minClinics,
-                    nx.minLv4 > cur.minLv4,
                   ].where((v) => v).length;
               return total == 0 ? 1.0 : done / total;
             }();
@@ -232,15 +221,6 @@ class CareerStageCard extends StatelessWidget {
           text: '치과 이력 ${next.minClinics}곳 달성',
           done: totalClinics >= next.minClinics,
           current: '현재 ${totalClinics}곳',
-        ),
-      );
-    }
-    if (next.minLv4 > cur.minLv4) {
-      items.add(
-        _ChecklistItemData(
-          text: 'Lv.4 이상 스킬 ${next.minLv4}개 달성',
-          done: skillsLv4Count >= next.minLv4,
-          current: '현재 ${skillsLv4Count}개',
         ),
       );
     }
@@ -376,7 +356,7 @@ void showCareerStageGuideSheet(BuildContext context) {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
             child: const Text(
-              '총 경력, 치과 이력 수, Lv.4 이상 스킬 수에 따라 단계가 자동으로 결정됩니다.',
+              '총 경력, 치과 이력 수에 따라 단계가 자동으로 결정됩니다.',
               style: TextStyle(
                 fontSize: 12,
                 color: AppColors.textSecondary,
@@ -456,17 +436,7 @@ void showCareerStageGuideSheet(BuildContext context) {
                                 color: AppColors.textSecondary,
                               ),
                             ),
-                          if (r.minLv4 > 0)
-                            Text(
-                              'Lv.4+ 스킬 ${r.minLv4}개',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          if (r.minMonths == 0 &&
-                              r.minClinics == 0 &&
-                              r.minLv4 == 0)
+                          if (r.minMonths == 0 && r.minClinics == 0)
                             const Text(
                               '시작',
                               style: TextStyle(
