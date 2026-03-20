@@ -272,6 +272,11 @@ enum ActivityEventType {
   // ── 퀴즈 ──────────────────────────────────────────────────
   quizCompleted('quiz_completed', '퀴즈 풀이 완료'),
 
+  // ── 공감투표 ──────────────────────────────────────────────
+  pollEmpathize('poll_empathize', '공감투표 공감'),
+  pollChangeEmpathy('poll_change_empathy', '공감투표 공감 변경'),
+  pollAddOption('poll_add_option', '공감투표 보기 추가'),
+
   // ── 기타 ──────────────────────────────────────────────────
   appOpen('app_open', '앱 실행'),
 

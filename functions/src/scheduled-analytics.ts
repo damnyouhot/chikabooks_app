@@ -15,6 +15,9 @@ const MEANINGFUL_ACTIONS = new Set([
   "tap_career_edit",
   "view_job_detail",
   "quiz_completed",
+  "poll_empathize",
+  "poll_change_empathy",
+  "poll_add_option",
 ]);
 
 const FEATURE_KEYS = [
@@ -22,6 +25,7 @@ const FEATURE_KEYS = [
   "tap_character",
   "view_job_detail",
   "quiz_completed",
+  "poll_empathize",
 ];
 
 const TAB_KEYS = ["view_home", "view_job", "view_growth", "view_bond"];
@@ -30,6 +34,7 @@ const CONVERSION_PAIRS: [string, string][] = [
   ["view_home", "emotion_save_success"],
   ["view_job", "view_job_detail"],
   ["view_growth", "quiz_completed"],
+  ["view_bond", "poll_empathize"],
 ];
 
 const GROWTH_EVENTS = new Set(["view_growth"]);

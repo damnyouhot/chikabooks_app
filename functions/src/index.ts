@@ -1183,6 +1183,9 @@ export { deleteMyAccount } from "./account-deletion";
 // ========== 행동 분석 일별 집계 ==========
 export { aggregateAnalyticsDaily } from "./scheduled-analytics";
 
+// ========== 공감투표 자동 종료 ==========
+export { closeExpiredPolls, manualClosePoll } from "./poll-close";
+
 // ========== 구인공고: 이미지 → 폼 자동채우기 (AI Vision) ==========
 /**
  * parseJobImagesToForm

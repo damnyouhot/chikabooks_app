@@ -24,6 +24,9 @@ class AdminBehaviorService {
     'tap_career_edit',
     'view_job_detail',
     'quiz_completed',
+    'poll_empathize',
+    'poll_change_empathy',
+    'poll_add_option',
   };
 
   // ── 유저 타입 분류용 이벤트 그룹 ──
@@ -141,6 +144,7 @@ class AdminBehaviorService {
       ('캐릭터 인터랙션', {'tap_character'}),
       ('채용 공고 클릭', {'view_job_detail'}),
       ('퀴즈 풀이', {'quiz_completed'}),
+      ('공감투표 참여', {'poll_empathize'}),
     ];
 
     return features.map((f) {
@@ -165,6 +169,7 @@ class AdminBehaviorService {
       ('나 탭 → 감정 기록', 'view_home', 'emotion_save_success'),
       ('구직 탭 → 공고 상세', 'view_job', 'view_job_detail'),
       ('성장 탭 → 퀴즈 풀이', 'view_growth', 'quiz_completed'),
+      ('같이 탭 → 공감투표', 'view_bond', 'poll_empathize'),
     ];
 
     return pairs.map((p) {
@@ -193,7 +198,7 @@ class AdminBehaviorService {
       'view_home' => '나 탭',
       'view_job' => '구직 탭',
       'view_growth' => '성장 탭',
-      'view_bond' => '교감 탭',
+      'view_bond' => '같이 탭',
       _ => event,
     };
   }

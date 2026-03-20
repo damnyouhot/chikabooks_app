@@ -12,7 +12,9 @@ class BondPage extends StatefulWidget {
 }
 
 class BondPageState extends State<BondPage> {
-  void refreshData() {}
+  final _pollKey = GlobalKey<BondPollSectionState>();
+
+  void refreshData() => _pollKey.currentState?.reload();
 
   @override
   Widget build(BuildContext context) {
@@ -23,7 +25,7 @@ class BondPageState extends State<BondPage> {
           slivers: [
             SliverToBoxAdapter(child: _buildHeader()),
             const SliverToBoxAdapter(child: SizedBox(height: 8)),
-            const SliverToBoxAdapter(child: BondPollSection()),
+            SliverToBoxAdapter(child: BondPollSection(key: _pollKey)),
             const SliverToBoxAdapter(child: SizedBox(height: 40)),
           ],
         ),

@@ -37,6 +37,7 @@ class _HomeShellState extends State<HomeShell> {
   static const _tabRoutes = ['/', '/bond', '/growth', '/career'];
 
   // ── 탭 위젯 캐시 (JobPage는 온보딩 상태에 따라 build에서 생성) ──
+  final _bondKey = GlobalKey<BondPageState>();
   late final BondPage _bondPage;
   late final GrowthPage _growthPage;
 
@@ -51,7 +52,7 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void initState() {
     super.initState();
-    _bondPage = const BondPage();
+    _bondPage = BondPage(key: _bondKey);
     _growthPage = GrowthPage(subTabNotifier: _growthSubTabNotifier);
 
     _onboardingCtrl = AppOnboardingController();
@@ -146,6 +147,10 @@ class _HomeShellState extends State<HomeShell> {
   // ─────────────────────────────────────────────────────────
   void _setTab(int idx) {
     setState(() => _selectedIndex = idx);
+
+    if (idx == _bondTabIndex) {
+      _bondKey.currentState?.refreshData();
+    }
 
     // 탭 진입 이벤트 기록
     const tabEvents = [
