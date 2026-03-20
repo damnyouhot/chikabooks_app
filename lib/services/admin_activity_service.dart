@@ -13,7 +13,6 @@ import 'package:flutter/foundation.dart';
 ///   - careerBucketSnapshot   : 기록 시점 연차 버킷 (분석용)
 ///   - regionSnapshot         : 기록 시점 지역 (분석용)
 ///   - workplaceTypeSnapshot  : 기록 시점 근무지 유형 (분석용)
-///   - partnerStatusSnapshot  : 기록 시점 파트너 상태 (분석용)
 ///
 /// ── 설계 원칙 ─────────────────────────────────────────────────
 /// 1. UI 코드에서 직접 Firestore를 쓰지 않고 이 서비스만 호출
@@ -207,14 +206,12 @@ class _UserSnapshot {
   final String careerBucket;
   final String region;
   final String workplaceType;
-  final String partnerStatus;
 
   const _UserSnapshot({
     this.careerGroup = '',
     this.careerBucket = '',
     this.region = '',
     this.workplaceType = '',
-    this.partnerStatus = '',
   });
 
   factory _UserSnapshot.fromMap(Map<String, dynamic> m) => _UserSnapshot(
@@ -222,7 +219,6 @@ class _UserSnapshot {
     careerBucket:   m['careerBucket']   as String? ?? '',
     region:         m['region']         as String? ?? '',
     workplaceType:  m['workplaceType']  as String? ?? '',
-    partnerStatus:  m['partnerStatus']  as String? ?? '',
   );
 
   Map<String, dynamic> toMap() {
@@ -231,7 +227,6 @@ class _UserSnapshot {
     if (careerBucket.isNotEmpty)  map['careerBucketSnapshot']  = careerBucket;
     if (region.isNotEmpty)        map['regionSnapshot']        = region;
     if (workplaceType.isNotEmpty) map['workplaceTypeSnapshot'] = workplaceType;
-    if (partnerStatus.isNotEmpty) map['partnerStatusSnapshot'] = partnerStatus;
     return map;
   }
 }
@@ -305,9 +300,8 @@ enum ActivityEventType {
 enum FunnelEventType {
   signupComplete('funnel_signup_complete', 'auth', '회원가입 완료', 1),
   profileBasicComplete('funnel_profile_basic', 'onboarding', '기본 프로필 완료', 2),
-  profilePartnerComplete('funnel_profile_partner', 'onboarding', '파트너 프로필 완료', 3),
-  firstEmotionStart('funnel_first_emotion_start', 'emotion', '첫 감정기록 시작', 4),
-  firstEmotionComplete('funnel_first_emotion_complete', 'emotion', '첫 감정기록 완료', 5);
+  firstEmotionStart('funnel_first_emotion_start', 'emotion', '첫 감정기록 시작', 3),
+  firstEmotionComplete('funnel_first_emotion_complete', 'emotion', '첫 감정기록 완료', 4);
 
   final String value;
   final String page;

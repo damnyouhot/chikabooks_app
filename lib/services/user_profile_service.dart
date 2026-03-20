@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/user_public_profile.dart';
-import '../models/partner_preferences.dart';
+
 
 /// 교감 프로필 서비스 (캐시 포함)
 ///
@@ -75,12 +75,6 @@ class UserProfileService {
     return profile?.hasBasicProfile ?? false;
   }
 
-  /// Step B 파트너 프로필 입력 완료 여부
-  static Future<bool> hasPartnerProfile() async {
-    final profile = await getMyProfile();
-    return profile?.hasPartnerProfile ?? false;
-  }
-
   /// Step A 저장: 닉네임 / 지역 / 연차
   static Future<void> updateBasicProfile({
     required String nickname,
@@ -129,69 +123,6 @@ class UserProfileService {
     await _db.collection('users').doc(uid).update(profile.toMap());
     await _ensurePublicProfile(uid, profile);
     _cache = profile;
-
-    // 현재 활성 파트너 그룹의 memberMeta도 최신 관심사로 업데이트
-    await _syncMemberMetaConcerns(uid, profile.mainConcerns);
-  }
-
-  /// 파트너 그룹 memberMeta의 관심사를 최신 값으로 동기화
-  static Future<void> _syncMemberMetaConcerns(
-    String uid,
-    List<String> mainConcerns,
-  ) async {
-    try {
-      final userDoc = await _db.collection('users').doc(uid).get();
-      final groupId = userDoc.data()?['partnerGroupId'] as String?;
-      if (groupId == null || groupId.isEmpty) return;
-
-      final concerns = mainConcerns.take(2).toList();
-      await _db
-          .collection('partnerGroups')
-          .doc(groupId)
-          .collection('memberMeta')
-          .doc(uid)
-          .update({
-            'mainConcerns': concerns,
-            'mainConcernShown': concerns.isNotEmpty ? concerns[0] : null,
-          });
-      debugPrint('✅ [UserProfileService] memberMeta 관심사 동기화 완료');
-    } catch (e) {
-      // memberMeta 업데이트 실패는 치명적이지 않으므로 로그만 남김
-      debugPrint('⚠️ [UserProfileService] memberMeta 동기화 실패 (무시): $e');
-    }
-  }
-
-  /// 현재 결 점수 (마이그레이션 포함, 0~100 범위)
-  /// 구버전(35~85) 데이터가 있으면 자동 변환 후 저장
-  static Future<double> getBondScore() async {
-    final uid = _auth.currentUser?.uid;
-    if (uid == null) return 50.0;
-
-    final profile = await getMyProfile();
-    if (profile == null) return 50.0;
-
-    // 이미 v2면 캐시값 그대로
-    if (profile.bondScoreVersion >= 2) return profile.bondScore;
-
-    // 구버전 → BondScoreService.readAndMigrate 로 1회 변환+저장
-    // (순환 import 방지: 여기서 직접 변환)
-    final raw = profile.bondScore;
-    final migrated = ((raw.clamp(35.0, 85.0) - 35.0) * 2.0).clamp(0.0, 100.0);
-    await _db.collection('users').doc(uid).update({
-      'bondScore': migrated,
-      'bondScoreVersion': 2,
-    });
-    _cache = null; // 캐시 갱신 유도
-    return migrated;
-  }
-
-  /// 활성 파트너 그룹 ID (없으면 null)
-  static Future<String?> getPartnerGroupId() async {
-    final profile = await getMyProfile(forceRefresh: true);
-    if (profile?.hasActiveGroup == true) {
-      return profile!.partnerGroupId;
-    }
-    return null;
   }
 
   /// 온보딩 프로필 완료 (닉네임 + 지역군 + 연차 + 관심사)
@@ -223,21 +154,14 @@ class UserProfileService {
       careerBucket = '6+';
     }
 
-    // bondScore가 없는 신규 계정은 20.0으로 초기화
-    final existingDoc = await _db.collection('users').doc(uid).get();
-    final existingData = existingDoc.data();
     final Map<String, dynamic> data = {
       'nickname': nickname.trim(),
       'region': region,
-      'careerGroup': careerGroup, // 원본도 저장
-      'careerBucket': careerBucket, // 매칭용 버킷도 저장
+      'careerGroup': careerGroup,
+      'careerBucket': careerBucket,
       'mainConcerns': concernTags,
       'isProfileCompleted': true,
       'updatedAt': FieldValue.serverTimestamp(),
-      // 파트너 매칭 기본값 (없는 경우에만 설정)
-      if (existingData?['partnerStatus'] == null) 'partnerStatus': 'active',
-      if (existingData?['bondScore'] == null) 'bondScore': 20.0,
-      if (existingData?['bondScore'] == null) 'bondScoreVersion': 2,
     };
 
     debugPrint('🔍 [completeOnboarding] Firestore 업데이트 시작...');
@@ -273,132 +197,6 @@ class UserProfileService {
     } catch (e) {
       debugPrint('⚠️ isOnboardingCompleted error: $e');
       return false;
-    }
-  }
-
-  // ═══════════════════════ 파트너 선호도 (v1 설계) ═══════════════════════
-
-  /// 파트너 매칭 선호도 가져오기
-  static Future<PartnerPreferences> getPartnerPreferences() async {
-    final uid = _auth.currentUser?.uid;
-    if (uid == null) return PartnerPreferences.defaultPreset();
-
-    try {
-      final doc = await _db.collection('users').doc(uid).get();
-      if (!doc.exists) return PartnerPreferences.defaultPreset();
-
-      final data = doc.data();
-      if (data?['partnerPreferences'] != null) {
-        return PartnerPreferences.fromMap(
-          data!['partnerPreferences'] as Map<String, dynamic>,
-        );
-      }
-      return PartnerPreferences.defaultPreset();
-    } catch (e) {
-      debugPrint('⚠️ getPartnerPreferences error: $e');
-      return PartnerPreferences.defaultPreset();
-    }
-  }
-
-  /// 파트너 매칭 선호도 저장
-  static Future<void> updatePartnerPreferences(
-    PartnerPreferences preferences,
-  ) async {
-    final uid = _auth.currentUser?.uid;
-    if (uid == null) throw Exception('로그인이 필요합니다.');
-
-    try {
-      await _db.collection('users').doc(uid).update({
-        'partnerPreferences': preferences.toMap(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-      _cache = null; // 캐시 초기화
-    } catch (e) {
-      debugPrint('⚠️ updatePartnerPreferences error: $e');
-      rethrow;
-    }
-  }
-
-  /// 파트너 상태 업데이트 ('active' | 'pause')
-  static Future<void> updatePartnerStatus(String status) async {
-    final uid = _auth.currentUser?.uid;
-    if (uid == null) throw Exception('로그인이 필요합니다.');
-
-    if (status != 'active' && status != 'pause') {
-      throw Exception('유효하지 않은 상태값입니다: $status');
-    }
-
-    try {
-      await _db.collection('users').doc(uid).update({
-        'partnerStatus': status,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-      _cache = null;
-    } catch (e) {
-      debugPrint('⚠️ updatePartnerStatus error: $e');
-      rethrow;
-    }
-  }
-
-  /// 다음 주 매칭 여부 업데이트 (pause 상태에서만 의미 있음)
-  static Future<void> updateWillMatchNextWeek(bool willMatch) async {
-    final uid = _auth.currentUser?.uid;
-    if (uid == null) throw Exception('로그인이 필요합니다.');
-
-    // pause 상태 확인 - active는 항상 매칭 대상이므로 변경 불가
-    final profile = await getMyProfile(forceRefresh: true);
-    if (profile?.partnerStatus != 'pause') {
-      debugPrint('⚠️ active 상태에서는 willMatchNextWeek 변경 불가 (항상 매칭 대상)');
-      return;
-    }
-
-    try {
-      await _db.collection('users').doc(uid).update({
-        'willMatchNextWeek': willMatch,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-      _cache = null;
-    } catch (e) {
-      debugPrint('⚠️ updateWillMatchNextWeek error: $e');
-      rethrow;
-    }
-  }
-
-  /// 이어가기 파트너 선택 (리스트 저장, 구버전 단일 필드도 함께 유지)
-  static Future<void> selectContinuePartners(List<String> partnerUids) async {
-    final uid = _auth.currentUser?.uid;
-    if (uid == null) throw Exception('로그인이 필요합니다.');
-
-    try {
-      await _db.collection('users').doc(uid).update({
-        'continueWithPartners': partnerUids,
-        // 구버전 호환: 첫 번째 UID를 단일 필드에도 저장
-        'continueWithPartner':
-            partnerUids.isNotEmpty ? partnerUids.first : null,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-      _cache = null;
-    } catch (e) {
-      debugPrint('⚠️ selectContinuePartners error: $e');
-      rethrow;
-    }
-  }
-
-  /// 이어가기 선택 취소
-  static Future<void> cancelContinuePartners() async {
-    final uid = _auth.currentUser?.uid;
-    if (uid == null) throw Exception('로그인이 필요합니다.');
-
-    try {
-      await _db.collection('users').doc(uid).update({
-        'continueWithPartners': [],
-        'continueWithPartner': null,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-      _cache = null;
-    } catch (e) {
-      debugPrint('⚠️ cancelContinuePartners error: $e');
-      rethrow;
     }
   }
 

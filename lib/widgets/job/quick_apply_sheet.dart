@@ -4,8 +4,6 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../models/job.dart';
 import '../../services/job_service.dart';
-import '../../services/bond_score_service.dart';
-import '../../models/activity_log.dart';
 
 /// 1분 지원 바텀시트
 ///
@@ -99,13 +97,13 @@ class _QuickApplySheetState extends State<QuickApplySheet> {
         career: _career,
         message: _messageController.text.trim(),
       );
-      await BondScoreService.applyEvent(uid, ActivityType.jobApply);
+
 
       if (mounted) {
         Navigator.pop(context, true);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('✅ 지원이 완료되었습니다! +1.0P'),
+            content: Text('✅ 지원이 완료되었습니다!'),
             backgroundColor: AppColors.success,
           ),
         );

@@ -2,10 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:geolocator/geolocator.dart' hide ActivityType;
+import 'package:geolocator/geolocator.dart';
 import '../models/job.dart';
-import '../models/activity_log.dart';
-import 'bond_score_service.dart';
 
 class JobService {
   final _db = FirebaseFirestore.instance;
@@ -350,10 +348,7 @@ class JobService {
         'bookmarkedJobs': FieldValue.arrayUnion([jobId]),
       });
 
-      // ★ 북마크 포인트 적용
-      await BondScoreService.applyEvent(uid, ActivityType.jobBookmark);
-
-      debugPrint('✅ 북마크 추가 + 포인트 적용: $jobId');
+      debugPrint('✅ 북마크 추가: $jobId');
     } catch (e) {
       debugPrint('⚠️ bookmarkJob error: $e');
     }

@@ -1,48 +1,6 @@
 {
   "indexes": [
     {
-      "collectionGroup": "posts",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        {
-          "fieldPath": "isDeleted",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAtClient",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "posts",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "isDeleted",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "billboardPosts",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "expiresAt",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
       "collectionGroup": "users",
       "queryScope": "COLLECTION",
       "fields": [

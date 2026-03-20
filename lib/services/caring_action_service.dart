@@ -4,9 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../data/caring_ments.dart';
-import '../models/activity_log.dart';
 import '../services/caring_state_service.dart';
-import '../services/bond_score_service.dart';
 
 /// 돌보기(나 탭) 액션 처리 서비스
 ///
@@ -111,15 +109,6 @@ class CaringActionService {
         );
       }
 
-      // 결 점수 적용
-      if (bondDelta != 0.0) {
-        await BondScoreService.applyEvent(
-          uid,
-          ActivityType.slotPost,
-          customDelta: bondDelta,
-        );
-      }
-
       debugPrint('✅ dailySettle: bondDelta=$bondDelta');
     } catch (e) {
       debugPrint('⚠️ CaringActionService.dailySettle error: $e');
@@ -189,11 +178,6 @@ class CaringActionService {
             skipDaysStreak: 0,
             lastActionDate: todayKey,
           ),
-        );
-        await BondScoreService.applyEvent(
-          uid,
-          ActivityType.slotPost,
-          customDelta: 0.1,
         );
       } catch (e) {
         debugPrint('⚠️ _processFeed background write: $e');
@@ -273,11 +257,6 @@ class CaringActionService {
       try {
         await _saveState(
           state.copyWith(touchCountToday: newCount, lastActionDate: todayKey),
-        );
-        await BondScoreService.applyEvent(
-          uid,
-          ActivityType.slotPost,
-          customDelta: 0.05,
         );
       } catch (e) {
         debugPrint('⚠️ _processTouch background write: $e');
@@ -370,13 +349,6 @@ class CaringActionService {
         await _saveState(
           state.copyWith(diaryCountToday: newCount, lastActionDate: todayKey),
         );
-        if (bondDelta > 0.0) {
-          await BondScoreService.applyEvent(
-            uid,
-            ActivityType.slotPost,
-            customDelta: bondDelta,
-          );
-        }
       } catch (e) {
         debugPrint('⚠️ _processDiary background write: $e');
       }
@@ -421,14 +393,6 @@ class CaringActionService {
           bondDelta = 0.0;
           mentPool = CaringMents.goalRestarted;
           break;
-      }
-
-      if (bondDelta > 0.0) {
-        await BondScoreService.applyEvent(
-          uid,
-          ActivityType.slotPost,
-          customDelta: bondDelta,
-        );
       }
 
       final ment = _pickRandom(mentPool);

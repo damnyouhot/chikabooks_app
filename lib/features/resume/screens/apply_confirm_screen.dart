@@ -4,8 +4,6 @@ import '../../../models/job.dart';
 import '../../../models/resume.dart';
 import '../../../services/resume_service.dart';
 import '../../../services/application_service.dart';
-import '../../../services/bond_score_service.dart';
-import '../../../models/activity_log.dart';
 import '../../../core/theme/app_colors.dart';
 import 'resume_preview_screen.dart';
 import 'resume_home_screen.dart';
@@ -85,11 +83,9 @@ class _ApplyConfirmScreenState extends State<ApplyConfirmScreen> {
 
     if (result != null) {
       // 포인트 적용
-      await BondScoreService.applyEvent(uid, ActivityType.jobApply);
-
       if (mounted) {
         Navigator.pop(context, true);
-        _showSnack('✅ 지원이 완료되었어요! +1.0P 적립');
+        _showSnack('✅ 지원이 완료되었어요!');
       }
     } else {
       if (mounted) {

@@ -1,6 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
-/// 교감 프로필 모델
+/// 프로필 모델
 /// Firestore users/{uid} 에 저장되는 공개 프로필 필드
 class UserPublicProfile {
   final String nickname;
@@ -9,18 +7,6 @@ class UserPublicProfile {
   final String careerGroup;   // "1년차" | "2년차" | ... (표시용)
   final List<String> mainConcerns; // 최대 2개
   final String? workplaceType;     // "개인치과" | "네트워크" | "대학병원" | "기타"
-
-  // ─── 파트너 시스템 필드 ───
-  final double bondScore;          // 결 점수 (초기값 50.0, 범위 0~100)
-  final int bondScoreVersion;      // 1=구버전(35~85), 2=신버전(0~100)
-  final String? partnerGroupId;    // 현재 속한 파트너 그룹 ID
-  final DateTime? partnerGroupEndsAt; // 그룹 종료일
-  
-  // ─── 매칭 설정 필드 (v1 설계) ───
-  final String partnerStatus;      // 'active' | 'pause' (기본값: 'active')
-  final bool willMatchNextWeek;    // 쉬는 중 매칭 되기 스위치 (기본값: true)
-  final String? continueWithPartner; // 이어가기 선택한 상대 UID (구버전 호환)
-  final List<String> continueWithPartners; // 이어가기 선택 목록 (신버전)
 
   // ─── 관리자 / 통계 제어 필드 ───
   final bool isAdmin;              // 관리자 여부 (대시보드 접근 권한)
@@ -33,14 +19,6 @@ class UserPublicProfile {
     this.careerGroup = '',
     this.mainConcerns = const [],
     this.workplaceType,
-    this.bondScore = 50.0,
-    this.bondScoreVersion = 2,
-    this.partnerGroupId,
-    this.partnerGroupEndsAt,
-    this.partnerStatus = 'active',
-    this.willMatchNextWeek = true,
-    this.continueWithPartner,
-    this.continueWithPartners = const [],
     this.isAdmin = false,
     this.excludeFromStats = false,
   });
@@ -51,27 +29,7 @@ class UserPublicProfile {
       region.isNotEmpty &&
       careerBucket.isNotEmpty;
 
-  /// Step B(파트너 프로필) 완료 여부
-  bool get hasPartnerProfile =>
-      hasBasicProfile && mainConcerns.isNotEmpty;
-
-  /// 현재 파트너 그룹이 활성 상태인지
-  /// UTC 기준 비교로 시간대 차이 문제 방지
-  bool get hasActiveGroup =>
-      partnerGroupId != null &&
-      partnerGroupId!.isNotEmpty &&
-      partnerGroupEndsAt != null &&
-      partnerGroupEndsAt!.toUtc().isAfter(DateTime.now().toUtc());
-
   factory UserPublicProfile.fromMap(Map<String, dynamic> m) {
-    DateTime? endsAt;
-    final raw = m['partnerGroupEndsAt'];
-    if (raw is Timestamp) {
-      endsAt = raw.toDate();
-    } else if (raw is DateTime) {
-      endsAt = raw;
-    }
-
     return UserPublicProfile(
       nickname: m['nickname'] ?? '',
       region: m['region'] ?? '',
@@ -79,14 +37,6 @@ class UserPublicProfile {
       careerGroup: m['careerGroup'] ?? '', // ✅ 추가
       mainConcerns: List<String>.from(m['mainConcerns'] ?? []),
       workplaceType: m['workplaceType'],
-      bondScore: (m['bondScore'] ?? 50.0).toDouble(),
-      bondScoreVersion: (m['bondScoreVersion'] ?? 1) as int,
-      partnerGroupId: m['partnerGroupId'],
-      partnerGroupEndsAt: endsAt,
-      partnerStatus: m['partnerStatus'] ?? 'active',
-      willMatchNextWeek: m['willMatchNextWeek'] ?? true,
-      continueWithPartner: m['continueWithPartner'],
-      continueWithPartners: List<String>.from(m['continueWithPartners'] ?? []),
       isAdmin: m['isAdmin'] == true,
       excludeFromStats: m['excludeFromStats'] == true,
     );

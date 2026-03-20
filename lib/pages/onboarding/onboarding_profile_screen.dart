@@ -735,14 +735,6 @@ class _OnboardingProfileScreenState extends State<OnboardingProfileScreen> {
         concernTags: _selectedConcerns.toList(),
       );
 
-      // 파트너 프로필 완료 이벤트 기록
-      AdminActivityService.logFunnel(
-        FunnelEventType.profilePartnerComplete,
-        extra: {
-          'careerGroup': _selectedCareer,
-          'region': _selectedRegion,
-        },
-      );
       // 프로필 저장 성공 이벤트
       AdminActivityService.log(
         ActivityEventType.tapProfileSave,

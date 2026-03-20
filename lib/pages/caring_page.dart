@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:rive/rive.dart' hide Animation;
 import '../services/caring_state_service.dart';
-import '../services/bond_score_service.dart';
 import '../services/caring_action_service.dart';
 import '../services/base_message_service.dart';
 import '../services/job_service.dart';
@@ -96,11 +95,8 @@ class _CaringPageState extends State<CaringPage>
   RiveWidgetController? _dogController;
   TriggerInput? _tapTrigger;
 
-  // ── 결 점수 플로팅 애니메이션 ──
   // GlobalKey로 캐릭터 영역 좌표를 정확하게 추적
   final GlobalKey _characterAreaKey = GlobalKey();
-  // 현재 활성화된 OverlayEntry 목록 (dispose 시 일괄 제거)
-  final List<OverlayEntry> _activeOverlayEntries = [];
 
   // 터치 리액션 fallback 문구
   static const List<String> _neutralPhrases = [
@@ -152,7 +148,7 @@ class _CaringPageState extends State<CaringPage>
     if (!widget.isOnboardingActive) {
       _revealCtrl.value = 1.0;
     }    _loadRiveFile();
-    // ① CaringState(캐릭터 데이터) + BondScore → 완료 즉시 메시지 루프 시작
+    // ① CaringState(캐릭터 데이터) → 완료 즉시 메시지 루프 시작
     _loadCaringState().then((_) {
       if (mounted && !widget.isOnboardingActive) _startMsgLoop();
     });
@@ -191,11 +187,6 @@ class _CaringPageState extends State<CaringPage>
     _dogController?.dispose();
     _riveFile?.dispose();
     _revealCtrl.dispose();
-    // 미제거 OverlayEntry 일괄 정리 (탭 전환 등으로 dispose될 때 안전 제거)
-    for (final entry in _activeOverlayEntries) {
-      try { entry.remove(); } catch (_) {}
-    }
-    _activeOverlayEntries.clear();
     super.dispose();
   }
 
@@ -228,13 +219,10 @@ class _CaringPageState extends State<CaringPage>
     }
   }
 
-  // ── ① CaringState + BondScore (캐릭터 동작에 필요한 최소 데이터) ──
+  // ── ① CaringState (캐릭터 동작에 필요한 최소 데이터) ──
   Future<void> _loadCaringState() async {
     try {
-      await Future.wait<dynamic>([
-        CaringStateService.loadState(),
-        BondScoreService.applyCenterGravity(),
-      ]);
+      await CaringStateService.loadState();
       // Policy / Quiz 카드는 정적 데이터 → CaringState 완료 직후 세팅
       final policies = [
         {'title': '2026 스케일링 급여 개정',       'dday': 'D-12', 'date': '3월 1일'},
@@ -467,32 +455,26 @@ class _CaringPageState extends State<CaringPage>
     final result = await CaringActionService.tryTouch();
     if (!mounted) return;
 
-    if (result.bondDelta > 0) _showFloatingDelta(result.bondDelta);
-
     final phrase = result.ment.isNotEmpty
             ? result.ment
             : _neutralPhrases[Random().nextInt(_neutralPhrases.length)];
 
     _enqueueReaction(phrase);
 
-    // 캐릭터 클릭 이벤트 기록 (fire-and-forget)
     AdminActivityService.log(ActivityEventType.tapCharacter, page: 'home');
   }
 
   void _onFeed() async {
-    _tapTrigger?.fire(); // 밥먹기 애니메이션 재생
+    _tapTrigger?.fire();
 
     final result = await CaringActionService.tryFeed();
     if (!mounted) return;
-
-    if (result.success && result.bondDelta > 0) _showFloatingDelta(result.bondDelta);
 
     final msg = result.success
         ? (result.ment ?? '밥을 줬어요')
         : (result.rejectMent ?? '나중에 다시 시도하세요');
 
     _enqueueReaction(msg);
-    // 터치 성공 → CaringState만 재로드 (구인/책 카드는 변화 없음)
     if (result.success) _loadCaringState();
   }
 
@@ -507,79 +489,6 @@ class _CaringPageState extends State<CaringPage>
 
   void _onGoal() {
     UserGoalSheet.show(context);
-  }
-
-  void _showFloatingDelta(double delta) {
-    if (!mounted) return;
-    if (widget.currentTabIndex != 0) return;
-
-    // ── 캐릭터 영역 GlobalKey로 정확한 화면 좌표 계산 ──
-    final keyContext = _characterAreaKey.currentContext;
-    Offset baseOffset;
-    String _coordSrc; // ── 진단용 (원인 확인 후 제거) ──
-
-    if (keyContext != null) {
-      final box = keyContext.findRenderObject() as RenderBox?;
-      if (box != null && box.hasSize) {
-        final topLeft = box.localToGlobal(Offset.zero);
-        final size = box.size;
-        baseOffset = Offset(
-          topLeft.dx + size.width * 0.55 + (Random().nextDouble() * 30 - 15),
-          topLeft.dy + size.height * 0.28 + (Random().nextDouble() * 20 - 10),
-        );
-        _coordSrc = 'key(tl=$topLeft, sz=$size)';
-      } else {
-        baseOffset = _fallbackDeltaOffset();
-        _coordSrc = 'fallback(box=${box != null}, hasSize=${box?.hasSize})';
-      }
-    } else {
-      baseOffset = _fallbackDeltaOffset();
-      _coordSrc = 'fallback(keyCtx=null)';
-    }
-
-    // ── 진단 로그 (원인 확인 후 제거) ──
-    final screen = MediaQuery.of(context).size;
-    debugPrint('🎯 Delta: offset=$baseOffset, screen=$screen, src=$_coordSrc');
-
-    final label = '결 +${delta.toStringAsFixed(2)}';
-    OverlayEntry? entry;
-
-    entry = OverlayEntry(
-      builder: (ctx) => _FloatingDeltaWidget(
-        label: label,
-        startOffset: baseOffset,
-        onFinished: () {
-          debugPrint('🎯 Delta: onFinished → remove'); // 진단용
-          try { entry?.remove(); } catch (_) {}
-          _activeOverlayEntries.remove(entry);
-        },
-      ),
-    );
-
-    _activeOverlayEntries.add(entry);
-
-    // postFrameCallback: rebuild 중 삽입 방지
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        debugPrint('🎯 Delta: postFrame SKIP (unmounted)'); // 진단용
-        try { entry?.remove(); } catch (_) {}
-        _activeOverlayEntries.remove(entry);
-        return;
-      }
-      try {
-        Overlay.of(context).insert(entry!);
-        debugPrint('🎯 Delta: ✅ inserted'); // 진단용
-      } catch (e) {
-        debugPrint('🎯 Delta: ❌ insert failed: $e'); // 진단용
-        _activeOverlayEntries.remove(entry);
-      }
-    });
-  }
-
-  Offset _fallbackDeltaOffset() {
-    // GlobalKey 사용 불가 시 화면 중앙 상단 fallback
-    final size = MediaQuery.of(context).size;
-    return Offset(size.width * 0.55, size.height * 0.40);
   }
 
   // ══════════════════════════════════════════════
@@ -927,10 +836,6 @@ class _CaringPageState extends State<CaringPage>
                   Text('🎯 목표달성', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                   SizedBox(height: 8),
                   Text('주간 목표를 세우고 체크해요.', style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
-                  SizedBox(height: 16),
-                  Text('💖 결 점수', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                  SizedBox(height: 8),
-                  Text('교감·기록·목표가 모여 쌓이는 나와의 깊이를 나타내요.', style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
                 ],
               ),
             ),
@@ -1260,121 +1165,3 @@ class _ActionBtn extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════
-// 결 점수 플로팅 애니메이션 위젯
-// - GlobalKey 기반 좌표로 캐릭터 위에 정확히 배치
-// - fade-in(30%) → 유지(50%) → fade-out(20%) 패턴
-// - 완료 후 onFinished 콜백으로 OverlayEntry 안전 제거
-// ══════════════════════════════════════════════════════════════
-class _FloatingDeltaWidget extends StatefulWidget {
-  final String label;
-  final Offset startOffset;
-  final VoidCallback onFinished;
-
-  const _FloatingDeltaWidget({
-    required this.label,
-    required this.startOffset,
-    required this.onFinished,
-  });
-
-  @override
-  State<_FloatingDeltaWidget> createState() => _FloatingDeltaWidgetState();
-}
-
-class _FloatingDeltaWidgetState extends State<_FloatingDeltaWidget>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _ctrl;
-  late Animation<double> _offsetY;
-  late Animation<double> _opacity;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1800),
-    );
-
-    // 위로 60px 이동
-    _offsetY = Tween<double>(begin: 0.0, end: -60.0).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeOut),
-    );
-
-    // fade-in(0~30%) → 유지(30~80%) → fade-out(80~100%)
-    _opacity = TweenSequence<double>([
-      TweenSequenceItem(
-        tween: Tween(begin: 0.0, end: 1.0)
-            .chain(CurveTween(curve: Curves.easeIn)),
-        weight: 30,
-      ),
-      TweenSequenceItem(
-        tween: ConstantTween(1.0),
-        weight: 50,
-      ),
-      TweenSequenceItem(
-        tween: Tween(begin: 1.0, end: 0.0)
-            .chain(CurveTween(curve: Curves.easeOut)),
-        weight: 20,
-      ),
-    ]).animate(_ctrl);
-
-    // ── 진단용 (원인 확인 후 제거) ──
-    debugPrint('🎯 DeltaWidget: initState, offset=${widget.startOffset}');
-    _ctrl.forward().then((_) {
-      debugPrint('🎯 DeltaWidget: anim done → onFinished'); // 진단용
-      widget.onFinished();
-    });
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // IgnorePointer: 전체 화면 overlay가 터치를 가로채지 않도록
-    // SizedBox.expand + Stack: Positioned에 올바른 Stack 부모 제공
-    return IgnorePointer(
-      child: SizedBox.expand(
-        child: AnimatedBuilder(
-      animation: _ctrl,
-          builder: (_, child) {
-            return Stack(
-              children: [
-                Positioned(
-          left: widget.startOffset.dx,
-          top: widget.startOffset.dy + _offsetY.value,
-          child: Opacity(
-            opacity: _opacity.value,
-                    child: child!,
-                  ),
-                ),
-              ],
-            );
-          },
-            child: Material(
-              type: MaterialType.transparency,
-              child: Text(
-                widget.label,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                color: AppColors.cardEmphasis,
-                  decoration: TextDecoration.none,
-                  shadows: [
-                    Shadow(
-                      color: Color(0x33000000),
-                      blurRadius: 4,
-                      offset: Offset(0, 1),
-                    ),
-                  ],
-              ),
-                ),
-              ),
-            ),
-          ),
-    );
-  }
-}
