@@ -207,7 +207,10 @@ class AdminDashboardService {
   /// quiz_meta/state 문서 읽기 (1 read)
   static Future<QuizMetaState?> getQuizMetaState() async {
     try {
-      final doc = await _db.doc('quiz_meta/state').get();
+      // 캐시가 아닌 서버 기준으로 읽어 대시보드 숫자가 최신이 되도록 함
+      final doc = await _db.doc('quiz_meta/state').get(
+            const GetOptions(source: Source.server),
+          );
       if (!doc.exists) return null;
       return QuizMetaState.fromFirestore(doc);
     } catch (e) {

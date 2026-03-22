@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -5,7 +7,7 @@ import '../config/reward_constants.dart';
 
 /// 돌보기(1탭) 상태 서비스
 ///
-/// 재우기/깨우기 + 아침 인사 + 리추얼 상태를 Firestore에 저장.
+/// hunger / mood / energy / bond 4개 상태 + 시간 경과 시스템.
 /// users/{uid} 문서의 caringState 필드를 사용.
 class CaringStateService {
   static final _db = FirebaseFirestore.instance;
@@ -17,11 +19,34 @@ class CaringStateService {
     return _db.collection('users').doc(uid);
   }
 
+  // ═══════════════════════ 상수 ═══════════════════════
+
+  /// 시간당 감소량
+  static const double hungerDecayPerHour = 5.0;
+  static const double moodDecayPerHour = 6.0;
+  static const double energyDecayPerHour = 4.0;
+
+  /// 시간 감소 하한 캡 (이 아래로는 떨어지지 않음)
+  static const double hungerFloor = 20.0;
+  static const double moodFloor = 15.0;
+  static const double energyFloor = 25.0;
+
+  /// 수면 — energy 시간당 회복량, 최대 반영 시간
+  static const double sleepEnergyPerHour = 12.5;
+  static const double sleepMaxHours = 8.0;
+  static const double sleepMoodBonus = 5.0;
+
+  /// bond 미접속 패널티
+  static const double bondAbsencePenaltyPerDay = 3.0;
+  static const double bondAbsenceMaxPenalty = 9.0;
+
   // ═══════════════════════ 읽기 ═══════════════════════
 
-  /// 현재 돌보기 상태 로드
-  /// 캐시 우선 → 서버 폴백: 콜드 스타트 시 Firestore 연결 대기 없이 즉시 반환
-  static Future<CaringState> loadState() async {
+  /// 상태 로드 → 시간 경과 반영 → 반환
+  ///
+  /// [applyTimeDecay] = true면 경과 시간만큼 상태를 감소시킨 뒤 Firestore에 저장.
+  /// UI에서 최초 로드 시만 true, 액션 내부에서는 false로 호출.
+  static Future<CaringState> loadState({bool applyTimeDecay = false}) async {
     try {
       final ref = _userRef;
       if (ref == null) return CaringState.initial();
@@ -38,30 +63,104 @@ class CaringStateService {
       final cs = data['caringState'] as Map<String, dynamic>?;
       if (cs == null) return CaringState.initial();
 
-      return CaringState.fromMap(cs);
+      var state = CaringState.fromMap(cs);
+
+      if (applyTimeDecay) {
+        state = _applyTimeDecay(state, DateTime.now());
+        unawaited(saveState(state));
+      }
+
+      return state;
     } catch (e) {
       debugPrint('⚠️ CaringStateService.loadState error: $e');
       return CaringState.initial();
     }
   }
 
+  // ═══════════════════════ 시간 경과 ═══════════════════════
+
+  /// 배고픔 → mood 감소 가속 추가치
+  static const double hungerMoodAccel = 1.0;
+
+  /// 오프라인 시간 반영 (순수 함수)
+  ///
+  /// 수면 중이면 감소/회복 없음 (회복은 wake()에서만 처리)
+  static CaringState _applyTimeDecay(CaringState state, DateTime now) {
+    final lastActive = state.lastActiveAt ?? now;
+    final elapsed = now.difference(lastActive);
+    final hours = elapsed.inMinutes / 60.0;
+
+    if (hours < 0.05) {
+      return state.copyWith(lastActiveAt: now);
+    }
+
+    double hunger = state.hunger;
+    double mood = state.mood;
+    double energy = state.energy;
+    double bond = state.bond;
+
+    if (state.isSleeping) {
+      // 수면 중: 감소·회복 모두 없음 (wake()에서 일괄 처리)
+    } else {
+      // hunger < 30 → mood 시간감소 +1/h 가속
+      final effectiveMoodDecay = hunger < 30
+          ? moodDecayPerHour + hungerMoodAccel
+          : moodDecayPerHour;
+
+      hunger = max(hungerFloor, hunger - hours * hungerDecayPerHour);
+      mood = max(moodFloor, mood - hours * effectiveMoodDecay);
+      energy = max(energyFloor, energy - hours * energyDecayPerHour);
+    }
+
+    // ── bond 미접속 패널티 (24h 초과분만) ──
+    if (hours >= 24) {
+      final absentDays = (hours / 24).floor();
+      final penalty = min(
+        absentDays * bondAbsencePenaltyPerDay,
+        bondAbsenceMaxPenalty,
+      );
+      bond = max(0, bond - penalty);
+      debugPrint('🔻 bond 미접속 패널티: -$penalty (${absentDays}일)');
+    }
+
+    // ── 일일 첫 접속 bond +1 ──
+    final todayKey = _dateKey(now);
+    final lastDateKey = state.lastActiveAt != null ? _dateKey(state.lastActiveAt!) : null;
+    if (lastDateKey != todayKey) {
+      bond = min(100, bond + 1);
+      debugPrint('✅ 일일 첫 접속 bond +1');
+    }
+
+    // ── 날짜가 바뀌었으면 일일 카운터 리셋 ──
+    int touchCount = state.touchCountToday;
+    if (lastDateKey != todayKey) {
+      touchCount = 0;
+    }
+
+    return state.copyWith(
+      hunger: hunger,
+      mood: mood,
+      energy: energy,
+      bond: bond,
+      lastActiveAt: now,
+      touchCountToday: touchCount,
+    );
+  }
+
   // ═══════════════════════ 쓰기 ═══════════════════════
 
-  /// 상태 저장 (merge)
-  static Future<void> _save(Map<String, dynamic> fields) async {
+  /// 전체 상태 저장 (merge)
+  static Future<void> saveState(CaringState state) async {
     try {
       final ref = _userRef;
       if (ref == null) return;
-
-      await ref.set({
-        'caringState': fields,
-      }, SetOptions(merge: true));
+      await ref.set({'caringState': state.toMap()}, SetOptions(merge: true));
     } catch (e) {
-      debugPrint('⚠️ CaringStateService._save error: $e');
+      debugPrint('⚠️ CaringStateService.saveState error: $e');
     }
   }
 
-  /// 아침 인사 완료 처리 (출석 체크 통합)
+  /// 아침 인사 완료 처리 (출석 체크 통합, 기존 호환)
   static Future<String> completeGreeting() async {
     try {
       final ref = _userRef;
@@ -70,12 +169,12 @@ class CaringStateService {
       final now = DateTime.now();
       final todayKey = _dateKey(now);
 
-      // 출석 포인트 적립 (아침 인사 = 출석)
       await ref.set({
         'caringState': {
           'hasGreetedDate': todayKey,
           'isSleeping': false,
           'lastWakeAt': Timestamp.fromDate(now),
+          'lastActiveAt': Timestamp.fromDate(now),
         },
         'emotionPoints': FieldValue.increment(RewardPolicy.attendance),
         'lastCheckIn': Timestamp.fromDate(now),
@@ -89,131 +188,189 @@ class CaringStateService {
   }
 
   /// 재우기
-  static Future<void> sleep() async {
+  static Future<void> sleep(CaringState current) async {
     final now = DateTime.now();
-    await _save({
-      'isSleeping': true,
-      'sleepStartedAt': Timestamp.fromDate(now),
-    });
+    final updated = current.copyWith(
+      isSleeping: true,
+      sleepStartedAt: now,
+      lastActiveAt: now,
+    );
+    await saveState(updated);
   }
 
-  /// 깨우기 (아침 인사 없이 단순 깨우기)
-  static Future<void> wake() async {
+  /// 짧은 수면 패널티 기준 (분)
+  static const int shortSleepThresholdMin = 30;
+  static const double shortSleepMoodPenalty = 5.0;
+
+  /// 깨우기 — 30분 초과면 회복, 이하면 패널티
+  static Future<CaringState> wake(CaringState current) async {
     final now = DateTime.now();
-    await _save({
-      'isSleeping': false,
-      'lastWakeAt': Timestamp.fromDate(now),
-    });
+    if (current.sleepStartedAt == null) {
+      final woken = current.copyWith(isSleeping: false, lastActiveAt: now);
+      await saveState(woken);
+      return woken;
+    }
+
+    final sleepElapsed = now.difference(current.sleepStartedAt!);
+    final sleepMinutes = sleepElapsed.inMinutes;
+
+    CaringState woken;
+    if (sleepMinutes <= shortSleepThresholdMin) {
+      woken = current.copyWith(
+        isSleeping: false,
+        mood: current.mood - shortSleepMoodPenalty,
+        lastActiveAt: now,
+      );
+      debugPrint('😴 짧은 수면 패널티: mood -$shortSleepMoodPenalty (${sleepMinutes}분)');
+    } else {
+      final sleepHours = min(sleepElapsed.inMinutes / 60.0, sleepMaxHours);
+      final recoveredEnergy = min(100.0, current.energy + sleepHours * sleepEnergyPerHour);
+      final recoveredMood = min(100.0, current.mood + sleepMoodBonus);
+      woken = current.copyWith(
+        isSleeping: false,
+        energy: recoveredEnergy,
+        mood: recoveredMood,
+        lastActiveAt: now,
+      );
+    }
+
+    await saveState(woken);
+    return woken;
   }
 
   // ═══════════════════════ 유틸 ═══════════════════════
 
-  /// 오늘 날짜 키 (YYYY-MM-DD)
   static String _dateKey(DateTime dt) =>
       '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
 
-  /// 오늘 인사 완료 여부 판정
   static bool hasGreetedToday(CaringState state) {
     final todayKey = _dateKey(DateTime.now());
     return state.hasGreetedDate == todayKey;
   }
 }
 
-/// 돌보기 상태 값 객체
+// ═══════════════════════════════════════════════════════════
+// CaringState 값 객체
+// ═══════════════════════════════════════════════════════════
+
+/// 캐릭터 상태 — hunger / mood / energy / bond (0~100)
 class CaringState {
+  // ── 핵심 4대 상태 ──
+  final double hunger;
+  final double mood;
+  final double energy;
+  final double bond;
+
+  // ── 수면 ──
   final bool isSleeping;
-  final String? hasGreetedDate; // "YYYY-MM-DD" 형태
   final DateTime? sleepStartedAt;
+
+  // ── 시간 추적 ──
+  final DateTime? lastActiveAt;
+
+  // ── 일일 카운터 ──
+  final int touchCountToday;
+
+  // ── 밥주기 연속 카운터 (시간 기반) ──
+  final int consecutiveFeedCount;
+  final DateTime? lastFeedAt;
+
+  // ── 기존 호환 (아침 인사 등) ──
+  final String? hasGreetedDate;
   final DateTime? lastWakeAt;
 
-  // ✨ 밥주기 관련
-  final List<String> lastFedSlots; // ['morning', 'lunch', 'dinner', 'night']
-  final int fedCountToday; // 오늘 먹인 횟수
-  final int skipDaysStreak; // 연속 미급여 일수
-
-  // ✨ 교감/글 관련
-  final int touchCountToday; // 오늘 교감 횟수 (상한 3)
-  final int diaryCountToday; // 오늘 글쓰기 횟수 (상한 2)
-
-  // ✨ 날짜 체크용
-  final String? lastActionDate; // "YYYY-MM-DD"
+  // ── 초기값 상수 (신규·미저장 유저 기본 게이지) ──
+  static const double _initHunger = 30;
+  static const double _initMood = 40;
+  static const double _initEnergy = 20;
+  static const double _initBond = 10;
 
   const CaringState({
+    this.hunger = _initHunger,
+    this.mood = _initMood,
+    this.energy = _initEnergy,
+    this.bond = _initBond,
     this.isSleeping = false,
-    this.hasGreetedDate,
     this.sleepStartedAt,
-    this.lastWakeAt,
-    this.lastFedSlots = const [],
-    this.fedCountToday = 0,
-    this.skipDaysStreak = 0,
+    this.lastActiveAt,
     this.touchCountToday = 0,
-    this.diaryCountToday = 0,
-    this.lastActionDate,
+    this.consecutiveFeedCount = 0,
+    this.lastFeedAt,
+    this.hasGreetedDate,
+    this.lastWakeAt,
   });
 
   factory CaringState.initial() => const CaringState();
 
+  /// Firestore → Dart
   factory CaringState.fromMap(Map<String, dynamic> m) {
     return CaringState(
+      hunger: (m['hunger'] as num?)?.toDouble() ?? _initHunger,
+      mood: (m['mood'] as num?)?.toDouble() ?? _initMood,
+      energy: (m['energy'] as num?)?.toDouble() ?? _initEnergy,
+      bond: (m['bond'] as num?)?.toDouble() ?? _initBond,
       isSleeping: m['isSleeping'] ?? false,
-      hasGreetedDate: m['hasGreetedDate'],
       sleepStartedAt: (m['sleepStartedAt'] as Timestamp?)?.toDate(),
+      lastActiveAt: (m['lastActiveAt'] as Timestamp?)?.toDate(),
+      touchCountToday: m['touchCountToday'] ?? m['touchBondCountToday'] ?? 0,
+      consecutiveFeedCount: m['consecutiveFeedCount'] ?? 0,
+      lastFeedAt: (m['lastFeedAt'] as Timestamp?)?.toDate(),
+      hasGreetedDate: m['hasGreetedDate'],
       lastWakeAt: (m['lastWakeAt'] as Timestamp?)?.toDate(),
-      lastFedSlots: (m['lastFedSlots'] as List?)?.cast<String>() ?? [],
-      fedCountToday: m['fedCountToday'] ?? 0,
-      skipDaysStreak: m['skipDaysStreak'] ?? 0,
-      touchCountToday: m['touchCountToday'] ?? 0,
-      diaryCountToday: m['diaryCountToday'] ?? 0,
-      lastActionDate: m['lastActionDate'],
     );
   }
 
+  /// Dart → Firestore
   Map<String, dynamic> toMap() {
     return {
+      'hunger': hunger,
+      'mood': mood,
+      'energy': energy,
+      'bond': bond,
       'isSleeping': isSleeping,
-      'hasGreetedDate': hasGreetedDate,
       'sleepStartedAt': sleepStartedAt != null ? Timestamp.fromDate(sleepStartedAt!) : null,
-      'lastWakeAt': lastWakeAt != null ? Timestamp.fromDate(lastWakeAt!) : null,
-      'lastFedSlots': lastFedSlots,
-      'fedCountToday': fedCountToday,
-      'skipDaysStreak': skipDaysStreak,
+      'lastActiveAt': lastActiveAt != null ? Timestamp.fromDate(lastActiveAt!) : null,
       'touchCountToday': touchCountToday,
-      'diaryCountToday': diaryCountToday,
-      'lastActionDate': lastActionDate,
+      'consecutiveFeedCount': consecutiveFeedCount,
+      'lastFeedAt': lastFeedAt != null ? Timestamp.fromDate(lastFeedAt!) : null,
+      'hasGreetedDate': hasGreetedDate,
+      'lastWakeAt': lastWakeAt != null ? Timestamp.fromDate(lastWakeAt!) : null,
     };
   }
 
   CaringState copyWith({
+    double? hunger,
+    double? mood,
+    double? energy,
+    double? bond,
     bool? isSleeping,
-    String? hasGreetedDate,
     DateTime? sleepStartedAt,
-    DateTime? lastWakeAt,
-    List<String>? lastFedSlots,
-    int? fedCountToday,
-    int? skipDaysStreak,
+    DateTime? lastActiveAt,
     int? touchCountToday,
-    int? diaryCountToday,
-    String? lastActionDate,
+    int? consecutiveFeedCount,
+    DateTime? lastFeedAt,
+    String? hasGreetedDate,
+    DateTime? lastWakeAt,
   }) {
     return CaringState(
+      hunger: (hunger ?? this.hunger).clamp(0, 100),
+      mood: (mood ?? this.mood).clamp(0, 100),
+      energy: (energy ?? this.energy).clamp(0, 100),
+      bond: (bond ?? this.bond).clamp(0, 100),
       isSleeping: isSleeping ?? this.isSleeping,
-      hasGreetedDate: hasGreetedDate ?? this.hasGreetedDate,
       sleepStartedAt: sleepStartedAt ?? this.sleepStartedAt,
-      lastWakeAt: lastWakeAt ?? this.lastWakeAt,
-      lastFedSlots: lastFedSlots ?? this.lastFedSlots,
-      fedCountToday: fedCountToday ?? this.fedCountToday,
-      skipDaysStreak: skipDaysStreak ?? this.skipDaysStreak,
+      lastActiveAt: lastActiveAt ?? this.lastActiveAt,
       touchCountToday: touchCountToday ?? this.touchCountToday,
-      diaryCountToday: diaryCountToday ?? this.diaryCountToday,
-      lastActionDate: lastActionDate ?? this.lastActionDate,
+      consecutiveFeedCount: consecutiveFeedCount ?? this.consecutiveFeedCount,
+      lastFeedAt: lastFeedAt ?? this.lastFeedAt,
+      hasGreetedDate: hasGreetedDate ?? this.hasGreetedDate,
+      lastWakeAt: lastWakeAt ?? this.lastWakeAt,
     );
   }
+
+  /// 정수 반환 헬퍼 (UI 표시용)
+  int get hungerInt => hunger.round();
+  int get moodInt => mood.round();
+  int get energyInt => energy.round();
+  int get bondInt => bond.round();
 }
-
-
-
-
-
-
-
-

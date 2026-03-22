@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/poll.dart';
+import '../models/poll_comment.dart';
 import '../models/poll_option.dart';
 
 /// 공감투표 서비스
@@ -29,6 +30,12 @@ class EmpathyPollService {
 
   static CollectionReference<Map<String, dynamic>> _votesRef(String pollId) =>
       _pollDoc(pollId).collection('votes');
+
+  static CollectionReference<Map<String, dynamic>> _pollCommentsRef(String pollId) =>
+      _pollDoc(pollId).collection('pollComments');
+
+  /// 종료 투표 한마디 댓글 최대 길이
+  static const int maxPollCommentLength = 300;
 
   // ═══════════════════════════════════════════════════════════
   // 조회
@@ -93,7 +100,9 @@ class EmpathyPollService {
   }
 
   /// 종료된 투표 피드 (페이지네이션)
-  static Future<List<Poll>> getClosedPolls({
+  ///
+  /// [ClosedPollsPage]를 반환하여 다음 페이지 커서를 함께 제공
+  static Future<ClosedPollsPage> getClosedPolls({
     int limit = 10,
     DocumentSnapshot? startAfter,
   }) async {
@@ -108,10 +117,12 @@ class EmpathyPollService {
       }
 
       final snap = await query.get();
-      return snap.docs.map((d) => Poll.fromDoc(d)).toList();
+      final polls = snap.docs.map((d) => Poll.fromDoc(d)).toList();
+      final lastDoc = snap.docs.isNotEmpty ? snap.docs.last : null;
+      return ClosedPollsPage(polls: polls, lastDoc: lastDoc);
     } catch (e) {
       debugPrint('⚠️ EmpathyPollService.getClosedPolls: $e');
-      return [];
+      return ClosedPollsPage(polls: [], lastDoc: null);
     }
   }
 
@@ -285,6 +296,49 @@ class EmpathyPollService {
   }
 
   // ═══════════════════════════════════════════════════════════
+  // 종료 투표 댓글
+  // ═══════════════════════════════════════════════════════════
+
+  /// 종료된 투표 댓글 스트림 (오래된 순)
+  static Stream<List<PollComment>> pollCommentsStream(String pollId) {
+    return _pollCommentsRef(pollId)
+        .orderBy('createdAt', descending: false)
+        .snapshots()
+        .map((s) => s.docs.map(PollComment.fromDoc).toList());
+  }
+
+  /// 종료된 투표에만 댓글 작성 가능
+  static Future<PollCommentResult> addPollComment(String pollId, String text) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return PollCommentResult.fail('로그인이 필요합니다.');
+
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return PollCommentResult.fail('내용을 입력해주세요.');
+    if (trimmed.length > maxPollCommentLength) {
+      return PollCommentResult.fail('$maxPollCommentLength자 이내로 작성해주세요.');
+    }
+
+    try {
+      final pollSnap = await _pollDoc(pollId).get();
+      if (!pollSnap.exists) return PollCommentResult.fail('투표를 찾을 수 없습니다.');
+      final poll = Poll.fromDoc(pollSnap);
+      if (!poll.isClosed) {
+        return PollCommentResult.fail('종료된 투표에만 댓글을 달 수 있습니다.');
+      }
+
+      await _pollCommentsRef(pollId).add({
+        'text': trimmed,
+        'uid': uid,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      return PollCommentResult.ok();
+    } catch (e) {
+      debugPrint('⚠️ EmpathyPollService.addPollComment: $e');
+      return PollCommentResult.fail('댓글 등록 중 오류가 발생했습니다.');
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
   // 신고
   // ═══════════════════════════════════════════════════════════
 
@@ -372,6 +426,16 @@ class AddOptionResult {
       AddOptionResult._(success: false, error: msg);
 }
 
+class PollCommentResult {
+  final bool success;
+  final String? error;
+
+  const PollCommentResult._({required this.success, this.error});
+  factory PollCommentResult.ok() => const PollCommentResult._(success: true);
+  factory PollCommentResult.fail(String msg) =>
+      PollCommentResult._(success: false, error: msg);
+}
+
 class ReportResult {
   final bool success;
   final bool hidden;
@@ -382,4 +446,12 @@ class ReportResult {
       ReportResult._(success: true, hidden: hidden);
   factory ReportResult.fail(String msg) =>
       ReportResult._(success: false, error: msg);
+}
+
+/// 종료된 투표 페이지 결과 (커서 포함)
+class ClosedPollsPage {
+  final List<Poll> polls;
+  final DocumentSnapshot? lastDoc;
+
+  const ClosedPollsPage({required this.polls, required this.lastDoc});
 }

@@ -1900,9 +1900,17 @@ export const scheduleQuizzes = functions
     const scheduleRef = db.collection("quiz_schedule").doc(dateKey);
     const metaRef     = db.doc("quiz_meta/state");
 
-    // ── 이미 생성됐으면 스킵 ──
+    // ── 이미 생성됐으면 선정은 스킵하되, 활성 풀 크기·스케줄일은 갱신(대시보드 동기화) ──
     if ((await scheduleRef.get()).exists) {
-      functions.logger.info("⏭️ 이미 스케줄 생성됨", { dateKey });
+      const poolSnapEarly = await db.collection("quiz_pool").where("isActive", "==", true).get();
+      await metaRef.set({
+        totalActiveCount: poolSnapEarly.size,
+        lastScheduledDate: dateKey,
+      }, { merge: true });
+      functions.logger.info("⏭️ 이미 스케줄 생성됨 — quiz_meta totalActiveCount 동기화", {
+        dateKey,
+        totalActive: poolSnapEarly.size,
+      });
       return null;
     }
 

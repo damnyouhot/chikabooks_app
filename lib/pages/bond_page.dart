@@ -89,7 +89,7 @@ class BondPageState extends State<BondPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text(
-          "'공감투표' 탭에 대해서",
+          "'같이' 탭 · 공감 투표에 대해서",
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
         content: const SingleChildScrollView(
@@ -98,7 +98,7 @@ class BondPageState extends State<BondPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                '매일 하나의 주제가 등록되고, 여러 보기 중 가장 공감되는 것에 투표하는 공간이에요.',
+                '서로의 생각에 공감하고, 투표와 반응으로 연결되는 공간이에요. 오늘의 주제와 지난 결과를 함께 볼 수 있어요.',
                 style: TextStyle(fontSize: 13, height: 1.5),
               ),
               SizedBox(height: 16),
@@ -107,7 +107,7 @@ class BondPageState extends State<BondPage> {
                       fontSize: 13, fontWeight: FontWeight.w600)),
               SizedBox(height: 8),
               Text(
-                '보기 중 하나에 공감할 수 있어요. 투표 종료 전까지 선택을 바꿀 수 있어요.',
+                '보기 중 하나에 공감할 수 있어요. 투표가 끝나기 전까지 선택을 바꿀 수 있어요.',
                 style: TextStyle(
                     fontSize: 12,
                     height: 1.5,
@@ -119,19 +119,19 @@ class BondPageState extends State<BondPage> {
                       fontSize: 13, fontWeight: FontWeight.w600)),
               SizedBox(height: 8),
               Text(
-                '기본 보기 외에 직접 새 보기를 작성할 수 있어요. 다른 사람들도 공감할 수 있어요.',
+                '진행 중인 투표에서 기본 보기 외에 직접 새 보기를 적을 수 있어요(운영 정책에 따라 제한될 수 있어요).',
                 style: TextStyle(
                     fontSize: 12,
                     height: 1.5,
                     color: AppColors.textSecondary),
               ),
               SizedBox(height: 16),
-              Text('🏅 결과 확인',
+              Text('📊 지난 투표',
                   style: TextStyle(
                       fontSize: 13, fontWeight: FontWeight.w600)),
               SizedBox(height: 8),
               Text(
-                '투표가 끝나면 공감 수 기준 1~3위에 메달이 부여돼요. 지난 투표 결과도 확인할 수 있어요.',
+                '끝난 투표는 공감 수 기준 순위(1위, 2위 …)로 볼 수 있어요. 전체 보기로 펼치면 종료된 투표에 한마디를 남길 수 있어요.',
                 style: TextStyle(
                     fontSize: 12,
                     height: 1.5,
