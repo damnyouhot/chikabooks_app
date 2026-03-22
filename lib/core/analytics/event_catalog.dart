@@ -367,9 +367,14 @@ const List<(String type, String label)> kOnboardingFunnelOrderedSteps = [
 /// 탭 → 핵심 행동 전환 (제목 + `activityLogs.type` 쌍)
 ///
 /// [AdminAnalyticsDailyService] `tabConversions`와 [AdminBehaviorService] 전환율이 동일 출처.
+/// 일별 문서 키는 `tabViewType__actionType` (예: `view_home__caring_feed_success`).
+///
+/// **Breaking (정의 변경 시):** 첫 행을 `emotion_save_success` → `caring_feed_success`로 바꾼 경우,
+/// 과거 일별 `tabConversions`의 `view_home__emotion_save_success`와 **동일 지표가 아님**.
+/// 시계열 비교·백필 시 날짜·키 정의를 문서에 남길 것.
 const List<(String title, String tabViewType, String actionType)>
     kTabConversionRows = [
-  ('나 탭 → 감정 기록', 'view_home', 'emotion_save_success'),
+  ('나 탭 → 캐릭터 밥주기', 'view_home', 'caring_feed_success'),
   ('구직 탭 → 공고 상세', 'view_job', 'view_job_detail'),
   ('성장 탭 → 퀴즈 풀이', 'view_growth', 'quiz_completed'),
   ('같이 탭 → 공감투표', 'view_bond', 'poll_empathize'),
@@ -387,13 +392,44 @@ const List<(String label, Set<String> types)> kBehaviorFeatureUsageRows = [
   ('공감투표 참여', {'poll_empathize'}),
 ];
 
-/// «반복 사용» — (라벨, 이벤트 타입, 최소 횟수)
-const List<(String label, String eventType, int minCount)>
+/// «반복 사용» — (라벨, 이벤트 타입, 최소 횟수, 분모 설명)
+///
+/// 분모: 해당 [eventType]이 **1회 이상**인 사용자 수. 분자: 같은 타입이 [minCount]회 이상.
+const List<(String label, String eventType, int minCount, String repeatBasis)>
     kBehaviorRepeatRows = [
-  ('감정 기록 2회+', 'emotion_save_success', 2),
-  ('캐릭터 상호작용 3회+', 'tap_character', 3),
-  ('퀴즈 풀이 2회+', 'quiz_completed', 2),
-  ('밥주기 2회+', 'caring_feed_success', 2),
+  (
+    '공감투표 3회+',
+    'poll_empathize',
+    3,
+    '공감투표(공감) 이벤트 1회 이상 발생한 사용자',
+  ),
+  (
+    '캐릭터 상호작용 3회+',
+    'tap_character',
+    3,
+    '캐릭터 탭(상호작용) 이벤트 1회 이상 발생한 사용자',
+  ),
+  (
+    '퀴즈 풀이 3회+',
+    'quiz_completed',
+    3,
+    '퀴즈 완료 이벤트 1회 이상 발생한 사용자',
+  ),
+  (
+    '밥주기 3회+',
+    'caring_feed_success',
+    3,
+    '밥주기 성공 이벤트 1회 이상 발생한 사용자',
+  ),
+];
+
+/// «유저 타입 분포» 카드 부가 설명 (집계 규칙과 동일 순서: 성장·감정·커리어·교감·유령)
+const List<String> kBehaviorSegmentCardDetails = [
+  '분석 기간 내 성장 탭(view_growth)을 한 번이라도 연 사용자. 다른 유형과 중복 집계됩니다.',
+  '캐릭터 탭(tap_character) 또는 감정 기록 저장(emotion_save_success)을 한 번이라도 한 사용자. 다른 유형과 중복 집계됩니다.',
+  '채용 공고 상세·관심 저장·지원(view_job_detail / tap_job_save / tap_job_apply) 중 하나라도 한 사용자. 다른 유형과 중복 집계됩니다.',
+  '교감 탭(view_bond) 또는 공감투표 관련(poll_empathize 등) 행동을 한 번이라도 한 사용자. 다른 유형과 중복 집계됩니다.',
+  '기간 내 활동 로그가 없거나, 위 네 유형에 해당하지 않으며 의미 있는 행동(meaningful)도 없는 사용자(단일 집계).',
 ];
 
 /// 유저 세그먼트(중복 가능): 해당 타입을 **한 번이라도** 하면 포함
@@ -452,8 +488,11 @@ abstract final class EventCatalog {
       behaviorFeatureUsageRows = kBehaviorFeatureUsageRows;
 
   /// Behavior «반복 사용»
-  static const List<(String label, String eventType, int minCount)>
+  static const List<(String label, String eventType, int minCount, String repeatBasis)>
       behaviorRepeatRows = kBehaviorRepeatRows;
+
+  /// Behavior «유저 타입» 카드 하단 설명 (순서 고정)
+  static const List<String> behaviorSegmentCardDetails = kBehaviorSegmentCardDetails;
 
   static const Set<String> segmentGrowthTypes = kSegmentGrowthTypes;
   static const Set<String> segmentEmotionTypes = kSegmentEmotionTypes;

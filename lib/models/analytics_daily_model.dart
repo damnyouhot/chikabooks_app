@@ -16,7 +16,10 @@ class DailySummary {
   /// 탭 진입 고유 유저 수
   final Map<String, int> tabViews;
 
-  /// 탭→행동 전환 유저 수 (키: "view_home__emotion_save_success")
+  /// 탭→행동 전환 유저 수 (키: `tabViewType__actionType`, 예: `view_home__caring_feed_success`)
+  ///
+  /// 키는 [EventCatalog.kTabConversionRows] 정의가 바뀌면 달라질 수 있음. 과거 문서와 시계열 비교 시
+  /// 동일 키가 동일 비즈니스 의미인지 확인할 것.
   final Map<String, int> tabConversions;
 
   /// 행동 깊이 분포

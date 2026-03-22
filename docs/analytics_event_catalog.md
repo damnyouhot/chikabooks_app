@@ -43,8 +43,23 @@
 ## C파트 (Behavior·세그먼트·운영)
 
 1. **카탈로그 단일화** — `kTabConversionRows`로 일별 `tabConversions`와 Behavior «탭→행동»을 동기화. `kBehaviorFeatureUsageRows`, `kBehaviorRepeatRows`, 세그먼트용 `kSegment*Types`를 [EventCatalog]에 두고 [AdminBehaviorService]가 참조.
+
+### `tabConversions` 키 / 나 탭 전환 정의
+
+- 일별 문서 키: `{tabViewType}__{actionType}` (예: `view_home__caring_feed_success`).
+- **정의 변경 시:** `kTabConversionRows`에서 `actionType`을 바꾸면 **새 키**로 저장되며, 이전 날짜의 옛 키(예: `view_home__emotion_save_success`)와 **같은 지표가 아님**. 시계열·백필 비교 시 날짜와 키 의미를 기록할 것.
 2. **교감형 세그먼트** — `view_bond`·`poll_*` 이벤트가 있으면 «교감형» 카운트. 유령(ghost) 판정에서 교감·의미행동과 배타적으로 정리.
-3. **Behavior UI** — 기능 실행률에 **캐릭터 밥주기**, 반복 사용에 **밥주기 2회+**, 유저 타입에 **교감형** 카드 추가.
+3. **Behavior UI** — 기능 실행률에 **캐릭터 밥주기**, 반복 사용은 **공감투표·밥주기 등 3회+** 등 [kBehaviorRepeatRows] 기준, 유저 타입에 **교감형** 카드·부가 설명 추가.
 4. **추세 차트** — 일별 `segments.bond` 라인 추가 (백필 후 데이터 반영).
 5. **스냅샷 워밍** — [OnboardingGate] `initState`에서 `AdminActivityService.warmupCache()` 호출 (로그인 세션에서 첫 이벤트부터 스냅샷 캐시 활용).
 6. **첫 클릭** — `caring_feed_success`, `poll_*`, `view_career`·`tap_career_edit`를 탭 버킷에 매핑, **커리어 탭** 버킷 추가.
+
+---
+
+## 퀴즈 풀 대시보드 (`quiz_meta/state`)
+
+- **이번 사이클 배포** = `usedQuizIds.length` (이번 사이클에서 한 번이라도 배포된 **고유** 문항 ID 수).
+- 자정 CF `scheduleQuizzes`가 당일 스케줄이 이미 있을 때도 **오늘 스케줄의 `quizIds`를 `usedQuizIds`에 병합**하도록 보정됨.
+- 스케줄 문서와 meta가 어긋나면 Overview **「스케줄 기준으로 메타 동기화」** 또는  
+  `cd functions && node scripts/sync_quiz_meta_from_pool.js --rebuild-used`  
+  배포 함수: `rebuildQuizMetaFromSchedules` (어드민 전용 Callable).

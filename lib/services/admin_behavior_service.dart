@@ -235,7 +235,7 @@ class AdminBehaviorService {
         label: f.$1,
         count: repeatUsers,
         total: oneOrMore,
-        basis: '${f.$1.split(' ').first} 1회 이상 사용자',
+        basis: f.$4,
       );
     }).toList();
   }
@@ -284,22 +284,43 @@ class AdminBehaviorService {
     debugPrint('📊 [유저타입] 성장관심=$growth, 감정=$emotion, '
         '커리어=$career, 교감=$bond, 유령=$ghost(이벤트없음=$noEventUsers), total=$total');
 
+    final segDetails = EventCatalog.behaviorSegmentCardDetails;
     return [
       MetricCard.safe(
-          label: '성장 관심형', count: growth, total: total,
-          basis: '전체 로그인 사용자'),
+        label: '성장 관심형',
+        count: growth,
+        total: total,
+        basis: '전체 로그인 사용자',
+        detail: segDetails[0],
+      ),
       MetricCard.safe(
-          label: '감정형', count: emotion, total: total,
-          basis: '전체 로그인 사용자'),
+        label: '감정형',
+        count: emotion,
+        total: total,
+        basis: '전체 로그인 사용자',
+        detail: segDetails[1],
+      ),
       MetricCard.safe(
-          label: '커리어형', count: career, total: total,
-          basis: '전체 로그인 사용자'),
+        label: '커리어형',
+        count: career,
+        total: total,
+        basis: '전체 로그인 사용자',
+        detail: segDetails[2],
+      ),
       MetricCard.safe(
-          label: '교감형', count: bond, total: total,
-          basis: '전체 로그인 사용자'),
+        label: '교감형',
+        count: bond,
+        total: total,
+        basis: '전체 로그인 사용자',
+        detail: segDetails[3],
+      ),
       MetricCard.safe(
-          label: '유령 유저', count: ghost, total: total,
-          basis: '전체 로그인 사용자'),
+        label: '유령 유저',
+        count: ghost,
+        total: total,
+        basis: '전체 로그인 사용자',
+        detail: segDetails[4],
+      ),
     ];
   }
 
@@ -434,11 +455,15 @@ class MetricCard {
   final int total;
   final String basis;
 
+  /// 집계 규칙 등 추가 설명 (유저 타입 등)
+  final String? detail;
+
   const MetricCard({
     required this.label,
     required this.count,
     required this.total,
     required this.basis,
+    this.detail,
   });
 
   /// 안전한 생성자: 음수 clamp + 분자>분모 warning
@@ -447,6 +472,7 @@ class MetricCard {
     required int count,
     required int total,
     required String basis,
+    String? detail,
   }) {
     var safeCount = count < 0 ? 0 : count;
     final safeTotal = total < 0 ? 0 : total;
@@ -461,6 +487,7 @@ class MetricCard {
       count: safeCount,
       total: safeTotal,
       basis: basis,
+      detail: detail,
     );
   }
 

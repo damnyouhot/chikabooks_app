@@ -201,6 +201,17 @@ class _MetricTile extends StatelessWidget {
               color: AppColors.textDisabled,
             ),
           ),
+          if (metric.detail != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              metric.detail!,
+              style: const TextStyle(
+                fontSize: 10,
+                height: 1.35,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
         ],
       ),
     );
