@@ -70,12 +70,14 @@ class _AdminUserFlowTabState extends State<AdminUserFlowTab>
         children: [
           // 설명 배너
           _InfoBanner(
-            text: '각 단계에 도달한 유저 수와 이전 단계 대비 전환율을 보여줍니다.',
+            text:
+                '순차 온보딩 퍼널입니다. 각 단계 인원은 **이전 단계를 통과한 유저만** 포함됩니다(교집합). '
+                '②~⑤ 이벤트는 계정당 1회만 기록됩니다.',
           ),
           const SizedBox(height: 16),
 
-          // 가입 퍼널
-          const AdminSectionTitle('가입 퍼널'),
+          // 온보딩 퍼널
+          const AdminSectionTitle('온보딩 퍼널'),
           if (_steps.isEmpty)
             const AdminEmptyState(message: '퍼널 데이터가 아직 없어요')
           else
@@ -306,6 +308,10 @@ class _FunnelGuide extends StatelessWidget {
             ),
           ),
           SizedBox(height: 8),
+          _GuideItem(
+            icon: Icons.arrow_downward,
+            text: '순차 퍼널: N단계 인원 = (N−1단계를 통과한 사람) ∩ (N단계 이벤트가 있는 사람)',
+          ),
           _GuideItem(
             icon: Icons.arrow_downward,
             text: '전환율이 낮은 단계 = 사용자가 막히는 지점',

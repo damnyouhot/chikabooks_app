@@ -259,6 +259,7 @@ enum ActivityEventType {
 
   // ── 버튼/기능 클릭 ─────────────────────────────────────────
   tapCharacter('tap_character', '캐릭터 클릭'),
+  caringFeedSuccess('caring_feed_success', '캐릭터 밥주기 성공'),
   tapEmotionStart('tap_emotion_start', '감정기록 시작'),
   tapEmotionSave('tap_emotion_save', '감정기록 저장 시도'),
   emotionSaveSuccess('emotion_save_success', '감정기록 저장 성공'),
@@ -306,7 +307,18 @@ enum FunnelEventType {
   signupComplete('funnel_signup_complete', 'auth', '회원가입 완료', 1),
   profileBasicComplete('funnel_profile_basic', 'onboarding', '기본 프로필 완료', 2),
   firstEmotionStart('funnel_first_emotion_start', 'emotion', '첫 감정기록 시작', 3),
-  firstEmotionComplete('funnel_first_emotion_complete', 'emotion', '첫 감정기록 완료', 4);
+  firstEmotionComplete('funnel_first_emotion_complete', 'emotion', '첫 감정기록 완료', 4),
+
+  /// v3 온보딩 순차 퍼널 (대시보드 교집합 집계용, [order]는 레거시와 구분용)
+  onboardingFeed('funnel_step_2_feed', 'home', '캐릭터 밥주기 (온보딩)', 10),
+  onboardingPoll('funnel_step_3_poll', 'bond', '공감투표 선택 (온보딩)', 11),
+  onboardingQuiz('funnel_step_4_quiz', 'growth', '퀴즈 첫 풀이 (온보딩)', 12),
+  onboardingCareerSpecialty(
+    'funnel_step_5_career_specialty',
+    'career',
+    '전문분야 등록 (온보딩)',
+    13,
+  );
 
   final String value;
   final String page;

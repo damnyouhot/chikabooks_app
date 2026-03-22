@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import '../core/analytics/event_catalog.dart';
 import '../models/analytics_daily_model.dart';
 
 /// analytics_daily 읽기 + 백필 서비스
@@ -11,43 +12,12 @@ import '../models/analytics_daily_model.dart';
 class AdminAnalyticsDailyService {
   static final _db = FirebaseFirestore.instance;
 
-  // ── 의미 있는 행동 이벤트 (AdminBehaviorService와 동일) ──
-  static const _meaningfulActions = {
-    'tap_character',
-    'tap_emotion_start',
-    'tap_emotion_save',
-    'emotion_save_success',
-    'tap_profile_save',
-    'tap_job_save',
-    'tap_job_apply',
-    'tap_career_edit',
-    'view_job_detail',
-    'quiz_completed',
-  };
-
-  static const _growthEvents = {'view_growth'};
-  static const _emotionEvents = {'tap_character', 'emotion_save_success'};
-  static const _careerEvents = {'view_job_detail', 'tap_job_save', 'tap_job_apply'};
-
-  static const _featureKeys = {
-    'emotion_save_success',
-    'tap_character',
-    'view_job_detail',
-    'quiz_completed',
-  };
-
   static const _tabKeys = {
     'view_home',
     'view_job',
     'view_growth',
     'view_bond',
   };
-
-  static const _conversionPairs = [
-    ('view_home', 'emotion_save_success'),
-    ('view_job', 'view_job_detail'),
-    ('view_growth', 'quiz_completed'),
-  ];
 
   /// 기간 내 일별 집계 문서 읽기
   static Future<List<DailySummary>> fetchRange({
@@ -165,7 +135,7 @@ class AdminAnalyticsDailyService {
 
     // featureUsage: 각 기능을 1회 이상 사용한 고유 유저 수
     final featureUsage = <String, int>{};
-    for (final key in _featureKeys) {
+    for (final key in EventCatalog.dailyFeatureUsageTypes) {
       featureUsage[key] = userEvents.entries
           .where((e) => e.value.contains(key))
           .length;
@@ -181,7 +151,7 @@ class AdminAnalyticsDailyService {
 
     // tabConversions
     final tabConversions = <String, int>{};
-    for (final (tab, action) in _conversionPairs) {
+    for (final (tab, action) in EventCatalog.dailyTabConversionPairs) {
       final convKey = '${tab}__$action';
       tabConversions[convKey] = userEvents.entries
           .where((e) => e.value.contains(tab) && e.value.contains(action))
@@ -191,7 +161,9 @@ class AdminAnalyticsDailyService {
     // depthBuckets
     int loginOnly = 0, oneAction = 0, twoToFour = 0, fivePlus = 0;
     for (final entry in userEvents.entries) {
-      final meaningful = entry.value.where((t) => _meaningfulActions.contains(t)).length;
+      final meaningful = entry.value
+          .where((t) => EventCatalog.meaningfulTypes.contains(t))
+          .length;
       if (meaningful == 0) {
         loginOnly++;
       } else if (meaningful == 1) {
@@ -205,18 +177,28 @@ class AdminAnalyticsDailyService {
     final noEventUsers = validUserIds.where((uid) => !userEvents.containsKey(uid)).length;
     loginOnly += noEventUsers;
 
-    // segments
-    int growth = 0, emotion = 0, career = 0, ghost = 0;
+    // segments (중복 가능 · C파트: 교감형 추가)
+    int growth = 0, emotion = 0, career = 0, bond = 0, ghost = 0;
     for (final entry in userEvents.entries) {
       final types = entry.value.toSet();
-      final isGrowth = types.any((t) => _growthEvents.contains(t));
-      final isEmotion = types.any((t) => _emotionEvents.contains(t));
-      final isCareer = types.any((t) => _careerEvents.contains(t));
+      final isGrowth =
+          types.any((t) => EventCatalog.segmentGrowthTypes.contains(t));
+      final isEmotion =
+          types.any((t) => EventCatalog.segmentEmotionTypes.contains(t));
+      final isCareer =
+          types.any((t) => EventCatalog.segmentCareerTypes.contains(t));
+      final isBond =
+          types.any((t) => EventCatalog.segmentBondTypes.contains(t));
       if (isGrowth) growth++;
       if (isEmotion) emotion++;
       if (isCareer) career++;
-      if (!isGrowth && !isEmotion && !isCareer) {
-        if (!types.any((t) => _meaningfulActions.contains(t))) ghost++;
+      if (isBond) bond++;
+      if (!isGrowth &&
+          !isEmotion &&
+          !isCareer &&
+          !isBond &&
+          !types.any((t) => EventCatalog.meaningfulTypes.contains(t))) {
+        ghost++;
       }
     }
     ghost += noEventUsers;
@@ -242,6 +224,7 @@ class AdminAnalyticsDailyService {
         'growth': growth,
         'emotion': emotion,
         'career': career,
+        'bond': bond,
         'ghost': ghost,
       },
       'retention': {'d3': 0, 'd7': 0},

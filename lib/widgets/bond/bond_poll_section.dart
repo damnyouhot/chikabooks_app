@@ -8,8 +8,9 @@ import '../../core/widgets/app_badge.dart';
 import '../../models/poll.dart';
 import '../../models/poll_comment.dart';
 import '../../models/poll_option.dart';
-import '../../services/empathy_poll_service.dart';
 import '../../services/admin_activity_service.dart';
+import '../../services/empathy_poll_service.dart';
+import '../../services/funnel_onboarding_service.dart';
 
 /// 공감투표 섹션 — 오늘의 투표 + 지난 투표 피드
 class BondPollSection extends StatefulWidget {
@@ -198,6 +199,10 @@ class BondPollSectionState extends State<BondPollSection> {
         page: 'bond',
         targetId: optionId,
       );
+      // 첫 공감 선택일 때만 온보딩 퍼널 ③ (이미 투표한 유저 재선택은 isChange)
+      if (!result.isChange) {
+        unawaited(FunnelOnboardingService.tryLogFirstPoll());
+      }
     } else if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(result.error ?? '오류가 발생했습니다.')),

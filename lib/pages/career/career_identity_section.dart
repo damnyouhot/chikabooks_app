@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import '../../services/career_profile_service.dart';
 import '../../services/admin_activity_service.dart';
+import '../../services/career_profile_service.dart';
+import '../../services/funnel_onboarding_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../core/widgets/app_badge.dart';
@@ -391,6 +394,9 @@ class _CareerIdentitySheetState extends State<CareerIdentitySheet> {
         useTotalCareerMonthsOverride: _useOverride,
         totalCareerMonthsOverride: _useOverride ? overrideM : null,
       );
+      if (_tags.isNotEmpty) {
+        unawaited(FunnelOnboardingService.tryLogFirstCareerSpecialty());
+      }
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;

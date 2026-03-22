@@ -54,6 +54,8 @@ class _OnboardingGateState extends State<OnboardingGate> {
   @override
   void initState() {
     super.initState();
+    // activityLogs 스냅샷 선로딩 — 이후 이벤트 기록 시 users 읽기 생략
+    AdminActivityService.warmupCache();
     _check();
   }
 

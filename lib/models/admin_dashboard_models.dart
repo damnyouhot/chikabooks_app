@@ -1,6 +1,8 @@
 /// 관리자 대시보드에서 사용하는 데이터 모델 모음
 library;
 
+import '../core/analytics/event_catalog.dart';
+
 // ─── KPI 카드 ───────────────────────────────────────────────
 class DashboardKpi {
   final String label;
@@ -30,64 +32,22 @@ class FunnelStep {
 // ─── 기능 반응 항목 ──────────────────────────────────────────
 class FeatureReactionItem {
   final String eventType; // activityLogs.type
-  final String label;     // 화면에 표시할 한국어 이름
+  final String label; // 화면에 표시할 한국어 이름
+  /// [EventCatalog.tabForType] — 기능 반응 그룹(탭)
+  final String tab;
   final int clickCount;
   final int userCount;
 
   const FeatureReactionItem({
     required this.eventType,
     required this.label,
+    required this.tab,
     required this.clickCount,
     required this.userCount,
   });
 
-  /// activityLogs.type → 한국어 라벨 매핑
-  /// ※ Firestore에 저장되는 값은 ActivityEventType.value (snake_case)
-  static String labelFor(String type) {
-    const map = {
-      // ── 화면 진입 ──────────────────────────────────────────
-      'view_sign_in_page':        '로그인 화면 진입',
-      'view_home':                '홈 탭',
-      'view_bond':                '교감 탭',
-      'view_growth':              '성장 탭',
-      'view_career':              '커리어 탭',
-      'view_job':                 '구직 탭',
-      'view_settings':            '설정 진입',
-      'view_emotion_record':      '감정기록 화면',
-      'view_job_detail':          '공고 상세',
-      'view_onboarding_profile':  '온보딩 프로필',
-      // ── 소셜 로그인 ────────────────────────────────────────
-      'tap_login_google':  'Google 로그인',
-      'tap_login_apple':   'Apple 로그인',
-      'tap_login_kakao':   '카카오 로그인',
-      'tap_login_naver':   '네이버 로그인',
-      'tap_login_email':   '이메일 로그인',
-      'login_success':     '로그인 성공',
-      // ── 기능 클릭 ──────────────────────────────────────────
-      'quiz_completed':     '퀴즈 풀이 완료',
-      'tap_character':      '캐릭터 클릭',
-      'tap_emotion_start':  '감정기록 시작',
-      'tap_emotion_save':   '감정기록 저장 시도',
-      'emotion_save_success': '감정기록 저장 성공',
-      'emotion_save_fail':  '감정기록 저장 실패',
-      'tap_profile_save':   '프로필 저장',
-      'tap_job_save':       '공고 관심 저장',
-      'tap_job_apply':      '공고 지원',
-      'tap_career_edit':    '커리어 카드 수정',
-      'tap_notification_allow': '알림 허용',
-      // ── 기타 ──────────────────────────────────────────────
-      'app_open': '앱 실행',
-      // ── 공고자(Publisher) 이벤트 ─────────────────────────
-      'publisher_signup_submitted': '공고자 가입 신청',
-      'publisher_login':            '공고자 로그인',
-      'publisher_phone_verified':   '공고자 휴대폰 인증',
-      'publisher_profile_saved':    '공고자 프로필 저장',
-      'publisher_biz_submitted':    '공고자 사업자 인증 제출',
-      'publisher_approved':         '공고자 승인 완료',
-      'publisher_job_created':      '공고 작성 완료',
-    };
-    return map[type] ?? type;
-  }
+  /// activityLogs.type → 한국어 라벨 ([EventCatalog] 단일 출처)
+  static String labelFor(String type) => EventCatalog.labelForType(type);
 }
 
 // ─── 오류 항목 ───────────────────────────────────────────────

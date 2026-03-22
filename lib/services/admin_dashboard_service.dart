@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import '../core/analytics/event_catalog.dart';
 import '../models/admin_dashboard_models.dart';
 import '../models/quiz_schedule.dart';
 
@@ -221,31 +222,22 @@ class AdminDashboardService {
 
   // ─── User Flow (퍼널) ─────────────────────────────────────────
 
-  /// 퍼널 단계별 **고유 유저 수** (distinct userId)
+  /// 온보딩 **순차 퍼널** 단계별 유저 수 (교집합 집계)
   ///
-  /// 4단계:
-  ///   1. view_sign_in_page           — 로그인 화면 진입
-  ///   2. login_success               — 로그인 성공
-  ///   3. tap_profile_save            — 프로필 저장 완료
-  ///   4. funnel_first_emotion_complete — 첫 감정기록 완료
+  /// - 정의: [EventCatalog.onboardingFunnelOrderedSteps] (①~⑤)
+  /// - 집계: \(U_1\) = ① 이벤트를 가진 유저, \(U_{k} = U_{k-1} \cap S_k\)
+  ///   (\(S_k\) = k번째 이벤트 타입을 **한 번이라도** 가진 유저 집합)
+  /// - 기록: ①은 일반 로그, ②~⑤는 계정당 1회 [FunnelOnboardingService] + `isFunnel`
   ///
-  /// Firestore count()는 distinct를 지원하지 않으므로
-  /// 문서를 읽어 클라이언트에서 고유 userId 수를 계산합니다.
-  /// (퍼널 이벤트는 유저당 소수이므로 비용 부담 적음)
+  /// Firestore는 distinct count 미지원 → 문서 읽어 클라이언트에서 집합 연산.
   ///
-  /// [since] 로 기간 제한 가능 (null이면 전체 기간)
+  /// [since] 로 기간 제한 (null이면 전체 기간)
   static Future<List<FunnelStep>> getFunnelSteps({DateTime? since}) async {
-    const steps = <(String, String)>[
-      ('view_sign_in_page', '① 로그인 화면 진입'),
-      ('login_success', '② 로그인 성공'),
-      ('tap_profile_save', '③ 프로필 저장'),
-      ('funnel_first_emotion_complete', '④ 첫 감정기록 완료'),
-    ];
-
+    final steps = EventCatalog.onboardingFunnelOrderedSteps;
     final result = <FunnelStep>[];
-    int? prevCount;
+    Set<String>? eligible;
 
-    debugPrint('📊 getFunnelSteps since=$since');
+    debugPrint('📊 getFunnelSteps (sequential ∩) since=$since');
     for (final (key, label) in steps) {
       try {
         Query<Map<String, dynamic>> q =
@@ -253,29 +245,33 @@ class AdminDashboardService {
         if (since != null) {
           q = q.where('timestamp', isGreaterThan: Timestamp.fromDate(since));
         }
-        // userId만 읽으면 되므로 select로 최소화
         final snap = await q.get();
-        // 고유 userId 집합으로 중복 제거
-        final uniqueUsers = <String>{};
+        final stepUsers = <String>{};
         for (final doc in snap.docs) {
           final uid = doc.data()['userId'] as String?;
-          if (uid != null && uid.isNotEmpty) uniqueUsers.add(uid);
+          if (uid != null && uid.isNotEmpty) stepUsers.add(uid);
         }
-        final count = uniqueUsers.length;
-        debugPrint('📊 funnel [$key]: $count명 (문서 ${snap.docs.length}건)');
+        final intersected = eligible == null
+            ? stepUsers
+            : stepUsers.intersection(eligible);
+        eligible = intersected;
+        final count = intersected.length;
+        debugPrint(
+          '📊 funnel [$key]: $count명 (이 단계 raw ${stepUsers.length}, 문서 ${snap.docs.length}건)',
+        );
+        final prevCount = result.isEmpty ? null : result.last.count;
         final rate = (prevCount != null && prevCount > 0)
             ? count / prevCount
             : null;
         result.add(FunnelStep(label: label, count: count, conversionRate: rate));
-        prevCount = count;
       } catch (e, st) {
         debugPrint('❌ funnel [$key] 실패: $e');
         debugPrint('❌ stack: $st');
         if (e.toString().contains('index')) {
           debugPrint('💡 복합 인덱스 배포 필요: activityLogs(type, timestamp)');
         }
-        result.add(FunnelStep(label: label, count: 0));
-        prevCount = 0;
+        result.add(FunnelStep(label: label, count: 0, conversionRate: null));
+        eligible = <String>{};
       }
     }
 
@@ -333,6 +329,7 @@ class AdminDashboardService {
           .map((e) => FeatureReactionItem(
                 eventType: e.key,
                 label: FeatureReactionItem.labelFor(e.key),
+                tab: EventCatalog.tabForType(e.key),
                 clickCount: e.value.clicks,
                 userCount: e.value.users.length,
               ))

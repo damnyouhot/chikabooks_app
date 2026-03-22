@@ -121,18 +121,38 @@ class _FeatureList extends StatelessWidget {
   const _FeatureList({required this.items});
 
   static const _icons = <String, IconData>{
+    // 나
     'tap_character': Icons.emoji_nature_outlined,
+    'caring_feed_success': Icons.restaurant_outlined,
     'tap_emotion_start': Icons.edit_note_outlined,
     'tap_emotion_save': Icons.save_outlined,
+    'emotion_save_success': Icons.check_circle_outline,
+    'emotion_save_fail': Icons.error_outline,
+    'view_emotion_record': Icons.mood_outlined,
+    // 같이
+    'view_bond': Icons.favorite_outline,
+    'poll_empathize': Icons.how_to_vote_outlined,
+    'poll_change_empathy': Icons.swap_horiz_outlined,
+    'poll_add_option': Icons.playlist_add_outlined,
+    // 성장
+    'view_growth': Icons.bar_chart_outlined,
+    'quiz_completed': Icons.quiz_outlined,
+    // 커리어·구직
+    'view_career': Icons.work_history_outlined,
+    'view_job': Icons.list_alt_outlined,
     'view_job_detail': Icons.work_outline,
     'tap_job_save': Icons.bookmark_outline,
     'tap_job_apply': Icons.send_outlined,
     'tap_career_edit': Icons.badge_outlined,
+    // 홈·기타
     'view_home': Icons.home_outlined,
-    'view_bond': Icons.favorite_outline,
-    'view_growth': Icons.bar_chart_outlined,
-    'view_career': Icons.work_history_outlined,
+    'view_settings': Icons.settings_outlined,
     'login_success': Icons.login_outlined,
+    'view_sign_in_page': Icons.lock_open_outlined,
+    'tap_login_google': Icons.g_mobiledata,
+    'tap_login_kakao': Icons.chat_bubble_outline,
+    'tap_login_apple': Icons.apple,
+    'tap_login_email': Icons.email_outlined,
   };
 
   @override
@@ -172,13 +192,26 @@ class _FeatureList extends StatelessWidget {
                   Icon(icon, size: 16, color: AppColors.accent),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(
-                      item.label,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.label,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          item.tab,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textDisabled,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   Text(

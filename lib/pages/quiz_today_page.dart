@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -8,8 +10,9 @@ import '../core/widgets/app_muted_card.dart';
 import '../core/widgets/app_primary_card.dart';
 import '../core/widgets/glass_card.dart';
 import '../models/quiz_schedule.dart';
-import '../services/quiz_pool_service.dart';
 import '../services/admin_activity_service.dart';
+import '../services/funnel_onboarding_service.dart';
+import '../services/quiz_pool_service.dart';
 
 /// 퀴즈 탭 글래스 모드 플래그
 const bool kQuizGlassMode = false;
@@ -255,6 +258,7 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
     });
 
     AdminActivityService.log(ActivityEventType.quizCompleted, page: 'growth');
+    unawaited(FunnelOnboardingService.tryLogFirstQuiz());
 
     QuizPoolService.saveAnswer(
       dateKey: dateKey,

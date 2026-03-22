@@ -190,6 +190,8 @@ class _AdminTrendsTabState extends State<AdminTrendsTab>
                     (d.featureUsage['emotion_save_success'] ?? 0).toDouble(),
                 '캐릭터': (d) =>
                     (d.featureUsage['tap_character'] ?? 0).toDouble(),
+                '밥주기': (d) =>
+                    (d.featureUsage['caring_feed_success'] ?? 0).toDouble(),
                 '공고 클릭': (d) =>
                     (d.featureUsage['view_job_detail'] ?? 0).toDouble(),
                 '퀴즈': (d) =>
@@ -198,6 +200,7 @@ class _AdminTrendsTabState extends State<AdminTrendsTab>
               colors: const [
                 Color(0xFFEF5350),
                 Color(0xFF66BB6A),
+                Color(0xFFFF9800),
                 Color(0xFFFFCC00),
                 AppColors.accent,
               ],
@@ -215,6 +218,8 @@ class _AdminTrendsTabState extends State<AdminTrendsTab>
                     (d.segments['emotion'] ?? 0).toDouble(),
                 '커리어형': (d) =>
                     (d.segments['career'] ?? 0).toDouble(),
+                '교감형': (d) =>
+                    (d.segments['bond'] ?? 0).toDouble(),
                 '유령': (d) =>
                     (d.segments['ghost'] ?? 0).toDouble(),
               },
@@ -222,6 +227,7 @@ class _AdminTrendsTabState extends State<AdminTrendsTab>
                 AppColors.accent,
                 Color(0xFFEF5350),
                 Color(0xFFFFCC00),
+                Color(0xFF42A5F5),
                 Color(0xFFBDBDBD),
               ],
             ),

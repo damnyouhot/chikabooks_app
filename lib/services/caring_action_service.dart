@@ -4,7 +4,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../data/caring_ments.dart';
+import '../services/admin_activity_service.dart';
 import '../services/caring_state_service.dart';
+import '../services/funnel_onboarding_service.dart';
 
 /// 돌보기(나 탭) 액션 처리 서비스
 ///
@@ -149,6 +151,12 @@ class CaringActionService {
       } else {
         ment = _pickRandom(CaringMents.feedSuccessSimple);
       }
+
+      AdminActivityService.log(
+        ActivityEventType.caringFeedSuccess,
+        page: 'home',
+      );
+      unawaited(FunnelOnboardingService.tryLogFirstFeed());
 
       return FeedResult(
         success: true,

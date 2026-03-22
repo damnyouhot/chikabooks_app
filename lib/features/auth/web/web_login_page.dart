@@ -1,13 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../services/kakao_auth_service.dart';
+import '../../../services/admin_activity_service.dart';
 import '../../../services/apple_auth_service.dart';
 import '../../../services/email_auth_service.dart';
+import '../../../services/kakao_auth_service.dart';
 import '../../../services/sign_in_tracker.dart';
 import '../../publisher/services/clinic_auth_service.dart';
 import '../../publisher/pages/publisher_shared.dart';
@@ -230,7 +230,10 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
   }
 
   // ── 로그인 후 공통 라우팅 ──────────────────────────────────
-  Future<void> _handlePostLogin(String provider) async {
+  Future<void> _handlePostLogin(
+    String provider, {
+    bool isSignUp = false,
+  }) async {
     if (!mounted) return;
 
     final uid = FirebaseAuth.instance.currentUser?.uid;
@@ -253,6 +256,24 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
       }
 
       await SignInTracker.record(provider);
+      // 앱 [SignInPage]와 동일: 로그인 성공 후 uid가 있을 때만 기록 (①~③)
+      AdminActivityService.log(
+        ActivityEventType.viewSignInPage,
+        page: 'sign_in',
+      );
+      AdminActivityService.log(
+        ActivityEventType.loginSuccess,
+        page: 'sign_in',
+        extra: {
+          'provider': provider,
+          'platform': 'web',
+          if (provider == 'email') 'isSignUp': isSignUp,
+        },
+      );
+      AdminActivityService.logFunnel(
+        FunnelEventType.signupComplete,
+        extra: {'provider': provider, 'platform': 'web'},
+      );
       if (!mounted) return;
       context.go(widget.nextRoute ?? '/applicant/resumes');
     } catch (_) {
@@ -262,6 +283,10 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
 
   // ── 카카오 ─────────────────────────────────────────────────
   Future<void> _loginKakao() async {
+    AdminActivityService.log(
+      ActivityEventType.tapLoginKakao,
+      page: 'sign_in',
+    );
     _setLoading('kakao');
     try {
       final user = await KakaoAuthService.signInWithKakao();
@@ -279,6 +304,10 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
 
   // ── 구글 ───────────────────────────────────────────────────
   Future<void> _loginGoogle() async {
+    AdminActivityService.log(
+      ActivityEventType.tapLoginGoogle,
+      page: 'sign_in',
+    );
     _setLoading('google');
     try {
       // 웹에서는 signInWithPopup 방식 사용 (idToken null 문제 해결)
@@ -304,6 +333,10 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
 
   // ── 애플 ───────────────────────────────────────────────────
   Future<void> _loginApple() async {
+    AdminActivityService.log(
+      ActivityEventType.tapLoginApple,
+      page: 'sign_in',
+    );
     _setLoading('apple');
     try {
       final user = await AppleAuthService.signInWithApple();
@@ -369,6 +402,10 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
       _showError('이메일과 비밀번호를 입력해주세요.');
       return;
     }
+    AdminActivityService.log(
+      ActivityEventType.tapLoginEmail,
+      page: 'sign_in',
+    );
     _setLoading('email');
     try {
       User? user;
@@ -392,7 +429,7 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
         _showError(_isSignUp ? '회원가입에 실패했어요.' : '로그인에 실패했어요.');
         return;
       }
-      await _handlePostLogin('email');
+      await _handlePostLogin('email', isSignUp: _isSignUp);
     } on FirebaseAuthException catch (e) {
       _showError(_mapAuthError(e.code));
     } catch (e) {

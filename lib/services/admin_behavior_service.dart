@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
+import '../core/analytics/event_catalog.dart';
+
 /// 행동 분석 대시보드 데이터 서비스
 ///
 /// ── 핵심 원칙 ─────────────────────────────────────────────────
@@ -8,37 +10,12 @@ import 'package:flutter/foundation.dart';
 ///    먼저 확보한 뒤, 모든 지표를 이 집합 기준으로만 계산한다.
 /// 2. activityLogs를 1회 bulk read하여 7개 지표를 동시에 계산한다.
 /// 3. 새로운 Firestore write는 절대 추가하지 않는다.
+/// 4. 탭 전환·기능 실행률·세그먼트 타입 집합은 [EventCatalog] 단일 출처 (C파트).
 /// ──────────────────────────────────────────────────────────────
 class AdminBehaviorService {
   static final _db = FirebaseFirestore.instance;
 
-  // ── 의미 있는 행동 이벤트 (단순 화면 진입 제외) ──
-  static const _meaningfulActions = {
-    'tap_character',
-    'tap_emotion_start',
-    'tap_emotion_save',
-    'emotion_save_success',
-    'tap_profile_save',
-    'tap_job_save',
-    'tap_job_apply',
-    'tap_career_edit',
-    'view_job_detail',
-    'quiz_completed',
-    'poll_empathize',
-    'poll_change_empathy',
-    'poll_add_option',
-  };
-
-  // ── 유저 타입 분류용 이벤트 그룹 ──
-  static const _growthEvents = {'view_growth'};
-  static const _emotionEvents = {'tap_character', 'emotion_save_success'};
-  static const _careerEvents = {
-    'view_job_detail',
-    'tap_job_save',
-    'tap_job_apply',
-  };
-
-  /// activityLogs bulk read → 7개 지표 동시 계산
+  /// activityLogs bulk read → 지표 동시 계산
   static Future<BehaviorAnalysis> analyze({
     required DateTime since,
     int readLimit = 3000,
@@ -108,7 +85,7 @@ class AdminBehaviorService {
           'publisher=$skippedPublisher, '
           'empty=$skippedEmpty');
 
-      // ── Step 4: 7개 지표 계산 (모두 validUserIds 기준) ──
+      // ── Step 4: 지표 계산 (모두 validUserIds 기준) ──
       final featureUsage = _calcFeatureUsage(userEvents, total);
       final conversions = _calcConversions(userEvents);
       final depth = _calcEngagementDepth(userEvents, validUserIds, total);
@@ -139,15 +116,7 @@ class AdminBehaviorService {
     Map<String, List<_EventEntry>> userEvents,
     int total,
   ) {
-    const features = <(String, Set<String>)>[
-      ('감정 기록', {'emotion_save_success'}),
-      ('캐릭터 인터랙션', {'tap_character'}),
-      ('채용 공고 클릭', {'view_job_detail'}),
-      ('퀴즈 풀이', {'quiz_completed'}),
-      ('공감투표 참여', {'poll_empathize'}),
-    ];
-
-    return features.map((f) {
+    return EventCatalog.behaviorFeatureUsageRows.map((f) {
       final count = userEvents.entries
           .where((e) => e.value.any((ev) => f.$2.contains(ev.type)))
           .length;
@@ -165,14 +134,7 @@ class AdminBehaviorService {
   static List<MetricCard> _calcConversions(
     Map<String, List<_EventEntry>> userEvents,
   ) {
-    const pairs = <(String, String, String)>[
-      ('나 탭 → 감정 기록', 'view_home', 'emotion_save_success'),
-      ('구직 탭 → 공고 상세', 'view_job', 'view_job_detail'),
-      ('성장 탭 → 퀴즈 풀이', 'view_growth', 'quiz_completed'),
-      ('같이 탭 → 공감투표', 'view_bond', 'poll_empathize'),
-    ];
-
-    return pairs.map((p) {
+    return EventCatalog.behaviorConversionRows.map((p) {
       final tabUsers = userEvents.entries
           .where((e) => e.value.any((ev) => ev.type == p.$2))
           .length;
@@ -216,7 +178,9 @@ class AdminBehaviorService {
 
     for (final entry in userEvents.entries) {
       final meaningful =
-          entry.value.where((e) => _meaningfulActions.contains(e.type)).length;
+          entry.value
+              .where((e) => EventCatalog.meaningfulTypes.contains(e.type))
+              .length;
       if (meaningful == 0) {
         loginOnly++;
       } else if (meaningful == 1) {
@@ -257,13 +221,7 @@ class AdminBehaviorService {
   static List<MetricCard> _calcRepeatUsage(
     Map<String, List<_EventEntry>> userEvents,
   ) {
-    const features = <(String, String, int)>[
-      ('감정 기록 2회+', 'emotion_save_success', 2),
-      ('캐릭터 상호작용 3회+', 'tap_character', 3),
-      ('퀴즈 풀이 2회+', 'quiz_completed', 2),
-    ];
-
-    return features.map((f) {
+    return EventCatalog.behaviorRepeatRows.map((f) {
       final oneOrMore = userEvents.entries
           .where((e) => e.value.any((ev) => ev.type == f.$2))
           .length;
@@ -291,20 +249,29 @@ class AdminBehaviorService {
     int growth = 0;
     int emotion = 0;
     int career = 0;
+    int bond = 0;
     int ghost = 0;
 
     for (final entry in userEvents.entries) {
       final types = entry.value.map((e) => e.type).toSet();
-      final isGrowth = types.any((t) => _growthEvents.contains(t));
-      final isEmotion = types.any((t) => _emotionEvents.contains(t));
-      final isCareer = types.any((t) => _careerEvents.contains(t));
+      final isGrowth =
+          types.any((t) => EventCatalog.segmentGrowthTypes.contains(t));
+      final isEmotion =
+          types.any((t) => EventCatalog.segmentEmotionTypes.contains(t));
+      final isCareer =
+          types.any((t) => EventCatalog.segmentCareerTypes.contains(t));
+      final isBond =
+          types.any((t) => EventCatalog.segmentBondTypes.contains(t));
       if (isGrowth) growth++;
       if (isEmotion) emotion++;
       if (isCareer) career++;
-      if (!isGrowth && !isEmotion && !isCareer) {
-        final hasMeaningful =
-            types.any((t) => _meaningfulActions.contains(t));
-        if (!hasMeaningful) ghost++;
+      if (isBond) bond++;
+      if (!isGrowth &&
+          !isEmotion &&
+          !isCareer &&
+          !isBond &&
+          !types.any((t) => EventCatalog.meaningfulTypes.contains(t))) {
+        ghost++;
       }
     }
 
@@ -315,7 +282,7 @@ class AdminBehaviorService {
     ghost += noEventUsers;
 
     debugPrint('📊 [유저타입] 성장관심=$growth, 감정=$emotion, '
-        '커리어=$career, 유령=$ghost(이벤트없음=$noEventUsers), total=$total');
+        '커리어=$career, 교감=$bond, 유령=$ghost(이벤트없음=$noEventUsers), total=$total');
 
     return [
       MetricCard.safe(
@@ -326,6 +293,9 @@ class AdminBehaviorService {
           basis: '전체 로그인 사용자'),
       MetricCard.safe(
           label: '커리어형', count: career, total: total,
+          basis: '전체 로그인 사용자'),
+      MetricCard.safe(
+          label: '교감형', count: bond, total: total,
           basis: '전체 로그인 사용자'),
       MetricCard.safe(
           label: '유령 유저', count: ghost, total: total,
@@ -356,7 +326,14 @@ class AdminBehaviorService {
 
     debugPrint('📊 [첫클릭] $firstActionMap, total=$total');
 
-    const order = ['나 탭', '교감 탭', '성장 탭', '구직 탭', '기타'];
+    const order = [
+      '나 탭',
+      '교감 탭',
+      '성장 탭',
+      '구직 탭',
+      '커리어 탭',
+      '기타',
+    ];
     return order.map((cat) {
       return MetricCard.safe(
         label: '$cat 첫 클릭',
@@ -371,14 +348,27 @@ class AdminBehaviorService {
     if (type.startsWith('view_home') ||
         type == 'tap_character' ||
         type == 'tap_emotion_start' ||
-        type == 'emotion_save_success') return '나 탭';
-    if (type.startsWith('view_bond')) return '교감 탭';
+        type == 'emotion_save_success' ||
+        type == 'caring_feed_success') {
+      return '나 탭';
+    }
+    if (type.startsWith('view_bond') ||
+        type == 'poll_empathize' ||
+        type == 'poll_change_empathy' ||
+        type == 'poll_add_option') {
+      return '교감 탭';
+    }
     if (type.startsWith('view_growth') || type == 'quiz_completed') {
       return '성장 탭';
     }
     if (type.startsWith('view_job') ||
         type == 'tap_job_save' ||
-        type == 'tap_job_apply') return '구직 탭';
+        type == 'tap_job_apply') {
+      return '구직 탭';
+    }
+    if (type.startsWith('view_career') || type == 'tap_career_edit') {
+      return '커리어 탭';
+    }
     return '기타';
   }
 
