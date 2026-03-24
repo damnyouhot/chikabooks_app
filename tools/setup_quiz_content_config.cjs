@@ -1,7 +1,7 @@
 /**
  * 퀴즈 콘텐츠 전환용 Firestore 초기 문서
  *
- *   - config/quiz_content   … 현재 임상 패크 ID 등
+ *   - config/quiz_content   … 현재 임상·국시 패크 ID 등
  *   - quiz_packs/national_default … 국시 업로드와 스키마 정합용 메타
  *
  * 사용: cd functions && npm install 후
@@ -36,6 +36,8 @@ async function main() {
     {
       currentClinicalPackId: "",
       includeClinicalWithoutPack: true,
+      currentNationalPackId: "",
+      includeNationalWithoutPack: true,
       updatedAt: now,
     },
     { merge: true },

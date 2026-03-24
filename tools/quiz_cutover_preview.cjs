@@ -1,10 +1,10 @@
 /**
- * 임상 패크 전환 전·후 집계 (dry-run, 쓰기 없음)
+ * 패크 전환 전·후 집계 (dry-run, 쓰기 없음)
  *
  *   node ../tools/quiz_cutover_preview.cjs
  *
- * config/quiz_content 의 currentClinicalPackId / includeClinicalWithoutPack 과
- * quiz_pool 의 packId 를 읽어 후보 풀 크기를 출력합니다.
+ * config/quiz_content 와 quiz_pool packId 를 읽어
+ * Cloud Functions 선정 로직과 동일한 기준으로 후보 수를 출력합니다.
  */
 
 const fs = require("fs");
@@ -36,6 +36,18 @@ function clinicalMatches(data, cfg) {
   return pid === cfg.currentClinicalPackId;
 }
 
+function nationalMatches(data, cfg) {
+  if (quizQuestionType(data) !== "national_exam") return true;
+  if (!cfg.currentNationalPackId) return true;
+  const pid = typeof data.packId === "string" ? data.packId.trim() : "";
+  if (!pid) return cfg.includeNationalWithoutPack;
+  return pid === cfg.currentNationalPackId;
+}
+
+function poolMatches(data, cfg) {
+  return clinicalMatches(data, cfg) && nationalMatches(data, cfg);
+}
+
 async function main() {
   if (!admin.apps.length) {
     admin.initializeApp({ credential: admin.credential.cert(loadServiceAccount()) });
@@ -48,36 +60,62 @@ async function main() {
     currentClinicalPackId:
       typeof cfg.currentClinicalPackId === "string" ? cfg.currentClinicalPackId.trim() : "",
     includeClinicalWithoutPack: cfg.includeClinicalWithoutPack !== false,
+    currentNationalPackId:
+      typeof cfg.currentNationalPackId === "string" ? cfg.currentNationalPackId.trim() : "",
+    includeNationalWithoutPack: cfg.includeNationalWithoutPack !== false,
   };
 
   const poolSnap = await db.collection("quiz_pool").where("isActive", "==", true).get();
 
-  let national = 0;
+  let nationalAll = 0;
   let clinicalAll = 0;
+  let nationalEligible = 0;
   let clinicalEligible = 0;
-  const byPack = {};
+  const byPackNational = {};
+  const byPackClinical = {};
 
   for (const doc of poolSnap.docs) {
     const d = doc.data();
     const t = quizQuestionType(d);
+    const pidRaw = typeof d.packId === "string" && d.packId.trim() ? d.packId.trim() : "(packId 없음)";
     if (t === "national_exam") {
-      national++;
-      continue;
+      nationalAll++;
+      byPackNational[pidRaw] = (byPackNational[pidRaw] || 0) + 1;
+      if (nationalMatches(d, contentCfg)) nationalEligible++;
+    } else {
+      clinicalAll++;
+      byPackClinical[pidRaw] = (byPackClinical[pidRaw] || 0) + 1;
+      if (clinicalMatches(d, contentCfg)) clinicalEligible++;
     }
-    clinicalAll++;
-    const pid = typeof d.packId === "string" && d.packId.trim() ? d.packId.trim() : "(packId 없음)";
-    byPack[pid] = (byPack[pid] || 0) + 1;
-    if (clinicalMatches(d, contentCfg)) clinicalEligible++;
+  }
+
+  let bothEligible = 0;
+  for (const doc of poolSnap.docs) {
+    if (poolMatches(doc.data(), contentCfg)) bothEligible++;
   }
 
   console.log("── config/quiz_content ──");
   console.log(JSON.stringify(contentCfg, null, 2));
   console.log("── 활성 풀 (isActive) ──");
-  console.log("국시:", national, "/ 임상(전체):", clinicalAll, "/ 임상(스케줄 후보):", clinicalEligible);
-  console.log("── 임상 packId 별 건수 ──");
-  Object.keys(byPack)
+  console.log(
+    "국시: 전체",
+    nationalAll,
+    "/ 스케줄 후보",
+    nationalEligible,
+    "| 임상: 전체",
+    clinicalAll,
+    "/ 스케줄 후보",
+    clinicalEligible,
+  );
+  console.log("── 스케줄 후보 합계(임상∩국시 필터 동시 적용, CF와 동일) ──", bothEligible);
+  console.log("── 국시 packId 별 건수 ──");
+  Object.keys(byPackNational)
     .sort()
-    .forEach((k) => console.log(`  ${k}: ${byPack[k]}`));
+    .forEach((k) => console.log(`  ${k}: ${byPackNational[k]}`));
+  console.log("── 임상 packId 별 건수 ──");
+  Object.keys(byPackClinical)
+    .sort()
+    .forEach((k) => console.log(`  ${k}: ${byPackClinical[k]}`));
 }
 
 main().catch((e) => {

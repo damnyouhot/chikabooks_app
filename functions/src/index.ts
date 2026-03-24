@@ -1798,12 +1798,14 @@ function quizQuestionType(data: FirebaseFirestore.DocumentData): "national_exam"
   return data.questionType === "national_exam" ? "national_exam" : "clinical";
 }
 
-/** `config/quiz_content` — 임상 풀 패킹 ID 전환용 (국시·공감투표와 무관) */
+/** `config/quiz_content` — 임상·국시 풀 패킹 ID (공감투표와 무관) */
 const QUIZ_CONTENT_CONFIG_PATH = "config/quiz_content";
 
 interface QuizContentConfig {
   currentClinicalPackId: string;
   includeClinicalWithoutPack: boolean;
+  currentNationalPackId: string;
+  includeNationalWithoutPack: boolean;
 }
 
 async function loadQuizContentConfig(): Promise<QuizContentConfig> {
@@ -1814,11 +1816,15 @@ async function loadQuizContentConfig(): Promise<QuizContentConfig> {
       ? d.currentClinicalPackId.trim()
       : "",
     includeClinicalWithoutPack: d.includeClinicalWithoutPack !== false,
+    currentNationalPackId: typeof d.currentNationalPackId === "string"
+      ? d.currentNationalPackId.trim()
+      : "",
+    includeNationalWithoutPack: d.includeNationalWithoutPack !== false,
   };
 }
 
 /**
- * 일일 스케줄 선정에 포함할지 (국시는 항상 true).
+ * 임상 후보 필터
  * - currentClinicalPackId 비어 있음: 임상 전부 후보 (기존 동작)
  * - 비어 있지 않음: 해당 packId 이거나, packId 없음+includeClinicalWithoutPack
  */
@@ -1833,10 +1839,34 @@ function clinicalMatchesContentPack(
   return pid === cfg.currentClinicalPackId;
 }
 
-/** 대시보드용: 활성 풀 기준 타입별 개수 + 이번 사이클 배포 수 */
+/**
+ * 국시 후보 필터 (임상과 동일 패턴)
+ * - currentNationalPackId 비어 있음: 국시 전부 후보 (기존 동작)
+ * - 비어 있지 않음: 해당 packId 이거나, packId 없음+includeNationalWithoutPack
+ */
+function nationalMatchesContentPack(
+  data: FirebaseFirestore.DocumentData,
+  cfg: QuizContentConfig,
+): boolean {
+  if (quizQuestionType(data) !== "national_exam") return true;
+  if (!cfg.currentNationalPackId) return true;
+  const pid = typeof data.packId === "string" ? data.packId.trim() : "";
+  if (!pid) return cfg.includeNationalWithoutPack;
+  return pid === cfg.currentNationalPackId;
+}
+
+function poolDocMatchesContentPacks(
+  data: FirebaseFirestore.DocumentData,
+  cfg: QuizContentConfig,
+): boolean {
+  return clinicalMatchesContentPack(data, cfg) && nationalMatchesContentPack(data, cfg);
+}
+
+/** 대시보드용: 스케줄 후보(패크 필터 적용) 기준 타입별 개수 + 이번 사이클 배포 수 */
 function computeQuizMetaAnalytics(
   poolSnap: FirebaseFirestore.QuerySnapshot,
   usedQuizIds: string[],
+  contentCfg: QuizContentConfig,
 ): {
   totalActiveCount: number;
   totalNationalActiveCount: number;
@@ -1850,6 +1880,7 @@ function computeQuizMetaAnalytics(
   let usedNational = 0;
   let usedClinical = 0;
   for (const doc of poolSnap.docs) {
+    if (!poolDocMatchesContentPacks(doc.data(), contentCfg)) continue;
     const t = quizQuestionType(doc.data());
     if (t === "national_exam") {
       totalNational++;
@@ -1860,7 +1891,7 @@ function computeQuizMetaAnalytics(
     }
   }
   return {
-    totalActiveCount: poolSnap.size,
+    totalActiveCount: totalNational + totalClinical,
     totalNationalActiveCount: totalNational,
     totalClinicalActiveCount: totalClinical,
     usedNationalCount: usedNational,
@@ -1920,7 +1951,7 @@ async function pickTodayQuizzes(
     .where("isActive", "==", true)
     .get();
 
-  const allDocs = poolSnap.docs.filter((d) => clinicalMatchesContentPack(d.data(), contentCfg));
+  const allDocs = poolSnap.docs.filter((d) => poolDocMatchesContentPacks(d.data(), contentCfg));
 
   const trySelect = (used: string[]): {
     selected: FirebaseFirestore.QueryDocumentSnapshot[];
@@ -2017,6 +2048,7 @@ export const scheduleQuizzes = functions
     const dateKey     = toDateKey(new Date());
     const scheduleRef = db.collection("quiz_schedule").doc(dateKey);
     const metaRef     = db.doc("quiz_meta/state");
+    const contentCfg  = await loadQuizContentConfig();
 
     // ── 이미 생성됐으면 선정은 스킵하되, meta는 스케줄과 맞춤(usedQuizIds 누락 방지) ──
     const scheduleSnapEarly = await scheduleRef.get();
@@ -2037,7 +2069,7 @@ export const scheduleQuizzes = functions
       const mergedUsed = [...new Set([...prevUsed, ...todayQuizIds])];
 
       const poolSnapEarly = await db.collection("quiz_pool").where("isActive", "==", true).get();
-      const analyticsEarly = computeQuizMetaAnalytics(poolSnapEarly, mergedUsed);
+      const analyticsEarly = computeQuizMetaAnalytics(poolSnapEarly, mergedUsed, contentCfg);
       await metaRef.set({
         ...analyticsEarly,
         lastScheduledDate: dateKey,
@@ -2046,7 +2078,7 @@ export const scheduleQuizzes = functions
       }, { merge: true });
       functions.logger.info("⏭️ 이미 스케줄 생성됨 — quiz_meta 동기화(usedQuizIds 병합)", {
         dateKey,
-        totalActive: poolSnapEarly.size,
+        totalActive: analyticsEarly.totalActiveCount,
         todayIds: todayQuizIds.length,
         mergedCount: mergedUsed.length,
         scheduleCycle,
@@ -2058,7 +2090,6 @@ export const scheduleQuizzes = functions
     const metaDoc  = await metaRef.get();
     const meta     = metaDoc.exists ? metaDoc.data()! : {};
     const dailyCount: number = meta.dailyCount ?? 2;
-    const contentCfg = await loadQuizContentConfig();
 
     // ── 오늘의 문제 선정 ──
     const { selectedDocs, nextCycleCount, nextUsedQuizIds, wasReset } =
@@ -2094,7 +2125,7 @@ export const scheduleQuizzes = functions
 
     // ── quiz_meta/state 업데이트 ──
     const poolSnap = await db.collection("quiz_pool").where("isActive", "==", true).get();
-    const analytics = computeQuizMetaAnalytics(poolSnap, nextUsedQuizIds);
+    const analytics = computeQuizMetaAnalytics(poolSnap, nextUsedQuizIds, contentCfg);
 
     await metaRef.set({
       cycleCount: nextCycleCount,
@@ -2113,6 +2144,7 @@ export const scheduleQuizzes = functions
       cycleCount: nextCycleCount,
       usedCount: nextUsedQuizIds.length,
       clinicalPackId: contentCfg.currentClinicalPackId || "(전체 임상)",
+      nationalPackId: contentCfg.currentNationalPackId || "(전체 국시)",
       ...analytics,
     });
 
@@ -2185,7 +2217,7 @@ export const manualScheduleQuiz = functions
     await batch.commit();
 
     const poolSnap = await db.collection("quiz_pool").where("isActive", "==", true).get();
-    const analytics = computeQuizMetaAnalytics(poolSnap, nextUsedQuizIds);
+    const analytics = computeQuizMetaAnalytics(poolSnap, nextUsedQuizIds, contentCfg);
 
     await metaRef.set({
       cycleCount: nextCycleCount,
@@ -2247,8 +2279,9 @@ export const rebuildQuizMetaFromSchedules = functions
     }
 
     const usedQuizIds = Array.from(idSet);
+    const contentCfg = await loadQuizContentConfig();
     const poolSnap = await db.collection("quiz_pool").where("isActive", "==", true).get();
-    const analytics = computeQuizMetaAnalytics(poolSnap, usedQuizIds);
+    const analytics = computeQuizMetaAnalytics(poolSnap, usedQuizIds, contentCfg);
 
     await metaRef.set({
       usedQuizIds,

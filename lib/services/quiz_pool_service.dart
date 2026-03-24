@@ -10,7 +10,7 @@ import '../models/quiz_schedule.dart';
 ///   quiz_pool/{autoId}                — 원본 문제 은행
 ///   quiz_schedule/{dateKey}           — 날짜별 배포 스케줄
 ///   quiz_meta/state                   — 전체 진행 상태
-///   config/quiz_content               — 임상 패크 ID (`QuizContentConfigService`)
+///   config/quiz_content               — 임상·국시 패크 ID (`QuizContentConfigService`)
 ///   quiz_packs/{packId}               — 패크 메타
 ///   users/{uid}/quiz_history/{dateKey} — 유저별 풀이 기록
 class QuizPoolService {

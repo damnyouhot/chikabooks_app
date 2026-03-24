@@ -82,10 +82,11 @@ class QuizSchedule {
 ///   - Firestore에 직접 저장되는 필드가 아닌, usedQuizIds.length 파생값.
 class QuizMetaState {
   final int cycleCount;        // 현재 사이클 번호 (1부터)
-  final int totalActiveCount;  // 활성화된 총 문제 수
-  /// 활성 풀 중 국시 문항 수 (CF 동기화)
+  /// `config/quiz_content` 패크 필터를 적용한 스케줄 후보 수 (국시+임상 합)
+  final int totalActiveCount;
+  /// 후보 중 국시 문항 수 (CF `computeQuizMetaAnalytics` 동기화)
   final int totalNationalActiveCount;
-  /// 활성 풀 중 임상 문항 수
+  /// 후보 중 임상 문항 수
   final int totalClinicalActiveCount;
   /// 이번 사이클 배포된 고유 국시 id 수
   final int usedNationalCount;
