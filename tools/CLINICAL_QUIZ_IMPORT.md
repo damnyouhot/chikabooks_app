@@ -78,9 +78,23 @@ Desktop `공감투표.xlsx`의 **`임상문제`** 시트를 Node(xlsx)로 읽어
 
 ## 운영 순서 (요약)
 
-1. `import_clinical_quiz_xlsx.js` 실행 (`--dry-run` 권장 후 본 업로드)
-2. `node tools/quiz_cutover_preview.cjs` 로 후보 수 확인
-3. `node tools/quiz_content_apply_clinical_pack.cjs --pack-id=...` (`--no-legacy` 선택, `--yes` 로 확인 생략)
-4. 레거시: 위 스크립트의 `--no-legacy` 만으로도 가능. 추가로 `node tools/quiz_deactivate_clinical_except_pack.cjs --except-pack-id=... --dry-run` 후 `--yes` (삭제 없음)
+1. **dry-run + 샘플 10문항**  
+   `node ../tools/import_clinical_quiz_xlsx.js --dry-run "경로/공감투표.xlsx" --pack-id=YOUR_PACK --sample-n=10`  
+   → `question`, `options`, `correctIndex`, `explanation` JSON 확인
+2. **본 업로드**  
+   동일 명령에서 `--dry-run` 제거
+3. **quiz_pool 건수**  
+   Firestore 콘솔 또는 `node tools/quiz_cutover_verify.cjs --pack-id=YOUR_PACK` (활성 임상 중 해당 pack 건수)
+4. **후보 풀 미리보기**  
+   `node tools/quiz_cutover_preview.cjs`
+5. **config 컷오버**  
+   `node tools/quiz_content_apply_clinical_pack.cjs --pack-id=YOUR_PACK --yes` (`--no-legacy` 선택)
+6. **오늘 스케줄**  
+   유지 vs `manualScheduleQuiz` + `forceReplace` 결정 후  
+   `node tools/quiz_cutover_verify.cjs --pack-id=YOUR_PACK` (날짜 기본 KST 오늘) 로 `items`의 `questionType` / `packId` / `packVersion` 확인
+7. **앱**에서 국시1+임상1·정답/해설 확인
+8. **레거시**  
+   `quiz_deactivate_clinical_except_pack.cjs --except-pack-id=YOUR_PACK --dry-run` → `--yes`
+
 
 랜덤 선정·국시 pack 통일·당일 스케줄 유지 여부는 프로젝트 `functions/src/index.ts` 및 기존 논의와 동일합니다.

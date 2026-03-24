@@ -10,6 +10,7 @@
  *   cd functions && npm install
  *   node ../tools/import_clinical_quiz_xlsx.js "C:/Users/douglas/Desktop/공감투표.xlsx" --pack-id=clinical_2026_03
  *   node ../tools/import_clinical_quiz_xlsx.js --dry-run "C:/path/공감투표.xlsx" --pack-id=clinical_2026_03
+ *   --sample-n=10  (dry-run 시 앞에서부터 N문항의 question/options/correctIndex/explanation JSON 출력, 기본 10)
  *
  * 환경변수:
  *   GOOGLE_APPLICATION_CREDENTIALS 또는 functions/serviceAccountKey.json
@@ -43,6 +44,7 @@ function parseArgs(argv) {
     dryRun: false,
     packId: "",
     packVersion: 1,
+    sampleN: 10,
   };
   for (const a of argv.slice(2)) {
     if (a === "--dry-run") out.dryRun = true;
@@ -50,9 +52,28 @@ function parseArgs(argv) {
     else if (a.startsWith("--pack-version=")) {
       const n = Number(a.slice("--pack-version=".length).trim());
       out.packVersion = Number.isFinite(n) ? n : 1;
+    } else if (a.startsWith("--sample-n=")) {
+      const n = Number(a.slice("--sample-n=".length).trim());
+      out.sampleN = Number.isFinite(n) && n > 0 ? Math.min(n, 500) : 10;
     } else if (!a.startsWith("--")) out.xlsxPath = a;
   }
   return out;
+}
+
+function printSampleItems(items, n) {
+  const slice = items.slice(0, n);
+  console.log("\n── dry-run 샘플 (question / options / correctIndex / explanation) ──");
+  slice.forEach((it, idx) => {
+    const payload = {
+      index: idx + 1,
+      question: it.question,
+      options: it.options,
+      correctIndex: it.correctIndex,
+      explanation: it.explanation,
+    };
+    console.log("\n#" + (idx + 1), JSON.stringify(payload, null, 2));
+  });
+  console.log("\n── 샘플 끝 (" + slice.length + "/" + items.length + "문항 표시) ──\n");
 }
 
 /**
@@ -267,12 +288,14 @@ async function main() {
     console.error("❌ 업로드할 문항 없음");
     process.exit(1);
   }
-  console.log("📌 샘플 1문항:", JSON.stringify(items[0], null, 2));
 
   if (args.dryRun) {
+    printSampleItems(items, args.sampleN);
     console.log("✅ dry-run: Firestore 쓰기 없음. packId=", args.packId, "version=", args.packVersion);
     return;
   }
+
+  console.log("📌 업로드 직전 요약 1문항:", JSON.stringify(items[0], null, 2));
 
   if (!admin.apps.length) {
     admin.initializeApp({ credential: admin.credential.cert(loadServiceAccount()) });
