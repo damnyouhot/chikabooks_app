@@ -4,6 +4,9 @@
  *   node ../tools/quiz_cutover_verify.cjs --pack-id=clinical_xxx
  *   node ../tools/quiz_cutover_verify.cjs --pack-id=clinical_xxx --schedule-date=2026-03-25
  *
+ * 오늘 스케줄만 서비스 계정으로 재생성:
+ *   node ../tools/regenerate_quiz_schedule_admin.cjs
+ *
  * 출력:
  *   - config/quiz_content
  *   - quiz_pool: 해당 packId + clinical + isActive 건수
