@@ -50,6 +50,8 @@ class QuizSchedule {
         sourceFileName:  map['sourceFileName'] as String? ?? '',
         sourcePage:      map['sourcePage'] as String? ?? '',
         sourceName:      map['sourceName'] as String? ?? '',
+        packId:          map['packId'] as String? ?? '',
+        packVersion:     (map['packVersion'] as num?)?.toInt() ?? 0,
         isActive:        map['isActive'] as bool? ?? true,
         lastCycleServed: (map['lastCycleServed'] as num?)?.toInt() ?? 0,
         createdAt:       DateTime.now(),

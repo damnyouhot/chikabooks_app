@@ -21,6 +21,10 @@ const XLSX = require(path.join(__dirname, "../functions/node_modules/xlsx"));
 const functionsDir = path.join(__dirname, "../functions");
 const defaultXlsx = "C:/Users/douglas/Desktop/공감투표.xlsx";
 
+/** 스키마 정합용 (국시 문항 내용·공감투표 시트는 변경 없음) */
+const NATIONAL_PACK_ID = "national_default";
+const NATIONAL_PACK_VERSION = 1;
+
 function loadServiceAccount() {
   const envPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
   const p = path.join(functionsDir, "serviceAccountKey.json");
@@ -120,6 +124,17 @@ async function main() {
   const col = db.collection("quiz_pool");
   const now = admin.firestore.FieldValue.serverTimestamp();
 
+  await db.doc(`quiz_packs/${NATIONAL_PACK_ID}`).set(
+    {
+      kind: "national_exam",
+      title: "국시 기본",
+      version: NATIONAL_PACK_VERSION,
+      isActive: true,
+      updatedAt: now,
+    },
+    { merge: true },
+  );
+
   for (const it of items) {
     const ref = col.doc();
     batch.set(ref, {
@@ -135,6 +150,8 @@ async function main() {
       sourceFileName: "",
       sourcePage: "",
       sourceName: it.sourceName || "국가고시",
+      packId: NATIONAL_PACK_ID,
+      packVersion: NATIONAL_PACK_VERSION,
       isActive: true,
       lastCycleServed: 0,
       createdAt: now,

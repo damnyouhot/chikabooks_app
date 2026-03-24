@@ -1798,6 +1798,41 @@ function quizQuestionType(data: FirebaseFirestore.DocumentData): "national_exam"
   return data.questionType === "national_exam" ? "national_exam" : "clinical";
 }
 
+/** `config/quiz_content` — 임상 풀 패킹 ID 전환용 (국시·공감투표와 무관) */
+const QUIZ_CONTENT_CONFIG_PATH = "config/quiz_content";
+
+interface QuizContentConfig {
+  currentClinicalPackId: string;
+  includeClinicalWithoutPack: boolean;
+}
+
+async function loadQuizContentConfig(): Promise<QuizContentConfig> {
+  const snap = await db.doc(QUIZ_CONTENT_CONFIG_PATH).get();
+  const d = snap.exists ? snap.data()! : {};
+  return {
+    currentClinicalPackId: typeof d.currentClinicalPackId === "string"
+      ? d.currentClinicalPackId.trim()
+      : "",
+    includeClinicalWithoutPack: d.includeClinicalWithoutPack !== false,
+  };
+}
+
+/**
+ * 일일 스케줄 선정에 포함할지 (국시는 항상 true).
+ * - currentClinicalPackId 비어 있음: 임상 전부 후보 (기존 동작)
+ * - 비어 있지 않음: 해당 packId 이거나, packId 없음+includeClinicalWithoutPack
+ */
+function clinicalMatchesContentPack(
+  data: FirebaseFirestore.DocumentData,
+  cfg: QuizContentConfig,
+): boolean {
+  if (quizQuestionType(data) !== "clinical") return true;
+  if (!cfg.currentClinicalPackId) return true;
+  const pid = typeof data.packId === "string" ? data.packId.trim() : "";
+  if (!pid) return cfg.includeClinicalWithoutPack;
+  return pid === cfg.currentClinicalPackId;
+}
+
 /** 대시보드용: 활성 풀 기준 타입별 개수 + 이번 사이클 배포 수 */
 function computeQuizMetaAnalytics(
   poolSnap: FirebaseFirestore.QuerySnapshot,
@@ -1839,6 +1874,9 @@ function buildScheduleItem(
   nextCycleCount: number,
 ): Record<string, unknown> {
   const data = d.data();
+  const packVersion = typeof data.packVersion === "number" && Number.isFinite(data.packVersion)
+    ? data.packVersion
+    : 0;
   return {
     id: d.id,
     order: data.order ?? 0,
@@ -1855,6 +1893,8 @@ function buildScheduleItem(
     isActive: true,
     lastCycleServed: nextCycleCount,
     questionType: quizQuestionType(data),
+    packId: typeof data.packId === "string" ? data.packId : "",
+    packVersion,
   };
 }
 
@@ -1863,7 +1903,10 @@ function buildScheduleItem(
  *   - 우선 national_exam 1 + clinical 1
  *   - 국시 미사용 후보가 없으면 clinical 2 (서로 다른 책 우선)
  */
-async function pickTodayQuizzes(meta: FirebaseFirestore.DocumentData): Promise<{
+async function pickTodayQuizzes(
+  meta: FirebaseFirestore.DocumentData,
+  contentCfg: QuizContentConfig,
+): Promise<{
   selectedDocs: FirebaseFirestore.QueryDocumentSnapshot[];
   nextCycleCount: number;
   nextUsedQuizIds: string[];
@@ -1877,7 +1920,7 @@ async function pickTodayQuizzes(meta: FirebaseFirestore.DocumentData): Promise<{
     .where("isActive", "==", true)
     .get();
 
-  const allDocs = poolSnap.docs;
+  const allDocs = poolSnap.docs.filter((d) => clinicalMatchesContentPack(d.data(), contentCfg));
 
   const trySelect = (used: string[]): {
     selected: FirebaseFirestore.QueryDocumentSnapshot[];
@@ -2015,10 +2058,11 @@ export const scheduleQuizzes = functions
     const metaDoc  = await metaRef.get();
     const meta     = metaDoc.exists ? metaDoc.data()! : {};
     const dailyCount: number = meta.dailyCount ?? 2;
+    const contentCfg = await loadQuizContentConfig();
 
     // ── 오늘의 문제 선정 ──
     const { selectedDocs, nextCycleCount, nextUsedQuizIds, wasReset } =
-      await pickTodayQuizzes(meta);
+      await pickTodayQuizzes(meta, contentCfg);
 
     if (selectedDocs.length === 0) {
       functions.logger.warn("⚠️ 선정된 문제 없음 — quiz_pool을 확인하세요");
@@ -2068,6 +2112,7 @@ export const scheduleQuizzes = functions
       wasReset,
       cycleCount: nextCycleCount,
       usedCount: nextUsedQuizIds.length,
+      clinicalPackId: contentCfg.currentClinicalPackId || "(전체 임상)",
       ...analytics,
     });
 
@@ -2109,9 +2154,10 @@ export const manualScheduleQuiz = functions
     const metaDoc  = await metaRef.get();
     const meta     = metaDoc.exists ? metaDoc.data()! : {};
     const dailyCount: number = meta.dailyCount ?? 2;
+    const contentCfg = await loadQuizContentConfig();
 
     const { selectedDocs, nextCycleCount, nextUsedQuizIds, wasReset } =
-      await pickTodayQuizzes(meta);
+      await pickTodayQuizzes(meta, contentCfg);
 
     if (selectedDocs.length === 0) {
       return { success: false, message: "quiz_pool에 활성화된 문제 없음" };

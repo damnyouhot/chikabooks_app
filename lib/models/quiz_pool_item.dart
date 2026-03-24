@@ -22,6 +22,10 @@ class QuizPoolItem {
   final String sourcePage;  // 출처 페이지
   /// 국시 등 책 외 출처 한 줄 (예: 2024 국가고시 치과위생사)
   final String sourceName;
+  /// 임상 세트 전환용 패크 ID (`config/quiz_content` 와 매칭). 비어 있으면 레거시 풀.
+  final String packId;
+  /// 패크 내 버전(정수). 스케줄 스냅샷에 복사됨.
+  final int packVersion;
   final bool isActive;      // false면 스케줄에서 제외
   final int lastCycleServed; // 마지막으로 배포된 사이클 번호 (0 = 아직 미배포)
   final DateTime createdAt;
@@ -41,6 +45,8 @@ class QuizPoolItem {
     required this.sourceFileName,
     required this.sourcePage,
     this.sourceName = '',
+    this.packId = '',
+    this.packVersion = 0,
     required this.isActive,
     required this.lastCycleServed,
     required this.createdAt,
@@ -72,6 +78,8 @@ class QuizPoolItem {
       sourceFileName:  d['sourceFileName'] as String? ?? '',
       sourcePage:      d['sourcePage'] as String? ?? '',
       sourceName:      d['sourceName'] as String? ?? '',
+      packId:          d['packId'] as String? ?? '',
+      packVersion:     (d['packVersion'] as num?)?.toInt() ?? 0,
       isActive:        d['isActive'] as bool? ?? true,
       lastCycleServed: (d['lastCycleServed'] as num?)?.toInt() ?? 0,
       createdAt:       (d['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
@@ -92,6 +100,8 @@ class QuizPoolItem {
     'sourceFileName':  sourceFileName,
     'sourcePage':      sourcePage,
     'sourceName':      sourceName,
+    'packId':          packId,
+    'packVersion':     packVersion,
     'isActive':        isActive,
     'lastCycleServed': lastCycleServed,
     'createdAt':       Timestamp.fromDate(createdAt),
@@ -117,6 +127,8 @@ class QuizPoolItem {
       sourceFileName:  sourceFileName,
       sourcePage:      sourcePage,
       sourceName:      sourceName,
+      packId:          packId,
+      packVersion:     packVersion,
       isActive:        isActive ?? this.isActive,
       lastCycleServed: lastCycleServed ?? this.lastCycleServed,
       createdAt:       createdAt,
