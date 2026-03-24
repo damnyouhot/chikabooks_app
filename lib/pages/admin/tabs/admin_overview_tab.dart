@@ -3,6 +3,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../models/admin_dashboard_models.dart';
 import '../../../models/quiz_schedule.dart';
 import '../../../services/admin_dashboard_service.dart';
+import '../../../services/quiz_pool_service.dart';
 import '../widgets/admin_common_widgets.dart';
 
 class AdminOverviewTab extends StatefulWidget {
@@ -38,6 +39,8 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
 
   // 퀴즈 풀 데이터
   QuizMetaState? _quizMeta;
+  bool _syncingQuizMeta = false;
+  bool _reschedulingTodayQuiz = false;
 
   // 연차 분포
   List<CareerGroupCount> _careerGroups = [];
@@ -126,6 +129,73 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
     }
   }
 
+  Future<void> _syncQuizMetaFromSchedules() async {
+    setState(() => _syncingQuizMeta = true);
+    try {
+      await AdminDashboardService.rebuildQuizMetaFromSchedules();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('퀴즈 메타가 스케줄과 동기화되었습니다.')),
+      );
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('동기화 실패: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _syncingQuizMeta = false);
+    }
+  }
+
+  Future<void> _rescheduleTodayQuiz() async {
+    final today = QuizPoolService.todayKey;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('오늘 퀴즈 스케줄 다시 만들기'),
+        content: Text(
+          '날짜 $today 의 quiz_schedule을 덮어씁니다.\n'
+          '모든 사용자의 오늘 퀴즈가 새로 선정된 문항으로 바뀝니다. 진행할까요?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('덮어쓰기'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+
+    setState(() => _reschedulingTodayQuiz = true);
+    try {
+      final data = await AdminDashboardService.manualScheduleQuiz(
+        targetDate: today,
+        forceReplace: true,
+      );
+      if (!mounted) return;
+      final success = data?['success'] == true;
+      final msg = data?['message'] as String? ??
+          (success ? '스케줄을 갱신했습니다.' : '스케줄 갱신에 실패했습니다.');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg)),
+      );
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('오류: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _reschedulingTodayQuiz = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -177,7 +247,13 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
 
           // ── 퀴즈 풀 현황 ─────────────────────────────────────
           const AdminSectionTitle('퀴즈 풀 현황'),
-          _QuizPoolCard(meta: _quizMeta),
+          _QuizPoolCard(
+            meta: _quizMeta,
+            syncing: _syncingQuizMeta,
+            onSyncFromSchedules: _syncQuizMetaFromSchedules,
+            reschedulingToday: _reschedulingTodayQuiz,
+            onRescheduleToday: _rescheduleTodayQuiz,
+          ),
 
           const SizedBox(height: 20),
 
@@ -362,7 +438,18 @@ class _CareerGroupChart extends StatelessWidget {
 // ─── 퀴즈 풀 현황 카드 ─────────────────────────────────────────
 class _QuizPoolCard extends StatelessWidget {
   final QuizMetaState? meta;
-  const _QuizPoolCard({required this.meta});
+  final bool syncing;
+  final VoidCallback onSyncFromSchedules;
+  final bool reschedulingToday;
+  final VoidCallback onRescheduleToday;
+
+  const _QuizPoolCard({
+    required this.meta,
+    required this.syncing,
+    required this.onSyncFromSchedules,
+    required this.reschedulingToday,
+    required this.onRescheduleToday,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -380,15 +467,20 @@ class _QuizPoolCard extends StatelessWidget {
       );
     }
 
-    final total     = meta!.totalActiveCount;
+    final total = meta!.totalActiveCount;
     // usedCount = 이번 사이클에서 배포된 문제 수 (CF의 usedQuizIds.length)
-    // 풀 소진(사이클 리셋) 시 0으로 초기화되므로 "이번 사이클 기준"임
-    final served    = meta!.usedCount;
+    final served = meta!.usedCount;
     final remaining = (total - served).clamp(0, total);
-    final cycle     = meta!.cycleCount;
-    final daily     = meta!.dailyCount;
-    // 남은 날수 (하루 dailyCount 문제 배포 기준)
-    final daysLeft  = daily > 0 ? (remaining / daily).ceil() : 0;
+    final cycle = meta!.cycleCount;
+    final daily = meta!.dailyCount;
+    final daysLeft = daily > 0 ? (remaining / daily).ceil() : 0;
+
+    final natTotal = meta!.totalNationalActiveCount;
+    final clinTotal = meta!.totalClinicalActiveCount;
+    final natUsed = meta!.usedNationalCount;
+    final clinUsed = meta!.usedClinicalCount;
+    final natRem = (natTotal - natUsed).clamp(0, natTotal);
+    final clinRem = (clinTotal - clinUsed).clamp(0, clinTotal);
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -449,6 +541,83 @@ class _QuizPoolCard extends StatelessWidget {
               fontSize: 11,
               color: AppColors.textDisabled,
             ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '「이번 사이클 배포」= 이번 사이클에서 한 번이라도 나간 고유 문항 수(usedQuizIds). '
+            '국시/임상 수치는 활성 풀의 questionType 기준으로 CF가 갱신합니다. '
+            '스케줄과 숫자가 어긋나면 아래를 눌러 맞춥니다.',
+            style: TextStyle(
+              fontSize: 10,
+              height: 1.35,
+              color: AppColors.textDisabled.withValues(alpha: 0.95),
+            ),
+          ),
+          if (natTotal > 0 || clinTotal > 0) ...[
+            const SizedBox(height: 12),
+            Text(
+              '국시 풀: 활성 $natTotal · 배포 $natUsed · 남음 $natRem',
+              style: const TextStyle(
+                fontSize: 11,
+                height: 1.35,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '임상 풀: 활성 $clinTotal · 배포 $clinUsed · 남음 $clinRem',
+              style: const TextStyle(
+                fontSize: 11,
+                height: 1.35,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 4,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              TextButton.icon(
+                onPressed: syncing ? null : onSyncFromSchedules,
+                icon: syncing
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.sync, size: 18),
+                label: Text(syncing ? '동기화 중…' : '스케줄 기준으로 메타 동기화'),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.accent,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: (syncing || reschedulingToday)
+                    ? null
+                    : onRescheduleToday,
+                icon: reschedulingToday
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.event_repeat, size: 18),
+                label: Text(
+                  reschedulingToday
+                      ? '오늘 스케줄 재생성 중…'
+                      : '오늘 스케줄 다시 만들기',
+                ),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.textPrimary,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                ),
+              ),
+            ],
           ),
         ],
       ),

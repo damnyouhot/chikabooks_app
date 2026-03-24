@@ -32,6 +32,10 @@ class QuizSchedule {
     final items = rawItems.map((e) {
       // items는 자동ID 없이 저장되므로 임시 id=''로 처리
       final map = Map<String, dynamic>.from(e as Map);
+      final rawType = map['questionType'] as String?;
+      final qType = rawType == QuizPoolItem.kNationalExam
+          ? QuizPoolItem.kNationalExam
+          : QuizPoolItem.kClinical;
       return QuizPoolItem(
         id:              map['id'] as String? ?? '',
         order:           (map['order'] as num?)?.toInt() ?? 0,
@@ -41,9 +45,11 @@ class QuizSchedule {
         explanation:     map['explanation'] as String? ?? '',
         category:        map['category'] as String? ?? '',
         difficulty:      map['difficulty'] as String? ?? 'basic',
+        questionType:    qType,
         sourceBook:      map['sourceBook'] as String? ?? '',
         sourceFileName:  map['sourceFileName'] as String? ?? '',
         sourcePage:      map['sourcePage'] as String? ?? '',
+        sourceName:      map['sourceName'] as String? ?? '',
         isActive:        map['isActive'] as bool? ?? true,
         lastCycleServed: (map['lastCycleServed'] as num?)?.toInt() ?? 0,
         createdAt:       DateTime.now(),
@@ -75,6 +81,14 @@ class QuizSchedule {
 class QuizMetaState {
   final int cycleCount;        // 현재 사이클 번호 (1부터)
   final int totalActiveCount;  // 활성화된 총 문제 수
+  /// 활성 풀 중 국시 문항 수 (CF 동기화)
+  final int totalNationalActiveCount;
+  /// 활성 풀 중 임상 문항 수
+  final int totalClinicalActiveCount;
+  /// 이번 사이클 배포된 고유 국시 id 수
+  final int usedNationalCount;
+  /// 이번 사이클 배포된 고유 임상 id 수
+  final int usedClinicalCount;
   final String lastScheduledDate; // 마지막 스케줄 생성일 e.g. '2026-03-16'
   final int dailyCount;        // 하루 배포 수 (기본 2)
   final int usedCount;         // 이번 사이클에서 배포된 문제 수 (usedQuizIds.length)
@@ -82,6 +96,10 @@ class QuizMetaState {
   const QuizMetaState({
     required this.cycleCount,
     required this.totalActiveCount,
+    this.totalNationalActiveCount = 0,
+    this.totalClinicalActiveCount = 0,
+    this.usedNationalCount = 0,
+    this.usedClinicalCount = 0,
     required this.lastScheduledDate,
     required this.dailyCount,
     this.usedCount = 0,
@@ -95,6 +113,12 @@ class QuizMetaState {
     return QuizMetaState(
       cycleCount:         (d['cycleCount'] as num?)?.toInt() ?? 1,
       totalActiveCount:   (d['totalActiveCount'] as num?)?.toInt() ?? 0,
+      totalNationalActiveCount:
+          (d['totalNationalActiveCount'] as num?)?.toInt() ?? 0,
+      totalClinicalActiveCount:
+          (d['totalClinicalActiveCount'] as num?)?.toInt() ?? 0,
+      usedNationalCount: (d['usedNationalCount'] as num?)?.toInt() ?? 0,
+      usedClinicalCount: (d['usedClinicalCount'] as num?)?.toInt() ?? 0,
       lastScheduledDate:  d['lastScheduledDate'] as String? ?? '',
       dailyCount:         (d['dailyCount'] as num?)?.toInt() ?? 2,
       usedCount:          usedQuizIds.length,

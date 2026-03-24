@@ -22,7 +22,7 @@ import 'settings/settings_page.dart';
 /// 내부 소탭 4개:
 /// 1. 오늘의 퀴즈 — 매일 2문제
 /// 2. 급여변경 — HIRA 수가/급여 변경 포인트
-/// 3. 치과책방 — e-Book 스토어
+/// 3. 성장하기 3번 탭(라벨: 치과책방) — e-Book 스토어
 /// 4. 내 서재 — 구매한 e-Book 목록
 class GrowthPage extends StatefulWidget {
   final ValueNotifier<int>? subTabNotifier;
@@ -160,19 +160,22 @@ class _GrowthPageState extends State<GrowthPage>
                   SizedBox(height: 16),
                   Text('📝 오늘 퀴즈', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                   SizedBox(height: 8),
-                  Text('매일 치과 관련 퀴즈를 풀어요.', style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
+                  Text(
+                    '매일 국시·임상 문제를 풀어요. (스케줄에 따라 하루 2문항)',
+                    style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary),
+                  ),
                   SizedBox(height: 16),
                   Text('📋 제도 변경', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                   SizedBox(height: 8),
                   Text('HIRA 급여·수가 등 변경 소식을 확인하고 저장해요.', style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
                   SizedBox(height: 16),
-                  Text('📖 치과책방', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  Text('📖 하이진랩', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                   SizedBox(height: 8),
-                  Text('치과책방에 올라온 책들을 볼 수 있는 공간이에요.', style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
+                  Text('하이진랩에 올라온 책들을 볼 수 있는 공간이에요.', style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
                   SizedBox(height: 16),
                   Text('📗 내 서재', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                   SizedBox(height: 8),
-                  Text('치과책방 공식 홈페이지에서 구매한 책들을 볼 수 있는 곳이에요.', style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
+                  Text('연동 전자책 스토어에서 구매한 책들을 볼 수 있는 곳이에요.', style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
                 ],
               ),
             ),
@@ -305,7 +308,7 @@ class _MyBooksTabState extends State<_MyBooksTab> {
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
               ),
               content: Text(
-                "치과책방에서 '$aliasEmail' 이메일로\n구매된 기록이 확인되었습니다.\n\n"
+                "연동 스토어에서 '$aliasEmail' 이메일로\n구매된 기록이 확인되었습니다.\n\n"
                 '구매 내역은 정상적으로 연결되어 있습니다.\n'
                 '앞으로는 현재 로그인한 이메일로 이용해 주세요.',
                 style: const TextStyle(fontSize: 14, height: 1.6),
@@ -410,7 +413,7 @@ class _MyBooksTabState extends State<_MyBooksTab> {
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                 ),
                 content: const Text(
-                  '치과책방에서 사용한 이메일 주소로\n로그인하셨나요?\n\n'
+                  '구매 시 사용한 이메일 주소로\n로그인하셨나요?\n\n'
                   '구매 시 사용한 이메일 계정으로\n로그인하면 자동으로 연결됩니다.',
                   style: TextStyle(fontSize: 14, height: 1.55),
                 ),
@@ -471,7 +474,7 @@ class _MyBooksTabState extends State<_MyBooksTab> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '치과책방 구매내역이 보이지 않나요?',
+                      '전자책 구매내역이 보이지 않나요?',
                       style: TextStyle(
                         fontSize: 12,
                         color: AppColors.textSecondary,
@@ -523,7 +526,7 @@ class _MyBooksTabState extends State<_MyBooksTab> {
                         ),
                         const SizedBox(height: AppSpacing.xs),
                         Text(
-                          '치과책방에서 도서를 만나보세요.',
+                          '하이진랩에서 도서를 만나보세요.',
                           style: TextStyle(
                             color: AppColors.textDisabled,
                             fontSize: 12,

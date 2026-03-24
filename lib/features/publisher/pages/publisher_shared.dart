@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
 
-// ── 치카북스 게시자 화면 공통 팔레트 ─────────────────────
+// ── 하이진랩 게시자 화면 공통 팔레트 ─────────────────────
 // 아래 상수들은 외부 참조(web_login_page 등)가 있으므로 이름은 유지하되
 // AppColors 토큰으로 값을 통일합니다.
 const kPubBg      = AppColors.appBg;

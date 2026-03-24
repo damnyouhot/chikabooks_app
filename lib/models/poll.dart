@@ -6,7 +6,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class Poll {
   final String id;
   final String question;
-  final String status; // 'active' | 'closed'
+  /// Firestore: `active` | `closed` | `scheduled` (일정만 반영, 앱은 시간으로 판별)
+  final String status;
   final DateTime startsAt;
   final DateTime endsAt;
   final DateTime? closedAt;
@@ -26,6 +27,19 @@ class Poll {
 
   bool get isActive => status == 'active';
   bool get isClosed => status == 'closed';
+  bool get isScheduled => status == 'scheduled';
+
+  /// 현재 시각 기준 투표 진행 중 (startsAt ≤ now < endsAt)
+  bool get isVotingOpen {
+    final n = DateTime.now();
+    return !startsAt.isAfter(n) && endsAt.isAfter(n);
+  }
+
+  /// 마감 시각 경과 (한마디·지난 투표 피드)
+  bool get hasEnded {
+    final n = DateTime.now();
+    return !endsAt.isAfter(n);
+  }
 
   /// 마감까지 남은 시간 (종료됐으면 Duration.zero)
   Duration get remaining {

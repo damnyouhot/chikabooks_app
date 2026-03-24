@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
 
-// _kPink는 치카북스 브랜드 핑크 — 의도적 유지
+// _kPink는 법적 문서 구분선 색 — 의도적 유지
 const _kPink = Color(0xFFFF6B9D);
 
 /// 약관/개인정보처리방침 등 법적 문서를 표시하는 공용 웹 페이지
@@ -68,7 +68,7 @@ class LegalPage extends StatelessWidget {
                 const SizedBox(height: 6),
                 Center(
                   child: Text(
-                    '© 치과책방. All rights reserved.',
+                    '© 하이진랩. All rights reserved.',
                     style: GoogleFonts.notoSansKr(
                       fontSize: 13,
                       color: AppColors.textDisabled,
@@ -240,7 +240,7 @@ LegalPage buildPrivacyPage() {
         heading: '1. 개인정보처리방침의 목적',
         contents: [
           LegalContent.paragraph(
-            '홍덕우(이하 "사업자")는 모바일 앱 「치카북스」(표시명, 이하 "서비스")를 포함한 치과책방 관련 서비스 제공을 위해 개인정보를 처리하며, 「개인정보 보호법」 등 관련 법령을 준수합니다.',
+            '홍덕우(이하 "사업자")는 모바일 앱 「하이진랩」(영문 표기 HygieneLab, 이하 "서비스") 제공을 위해 개인정보를 처리하며, 「개인정보 보호법」 등 관련 법령을 준수합니다.',
           ),
         ],
       ),
@@ -401,7 +401,7 @@ LegalPage buildPrivacyPage() {
           LegalContent.bullets([
             '개인정보 보호책임자: 홍덕우',
             '문의 이메일: chikabooks.app@gmail.com',
-            '사업자 정보: 치과책방',
+            '사업자 정보: 하이진랩',
           ]),
         ],
       ),
@@ -415,7 +415,7 @@ LegalPage buildPrivacyPage() {
 
 LegalPage buildTermsPage() {
   return const LegalPage(
-    title: '치카북스 이용약관',
+    title: '하이진랩 이용약관',
     emoji: '📄',
     effectiveDate: '2026년 3월 19일',
     sections: [
@@ -423,7 +423,7 @@ LegalPage buildTermsPage() {
         heading: '제1조(목적)',
         contents: [
           LegalContent.paragraph(
-            '본 약관은 홍덕우(이하 "사업자")가 제공하는 모바일 앱 「치카북스」 및 관련 웹페이지(이하 통칭 "서비스")의 이용과 관련하여 사업자와 회원 간 권리·의무 및 책임사항, 서비스 이용조건 및 절차를 규정함을 목적으로 합니다. 서비스는 치과책방 브랜드로 운영될 수 있습니다.',
+            '본 약관은 홍덕우(이하 "사업자")가 제공하는 모바일 앱 「하이진랩」(영문 표기 HygieneLab) 및 관련 웹페이지(이하 통칭 "서비스")의 이용과 관련하여 사업자와 회원 간 권리·의무 및 책임사항, 서비스 이용조건 및 절차를 규정함을 목적으로 합니다.',
           ),
         ],
       ),

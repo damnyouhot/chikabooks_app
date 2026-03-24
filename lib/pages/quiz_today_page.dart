@@ -9,6 +9,7 @@ import '../core/widgets/app_badge.dart';
 import '../core/widgets/app_muted_card.dart';
 import '../core/widgets/app_primary_card.dart';
 import '../core/widgets/glass_card.dart';
+import '../models/quiz_pool_item.dart';
 import '../models/quiz_schedule.dart';
 import '../services/admin_activity_service.dart';
 import '../services/funnel_onboarding_service.dart';
@@ -428,9 +429,11 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
           options: item.options,
           correctIndex: item.correctIndex,
           explanation: item.explanation,
+          questionType: item.questionType,
           sourceBook: item.sourceBook,
           sourceFileName: item.sourceFileName,
           sourcePage: item.sourcePage,
+          sourceName: item.sourceName,
           savedAnswer: savedAnswer,
           glassMode: kQuizGlassMode,
           onAnswered:
@@ -840,9 +843,11 @@ class _RecentDayQuizGroup extends StatelessWidget {
               options: item.options,
               correctIndex: item.correctIndex,
               explanation: item.explanation,
+              questionType: item.questionType,
               sourceBook: item.sourceBook,
               sourceFileName: item.sourceFileName,
               sourcePage: item.sourcePage,
+              sourceName: item.sourceName,
               savedAnswer: savedAnswer,
               readOnly: true, // 지난 퀴즈: 답 변경 불가
               glassMode: glassMode,
@@ -905,9 +910,11 @@ class _QuizCard extends StatefulWidget {
   final List<String> options;
   final int correctIndex;
   final String explanation;
+  final String questionType;
   final String sourceBook;     // 출처 책 이름
-  final String sourceFileName; // 출처 파일명 (e.g. 치과책방_신입을_위한_친절한_임상문답.pdf)
+  final String sourceFileName; // 출처 파일명 (e.g. 치과책방_…pdf — 스토리지 파일명 접두 유지)
   final String sourcePage;     // 출처 페이지
+  final String sourceName;    // 국시 등 책 외 출처 한 줄
   final int? savedAnswer;
   final bool readOnly;
   final bool glassMode;
@@ -920,9 +927,11 @@ class _QuizCard extends StatefulWidget {
     required this.options,
     required this.correctIndex,
     required this.explanation,
+    this.questionType = QuizPoolItem.kClinical,
     this.sourceBook = '',
     this.sourceFileName = '',
     this.sourcePage = '',
+    this.sourceName = '',
     this.savedAnswer,
     this.readOnly = false,
     this.glassMode = false,
@@ -1054,7 +1063,7 @@ class _QuizCardState extends State<_QuizCard> {
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 질문 헤더
+        // 질문 헤더: 왼쪽 Q → 아래 유형(국시/임상), 오른쪽 질문 본문
         Padding(
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.xl,
@@ -1065,18 +1074,40 @@ class _QuizCardState extends State<_QuizCard> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              AppBadge(
-                label: 'Q${widget.index}',
-                bgColor:
-                    widget.glassMode
-                        ? AppColors.white.withValues(alpha: 0.20)
-                        : AppColors.pollBadgeBg,
-                textColor:
-                    widget.glassMode
-                        ? AppColors.white
-                        : AppColors.pollBadgeText,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AppBadge(
+                    label: 'Q${widget.index}',
+                    bgColor:
+                        widget.glassMode
+                            ? AppColors.white.withValues(alpha: 0.20)
+                            : AppColors.pollBadgeBg,
+                    textColor:
+                        widget.glassMode
+                            ? AppColors.white
+                            : AppColors.pollBadgeText,
+                  ),
+                  const SizedBox(height: 8),
+                  AppBadge(
+                    label: QuizPoolItem.badgeLabelForType(widget.questionType),
+                    bgColor:
+                        widget.glassMode
+                            ? AppColors.white.withValues(alpha: 0.14)
+                            : (widget.questionType == QuizPoolItem.kNationalExam
+                                ? AppColors.accent.withValues(alpha: 0.14)
+                                : AppColors.surfaceMuted),
+                    textColor:
+                        widget.glassMode
+                            ? AppColors.white.withValues(alpha: 0.95)
+                            : (widget.questionType == QuizPoolItem.kNationalExam
+                                ? AppColors.accent
+                                : AppColors.textSecondary),
+                  ),
+                ],
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   widget.question,
@@ -1084,7 +1115,7 @@ class _QuizCardState extends State<_QuizCard> {
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
                     color: questionColor,
-                    height: 1.4,
+                    height: 1.45,
                   ),
                 ),
               ),
@@ -1097,6 +1128,28 @@ class _QuizCardState extends State<_QuizCard> {
           padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
           child: optionList,
         ),
+
+        // 임상 문제 참고 안내 (보기 아래)
+        if (widget.questionType == QuizPoolItem.kClinical)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.xl,
+              0,
+              AppSpacing.xl,
+              AppSpacing.sm,
+            ),
+            child: Text(
+              '참고: 임상 문제는 노하우나 적용의 유연성에 대한 내용으로 상황에 따라 해석이 달라질 수 있습니다.',
+              style: TextStyle(
+                fontSize: 11,
+                height: 1.45,
+                color:
+                    widget.glassMode
+                        ? AppColors.white.withValues(alpha: 0.45)
+                        : AppColors.textDisabled,
+              ),
+            ),
+          ),
 
         // 정답 피드백 + 해설
         if (_answered)
@@ -1134,8 +1187,37 @@ class _QuizCardState extends State<_QuizCard> {
                     ),
                   ),
                 ],
-                // 출처 표시
-                if (widget.sourceBook.isNotEmpty || widget.sourceFileName.isNotEmpty) ...[
+                // 출처 표시 (국시: sourceName 우선 / 임상: 책·파일명 기존 로직)
+                if (widget.questionType == QuizPoolItem.kNationalExam &&
+                    widget.sourceName.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.school_outlined,
+                        size: 11,
+                        color:
+                            widget.glassMode
+                                ? AppColors.white.withValues(alpha: 0.35)
+                                : AppColors.textDisabled,
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          '출처: ${widget.sourceName}',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color:
+                                widget.glassMode
+                                    ? AppColors.white.withValues(alpha: 0.35)
+                                    : AppColors.textDisabled,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ] else if (widget.sourceBook.isNotEmpty ||
+                    widget.sourceFileName.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Row(
                     children: [
@@ -1151,10 +1233,8 @@ class _QuizCardState extends State<_QuizCard> {
                       Expanded(
                         child: Text(
                           () {
-                            // sourceFileName에서 .pdf 제거 후
-                            // 첫 번째 '_' 이후의 '_'만 공백으로 변환
-                            // 예: 치과책방_신입을_위한_친절한_임상문답.pdf
-                            //   → 치과책방_신입을 위한 친절한 임상문답
+                            // sourceFileName에서 .pdf 제거 후 '_' → 공백 (표시용)
+                            // 스토리지 파일명 접두 '치과책방'은 UI에서는 '하이진랩'으로 표시
                             String bookName = widget.sourceFileName.isNotEmpty
                                 ? widget.sourceFileName.replaceAll(
                                     RegExp(r'\.pdf$', caseSensitive: false), '')
@@ -1162,8 +1242,12 @@ class _QuizCardState extends State<_QuizCard> {
 
                             if (bookName.isNotEmpty) {
                               bookName = bookName.replaceAll('_', ' ');
-                              if (!bookName.startsWith('치과책방')) {
-                                bookName = '치과책방 $bookName';
+                              const legacyStorePrefix = '치과책방';
+                              if (bookName.startsWith(legacyStorePrefix)) {
+                                bookName =
+                                    '하이진랩${bookName.substring(legacyStorePrefix.length)}';
+                              } else if (!bookName.startsWith('하이진랩')) {
+                                bookName = '하이진랩 $bookName';
                               }
                             }
 

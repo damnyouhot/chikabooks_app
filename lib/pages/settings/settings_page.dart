@@ -436,9 +436,9 @@ class _SettingsPageState extends State<SettingsPage> {
 
               _sendEmail(
                 to: 'doughong@naver.com',
-                subject: '[치카북스 문의] ',
+                subject: '[하이진랩 문의] ',
                 body: '''
-안녕하세요. 치카북스 문의드립니다.
+안녕하세요. 하이진랩 문의드립니다.
 
 - UID: $uid
 - 이메일: $email
@@ -471,7 +471,7 @@ class _SettingsPageState extends State<SettingsPage> {
             onTap: () {
               showLicensePage(
                 context: context,
-                applicationName: _pkg?.appName ?? '치카북스',
+                applicationName: _pkg?.appName ?? '하이진랩',
                 applicationVersion:
                     _pkg == null
                         ? null

@@ -4,6 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 ///
 /// 날짜와 무관한 "원본 문제 은행".
 /// Cloud Function이 매일 자정 quiz_schedule에 순서대로 배포.
+///
+/// [questionType]: `national_exam`(국시) | `clinical`(임상·책 발췌). 미설정은 임상으로 취급.
 class QuizPoolItem {
   final String id;          // Firestore autoId
   final int order;          // 배포 순서 (1부터 시작, 연속 정수)
@@ -13,9 +15,13 @@ class QuizPoolItem {
   final String explanation;
   final String category;    // e.g. '임플란트', '보철', '예방치과'
   final String difficulty;  // 'basic' | 'intermediate' | 'advanced'
+  /// `national_exam` | `clinical` — 스케줄 스냅샷에도 복사됨 (앱 배지용)
+  final String questionType;
   final String sourceBook;  // 출처 책 이름
   final String sourceFileName; // PDF 원본 파일명
   final String sourcePage;  // 출처 페이지
+  /// 국시 등 책 외 출처 한 줄 (예: 2024 국가고시 치과위생사)
+  final String sourceName;
   final bool isActive;      // false면 스케줄에서 제외
   final int lastCycleServed; // 마지막으로 배포된 사이클 번호 (0 = 아직 미배포)
   final DateTime createdAt;
@@ -30,17 +36,28 @@ class QuizPoolItem {
     required this.explanation,
     required this.category,
     required this.difficulty,
+    this.questionType = 'clinical',
     required this.sourceBook,
     required this.sourceFileName,
     required this.sourcePage,
+    this.sourceName = '',
     required this.isActive,
     required this.lastCycleServed,
     required this.createdAt,
     required this.updatedAt,
   });
 
+  static const String kNationalExam = 'national_exam';
+  static const String kClinical = 'clinical';
+
+  /// 앱·관리자 UI용 유형 표기
+  static String badgeLabelForType(String questionType) =>
+      questionType == kNationalExam ? '국시' : '임상';
+
   factory QuizPoolItem.fromFirestore(DocumentSnapshot doc) {
     final d = doc.data() as Map<String, dynamic>;
+    final rawType = d['questionType'] as String?;
+    final qType = rawType == kNationalExam ? kNationalExam : kClinical;
     return QuizPoolItem(
       id:              doc.id,
       order:           (d['order'] as num?)?.toInt() ?? 0,
@@ -50,9 +67,11 @@ class QuizPoolItem {
       explanation:     d['explanation'] as String? ?? '',
       category:        d['category'] as String? ?? '일반',
       difficulty:      d['difficulty'] as String? ?? 'basic',
+      questionType:    qType,
       sourceBook:      d['sourceBook'] as String? ?? '',
       sourceFileName:  d['sourceFileName'] as String? ?? '',
       sourcePage:      d['sourcePage'] as String? ?? '',
+      sourceName:      d['sourceName'] as String? ?? '',
       isActive:        d['isActive'] as bool? ?? true,
       lastCycleServed: (d['lastCycleServed'] as num?)?.toInt() ?? 0,
       createdAt:       (d['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
@@ -68,9 +87,11 @@ class QuizPoolItem {
     'explanation':     explanation,
     'category':        category,
     'difficulty':      difficulty,
+    'questionType':    questionType,
     'sourceBook':      sourceBook,
     'sourceFileName':  sourceFileName,
     'sourcePage':      sourcePage,
+    'sourceName':      sourceName,
     'isActive':        isActive,
     'lastCycleServed': lastCycleServed,
     'createdAt':       Timestamp.fromDate(createdAt),
@@ -91,9 +112,11 @@ class QuizPoolItem {
       explanation:     explanation,
       category:        category,
       difficulty:      difficulty,
+      questionType:    questionType,
       sourceBook:      sourceBook,
       sourceFileName:  sourceFileName,
       sourcePage:      sourcePage,
+      sourceName:      sourceName,
       isActive:        isActive ?? this.isActive,
       lastCycleServed: lastCycleServed ?? this.lastCycleServed,
       createdAt:       createdAt,

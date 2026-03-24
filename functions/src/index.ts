@@ -1761,15 +1761,16 @@ export const syncImwebPurchases = functions
 // 퀴즈 풀 자동 스케줄러
 //
 // 배포 규칙:
-//   1. 완전 랜덤 선정 (order 무관)
-//   2. 하루 2문제는 반드시 서로 다른 책(sourceBook)에서 1개씩
-//   3. 현재 사이클에서 이미 출제된 문제는 제외 (usedQuizIds)
-//   4. 각 책의 미출제 문제가 소진되면 → 사이클 증가, usedQuizIds 초기화
+//   1. 기본: national_exam 1문제 + clinical 1문제 (quiz_pool.questionType)
+//   2. 임상 쪽은 가능하면 국시와 다른 sourceBook 우선
+//   3. 국시 후보가 없으면 임상 2문제 (가능하면 서로 다른 책)
+//   4. 현재 사이클 usedQuizIds 에 이미 나간 문항 제외
+//   5. 2문제를 못 채우면 사이클 증가 후 재시도 (기존과 동일)
 //
 // Firestore 컬렉션:
 //   quiz_pool/{autoId}          — 원본 문제 은행
-//   quiz_schedule/{dateKey}     — 날짜별 배포 스케줄
-//   quiz_meta/state             — 진행 상태
+//   quiz_schedule/{dateKey}     — 날짜별 배포 스냅샷 (items에 questionType 포함)
+//   quiz_meta/state             — 진행 상태 + 타입별 활성/배포 수
 // ══════════════════════════════════════════════════════════════
 
 /** Fisher-Yates 셔플 */
@@ -1792,13 +1793,75 @@ function toDateKey(date: Date): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+/** 미설정 시 임상으로 간주 (기존 풀 호환) */
+function quizQuestionType(data: FirebaseFirestore.DocumentData): "national_exam" | "clinical" {
+  return data.questionType === "national_exam" ? "national_exam" : "clinical";
+}
+
+/** 대시보드용: 활성 풀 기준 타입별 개수 + 이번 사이클 배포 수 */
+function computeQuizMetaAnalytics(
+  poolSnap: FirebaseFirestore.QuerySnapshot,
+  usedQuizIds: string[],
+): {
+  totalActiveCount: number;
+  totalNationalActiveCount: number;
+  totalClinicalActiveCount: number;
+  usedNationalCount: number;
+  usedClinicalCount: number;
+} {
+  const used = new Set(usedQuizIds);
+  let totalNational = 0;
+  let totalClinical = 0;
+  let usedNational = 0;
+  let usedClinical = 0;
+  for (const doc of poolSnap.docs) {
+    const t = quizQuestionType(doc.data());
+    if (t === "national_exam") {
+      totalNational++;
+      if (used.has(doc.id)) usedNational++;
+    } else {
+      totalClinical++;
+      if (used.has(doc.id)) usedClinical++;
+    }
+  }
+  return {
+    totalActiveCount: poolSnap.size,
+    totalNationalActiveCount: totalNational,
+    totalClinicalActiveCount: totalClinical,
+    usedNationalCount: usedNational,
+    usedClinicalCount: usedClinical,
+  };
+}
+
+/** 스케줄 문서 items[] 원소 — 앱은 questionType 필드로 배지 표시 */
+function buildScheduleItem(
+  d: FirebaseFirestore.QueryDocumentSnapshot,
+  nextCycleCount: number,
+): Record<string, unknown> {
+  const data = d.data();
+  return {
+    id: d.id,
+    order: data.order ?? 0,
+    question: data.question ?? "",
+    options: data.options ?? [],
+    correctIndex: data.correctIndex ?? 0,
+    explanation: data.explanation ?? "",
+    category: data.category ?? "",
+    difficulty: data.difficulty ?? "basic",
+    sourceBook: data.sourceBook ?? "",
+    sourceFileName: data.sourceFileName ?? "",
+    sourcePage: data.sourcePage ?? "",
+    sourceName: data.sourceName ?? "",
+    isActive: true,
+    lastCycleServed: nextCycleCount,
+    questionType: quizQuestionType(data),
+  };
+}
+
 /**
- * 핵심 선정 로직:
- * quiz_pool에서 오늘의 2문제를 선정한다.
- *   - 각기 다른 책(sourceBook)에서 1문제씩
- *   - 현재 사이클 내에서 이미 출제된 문제(usedQuizIds) 제외
- *   - 미출제 문제 중 완전 랜덤 선택
- *   - 어느 책이든 미출제 문제가 없으면 사이클 증가 후 풀 전체 재사용
+ * 오늘의 2문제 선정
+ *   - 우선 national_exam 1 + clinical 1
+ *   - 국시 미사용 후보가 없으면 clinical 2 (서로 다른 책 우선)
  */
 async function pickTodayQuizzes(meta: FirebaseFirestore.DocumentData): Promise<{
   selectedDocs: FirebaseFirestore.QueryDocumentSnapshot[];
@@ -1806,11 +1869,9 @@ async function pickTodayQuizzes(meta: FirebaseFirestore.DocumentData): Promise<{
   nextUsedQuizIds: string[];
   wasReset: boolean;
 }> {
-  const usedQuizIds: string[]   = meta.usedQuizIds   ?? [];
-  const cycleCount:  number     = meta.cycleCount     ?? 1;
-  const bookRotation: string[]  = meta.bookRotation   ?? [];
+  const usedQuizIds: string[] = meta.usedQuizIds ?? [];
+  const cycleCount = meta.cycleCount ?? 1;
 
-  // ── 1. 전체 풀 조회 ──
   const poolSnap = await db
     .collection("quiz_pool")
     .where("isActive", "==", true)
@@ -1818,73 +1879,87 @@ async function pickTodayQuizzes(meta: FirebaseFirestore.DocumentData): Promise<{
 
   const allDocs = poolSnap.docs;
 
-  // ── 2. 사용 가능한 책 목록 추출 ──
-  const bookSet = new Set(allDocs.map((d) => d.data().sourceBook as string));
-  const books   = bookRotation.filter((b) => bookSet.has(b));
-  // bookRotation에 없는 책도 포함
-  bookSet.forEach((b) => { if (!books.includes(b)) books.push(b); });
-
-  // ── 3. 각 책에서 미출제 문제 그룹화 ──
-  const unusedByBook: Record<string, FirebaseFirestore.QueryDocumentSnapshot[]> = {};
-  for (const book of books) {
-    unusedByBook[book] = shuffleArray(
+  const trySelect = (used: string[]): {
+    selected: FirebaseFirestore.QueryDocumentSnapshot[];
+    ok: boolean;
+  } => {
+    const national = shuffleArray(
       allDocs.filter(
-        (d) => d.data().sourceBook === book && !usedQuizIds.includes(d.id)
-      )
+        (d) =>
+          quizQuestionType(d.data()) === "national_exam" &&
+          !used.includes(d.id),
+      ),
     );
-  }
+    const clinical = shuffleArray(
+      allDocs.filter(
+        (d) =>
+          quizQuestionType(d.data()) === "clinical" &&
+          !used.includes(d.id),
+      ),
+    );
 
-  // ── 4. 서로 다른 책에서 1문제씩 선정 ──
-  //    books 중 미출제 문제가 있는 책 2개를 우선 선택 (셔플로 매일 다른 조합)
-  const shuffledBooks = shuffleArray(books);
-  const selected: FirebaseFirestore.QueryDocumentSnapshot[] = [];
-  const usedBooksToday: string[] = [];
-
-  for (const book of shuffledBooks) {
-    if (selected.length >= 2) break;
-    const candidates = unusedByBook[book];
-    if (candidates && candidates.length > 0) {
-      selected.push(candidates[0]);
-      usedBooksToday.push(book);
+    if (national.length >= 1 && clinical.length >= 1) {
+      const n = national[0];
+      const nBook = (n.data().sourceBook as string) || "";
+      const clinDiff = clinical.filter(
+        (d) => ((d.data().sourceBook as string) || "") !== nBook,
+      );
+      const pool = clinDiff.length ? clinDiff : clinical;
+      const c = pool[0];
+      return {selected: [n, c], ok: true};
     }
-  }
 
-  // ── 5. 사이클 소진 처리 ──
-  //    2문제를 채우지 못하면(어느 책이든 미출제 문제 없음) → 사이클 초기화
-  let wasReset     = false;
-  let nextCycle    = cycleCount;
-  let nextUsedIds  = [...usedQuizIds];
+    if (national.length === 0 && clinical.length >= 2) {
+      const byBook: Record<string, FirebaseFirestore.QueryDocumentSnapshot[]> = {};
+      for (const d of clinical) {
+        const b = (d.data().sourceBook as string) || "_";
+        if (!byBook[b]) byBook[b] = [];
+        byBook[b].push(d);
+      }
+      const bookKeys = shuffleArray(Object.keys(byBook));
+      if (bookKeys.length >= 2) {
+        return {
+          selected: [byBook[bookKeys[0]][0], byBook[bookKeys[1]][0]],
+          ok: true,
+        };
+      }
+      return {selected: [clinical[0], clinical[1]], ok: true};
+    }
 
-  if (selected.length < 2) {
-    functions.logger.info("🔄 풀 소진 → 사이클 증가 및 usedQuizIds 초기화", {
+    return {selected: [], ok: false};
+  };
+
+  let wasReset = false;
+  let nextCycle = cycleCount;
+  let nextUsed = [...usedQuizIds];
+
+  let {selected, ok} = trySelect(nextUsed);
+
+  if (!ok || selected.length < 2) {
+    functions.logger.info("🔄 퀴즈 1+1(또는 임상2) 불가 → 사이클 증가 및 usedQuizIds 초기화", {
       cycleCount: cycleCount + 1,
     });
-    wasReset   = true;
-    nextCycle  = cycleCount + 1;
-    nextUsedIds = [];
-
-    // 초기화 후 재선정
-    const freshSelected: FirebaseFirestore.QueryDocumentSnapshot[] = [];
-    const freshShuffled = shuffleArray(books);
-    for (const book of freshShuffled) {
-      if (freshSelected.length >= 2) break;
-      const freshCandidates = shuffleArray(
-        allDocs.filter((d) => d.data().sourceBook === book)
-      );
-      if (freshCandidates.length > 0) {
-        freshSelected.push(freshCandidates[0]);
-      }
-    }
-    selected.splice(0, selected.length, ...freshSelected);
+    wasReset = true;
+    nextCycle = cycleCount + 1;
+    nextUsed = [];
+    ({selected, ok} = trySelect(nextUsed));
   }
 
-  // 선정된 문제를 usedQuizIds에 추가
-  nextUsedIds = [...new Set([...nextUsedIds, ...selected.map((d) => d.id)])];
+  if (!ok || selected.length < 2) {
+    return {
+      selectedDocs: selected,
+      nextCycleCount: nextCycle,
+      nextUsedQuizIds: nextUsed,
+      wasReset,
+    };
+  }
+
+  nextUsed = [...new Set([...nextUsed, ...selected.map((d) => d.id)])];
 
   return {
-    selectedDocs:    selected,
-    nextCycleCount:  nextCycle,
-    nextUsedQuizIds: nextUsedIds,
+    selectedDocs: selected,
+    nextCycleCount: nextCycle,
+    nextUsedQuizIds: nextUsed,
     wasReset,
   };
 }
@@ -1900,16 +1975,38 @@ export const scheduleQuizzes = functions
     const scheduleRef = db.collection("quiz_schedule").doc(dateKey);
     const metaRef     = db.doc("quiz_meta/state");
 
-    // ── 이미 생성됐으면 선정은 스킵하되, 활성 풀 크기·스케줄일은 갱신(대시보드 동기화) ──
-    if ((await scheduleRef.get()).exists) {
+    // ── 이미 생성됐으면 선정은 스킵하되, meta는 스케줄과 맞춤(usedQuizIds 누락 방지) ──
+    const scheduleSnapEarly = await scheduleRef.get();
+    if (scheduleSnapEarly.exists) {
+      const schedData = scheduleSnapEarly.data()!;
+      const todayQuizIds: string[] = Array.isArray(schedData.quizIds)
+        ? (schedData.quizIds as string[])
+        : [];
+      const scheduleCycle = typeof schedData.cycleCount === "number"
+        ? schedData.cycleCount
+        : 1;
+
+      const metaDocEarly = await metaRef.get();
+      const metaEarly = metaDocEarly.exists ? metaDocEarly.data()! : {};
+      const prevUsed: string[] = Array.isArray(metaEarly.usedQuizIds)
+        ? (metaEarly.usedQuizIds as string[])
+        : [];
+      const mergedUsed = [...new Set([...prevUsed, ...todayQuizIds])];
+
       const poolSnapEarly = await db.collection("quiz_pool").where("isActive", "==", true).get();
+      const analyticsEarly = computeQuizMetaAnalytics(poolSnapEarly, mergedUsed);
       await metaRef.set({
-        totalActiveCount: poolSnapEarly.size,
+        ...analyticsEarly,
         lastScheduledDate: dateKey,
+        usedQuizIds: mergedUsed,
+        cycleCount: scheduleCycle,
       }, { merge: true });
-      functions.logger.info("⏭️ 이미 스케줄 생성됨 — quiz_meta totalActiveCount 동기화", {
+      functions.logger.info("⏭️ 이미 스케줄 생성됨 — quiz_meta 동기화(usedQuizIds 병합)", {
         dateKey,
         totalActive: poolSnapEarly.size,
+        todayIds: todayQuizIds.length,
+        mergedCount: mergedUsed.length,
+        scheduleCycle,
       });
       return null;
     }
@@ -1929,30 +2026,16 @@ export const scheduleQuizzes = functions
     }
 
     const quizIds = selectedDocs.map((d) => d.id);
-    const items   = selectedDocs.map((d) => ({
-      id:             d.id,
-      order:          d.data().order          ?? 0,
-      question:       d.data().question       ?? "",
-      options:        d.data().options        ?? [],
-      correctIndex:   d.data().correctIndex   ?? 0,
-      explanation:    d.data().explanation    ?? "",
-      category:       d.data().category       ?? "",
-      difficulty:     d.data().difficulty     ?? "basic",
-      sourceBook:     d.data().sourceBook     ?? "",
-      sourceFileName: d.data().sourceFileName ?? "",
-      sourcePage:     d.data().sourcePage     ?? "",
-      isActive:       true,
-      lastCycleServed: nextCycleCount,
-    }));
+    const items = selectedDocs.map((d) => buildScheduleItem(d, nextCycleCount));
 
     // ── quiz_schedule/{dateKey} 저장 ──
     await scheduleRef.set({
       quizIds,
       items,
-      cycleCount:  nextCycleCount,
-      startOrder:  items[0].order,
-      endOrder:    items[items.length - 1].order,
-      createdAt:   admin.firestore.FieldValue.serverTimestamp(),
+      cycleCount: nextCycleCount,
+      startOrder: selectedDocs[0].data().order ?? 0,
+      endOrder: selectedDocs[selectedDocs.length - 1].data().order ?? 0,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
     // ── quiz_pool lastCycleServed 업데이트 ──
@@ -1966,25 +2049,26 @@ export const scheduleQuizzes = functions
     await batch.commit();
 
     // ── quiz_meta/state 업데이트 ──
-    const poolSnap     = await db.collection("quiz_pool").where("isActive", "==", true).get();
-    const totalActive  = poolSnap.size;
+    const poolSnap = await db.collection("quiz_pool").where("isActive", "==", true).get();
+    const analytics = computeQuizMetaAnalytics(poolSnap, nextUsedQuizIds);
 
     await metaRef.set({
-      cycleCount:         nextCycleCount,
-      totalActiveCount:   totalActive,
-      lastScheduledDate:  dateKey,
+      cycleCount: nextCycleCount,
+      lastScheduledDate: dateKey,
       dailyCount,
-      usedQuizIds:        nextUsedQuizIds,
+      usedQuizIds: nextUsedQuizIds,
+      ...analytics,
     }, { merge: true });
 
     functions.logger.info("✅ scheduleQuizzes 완료", {
       dateKey,
       quizIds,
       books: selectedDocs.map((d) => d.data().sourceBook),
+      questionTypes: selectedDocs.map((d) => quizQuestionType(d.data())),
       wasReset,
       cycleCount: nextCycleCount,
-      usedCount:  nextUsedQuizIds.length,
-      totalActive,
+      usedCount: nextUsedQuizIds.length,
+      ...analytics,
     });
 
     return null;
@@ -2034,29 +2118,15 @@ export const manualScheduleQuiz = functions
     }
 
     const quizIds = selectedDocs.map((d) => d.id);
-    const items   = selectedDocs.map((d) => ({
-      id:             d.id,
-      order:          d.data().order          ?? 0,
-      question:       d.data().question       ?? "",
-      options:        d.data().options        ?? [],
-      correctIndex:   d.data().correctIndex   ?? 0,
-      explanation:    d.data().explanation    ?? "",
-      category:       d.data().category       ?? "",
-      difficulty:     d.data().difficulty     ?? "basic",
-      sourceBook:     d.data().sourceBook     ?? "",
-      sourceFileName: d.data().sourceFileName ?? "",
-      sourcePage:     d.data().sourcePage     ?? "",
-      isActive:       true,
-      lastCycleServed: nextCycleCount,
-    }));
+    const items = selectedDocs.map((d) => buildScheduleItem(d, nextCycleCount));
 
     await scheduleRef.set({
       quizIds,
       items,
-      cycleCount:  nextCycleCount,
-      startOrder:  items[0].order,
-      endOrder:    items[items.length - 1].order,
-      createdAt:   admin.firestore.FieldValue.serverTimestamp(),
+      cycleCount: nextCycleCount,
+      startOrder: selectedDocs[0].data().order ?? 0,
+      endOrder: selectedDocs[selectedDocs.length - 1].data().order ?? 0,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
     const batch = db.batch();
@@ -2068,23 +2138,84 @@ export const manualScheduleQuiz = functions
     }
     await batch.commit();
 
-    const poolSnap    = await db.collection("quiz_pool").where("isActive", "==", true).get();
-    const totalActive = poolSnap.size;
+    const poolSnap = await db.collection("quiz_pool").where("isActive", "==", true).get();
+    const analytics = computeQuizMetaAnalytics(poolSnap, nextUsedQuizIds);
 
     await metaRef.set({
-      cycleCount:        nextCycleCount,
-      totalActiveCount:  totalActive,
+      cycleCount: nextCycleCount,
       lastScheduledDate: dateKey,
       dailyCount,
-      usedQuizIds:       nextUsedQuizIds,
+      usedQuizIds: nextUsedQuizIds,
+      ...analytics,
     }, { merge: true });
 
     return {
       success: true,
       dateKey,
       quizIds,
-      books:   selectedDocs.map((d) => d.data().sourceBook),
+      books: selectedDocs.map((d) => d.data().sourceBook),
+      questionTypes: selectedDocs.map((d) => quizQuestionType(d.data())),
       wasReset,
       message: `${dateKey} 스케줄 생성 완료 (${quizIds.length}문제, ${wasReset ? "사이클 초기화" : "정상"})`,
+    };
+  });
+
+/**
+ * quiz_meta/state 의 usedQuizIds·lastScheduledDate 를
+ * 현재 사이클의 quiz_schedule 문서들과 다시 맞춤 (대시보드 불일치 보정).
+ */
+export const rebuildQuizMetaFromSchedules = functions
+  .region("us-central1")
+  .https.onCall(async (data, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "로그인 필요");
+    }
+    const callerDoc = await db.collection("users").doc(context.auth.uid).get();
+    if (callerDoc.data()?.isAdmin !== true) {
+      throw new functions.https.HttpsError("permission-denied", "어드민 권한 필요");
+    }
+
+    const metaRef = db.doc("quiz_meta/state");
+    const metaDoc = await metaRef.get();
+    const meta = metaDoc.exists ? metaDoc.data()! : {};
+    const cycleCount: number = (meta.cycleCount as number) ?? 1;
+
+    const schedSnap = await db.collection("quiz_schedule").get();
+    const idSet = new Set<string>();
+    let maxDateKey = "";
+
+    for (const doc of schedSnap.docs) {
+      const d = doc.data();
+      const c = (d.cycleCount as number) ?? 1;
+      if (c !== cycleCount) continue;
+
+      const ids = (d.quizIds as string[]) || [];
+      ids.forEach((id) => {
+        if (typeof id === "string" && id.length) idSet.add(id);
+      });
+
+      const key = doc.id;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(key) && key > maxDateKey) {
+        maxDateKey = key;
+      }
+    }
+
+    const usedQuizIds = Array.from(idSet);
+    const poolSnap = await db.collection("quiz_pool").where("isActive", "==", true).get();
+    const analytics = computeQuizMetaAnalytics(poolSnap, usedQuizIds);
+
+    await metaRef.set({
+      usedQuizIds,
+      lastScheduledDate: maxDateKey || (meta.lastScheduledDate as string) || "",
+      ...analytics,
+    }, { merge: true });
+
+    return {
+      success: true,
+      cycleCount,
+      usedCount: usedQuizIds.length,
+      lastScheduledDate: maxDateKey || (meta.lastScheduledDate as string) || "",
+      ...analytics,
+      message: `사이클 ${cycleCount}: 스케줄에서 고유 문항 ${usedQuizIds.length}개로 동기화`,
     };
   });

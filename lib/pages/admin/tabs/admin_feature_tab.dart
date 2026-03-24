@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/analytics/event_catalog.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../models/admin_dashboard_models.dart';
 import '../../../services/admin_dashboard_service.dart';
@@ -44,7 +45,8 @@ class _AdminFeatureTabState extends State<AdminFeatureTab>
     });
     try {
       final results = await Future.wait([
-        AdminDashboardService.getTopFeatures(limit: 12, since: widget.since),
+        // 탭별 섹션에 나눠 담기 위해 타입 수를 넉넉히 (전역 TOP N)
+        AdminDashboardService.getTopFeatures(limit: 36, since: widget.since),
         AdminDashboardService.getRecentErrors(limit: 10, since: widget.since),
         AdminDashboardService.getTopErrorPages(limit: 5, since: widget.since),
       ]);
@@ -76,12 +78,23 @@ class _AdminFeatureTabState extends State<AdminFeatureTab>
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // ── 기능 반응 TOP ──────────────────────────────────────
+          // ── 기능 반응 TOP (탭별) ───────────────────────────────
           const AdminSectionTitle('기능 반응 TOP'),
+          const Padding(
+            padding: EdgeInsets.only(top: 4, bottom: 8),
+            child: Text(
+              '탭(앱 하단 메뉴 그룹)별로 묶어 표시합니다.\n'
+              '같이: 공감·공감 변경은 「공감투표 참여」로 합산, 보기 추가는 「투표 보기 추가」로 표시합니다.',
+              style: TextStyle(
+                fontSize: 11,
+                color: AppColors.textDisabled,
+              ),
+            ),
+          ),
           if (_features.isEmpty)
             const AdminEmptyState(message: '아직 기록된 기능 반응이 없어요')
           else
-            _FeatureList(items: _features),
+            _FeatureListByTab(items: _features),
 
           const SizedBox(height: 24),
 
@@ -115,10 +128,112 @@ class _AdminFeatureTabState extends State<AdminFeatureTab>
   }
 }
 
-// ─── 기능 반응 리스트 ─────────────────────────────────────────
-class _FeatureList extends StatelessWidget {
+// ─── 탭 순서 (EventTab과 동일) ─────────────────────────────────
+int _featureTabSortOrder(String tab) {
+  const order = <String>[
+    EventTab.na,
+    EventTab.bond,
+    EventTab.growth,
+    EventTab.career,
+    EventTab.job,
+    EventTab.auth,
+    EventTab.publisher,
+    EventTab.other,
+  ];
+  final i = order.indexOf(tab);
+  return i >= 0 ? i : 999;
+}
+
+// ─── 기능 반응: 탭별 섹션 ─────────────────────────────────────
+class _FeatureListByTab extends StatelessWidget {
   final List<FeatureReactionItem> items;
-  const _FeatureList({required this.items});
+  const _FeatureListByTab({required this.items});
+
+  @override
+  Widget build(BuildContext context) {
+    final grouped = <String, List<FeatureReactionItem>>{};
+    for (final item in items) {
+      grouped.putIfAbsent(item.tab, () => []).add(item);
+    }
+    for (final list in grouped.values) {
+      list.sort((a, b) => b.clickCount.compareTo(a.clickCount));
+    }
+    final tabKeys = grouped.keys.toList()
+      ..sort((a, b) {
+        final cmp = _featureTabSortOrder(a).compareTo(_featureTabSortOrder(b));
+        return cmp != 0 ? cmp : a.compareTo(b);
+      });
+
+    final globalMax =
+        items.isEmpty ? 1 : items.map((e) => e.clickCount).reduce((a, b) => a > b ? a : b);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var t = 0; t < tabKeys.length; t++) ...[
+          if (t > 0) const SizedBox(height: 16),
+          _TabSubheading(
+            title: tabKeys[t],
+            count: grouped[tabKeys[t]]!.length,
+          ),
+          const SizedBox(height: 8),
+          _FeatureRows(
+            items: grouped[tabKeys[t]]!,
+            globalMaxCount: globalMax,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _TabSubheading extends StatelessWidget {
+  final String title;
+  final int count;
+
+  const _TabSubheading({required this.title, required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: AppColors.accent.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: AppColors.accent,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          '$count개 이벤트',
+          style: const TextStyle(
+            fontSize: 11,
+            color: AppColors.textDisabled,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── 기능 반응 행 (한 탭 안) ────────────────────────────────────
+class _FeatureRows extends StatelessWidget {
+  final List<FeatureReactionItem> items;
+  final int globalMaxCount;
+
+  const _FeatureRows({
+    required this.items,
+    required this.globalMaxCount,
+  });
 
   static const _icons = <String, IconData>{
     // 나
@@ -134,6 +249,8 @@ class _FeatureList extends StatelessWidget {
     'poll_empathize': Icons.how_to_vote_outlined,
     'poll_change_empathy': Icons.swap_horiz_outlined,
     'poll_add_option': Icons.playlist_add_outlined,
+    FeatureReactionAggregates.bondPollVote: Icons.how_to_vote_outlined,
+    FeatureReactionAggregates.bondPollAdd: Icons.playlist_add_outlined,
     // 성장
     'view_growth': Icons.bar_chart_outlined,
     'quiz_completed': Icons.quiz_outlined,
@@ -157,12 +274,12 @@ class _FeatureList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final maxCount = items.isNotEmpty ? items.first.clickCount : 1;
+    final maxCount = globalMaxCount > 0 ? globalMaxCount : 1;
 
     return Column(
       children: List.generate(items.length, (i) {
         final item = items[i];
-        final ratio = maxCount > 0 ? item.clickCount / maxCount : 0.0;
+        final ratio = item.clickCount / maxCount;
         final icon = _icons[item.eventType] ?? Icons.touch_app_outlined;
 
         return Container(
@@ -177,7 +294,6 @@ class _FeatureList extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  // 순위
                   SizedBox(
                     width: 20,
                     child: Text(
@@ -192,26 +308,13 @@ class _FeatureList extends StatelessWidget {
                   Icon(icon, size: 16, color: AppColors.accent),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          item.label,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          item.tab,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: AppColors.textDisabled,
-                          ),
-                        ),
-                      ],
+                    child: Text(
+                      item.label,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
                   ),
                   Text(
@@ -232,7 +335,7 @@ class _FeatureList extends StatelessWidget {
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(4),
                       child: LinearProgressIndicator(
-                        value: ratio,
+                        value: ratio.clamp(0.0, 1.0),
                         minHeight: 6,
                         backgroundColor: AppColors.disabledBg,
                         valueColor: const AlwaysStoppedAnimation(AppColors.accent),

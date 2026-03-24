@@ -10,6 +10,11 @@ import '../services/funnel_onboarding_service.dart';
 
 /// 돌보기(나 탭) 액션 처리 서비스
 ///
+/// **낙관적 UI ([fromLocal]):** [tryFeed]/[tryTouch]/[startSleep]/[wakeUp]에 `fromLocal`을 넘기면
+/// `loadState()` 없이 해당 스냅샷만으로 계산하고 **저장은 호출자**가
+/// [CaringStateService.saveStateSequential]로 처리한다.
+/// 나 탭은 `dailySettle`·초기 로드 완료 전에는 액션을 열지 않는다.
+///
 /// ── 핵심 정책 ────────────────────────────────
 /// 밥주기:
 ///   1회차(정상): hunger+25, mood+8, bond+2
@@ -77,14 +82,18 @@ class CaringActionService {
   static const int _feedCooldownMin = 60;
 
   /// 연속 판정 → 쿨타임 → 과식 우선 → 상태 연동
-  static Future<FeedResult> tryFeed() async {
+  ///
+  /// [fromLocal]이 null이면 서버에서 [CaringStateService.loadState] 후 저장까지 수행.
+  /// null이 아니면 해당 상태만 사용·저장은 하지 않음(호출자가 순차 저장).
+  static Future<FeedResult> tryFeed({CaringState? fromLocal}) async {
     try {
       final uid = await _ensureUidReady();
       if (uid == null) {
         return FeedResult(success: false, rejectMent: '로그인이 필요합니다.');
       }
 
-      final state = await CaringStateService.loadState();
+      final state =
+          fromLocal ?? await CaringStateService.loadState();
 
       if (state.isSleeping) {
         return FeedResult(
@@ -141,7 +150,14 @@ class CaringActionService {
         lastActiveAt: now,
       );
 
-      unawaited(CaringStateService.saveState(updated));
+      if (fromLocal == null) {
+        await CaringStateService.saveState(updated);
+        AdminActivityService.log(
+          ActivityEventType.caringFeedSuccess,
+          page: 'home',
+        );
+        unawaited(FunnelOnboardingService.tryLogFirstFeed());
+      }
 
       String ment;
       if (isOverfed) {
@@ -151,12 +167,6 @@ class CaringActionService {
       } else {
         ment = _pickRandom(CaringMents.feedSuccessSimple);
       }
-
-      AdminActivityService.log(
-        ActivityEventType.caringFeedSuccess,
-        page: 'home',
-      );
-      unawaited(FunnelOnboardingService.tryLogFirstFeed());
 
       return FeedResult(
         success: true,
@@ -175,14 +185,17 @@ class CaringActionService {
 
   /// 1~3: mood+5, bond+1 | 4~6: mood+1, bond+0 | 7+: mood-1
   /// energy<30 → mood 보상 절반 | mood<30 → bond 절반
-  static Future<TouchResult> tryTouch() async {
+  ///
+  /// [fromLocal]: [tryFeed]와 동일. null이면 로드 후 저장, 아니면 저장 생략.
+  static Future<TouchResult> tryTouch({CaringState? fromLocal}) async {
     try {
       final uid = await _ensureUidReady();
       if (uid == null) {
         return TouchResult(ment: '로그인이 필요합니다.', state: null);
       }
 
-      final state = await CaringStateService.loadState();
+      final state =
+          fromLocal ?? await CaringStateService.loadState();
 
       if (state.isSleeping) {
         return TouchResult(
@@ -222,7 +235,9 @@ class CaringActionService {
         lastActiveAt: now,
       );
 
-      unawaited(CaringStateService.saveState(updated));
+      if (fromLocal == null) {
+        await CaringStateService.saveState(updated);
+      }
 
       final ment = _pickTouchMent(state, count);
 
@@ -249,20 +264,36 @@ class CaringActionService {
   // ═══════════════════════ 재우기 / 깨우기 ═══════════════════════
 
   /// 재우기 시작
-  static Future<CaringState> startSleep() async {
+  ///
+  /// [fromLocal]이 있으면 `loadState`·내부 저장 생략, 잠든 상태만 계산해 반환(저장은 호출자).
+  /// 없으면 기존처럼 서버 로드 후 [CaringStateService.sleep]까지 수행.
+  static Future<CaringState> startSleep({CaringState? fromLocal}) async {
+    if (fromLocal != null) {
+      if (fromLocal.isSleeping) return fromLocal;
+      final now = DateTime.now();
+      return fromLocal.copyWith(
+        isSleeping: true,
+        sleepStartedAt: now,
+        lastActiveAt: now,
+      );
+    }
     final state = await CaringStateService.loadState();
     if (state.isSleeping) return state;
     await CaringStateService.sleep(state);
+    final now = DateTime.now();
     return state.copyWith(
       isSleeping: true,
-      sleepStartedAt: DateTime.now(),
-      lastActiveAt: DateTime.now(),
+      sleepStartedAt: now,
+      lastActiveAt: now,
     );
   }
 
   /// 깨우기 — 30분 이하 패널티 / 초과 회복 + 상황별 멘트
-  static Future<WakeResult> wakeUp() async {
-    final state = await CaringStateService.loadState();
+  ///
+  /// [fromLocal]: [startSleep]과 동일. 있으면 서버 읽기 없이 판단·벌점 일관성 확보.
+  static Future<WakeResult> wakeUp({CaringState? fromLocal}) async {
+    final state =
+        fromLocal ?? await CaringStateService.loadState();
     if (!state.isSleeping) {
       return WakeResult(state: state, ment: '이미 깨어 있어요.');
     }
@@ -271,7 +302,10 @@ class CaringActionService {
         DateTime.now().difference(state.sleepStartedAt!).inMinutes <=
             CaringStateService.shortSleepThresholdMin;
 
-    final woken = await CaringStateService.wake(state);
+    final woken = await CaringStateService.wake(
+      state,
+      persist: fromLocal == null,
+    );
     final ment = isShort
         ? _pickRandom(CaringMents.sleepShort)
         : _pickRandom(CaringMents.sleepWake);
@@ -297,7 +331,7 @@ class CaringActionService {
         bond: state.bond + 1,
         lastActiveAt: now,
       );
-      unawaited(CaringStateService.saveState(updated));
+      await CaringStateService.saveState(updated);
 
       final ment = _pickRandom(CaringMents.diary);
       return DiaryResult(ment: ment, state: updated);

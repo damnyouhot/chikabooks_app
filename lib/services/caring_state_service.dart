@@ -9,6 +9,9 @@ import '../config/reward_constants.dart';
 ///
 /// hunger / mood / energy / bond 4개 상태 + 시간 경과 시스템.
 /// users/{uid} 문서의 caringState 필드를 사용.
+///
+/// **저장:** [saveState] / [saveStateSequential]는 동일 FIFO 큐로 처리되어
+/// `caringState` 전체 덮어쓰기가 동시에 끝나며 순서가 뒤바뀌지 않도록 한다.
 class CaringStateService {
   static final _db = FirebaseFirestore.instance;
   static final _auth = FirebaseAuth.instance;
@@ -67,7 +70,7 @@ class CaringStateService {
 
       if (applyTimeDecay) {
         state = _applyTimeDecay(state, DateTime.now());
-        unawaited(saveState(state));
+        await saveState(state);
       }
 
       return state;
@@ -149,15 +152,35 @@ class CaringStateService {
 
   // ═══════════════════════ 쓰기 ═══════════════════════
 
-  /// 전체 상태 저장 (merge)
+  static Future<void> _saveTail = Future.value();
+
+  /// `caringState` 전체를 Firestore에 쓸 때 **한 번에 하나씩** 순차 처리.
+  /// 동시 저장 완료 순서 뒤바뀜으로 인한 옛 스냅샷 덮어쓰기를 방지한다.
+  /// ref 없음 또는 예외 시 `false`.
+  static Future<bool> saveStateSequential(CaringState state) {
+    final completer = Completer<bool>();
+    _saveTail = _saveTail.then((_) async {
+      var ok = false;
+      try {
+        final ref = _userRef;
+        if (ref == null) {
+          ok = false;
+        } else {
+          await ref.set({'caringState': state.toMap()}, SetOptions(merge: true));
+          ok = true;
+        }
+      } catch (e) {
+        debugPrint('⚠️ CaringStateService.saveStateSequential: $e');
+        ok = false;
+      }
+      if (!completer.isCompleted) completer.complete(ok);
+    });
+    return completer.future;
+  }
+
+  /// [saveStateSequential]을 await하는 래퍼 (수면·깨우기 등 기존 호출부 호환).
   static Future<void> saveState(CaringState state) async {
-    try {
-      final ref = _userRef;
-      if (ref == null) return;
-      await ref.set({'caringState': state.toMap()}, SetOptions(merge: true));
-    } catch (e) {
-      debugPrint('⚠️ CaringStateService.saveState error: $e');
-    }
+    await saveStateSequential(state);
   }
 
   /// 아침 인사 완료 처리 (출석 체크 통합, 기존 호환)
@@ -203,11 +226,13 @@ class CaringStateService {
   static const double shortSleepMoodPenalty = 5.0;
 
   /// 깨우기 — 30분 초과면 회복, 이하면 패널티
-  static Future<CaringState> wake(CaringState current) async {
+  ///
+  /// [persist]: false면 계산만 하고 저장은 호출자([saveStateSequential] 등)에 맡김.
+  static Future<CaringState> wake(CaringState current, {bool persist = true}) async {
     final now = DateTime.now();
     if (current.sleepStartedAt == null) {
       final woken = current.copyWith(isSleeping: false, lastActiveAt: now);
-      await saveState(woken);
+      if (persist) await saveState(woken);
       return woken;
     }
 
@@ -234,7 +259,7 @@ class CaringStateService {
       );
     }
 
-    await saveState(woken);
+    if (persist) await saveState(woken);
     return woken;
   }
 

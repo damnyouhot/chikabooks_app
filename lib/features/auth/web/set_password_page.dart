@@ -128,7 +128,7 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
                     ),
                     const SizedBox(width: 10),
                     const Text(
-                      '치카북스',
+                      'HygieneLab',
                       style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w700,

@@ -1,8 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 import '../core/analytics/event_catalog.dart';
 import '../models/admin_dashboard_models.dart';
 import '../models/quiz_schedule.dart';
+import 'quiz_pool_service.dart';
 
 /// 관리자 대시보드 데이터를 Firestore에서 읽어오는 서비스
 ///
@@ -220,6 +222,52 @@ class AdminDashboardService {
     }
   }
 
+  /// `quiz_meta/state` 의 usedQuizIds·lastScheduledDate 를
+  /// 현재 사이클 [quiz_schedule] 과 맞춤 (Cloud Function `rebuildQuizMetaFromSchedules`).
+  static Future<Map<String, dynamic>?> rebuildQuizMetaFromSchedules() async {
+    try {
+      final callable = FirebaseFunctions.instanceFor(region: 'us-central1')
+          .httpsCallable('rebuildQuizMetaFromSchedules');
+      final result = await callable.call();
+      final data = result.data;
+      if (data is Map) {
+        return Map<String, dynamic>.from(data);
+      }
+      return null;
+    } catch (e, st) {
+      debugPrint('⚠️ rebuildQuizMetaFromSchedules: $e');
+      debugPrint('$st');
+      rethrow;
+    }
+  }
+
+  /// 오늘(또는 [targetDate]) `quiz_schedule` 재생성 — Cloud Function `manualScheduleQuiz`.
+  ///
+  /// [forceReplace]: true면 기존 해당 날짜 스케줄을 덮어씀.
+  /// [targetDate] 미지정 시 KST 기준 오늘 (`QuizPoolService.todayKey`).
+  static Future<Map<String, dynamic>?> manualScheduleQuiz({
+    String? targetDate,
+    bool forceReplace = false,
+  }) async {
+    try {
+      final callable = FirebaseFunctions.instanceFor(region: 'us-central1')
+          .httpsCallable('manualScheduleQuiz');
+      final result = await callable.call(<String, dynamic>{
+        'targetDate': targetDate ?? QuizPoolService.todayKey,
+        'forceReplace': forceReplace,
+      });
+      final data = result.data;
+      if (data is Map) {
+        return Map<String, dynamic>.from(data);
+      }
+      return null;
+    } catch (e, st) {
+      debugPrint('⚠️ manualScheduleQuiz: $e');
+      debugPrint('$st');
+      rethrow;
+    }
+  }
+
   // ─── User Flow (퍼널) ─────────────────────────────────────────
 
   /// 온보딩 **순차 퍼널** 단계별 유저 수 (교집합 집계)
@@ -280,10 +328,42 @@ class AdminDashboardService {
 
   // ─── Feature Reaction ─────────────────────────────────────────
 
+  /// `같이` 탭: 공감투표를 의미 단위로 합친 뒤 정렬·상위 N에 포함시킵니다.
+  ///
+  /// - [poll_empathize] + [poll_change_empathy] → [FeatureReactionAggregates.bondPollVote]
+  /// - [poll_add_option] → [FeatureReactionAggregates.bondPollAdd] (별도 행)
+  static void _mergeBondPollFeatureAggregates(
+    Map<String, ({int clicks, Set<String> users})> typeMap,
+  ) {
+    const voteTypes = <String>['poll_empathize', 'poll_change_empathy'];
+    var voteClicks = 0;
+    final voteUsers = <String>{};
+    for (final t in voteTypes) {
+      final p = typeMap.remove(t);
+      if (p != null) {
+        voteClicks += p.clicks;
+        voteUsers.addAll(p.users);
+      }
+    }
+    if (voteClicks > 0) {
+      typeMap[FeatureReactionAggregates.bondPollVote] = (
+        clicks: voteClicks,
+        users: voteUsers,
+      );
+    }
+
+    final add = typeMap.remove('poll_add_option');
+    if (add != null) {
+      typeMap[FeatureReactionAggregates.bondPollAdd] = add;
+    }
+  }
+
   /// 기능 반응 TOP N
   ///
   /// Firestore group-by 미지원 → 최근 N건 읽어 클라이언트 집계
   /// [since] 로 기간 제한 가능
+  ///
+  /// 공감투표 관련 타입은 [_mergeBondPollFeatureAggregates] 후 정렬합니다.
   static Future<List<FeatureReactionItem>> getTopFeatures({
     int limit = 12,
     DateTime? since,
@@ -325,11 +405,16 @@ class AdminDashboardService {
         }
       }
 
+      _mergeBondPollFeatureAggregates(typeMap);
+
       final items = typeMap.entries
           .map((e) => FeatureReactionItem(
                 eventType: e.key,
                 label: FeatureReactionItem.labelFor(e.key),
-                tab: EventCatalog.tabForType(e.key),
+                tab: (e.key == FeatureReactionAggregates.bondPollVote ||
+                        e.key == FeatureReactionAggregates.bondPollAdd)
+                    ? EventTab.bond
+                    : EventCatalog.tabForType(e.key),
                 clickCount: e.value.clicks,
                 userCount: e.value.users.length,
               ))

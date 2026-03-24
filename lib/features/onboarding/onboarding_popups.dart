@@ -8,7 +8,7 @@ import '../../core/theme/app_colors.dart';
 const _kBg = Color(0xFFFFFBF9);
 // _kText: 온보딩 다이얼로그 전용 텍스트 톤 — AppColors.textPrimary 대신 약간 따뜻한 느낌
 const _kText = Color(0xFF3D3535);
-// _kAccent: 온보딩 민트/그린 액센트 — 치카북스 메인 accent와 별개 의도적 유지
+// _kAccent: 온보딩 민트/그린 액센트 — 앱 메인 accent와 별개 의도적 유지
 const _kAccent = Color(0xFF6BBFA0);
 const _kRadius = 20.0;
 
@@ -197,10 +197,11 @@ class _OnboardingWorkplacePopupState extends State<OnboardingWorkplacePopup> {
       case WorkStatus.student:
         return '학교 이름 입력';
       case WorkStatus.working:
-      case WorkStatus.leave:
         return '근무 중인 치과 이름';
+      case WorkStatus.leave:
+        return '마지막 근무한 치과이름';
       case WorkStatus.seeking:
-        return '마지막 근무한 치과';
+        return '마지막 근무한 치과 또는 학교 이름';
       default:
         return '이름 입력';
     }

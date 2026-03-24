@@ -170,7 +170,7 @@ class _JobPostWebPageState extends State<JobPostWebPage>
                 ),
                 const SizedBox(width: 10),
                 Text(
-                  '치카북스',
+                  '하이진랩',
                   style: WebTypo.heading(color: AppColors.textPrimary),
                 ),
                 const Spacer(),
@@ -324,7 +324,7 @@ class _JobPostWebPageState extends State<JobPostWebPage>
               ),
               const SizedBox(width: 10),
               Text(
-                '치카북스 구인등록',
+                '하이진랩 구인등록',
                 style: WebTypo.sectionTitle(color: AppColors.textPrimary),
               ),
             ],
@@ -508,7 +508,7 @@ class _JobPostWebPageState extends State<JobPostWebPage>
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const Text(
-            '© 치과책방',
+            '© 하이진랩',
             style: TextStyle(fontSize: 12, color: AppColors.textDisabled),
           ),
           const SizedBox(width: 20),

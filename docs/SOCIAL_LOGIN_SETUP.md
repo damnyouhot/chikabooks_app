@@ -1,7 +1,7 @@
 # 소셜 로그인 설정 가이드
 
 ## 📝 개요
-이 가이드는 치카북스 앱에 **Google, Apple, Kakao, Naver, Email/Password** 로그인을 설정하는 방법을 안내합니다.
+이 가이드는 하이진랩 앱에 **Google, Apple, Kakao, Naver, Email/Password** 로그인을 설정하는 방법을 안내합니다.
 
 ---
 
@@ -165,7 +165,7 @@ KakaoSdk.init(
 2. 로그인 → **Application → 애플리케이션 등록**
 
 ### 4-2. 애플리케이션 등록
-1. **애플리케이션 이름**: 치카북스
+1. **애플리케이션 이름**: 하이진랩
 2. **사용 API**: "네아로(네이버 아이디로 로그인)" 선택
 3. **제공 정보**: 이메일, 닉네임, 프로필 이미지 선택
 4. **환경 추가**:
@@ -237,7 +237,7 @@ manifestPlaceholders["naverClientSecret"] = naverClientSecret
 <key>NaverConsumerSecret</key>
 <string>ZQ9vUktdbW</string>
 <key>NaverServiceAppName</key>
-<string>치과책방</string>
+<string>하이진랩</string>
 <key>NaverServiceUrlScheme</key>
 <string>com.chikabooks.tenth</string>
 ```

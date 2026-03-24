@@ -1,6 +1,7 @@
 {
   "name": "functions",
   "scripts": {
+    "polls-import": "node ../tools/polls-firestore-import.cjs",
     "lint": "eslint --ext .js,.ts .",
     "build": "tsc",
     "build:watch": "tsc --watch",
@@ -8,7 +9,9 @@
     "shell": "npm run build && firebase functions:shell",
     "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
-    "logs": "firebase functions:log"
+    "logs": "firebase functions:log",
+    "setup-admin": "node ../tools/setup_admin.js",
+    "setup-admin:yhgjd": "node ../tools/setup_admin.js --by-email-prefix Yhgjd"
   },
   "engines": {
     "node": "22"
@@ -33,7 +36,8 @@
     "eslint-config-google": "^0.14.0",
     "eslint-plugin-import": "^2.25.4",
     "firebase-functions-test": "^3.1.0",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "xlsx": "^0.18.5"
   },
   "private": true
 }

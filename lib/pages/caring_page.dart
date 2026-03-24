@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:rive/rive.dart' hide Animation, PaintingStyle;
 import '../services/caring_state_service.dart';
 import '../services/caring_action_service.dart';
+import '../services/funnel_onboarding_service.dart';
 import '../services/base_message_service.dart';
 import '../services/job_service.dart';
 import '../services/ebook_service.dart';
@@ -26,6 +27,9 @@ class CaringPage extends StatefulWidget {
   final ValueChanged<int>? onGrowthSubTabRequested;
   final bool isOnboardingActive;
   final String? onboardingDialogue;
+
+  /// 온보딩 말풍선에서 굵게 표시할 단어 (예: step1a의 '저니')
+  final String? onboardingBoldWord;
   final int currentTabIndex;
 
   const CaringPage({
@@ -34,6 +38,7 @@ class CaringPage extends StatefulWidget {
     this.onGrowthSubTabRequested,
     this.isOnboardingActive = false,
     this.onboardingDialogue,
+    this.onboardingBoldWord,
     this.currentTabIndex = 0,
   });
 
@@ -59,6 +64,12 @@ class _CaringPageState extends State<CaringPage>
   String _quizSummary = '오늘의 퀴즈 확인 중...';
 
   CaringState _caringState = CaringState.initial();
+
+  /// `dailySettle` + 초기 `caringState` 로드 완료 후에만 밥·쓰다듬기 허용
+  bool _caringReady = false;
+
+  /// 밥·쓰다듬기 저장(FIFO) 중 중복 액션 방지
+  bool _caringPersistBusy = false;
 
   // 수면 페이드 애니메이션
   late AnimationController _sleepFadeCtrl;
@@ -126,17 +137,9 @@ class _CaringPageState extends State<CaringPage>
     );
 
     _loadRiveFile();
-    _loadCaringState().then((_) {
-      if (mounted && !widget.isOnboardingActive) _startMsgLoop();
-      if (mounted && _caringState.isSleeping) _sleepFadeCtrl.value = 1.0;
-    });
+    Future.microtask(() => _bootstrapCaringTab());
     _loadJobCard();
     _loadBookCard();
-    Future.microtask(() async {
-      await CaringActionService.dailySettle();
-      final events = await CaringActionService.detectOpenEvents();
-      for (final e in events) { _queueEventIfNew(e); }
-    });
   }
 
   @override
@@ -176,9 +179,30 @@ class _CaringPageState extends State<CaringPage>
     }
   }
 
-  Future<void> _loadCaringState() async {
+  /// 나 탭 초기화: 정산 → 이벤트 → 상태 표시. [applyTimeDecay]는 직전에 정산된 경우 false.
+  Future<void> _bootstrapCaringTab() async {
     try {
-      final state = await CaringStateService.loadState(applyTimeDecay: true);
+      await CaringActionService.dailySettle();
+      if (!mounted) return;
+      final events = await CaringActionService.detectOpenEvents();
+      if (!mounted) return;
+      for (final e in events) {
+        _queueEventIfNew(e);
+      }
+      await _loadCaringState(applyTimeDecay: false);
+    } catch (e, st) {
+      debugPrint('❌ _bootstrapCaringTab: $e\n$st');
+      if (mounted) await _loadCaringState(applyTimeDecay: true);
+    }
+    if (!mounted) return;
+    setState(() => _caringReady = true);
+    if (!widget.isOnboardingActive) _startMsgLoop();
+    if (_caringState.isSleeping) _sleepFadeCtrl.value = 1.0;
+  }
+
+  Future<void> _loadCaringState({bool applyTimeDecay = true}) async {
+    try {
+      final state = await CaringStateService.loadState(applyTimeDecay: applyTimeDecay);
       if (!mounted) return;
       final policies = [
         {'title': '2026 스케일링 급여 개정', 'dday': 'D-12', 'date': '3월 1일'},
@@ -396,50 +420,138 @@ class _CaringPageState extends State<CaringPage>
   }
 
   void _onCircleTap() async {
-    if (_caringState.isSleeping) return;
+    if (_caringState.isSleeping || !_caringReady || _caringPersistBusy) return;
     _tapTrigger?.fire();
-    final result = await CaringActionService.tryTouch();
-    if (!mounted) return;
-    if (result.state != null) setState(() => _caringState = result.state!);
-    final phrase = result.ment.isNotEmpty
-        ? result.ment : _neutralPhrases[Random().nextInt(_neutralPhrases.length)];
-    _enqueueReaction(phrase);
-    AdminActivityService.log(ActivityEventType.tapCharacter, page: 'home');
+    final prev = _caringState;
+    setState(() => _caringPersistBusy = true);
+    try {
+      final result =
+          await CaringActionService.tryTouch(fromLocal: _caringState);
+      if (!mounted) return;
+      if (result.state != null) {
+        setState(() => _caringState = result.state!);
+        final phrase = result.ment.isNotEmpty
+            ? result.ment
+            : _neutralPhrases[Random().nextInt(_neutralPhrases.length)];
+        _enqueueReaction(phrase);
+        final ok =
+            await CaringStateService.saveStateSequential(result.state!);
+        if (!mounted) return;
+        if (!ok) {
+          setState(() => _caringState = prev);
+          _enqueueReaction(
+            '저장에 실패했어요. 연결을 확인하고 다시 시도해 주세요.',
+          );
+        } else {
+          AdminActivityService.log(ActivityEventType.tapCharacter, page: 'home');
+        }
+      } else {
+        final phrase = result.ment.isNotEmpty
+            ? result.ment
+            : _neutralPhrases[Random().nextInt(_neutralPhrases.length)];
+        _enqueueReaction(phrase);
+      }
+    } finally {
+      if (mounted) setState(() => _caringPersistBusy = false);
+    }
   }
 
   void _onFeed() async {
-    if (_caringState.isSleeping) return;
+    if (_caringState.isSleeping || !_caringReady || _caringPersistBusy) return;
 
     // energy<30 → 리액션 확률 50%
     final shouldAnimate = _caringState.energy >= 30 || Random().nextBool();
     if (shouldAnimate) _tapTrigger?.fire();
 
-    final result = await CaringActionService.tryFeed();
-    if (!mounted) return;
-    if (result.state != null) setState(() => _caringState = result.state!);
-    final msg = result.success
-        ? (result.ment ?? '밥을 줬어요') : (result.rejectMent ?? '나중에 다시 시도하세요');
-    _enqueueReaction(msg);
+    final prev = _caringState;
+    setState(() => _caringPersistBusy = true);
+    try {
+      final result = await CaringActionService.tryFeed(fromLocal: _caringState);
+      if (!mounted) return;
+      if (result.success && result.state != null) {
+        setState(() => _caringState = result.state!);
+        final msg = result.ment ?? '밥을 줬어요';
+        _enqueueReaction(msg);
+        final ok =
+            await CaringStateService.saveStateSequential(result.state!);
+        if (!mounted) return;
+        if (!ok) {
+          setState(() => _caringState = prev);
+          _enqueueReaction(
+            '저장에 실패했어요. 연결을 확인하고 다시 시도해 주세요.',
+          );
+        } else {
+          AdminActivityService.log(
+            ActivityEventType.caringFeedSuccess,
+            page: 'home',
+          );
+          unawaited(FunnelOnboardingService.tryLogFirstFeed());
+        }
+      } else {
+        final msg = result.rejectMent ?? '나중에 다시 시도하세요';
+        _enqueueReaction(msg);
+      }
+    } finally {
+      if (mounted) setState(() => _caringPersistBusy = false);
+    }
   }
 
   void _onSleepToggle() async {
-    if (_caringState.isSleeping) {
-      setState(() => _caringState = _caringState.copyWith(isSleeping: false));
-      _sleepFadeCtrl.reverse();
-      final result = await CaringActionService.wakeUp();
-      if (!mounted) return;
-      setState(() => _caringState = result.state);
-      _enqueueReaction(result.ment);
-    } else {
-      setState(() => _caringState = _caringState.copyWith(
-        isSleeping: true, sleepStartedAt: DateTime.now(),
-      ));
-      _sleepFadeCtrl.forward();
-      final sleeping = await CaringActionService.startSleep();
-      if (!mounted) return;
-      setState(() => _caringState = sleeping);
-      final ment = CaringMents.sleepStart[Random().nextInt(CaringMents.sleepStart.length)];
-      _enqueueReaction(ment);
+    if (!_caringReady || _caringPersistBusy) return;
+
+    final prev = _caringState;
+    setState(() => _caringPersistBusy = true);
+    try {
+      if (_caringState.isSleeping) {
+        // 깨우기: 서버 선읽기 없이 로컬 스냅샷으로 벌점·회복 계산 후 순차 저장
+        final result =
+            await CaringActionService.wakeUp(fromLocal: _caringState);
+        if (!mounted) return;
+        setState(() => _caringState = result.state);
+        _sleepFadeCtrl.reverse();
+        _enqueueReaction(result.ment);
+
+        final ok =
+            await CaringStateService.saveStateSequential(result.state);
+        if (!mounted) return;
+        if (!ok) {
+          setState(() => _caringState = prev);
+          _sleepFadeCtrl.forward();
+          _enqueueReaction(
+            '저장에 실패했어요. 연결을 확인하고 다시 시도해 주세요.',
+          );
+        }
+      } else {
+        // 재우기: 저장 완료 전에는 _caringPersistBusy로 깨우기 포함 전 버튼 잠금
+        final wasAwake = !_caringState.isSleeping;
+        final sleeping =
+            await CaringActionService.startSleep(fromLocal: _caringState);
+        if (!mounted) return;
+
+        if (wasAwake && sleeping.isSleeping) {
+          setState(() => _caringState = sleeping);
+          _sleepFadeCtrl.forward();
+          final ment = CaringMents
+              .sleepStart[Random().nextInt(CaringMents.sleepStart.length)];
+          _enqueueReaction(ment);
+
+          final ok =
+              await CaringStateService.saveStateSequential(sleeping);
+          if (!mounted) return;
+          if (!ok) {
+            setState(() => _caringState = prev);
+            _sleepFadeCtrl.reverse();
+            _enqueueReaction(
+              '저장에 실패했어요. 연결을 확인하고 다시 시도해 주세요.',
+            );
+          }
+        } else {
+          // 이미 잠든 상태로 판정된 경우(동기화만)
+          setState(() => _caringState = sleeping);
+        }
+      }
+    } finally {
+      if (mounted) setState(() => _caringPersistBusy = false);
     }
   }
 
@@ -619,7 +731,15 @@ class _CaringPageState extends State<CaringPage>
               final isDismissing = isOnboarding ? false : _isBaseMsgDismissing;
               return Stack(children: [
                 Positioned(top: baseMsgTop, left: 0, right: 0,
-                  child: Center(child: SpeechOverlay(text: displayText, isDismissing: isDismissing, isOnboarding: isOnboarding))),
+                  child: Center(
+                    child: SpeechOverlay(
+                      text: displayText,
+                      isDismissing: isDismissing,
+                      isOnboarding: isOnboarding,
+                      onboardingBoldWord:
+                          isOnboarding ? widget.onboardingBoldWord : null,
+                    ),
+                  )),
                 if (!isOnboarding)
                   Positioned(top: reactionTop, left: 0, right: 0,
                     child: Center(child: SpeechOverlay(text: _currentSpeech, isDismissing: _isDismissingSpeech))),
@@ -655,12 +775,30 @@ class _CaringPageState extends State<CaringPage>
 
   Widget _buildBottomSection({bool isOnboarding = false}) {
     final isSleeping = _caringState.isSleeping;
+    final blockCareActions =
+        isSleeping || !_caringReady || _caringPersistBusy;
     final buttons = [
-      _ActionBtn(icon: Icons.restaurant_outlined, label: '밥주기', onTap: _onFeed, disabled: isSleeping),
-      _ActionBtn(icon: Icons.pets_outlined, label: '쓰다듬기', onTap: _onCircleTap, disabled: isSleeping),
+      _ActionBtn(
+        icon: Icons.restaurant_outlined,
+        label: '밥주기',
+        onTap: _onFeed,
+        disabled: blockCareActions,
+        suppressInteractionFade: isOnboarding,
+      ),
+      _ActionBtn(
+        icon: Icons.pets_outlined,
+        label: '쓰다듬기',
+        onTap: _onCircleTap,
+        disabled: blockCareActions,
+        suppressInteractionFade: isOnboarding,
+      ),
       _ActionBtn(
         icon: isSleeping ? Icons.wb_sunny_outlined : Icons.bedtime_outlined,
-        label: isSleeping ? '깨우기' : '재우기', onTap: _onSleepToggle,
+        label: isSleeping ? '깨우기' : '재우기',
+        onTap: _onSleepToggle,
+        // 저장 FIFO 중 loadState→save가 끼어들면 밥 반영이 날아갈 수 있어 동일 잠금
+        disabled: !_caringReady || _caringPersistBusy,
+        suppressInteractionFade: isOnboarding,
       ),
     ];
     return Row(
@@ -973,18 +1111,24 @@ class _PolicyRollingCard extends StatelessWidget {
 // 액션 버튼 (바운스 터치 반응)
 // ══════════════════════════════════════════════
 
+/// 비활성 시 시각 불투명도 (활성 1.0과 보간)
+const double _kActionBtnDisabledOpacity = 0.5;
+
 class _ActionBtn extends StatefulWidget {
   const _ActionBtn({
     required this.icon,
     required this.label,
     required this.onTap,
     this.disabled = false,
+    /// true면 활성/비활성 페이드 없음(즉시). 온보딩 시 바깥 [FadeTransition]과 곱연산 이중 페이드 완화.
+    this.suppressInteractionFade = false,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
   final bool disabled;
+  final bool suppressInteractionFade;
 
   @override
   State<_ActionBtn> createState() => _ActionBtnState();
@@ -1036,15 +1180,39 @@ class _ActionBtnState extends State<_ActionBtn> with SingleTickerProviderStateMi
           final fgColor = widget.disabled ? AppColors.disabledText : AppColors.onAccent;
           final labelColor = widget.disabled ? AppColors.textDisabled : AppColors.textPrimary;
 
-          return Opacity(
-            opacity: widget.disabled ? 0.5 : 1.0,
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Container(width: btnSize, height: btnSize,
-                decoration: BoxDecoration(color: bgColor, shape: BoxShape.circle),
-                child: Icon(widget.icon, color: fgColor, size: iconSize)),
-              const SizedBox(height: 6),
-              Text(widget.label, style: TextStyle(fontSize: 11, color: labelColor, fontWeight: FontWeight.w600)),
-            ]),
+          final targetOpacity =
+              widget.disabled ? _kActionBtnDisabledOpacity : 1.0;
+          final fadeDuration = widget.suppressInteractionFade
+              ? Duration.zero
+              : const Duration(milliseconds: 220);
+
+          return AnimatedOpacity(
+            opacity: targetOpacity,
+            duration: fadeDuration,
+            curve: Curves.easeInOut,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: btnSize,
+                  height: btnSize,
+                  decoration: BoxDecoration(
+                    color: bgColor,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(widget.icon, color: fgColor, size: iconSize),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  widget.label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: labelColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
           );
         }),
       ),

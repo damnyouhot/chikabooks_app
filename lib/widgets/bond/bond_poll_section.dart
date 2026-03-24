@@ -29,8 +29,6 @@ class BondPollSectionState extends State<BondPollSection> {
   StreamSubscription<String?>? _voteSub;
   List<PollOption> _options = [];
   bool _empathizing = false;
-  Timer? _countdownTimer;
-  Duration _remaining = Duration.zero;
 
   // ── 인라인 보기 추가 ──
   final _addOptionController = TextEditingController();
@@ -65,7 +63,6 @@ class BondPollSectionState extends State<BondPollSection> {
   void dispose() {
     _optionsSub?.cancel();
     _voteSub?.cancel();
-    _countdownTimer?.cancel();
     _addOptionController.dispose();
     for (final c in _closedCommentControllers.values) {
       c.dispose();
@@ -92,7 +89,6 @@ class BondPollSectionState extends State<BondPollSection> {
     if (poll != null) {
       _subscribeToOptions(poll.id);
       _subscribeToMyVote(poll.id);
-      _startCountdown(poll);
     }
     // 활성 투표 로드 후 지난 투표 첫 페이지 로드
     if (_closedPolls.isEmpty) _loadMoreClosedPolls();
@@ -109,20 +105,6 @@ class BondPollSectionState extends State<BondPollSection> {
     _voteSub?.cancel();
     _voteSub = EmpathyPollService.myVoteStream(pollId).listen((optionId) {
       if (mounted) setState(() => _myVoteOptionId = optionId);
-    });
-  }
-
-  void _startCountdown(Poll poll) {
-    _remaining = poll.remaining;
-    _countdownTimer?.cancel();
-    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted) return;
-      final r = poll.endsAt.difference(DateTime.now());
-      setState(() => _remaining = r.isNegative ? Duration.zero : r);
-      if (_remaining == Duration.zero) {
-        _countdownTimer?.cancel();
-        _loadActivePoll();
-      }
     });
   }
 
@@ -319,7 +301,13 @@ class BondPollSectionState extends State<BondPollSection> {
             const Text('오늘의 공감 투표',
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
             const Spacer(),
-            _buildCountdown(),
+            _PollCountdownTicker(
+              key: ValueKey<String>(poll.id),
+              endsAt: poll.endsAt,
+              onExpired: () {
+                if (mounted) _loadActivePoll();
+              },
+            ),
           ],
         ),
         const SizedBox(height: 12),
@@ -515,26 +503,6 @@ class BondPollSectionState extends State<BondPollSection> {
     );
   }
 
-  Widget _buildCountdown() {
-    if (_remaining == Duration.zero) {
-      return const Text('마감됨', style: TextStyle(fontSize: 11, color: AppColors.textDisabled));
-    }
-    final h = _remaining.inHours;
-    final m = _remaining.inMinutes % 60;
-    final s = _remaining.inSeconds % 60;
-    final text = h > 0
-        ? '${h}시간 ${m}분 남음'
-        : m > 0
-            ? '${m}분 ${s}초 남음'
-            : '${s}초 남음';
-
-    return Text(text,
-        style: TextStyle(
-            fontSize: 11,
-            color: _remaining.inMinutes < 60 ? AppColors.cardEmphasis : AppColors.textDisabled,
-            fontWeight: _remaining.inMinutes < 60 ? FontWeight.w600 : FontWeight.w400));
-  }
-
   // ── 지난 투표 피드 ────────────────────────────────────────
 
   Widget _buildClosedPollFeed() {
@@ -586,7 +554,7 @@ class BondPollSectionState extends State<BondPollSection> {
     final topOptions = _closedTopOptions[poll.id] ?? [];
     final allOptions = _expandedAllOptions[poll.id] ?? [];
     final displayOptions = isExpanded ? allOptions : topOptions;
-    final dateStr = _formatDate(poll.closedAt ?? poll.endsAt);
+    final dateStr = _formatPollDateBadge(poll);
     final totalEmpathy = poll.totalEmpathyCount;
     // 옵션이 3개 미만이면 이미 전체 노출 → 댓글 허용. 그 외에는 펼친 뒤에만.
     final showCommentSection = isExpanded || topOptions.length < 3;
@@ -657,36 +625,10 @@ class BondPollSectionState extends State<BondPollSection> {
           ],
         ),
         const SizedBox(height: 8),
-        StreamBuilder<List<PollComment>>(
-          stream: EmpathyPollService.pollCommentsStream(poll.id),
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text(
-                  '한마디를 불러오지 못했어요.',
-                  style: TextStyle(fontSize: 12, color: AppColors.error.withValues(alpha: 0.85)),
-                ),
-              );
-            }
-            final list = snapshot.data ?? [];
-            if (list.isEmpty) {
-              return const Padding(
-                padding: EdgeInsets.only(bottom: 8),
-                child: Text(
-                  '첫 한마디를 남겨보세요.',
-                  style: TextStyle(fontSize: 12, color: AppColors.textDisabled),
-                ),
-              );
-            }
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ...list.map(_buildClosedCommentTile),
-                const SizedBox(height: 8),
-              ],
-            );
-          },
+        _StablePollCommentsList(
+          key: ValueKey<String>(poll.id),
+          pollId: poll.id,
+          buildTile: _buildClosedCommentTile,
         ),
         _buildClosedCommentInput(poll.id),
       ],
@@ -818,5 +760,148 @@ class BondPollSectionState extends State<BondPollSection> {
     );
   }
 
-  String _formatDate(DateTime dt) => '${dt.month}/${dt.day}';
+  /// 지난 투표 카드 뱃지: 실제 마감일(종료일) 기준, 연도 포함
+  String _formatPollDateBadge(Poll poll) {
+    final t = poll.closedAt ?? poll.endsAt;
+    return '${t.year}/${t.month}/${t.day}';
+  }
+}
+
+/// 1초마다 이 위젯만 rebuild → 지난 투표·댓글 Stream 전체가 매초 다시 구독되지 않음
+class _PollCountdownTicker extends StatefulWidget {
+  const _PollCountdownTicker({
+    super.key,
+    required this.endsAt,
+    required this.onExpired,
+  });
+
+  final DateTime endsAt;
+  final VoidCallback onExpired;
+
+  @override
+  State<_PollCountdownTicker> createState() => _PollCountdownTickerState();
+}
+
+class _PollCountdownTickerState extends State<_PollCountdownTicker> {
+  Timer? _timer;
+  Duration _remaining = Duration.zero;
+  bool _firedExpired = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _tick();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
+  }
+
+  void _tick() {
+    if (!mounted) return;
+    final r = widget.endsAt.difference(DateTime.now());
+    final next = r.isNegative ? Duration.zero : r;
+    setState(() => _remaining = next);
+    if (next == Duration.zero && !_firedExpired) {
+      _firedExpired = true;
+      widget.onExpired();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _PollCountdownTicker oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.endsAt != widget.endsAt) {
+      _firedExpired = false;
+      _tick();
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_remaining == Duration.zero) {
+      return const Text('마감됨', style: TextStyle(fontSize: 11, color: AppColors.textDisabled));
+    }
+    final h = _remaining.inHours;
+    final m = _remaining.inMinutes % 60;
+    final s = _remaining.inSeconds % 60;
+    final text = h > 0
+        ? '${h}시간 ${m}분 남음'
+        : m > 0
+            ? '${m}분 ${s}초 남음'
+            : '${s}초 남음';
+
+    return Text(
+      text,
+      style: TextStyle(
+        fontSize: 11,
+        color: _remaining.inMinutes < 60 ? AppColors.cardEmphasis : AppColors.textDisabled,
+        fontWeight: _remaining.inMinutes < 60 ? FontWeight.w600 : FontWeight.w400,
+      ),
+    );
+  }
+}
+
+typedef _CommentTileBuilder = Widget Function(PollComment c);
+
+class _StablePollCommentsList extends StatefulWidget {
+  const _StablePollCommentsList({
+    super.key,
+    required this.pollId,
+    required this.buildTile,
+  });
+
+  final String pollId;
+  final _CommentTileBuilder buildTile;
+
+  @override
+  State<_StablePollCommentsList> createState() => _StablePollCommentsListState();
+}
+
+class _StablePollCommentsListState extends State<_StablePollCommentsList> {
+  late final Stream<List<PollComment>> _stream;
+
+  @override
+  void initState() {
+    super.initState();
+    _stream = EmpathyPollService.pollCommentsStream(widget.pollId);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<PollComment>>(
+      stream: _stream,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              '한마디를 불러오지 못했어요.',
+              style: TextStyle(fontSize: 12, color: AppColors.error.withValues(alpha: 0.85)),
+            ),
+          );
+        }
+        final list = snapshot.data ?? [];
+        if (list.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.only(bottom: 8),
+            child: Text(
+              '첫 한마디를 남겨보세요.',
+              style: TextStyle(fontSize: 12, color: AppColors.textDisabled),
+            ),
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ...list.map(widget.buildTile),
+            const SizedBox(height: 8),
+          ],
+        );
+      },
+    );
+  }
 }

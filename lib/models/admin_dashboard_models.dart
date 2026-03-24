@@ -29,11 +29,25 @@ class FunnelStep {
   });
 }
 
+// ─── 기능 반응 집계용 가상 타입 (Firestore type 문자열과 다를 수 있음) ───
+///
+/// [getTopFeatures]에서 `같이` 탭 투표 이벤트를 의미 단위로 합칠 때 사용합니다.
+abstract final class FeatureReactionAggregates {
+  FeatureReactionAggregates._();
+
+  /// [poll_empathize] + [poll_change_empathy] 클릭·유저 합산
+  static const bondPollVote = '__feat_bond_poll_vote__';
+
+  /// [poll_add_option] 단독 (보기 추가)
+  static const bondPollAdd = '__feat_bond_poll_add__';
+}
+
 // ─── 기능 반응 항목 ──────────────────────────────────────────
 class FeatureReactionItem {
-  final String eventType; // activityLogs.type
+  /// [activityLogs.type] 또는 [FeatureReactionAggregates] 키
+  final String eventType;
   final String label; // 화면에 표시할 한국어 이름
-  /// [EventCatalog.tabForType] — 기능 반응 그룹(탭)
+  /// [EventCatalog.tabForType] 또는 탭 고정(집계 행) — 기능 반응 그룹(탭)
   final String tab;
   final int clickCount;
   final int userCount;
@@ -46,8 +60,16 @@ class FeatureReactionItem {
     required this.userCount,
   });
 
-  /// activityLogs.type → 한국어 라벨 ([EventCatalog] 단일 출처)
-  static String labelFor(String type) => EventCatalog.labelForType(type);
+  /// activityLogs.type 또는 집계 키 → 한글 라벨
+  static String labelFor(String type) {
+    if (type == FeatureReactionAggregates.bondPollVote) {
+      return '공감투표 참여';
+    }
+    if (type == FeatureReactionAggregates.bondPollAdd) {
+      return '투표 보기 추가';
+    }
+    return EventCatalog.labelForType(type);
+  }
 }
 
 // ─── 오류 항목 ───────────────────────────────────────────────

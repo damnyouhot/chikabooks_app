@@ -95,7 +95,7 @@ C7:68:B9:28:94:01:46:91:CF:E6:56:2F:C4:04:7E:C6
 <key>NaverConsumerSecret</key>
 <string>ZQ9vUktdbW</string>
 <key>NaverServiceAppName</key>
-<string>치과책방</string>
+<string>하이진랩</string>
 <key>NaverServiceUrlScheme</key>
 <string>com.chikabooks.tenth</string>
 

@@ -41,26 +41,24 @@ class EmpathyPollService {
   // 조회
   // ═══════════════════════════════════════════════════════════
 
-  /// 현재 활성 투표 1개 (없으면 null)
+  /// 현재 진행 중인 투표 1개 (없으면 null)
   ///
-  /// startsAt <= now < endsAt 인 투표만 반환 (미래 투표 제외)
+  /// `startsAt <= now < endsAt` 인 문서만 (status는 `scheduled`/`active` 모두 가능)
   static Future<Poll?> getActivePoll() async {
     try {
       final now = DateTime.now();
       final nowTs = Timestamp.fromDate(now);
       final snap = await _pollsRef
-          .where('status', isEqualTo: 'active')
           .where('startsAt', isLessThanOrEqualTo: nowTs)
           .orderBy('startsAt', descending: true)
-          .limit(5)
+          .limit(12)
           .get();
 
       if (snap.docs.isEmpty) return null;
 
-      // endsAt > now인 것만 필터
       for (final doc in snap.docs) {
         final poll = Poll.fromDoc(doc);
-        if (poll.endsAt.isAfter(now)) return poll;
+        if (poll.isVotingOpen) return poll;
       }
       return null;
     } catch (e) {
@@ -101,15 +99,19 @@ class EmpathyPollService {
 
   /// 종료된 투표 피드 (페이지네이션)
   ///
+  /// `endsAt < now` 기준(실제 마감). `endsAt` 내림차순.
   /// [ClosedPollsPage]를 반환하여 다음 페이지 커서를 함께 제공
   static Future<ClosedPollsPage> getClosedPolls({
     int limit = 10,
     DocumentSnapshot? startAfter,
   }) async {
     try {
+      final now = DateTime.now();
+      final nowTs = Timestamp.fromDate(now);
+
       var query = _pollsRef
-          .where('status', isEqualTo: 'closed')
-          .orderBy('closedAt', descending: true)
+          .where('endsAt', isLessThan: nowTs)
+          .orderBy('endsAt', descending: true)
           .limit(limit);
 
       if (startAfter != null) {
@@ -189,9 +191,10 @@ class EmpathyPollService {
         if (!pollSnap.exists) return EmpathyResult.fail('투표를 찾을 수 없습니다.');
 
         final poll = Poll.fromDoc(pollSnap);
-        if (poll.isClosed) return EmpathyResult.fail('종료된 투표입니다.');
-        if (poll.endsAt.isBefore(DateTime.now())) {
-          return EmpathyResult.fail('투표 시간이 종료되었습니다.');
+        if (!poll.isVotingOpen) {
+          return EmpathyResult.fail(
+            poll.hasEnded ? '투표 시간이 종료되었습니다.' : '아직 시작되지 않은 투표입니다.',
+          );
         }
 
         final voteSnap = await tx.get(voteRef);
@@ -263,7 +266,7 @@ class EmpathyPollService {
       final pollSnap = await _pollDoc(pollId).get();
       if (!pollSnap.exists) return AddOptionResult.fail('투표를 찾을 수 없습니다.');
       final poll = Poll.fromDoc(pollSnap);
-      if (poll.isClosed || poll.endsAt.isBefore(DateTime.now())) {
+      if (!poll.isVotingOpen) {
         return AddOptionResult.fail('종료된 투표에는 보기를 추가할 수 없습니다.');
       }
 
@@ -322,7 +325,7 @@ class EmpathyPollService {
       final pollSnap = await _pollDoc(pollId).get();
       if (!pollSnap.exists) return PollCommentResult.fail('투표를 찾을 수 없습니다.');
       final poll = Poll.fromDoc(pollSnap);
-      if (!poll.isClosed) {
+      if (!poll.hasEnded) {
         return PollCommentResult.fail('종료된 투표에만 댓글을 달 수 있습니다.');
       }
 

@@ -13,7 +13,7 @@ import 'pdf_reader_page.dart';
 class EbookDetailPage extends StatefulWidget {
   final Ebook ebook;
 
-  /// true이면 구매/읽기 버튼을 숨김 (치과책방 탭 전용)
+  /// true이면 구매/읽기 버튼을 숨김 (성장하기 3번 탭 전용)
   final bool hideActions;
 
   const EbookDetailPage({
@@ -155,7 +155,7 @@ class _EbookDetailPageState extends State<EbookDetailPage> {
             ),
             const SizedBox(height: AppSpacing.xxl + 8),
             
-            // 구매/읽기 버튼 (hideActions가 true면 숨김 — 치과책방 탭)
+            // 구매/읽기 버튼 (hideActions가 true면 숨김 — 3번 탭)
             if (!widget.hideActions) ...[
               SizedBox(
                 width: double.infinity,

@@ -596,92 +596,98 @@ class _SignInPageState extends State<SignInPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // 앱 로고/타이틀
-                  const Icon(
-                    Icons.medical_services,
-                    size: 80,
-                    color: AppColors.white,
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    '치카북스',
-                    style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.white,
+      backgroundColor: AppColors.appBg,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Text(
+                            'HygieneLab',
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.blue,
+                              letterSpacing: 0.35,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '하이진랩',
+                            style: TextStyle(
+                              fontSize: 19.5,
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Apple SD Gothic Neo',
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            '치과인들의 커리어 연구소',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary.withValues(alpha: 0.85),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '치과 커뮤니티 & 구인구직 플랫폼',
-                    style: TextStyle(fontSize: 14, color: AppColors.white.withOpacity(0.7)),
-                  ),
-                  const SizedBox(height: 48),
-
-                  // 로딩 표시
-                  if (_isLoading)
-                    const CircularProgressIndicator(color: AppColors.white)
-                  else
-                    Column(
-                      children: [
-                        // 마지막 로그인 버튼을 맨 위로 올리고 나머지 순서 유지
-                        ..._buildOrderedButtons(),
-
-                        const SizedBox(height: 24),
-
-                        // ── 치과책방 구매내역 안내 ──
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.white.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.menu_book_rounded,
-                                size: 15,
-                                color: AppColors.white.withValues(alpha: 0.7),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  '치과책방 구매자는 구매 이메일 계정으로 로그인하세요.',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color:
-                                        AppColors.white.withValues(alpha: 0.8),
-                                    height: 1.4,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                ],
+                  );
+                },
               ),
             ),
-          ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+              child:
+                  _isLoading
+                      ? const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24),
+                        child: Center(
+                          child: CircularProgressIndicator(color: AppColors.blue),
+                        ),
+                      )
+                      : Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          ..._buildOrderedButtons(),
+                          const SizedBox(height: 24),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.warning_amber_rounded,
+                                  size: 22,
+                                  color: AppColors.warning,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  '전자책 스토어 구매자는 \n구매에 사용한 이메일 계정으로 로그인하세요.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.textSecondary,
+                                    height: 1.45,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+            ),
+          ],
         ),
       ),
     );

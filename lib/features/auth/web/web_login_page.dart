@@ -82,7 +82,7 @@ class _WebLoginPageState extends State<WebLoginPage> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        '© 치카북스',
+                        '© 하이진랩',
                         style: TextStyle(
                           fontSize: 12,
                           color: AppColors.textDisabled,
@@ -106,32 +106,28 @@ class _WebLoginPageState extends State<WebLoginPage> {
   Widget _buildLogo() {
     return Column(
       children: [
-        Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            color: AppColors.accent,
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: const Icon(
-            Icons.local_hospital_outlined,
-            size: 28,
-            color: AppColors.white,
+        Text(
+          'HygieneLab',
+          style: GoogleFonts.notoSansKr(
+            fontSize: 26,
+            fontWeight: FontWeight.w900,
+            color: AppColors.blue,
+            letterSpacing: 0.3,
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 2),
         Text(
-          '치카북스',
-          style: GoogleFonts.notoSansKr(
-            fontSize: 24,
-            fontWeight: FontWeight.w800,
-            color: AppColors.textPrimary,
-            letterSpacing: -0.5,
+          '하이진랩',
+          style: TextStyle(
+            fontSize: 19.5,
+            fontWeight: FontWeight.bold,
+            color: AppColors.textSecondary,
+            fontFamily: 'Apple SD Gothic Neo',
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
         Text(
-          '치과 커뮤니티 & 구인구직 플랫폼',
+          '치과인들의 커리어 연구소',
           style: GoogleFonts.notoSansKr(
             fontSize: 13,
             color: AppColors.textSecondary,

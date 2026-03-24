@@ -14,12 +14,12 @@ enum AppOnboardingStepId {
   step3,  // 탭1(나)  "나는 멍멍 치과에서 1년차로 일하고 있어. 넌?"
   step4,  // 탭1(나)  근무상태 + 치과/학교 입력 팝업
   step5,  // 탭1(나)  스팟라이트 → 탭4(커리어) 터치 유도
-  step6a, // 탭4(커리어 > 커리어카드)  "여기서 너의 커리어를 관리할 수 있어."
-  step6b, // 탭4(커리어 > 커리어카드)  "나중에 이력서를 사진찍어 올리면..."
-  step6c, // 탭4(커리어 > 커리어카드)  "그렇게 완성된 우리 이력서로..."
+  step6a, // 탭4(커리어 > 커리어카드)  커리어 소개 통합 대사 (6b·6c는 advance에서 건너뜀)
+  step6b, // (enum 순서 유지용, 플로우 미사용)
+  step6c, // (enum 순서 유지용, 플로우 미사용)
   step5b, // 탭4→탭3  스팟라이트 → 탭3(성장하기) 터치 유도
-  step7a, // 탭3(성장하기)  "여기서 자기 계발도 할 수 있어"
-  step7b, // 탭3(성장하기)  "나랑 같이 퀴즈, 제도들, 책으로..."
+  step7a, // 탭3(성장하기)  성장 소개 통합 대사 (7b는 advance에서 건너뜀)
+  step7b, // (enum 순서 유지용, 플로우 미사용)
   step8,  // 탭3(성장하기)  "이제 첫 번째 탭으로 가볼까?"
   step9a, // 탭1(나)  "난 항상 여기 있을건데..."
   step9b, // 탭1(나)  "하루 몇번이면 충분해."
@@ -53,10 +53,7 @@ const Set<AppOnboardingStepId> kTouchAdvanceSteps = {
   AppOnboardingStepId.step1b,
   AppOnboardingStepId.step3,
   AppOnboardingStepId.step6a,
-  AppOnboardingStepId.step6b,
-  AppOnboardingStepId.step6c,
   AppOnboardingStepId.step7a,
-  AppOnboardingStepId.step7b,
   // step8은 spotlight → 탭1 클릭으로만 진행 (터치 불가)
   AppOnboardingStepId.step9a,
   AppOnboardingStepId.step9b,
@@ -104,7 +101,11 @@ class AppOnboardingController extends ChangeNotifier {
 
   /// 다음 step으로 진행
   void advance() {
-    final next = _nextStep(_current);
+    final AppOnboardingStepId? next = switch (_current) {
+      AppOnboardingStepId.step6a => AppOnboardingStepId.step5b,
+      AppOnboardingStepId.step7a => AppOnboardingStepId.step8,
+      _ => _nextStep(_current),
+    };
     if (next == null) {
       _active = false;
       notifyListeners();

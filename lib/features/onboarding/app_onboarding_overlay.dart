@@ -15,12 +15,11 @@ const Map<AppOnboardingStepId, String> kStepDialogue = {
   AppOnboardingStepId.step1b: '넌 이름이 뭐야?',
   AppOnboardingStepId.step3:  '나는 멍멍 치과에서\n1년차로 일하고 있어.\n\n넌?',
   AppOnboardingStepId.step5:  '아래 커리어 탭을 눌러봐!',
-  AppOnboardingStepId.step6a: '여기서 너의 커리어를 관리할 수 있어.\n겁먹지마 천천히 하나씩 해도 되고,',
-  AppOnboardingStepId.step6b: '나중에 이력서를 사진찍어 올리면\nAI가 자동으로 입력해줄거야.',
-  AppOnboardingStepId.step6c: '그렇게 완성된 우리 이력서로\n여기서 바로 치과에 지원할 수도 있어.',
+  AppOnboardingStepId.step6a:
+      '여기서 너의 커리어를 관리해봐.\n기존 이력서를 AI가 자동입력도 해주고\n바로 공고에 지원도 가능해!',
   AppOnboardingStepId.step5b: '아래 성장하기 탭도 눌러봐!',
-  AppOnboardingStepId.step7a: '여기서 자기 계발도 할 수 있어',
-  AppOnboardingStepId.step7b: '나랑 같이 퀴즈, 제도들,\n책으로 공부 하면서 성장해 나가자!',
+  AppOnboardingStepId.step7a:
+      '여기서 자기 계발도 할 수 있어\n나랑 같이 퀴즈, 제도들,\n책으로 공부 하면서 성장해 나가자!',
   AppOnboardingStepId.step8:  '아래 첫 번째 탭으로 가볼까?',
   AppOnboardingStepId.step9a: '난 항상 여기 있을건데\n혹시 나 밥도 주고 사랑도 줄 수 있어?',
   AppOnboardingStepId.step9b: '하루 몇번이면 충분해.',

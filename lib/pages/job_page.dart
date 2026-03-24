@@ -8,7 +8,57 @@ import '../services/job_service.dart';
 import '../screen/jobs/job_listings_screen.dart';
 import '../screen/jobs/job_map_screen.dart';
 import 'career/career_tab.dart';
+import 'career/career_skill_section.dart';
 import 'settings/settings_page.dart';
+
+/// [careerSkillAutoHintToken]이 증가할 때마다(동일 세션 1회 등) 커리어 카드 탭으로 전환 후 스킬 편집 시트를 연다.
+class _CareerSkillAutoHintScope extends StatefulWidget {
+  final int token;
+  final Widget child;
+
+  const _CareerSkillAutoHintScope({
+    required this.token,
+    required this.child,
+  });
+
+  @override
+  State<_CareerSkillAutoHintScope> createState() =>
+      _CareerSkillAutoHintScopeState();
+}
+
+class _CareerSkillAutoHintScopeState extends State<_CareerSkillAutoHintScope> {
+  int _lastHandledToken = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _lastHandledToken = widget.token;
+  }
+
+  void _scheduleOpenIfNeeded(int newToken) {
+    if (newToken <= _lastHandledToken) return;
+    _lastHandledToken = newToken;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final tc = DefaultTabController.maybeOf(context);
+      if (tc != null) {
+        tc.animateTo(1);
+      }
+      CareerSkillEditSheet.show(context);
+    });
+  }
+
+  @override
+  void didUpdateWidget(_CareerSkillAutoHintScope oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.token != oldWidget.token) {
+      _scheduleOpenIfNeeded(widget.token);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
 
 /// 커리어(도전하기) 탭 - 탭4
 ///
@@ -16,9 +66,17 @@ import 'settings/settings_page.dart';
 /// - 소탭 1: 커리어 카드 (CareerTab)
 ///
 /// [isOnboardingActive] 온보딩 진행 중이면 커리어 카드(소탭1)로 바로 열림
+///
+/// [careerSkillAutoHintToken]은 홈에서 커리어 탭 3회 진입 시 1회 증가 → 스킬 시트 자동 오픈
 class JobPage extends StatefulWidget {
   final bool isOnboardingActive;
-  const JobPage({super.key, this.isOnboardingActive = false});
+  final int careerSkillAutoHintToken;
+
+  const JobPage({
+    super.key,
+    this.isOnboardingActive = false,
+    this.careerSkillAutoHintToken = 0,
+  });
 
   @override
   State<JobPage> createState() => _JobPageState();
@@ -92,24 +150,27 @@ class _JobPageState extends State<JobPage> {
           length: 2,
           // 탭4(커리어) 진입 시: 온보딩 중이면 소탭1(커리어카드)로 바로 시작
           initialIndex: widget.isOnboardingActive ? 1 : 0,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // ── 공통 타이틀 + 인포/설정 (두 소탭 모두 항상 표시) ──
-              const _JobPageTitleBar(),
-              // ── 공통 소탭바 (공고보기 / 커리어카드) ──
-              const CareerTabHeader(),
-              // 소탭 본문
-              Expanded(
-                child: TabBarView(
-                  physics: const NeverScrollableScrollPhysics(),
-                  children: [
-                    _buildJobsTab(),
-                    const CareerTab(),
-                  ],
+          child: _CareerSkillAutoHintScope(
+            token: widget.careerSkillAutoHintToken,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // ── 공통 타이틀 + 인포/설정 (두 소탭 모두 항상 표시) ──
+                const _JobPageTitleBar(),
+                // ── 공통 소탭바 (공고보기 / 커리어카드) ──
+                const CareerTabHeader(),
+                // 소탭 본문
+                Expanded(
+                  child: TabBarView(
+                    physics: const NeverScrollableScrollPhysics(),
+                    children: [
+                      _buildJobsTab(),
+                      const CareerTab(),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

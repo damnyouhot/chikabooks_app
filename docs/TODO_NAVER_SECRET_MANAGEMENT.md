@@ -8,7 +8,7 @@
 await FlutterNaverLogin.initSdk(
   clientId: 'EKvvbgJMV6rAx5L6Rybn',
   clientSecret: 'ZQ9vUktdbW',  // ⚠️ 하드코딩됨
-  clientName: '치과책방',
+  clientName: '하이진랩',
 );
 ```
 

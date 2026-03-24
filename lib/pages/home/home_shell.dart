@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../bond_page.dart';
 import '../caring_page.dart';
 import '../growth_page.dart';
@@ -48,6 +49,9 @@ class _HomeShellState extends State<HomeShell> {
   bool _onboardingChecked = true;
   bool _onboardingActive = false;
   late final AppOnboardingController _onboardingCtrl;
+
+  /// 커리어 탭 3회 진입 시 1회 스킬 시트 자동 오픈용 (JobPage에 전달)
+  int _careerSkillAutoHintToken = 0;
 
   @override
   void initState() {
@@ -124,7 +128,7 @@ class _HomeShellState extends State<HomeShell> {
           if (synced > 0 && mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('📚 치과책방 구매내역 ${synced}권을 불러왔습니다.'),
+                content: Text('📚 하이진랩 구매내역 ${synced}권을 불러왔습니다.'),
                 backgroundColor: AppColors.success,
                 behavior: SnackBarBehavior.floating,
                 duration: const Duration(seconds: 3),
@@ -142,11 +146,37 @@ class _HomeShellState extends State<HomeShell> {
     setState(() => _onboardingActive = false);
   }
 
+  /// 커리어 메인 탭(인덱스 3)에 온보딩이 아닐 때만 방문 카운트. 3번째 방문에서 1회 스킬 시트 오픈 신호.
+  Future<void> _maybeTriggerCareerThirdVisitSkillHint() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      const kDone = 'career_skill_third_visit_hint_done';
+      if (prefs.getBool(kDone) == true) return;
+
+      final n = (prefs.getInt('career_tab_visit_count') ?? 0) + 1;
+      await prefs.setInt('career_tab_visit_count', n);
+
+      if (n == 3) {
+        await prefs.setBool(kDone, true);
+        if (mounted) {
+          setState(() => _careerSkillAutoHintToken++);
+        }
+      }
+    } catch (_) {
+      // 프리퍼런스 실패 시 온보딩/탭 동작에는 영향 없음
+    }
+  }
+
   // ─────────────────────────────────────────────────────────
   // 탭 이동 (TabThemeNotifier 제거 → setState만으로 단순화)
   // ─────────────────────────────────────────────────────────
   void _setTab(int idx) {
+    final prev = _selectedIndex;
     setState(() => _selectedIndex = idx);
+
+    if (idx == 3 && prev != 3 && !_onboardingActive) {
+      unawaited(_maybeTriggerCareerThirdVisitSkillHint());
+    }
 
     if (idx == _bondTabIndex) {
       _bondKey.currentState?.refreshData();
@@ -234,6 +264,11 @@ class _HomeShellState extends State<HomeShell> {
             (_onboardingActive && _onboardingCtrl.isTab0Step)
                 ? kStepDialogue[_onboardingCtrl.current]
                 : null,
+        onboardingBoldWord:
+            (_onboardingActive &&
+                _onboardingCtrl.current == AppOnboardingStepId.step1a)
+            ? '저니'
+            : null,
         currentTabIndex: _selectedIndex,
       ),
       _bondPage,
@@ -241,6 +276,7 @@ class _HomeShellState extends State<HomeShell> {
       JobPage(
         key: ValueKey('job_$_onboardingActive'),
         isOnboardingActive: _onboardingActive,
+        careerSkillAutoHintToken: _careerSkillAutoHintToken,
       ),
     ];
 
