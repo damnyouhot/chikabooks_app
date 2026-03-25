@@ -15,6 +15,35 @@ import 'quiz_pool_service.dart';
 class AdminDashboardService {
   static final _db = FirebaseFirestore.instance;
 
+  // ─── Callable 응답 정규화 (플랫폼 채널 중첩 `Map<Object?, Object?>` 캐스팅 오류 방지) ───
+
+  static Map<String, dynamic> _deepDecodeCallableMap(Map<dynamic, dynamic> raw) {
+    return Map<String, dynamic>.fromEntries(
+      raw.entries.map(
+        (e) => MapEntry(
+          e.key is String ? e.key as String : e.key.toString(),
+          _deepDecodeCallableValue(e.value),
+        ),
+      ),
+    );
+  }
+
+  static dynamic _deepDecodeCallableValue(dynamic v) {
+    if (v == null) return null;
+    if (v is Map) {
+      return _deepDecodeCallableMap(Map<dynamic, dynamic>.from(v));
+    }
+    if (v is List) {
+      return v.map(_deepDecodeCallableValue).toList();
+    }
+    return v;
+  }
+
+  static Map<String, dynamic>? _mapFromCallableResult(Object? data) {
+    if (data is! Map) return null;
+    return _deepDecodeCallableMap(Map<dynamic, dynamic>.from(data));
+  }
+
   // ─── Overview ─────────────────────────────────────────────────
 
   /// 전체 사용자 수 (excludeFromStats 제외, 기간 무관)
@@ -222,6 +251,116 @@ class AdminDashboardService {
     }
   }
 
+  /// 콘텐츠 운영 허브 스냅샷 (Cloud Function `getContentOpsHub`).
+  ///
+  /// [schedulePreviewDays]: 오늘(KST) 포함 역방향으로 읽을 `quiz_schedule` 일수 (1~60, 기본 14).
+  static Future<Map<String, dynamic>?> getContentOpsHub({
+    int schedulePreviewDays = 14,
+  }) async {
+    try {
+      final callable = FirebaseFunctions.instanceFor(region: 'us-central1')
+          .httpsCallable('getContentOpsHub');
+      final result = await callable.call(<String, dynamic>{
+        'schedulePreviewDays': schedulePreviewDays,
+      });
+      return _mapFromCallableResult(result.data);
+    } catch (e, st) {
+      debugPrint('⚠️ getContentOpsHub: $e');
+      debugPrint('$st');
+      rethrow;
+    }
+  }
+
+  /// 다음 일일 퀴즈 선정 시뮬 (읽기 전용, Cloud Function `previewNextQuizSelection`).
+  static Future<Map<String, dynamic>?> previewNextQuizSelection() async {
+    try {
+      final callable = FirebaseFunctions.instanceFor(region: 'us-central1')
+          .httpsCallable('previewNextQuizSelection');
+      final result = await callable.call();
+      return _mapFromCallableResult(result.data);
+    } catch (e, st) {
+      debugPrint('⚠️ previewNextQuizSelection: $e');
+      debugPrint('$st');
+      rethrow;
+    }
+  }
+
+  /// `quiz_schedule` 의 국시/임상 첫 슬롯만 제거 또는 교체 (`adminMutateQuizScheduleSlot`).
+  ///
+  /// [action]: `remove` | `replace` · [slotType]: `national_exam` | `clinical`
+  /// 메타·풀·유저 기록은 변경하지 않음 (스케줄 문서만).
+  static Future<Map<String, dynamic>?> adminMutateQuizScheduleSlot({
+    String? dateKey,
+    required String action,
+    required String slotType,
+  }) async {
+    try {
+      final callable = FirebaseFunctions.instanceFor(region: 'us-central1')
+          .httpsCallable('adminMutateQuizScheduleSlot');
+      final payload = <String, dynamic>{
+        'action': action,
+        'slotType': slotType,
+      };
+      if (dateKey != null && dateKey.isNotEmpty) {
+        payload['dateKey'] = dateKey;
+      }
+      final result = await callable.call(payload);
+      return _mapFromCallableResult(result.data);
+    } catch (e, st) {
+      debugPrint('⚠️ adminMutateQuizScheduleSlot: $e');
+      debugPrint('$st');
+      rethrow;
+    }
+  }
+
+  /// 진행 중 공감투표를 종료하고 `displayOrder` 기준 다음 미종료 투표를 즉시 진행 (`adminAdvancePollQueue`).
+  static Future<Map<String, dynamic>?> adminAdvancePollQueue() async {
+    try {
+      final callable = FirebaseFunctions.instanceFor(region: 'us-central1')
+          .httpsCallable('adminAdvancePollQueue');
+      final result = await callable.call();
+      return _mapFromCallableResult(result.data);
+    } catch (e, st) {
+      debugPrint('⚠️ adminAdvancePollQueue: $e');
+      debugPrint('$st');
+      rethrow;
+    }
+  }
+
+  /// 공감투표 수동 종료 (Cloud Function `manualClosePoll`).
+  static Future<Map<String, dynamic>?> manualClosePoll(String pollId) async {
+    try {
+      final callable = FirebaseFunctions.instanceFor(region: 'us-central1')
+          .httpsCallable('manualClosePoll');
+      final result = await callable.call(<String, dynamic>{'pollId': pollId});
+      return _mapFromCallableResult(result.data);
+    } catch (e, st) {
+      debugPrint('⚠️ manualClosePoll: $e');
+      debugPrint('$st');
+      rethrow;
+    }
+  }
+
+  /// 공감투표 완전 삭제 — [confirmPollId] 가 [pollId] 와 같아야 함 (`adminDeletePoll`).
+  static Future<Map<String, dynamic>?> adminDeletePoll({
+    required String pollId,
+    required String confirmPollId,
+  }) async {
+    try {
+      final callable = FirebaseFunctions.instanceFor(region: 'us-central1')
+          .httpsCallable('adminDeletePoll');
+      final result = await callable.call(<String, dynamic>{
+        'pollId': pollId,
+        'confirmPollId': confirmPollId,
+      });
+      return _mapFromCallableResult(result.data);
+    } catch (e, st) {
+      debugPrint('⚠️ adminDeletePoll: $e');
+      debugPrint('$st');
+      rethrow;
+    }
+  }
+
   /// `quiz_meta/state` 의 usedQuizIds·lastScheduledDate 를
   /// 현재 사이클 [quiz_schedule] 과 맞춤 (Cloud Function `rebuildQuizMetaFromSchedules`).
   static Future<Map<String, dynamic>?> rebuildQuizMetaFromSchedules() async {
@@ -229,11 +368,7 @@ class AdminDashboardService {
       final callable = FirebaseFunctions.instanceFor(region: 'us-central1')
           .httpsCallable('rebuildQuizMetaFromSchedules');
       final result = await callable.call();
-      final data = result.data;
-      if (data is Map) {
-        return Map<String, dynamic>.from(data);
-      }
-      return null;
+      return _mapFromCallableResult(result.data);
     } catch (e, st) {
       debugPrint('⚠️ rebuildQuizMetaFromSchedules: $e');
       debugPrint('$st');
@@ -256,11 +391,7 @@ class AdminDashboardService {
         'targetDate': targetDate ?? QuizPoolService.todayKey,
         'forceReplace': forceReplace,
       });
-      final data = result.data;
-      if (data is Map) {
-        return Map<String, dynamic>.from(data);
-      }
-      return null;
+      return _mapFromCallableResult(result.data);
     } catch (e, st) {
       debugPrint('⚠️ manualScheduleQuiz: $e');
       debugPrint('$st');

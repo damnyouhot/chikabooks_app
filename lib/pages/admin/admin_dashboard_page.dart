@@ -6,16 +6,18 @@ import 'tabs/admin_feature_tab.dart';
 import 'tabs/admin_emotion_feed_tab.dart';
 import 'tabs/admin_behavior_tab.dart';
 import 'tabs/admin_trends_tab.dart';
+import 'tabs/admin_content_ops_tab.dart';
 
 /// 관리자 전용 운영 대시보드
 ///
-/// 6탭 구조:
+/// 7탭 구조:
 ///   - Overview     : 핵심 KPI + 연차 분포
 ///   - User Flow    : 가입 퍼널 + 전환율
 ///   - Feature      : 기능 클릭 TOP + 오류 리스트
 ///   - Behavior     : 행동 분석 (7개 지표, direct calculation)
 ///   - Trends       : 일별 추세 차트 (analytics_daily 기반)
 ///   - 기록하기     : 1번 탭 '기록하기'에서 작성한 notes 트위터 타임라인
+///   - 콘텐츠       : 운영 허브 (공감투표·퀴즈 스냅샷, 종료/삭제)
 ///
 /// 상단 기간 필터(오늘 / 최근 7일 / 최근 30일)가 모든 탭에 공통 적용됨
 class AdminDashboardPage extends StatefulWidget {
@@ -41,7 +43,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 6,
+      length: 7,
       child: Scaffold(
         backgroundColor: AppColors.appBg,
         appBar: AppBar(
@@ -94,6 +96,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   Tab(text: 'Behavior'),
                   Tab(text: 'Trends'),
                   Tab(text: '기록하기'),
+                  Tab(text: '콘텐츠'),
                 ],
               ),
             ),
@@ -107,6 +110,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             AdminBehaviorTab(since: _since),
             const AdminTrendsTab(),
             AdminEmotionFeedTab(since: _since),
+            const AdminContentOpsTab(),
           ],
         ),
       ),

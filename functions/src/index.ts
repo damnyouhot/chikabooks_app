@@ -3,6 +3,7 @@ import * as admin from "firebase-admin";
 import axios from "axios";
 import {parseStringPromise} from "xml2js";
 import * as crypto from "crypto";
+import { resolvePollOpsFromRows } from "./poll-ops-hub";
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -1184,7 +1185,12 @@ export { deleteMyAccount } from "./account-deletion";
 export { aggregateAnalyticsDaily } from "./scheduled-analytics";
 
 // ========== 공감투표 자동 종료 ==========
-export { closeExpiredPolls, manualClosePoll } from "./poll-close";
+export {
+  adminAdvancePollQueue,
+  adminDeletePoll,
+  closeExpiredPolls,
+  manualClosePoll,
+} from "./poll-close";
 
 // ========== 구인공고: 이미지 → 폼 자동채우기 (AI Vision) ==========
 /**
@@ -1862,6 +1868,41 @@ function poolDocMatchesContentPacks(
   return clinicalMatchesContentPack(data, cfg) && nationalMatchesContentPack(data, cfg);
 }
 
+/** 활성 quiz_pool 전체를 타입·packId 기준으로 집계 (운영 허브용, 읽기 전용 스냅샷) */
+function computeQuizPoolPackBreakdown(
+  poolSnap: FirebaseFirestore.QuerySnapshot,
+): {
+  activeTotal: number;
+  nationalExam: {withoutPackId: number; byPack: {packId: string; count: number}[]};
+  clinical: {withoutPackId: number; byPack: {packId: string; count: number}[]};
+} {
+  const natMap = new Map<string, number>();
+  const clinMap = new Map<string, number>();
+  let natLoose = 0;
+  let clinLoose = 0;
+  for (const doc of poolSnap.docs) {
+    const d = doc.data();
+    const t = quizQuestionType(d);
+    const pid = typeof d.packId === "string" ? d.packId.trim() : "";
+    if (t === "national_exam") {
+      if (!pid) natLoose++;
+      else natMap.set(pid, (natMap.get(pid) ?? 0) + 1);
+    } else {
+      if (!pid) clinLoose++;
+      else clinMap.set(pid, (clinMap.get(pid) ?? 0) + 1);
+    }
+  }
+  const toSorted = (m: Map<string, number>) =>
+    [...m.entries()]
+      .map(([packId, count]) => ({packId, count}))
+      .sort((a, b) => b.count - a.count);
+  return {
+    activeTotal: poolSnap.size,
+    nationalExam: {withoutPackId: natLoose, byPack: toSorted(natMap)},
+    clinical: {withoutPackId: clinLoose, byPack: toSorted(clinMap)},
+  };
+}
+
 /** 대시보드용: 스케줄 후보(패크 필터 적용) 기준 타입별 개수 + 이번 사이클 배포 수 */
 function computeQuizMetaAnalytics(
   poolSnap: FirebaseFirestore.QuerySnapshot,
@@ -2238,6 +2279,295 @@ export const manualScheduleQuiz = functions
     };
   });
 
+function scheduleItemQuestionType(it: Record<string, unknown>): "national_exam" | "clinical" {
+  return it.questionType === "national_exam" ? "national_exam" : "clinical";
+}
+
+function orderBoundsFromItems(items: Record<string, unknown>[]): { startOrder: number; endOrder: number } {
+  if (items.length === 0) return { startOrder: 0, endOrder: 0 };
+  const orders = items.map((it) =>
+    typeof it.order === "number" && Number.isFinite(it.order) ? it.order : 0,
+  );
+  return { startOrder: Math.min(...orders), endOrder: Math.max(...orders) };
+}
+
+function findFirstScheduleSlotIndex(
+  items: Record<string, unknown>[],
+  slotType: "national_exam" | "clinical",
+): number {
+  return items.findIndex((it) => scheduleItemQuestionType(it) === slotType);
+}
+
+/** 스케줄 슬롯 1개 교체용: 패크 필터·타입·excludeIds·(가능하면) 다른 책 우선 */
+async function pickSingleScheduleReplacement(
+  slotType: "national_exam" | "clinical",
+  excludeIds: string[],
+  preferDifferentBookThan: string,
+  contentCfg: QuizContentConfig,
+): Promise<FirebaseFirestore.QueryDocumentSnapshot | null> {
+  const poolSnap = await db.collection("quiz_pool").where("isActive", "==", true).get();
+  const allDocs = poolSnap.docs.filter((d) => poolDocMatchesContentPacks(d.data(), contentCfg));
+  let candidates = allDocs.filter(
+    (d) => quizQuestionType(d.data()) === slotType && !excludeIds.includes(d.id),
+  );
+  const otherBook = (preferDifferentBookThan || "").trim();
+  if (otherBook) {
+    const diffBook = candidates.filter(
+      (d) => ((d.data().sourceBook as string) || "") !== otherBook,
+    );
+    if (diffBook.length) candidates = diffBook;
+  }
+  const shuffled = shuffleArray(candidates);
+  return shuffled[0] ?? null;
+}
+
+/** getContentOpsHub: 오늘 스케줄 기준 교체 후보 1문항씩(읽기 전용, 스케줄 미변경) */
+async function computeTodaySlotNextPreviewsForHub(
+  schedData: FirebaseFirestore.DocumentData,
+  contentCfg: QuizContentConfig,
+): Promise<{
+  national: Record<string, unknown> | null;
+  clinical: Record<string, unknown> | null;
+}> {
+  const rawItems = schedData.items;
+  if (!Array.isArray(rawItems)) {
+    return { national: null, clinical: null };
+  }
+  const items: Record<string, unknown>[] = rawItems.map((it) => {
+    if (typeof it === "object" && it !== null && !Array.isArray(it)) {
+      return { ...(it as Record<string, unknown>) };
+    }
+    return {};
+  });
+  const excludeIds = items.map((it) => String(it.id ?? "")).filter((id) => id.length > 0);
+  const natItem = items.find((it) => scheduleItemQuestionType(it) === "national_exam");
+  const clinItem = items.find((it) => scheduleItemQuestionType(it) === "clinical");
+  const clinBook = clinItem ? String(clinItem.sourceBook ?? "") : "";
+  const natBook = natItem ? String(natItem.sourceBook ?? "") : "";
+
+  const [natDoc, clinDoc] = await Promise.all([
+    pickSingleScheduleReplacement("national_exam", excludeIds, clinBook, contentCfg),
+    pickSingleScheduleReplacement("clinical", excludeIds, natBook, contentCfg),
+  ]);
+
+  const toPreview = (
+    d: FirebaseFirestore.QueryDocumentSnapshot | null,
+    qt: string,
+  ): Record<string, unknown> | null => {
+    if (!d) return null;
+    const data = d.data();
+    const q = String(data.question ?? "");
+    return {
+      id: d.id,
+      questionType: qt,
+      questionPreview: q.length > 220 ? `${q.slice(0, 220)}…` : q,
+      sourceBook: String(data.sourceBook ?? ""),
+      sourceFileName: String(data.sourceFileName ?? ""),
+      packId: typeof data.packId === "string" ? data.packId : "",
+    };
+  };
+
+  return {
+    national: toPreview(natDoc, "national_exam"),
+    clinical: toPreview(clinDoc, "clinical"),
+  };
+}
+
+/**
+ * 어드민: 특정 날짜 quiz_schedule 에서 국시/임상 "첫 슬롯"만 제거 또는 교체.
+ * quiz_meta · quiz_pool · 사용자 기록은 수정하지 않음.
+ */
+export const adminMutateQuizScheduleSlot = functions
+  .region("us-central1")
+  .https.onCall(async (data, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "로그인 필요");
+    }
+    const callerDoc = await db.collection("users").doc(context.auth.uid).get();
+    if (callerDoc.data()?.isAdmin !== true) {
+      throw new functions.https.HttpsError("permission-denied", "어드민 권한 필요");
+    }
+
+    const { dateKey: rawDate, action, slotType } = data as {
+      dateKey?: string;
+      action?: string;
+      slotType?: string;
+    };
+
+    if (action !== "remove" && action !== "replace") {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "action은 remove 또는 replace 여야 합니다.",
+      );
+    }
+    if (slotType !== "national_exam" && slotType !== "clinical") {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "slotType은 national_exam 또는 clinical 이어야 합니다.",
+      );
+    }
+
+    const dateKey = (rawDate && String(rawDate).trim()) || toDateKey(new Date());
+    const scheduleRef = db.collection("quiz_schedule").doc(dateKey);
+    const snap = await scheduleRef.get();
+    if (!snap.exists) {
+      return { success: false, message: `${dateKey} 스케줄이 없습니다.` };
+    }
+
+    const sched = snap.data()!;
+    const rawItems = sched.items;
+    if (!Array.isArray(rawItems)) {
+      return { success: false, message: "스케줄 items 형식이 올바르지 않습니다." };
+    }
+
+    const items: Record<string, unknown>[] = rawItems.map((it) => {
+      if (typeof it === "object" && it !== null && !Array.isArray(it)) {
+        return { ...(it as Record<string, unknown>) };
+      }
+      return {};
+    });
+
+    const st = slotType as "national_exam" | "clinical";
+    const idx = findFirstScheduleSlotIndex(items, st);
+    if (idx < 0) {
+      return { success: false, message: `${slotType} 슬롯을 찾을 수 없습니다.` };
+    }
+
+    const cycleCount = typeof sched.cycleCount === "number" && Number.isFinite(sched.cycleCount)
+      ? sched.cycleCount
+      : 1;
+    const contentCfg = await loadQuizContentConfig();
+
+    if (action === "remove") {
+      items.splice(idx, 1);
+      const quizIds = items.map((it) => String(it.id ?? "")).filter((id) => id.length > 0);
+      const bounds = orderBoundsFromItems(items);
+      await scheduleRef.update({
+        items,
+        quizIds,
+        startOrder: bounds.startOrder,
+        endOrder: bounds.endOrder,
+      });
+      return {
+        success: true,
+        dateKey,
+        action: "remove",
+        slotType,
+        quizIds,
+        message: "스케줄에서 해당 슬롯을 제거했습니다.",
+      };
+    }
+
+    const [removed] = items.splice(idx, 1);
+    const excludeIds = items
+      .map((it) => String(it.id ?? ""))
+      .filter((id) => id.length > 0);
+
+    let preferBook = "";
+    for (const it of items) {
+      if (scheduleItemQuestionType(it) !== st) {
+        preferBook = String(it.sourceBook ?? "");
+        break;
+      }
+    }
+
+    const newDoc = await pickSingleScheduleReplacement(st, excludeIds, preferBook, contentCfg);
+    if (!newDoc) {
+      items.splice(idx, 0, removed);
+      return {
+        success: false,
+        message:
+          "교체할 문항이 없습니다. 활성 풀·콘텐츠 패크·이미 스케줄에 있는 ID 제외 조건을 확인하세요.",
+      };
+    }
+
+    const built = buildScheduleItem(newDoc, cycleCount);
+    items.splice(idx, 0, built);
+    const quizIds = items.map((it) => String(it.id ?? "")).filter((id) => id.length > 0);
+    const bounds = orderBoundsFromItems(items);
+
+    await scheduleRef.update({
+      items,
+      quizIds,
+      startOrder: bounds.startOrder,
+      endOrder: bounds.endOrder,
+    });
+
+    return {
+      success: true,
+      dateKey,
+      action: "replace",
+      slotType,
+      quizIds,
+      newQuizId: newDoc.id,
+      message: "해당 슬롯을 다른 문항으로 교체했습니다.",
+    };
+  });
+
+/**
+ * 다음 일일 스케줄에 들어갈 문항 선정 시뮬 (읽기 전용)
+ *
+ * - `pickTodayQuizzes` 와 동일 알고리즘·셔플을 사용하나 Firestore 에 기록하지 않음
+ * - 셔플 때문에 호출마다 결과가 달라질 수 있음 (실제 자정 배치와도 다를 수 있음)
+ */
+export const previewNextQuizSelection = functions
+  .region("us-central1")
+  .https.onCall(async (_data, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "로그인 필요");
+    }
+    const callerDoc = await db.collection("users").doc(context.auth.uid).get();
+    if (callerDoc.data()?.isAdmin !== true) {
+      throw new functions.https.HttpsError("permission-denied", "어드민 권한 필요");
+    }
+
+    const metaRef = db.doc("quiz_meta/state");
+    const metaDoc = await metaRef.get();
+    const meta = metaDoc.exists ? metaDoc.data()! : {};
+    const contentCfg = await loadQuizContentConfig();
+
+    const {selectedDocs, nextCycleCount, nextUsedQuizIds, wasReset} =
+      await pickTodayQuizzes(meta, contentCfg);
+
+    const trimPreview = (q: unknown, max: number): string => {
+      const s = typeof q === "string" ? q.trim() : "";
+      if (s.length <= max) return s;
+      return `${s.slice(0, max)}…`;
+    };
+
+    if (selectedDocs.length === 0) {
+      return {
+        success: false,
+        readOnly: true,
+        message: "선정 가능한 활성 문항이 없습니다. quiz_pool·config/quiz_content 패크 설정을 확인하세요.",
+      };
+    }
+
+    const items = selectedDocs.map((d) => {
+      const row = d.data();
+      return {
+        id: d.id,
+        questionType: quizQuestionType(row),
+        questionPreview: trimPreview(row.question, 140),
+        sourceBook: (row.sourceBook as string) || "",
+        packId: typeof row.packId === "string" ? row.packId : "",
+        sourceFileName: typeof row.sourceFileName === "string" ? row.sourceFileName : "",
+      };
+    });
+
+    return {
+      success: true,
+      readOnly: true,
+      disclaimer:
+        "자정 스케줄러와 같은 선정 로직이지만 셔플이 들어가 호출할 때마다 결과가 달라질 수 있습니다. 스케줄·메타·풀 문서는 변경하지 않습니다.",
+      wasReset,
+      cycleCountUsed: nextCycleCount,
+      hypotheticalUsedQuizIdsCount: nextUsedQuizIds.length,
+      contentConfig: contentCfg,
+      items,
+    };
+  });
+
 /**
  * quiz_meta/state 의 usedQuizIds·lastScheduledDate 를
  * 현재 사이클의 quiz_schedule 문서들과 다시 맞춤 (대시보드 불일치 보정).
@@ -2296,5 +2626,174 @@ export const rebuildQuizMetaFromSchedules = functions
       lastScheduledDate: maxDateKey || (meta.lastScheduledDate as string) || "",
       ...analytics,
       message: `사이클 ${cycleCount}: 스케줄에서 고유 문항 ${usedQuizIds.length}개로 동기화`,
+    };
+  });
+
+/**
+ * 콘텐츠 운영 허브용 읽기 전용 스냅샷 (어드민)
+ * - polls: displayOrder 오름차순
+ * - quiz: config/quiz_content + quiz_meta/state + 최근 N일 quiz_schedule 요약
+ */
+export const getContentOpsHub = functions
+  .region("us-central1")
+  .https.onCall(async (data, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "로그인 필요");
+    }
+    const callerDoc = await db.collection("users").doc(context.auth.uid).get();
+    if (callerDoc.data()?.isAdmin !== true) {
+      throw new functions.https.HttpsError("permission-denied", "어드민 권한 필요");
+    }
+
+    const raw = data as { schedulePreviewDays?: number } | undefined;
+    const n = raw?.schedulePreviewDays;
+    const schedulePreviewDays =
+      typeof n === "number" && Number.isFinite(n) && n > 0 && n <= 60 ?
+        Math.floor(n) :
+        14;
+
+    const contentCfg = await loadQuizContentConfig();
+
+    const metaSnap = await db.doc("quiz_meta/state").get();
+    const meta = metaSnap.exists ? metaSnap.data()! : {};
+    const usedQuizIds: string[] = Array.isArray(meta.usedQuizIds) ?
+      (meta.usedQuizIds as string[]) :
+      [];
+
+    const metaSummary = {
+      cycleCount: (meta.cycleCount as number) ?? 1,
+      lastScheduledDate: (meta.lastScheduledDate as string) ?? "",
+      dailyCount: (meta.dailyCount as number) ?? 2,
+      usedQuizIdsCount: usedQuizIds.length,
+      usedQuizIdsSample: usedQuizIds.slice(0, 40),
+      totalActiveCount: (meta.totalActiveCount as number) ?? 0,
+      totalNationalActiveCount: (meta.totalNationalActiveCount as number) ?? 0,
+      totalClinicalActiveCount: (meta.totalClinicalActiveCount as number) ?? 0,
+      usedNationalCount: (meta.usedNationalCount as number) ?? 0,
+      usedClinicalCount: (meta.usedClinicalCount as number) ?? 0,
+    };
+
+    const pollsSnap = await db.collection("polls").get();
+    const pollRows = pollsSnap.docs.map((doc) => {
+      const d = doc.data();
+      let displayOrder: number;
+      if (typeof d.displayOrder === "number" && Number.isFinite(d.displayOrder)) {
+        displayOrder = d.displayOrder;
+      } else if (typeof d.dayIndex === "number" && Number.isFinite(d.dayIndex)) {
+        displayOrder = d.dayIndex;
+      } else {
+        const m = /^empathy_(\d+)$/.exec(doc.id);
+        displayOrder = m ? parseInt(m[1], 10) : 1_000_000;
+      }
+      const ts = (v: unknown): string | null => {
+        if (v && typeof (v as admin.firestore.Timestamp).toDate === "function") {
+          return (v as admin.firestore.Timestamp).toDate().toISOString();
+        }
+        return null;
+      };
+      return {
+        id: doc.id,
+        displayOrder,
+        question: (d.question as string) ?? "",
+        status: (d.status as string) ?? "",
+        category: (d.category as string) ?? "",
+        startsAt: ts(d.startsAt),
+        endsAt: ts(d.endsAt),
+        closedAt: ts(d.closedAt),
+        dayIndex: d.dayIndex ?? null,
+        totalEmpathyCount: typeof d.totalEmpathyCount === "number" ? d.totalEmpathyCount : 0,
+      };
+    });
+    pollRows.sort((a, b) => {
+      if (a.displayOrder !== b.displayOrder) return a.displayOrder - b.displayOrder;
+      return a.id.localeCompare(b.id);
+    });
+
+    const nowMs = Date.now();
+    const notYetStarted = pollRows.filter((p) => {
+      if (!p.startsAt) return false;
+      const t = Date.parse(p.startsAt);
+      return !Number.isNaN(t) && t > nowMs;
+    });
+    notYetStarted.sort((a, b) => {
+      if (a.displayOrder !== b.displayOrder) return a.displayOrder - b.displayOrder;
+      return a.id.localeCompare(b.id);
+    });
+    const pollNextPreview = notYetStarted[0] ?? null;
+
+    const poolSnapHub = await db.collection("quiz_pool").where("isActive", "==", true).get();
+    const quizPoolPackBreakdown = computeQuizPoolPackBreakdown(poolSnapHub);
+
+    const scheduleKeys: string[] = [];
+    for (let i = 0; i < schedulePreviewDays; i++) {
+      scheduleKeys.push(toDateKey(new Date(Date.now() - i * 86400000)));
+    }
+
+    const schedSnaps = await Promise.all(
+      scheduleKeys.map((k) => db.collection("quiz_schedule").doc(k).get()),
+    );
+
+    const schedules = schedSnaps.map((sdoc, i) => {
+      const k = scheduleKeys[i];
+      if (!sdoc.exists) {
+        return { dateKey: k, exists: false };
+      }
+      const sd = sdoc.data()!;
+      const items = (sd.items as unknown[]) || [];
+      const quizIds = (sd.quizIds as string[]) || [];
+      return {
+        dateKey: k,
+        exists: true,
+        cycleCount: (sd.cycleCount as number) ?? 1,
+        quizIds,
+        itemCount: items.length,
+        questionTypes: items.map((it) => {
+          const row = it as Record<string, unknown>;
+          return (row.questionType as string) || "clinical";
+        }),
+      };
+    });
+
+    let todaySlotNextPreviews: {
+      national: Record<string, unknown> | null;
+      clinical: Record<string, unknown> | null;
+    } = { national: null, clinical: null };
+    const todaySchedDoc = schedSnaps[0];
+    if (todaySchedDoc.exists) {
+      todaySlotNextPreviews = await computeTodaySlotNextPreviewsForHub(
+        todaySchedDoc.data()!,
+        contentCfg,
+      );
+    }
+
+    const pollOps = resolvePollOpsFromRows(
+      pollRows.map((r) => ({
+        id: r.id,
+        displayOrder: r.displayOrder,
+        question: r.question,
+        status: r.status,
+        startsAt: r.startsAt,
+        endsAt: r.endsAt,
+      })),
+      Date.now(),
+    );
+
+    return {
+      success: true,
+      generatedAt: new Date().toISOString(),
+      polls: pollRows,
+      pollNextPreview,
+      pollOps: {
+        ...pollOps,
+        totalPolls: pollRows.length,
+        closedPolls: pollRows.filter((p) => p.status === "closed").length,
+      },
+      quiz: {
+        contentConfig: contentCfg,
+        meta: metaSummary,
+        schedules,
+        poolPackBreakdown: quizPoolPackBreakdown,
+        todaySlotNextPreviews,
+      },
     };
   });
