@@ -72,7 +72,8 @@ class ResumeService {
 
   /// 새 이력서 생성 → 생성된 resumeId 반환
   /// 빈 이력서(제목만 있고 내용 없음)가 있으면 재사용
-  static Future<String?> createResume({String title = '기본 이력서'}) async {
+  static Future<String?> createResume({String? title}) async {
+    final resolvedTitle = title ?? Resume.kDefaultResumeTitle;
     final uid = _uid;
     if (uid == null) return null;
 
@@ -104,7 +105,7 @@ class ResumeService {
       final resume = Resume(
         id: '',
         ownerUid: uid,
-        title: title,
+        title: resolvedTitle,
       );
       final ref = await _col.add(resume.toMap());
       debugPrint('✅ 이력서 생성: ${ref.id}');
@@ -264,6 +265,45 @@ class ResumeService {
     }
   }
 
+  /// `(복사)` 접미사 대신 `제목 (2)`, `(3)` … 형태로 고유 제목 부여
+  static String _baseTitleForDuplicate(String title) {
+    var s = title.trim();
+    while (true) {
+      const copySuffix = ' (복사)';
+      if (s.endsWith(copySuffix)) {
+        s = s.substring(0, s.length - copySuffix.length).trimRight();
+        continue;
+      }
+      final m = RegExp(r' \((\d+)\)$').firstMatch(s);
+      if (m != null) {
+        s = s.substring(0, s.length - m.group(0)!.length).trimRight();
+        continue;
+      }
+      break;
+    }
+    return s.isEmpty ? title.trim() : s;
+  }
+
+  /// 내 이력서 제목 중 [base]와 동일하거나 `base (n)` 인 항목의 최대 번호 뒤에 이어지는 제목
+  static String _nextDuplicateTitle(String originalTitle, List<Resume> all) {
+    final base = _baseTitleForDuplicate(originalTitle);
+    var maxN = 0;
+    final pattern = RegExp('^${RegExp.escape(base)} \\((\\d+)\\)\$');
+    for (final r in all) {
+      final t = r.title.trim();
+      if (t == base) {
+        if (maxN < 1) maxN = 1;
+        continue;
+      }
+      final m = pattern.firstMatch(t);
+      if (m != null) {
+        final n = int.tryParse(m.group(1) ?? '') ?? 0;
+        if (n > maxN) maxN = n;
+      }
+    }
+    return '$base (${maxN + 1})';
+  }
+
   /// 이력서 복제
   static Future<String?> duplicateResume(String resumeId) async {
     final uid = _uid;
@@ -272,10 +312,13 @@ class ResumeService {
       final original = await fetchResume(resumeId);
       if (original == null) return null;
 
+      final allMine = await fetchMyResumes();
+      final newTitle = _nextDuplicateTitle(original.title, allMine);
+
       final copy = Resume(
         id: '',
         ownerUid: uid,
-        title: '${original.title} (복사)',
+        title: newTitle,
         visibility: original.visibility,
         profile: original.profile,
         licenses: original.licenses,

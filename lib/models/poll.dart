@@ -14,6 +14,9 @@ class Poll {
   final int totalEmpathyCount;
   final String category;
 
+  /// 프로그램·운영 허브 정렬용 (낮을수록 앞). 미백필 문서는 [fromDoc]에서 dayIndex·문서 ID 등으로 유추.
+  final int displayOrder;
+
   const Poll({
     required this.id,
     required this.question,
@@ -23,6 +26,7 @@ class Poll {
     this.closedAt,
     this.totalEmpathyCount = 0,
     this.category = '',
+    this.displayOrder = 1000000,
   });
 
   bool get isActive => status == 'active';
@@ -47,6 +51,18 @@ class Poll {
     return diff.isNegative ? Duration.zero : diff;
   }
 
+  static int _displayOrderFromMap(Map<String, dynamic> m, String docId) {
+    final raw = m['displayOrder'];
+    if (raw is int) return raw;
+    if (raw is num) return raw.round();
+    final di = m['dayIndex'];
+    if (di is int) return di;
+    if (di is num) return di.round();
+    final match = RegExp(r'^empathy_(\d+)$').firstMatch(docId);
+    if (match != null) return int.parse(match.group(1)!);
+    return 1000000;
+  }
+
   factory Poll.fromDoc(DocumentSnapshot doc) {
     final m = doc.data() as Map<String, dynamic>? ?? {};
     return Poll(
@@ -58,6 +74,7 @@ class Poll {
       closedAt: (m['closedAt'] as Timestamp?)?.toDate(),
       totalEmpathyCount: (m['totalEmpathyCount'] as int?) ?? 0,
       category: m['category'] as String? ?? '',
+      displayOrder: _displayOrderFromMap(m, doc.id),
     );
   }
 
@@ -69,5 +86,6 @@ class Poll {
         if (closedAt != null) 'closedAt': Timestamp.fromDate(closedAt!),
         'totalEmpathyCount': totalEmpathyCount,
         'category': category,
+        'displayOrder': displayOrder,
       };
 }

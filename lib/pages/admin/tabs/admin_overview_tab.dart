@@ -4,6 +4,7 @@ import '../../../models/admin_dashboard_models.dart';
 import '../../../models/quiz_pool_item.dart';
 import '../../../models/quiz_schedule.dart';
 import '../../../services/admin_dashboard_service.dart';
+import '../../../services/quiz_content_config_service.dart';
 import '../../../services/quiz_pool_service.dart';
 import '../widgets/admin_common_widgets.dart';
 
@@ -95,6 +96,7 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
     });
 
     try {
+      final cfgF = QuizContentConfigService.getConfig();
       final results = await Future.wait([
         AdminDashboardService.getTotalUserCount(),
         AdminDashboardService.getRecentSignups(since: widget.since),
@@ -104,7 +106,7 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
         AdminDashboardService.getNoteCount(since: widget.since),
         AdminDashboardService.getCareerGroupDistribution(),
         AdminDashboardService.getQuizMetaState(),
-        QuizPoolService.getTodaySchedule(),
+        cfgF.then((c) => QuizPoolService.getTodaySchedule(contentConfig: c)),
         _loadOverviewHub(),
       ]);
 
@@ -409,9 +411,10 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
       final ok = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: Text('$typeKo 슬롯 제거'),
+          title: Text('$typeKo 문항 삭제'),
           content: Text(
-            'quiz_schedule/$today 에서 $typeKo 첫 슬롯을 제거합니다.\n'
+            '현재 $typeKo 문항을 quiz_pool에서 영구 삭제하고,\n'
+            '같은 타입의 다음 문항으로 자동 교체합니다.\n\n'
             '사용자 풀이 기록·quiz_meta·전역 통계는 변경되지 않습니다.',
           ),
           actions: [
@@ -528,6 +531,7 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
         title: const Text('현재 투표 완전 삭제'),
         content: Text(
           '투표 $pollId 및 보기·공감·댓글 등 하위 데이터가 영구 삭제됩니다.\n'
+          '삭제 후 다음 대기 투표가 자동으로 활성화됩니다.\n\n'
           '계속할까요?',
         ),
         actions: [

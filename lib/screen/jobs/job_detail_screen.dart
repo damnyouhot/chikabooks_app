@@ -33,19 +33,27 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   }
 
   Future<void> _load() async {
-    final job = await context.read<JobService>().fetchJob(widget.jobId);
+    final svc = context.read<JobService>();
+    Job job;
+    try {
+      job = await svc.fetchJob(widget.jobId);
+    } catch (e, st) {
+      debugPrint('⚠️ JobDetailScreen fetchJob: $e\n$st');
+      job = svc.jobOfflineFallback(widget.jobId);
+    }
     if (!mounted) return;
     setState(() => _job = job);
 
-    // 조회수 기록
-    JobStatsService.recordView(widget.jobId);
-
-    // 공고 상세 진입 이벤트 기록
-    AdminActivityService.log(
-      ActivityEventType.viewJobDetail,
-      page: 'job_detail',
-      targetId: widget.jobId,
-    );
+    try {
+      JobStatsService.recordView(widget.jobId);
+      AdminActivityService.log(
+        ActivityEventType.viewJobDetail,
+        page: 'job_detail',
+        targetId: widget.jobId,
+      );
+    } catch (e, st) {
+      debugPrint('⚠️ JobDetailScreen analytics: $e\n$st');
+    }
 
     if (widget.autoOpenApply) {
       WidgetsBinding.instance.addPostFrameCallback((_) {

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 import '../models/hira_update.dart';
 import '../services/hira_update_service.dart';
@@ -9,6 +8,8 @@ import '../core/widgets/app_muted_card.dart';
 import '../core/widgets/app_muted_button.dart';
 import '../core/widgets/app_badge.dart';
 import 'hira_comment_sheet.dart';
+import 'hira_update_detail_sheet.dart';
+import 'hira_web_view_sheet.dart';
 
 /// HIRA 업데이트 카드
 ///
@@ -32,6 +33,7 @@ class HiraUpdateCard extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: AppSpacing.md),
       child: AppMutedCard(
         padding: const EdgeInsets.all(AppSpacing.lg),
+        onTap: () => _openDetail(context),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -109,7 +111,7 @@ class HiraUpdateCard extends StatelessWidget {
                 Expanded(
                   flex: 2,
                   child: AppMutedButton(
-                    onTap: () => _openLink(context),
+                    onTap: () => _openWebView(context),
                     icon: Icons.open_in_new,
                     label: '원문 보기',
                     padding: const EdgeInsets.symmetric(vertical: 10),
@@ -132,30 +134,21 @@ class HiraUpdateCard extends StatelessWidget {
     );
   }
 
-  Future<void> _openLink(BuildContext context) async {
-    try {
-      final uri = Uri.parse(update.link);
-      final canLaunch = await canLaunchUrl(uri);
-      if (canLaunch) {
-        final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-        if (!launched && context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('브라우저를 열 수 없습니다')),
-          );
-        }
-      } else if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('링크를 열 수 없습니다')),
-        );
-      }
-    } catch (e) {
-      debugPrint('❌ URL launch error: $e');
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('오류: $e')),
-        );
-      }
-    }
+  void _openDetail(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => HiraUpdateDetailSheet(update: update),
+    );
+  }
+
+  void _openWebView(BuildContext context) {
+    HiraWebViewSheet.show(
+      context,
+      url: update.link,
+      title: update.title,
+    );
   }
 
   void _openCommentSheet(BuildContext context) {

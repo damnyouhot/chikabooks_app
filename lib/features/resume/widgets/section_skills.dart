@@ -114,19 +114,51 @@ class _SectionSkillsState extends State<SectionSkills> {
         ),
         const SizedBox(height: 12),
         const ResumeOcrPrompt(),
-        Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          children: _clinicalPresets.map((s) {
-            final selected = _items.any((sk) => sk.id == s);
-            return FilterChip(
-              label: Text(s, style: const TextStyle(fontSize: 12)),
-              selected: selected,
-              selectedColor: AppColors.accent.withOpacity(0.12),
-              checkmarkColor: AppColors.accent,
-              onSelected: (_) => _toggleSkill(s, s),
+        LayoutBuilder(
+          builder: (context, c) {
+            const gap = 8.0;
+            final w = (c.maxWidth - gap) / 2;
+            return Wrap(
+              spacing: gap,
+              runSpacing: gap,
+              children: _clinicalPresets.map((s) {
+                final selected = _items.any((sk) => sk.id == s);
+                return SizedBox(
+                  width: w,
+                  child: FilterChip(
+                    label: Text(
+                      s,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        height: 1.25,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    selected: selected,
+                    selectedColor: AppColors.accent.withOpacity(0.12),
+                    checkmarkColor: AppColors.accent,
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    side: BorderSide(
+                      color: selected
+                          ? AppColors.accent.withOpacity(0.45)
+                          : AppColors.divider,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    onSelected: (_) => _toggleSkill(s, s),
+                  ),
+                );
+              }).toList(),
             );
-          }).toList(),
+          },
         ),
 
         const SizedBox(height: 24),
@@ -135,19 +167,51 @@ class _SectionSkillsState extends State<SectionSkills> {
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
         ),
         const SizedBox(height: 12),
-        Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          children: _softPresets.map((s) {
-            final selected = _items.any((sk) => sk.id == s);
-            return FilterChip(
-              label: Text(s, style: const TextStyle(fontSize: 12)),
-              selected: selected,
-              selectedColor: AppColors.accent.withOpacity(0.12),
-              checkmarkColor: AppColors.accent,
-              onSelected: (_) => _toggleSkill(s, s),
+        LayoutBuilder(
+          builder: (context, c) {
+            const gap = 8.0;
+            final w = (c.maxWidth - gap) / 2;
+            return Wrap(
+              spacing: gap,
+              runSpacing: gap,
+              children: _softPresets.map((s) {
+                final selected = _items.any((sk) => sk.id == s);
+                return SizedBox(
+                  width: w,
+                  child: FilterChip(
+                    label: Text(
+                      s,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        height: 1.25,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    selected: selected,
+                    selectedColor: AppColors.accent.withOpacity(0.12),
+                    checkmarkColor: AppColors.accent,
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    side: BorderSide(
+                      color: selected
+                          ? AppColors.accent.withOpacity(0.45)
+                          : AppColors.divider,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    onSelected: (_) => _toggleSkill(s, s),
+                  ),
+                );
+              }).toList(),
             );
-          }).toList(),
+          },
         ),
 
         const SizedBox(height: 20),

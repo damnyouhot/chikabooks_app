@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_tokens.dart';
 import '../core/widgets/app_muted_button.dart';
@@ -8,6 +7,7 @@ import '../core/widgets/app_badge.dart';
 import '../models/hira_update.dart';
 import '../services/hira_update_service.dart';
 import 'hira_comment_sheet.dart';
+import 'hira_web_view_sheet.dart';
 
 /// HIRA 업데이트 상세 BottomSheet
 ///
@@ -62,15 +62,56 @@ class HiraUpdateDetailSheet extends StatelessWidget {
                   ),
                   const SizedBox(height: AppSpacing.sm),
 
-                  // 날짜
-                  Text(
-                    DateFormat('yyyy년 MM월 dd일 발표').format(update.publishedAt),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textPrimary.withOpacity(0.45),
-                    ),
+                  // 날짜 + 시행일 배지
+                  Row(
+                    children: [
+                      Text(
+                        DateFormat('yyyy년 MM월 dd일 발표').format(update.publishedAt),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textPrimary.withOpacity(0.45),
+                        ),
+                      ),
+                      if (update.effectiveDate != null) ...[
+                        const SizedBox(width: AppSpacing.sm),
+                        AppStatusBadge(
+                          badgeLevel: update.getBadgeLevel(),
+                          badgeText: update.getBadgeText(),
+                        ),
+                      ],
+                    ],
                   ),
                   const SizedBox(height: AppSpacing.xl),
+
+                  // 본문
+                  if (update.body.isNotEmpty) ...[
+                    Text(
+                      '본문 요약',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary.withOpacity(0.8),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(AppSpacing.lg),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceMuted,
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                      ),
+                      child: Text(
+                        update.body,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textSecondary,
+                          height: 1.6,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                  ],
 
                   // 업무 영향 체크
                   if (update.actionHints.isNotEmpty) ...[
@@ -119,7 +160,11 @@ class HiraUpdateDetailSheet extends StatelessWidget {
                         child: AppMutedButton(
                           icon: Icons.open_in_new,
                           label: '원문 보기',
-                          onTap: () => _openLink(context),
+                          onTap: () => HiraWebViewSheet.show(
+                            context,
+                            url: update.link,
+                            title: update.title,
+                          ),
                           padding: const EdgeInsets.symmetric(
                             vertical: AppSpacing.md,
                           ),
@@ -221,27 +266,6 @@ class HiraUpdateDetailSheet extends StatelessWidget {
         return '보통';
       default:
         return '참고만';
-    }
-  }
-
-  Future<void> _openLink(BuildContext context) async {
-    try {
-      final uri = Uri.parse(update.link);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('링크를 열 수 없습니다')),
-          );
-        }
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('오류: $e')),
-        );
-      }
     }
   }
 }

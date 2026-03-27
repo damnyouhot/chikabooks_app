@@ -176,7 +176,7 @@ class _ExperienceCardState extends State<_ExperienceCard> {
       margin: const EdgeInsets.only(bottom: 14),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -202,6 +202,8 @@ class _ExperienceCardState extends State<_ExperienceCard> {
               ],
             ),
             const SizedBox(height: 10),
+            Divider(height: 1, color: AppColors.divider.withOpacity(0.6)),
+            const SizedBox(height: 14),
 
             _field('병원명 *', _clinicCtrl, '예: 서울밝은치과'),
             _field('지역', _regionCtrl, '서울시 강남구'),
@@ -225,30 +227,61 @@ class _ExperienceCardState extends State<_ExperienceCard> {
                 color: AppColors.textSecondary,
               ),
             ),
-            const SizedBox(height: 4),
-            Wrap(
-              spacing: 6,
-              runSpacing: 4,
-              children: widget.taskOptions.map((t) {
-                final selected = _tasks.contains(t);
-                return FilterChip(
-                  label: Text(t, style: const TextStyle(fontSize: 11)),
-                  selected: selected,
-                  selectedColor: AppColors.accent.withOpacity(0.12),
-                  checkmarkColor: AppColors.accent,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  onSelected: (val) {
-                    setState(() {
-                      if (val) {
-                        _tasks.add(t);
-                      } else {
-                        _tasks.remove(t);
-                      }
-                    });
-                    _emit();
-                  },
+            const SizedBox(height: 6),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                const gap = 8.0;
+                final cellW = (constraints.maxWidth - gap) / 2;
+                return Wrap(
+                  spacing: gap,
+                  runSpacing: gap,
+                  children: widget.taskOptions.map((t) {
+                    final selected = _tasks.contains(t);
+                    return SizedBox(
+                      width: cellW,
+                      child: FilterChip(
+                        label: Text(
+                          t,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            height: 1.25,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        selected: selected,
+                        selectedColor: AppColors.accent.withOpacity(0.12),
+                        checkmarkColor: AppColors.accent,
+                        visualDensity: VisualDensity.compact,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        side: BorderSide(
+                          color: selected
+                              ? AppColors.accent.withOpacity(0.45)
+                              : AppColors.divider,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        onSelected: (val) {
+                          setState(() {
+                            if (val) {
+                              _tasks.add(t);
+                            } else {
+                              _tasks.remove(t);
+                            }
+                          });
+                          _emit();
+                        },
+                      ),
+                    );
+                  }).toList(),
                 );
-              }).toList(),
+              },
             ),
 
             const SizedBox(height: 10),

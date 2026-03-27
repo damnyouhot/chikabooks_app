@@ -3,7 +3,7 @@ import '../data/base_message_data.dart';
 
 /// 기본 메시지(우선순위 5) 생성 서비스
 ///
-/// Part1 / Part2 / Part3 전체 풀에서 1문장만 무작위로 반환.
+/// Part1 / Part2 / Part3 / relationshipGuide 전체 풀에서 1문장만 무작위로 반환.
 /// 최근 5개 중복 방지 룰 적용 (세션 내).
 class BaseMessageService {
   static const int _recentN = 5;
@@ -14,6 +14,7 @@ class BaseMessageService {
     ...BaseMessageData.part1,
     ...BaseMessageData.part2,
     ...BaseMessageData.part3,
+    ...BaseMessageData.relationshipGuide,
   ];
 
   // 최근 선택 항목 추적 (세션 내 중복 방지)

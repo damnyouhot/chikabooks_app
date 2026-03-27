@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart' show DocumentSnapshot;
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'poll_share_capture.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../core/widgets/app_muted_card.dart';
@@ -73,6 +75,52 @@ class BondPollSectionState extends State<BondPollSection> {
 
   TextEditingController _commentControllerFor(String pollId) {
     return _closedCommentControllers.putIfAbsent(pollId, TextEditingController.new);
+  }
+
+  Future<void> _shareActivePollAsImage() async {
+    final poll = _activePoll;
+    if (poll == null || !mounted) return;
+    final totalEmpathy = _options.fold<int>(0, (s, o) => s + o.empathyCount);
+    try {
+      await PollShareCapture.share(
+        context,
+        poll: poll,
+        options: List<PollOption>.from(_options),
+        badgeLabel: '오늘',
+        isPastStyle: false,
+        totalEmpathy: totalEmpathy,
+        selectedOptionId: _myVoteOptionId,
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('공유에 실패했어요. $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _shareClosedPollAsImage(Poll poll) async {
+    if (!mounted) return;
+    try {
+      final options = await EmpathyPollService.getOptionsOrderedForPoll(poll.id);
+      if (!mounted) return;
+      await PollShareCapture.share(
+        context,
+        poll: poll,
+        options: options,
+        badgeLabel: _formatPollDateBadge(poll),
+        isPastStyle: true,
+        totalEmpathy: poll.totalEmpathyCount,
+        selectedOptionId: null,
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('공유에 실패했어요. $e')),
+        );
+      }
+    }
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -217,26 +265,113 @@ class BondPollSectionState extends State<BondPollSection> {
     }
   }
 
-  void _showReportDialog(PollOption option) {
+  void _onPollOptionDeletePressed(
+    PollOption option, {
+    required bool isAuthor,
+    required bool canDeleteAsAuthor,
+  }) {
+    if (!canDeleteAsAuthor) {
+      final msg = !isAuthor
+          ? '본인이 추가한 보기만 삭제할 수 있어요.'
+          : '공감 인원이 많아 삭제할 수 없어요. (6명 이상)';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      return;
+    }
+    _showDeleteOptionDialog(option);
+  }
+
+  void _showDeleteOptionDialog(PollOption option) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('보기 신고', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-        content: Text('"${option.content}" 보기를 신고하시겠습니까?', style: const TextStyle(fontSize: 14)),
+        title: const Text('보기 삭제', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+        content: Text('"${option.content}" 보기를 삭제할까요?', style: const TextStyle(fontSize: 14)),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('취소')),
           TextButton(
             onPressed: () async {
               Navigator.pop(ctx);
-              final result = await EmpathyPollService.reportOption(_activePoll!.id, option.id);
+              // 낙관적 UI: 즉시 화면에서 제거
+              setState(() {
+                _options = _options.where((o) => o.id != option.id).toList();
+              });
+              final result = await EmpathyPollService.deleteMyOption(_activePoll!.id, option.id);
               if (!mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(result.success ? '신고가 접수되었습니다.' : (result.error ?? '오류'))),
-              );
+              if (!result.success) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(result.error ?? '삭제에 실패했습니다.')),
+                );
+              }
             },
-            child: const Text('신고', style: TextStyle(color: AppColors.error)),
+            child: const Text('삭제', style: TextStyle(color: AppColors.error)),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showReportDialog(PollOption option) {
+    final keys = EmpathyPollService.pollReportReasonLabels.keys.toList();
+    var selected = keys.first;
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSt) => AlertDialog(
+          title: const Text('보기 신고', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '신고 사유를 선택해주세요.',
+                  style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '"${option.content}"',
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 12),
+                ...EmpathyPollService.pollReportReasonLabels.entries.map(
+                  (e) => RadioListTile<String>(
+                    title: Text(e.value, style: const TextStyle(fontSize: 14)),
+                    value: e.key,
+                    groupValue: selected,
+                    onChanged: (v) {
+                      if (v != null) setSt(() => selected = v);
+                    },
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('취소')),
+            TextButton(
+              onPressed: () async {
+                final reason = selected;
+                Navigator.pop(ctx);
+                final result = await EmpathyPollService.reportOption(
+                  _activePoll!.id,
+                  option.id,
+                  reasonKey: reason,
+                );
+                if (!mounted) return;
+                final msg = !result.success
+                    ? (result.error ?? '오류')
+                    : result.reachedRemovalThreshold
+                        ? '누적 신고로 해당 보기가 삭제되었습니다.'
+                        : '신고가 접수되었습니다.';
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+              },
+              child: const Text('신고', style: TextStyle(color: AppColors.error)),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -300,14 +435,6 @@ class BondPollSectionState extends State<BondPollSection> {
             const SizedBox(width: 6),
             const Text('오늘의 공감 투표',
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-            const Spacer(),
-            _PollCountdownTicker(
-              key: ValueKey<String>(poll.id),
-              endsAt: poll.endsAt,
-              onExpired: () {
-                if (mounted) _loadActivePoll();
-              },
-            ),
           ],
         ),
         const SizedBox(height: 12),
@@ -316,20 +443,46 @@ class BondPollSectionState extends State<BondPollSection> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 질문
+              // 지난 투표 카드와 동일: 첫 줄 — 뱃지 · 남은 시간 · 공유
               Padding(
-                padding: const EdgeInsets.fromLTRB(AppSpacing.xl, AppSpacing.xl, AppSpacing.xl, AppSpacing.lg),
+                padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, 0),
                 child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    AppBadge(label: '오늘', bgColor: AppColors.pollBadgeBg, textColor: AppColors.pollBadgeText),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(poll.question,
-                          style: const TextStyle(
-                              fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary, height: 1.4)),
+                    AppBadge(
+                      label: '오늘',
+                      bgColor: AppColors.pollBadgeBg,
+                      textColor: AppColors.pollBadgeText,
+                    ),
+                    const Spacer(),
+                    _PollCountdownTicker(
+                      key: ValueKey<String>(poll.id),
+                      endsAt: poll.endsAt,
+                      onExpired: () {
+                        if (mounted) _loadActivePoll();
+                      },
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.share_outlined, size: 20),
+                      color: AppColors.textSecondary,
+                      tooltip: '공유',
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                      onPressed: _shareActivePollAsImage,
                     ),
                   ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(AppSpacing.xl, 10, AppSpacing.xl, AppSpacing.lg),
+                child: Text(
+                  poll.question,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                    height: 1.4,
+                  ),
                 ),
               ),
               // 보기 목록
@@ -388,6 +541,25 @@ class BondPollSectionState extends State<BondPollSection> {
               onSubmitted: (_) => _submitAddOption(),
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Checkbox(
+                  value: false,
+                  onChanged: null,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.compact,
+                  side: BorderSide(color: AppColors.textDisabled.withValues(alpha: 0.5)),
+                ),
+                Text(
+                  '닉네임 비공개',
+                  style: TextStyle(fontSize: 11, color: AppColors.textDisabled),
+                ),
+              ],
+            ),
+          ),
           _addingOption
               ? const Padding(
                   padding: EdgeInsets.only(right: 12),
@@ -411,69 +583,137 @@ class BondPollSectionState extends State<BondPollSection> {
     required int totalEmpathy,
   }) {
     final percentage = totalEmpathy > 0 ? (option.empathyCount / totalEmpathy * 100) : 0.0;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final isAuthor = !option.isSystem && uid != null && option.authorUid == uid;
+    final canDeleteAsAuthor = isAuthor && option.empathyCount <= 5;
+
+    final actionIconColor = isSelected
+        ? AppColors.pollOptionSelectedText.withValues(alpha: 0.95)
+        : AppColors.pollOptionText.withValues(alpha: 0.82);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-      child: GestureDetector(
-        onTap: () => _onEmpathize(option.id),
-        onLongPress: option.isSystem ? null : () => _showReportDialog(option),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 280),
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: 13),
-          decoration: BoxDecoration(
-            color: isSelected ? AppColors.pollOptionSelectedBg : AppColors.pollOptionBg.withValues(alpha: 0.85),
-            borderRadius: BorderRadius.circular(AppRadius.md),
-          ),
-          child: Row(
-            children: [
-              _buildRadioCircle(isSelected),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 280),
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: 13),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.pollOptionSelectedBg : AppColors.pollOptionBg.withValues(alpha: 0.85),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── 라디오 + 본문 (공감 탭 영역) ──────────────────
+            Expanded(
+              child: GestureDetector(
+                onTap: () => _onEmpathize(option.id),
+                behavior: HitTestBehavior.opaque,
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(option.content,
-                        style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
-                            color: isSelected ? AppColors.pollOptionSelectedText : AppColors.pollOptionText)),
-                    if (!option.isSystem)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Text('유저 추가',
-                            style: TextStyle(
-                                fontSize: 10,
-                                color: isSelected
-                                    ? AppColors.pollOptionSelectedText.withValues(alpha: 0.6)
-                                    : AppColors.textDisabled)),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: _buildRadioCircle(isSelected),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(option.content,
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
+                                  color: isSelected
+                                      ? AppColors.pollOptionSelectedText
+                                      : AppColors.pollOptionText)),
+                          if (!option.isSystem)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Text(option.displayAuthorLabel,
+                                  style: TextStyle(
+                                      fontSize: 10,
+                                      color: isSelected
+                                          ? AppColors.pollOptionSelectedText.withValues(alpha: 0.6)
+                                          : AppColors.textDisabled)),
+                            ),
+                        ],
                       ),
+                    ),
                   ],
                 ),
               ),
-              if (hasVoted) ...[
-                const SizedBox(width: 8),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+            ),
+            // ── 삭제(작성자만)·신고 버튼 ───────────────────────
+            if (!option.isSystem)
+              Padding(
+                padding: const EdgeInsets.only(left: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text('${percentage.toStringAsFixed(1)}%',
-                        style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: isSelected
-                                ? AppColors.pollOptionSelectedText.withValues(alpha: 0.8)
-                                : AppColors.textSecondary)),
-                    Text('${option.empathyCount}명',
-                        style: TextStyle(
-                            fontSize: 10,
-                            color: isSelected
-                                ? AppColors.pollOptionSelectedText.withValues(alpha: 0.5)
-                                : AppColors.textDisabled)),
+                    // 삭제 — 작성자만 노출
+                    if (isAuthor)
+                      IconButton(
+                        icon: Icon(
+                          Icons.delete_outline,
+                          size: 18,
+                          color: canDeleteAsAuthor
+                              ? actionIconColor
+                              : actionIconColor.withValues(alpha: 0.38),
+                        ),
+                        tooltip: '삭제',
+                        onPressed: () => _onPollOptionDeletePressed(
+                          option,
+                          isAuthor: isAuthor,
+                          canDeleteAsAuthor: canDeleteAsAuthor,
+                        ),
+                        padding: EdgeInsets.zero,
+                        visualDensity: VisualDensity.compact,
+                        constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                      ),
+                    // 신고 — 모든 유저 표시
+                    IconButton(
+                      icon: Icon(Icons.flag_outlined, size: 18, color: actionIconColor),
+                      tooltip: '신고',
+                      onPressed: () => _showReportDialog(option),
+                      padding: EdgeInsets.zero,
+                      visualDensity: VisualDensity.compact,
+                      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                    ),
                   ],
                 ),
-              ],
-            ],
-          ),
+              ),
+            // ── 퍼센트 + 명수 (투표 후 표시, 맨 우측) ──────────
+            if (hasVoted)
+              GestureDetector(
+                onTap: () => _onEmpathize(option.id),
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 6),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('${percentage.toStringAsFixed(1)}%',
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: isSelected
+                                  ? AppColors.pollOptionSelectedText.withValues(alpha: 0.8)
+                                  : AppColors.textSecondary)),
+                      Text('${option.empathyCount}명',
+                          style: TextStyle(
+                              fontSize: 10,
+                              color: isSelected
+                                  ? AppColors.pollOptionSelectedText.withValues(alpha: 0.5)
+                                  : AppColors.textDisabled)),
+                    ],
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -570,7 +810,15 @@ class BondPollSectionState extends State<BondPollSection> {
               children: [
                 AppBadge(label: dateStr, bgColor: AppColors.cardPrimary, textColor: AppColors.onCardPrimary),
                 const Spacer(),
-                Text('${totalEmpathy}명 참여', style: const TextStyle(fontSize: 11, color: AppColors.textDisabled)),
+                Text('$totalEmpathy명 참여', style: const TextStyle(fontSize: 11, color: AppColors.textDisabled)),
+                IconButton(
+                  icon: const Icon(Icons.share_outlined, size: 20),
+                  color: AppColors.textSecondary,
+                  tooltip: '공유',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  onPressed: () => _shareClosedPollAsImage(poll),
+                ),
               ],
             ),
             const SizedBox(height: 10),
@@ -744,11 +992,24 @@ class BondPollSectionState extends State<BondPollSection> {
             ),
           ),
           Expanded(
-            child: Text(option.content,
-                style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: rank == 0 ? FontWeight.w600 : FontWeight.w400,
-                    color: AppColors.textPrimary)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(option.content,
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: rank == 0 ? FontWeight.w600 : FontWeight.w400,
+                        color: AppColors.textPrimary)),
+                if (!option.isSystem)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      option.displayAuthorLabel,
+                      style: const TextStyle(fontSize: 10, color: AppColors.textDisabled),
+                    ),
+                  ),
+              ],
+            ),
           ),
           const SizedBox(width: 8),
           Text('$pct%',

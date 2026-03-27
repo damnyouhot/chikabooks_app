@@ -602,47 +602,43 @@ class _SignInPageState extends State<SignInPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  return SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Text(
-                            'HygieneLab',
-                            style: TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w900,
-                              color: AppColors.blue,
-                              letterSpacing: 0.35,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '하이진랩',
-                            style: TextStyle(
-                              fontSize: 19.5,
-                              color: AppColors.textSecondary,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'Apple SD Gothic Neo',
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            '치과인들의 커리어 연구소',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: AppColors.textSecondary.withValues(alpha: 0.85),
-                            ),
-                          ),
-                        ],
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'HygieneLab',
+                        style: TextStyle(
+                          fontSize: 29,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.blue,
+                          letterSpacing: 0.35,
+                        ),
                       ),
-                    ),
-                  );
-                },
+                      const SizedBox(height: 2),
+                      Text(
+                        '하이진랩',
+                        style: TextStyle(
+                          fontSize: 20,
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w900,
+                          fontFamily: 'Apple SD Gothic Neo',
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        '치과인들의 커리어 만들기',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary.withValues(alpha: 0.9),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
             Padding(
@@ -673,7 +669,7 @@ class _SignInPageState extends State<SignInPage> {
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  '전자책 스토어 구매자는 \n구매에 사용한 이메일 계정으로 로그인하세요.',
+                                  '치과책방 전자책 구매자는 \n치과책방 계정으로 로그인하셔야 구매하신 책이 앱에 등록됩니다',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
                                     fontSize: 12,
@@ -778,14 +774,14 @@ class _SignInPageState extends State<SignInPage> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
               decoration: BoxDecoration(
-                color: AppColors.success,
+                color: AppColors.accent,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Text(
                 '마지막 로그인',
                 style: TextStyle(
                   fontSize: 10,
-                  color: AppColors.white,
+                  color: AppColors.onAccent,
                   fontWeight: FontWeight.w700,
                 ),
               ),

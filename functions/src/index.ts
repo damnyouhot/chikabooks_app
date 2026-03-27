@@ -129,6 +129,98 @@ function getCurrentDateKey(): string {
   return `${year}-${month}-${day}`;
 }
 
+/** HIRA CMS RSS (구 /rc/rss/rss_hira_*.xml 는 404 — 고객지원 RSS 안내 URL) */
+const HIRA_RSS_FEEDS = [
+  {
+    url: "https://www.hira.or.kr/cms/policy/03/01/01/01/act_notice.xml",
+    topic: "act",
+    filterKeyword: null,
+  },
+  {
+    url: "https://www.hira.or.kr/cms/inform/01/notice.xml",
+    topic: "notice",
+    filterKeyword: "치과",
+  },
+  {
+    url: "https://www.hira.or.kr/cms/policy/03/01/01/02/care_notice.xml",
+    topic: "material",
+    filterKeyword: null,
+  },
+  {
+    url: "https://www.hira.or.kr/cms/policy/03/01/04/02/request.xml",
+    topic: "billing",
+    filterKeyword: null,
+  },
+] as const;
+
+/** CMS 피드 pubDate: "20260325 17:28:44" (KST) — RFC822가 아님 */
+function parseHiraRssPubDate(pubDate: string): Date {
+  const trimmed = (pubDate || "").trim();
+  const cms = /^(\d{4})(\d{2})(\d{2})\s+(\d{2}):(\d{2}):(\d{2})$/.exec(
+    trimmed
+  );
+  if (cms) {
+    const [, y, mo, d, h, mi, s] = cms;
+    return new Date(`${y}-${mo}-${d}T${h}:${mi}:${s}+09:00`);
+  }
+  const parsed = new Date(trimmed);
+  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+}
+
+function absolutizeHiraLink(link: string): string {
+  const t = (link || "").trim();
+  if (!t) return t;
+  if (/^https?:\/\//i.test(t)) return t;
+  const base = "https://www.hira.or.kr";
+  return t.startsWith("/") ? `${base}${t}` : `${base}/${t}`;
+}
+
+/** RSS <description> HTML → 읽을 수 있는 plain text */
+function htmlToPlainText(html: string): string {
+  if (!html) return "";
+  return html
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, "\"")
+    .replace(/&#xD;\n?/g, "\n")
+    .replace(/<!\[CDATA\[/gi, "")
+    .replace(/\]\]>/g, "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<\/div>/gi, "\n")
+    .replace(/<\/li>/gi, "\n")
+    .replace(/<\/tr>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+    .slice(0, 3000);
+}
+
+/** 본문에서 시행일 자동 추출 ("시행일자 : 2026.3.25." 등) */
+function extractEffectiveDate(
+  text: string
+): admin.firestore.Timestamp | null {
+  const patterns = [
+    /시행일[자]?\s*[:：]\s*(\d{4})[.\-/\s](\d{1,2})[.\-/\s](\d{1,2})/,
+    /(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})[.\s]*시행/,
+  ];
+  for (const re of patterns) {
+    const m = re.exec(text);
+    if (m) {
+      const d = new Date(
+        `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}T00:00:00+09:00`
+      );
+      if (!Number.isNaN(d.getTime())) {
+        return admin.firestore.Timestamp.fromDate(d);
+      }
+    }
+  }
+  return null;
+}
+
 // ────────────────────────────────────────
 // HIRA RSS 수집 + Digest 생성
 // ────────────────────────────────────────
@@ -143,6 +235,47 @@ interface HiraUpdate {
   keywords: string[];
   actionHints: string[];
   fetchedAt: admin.firestore.Timestamp;
+  body?: string;
+  effectiveDate?: admin.firestore.Timestamp | null;
+  isDental?: "yes" | "no" | "maybe";
+}
+
+// ── 치과 관련성 분류 ──
+
+const DENTAL_WHITELIST = [
+  "치과", "구강", "악안면", "치주", "근관", "발치", "임플란트",
+  "틀니", "레진", "치석", "스케일링", "보철", "교정", "치아",
+  "치수", "치은", "치조골", "사랑니", "크라운", "브릿지", "의치",
+  "치과급여부", "치과기획부", "치과위생사",
+];
+
+const DENTAL_BLACKLIST = [
+  "한방", "한의원", "한의사", "한약", "약국", "조제", "약사",
+  "산부인과", "안과", "이비인후과", "정형외과", "피부과", "비뇨기과",
+  "항암제", "조영제", "투석", "인공신장", "방사선치료",
+  "정신건강", "요양병원",
+  "장애인 보조기기", "간호등급", "영양관리료", "차등제",
+  "요양기관", "입원료", "간호간병", "의료급여",
+  "재활", "호스피스", "장기요양", "보조기기",
+  "간호관리료", "치료식", "의료질평가",
+];
+
+const DENTAL_CODE_RE = /\b[UL]\d{3,5}\b/;
+
+function classifyDental(title: string, body: string): "yes" | "no" | "maybe" {
+  const text = `${title} ${body}`;
+
+  const hasCode = DENTAL_CODE_RE.test(text);
+  if (hasCode) return "yes";
+
+  const blackCount = DENTAL_BLACKLIST.filter((kw) => text.includes(kw)).length;
+  const whiteCount = DENTAL_WHITELIST.filter((kw) => text.includes(kw)).length;
+
+  if (whiteCount > 0 && blackCount === 0) return "yes";
+  if (whiteCount > 0 && whiteCount > blackCount) return "yes";
+  if (whiteCount > 0 && whiteCount <= blackCount) return "maybe";
+  if (blackCount > 0) return "no";
+  return "maybe";
 }
 
 /**
@@ -153,20 +286,9 @@ export const syncHiraUpdates = functions
   .timeZone("Asia/Seoul")
   .onRun(async () => {
     try {
-      const rssUrls = [
-        {
-          url: "https://www.hira.or.kr/rc/rss/rss_hira_act.xml",
-          topic: "act",
-        },
-        {
-          url: "https://www.hira.or.kr/rc/rss/rss_hira_notice.xml",
-          topic: "notice",
-        },
-      ];
-
       let totalProcessed = 0;
 
-      for (const {url, topic} of rssUrls) {
+      for (const {url, topic, filterKeyword} of HIRA_RSS_FEEDS) {
         try {
           const response = await axios.get(url, {timeout: 10000});
           const parsed = await parseStringPromise(response.data);
@@ -174,37 +296,45 @@ export const syncHiraUpdates = functions
 
           for (const item of items) {
             const title = item.title?.[0] || "";
-            const link = item.link?.[0] || "";
+            const rawLink = item.link?.[0] || "";
+            const link = absolutizeHiraLink(rawLink);
             const pubDate = item.pubDate?.[0] || "";
+            const descHtml = item.description?.[0] || "";
 
             if (!title || !link) continue;
 
-            // docId = SHA-1(link)
+            const body = htmlToPlainText(descHtml);
+
+            if (filterKeyword &&
+                !title.includes(filterKeyword) &&
+                !body.includes(filterKeyword)) {
+              continue;
+            }
+
             const docId = crypto
               .createHash("sha1")
               .update(link)
               .digest("hex");
 
-            // 이미 존재하는지 확인
             const docRef = db.collection("content_hira_updates").doc(docId);
             const docSnap = await docRef.get();
 
-            if (docSnap.exists) continue; // 이미 있으면 스킵
+            if (docSnap.exists) continue;
 
-            // impactScore 계산
-            const {score, keywords} = calculateImpactScore(title);
+            const isDental = classifyDental(title, body);
+            if (isDental === "no") continue;
+
+            const {score: rawScore, keywords} = calculateImpactScore(title);
+            const score = isDental === "maybe"
+              ? Math.round(rawScore * 0.5)
+              : rawScore;
             const impactLevel = getImpactLevel(score);
             const actionHints = generateActionHints(title);
+            const effectiveDate = extractEffectiveDate(body);
 
-            // publishedAt 변환
-            let publishedAt: admin.firestore.Timestamp;
-            try {
-              publishedAt = admin.firestore.Timestamp.fromDate(
-                new Date(pubDate)
-              );
-            } catch {
-              publishedAt = admin.firestore.Timestamp.now();
-            }
+            const publishedAt = admin.firestore.Timestamp.fromDate(
+              parseHiraRssPubDate(pubDate)
+            );
 
             const updateData: HiraUpdate = {
               title,
@@ -216,6 +346,9 @@ export const syncHiraUpdates = functions
               keywords,
               actionHints,
               fetchedAt: admin.firestore.Timestamp.now(),
+              body,
+              effectiveDate,
+              isDental,
             };
 
             await docRef.set(updateData);
@@ -245,14 +378,29 @@ export const buildHiraDigest = functions
         Date.now() - 14 * 24 * 60 * 60 * 1000
       );
 
-      // 최근 14일 내 impactScore 높은 순 3개
-      const snapshot = await db
+      // 최근 14일 내 치과 확정(yes) + impactScore 높은 순 3개
+      let snapshot = await db
         .collection("content_hira_updates")
+        .where("isDental", "==", "yes")
         .where("publishedAt", ">=", fourteenDaysAgo)
         .orderBy("publishedAt", "desc")
         .orderBy("impactScore", "desc")
         .limit(3)
         .get();
+
+      // "yes"가 3개 미만이면 "maybe"로 보충
+      if (snapshot.docs.length < 3) {
+        const maybeFallback = await db
+          .collection("content_hira_updates")
+          .where("isDental", "==", "maybe")
+          .where("publishedAt", ">=", fourteenDaysAgo)
+          .orderBy("publishedAt", "desc")
+          .orderBy("impactScore", "desc")
+          .limit(3 - snapshot.docs.length)
+          .get();
+        const allDocs = [...snapshot.docs, ...maybeFallback.docs];
+        snapshot = {docs: allDocs} as typeof snapshot;
+      }
 
       const topIds = snapshot.docs.map((doc) => doc.id);
 
@@ -371,24 +519,13 @@ function generateActionHints(title: string): string[] {
 export const syncHiraUpdatesHistorical = functions
   .https.onRequest(async (req, res): Promise<void> => {
     try {
-      const rssUrls = [
-        {
-          url: "https://www.hira.or.kr/rc/rss/rss_hira_act.xml",
-          topic: "act",
-        },
-        {
-          url: "https://www.hira.or.kr/rc/rss/rss_hira_notice.xml",
-          topic: "notice",
-        },
-      ];
-
       let totalProcessed = 0;
       const threeMonthsAgo = new Date();
       threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
 
       console.log(`📅 수집 시작: ${threeMonthsAgo.toISOString()} 이후 데이터`);
 
-      for (const {url, topic} of rssUrls) {
+      for (const {url, topic, filterKeyword} of HIRA_RSS_FEEDS) {
         try {
           const response = await axios.get(url, {timeout: 15000});
           const parsed = await parseStringPromise(response.data);
@@ -398,36 +535,44 @@ export const syncHiraUpdatesHistorical = functions
 
           for (const item of items) {
             const title = item.title?.[0] || "";
-            const link = item.link?.[0] || "";
+            const rawLink = item.link?.[0] || "";
+            const link = absolutizeHiraLink(rawLink);
             const pubDate = item.pubDate?.[0] || "";
+            const descHtml = item.description?.[0] || "";
 
             if (!title || !link) continue;
 
-            // 3개월 이내 데이터만
-            let publishedDate: Date;
-            try {
-              publishedDate = new Date(pubDate);
-              if (publishedDate < threeMonthsAgo) continue;
-            } catch {
+            const publishedDate = parseHiraRssPubDate(pubDate);
+            if (publishedDate < threeMonthsAgo) continue;
+
+            const body = htmlToPlainText(descHtml);
+
+            if (filterKeyword &&
+                !title.includes(filterKeyword) &&
+                !body.includes(filterKeyword)) {
               continue;
             }
 
-            // docId = SHA-1(link)
             const docId = crypto
               .createHash("sha1")
               .update(link)
               .digest("hex");
 
-            // 이미 존재하는지 확인
             const docRef = db.collection("content_hira_updates").doc(docId);
             const docSnap = await docRef.get();
 
             if (docSnap.exists) continue;
 
-            // impactScore 계산
-            const {score, keywords} = calculateImpactScore(title);
+            const isDental = classifyDental(title, body);
+            if (isDental === "no") continue;
+
+            const {score: rawScore, keywords} = calculateImpactScore(title);
+            const score = isDental === "maybe"
+              ? Math.round(rawScore * 0.5)
+              : rawScore;
             const impactLevel = getImpactLevel(score);
             const actionHints = generateActionHints(title);
+            const effectiveDate = extractEffectiveDate(body);
 
             const publishedAt = admin.firestore.Timestamp.fromDate(
               publishedDate
@@ -443,6 +588,9 @@ export const syncHiraUpdatesHistorical = functions
               keywords,
               actionHints,
               fetchedAt: admin.firestore.Timestamp.now(),
+              body,
+              effectiveDate,
+              isDental,
             };
 
             await docRef.set(updateData);
@@ -514,13 +662,27 @@ async function buildHiraDigestManually() {
       Date.now() - 14 * 24 * 60 * 60 * 1000
     );
 
-    const snapshot = await db
+    let snapshot = await db
       .collection("content_hira_updates")
+      .where("isDental", "==", "yes")
       .where("publishedAt", ">=", fourteenDaysAgo)
       .orderBy("publishedAt", "desc")
       .orderBy("impactScore", "desc")
       .limit(3)
       .get();
+
+    if (snapshot.docs.length < 3) {
+      const maybeFallback = await db
+        .collection("content_hira_updates")
+        .where("isDental", "==", "maybe")
+        .where("publishedAt", ">=", fourteenDaysAgo)
+        .orderBy("publishedAt", "desc")
+        .orderBy("impactScore", "desc")
+        .limit(3 - snapshot.docs.length)
+        .get();
+      const allDocs = [...snapshot.docs, ...maybeFallback.docs];
+      snapshot = {docs: allDocs} as typeof snapshot;
+    }
 
     const topIds = snapshot.docs.map((doc) => doc.id);
 
@@ -539,6 +701,70 @@ async function buildHiraDigestManually() {
     console.error("⚠️ buildHiraDigestManually error:", error);
   }
 }
+
+/**
+ * 기존 Firestore 문서에 isDental 필드를 소급 적용하는 1회성 함수
+ */
+export const reclassifyHiraDental = functions
+  .region("asia-northeast3")
+  .runWith({timeoutSeconds: 300, memory: "512MB"})
+  .https.onRequest(async (req, res): Promise<void> => {
+    try {
+      const snap = await db.collection("content_hira_updates").get();
+      let updated = 0;
+      let removed = 0;
+      let batch = db.batch();
+      let batchCount = 0;
+
+      for (const doc of snap.docs) {
+        const data = doc.data();
+        const title = data.title || "";
+        const body = data.body || "";
+        const isDental = classifyDental(title, body);
+
+        if (isDental === "no") {
+          batch.delete(doc.ref);
+          removed++;
+        } else {
+          const updates: {[key: string]: string | number} = {isDental};
+          if (isDental === "maybe" && typeof data.impactScore === "number") {
+            const {score: freshRaw} = calculateImpactScore(title);
+            updates.impactScore = Math.round(freshRaw * 0.5);
+            updates.impactLevel = getImpactLevel(updates.impactScore);
+          }
+          batch.update(doc.ref, updates);
+          updated++;
+        }
+        batchCount++;
+
+        if (batchCount >= 450) {
+          await batch.commit();
+          batch = db.batch();
+          batchCount = 0;
+        }
+      }
+
+      if (batchCount > 0) {
+        await batch.commit();
+      }
+
+      console.log(
+        `✅ reclassifyHiraDental: ${updated} updated, ${removed} removed`
+      );
+      res.status(200).json({
+        success: true,
+        updated,
+        removed,
+        total: snap.size,
+      });
+    } catch (error: any) {
+      console.error("⚠️ reclassifyHiraDental error:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message || String(error),
+      });
+    }
+  });
 
 /**
  * Custom Token 발급 함수
@@ -1192,6 +1418,13 @@ export {
   manualClosePoll,
 } from "./poll-close";
 
+// 공감투표: 신고 누적 삭제 · 작성자 보기 삭제(공감 본인 1표)
+export {
+  authorDeletePollOptionWithVote,
+  onPollOptionReportThreshold,
+  purgePollOptionAfterReports,
+} from "./poll-option-moderation";
+
 // ========== 구인공고: 이미지 → 폼 자동채우기 (AI Vision) ==========
 /**
  * parseJobImagesToForm
@@ -1767,11 +2000,11 @@ export const syncImwebPurchases = functions
 // 퀴즈 풀 자동 스케줄러
 //
 // 배포 규칙:
-//   1. 기본: national_exam 1문제 + clinical 1문제 (quiz_pool.questionType)
+//   1. 반드시 national_exam 1문제 + clinical 1문제 (quiz_pool.questionType 기준)
 //   2. 임상 쪽은 가능하면 국시와 다른 sourceBook 우선
-//   3. 국시 후보가 없으면 임상 2문제 (가능하면 서로 다른 책)
+//   3. 임상만 2문제로 채우는 폴백 없음 — 한쪽 풀이 비면 스케줄 미생성
 //   4. 현재 사이클 usedQuizIds 에 이미 나간 문항 제외
-//   5. 2문제를 못 채우면 사이클 증가 후 재시도 (기존과 동일)
+//   5. 2문제를 못 채우면 사이클 증가 후 1회 재시도, 그래도 불가면 중단
 //
 // Firestore 컬렉션:
 //   quiz_pool/{autoId}          — 원본 문제 은행
@@ -1971,9 +2204,7 @@ function buildScheduleItem(
 }
 
 /**
- * 오늘의 2문제 선정
- *   - 우선 national_exam 1 + clinical 1
- *   - 국시 미사용 후보가 없으면 clinical 2 (서로 다른 책 우선)
+ * 오늘의 2문제 선정 — national_exam 1 + clinical 1 만 허용 (임상 2개 폴백 없음)
  */
 async function pickTodayQuizzes(
   meta: FirebaseFirestore.DocumentData,
@@ -2024,23 +2255,6 @@ async function pickTodayQuizzes(
       return {selected: [n, c], ok: true};
     }
 
-    if (national.length === 0 && clinical.length >= 2) {
-      const byBook: Record<string, FirebaseFirestore.QueryDocumentSnapshot[]> = {};
-      for (const d of clinical) {
-        const b = (d.data().sourceBook as string) || "_";
-        if (!byBook[b]) byBook[b] = [];
-        byBook[b].push(d);
-      }
-      const bookKeys = shuffleArray(Object.keys(byBook));
-      if (bookKeys.length >= 2) {
-        return {
-          selected: [byBook[bookKeys[0]][0], byBook[bookKeys[1]][0]],
-          ok: true,
-        };
-      }
-      return {selected: [clinical[0], clinical[1]], ok: true};
-    }
-
     return {selected: [], ok: false};
   };
 
@@ -2051,7 +2265,7 @@ async function pickTodayQuizzes(
   let {selected, ok} = trySelect(nextUsed);
 
   if (!ok || selected.length < 2) {
-    functions.logger.info("🔄 퀴즈 1+1(또는 임상2) 불가 → 사이클 증가 및 usedQuizIds 초기화", {
+    functions.logger.info("🔄 국시+임상 1+1 선정 불가 → 사이클 증가 및 usedQuizIds 초기화 후 재시도", {
       cycleCount: cycleCount + 1,
     });
     wasReset = true;
@@ -2136,8 +2350,17 @@ export const scheduleQuizzes = functions
     const { selectedDocs, nextCycleCount, nextUsedQuizIds, wasReset } =
       await pickTodayQuizzes(meta, contentCfg);
 
-    if (selectedDocs.length === 0) {
-      functions.logger.warn("⚠️ 선정된 문제 없음 — quiz_pool을 확인하세요");
+    if (selectedDocs.length !== 2) {
+      functions.logger.warn(
+        "⚠️ 국시+임상 1+1 선정 실패 — 스케줄 미생성. 활성 풀·questionType·패크·usedQuizIds 확인",
+        { count: selectedDocs.length, dateKey },
+      );
+      return null;
+    }
+    const t0 = quizQuestionType(selectedDocs[0].data());
+    const t1 = quizQuestionType(selectedDocs[1].data());
+    if (t0 === t1) {
+      functions.logger.error("⚠️ 선정 결과 타입 중복 — 스케줄 미생성", { t0, t1, dateKey });
       return null;
     }
 
@@ -2232,8 +2455,21 @@ export const manualScheduleQuiz = functions
     const { selectedDocs, nextCycleCount, nextUsedQuizIds, wasReset } =
       await pickTodayQuizzes(meta, contentCfg);
 
-    if (selectedDocs.length === 0) {
-      return { success: false, message: "quiz_pool에 활성화된 문제 없음" };
+    if (selectedDocs.length !== 2) {
+      return {
+        success: false,
+        message:
+          "국시·임상 각 1문항씩 선정할 수 없습니다. 활성 풀에 questionType(national_exam/clinical)과 " +
+          "미사용 문항이 충분한지, config/quiz_content 패크 필터를 확인하세요.",
+      };
+    }
+    const t0 = quizQuestionType(selectedDocs[0].data());
+    const t1 = quizQuestionType(selectedDocs[1].data());
+    if (t0 === t1) {
+      return {
+        success: false,
+        message: `선정 결과가 국시+임상 1+1이 아닙니다(동일 타입: ${t0}). quiz_pool을 확인하세요.`,
+      };
     }
 
     const quizIds = selectedDocs.map((d) => d.id);
@@ -2375,7 +2611,9 @@ async function computeTodaySlotNextPreviewsForHub(
 
 /**
  * 어드민: 특정 날짜 quiz_schedule 에서 국시/임상 "첫 슬롯"만 제거 또는 교체.
- * quiz_meta · quiz_pool · 사용자 기록은 수정하지 않음.
+ * remove: quiz_pool 원본 삭제 + 같은 타입 다음 문항으로 교체 (후보 없으면 슬롯 비움)
+ * replace: quiz_pool 원본 유지 + 다른 문항으로 교체
+ * quiz_meta · 사용자 기록은 수정하지 않음.
  */
 export const adminMutateQuizScheduleSlot = functions
   .region("us-central1")
@@ -2439,7 +2677,29 @@ export const adminMutateQuizScheduleSlot = functions
     const contentCfg = await loadQuizContentConfig();
 
     if (action === "remove") {
+      const removedItem = items[idx];
+      const removedPoolId = typeof removedItem.id === "string" ? removedItem.id : "";
+
       items.splice(idx, 1);
+      const excludeIds = items
+        .map((it) => String(it.id ?? ""))
+        .filter((id) => id.length > 0);
+      if (removedPoolId) excludeIds.push(removedPoolId);
+
+      let preferBook = "";
+      for (const it of items) {
+        if (scheduleItemQuestionType(it) !== st) {
+          preferBook = String(it.sourceBook ?? "");
+          break;
+        }
+      }
+
+      const newDoc = await pickSingleScheduleReplacement(st, excludeIds, preferBook, contentCfg);
+      if (newDoc) {
+        const built = buildScheduleItem(newDoc, cycleCount);
+        items.splice(idx, 0, built);
+      }
+
       const quizIds = items.map((it) => String(it.id ?? "")).filter((id) => id.length > 0);
       const bounds = orderBoundsFromItems(items);
       await scheduleRef.update({
@@ -2448,13 +2708,23 @@ export const adminMutateQuizScheduleSlot = functions
         startOrder: bounds.startOrder,
         endOrder: bounds.endOrder,
       });
+
+      // quiz_pool 원본 삭제
+      if (removedPoolId) {
+        await db.collection("quiz_pool").doc(removedPoolId).delete();
+      }
+
       return {
         success: true,
         dateKey,
         action: "remove",
         slotType,
         quizIds,
-        message: "스케줄에서 해당 슬롯을 제거했습니다.",
+        deletedPoolId: removedPoolId || null,
+        newQuizId: newDoc ? newDoc.id : null,
+        message: newDoc
+          ? `문항 ${removedPoolId} 를 풀에서 삭제하고, 다음 문항 ${newDoc.id} 로 교체했습니다.`
+          : `문항 ${removedPoolId} 를 풀에서 삭제했습니다. 교체할 후보가 없어 슬롯은 비어 있습니다.`,
       };
     }
 
@@ -2535,11 +2805,12 @@ export const previewNextQuizSelection = functions
       return `${s.slice(0, max)}…`;
     };
 
-    if (selectedDocs.length === 0) {
+    if (selectedDocs.length !== 2) {
       return {
         success: false,
         readOnly: true,
-        message: "선정 가능한 활성 문항이 없습니다. quiz_pool·config/quiz_content 패크 설정을 확인하세요.",
+        message:
+          "국시+임상 1+1을 구성할 수 없습니다. 활성 풀·questionType·미사용(usedQuizIds)·패크 설정을 확인하세요.",
       };
     }
 
@@ -2797,3 +3068,412 @@ export const getContentOpsHub = functions
       },
     };
   });
+
+// ─────────────────────────────────────────────────────────────
+// 심평원 보험인정기준 검색 프록시 (Callable)
+// ─────────────────────────────────────────────────────────────
+
+interface HiraSearchResult {
+  category: string;
+  reference: string;
+  title: string;
+  link: string;
+  date: string;
+  views: number;
+}
+
+// tabGbn 코드 → 탭 이름 폴백 (HTML span에 없을 때만)
+const HIRA_TAB_MAP: Record<string, string> = {
+  "01": "고시",
+  "02": "행정해석",
+  "09": "심사지침",
+  "10": "심의사례공개",
+  "17": "요양기관현지조사",
+  "18": "심사사례",
+};
+
+interface HiraTabEntry {
+  id: string;
+  label: string;
+  count: number;
+}
+
+/** 심평원 탭 스트립에서 id·표시명·건수 추출 (신규 탭 코드도 라벨 표시 가능) */
+function parseHiraTabList(html: string): HiraTabEntry[] {
+  const out: HiraTabEntry[] = [];
+  const tabRe = /goTabMove\('(\d+)'\)[^>]*><span>(.*?)<\/span><em>\((\d+)건\)<\/em>/g;
+  let tm;
+  while ((tm = tabRe.exec(html)) !== null) {
+    out.push({
+      id: tm[1],
+      label: tm[2].trim().replace(/\s+/g, " "),
+      count: parseInt(tm[3], 10),
+    });
+  }
+  return out;
+}
+
+function tabListToCounts(tabList: HiraTabEntry[]): Record<string, number> {
+  const tabCounts: Record<string, number> = {};
+  for (const t of tabList) {
+    tabCounts[t.label] = t.count;
+  }
+  return tabCounts;
+}
+
+function idToLabelMap(tabList: HiraTabEntry[]): Map<string, string> {
+  return new Map(tabList.map((t) => [t.id, t.label]));
+}
+
+function parseHiraRows(html: string, fallbackCategory = ""): HiraSearchResult[] {
+  const results: HiraSearchResult[] = [];
+  // viewInsuAdtCrtr(no, 'mtgHmeDd', 'sno', 'mtgMtrRegSno', 'RN')
+  const rowRe = /onclick="viewInsuAdtCrtr\(\s*\d+\s*,\s*'(\d+)'\s*,\s*'(\d+)'\s*,\s*'(\d+)'\s*,\s*'\d+'[^)]*\)[^"]*"[^>]*title="([^"]*)"[\s\S]*?<td class="col-date">([\d-]+)<\/td>[\s\S]*?<td class="col-views">([\d,]+)<\/td>/g;
+  let rm;
+  while ((rm = rowRe.exec(html)) !== null) {
+    const [, mtgHmeDd, sno, mtgMtrRegSno, titleRaw, date, viewsStr] = rm;
+    const title = titleRaw.replace(/\s*새창으로 열기\s*$/, "").trim();
+    const link =
+      "https://www.hira.or.kr/rc/insu/insuadtcrtr/InsuAdtCrtrPopup.do" +
+      `?mtgHmeDd=${mtgHmeDd}&sno=${sno}&mtgMtrRegSno=${mtgMtrRegSno}`;
+
+    // col-gubun 값 추출 시도
+    const categoryRe = new RegExp(
+      `<td class="col-gubun">(.*?)<\\/td>[\\s\\S]*?${mtgHmeDd}`
+    );
+    const catMatch = categoryRe.exec(html);
+    const category = catMatch ? catMatch[1].trim() : fallbackCategory;
+
+    // col-num2 (관련근거) 추출 시도
+    const refRe = new RegExp(
+      `<td class="col-gubun">.*?<\\/td>\\s*<td class="col-num2">(.*?)<\\/td>[\\s\\S]*?${mtgHmeDd}`
+    );
+    const refMatch = refRe.exec(html);
+    const reference = refMatch ? refMatch[1].trim() : "";
+
+    results.push({
+      category,
+      reference,
+      title,
+      link,
+      date,
+      views: parseInt(viewsStr.replace(/,/g, ""), 10),
+    });
+  }
+  return results;
+}
+
+
+async function fetchHiraTab(
+  keyword: string,
+  tabGbn: string,
+  pageIndex: number,
+  recordCountPerPage: number
+): Promise<string> {
+  const url =
+    "https://www.hira.or.kr/rc/insu/insuadtcrtr/InsuAdtCrtrList.do" +
+    "?pgmid=HIRAA030069000400";
+  const formData = new URLSearchParams({
+    pgmid: "HIRAA030069000400",
+    pageIndex: String(pageIndex),
+    tabGbn: tabGbn,
+    mtgHmeDd: "RN",
+    divRngCdSc: "",
+    sno: "",
+    mtgMtrRegSno: "",
+    seqListYn: "N",
+    seqList: "",
+    searchYn: "Y",
+    allViewYn: "",
+    decIteTpCd: tabGbn,
+    startDate: "",
+    endDate: "",
+    recordCountPerPage: String(recordCountPerPage),
+    searchKeyword: keyword,
+    startDt: "",
+    endDt: "",
+    searchCondition: "TXTALL",
+    searchWord: keyword,
+    searchKeyword2: "",
+  });
+  const resp = await axios.post(url, formData.toString(), {
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    },
+    timeout: 30000,
+    responseType: "text",
+  });
+  return resp.data as string;
+}
+
+export const searchHiraInsurance = functions
+  .region("asia-northeast3")
+  .runWith({timeoutSeconds: 60, memory: "512MB"})
+  .https.onCall(
+  async (data: {
+    keyword: string;
+    page?: number;
+    tab?: string;
+    perPage?: number;
+  }) => {
+    const keyword = (data.keyword || "").trim();
+    if (!keyword || keyword.length < 2) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "검색어는 2글자 이상이어야 합니다."
+      );
+    }
+
+    const pageIndex = data.page ?? 1;
+    const requestedTab = (data.tab ?? "all").trim();
+    const recordCountPerPage = Math.min(data.perPage ?? 20, 50);
+
+    try {
+      // 1단계: 탭01(고시)로 요청하여 탭 스트립(라벨·건수·id) 파악
+      const firstHtml = await fetchHiraTab(keyword, "01", 1, 5);
+      const tabList = parseHiraTabList(firstHtml);
+      const tabCounts = tabListToCounts(tabList);
+      const idLabel = idToLabelMap(tabList);
+      const totalAll = tabList.reduce((a, t) => a + t.count, 0);
+
+      // 특정 탭만 (고시 01 포함)
+      if (requestedTab !== "all") {
+        const tabHtml = await fetchHiraTab(
+          keyword,
+          requestedTab,
+          pageIndex,
+          recordCountPerPage
+        );
+        const catLabel =
+          idLabel.get(requestedTab) ??
+          HIRA_TAB_MAP[requestedTab] ??
+          requestedTab;
+        const rows = parseHiraRows(tabHtml, catLabel);
+        const thisCount =
+          tabList.find((t) => t.id === requestedTab)?.count ?? rows.length;
+        return {
+          success: true,
+          keyword,
+          totalAllCount: totalAll,
+          totalCount: thisCount,
+          page: pageIndex,
+          perPage: recordCountPerPage,
+          results: rows,
+          tabResults: { [requestedTab]: rows },
+          tabCounts,
+          tabs: tabList,
+        };
+      }
+
+      // 전체(all): 건수가 있는 탭들을 순회하여 결과 수집
+      const nonZeroTabs = tabList
+        .filter((t) => t.count > 0)
+        .map((t) => t.id);
+
+      if (nonZeroTabs.length === 0) {
+        return {
+          success: true,
+          keyword,
+          totalAllCount: 0,
+          totalCount: 0,
+          page: 1,
+          perPage: recordCountPerPage,
+          results: [],
+          tabCounts,
+          tabs: tabList,
+        };
+      }
+
+      const tabsToFetch = nonZeroTabs.slice(0, 3);
+      const tabHtmls = await Promise.all(
+        tabsToFetch.map((tabGbn) =>
+          fetchHiraTab(keyword, tabGbn, pageIndex, recordCountPerPage)
+        )
+      );
+
+      const allResults: HiraSearchResult[] = [];
+      const tabResults: Record<string, HiraSearchResult[]> = {};
+      for (let i = 0; i < tabsToFetch.length; i++) {
+        const tabGbn = tabsToFetch[i];
+        const categoryName =
+          idLabel.get(tabGbn) ?? HIRA_TAB_MAP[tabGbn] ?? tabGbn;
+        const rows = parseHiraRows(tabHtmls[i], categoryName);
+        allResults.push(...rows);
+        tabResults[tabGbn] = rows;
+      }
+
+      return {
+        success: true,
+        keyword,
+        totalAllCount: totalAll,
+        totalCount: totalAll,
+        page: pageIndex,
+        perPage: recordCountPerPage,
+        results: allResults,
+        tabResults,
+        tabCounts,
+        tabs: tabList,
+      };
+    } catch (err: any) {
+      console.error("searchHiraInsurance error:", err.message);
+      throw new functions.https.HttpsError(
+        "unavailable",
+        "심평원 서버 응답 오류. 잠시 후 다시 시도해주세요."
+      );
+    }
+  }
+);
+
+// ─────────────────────────────────────────────────────────────
+// 수가 조회 프록시 (data.go.kr 공공데이터 API)
+// ─────────────────────────────────────────────────────────────
+
+interface FeeScheduleItem {
+  code: string;
+  codeName: string;
+  category: string;
+  relativeValue: number;
+  unitPrice: number;
+  priceClinic: number;
+  priceHospital: number;
+  priceGeneral: number;
+  priceAdvanced: number;
+  payType: string;
+  startDate: string;
+  note: string;
+}
+
+export const searchFeeSchedule = functions
+  .region("asia-northeast3")
+  .runWith({timeoutSeconds: 30, memory: "256MB"})
+  .https.onCall(
+  async (data: {
+    keyword: string;
+    page?: number;
+    perPage?: number;
+  }) => {
+    const keyword = (data.keyword || "").trim();
+    if (!keyword) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "검색어를 입력해 주세요."
+      );
+    }
+
+    const pageNo = data.page ?? 1;
+    const numOfRows = Math.min(data.perPage ?? 20, 50);
+
+    const apiKey = process.env.DATA_GO_KR_API_KEY;
+    if (!apiKey) {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        "수가 조회 API 키가 설정되지 않았습니다."
+      );
+    }
+
+    const encoded = encodeURIComponent(keyword);
+    const isEngCode = /^[A-Za-z]\d/.test(keyword);
+    const isDivNo = /^[가-힣]/.test(keyword) && /\d/.test(keyword);
+
+    let searchParams = "";
+    if (isEngCode) {
+      searchParams = `&mdfeeCd=${encoded}`;
+    } else if (isDivNo) {
+      searchParams = `&mdfeeDivNo=${encoded}`;
+    } else {
+      searchParams = `&korNm=${encoded}`;
+    }
+
+    const apiUrl =
+      `https://apis.data.go.kr/B551182/mdfeeCrtrInfoService/getDiagnossMdfeeList` +
+      `?ServiceKey=${apiKey}` +
+      `&numOfRows=${numOfRows}&pageNo=${pageNo}` +
+      searchParams;
+
+    try {
+      const resp = await axios.get(apiUrl, {
+        timeout: 15000,
+      });
+
+      let parsed: any;
+      if (typeof resp.data === "string") {
+        if (resp.data.startsWith("<?xml")) {
+          parsed = await parseStringPromise(resp.data, {
+            explicitArray: false,
+            trim: true,
+          });
+        } else {
+          parsed = JSON.parse(resp.data);
+        }
+      } else {
+        parsed = resp.data;
+      }
+
+      const header = parsed?.response?.header;
+      if (header?.resultCode !== "00") {
+        console.error("API error:", header?.resultMsg);
+        throw new Error(header?.resultMsg || "API error");
+      }
+
+      const body = parsed?.response?.body;
+      if (!body) {
+        return {totalCount: 0, page: pageNo, perPage: numOfRows, items: []};
+      }
+
+      const totalCount = parseInt(body.totalCount || "0", 10);
+
+      let rawItems = body.items?.item;
+      if (!rawItems || (typeof rawItems === "string" && rawItems.trim() === "")) {
+        return {totalCount: 0, page: pageNo, perPage: numOfRows, items: []};
+      }
+
+      if (!Array.isArray(rawItems)) {
+        rawItems = [rawItems];
+      }
+
+      const items: FeeScheduleItem[] = rawItems.map((r: any) => {
+        const unprc2 = parseInt(r.unprc2 || "0", 10);
+        const unprc3 = parseInt(r.unprc3 || "0", 10);
+        const unprc4 = parseInt(r.unprc4 || "0", 10);
+        const unprc6 = parseInt(r.unprc6 || "0", 10);
+        const bestPrice = unprc2 || unprc3 || unprc4 || unprc6;
+
+        return {
+          code: r.mdfeeCd || "",
+          codeName: r.korNm || "",
+          category: r.mdfeeDivNo || "",
+          relativeValue: parseFloat(r.cvalPnt || "0"),
+          unitPrice: bestPrice,
+          priceClinic: unprc2,
+          priceHospital: unprc3,
+          priceGeneral: unprc4,
+          priceAdvanced: unprc6,
+          payType: r.payTpCd || "",
+          startDate: r.adtStaDd || "",
+          note: r.soprTpNm || "",
+        };
+      });
+
+      return {
+        totalCount,
+        page: pageNo,
+        perPage: numOfRows,
+        items,
+      };
+    } catch (err: any) {
+      console.error("searchFeeSchedule error:", err.message);
+      if (err.response?.data) {
+        console.error("API response:",
+          typeof err.response.data === "string"
+            ? err.response.data.substring(0, 500)
+            : JSON.stringify(err.response.data).substring(0, 500));
+      }
+      throw new functions.https.HttpsError(
+        "unavailable",
+        "수가 조회 서버 응답 오류. 잠시 후 다시 시도해주세요."
+      );
+    }
+  }
+);

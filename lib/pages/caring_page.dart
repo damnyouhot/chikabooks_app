@@ -725,7 +725,7 @@ class _CaringPageState extends State<CaringPage>
           child: IgnorePointer(
             child: LayoutBuilder(builder: (ctx, constraints) {
               final h = constraints.maxHeight;
-              final baseMsgTop = isOnboarding ? h * 0.06 : h * 0.18;
+              final baseMsgTop = isOnboarding ? h * 0.034 : h * 0.126;
               final reactionTop = h * 0.86;
               final displayText = isOnboarding ? widget.onboardingDialogue : _baseMsgText;
               final isDismissing = isOnboarding ? false : _isBaseMsgDismissing;
@@ -907,7 +907,7 @@ class _CircleGauge extends StatelessWidget {
                   Text(
                     '$displayVal',
                     style: TextStyle(
-                      fontSize: 10,
+                      fontSize: 11,
                       fontWeight: FontWeight.w700,
                       color: AppColors.textPrimary,
                       height: 1.2,
@@ -932,13 +932,14 @@ class _CircleGaugePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = (size.width / 2) - 3;
+    const strokeWidth = 3.5 * 2.5;
+    final radius = size.width / 2 - strokeWidth / 2 - 1;
 
     // 트랙 (회색 원)
     final trackPaint = Paint()
       ..color = const Color(0x20000000)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.5
+      ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;
     canvas.drawCircle(center, radius, trackPaint);
 
@@ -947,7 +948,7 @@ class _CircleGaugePainter extends CustomPainter {
       final fillPaint = Paint()
         ..color = color
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 3.5
+        ..strokeWidth = strokeWidth
         ..strokeCap = StrokeCap.round;
       const startAngle = -pi / 2; // 12시 방향 시작
       final sweepAngle = 2 * pi * ratio;

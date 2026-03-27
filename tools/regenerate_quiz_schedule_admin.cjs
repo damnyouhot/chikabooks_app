@@ -158,20 +158,6 @@ async function pickTodayQuizzes(db, meta, contentCfg) {
       return { selected: [n, c], ok: true };
     }
 
-    if (national.length === 0 && clinical.length >= 2) {
-      const byBook = {};
-      for (const d of clinical) {
-        const b = (d.data().sourceBook || "_").toString();
-        if (!byBook[b]) byBook[b] = [];
-        byBook[b].push(d);
-      }
-      const bookKeys = shuffleArray(Object.keys(byBook));
-      if (bookKeys.length >= 2) {
-        return { selected: [byBook[bookKeys[0]][0], byBook[bookKeys[1]][0]], ok: true };
-      }
-      return { selected: [clinical[0], clinical[1]], ok: true };
-    }
-
     return { selected: [], ok: false };
   };
 

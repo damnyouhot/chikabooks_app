@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_tokens.dart';
@@ -8,6 +7,7 @@ import '../../../core/widgets/app_primary_button.dart';
 import '../../../models/resume.dart';
 import '../../../services/resume_service.dart';
 import '../../../services/resume_draft_service.dart';
+import '../../../services/resume_prefill_service.dart';
 import '../widgets/section_profile.dart';
 import '../widgets/section_licenses.dart';
 import '../widgets/section_experiences.dart';
@@ -78,13 +78,33 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
   }
 
   Future<void> _load() async {
-    final r = await ResumeService.fetchResume(widget.resumeId);
+    Resume? r = await ResumeService.fetchResume(widget.resumeId);
+    var prefillApplied = false;
+    if (r != null) {
+      final merged = await ResumePrefillService.mergeCareerSourcesIfNeeded(r);
+      r = merged.$1;
+      prefillApplied = merged.$2;
+    }
     if (mounted) {
       setState(() {
         _resume = r;
         _loading = false;
-        _titleCtrl.text = r?.title ?? '기본 이력서';
+        _titleCtrl.text = r?.title ?? Resume.kDefaultResumeTitle;
+        if (prefillApplied) _dirty = true;
       });
+      if (prefillApplied) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                '온보딩·커리어 카드 정보를 이력서에 반영했어요. 저장하면 확정돼요.',
+              ),
+              duration: Duration(seconds: 3),
+            ),
+          );
+        });
+      }
     }
     // 기존 드래프트가 있는지 확인
     final existing =
@@ -468,7 +488,7 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
           controller: _titleCtrl,
           autofocus: true,
           decoration: const InputDecoration(
-            hintText: '예: 기본 이력서, 교정 지원용',
+            hintText: '예: 하이진랩에서 작성한 이력서, 교정 지원용',
             border: OutlineInputBorder(),
           ),
         ),

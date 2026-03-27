@@ -189,50 +189,6 @@ class AdminDashboardService {
     }
   }
 
-  /// 최근 기록하기(한 줄 기록) 리스트 — 트위터 타임라인 형태
-  ///
-  /// 1번 탭 '기록하기'에서 작성한 notes를 최신순 [limit]건
-  static Future<List<NoteFeedItem>> getRecentNotes({
-    int limit = 50,
-    DateTime? since,
-  }) async {
-    try {
-      final fetchLimit = since != null ? 200 : limit;
-      final snap = await _db
-          .collectionGroup('notes')
-          .orderBy('createdAt', descending: true)
-          .limit(fetchLimit)
-          .get();
-
-      var items = snap.docs.map((d) {
-        final userId = d.reference.parent.parent?.id ?? '';
-        final data = d.data();
-        final rawUrls = data['imageUrls'];
-        final imageUrls = rawUrls is List
-            ? rawUrls.cast<String>()
-            : <String>[];
-        return NoteFeedItem(
-          id: d.id,
-          userId: userId,
-          text: data['text'] as String? ?? '',
-          createdAt: (data['createdAt'] as dynamic)?.toDate() ?? DateTime.now(),
-          imageUrls: imageUrls,
-        );
-      }).toList();
-
-      if (since != null) {
-        items = items
-            .where((e) => e.createdAt.isAfter(since))
-            .take(limit)
-            .toList();
-      }
-      return items;
-    } catch (e, st) {
-      debugPrint('⚠️ getRecentNotes: $e');
-      debugPrint('$st');
-      rethrow;
-    }
-  }
 
   // ─── Quiz Pool ────────────────────────────────────────────────
 
@@ -556,39 +512,6 @@ class AdminDashboardService {
     } catch (e) {
       debugPrint('⚠️ getTopFeatures: $e');
       return [];
-    }
-  }
-
-  // ─── Emotion Logs (emotionLogs 컬렉션, 레거시) ─────────────────
-
-  static Future<List<EmotionLogItem>> getRecentEmotionLogs({
-    int limit = 50,
-    DateTime? since,
-  }) async {
-    try {
-      // where 없이 orderBy만 사용 → 복합 인덱스 없이 동작
-      final fetchLimit = since != null ? 200 : limit;
-      final snap = await _db
-          .collection('emotionLogs')
-          .orderBy('timestamp', descending: true)
-          .limit(fetchLimit)
-          .get();
-
-      var items = snap.docs
-          .map((d) => EmotionLogItem.fromMap(d.id, d.data()))
-          .toList();
-
-      if (since != null) {
-        items = items
-            .where((e) => e.timestamp.isAfter(since))
-            .take(limit)
-            .toList();
-      }
-      return items;
-    } catch (e, st) {
-      debugPrint('⚠️ getRecentEmotionLogs: $e');
-      debugPrint('$st');
-      rethrow;
     }
   }
 

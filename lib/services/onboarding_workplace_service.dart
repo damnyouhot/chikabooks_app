@@ -24,12 +24,17 @@ class OnboardingWorkplaceService {
   static Future<void> saveWorkplaceInfo({
     required WorkStatus status,
     required String placeName, // 치과명 또는 학교명
+    List<String> specialtyTags = const [],
   }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return;
 
     final now = DateTime.now();
     final isStudent = status == WorkStatus.student;
+    final tags =
+        isStudent
+            ? <String>[]
+            : specialtyTags.map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
 
     try {
       // 1) users/{uid} 기본 정보 저장
@@ -49,7 +54,7 @@ class OnboardingWorkplaceService {
             'currentStartDate': Timestamp.fromDate(
               DateTime(now.year, now.month, 1),
             ),
-            'specialtyTags': <String>[],
+            'specialtyTags': tags,
             'updatedAt': FieldValue.serverTimestamp(),
           },
         },
@@ -79,7 +84,7 @@ class OnboardingWorkplaceService {
                 status == WorkStatus.seeking
                     ? Timestamp.fromDate(DateTime(now.year, now.month, 1))
                     : null,
-            'tags': <String>[],
+            'tags': List<String>.from(tags),
             'acquiredSkills': <String>[],
             'syncedFromOnboarding': true,
             'createdAt': FieldValue.serverTimestamp(),

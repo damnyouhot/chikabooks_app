@@ -17,7 +17,11 @@ final List<Job> mockLevel1Jobs = [
     career: '신입/경력 무관',
     salaryRange: [2800, 3500],
     postedAt: DateTime.now().subtract(const Duration(days: 2)),
-    details: '',
+    details:
+        '스케일링·PMTC 등 예방진료, 진료 보조 및 기구 소독·관리를 담당합니다. '
+        '환자 응대와 차트 기록, 재료 준비 등 진료실 전반을 함께 맡게 됩니다. '
+        '주 5일 근무이며 내·외부 교육을 지원해 역량을 키울 수 있는 환경입니다. '
+        '성실하고 팀워크를 중시하는 분을 기다립니다.',
     benefits: ['4대보험', '주5일', '교육지원'],
     images: [],
     jobLevel: 1,
@@ -38,7 +42,11 @@ final List<Job> mockLevel1Jobs = [
     career: '1년 이상',
     salaryRange: [3000, 3800],
     postedAt: DateTime.now().subtract(const Duration(days: 1)),
-    details: '',
+    details:
+        '임플란트·교정 등 다양한 진료 보조와 위생 관리 업무를 수행합니다. '
+        '원장 진료 스케줄에 맞춘 체어 세팅, 환자 안내, 사후 관리 안내까지 포함됩니다. '
+        '디지털 차트·구강 스캐너 등 장비 사용 경험이 있으면 우대합니다. '
+        '안정적인 정규직으로 장기 근속을 희망하는 경력자를 모십니다.',
     benefits: ['4대보험', '퇴직금', '연차'],
     images: [],
     jobLevel: 1,
@@ -59,7 +67,11 @@ final List<Job> mockLevel1Jobs = [
     career: '신입 가능',
     salaryRange: [2600, 3200],
     postedAt: DateTime.now().subtract(const Duration(hours: 12)),
-    details: '',
+    details:
+        '치과위생사는 스케일링·진료 보조, 조무사는 접수·수납·방사선 촬영 보조 등 역할에 따라 배치합니다. '
+        '지원 직종과 경력을 말씀해 주시면 면접 시 상세 안내드립니다. '
+        '주차 가능 구역이 인근에 있어 출퇴근 편의를 도와드립니다. '
+        '밝은 분위기에서 함께 성장할 분을 찾습니다.',
     benefits: ['4대보험', '식비지원', '주차지원'],
     images: [],
     jobLevel: 1,
@@ -80,7 +92,11 @@ final List<Job> mockLevel1Jobs = [
     career: '1년 이상',
     salaryRange: [2500, 3000],
     postedAt: DateTime.now().subtract(const Duration(days: 3)),
-    details: '',
+    details:
+        '전화·온라인 예약 접수, 내원 환자 응대, 수납 및 보험 청구 관련 업무를 담당합니다. '
+        '진료 안내와 대기 순서 관리, 간단한 서류 발급 등 프런트 전반을 맡게 됩니다. '
+        '치과 데스크 또는 의료기관 유사 업무 경험이 있으면 우대합니다. '
+        '정확하고 친절한 커뮤니케이션이 가능한 분을 환영합니다.',
     benefits: ['4대보험', '퇴직금', '명절상여'],
     images: [],
     jobLevel: 1,
@@ -101,7 +117,11 @@ final List<Job> mockLevel1Jobs = [
     career: '신입/경력',
     salaryRange: [2700, 3300],
     postedAt: DateTime.now().subtract(const Duration(days: 4)),
-    details: '',
+    details:
+        '예방·보존 진료 위주 클리닉으로 스케일링, 플루오라이드 도포, 진료 보조를 주 업무로 합니다. '
+        '신입은 수습 기간 중 OJT로 진료 흐름을 익히게 됩니다. '
+        '경력자는 담당 체어 운영과 재료·재고 관리까지 맡을 수 있습니다. '
+        '잠실역 도보권으로 대중교통 이용이 편리합니다.',
     benefits: ['4대보험', '연차', '식비지원'],
     images: [],
     jobLevel: 1,
@@ -122,7 +142,11 @@ final List<Job> mockLevel1Jobs = [
     career: '신입 가능',
     salaryRange: [2400, 2800],
     postedAt: DateTime.now().subtract(const Duration(days: 5)),
-    details: '',
+    details:
+        '접수·안내, 진료실 보조, 기구 준비 및 소독, 방사선 촬영 보조 업무를 합니다. '
+        '신입도 면허 취득 후 성실히 배우실 의지가 있으시면 지원 가능합니다. '
+        '주 5일 근무이며 기본 교육과 함께 단계별 업무를 배정합니다. '
+        '꾸준히 성장하고 싶은 조무사 지망생을 응원합니다.',
     benefits: ['4대보험', '교육지원', '주5일'],
     images: [],
     jobLevel: 1,
@@ -143,7 +167,11 @@ final List<Job> mockLevel1Jobs = [
     career: '경력 2년 이상',
     salaryRange: [3200, 4000],
     postedAt: DateTime.now().subtract(const Duration(days: 6)),
-    details: '',
+    details:
+        '진료 보조와 스케일링 등 위생 업무 외에 원장 일정·내원 조율, 간행물·서류 정리 등 보조 업무가 포함될 수 있습니다. '
+        '다양한 진료과목이 운영되어 업무 폭이 넓은 편입니다. '
+        '성과에 따른 인센티브 제도를 운영 중입니다. '
+        '책임감 있게 소통 가능한 경력 치위생사를 모십니다.',
     benefits: ['4대보험', '퇴직금', '성과급'],
     images: [],
     jobLevel: 1,
@@ -164,7 +192,11 @@ final List<Job> mockLevel1Jobs = [
     career: '1~3년',
     salaryRange: [2900, 3600],
     postedAt: DateTime.now().subtract(const Duration(days: 7)),
-    details: '',
+    details:
+        '체어별 진료 보조, 감염 관리, 환자 교육(칫솔질·치간 관리 등)을 담당합니다. '
+        '1~3년 차 경력자에게 맞춘 업무 난도로 배정하며, 연차 사용이 자유로운 분위기입니다. '
+        '주 5일, 점심시간 보장. 야간 진료는 주 1회 수준입니다(면접 시 확정). '
+        '사당 인근 거주자도 출퇴근하기 좋은 위치입니다.',
     benefits: ['4대보험', '연차', '주5일'],
     images: [],
     jobLevel: 1,
@@ -185,7 +217,11 @@ final List<Job> mockLevel1Jobs = [
     career: '3년 이상',
     salaryRange: [3400, 4200],
     postedAt: DateTime.now().subtract(const Duration(days: 8)),
-    details: '',
+    details:
+        '풀타임 정규직으로 상급종합병원급 진료 보조 경험이나 교정·임플 진료 보조 경험을 살릴 수 있습니다. '
+        '난이도 있는 케이스가 많아 실력 향상에 유리한 환경입니다. '
+        '기숙사 지원(거리·조건 면접 협의)으로 지방 출퇴근 부담을 줄일 수 있습니다. '
+        '3년 이상 실무 경력과 면허를 보유한 분만 지원해 주세요.',
     benefits: ['4대보험', '퇴직금', '기숙사'],
     images: [],
     jobLevel: 1,
@@ -209,7 +245,11 @@ final List<Job> mockLevel2Jobs = [
     career: '신입',
     salaryRange: [2500, 2900],
     postedAt: DateTime.now().subtract(const Duration(days: 3)),
-    details: '',
+    details:
+        '신규 면허 취득자를 위한 체계적 OJT를 제공합니다. '
+        '스케일링 보조부터 시작해 점진적으로 진료 보조 범위를 넓혀 갑니다. '
+        '선배 위생사님과 1:1 멘토링으로 적응을 돕습니다. '
+        '밝고 배우려는 자세만 있다면 환영합니다.',
     benefits: ['4대보험', '주5일'],
     images: [],
     jobLevel: 2,
@@ -230,7 +270,11 @@ final List<Job> mockLevel2Jobs = [
     career: '1년 이상',
     salaryRange: [2600, 3000],
     postedAt: DateTime.now().subtract(const Duration(days: 2)),
-    details: '',
+    details:
+        '수납·예약 관리, 진료실 기구 준비, 방사선 촬영, 멸균실 관리 등 조무사 표준 업무를 수행합니다. '
+        '1년 이상 실무 경험자를 우대하며, 성수역 인근 직장인 환자 비중이 높습니다. '
+        '점심 식대 일부 지원. 퇴직금·4대보험 적용. '
+        '꼼꼼한 성격과 시간 약속을 지키시는 분과 일하고 싶습니다.',
     benefits: ['4대보험', '퇴직금', '식비'],
     images: [],
     jobLevel: 2,
@@ -251,7 +295,11 @@ final List<Job> mockLevel2Jobs = [
     career: '경력 무관',
     salaryRange: [2400, 2800],
     postedAt: DateTime.now().subtract(const Duration(days: 4)),
-    details: '',
+    details:
+        '데스크 전담으로 예약·취소 처리, 초진 상담 안내, 수납 및 카드·현금 정산을 맡습니다. '
+        '경력 무관이나 서비스업·콜센터 경험은 플러스 요인입니다. '
+        '컴퓨터 기본 활용(엑셀·예약 프로그램)을 익힐 의지가 있으면 됩니다. '
+        '주민·가족 단위 환자가 많아 친절한 응대가 중요합니다.',
     benefits: ['4대보험', '연차'],
     images: [],
     jobLevel: 2,
@@ -272,7 +320,11 @@ final List<Job> mockLevel2Jobs = [
     career: '1~5년',
     salaryRange: [2700, 3300],
     postedAt: DateTime.now().subtract(const Duration(days: 5)),
-    details: '',
+    details:
+        '오전 시간대 집중 진료(약 8시~15시 전후)로 스케줄이 고정되어 있어 저녁 여유를 원하시는 분께 적합합니다. '
+        '스케일링·진료 보조·감염 관리를 담당합니다. '
+        '식비 지원과 연차는 규정에 따라 사용 가능합니다. '
+        '육아 병행 등 오전 근무를 희망하는 위생사님도 지원해 주세요.',
     benefits: ['4대보험', '식비지원', '연차'],
     images: [],
     jobLevel: 2,
@@ -293,7 +345,11 @@ final List<Job> mockLevel2Jobs = [
     career: '3년 이상',
     salaryRange: [3100, 3900],
     postedAt: DateTime.now().subtract(const Duration(days: 6)),
-    details: '',
+    details:
+        '크라운·브릿지 등 보철 진료 비중이 높아 인상 채득 보조, 임시치아 관리, 보철물 시착 보조 등 세심한 업무가 포함됩니다. '
+        '상주 기공소와 협업이 잦아 커뮤니케이션 능력이 중요합니다. '
+        '3년 이상 경력자 우대, 성과급 별도. '
+        '보철 진료에 자신 있는 분의 지원을 기다립니다.',
     benefits: ['4대보험', '퇴직금', '성과급'],
     images: [],
     jobLevel: 2,
@@ -314,7 +370,11 @@ final List<Job> mockLevel2Jobs = [
     career: '신입',
     salaryRange: [2300, 2700],
     postedAt: DateTime.now().subtract(const Duration(days: 7)),
-    details: '',
+    details:
+        '신입 조무사를 위한 단계별 교육 일정을 마련해 두었습니다. '
+        '접수·안내부터 방사선·소독 업무까지 순차적으로 배우게 됩니다. '
+        '질문을 편하게 할 수 있는 분위기를 지향합니다. '
+        '면허만 있으면 지원 가능하며, 인근 거주자 우대합니다.',
     benefits: ['4대보험', '교육지원'],
     images: [],
     jobLevel: 2,
@@ -335,7 +395,11 @@ final List<Job> mockLevel2Jobs = [
     career: '2년 이상',
     salaryRange: [2900, 3500],
     postedAt: DateTime.now().subtract(const Duration(days: 8)),
-    details: '',
+    details:
+        '2년 이상 실무 경력자를 우대하며, 자가 치석제거·아동 진료 보조 등 다양한 케이스를 경험할 수 있습니다. '
+        '주 5일, 퇴직금·4대보험. '
+        '야간 진료 시 스케줄은 주 1~2회 내외로 조정 가능합니다. '
+        '꾸준한 자기계발을 지원하는 클리닉입니다.',
     benefits: ['4대보험', '퇴직금', '주5일'],
     images: [],
     jobLevel: 2,
@@ -356,7 +420,11 @@ final List<Job> mockLevel2Jobs = [
     career: '경력 무관',
     salaryRange: [2500, 3000],
     postedAt: DateTime.now().subtract(const Duration(days: 9)),
-    details: '',
+    details:
+        '원장 일정 관리, 내·외부 연락, 간단한 문서 작성, 진료실 비품 발주 등 행정·보조 업무를 맡습니다. '
+        '치과 용어에 익숙해지면 진료 보조 일부를 함께 배울 수 있습니다. '
+        '직종은 \'기타\'로 표기되나 실제는 코디네이터에 가깝습니다. '
+        '꼼꼼하고 신뢰감 있는 분을 찾습니다.',
     benefits: ['4대보험', '연차', '식비'],
     images: [],
     jobLevel: 2,
@@ -377,7 +445,11 @@ final List<Job> mockLevel2Jobs = [
     career: '신입/경력',
     salaryRange: [2600, 3200],
     postedAt: DateTime.now().subtract(const Duration(days: 10)),
-    details: '',
+    details:
+        '파트(주 3~4일) 또는 정규직 모두 지원 가능하며, 면접 시 근무일·시간을 조율합니다. '
+        '스케일링·진료 보조·소독 업무가 주를 이룹니다. '
+        '구로디지털단지역 도보 10분 내. '
+        '명절 상여 지급, 4대보험은 고용 형태에 따라 적용(면접 안내).',
     benefits: ['4대보험', '주5일', '명절상여'],
     images: [],
     jobLevel: 2,
@@ -398,7 +470,11 @@ final List<Job> mockLevel2Jobs = [
     career: '1년 이상',
     salaryRange: [2700, 3300],
     postedAt: DateTime.now().subtract(const Duration(days: 11)),
-    details: '',
+    details:
+        '지원 자격에 따라 조무사 또는 위생사 포지션으로 채용합니다. '
+        '조무사는 데스크·방사선·진료 보조, 위생사는 스케일링·진료 보조에 집중합니다. '
+        '1년 이상 해당 면허 실무 경험이 있으면 우대합니다. '
+        '팀 단위 근무로 서로 커버하며 업무 강도를 조절합니다.',
     benefits: ['4대보험', '퇴직금'],
     images: [],
     jobLevel: 2,
@@ -409,8 +485,29 @@ final List<Job> mockLevel2Jobs = [
   ),
 ];
 
-/// 레벨3 Mock 데이터 생성기 (게시판형)
-List<Job> generateMockLevel3Jobs({int count = 30}) {
+String _mockLevel3Details({
+  required String clinicName,
+  required String jobType,
+  required String title,
+  required int variant,
+}) {
+  final intro =
+      '$clinicName에서 $title 포지션을 모집합니다. 직종은 $jobType 직무 중심으로 배정됩니다. ';
+  const blocks = <String>[
+    '스케일링·진료 보조, 기구 소독 및 감염 관리, 환자 안내까지 클리닉 전반에 참여합니다. '
+        '내원 환자 연령층이 다양해 소통 능력이 중요합니다.',
+    '예약·수납·전화 응대 등 데스크 업무와 진료 보조가 함께 포함될 수 있습니다. '
+        '업무 비중은 면접 시 협의합니다.',
+    '야간 또는 주말 진료가 일부 있을 수 있으며, 근무 스케줄은 월별로 공지합니다. '
+        '대체 휴무 및 수당은 내부 규정에 따릅니다.',
+    '4대보험 적용, 퇴직금 적립. 자격·경력에 따라 초봉은 공고 범위 내에서 조정됩니다. '
+        '자세한 복리후생은 방문 면접 시 안내드립니다.',
+  ];
+  return intro + blocks[variant % blocks.length];
+}
+
+/// 단일 레벨3 목업 (ID `mock_l3_{i}` 와 동일 규칙)
+Job _buildMockLevel3JobAt(int i) {
   final clinics = [
     ('중구연세치과', '서울 중구 을지로', '을지로 · 중구', 37.566, 126.998),
     ('종로밝은치과', '서울 종로구 종로', '종로 · 종로구', 37.572, 126.979),
@@ -422,37 +519,70 @@ List<Job> generateMockLevel3Jobs({int count = 30}) {
     ('동작밝은치과', '서울 동작구 노량진동', '노량진동 · 동작구', 37.513, 126.942),
   ];
   final titles = [
-    '치위생사 정규직 채용', '치과조무사 모집', '데스크 직원 채용',
-    '치과위생사 경력직', '신입 치위생사 환영', '치과 코디네이터 채용',
-    '야간 진료 치위생사', '임시직/정규직 동시 모집',
+    '치위생사 정규직 채용',
+    '치과조무사 모집',
+    '데스크 직원 채용',
+    '치과위생사 경력직',
+    '신입 치위생사 환영',
+    '치과 코디네이터 채용',
+    '야간 진료 치위생사',
+    '임시직/정규직 동시 모집',
   ];
   final types = ['치위생사', '치과조무사', '데스크', '기타'];
   final careers = ['신입', '1년 이상', '2년 이상', '3년 이상', '경력 무관'];
 
-  return List.generate(count, (i) {
-    final clinic = clinics[i % clinics.length];
-    return Job(
-      id: 'mock_l3_$i',
-      title: titles[i % titles.length],
+  final clinic = clinics[i % clinics.length];
+  final title = titles[i % titles.length];
+  final type = types[i % types.length];
+
+  return Job(
+    id: 'mock_l3_$i',
+    title: title,
+    clinicName: clinic.$1,
+    address: clinic.$2,
+    district: clinic.$3,
+    lat: clinic.$4,
+    lng: clinic.$5,
+    type: type,
+    career: careers[i % careers.length],
+    salaryRange: [2400 + (i % 6) * 100, 2900 + (i % 6) * 100],
+    postedAt: DateTime.now().subtract(Duration(days: i + 1)),
+    details: _mockLevel3Details(
       clinicName: clinic.$1,
-      address: clinic.$2,
-      district: clinic.$3,
-      lat: clinic.$4,
-      lng: clinic.$5,
-      type: types[i % types.length],
-      career: careers[i % careers.length],
-      salaryRange: [2400 + (i % 6) * 100, 2900 + (i % 6) * 100],
-      postedAt: DateTime.now().subtract(Duration(days: i + 1)),
-      details: '',
-      benefits: ['4대보험'],
-      images: [],
-      jobLevel: 3,
-      matchScore: 0,
-      isNearStation: i % 3 == 0,
-      closingDate: i % 4 == 0
-          ? DateTime.now().add(Duration(days: 7 + i % 14))
-          : null,
-      canApplyNow: i % 5 == 0,
-    );
-  });
+      jobType: type,
+      title: title,
+      variant: i,
+    ),
+    benefits: ['4대보험'],
+    images: [],
+    jobLevel: 3,
+    matchScore: 0,
+    isNearStation: i % 3 == 0,
+    closingDate:
+        i % 4 == 0 ? DateTime.now().add(Duration(days: 7 + i % 14)) : null,
+    canApplyNow: i % 5 == 0,
+  );
+}
+
+/// 레벨3 Mock 데이터 생성기 (게시판형)
+List<Job> generateMockLevel3Jobs({int count = 30}) {
+  return List.generate(count, _buildMockLevel3JobAt);
+}
+
+/// Firestore에 없는 목업 공고 ID → 로컬 [Job] 조회 (상세 화면 폴백용)
+Job? findMockJobById(String id) {
+  for (final j in mockLevel1Jobs) {
+    if (j.id == id) return j;
+  }
+  for (final j in mockLevel2Jobs) {
+    if (j.id == id) return j;
+  }
+  if (id.startsWith('mock_l3_')) {
+    final suffix = id.substring('mock_l3_'.length);
+    final idx = int.tryParse(suffix);
+    if (idx != null && idx >= 0) {
+      return _buildMockLevel3JobAt(idx);
+    }
+  }
+  return null;
 }

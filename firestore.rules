@@ -349,6 +349,8 @@ service cloud.firestore {
           && request.resource.data.content is string
           && request.resource.data.content.size() > 0
           && request.resource.data.content.size() <= 50
+          && request.resource.data.authorNickname is string
+          && request.resource.data.authorNickname.size() <= 30
           && request.resource.data.empathyCount == 0
           && request.resource.data.reportCount == 0
           && request.resource.data.isHidden == false;
@@ -357,14 +359,32 @@ service cloud.firestore {
         // 클라이언트 트랜잭션도 통과하도록 허용
         allow update: if request.auth != null;
 
-        allow delete: if false;
+        // 사용자 추가 보기: 작성자만 삭제 — 공감 0 또는 공감 1(본인 표만)
+        allow delete: if request.auth != null
+          && resource.data.isSystem == false
+          && resource.data.authorUid == request.auth.uid
+          && (
+            resource.data.empathyCount == 0
+            || (
+              resource.data.empathyCount == 1
+              && exists(/databases/$(database)/documents/polls/$(pollId)/votes/$(request.auth.uid))
+              && get(/databases/$(database)/documents/polls/$(pollId)/votes/$(request.auth.uid)).data.optionId == optionId
+            )
+          );
 
         // ── 신고 서브컬렉션 ──
         match /reports/{reportId} {
-          allow read: if false;
+          // 보기 작성자가 삭제 전 신고 문서 정리용으로 조회
+          allow read: if request.auth != null
+            && get(/databases/$(database)/documents/polls/$(pollId)/options/$(optionId)).data.authorUid == request.auth.uid;
           allow create: if request.auth != null
-            && request.auth.uid == reportId;
-          allow update, delete: if false;
+            && request.auth.uid == reportId
+            && request.resource.data.reason is string
+            && request.resource.data.reason.size() >= 1
+            && request.resource.data.reason.size() <= 80;
+          allow update: if false;
+          allow delete: if request.auth != null
+            && get(/databases/$(database)/documents/polls/$(pollId)/options/$(optionId)).data.authorUid == request.auth.uid;
         }
       }
 
@@ -375,7 +395,8 @@ service cloud.firestore {
         // 생성/수정: 본인만 (트랜잭션에서 사용)
         allow create, update: if request.auth != null
           && request.auth.uid == voteUid;
-        allow delete: if false;
+        // 본인 문서만 삭제 (작성자 보기 삭제 시 공감 정리용, CF에서도 Admin으로 삭제)
+        allow delete: if request.auth != null && request.auth.uid == voteUid;
       }
 
       // ── 종료 투표 한마디 댓글 ──

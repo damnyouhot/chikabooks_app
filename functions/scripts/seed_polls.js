@@ -394,11 +394,14 @@ async function main() {
     }
 
     // poll 문서 생성
+    const displayOrder = i + 1;
     const pollRef = await db.collection('polls').add({
       question: poll.question,
       status: 'active',
       startsAt: admin.firestore.Timestamp.fromDate(startsAt),
       endsAt: admin.firestore.Timestamp.fromDate(endsAt),
+      dayIndex: displayOrder,
+      displayOrder,
       totalEmpathyCount: 0,
       category: poll.category,
     });

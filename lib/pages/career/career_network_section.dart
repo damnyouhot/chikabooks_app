@@ -134,38 +134,62 @@ class _CareerNetworkCardState extends State<CareerNetworkCard> {
                   ),
                 ),
               ),
+              // 접힌 상태에서도 가장 최근 근무지(startDate 내림차순 첫 항목)는 항상 표시
+              if (entries.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: _NetworkTimelineItem(
+                    entry: entries.first,
+                    maxMonths: maxMonths,
+                    onEdit: () => DentalNetworkEditSheet.show(
+                      context,
+                      editing: entries.first,
+                    ),
+                    onDelete: () => _confirmDelete(context, entries.first),
+                  ),
+                ),
+              ],
               AnimatedCrossFade(
                 crossFadeState: _expanded
                     ? CrossFadeState.showSecond
                     : CrossFadeState.showFirst,
                 duration: const Duration(milliseconds: 200),
-                firstChild: const SizedBox(height: 0),
-                secondChild: Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: entries.isEmpty
-                      ? _NetworkEmptyHint(
+                firstChild: const SizedBox.shrink(),
+                secondChild: entries.isEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: _NetworkEmptyHint(
                           onAdd: () => DentalNetworkEditSheet.show(context),
-                        )
-                      : Column(
-                          children: entries
-                              .map(
-                                (e) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 10),
-                                  child: _NetworkTimelineItem(
-                                    entry: e,
-                                    maxMonths: maxMonths,
-                                    onEdit: () => DentalNetworkEditSheet.show(
-                                      context,
-                                      editing: e,
-                                    ),
-                                    onDelete: () =>
-                                        _confirmDelete(context, e),
-                                  ),
-                                ),
-                              )
-                              .toList(),
                         ),
-                ),
+                      )
+                    : entries.length <= 1
+                        ? const SizedBox.shrink()
+                        : Padding(
+                            padding: const EdgeInsets.only(top: 10),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: entries
+                                  .skip(1)
+                                  .map(
+                                    (e) => Padding(
+                                      padding:
+                                          const EdgeInsets.only(bottom: 10),
+                                      child: _NetworkTimelineItem(
+                                        entry: e,
+                                        maxMonths: maxMonths,
+                                        onEdit: () =>
+                                            DentalNetworkEditSheet.show(
+                                          context,
+                                          editing: e,
+                                        ),
+                                        onDelete: () =>
+                                            _confirmDelete(context, e),
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                            ),
+                          ),
               ),
             ],
           ),

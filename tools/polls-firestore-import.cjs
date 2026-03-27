@@ -15,6 +15,8 @@
  *
  * 일정: A열 n번 → 프로그램 시작일로부터 (n-1)일째 KST 자정~23:59:59 한 판.
  *       과거 일 → status closed, 미래 → scheduled, 오늘 → active.
+ *
+ * 필드: displayOrder = 엑셀 순번(seq), 운영 허브·앱 "현재 투표" 선택 시 정렬에 사용.
  */
 
 const path = require('path');
@@ -274,6 +276,7 @@ async function main() {
       endsAt: admin.firestore.Timestamp.fromDate(end),
       ...(closedAt ? { closedAt } : {}),
       dayIndex: p.seq,
+      displayOrder: p.seq,
       totalEmpathyCount: 0,
       category: p.category,
     });

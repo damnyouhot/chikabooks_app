@@ -162,11 +162,6 @@ class CareerIdentityFilledCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              AppBadge(
-                label: '치과위생사',
-                bgColor: AppColors.emphasisBadgeBg,
-                textColor: AppColors.emphasisBadgeText,
-              ),
               const Spacer(),
               IconButton(
                 onPressed: () {
@@ -311,16 +306,11 @@ class _CareerIdentitySheetState extends State<CareerIdentitySheet> {
   bool _loading = true;
 
   static const _tagOptions = <String>[
-    '스케일링',
-    '보철',
-    '교정',
-    '상담',
-    '보험청구',
-    '임플란트',
-    '소아',
-    '멸균/소독',
-    '데스크',
-    'X-ray',
+    '데스크 상담',
+    '데스크 코디',
+    '데스크 보험청구',
+    '진료실 팀원',
+    '진료실 팀장',
   ];
 
   @override

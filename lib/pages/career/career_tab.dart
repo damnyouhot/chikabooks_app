@@ -354,7 +354,7 @@ class _IdentityFilledInner extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── 타이틀 행: titleLine + 유저분류 배지 + 수정 아이콘 ──
+        // ── 타이틀 행: titleLine + 수정 아이콘 ──
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
@@ -367,13 +367,6 @@ class _IdentityFilledInner extends StatelessWidget {
                   color: AppColors.onCardPrimary,
                 ),
               ),
-            ),
-            const SizedBox(width: 8),
-            // '치과위생사' 분류 배지 (기존 위 줄에서 이동)
-            AppBadge(
-              label: '치과위생사',
-              bgColor: AppColors.onCardPrimary.withOpacity(0.15),
-              textColor: AppColors.onCardPrimary,
             ),
             const SizedBox(width: 4),
             IconButton(

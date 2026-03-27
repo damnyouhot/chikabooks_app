@@ -13,7 +13,9 @@ import '../models/quiz_pool_item.dart';
 import '../models/quiz_schedule.dart';
 import '../services/admin_activity_service.dart';
 import '../services/funnel_onboarding_service.dart';
+import '../services/quiz_content_config_service.dart';
 import '../services/quiz_pool_service.dart';
+import '../widgets/quiz/quiz_share_capture.dart';
 
 /// 퀴즈 탭 글래스 모드 플래그
 const bool kQuizGlassMode = false;
@@ -166,8 +168,9 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
   Future<void> _loadTodaySchedule() async {
     try {
       final dateKey = QuizPoolService.todayKey;
+      final cfgF = QuizContentConfigService.getConfig();
       final results = await Future.wait([
-        QuizPoolService.getTodaySchedule(),
+        cfgF.then((c) => QuizPoolService.getTodaySchedule(contentConfig: c)),
         QuizPoolService.getHistory(dateKey),
       ]);
 
@@ -187,8 +190,9 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
   Future<void> _loadRecentSchedules() async {
     if (_recentLoaded) return;
     try {
+      final cfg = await QuizContentConfigService.getConfig();
       final results = await Future.wait([
-        QuizPoolService.getRecentSchedules(days: 3),
+        QuizPoolService.getRecentSchedules(days: 3, contentConfig: cfg),
         QuizPoolService.getRecentHistories(days: 4),
       ]);
 
@@ -965,6 +969,24 @@ class _QuizCardState extends State<_QuizCard> {
     widget.onAnswered?.call(idx, idx == widget.correctIndex);
   }
 
+  Future<void> _shareQuizAsImage() async {
+    try {
+      await QuizShareCapture.share(
+        context,
+        qIndex: widget.index,
+        question: widget.question,
+        questionType: widget.questionType,
+        quizId: widget.quizId,
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('공유에 실패했어요. $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final questionColor =
@@ -1060,66 +1082,70 @@ class _QuizCardState extends State<_QuizCard> {
       }),
     );
 
+    final typeBadgeBg =
+        widget.glassMode
+            ? AppColors.white.withValues(alpha: 0.14)
+            : (widget.questionType == QuizPoolItem.kNationalExam
+                ? AppColors.accent.withValues(alpha: 0.14)
+                : AppColors.disabledBg);
+    final typeBadgeText =
+        widget.glassMode
+            ? AppColors.white.withValues(alpha: 0.95)
+            : (widget.questionType == QuizPoolItem.kNationalExam
+                ? AppColors.accent
+                : AppColors.textSecondary);
+
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 질문 헤더: 왼쪽 Q → 아래 유형(국시/임상), 오른쪽 질문 본문
+        // 공감 투표 카드와 동일: 첫 줄 Q · 국시/임상 · 공유, 질문은 그 아래
         Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.xl,
-            AppSpacing.xl,
-            AppSpacing.xl,
-            AppSpacing.lg,
-          ),
+          padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.xl, AppSpacing.lg, 0),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AppBadge(
-                    label: 'Q${widget.index}',
-                    bgColor:
-                        widget.glassMode
-                            ? AppColors.white.withValues(alpha: 0.20)
-                            : AppColors.pollBadgeBg,
-                    textColor:
-                        widget.glassMode
-                            ? AppColors.white
-                            : AppColors.pollBadgeText,
-                  ),
-                  const SizedBox(height: 8),
-                  AppBadge(
-                    label: QuizPoolItem.badgeLabelForType(widget.questionType),
-                    bgColor:
-                        widget.glassMode
-                            ? AppColors.white.withValues(alpha: 0.14)
-                            : (widget.questionType == QuizPoolItem.kNationalExam
-                                ? AppColors.accent.withValues(alpha: 0.14)
-                                : AppColors.surfaceMuted),
-                    textColor:
-                        widget.glassMode
-                            ? AppColors.white.withValues(alpha: 0.95)
-                            : (widget.questionType == QuizPoolItem.kNationalExam
-                                ? AppColors.accent
-                                : AppColors.textSecondary),
-                  ),
-                ],
+              AppBadge(
+                label: 'Q${widget.index}',
+                bgColor:
+                    widget.glassMode
+                        ? AppColors.white.withValues(alpha: 0.20)
+                        : AppColors.pollBadgeBg,
+                textColor:
+                    widget.glassMode
+                        ? AppColors.white
+                        : AppColors.pollBadgeText,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  widget.question,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: questionColor,
-                    height: 1.45,
-                  ),
-                ),
+              const SizedBox(width: 8),
+              AppBadge(
+                label: QuizPoolItem.badgeLabelForType(widget.questionType),
+                bgColor: typeBadgeBg,
+                textColor: typeBadgeText,
+              ),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.share_outlined, size: 20),
+                color:
+                    widget.glassMode
+                        ? AppColors.white.withValues(alpha: 0.85)
+                        : AppColors.textSecondary,
+                tooltip: '공유',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                onPressed: _shareQuizAsImage,
               ),
             ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(AppSpacing.xl, 10, AppSpacing.xl, AppSpacing.lg),
+          child: Text(
+            widget.question,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: questionColor,
+              height: 1.45,
+            ),
           ),
         ),
 

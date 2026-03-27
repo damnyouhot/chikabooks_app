@@ -1,16 +1,13 @@
+import 'dart:async';
 import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../services/onboarding_workplace_service.dart';
-import '../../core/theme/app_colors.dart';
 
-// _kBg: 따뜻한 크림 배경 — 온보딩 다이얼로그 전용, 의도적 유지
-const _kBg = Color(0xFFFFFBF9);
-// _kText: 온보딩 다이얼로그 전용 텍스트 톤 — AppColors.textPrimary 대신 약간 따뜻한 느낌
-const _kText = Color(0xFF3D3535);
-// _kAccent: 온보딩 민트/그린 액센트 — 앱 메인 accent와 별개 의도적 유지
-const _kAccent = Color(0xFF6BBFA0);
-const _kRadius = 20.0;
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
+import '../../services/funnel_onboarding_service.dart';
+import '../../services/onboarding_workplace_service.dart';
 
 // ─────────────────────────────────────────────────────────────
 // 팝업 1: 닉네임 입력 (Step2)
@@ -57,12 +54,17 @@ class _OnboardingNicknamePopupState extends State<OnboardingNicknamePopup> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      backgroundColor: _kBg,
+      backgroundColor: AppColors.white,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(_kRadius),
+        borderRadius: BorderRadius.circular(AppRadius.xl),
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          AppSpacing.xl,
+          AppSpacing.lg,
+          AppSpacing.lg,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -71,8 +73,8 @@ class _OnboardingNicknamePopupState extends State<OnboardingNicknamePopup> {
               '나의 닉네임은',
               style: GoogleFonts.notoSansKr(
                 fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: _kText,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary,
               ),
             ),
             const SizedBox(height: 4),
@@ -80,11 +82,11 @@ class _OnboardingNicknamePopupState extends State<OnboardingNicknamePopup> {
               '언제든 바꿀 수 있어',
               style: GoogleFonts.notoSansKr(
                 fontSize: 13,
-                color: _kText.withOpacity(0.55),
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
               ),
             ),
-            const SizedBox(height: 20),
-            // ── TextField + 주사위 버튼 Row ──
+            const SizedBox(height: AppSpacing.md + 8),
             Row(
               children: [
                 Expanded(
@@ -98,33 +100,40 @@ class _OnboardingNicknamePopupState extends State<OnboardingNicknamePopup> {
                       hintText: '닉네임 입력',
                       counterText: '',
                       filled: true,
-                      fillColor: AppColors.white,
+                      fillColor: AppColors.surfaceMuted,
                       contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 14,
+                        horizontal: AppSpacing.lg,
+                        vertical: AppSpacing.md + 2,
                       ),
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: AppColors.divider),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                        borderSide: const BorderSide(
+                          color: AppColors.divider,
+                          width: 0.8,
+                        ),
                       ),
                       focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide:
-                            const BorderSide(color: _kAccent, width: 1.5),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                        borderSide: const BorderSide(
+                          color: AppColors.accent,
+                          width: 1.4,
+                        ),
                       ),
                       enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: AppColors.divider),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                        borderSide: const BorderSide(
+                          color: AppColors.divider,
+                          width: 0.8,
+                        ),
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                // 🎲 랜덤 닉네임 주사위 버튼
+                const SizedBox(width: AppSpacing.sm),
                 Container(
                   decoration: BoxDecoration(
                     color: AppColors.surfaceMuted,
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                   ),
                   child: IconButton(
                     onPressed: _randomNickname,
@@ -134,7 +143,7 @@ class _OnboardingNicknamePopupState extends State<OnboardingNicknamePopup> {
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: AppSpacing.xl),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -143,20 +152,21 @@ class _OnboardingNicknamePopupState extends State<OnboardingNicknamePopup> {
                         ? () => widget.onDone(_ctrl.text.trim())
                         : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _kAccent,
-                  foregroundColor: AppColors.white,
-                  disabledBackgroundColor: _kAccent.withOpacity(0.35),
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: AppColors.onAccent,
+                  disabledBackgroundColor: AppColors.disabledBg,
+                  disabledForegroundColor: AppColors.disabledText,
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
                   ),
                 ),
                 child: Text(
                   '확인',
                   style: GoogleFonts.notoSansKr(
                     fontSize: 15,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
               ),
@@ -167,6 +177,15 @@ class _OnboardingNicknamePopupState extends State<OnboardingNicknamePopup> {
     );
   }
 }
+
+/// 커리어 카드 수정 시 `career_identity_section` 의 `_tagOptions` 와 동일 순서·문구 유지
+const _onboardingCareerSpecialtyTags = <String>[
+  '데스크 상담',
+  '데스크 코디',
+  '데스크 보험청구',
+  '진료실 팀원',
+  '진료실 팀장',
+];
 
 // ─────────────────────────────────────────────────────────────
 // 팝업 2: 근무 상태 + 치과/학교 입력 (Step4)
@@ -184,6 +203,7 @@ class OnboardingWorkplacePopup extends StatefulWidget {
 class _OnboardingWorkplacePopupState extends State<OnboardingWorkplacePopup> {
   WorkStatus? _selected;
   final _ctrl = TextEditingController();
+  final Set<String> _selectedSpecialtyTags = {};
   bool _saving = false;
 
   @override
@@ -191,6 +211,9 @@ class _OnboardingWorkplacePopupState extends State<OnboardingWorkplacePopup> {
     _ctrl.dispose();
     super.dispose();
   }
+
+  bool get _showSpecialtySection =>
+      _selected != null && _selected != WorkStatus.student;
 
   String get _hintText {
     switch (_selected) {
@@ -210,149 +233,270 @@ class _OnboardingWorkplacePopupState extends State<OnboardingWorkplacePopup> {
   bool get _canSubmit =>
       _selected != null && _ctrl.text.trim().isNotEmpty && !_saving;
 
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: _kBg,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(_kRadius),
+  void _onPickStatus(WorkStatus s) {
+    setState(() {
+      _selected = s;
+      _ctrl.clear();
+      _selectedSpecialtyTags.clear();
+    });
+  }
+
+  Widget _statusTile(WorkStatus s) {
+    final sel = _selected == s;
+    return Material(
+      color: sel ? AppColors.accent.withOpacity(0.18) : AppColors.surfaceMuted,
+      borderRadius: BorderRadius.circular(AppRadius.lg),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => _onPickStatus(s),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 54),
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.sm,
+                vertical: AppSpacing.md,
+              ),
+              child: Text(
+                s.label,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.notoSansKr(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  height: 1.25,
+                  color: sel ? AppColors.accent : AppColors.textPrimary,
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+    );
+  }
+
+  Widget _statusGrid() {
+    final v = WorkStatus.values;
+    return Column(
+      children: [
+        Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              '나는 지금',
-              style: GoogleFonts.notoSansKr(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: _kText,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '너만 볼 수 있고 언제든 바꿀 수 있어',
-              style: GoogleFonts.notoSansKr(
-                fontSize: 13,
-                color: _kText.withOpacity(0.55),
-              ),
-            ),
-            const SizedBox(height: 20),
+            Expanded(child: _statusTile(v[0])),
+            SizedBox(width: AppSpacing.sm),
+            Expanded(child: _statusTile(v[1])),
+          ],
+        ),
+        SizedBox(height: AppSpacing.sm),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: _statusTile(v[2])),
+            SizedBox(width: AppSpacing.sm),
+            Expanded(child: _statusTile(v[3])),
+          ],
+        ),
+      ],
+    );
+  }
 
-            // ── 상태 선택 칩 ──
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children:
-                  WorkStatus.values.map((s) {
-                    final selected = _selected == s;
-                    return ChoiceChip(
-                      label: Text(s.label),
-                      selected: selected,
-                      onSelected: (_) => setState(() {
-                        _selected = s;
-                        _ctrl.clear();
-                      }),
-                      selectedColor: _kAccent,
-                      backgroundColor: AppColors.white,
-                      labelStyle: GoogleFonts.notoSansKr(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: selected ? AppColors.white : AppColors.textSecondary,
-                      ),
-                      side: BorderSide(
-                        color: selected ? _kAccent : AppColors.divider,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      showCheckmark: false,
-                    );
-                  }).toList(),
-            ),
+  Future<void> _submit() async {
+    setState(() => _saving = true);
+    final tagsForSave =
+        _showSpecialtySection
+            ? _onboardingCareerSpecialtyTags
+                .where((t) => _selectedSpecialtyTags.contains(t))
+                .toList()
+            : const <String>[];
+    try {
+      await OnboardingWorkplaceService.saveWorkplaceInfo(
+        status: _selected!,
+        placeName: _ctrl.text.trim(),
+        specialtyTags: tagsForSave,
+      );
+      if (tagsForSave.isNotEmpty) {
+        unawaited(FunnelOnboardingService.tryLogFirstCareerSpecialty());
+      }
+      if (mounted) {
+        widget.onDone(_selected!, _ctrl.text.trim());
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
 
-            if (_selected != null) ...[
-              const SizedBox(height: 16),
-              TextField(
-                controller: _ctrl,
-                autofocus: true,
-                maxLength: 30,
-                onChanged: (_) => setState(() {}),
-                decoration: InputDecoration(
-                  hintText: _hintText,
-                  counterText: '',
-                  filled: true,
-                  fillColor: AppColors.white,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 14,
+  @override
+  Widget build(BuildContext context) {
+    final maxW = min(
+      400.0,
+      MediaQuery.sizeOf(context).width - AppSpacing.lg * 2,
+    );
+
+    return Dialog(
+      backgroundColor: AppColors.white,
+      insetPadding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.xxl,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+      ),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: maxW,
+          maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.xl,
+            AppSpacing.lg,
+            AppSpacing.lg,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '나는 지금',
+                style: GoogleFonts.notoSansKr(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '너만 볼 수 있고 언제든 바꿀 수 있어',
+                style: GoogleFonts.notoSansKr(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              _statusGrid(),
+              if (_selected != null) ...[
+                const SizedBox(height: AppSpacing.md),
+                TextField(
+                  controller: _ctrl,
+                  autofocus: true,
+                  maxLength: 30,
+                  onChanged: (_) => setState(() {}),
+                  decoration: InputDecoration(
+                    hintText: _hintText,
+                    counterText: '',
+                    filled: true,
+                    fillColor: AppColors.surfaceMuted,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.lg,
+                      vertical: AppSpacing.md + 2,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                      borderSide: const BorderSide(
+                        color: AppColors.divider,
+                        width: 0.8,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                      borderSide: const BorderSide(
+                        color: AppColors.accent,
+                        width: 1.4,
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                      borderSide: const BorderSide(
+                        color: AppColors.divider,
+                        width: 0.8,
+                      ),
+                    ),
                   ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.divider),
+                ),
+              ],
+              if (_showSpecialtySection) ...[
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  '전문 분야(선택)',
+                  style: GoogleFonts.notoSansKr(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
                   ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide:
-                        const BorderSide(color: _kAccent, width: 1.5),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.sm,
+                  children: [
+                    for (final t in _onboardingCareerSpecialtyTags)
+                      FilterChip(
+                        label: Text(t),
+                        selected: _selectedSpecialtyTags.contains(t),
+                        onSelected: (v) {
+                          setState(() {
+                            if (v) {
+                              _selectedSpecialtyTags.add(t);
+                            } else {
+                              _selectedSpecialtyTags.remove(t);
+                            }
+                          });
+                        },
+                        selectedColor: AppColors.accent.withOpacity(0.2),
+                        checkmarkColor: AppColors.accent,
+                        side: const BorderSide(
+                          color: AppColors.divider,
+                          width: 0.8,
+                        ),
+                        labelStyle: TextStyle(
+                          color: AppColors.textPrimary.withOpacity(0.85),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: AppSpacing.xl),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _canSubmit ? _submit : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: AppColors.onAccent,
+                    disabledBackgroundColor: AppColors.disabledBg,
+                    disabledForegroundColor: AppColors.disabledText,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.lg),
+                    ),
                   ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.divider),
-                  ),
+                  child:
+                      _saving
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.2,
+                                color: AppColors.onAccent,
+                              ),
+                            )
+                          : Text(
+                              '확인',
+                              style: GoogleFonts.notoSansKr(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
                 ),
               ),
             ],
-
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed:
-                    _canSubmit
-                        ? () async {
-                            setState(() => _saving = true);
-                            await OnboardingWorkplaceService.saveWorkplaceInfo(
-                              status: _selected!,
-                              placeName: _ctrl.text.trim(),
-                            );
-                            if (mounted) {
-                              widget.onDone(_selected!, _ctrl.text.trim());
-                            }
-                          }
-                        : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _kAccent,
-                  foregroundColor: AppColors.white,
-                  disabledBackgroundColor: _kAccent.withOpacity(0.35),
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child:
-                    _saving
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppColors.white,
-                            ),
-                          )
-                        : Text(
-                            '확인',
-                            style: GoogleFonts.notoSansKr(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

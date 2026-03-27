@@ -2,6 +2,7 @@
   "name": "functions",
   "scripts": {
     "polls-import": "node ../tools/polls-firestore-import.cjs",
+    "polls-backfill-displayorder": "node ../tools/polls-displayorder-backfill.cjs",
     "lint": "eslint --ext .js,.ts .",
     "build": "tsc",
     "build:watch": "tsc --watch",

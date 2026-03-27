@@ -171,6 +171,52 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "content_hira_updates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "publishedAt",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "impactScore",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "content_hira_updates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "isDental",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "publishedAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "content_hira_updates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "isDental",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "publishedAt",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "impactScore",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": [

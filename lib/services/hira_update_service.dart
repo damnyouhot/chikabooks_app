@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
@@ -37,7 +38,7 @@ class HiraUpdateService {
     }
   }
 
-  /// 전체 업데이트 목록 실시간 감시 (3개월, 최신순)
+  /// 전체 업데이트 목록 실시간 감시 (3개월, 치과만, 최신순)
   static Stream<List<HiraUpdate>> watchAllUpdates() {
     final threeMonthsAgo = DateTime.now().subtract(const Duration(days: 90));
     
@@ -45,6 +46,7 @@ class HiraUpdateService {
     
     return _db
         .collection('content_hira_updates')
+        .where('isDental', isEqualTo: 'yes')
         .where('publishedAt', isGreaterThanOrEqualTo: Timestamp.fromDate(threeMonthsAgo))
         .orderBy('publishedAt', descending: true)
         .snapshots()
@@ -56,7 +58,7 @@ class HiraUpdateService {
     });
   }
 
-  /// 전체 업데이트 목록 가져오기 (3개월, 최신순)
+  /// 전체 업데이트 목록 가져오기 (3개월, 치과만, 최신순)
   static Future<List<HiraUpdate>> getAllUpdates() async {
     try {
       final threeMonthsAgo = DateTime.now().subtract(const Duration(days: 90));
@@ -65,6 +67,7 @@ class HiraUpdateService {
       
       final snapshot = await _db
           .collection('content_hira_updates')
+          .where('isDental', isEqualTo: 'yes')
           .where('publishedAt', isGreaterThanOrEqualTo: Timestamp.fromDate(threeMonthsAgo))
           .orderBy('publishedAt', descending: true)
           .get();
@@ -188,6 +191,56 @@ class HiraUpdateService {
       final ids = snap.docs.map((doc) => doc.id).toList();
       return await getUpdates(ids);
     });
+  }
+
+  /// 심평원 보험인정기준 전체 DB 검색 (Cloud Function 프록시)
+  static Future<HiraSearchResponse> searchInsurance({
+    required String keyword,
+    int page = 1,
+    String tab = 'all',
+    int perPage = 30,
+  }) async {
+    try {
+      debugPrint('🔍 HIRA search: keyword="$keyword" page=$page tab=$tab');
+      final callable = FirebaseFunctions.instanceFor(region: 'asia-northeast3')
+          .httpsCallable('searchHiraInsurance');
+      final result = await callable.call<dynamic>(<String, dynamic>{
+        'keyword': keyword,
+        'page': page,
+        'tab': tab,
+        'perPage': perPage,
+      });
+      final data = Map<String, dynamic>.from(result.data as Map);
+      debugPrint('✅ HIRA search: ${data['totalCount']} total results');
+      return HiraSearchResponse.fromMap(data);
+    } catch (e) {
+      debugPrint('⚠️ HiraUpdateService.searchInsurance error: $e');
+      rethrow;
+    }
+  }
+
+  /// 수가 조회 (data.go.kr API 프록시)
+  static Future<FeeSearchResponse> searchFeeSchedule({
+    required String keyword,
+    int page = 1,
+    int perPage = 20,
+  }) async {
+    try {
+      debugPrint('🔍 Fee search: keyword="$keyword" page=$page');
+      final callable = FirebaseFunctions.instanceFor(region: 'asia-northeast3')
+          .httpsCallable('searchFeeSchedule');
+      final result = await callable.call<dynamic>(<String, dynamic>{
+        'keyword': keyword,
+        'page': page,
+        'perPage': perPage,
+      });
+      final data = Map<String, dynamic>.from(result.data as Map);
+      debugPrint('✅ Fee search: ${data['totalCount']} total results');
+      return FeeSearchResponse.fromMap(data);
+    } catch (e) {
+      debugPrint('⚠️ HiraUpdateService.searchFeeSchedule error: $e');
+      rethrow;
+    }
   }
 
   /// 현재 날짜 키 (YYYY-MM-DD)

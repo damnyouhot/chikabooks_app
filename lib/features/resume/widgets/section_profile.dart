@@ -84,28 +84,53 @@ class _SectionProfileState extends State<SectionProfile> {
         const SizedBox(height: 20),
         _sectionTitle('희망 근무형태', '복수 선택 가능'),
         const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 6,
-          children: _workTypeOptions.map((type) {
-            final selected = _workTypes.contains(type);
-            return FilterChip(
-              label: Text(type),
-              selected: selected,
-            selectedColor: AppColors.accent.withOpacity(0.15),
-            checkmarkColor: AppColors.accent,
-              onSelected: (val) {
-                setState(() {
-                  if (val) {
-                    _workTypes.add(type);
-                  } else {
-                    _workTypes.remove(type);
-                  }
-                });
-                _emit();
-              },
+        LayoutBuilder(
+          builder: (context, c) {
+            const gap = 8.0;
+            final w = (c.maxWidth - gap) / 2;
+            return Wrap(
+              spacing: gap,
+              runSpacing: gap,
+              children: _workTypeOptions.map((type) {
+                final selected = _workTypes.contains(type);
+                return SizedBox(
+                  width: w,
+                  child: FilterChip(
+                    label: Text(
+                      type,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    selected: selected,
+                    selectedColor: AppColors.accent.withOpacity(0.15),
+                    checkmarkColor: AppColors.accent,
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    side: BorderSide(
+                      color: selected
+                          ? AppColors.accent.withOpacity(0.5)
+                          : AppColors.divider,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    onSelected: (val) {
+                      setState(() {
+                        if (val) {
+                          _workTypes.add(type);
+                        } else {
+                          _workTypes.remove(type);
+                        }
+                      });
+                      _emit();
+                    },
+                  ),
+                );
+              }).toList(),
             );
-          }).toList(),
+          },
         ),
       ],
     );

@@ -266,6 +266,7 @@ async function deletePollSubtreeCompletely(pollId: string): Promise<void> {
 /**
  * 공감투표 완전 삭제 (어드민)
  *
+ * 삭제 후 displayOrder 기준 다음 미종료 투표를 즉시 활성화한다.
  * 2단계 확인: [confirmPollId] 가 [pollId] 와 동일해야 함 (클라 1차 확인 + ID 재입력).
  */
 export const adminDeletePoll = functions
@@ -300,12 +301,45 @@ export const adminDeletePoll = functions
       );
     }
 
+    // 삭제 전에 다음 투표 후보를 미리 찾아 둠 (삭제 대상 제외)
+    const allSnap = await db.collection("polls").get();
+    const rows: PollRowDoc[] = [];
+    for (const doc of allSnap.docs) {
+      if (doc.id === pollId) continue;
+      const r = pollDocToRow(doc);
+      if (r) rows.push(r);
+    }
+    const sortedNonClosed = rows
+      .filter((r) => r.status !== "closed")
+      .sort((a, b) => {
+        if (a.displayOrder !== b.displayOrder) return a.displayOrder - b.displayOrder;
+        return a.id.localeCompare(b.id);
+      });
+    const nextCandidate = sortedNonClosed.length > 0 ? sortedNonClosed[0] : null;
+
     await deletePollSubtreeCompletely(pollId);
 
-    functions.logger.info(`adminDeletePoll: 완료 ${pollId}`);
+    let activatedPollId: string | null = null;
+    if (nextCandidate) {
+      const nowMs = Date.now();
+      const nowTs = admin.firestore.Timestamp.now();
+      const duration = Math.max(nextCandidate.endsAtMs - nextCandidate.startsAtMs, 24 * 3600 * 1000);
+      const newEndsMs = nowMs + duration;
+      await nextCandidate.doc.ref.update({
+        status: "active",
+        startsAt: nowTs,
+        endsAt: admin.firestore.Timestamp.fromMillis(newEndsMs),
+      });
+      activatedPollId = nextCandidate.id;
+    }
+
+    functions.logger.info(`adminDeletePoll: 삭제 ${pollId}, 활성화 ${activatedPollId ?? "(없음)"}`);
     return {
       success: true,
       pollId,
-      message: `투표 ${pollId} 및 하위 데이터를 삭제했습니다.`,
+      activatedPollId,
+      message: activatedPollId
+        ? `투표 ${pollId} 삭제 완료. 다음 투표 ${activatedPollId} 를 즉시 활성화했습니다.`
+        : `투표 ${pollId} 삭제 완료. 대기 중인 다음 투표가 없습니다.`,
     };
   });

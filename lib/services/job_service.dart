@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import '../data/mock_jobs.dart';
 import '../models/job.dart';
 
 class JobService {
@@ -44,9 +45,49 @@ class JobService {
     return jobs;
   }
 
+  /// Firestore 없이 목업/플레이스홀더만 사용 (상세 화면 등 안전망)
+  Job jobOfflineFallback(String id) => _jobFetchFallback(id);
+
+  /// Firestore 미연결·권한 거부·문서 없음·파싱 실패 시에도 항상 [Job] 반환 (무한 로딩 방지)
+  Job _jobFetchFallback(String id) {
+    final mock = findMockJobById(id);
+    if (mock != null) return mock;
+    return Job.fromJson(
+      {
+        'postedAt': Timestamp.now(),
+        'title': '공고를 찾을 수 없어요',
+        'clinicName': '',
+        'career': '미정',
+        'salaryRange': [0, 0],
+        'details':
+            '삭제되었거나 주소가 잘못되었을 수 있어요. '
+            '로그인 상태와 네트워크를 확인해 주세요.',
+        'benefits': <String>[],
+        'images': <String>[],
+      },
+      docId: id,
+    );
+  }
+
   Future<Job> fetchJob(String id) async {
-    final doc = await _db.collection('jobs').doc(id).get();
-    return Job.fromDoc(doc);
+    DocumentSnapshot<Map<String, dynamic>>? doc;
+    try {
+      doc = await _db.collection('jobs').doc(id).get();
+    } catch (e, st) {
+      debugPrint('⚠️ fetchJob get($id): $e\n$st');
+      return _jobFetchFallback(id);
+    }
+
+    if (doc.exists && doc.data() != null) {
+      try {
+        return Job.fromDoc(doc);
+      } catch (e, st) {
+        debugPrint('⚠️ fetchJob fromDoc($id): $e\n$st');
+        return _jobFetchFallback(id);
+      }
+    }
+
+    return _jobFetchFallback(id);
   }
 
   // ══════════════════════════════════════════════

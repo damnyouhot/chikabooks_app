@@ -145,7 +145,7 @@ class _TrainingCardState extends State<_TrainingCard> {
       margin: const EdgeInsets.only(bottom: 14),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -170,6 +170,8 @@ class _TrainingCardState extends State<_TrainingCard> {
               ],
             ),
             const SizedBox(height: 10),
+            Divider(height: 1, color: AppColors.divider.withOpacity(0.6)),
+            const SizedBox(height: 14),
             _field('교육명', _titleCtrl, '예: 보수교육 8시간'),
             _field('교육기관', _orgCtrl, '대한치과위생사협회'),
             Row(

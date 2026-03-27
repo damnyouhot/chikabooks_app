@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'quiz_content_config.dart';
 import 'quiz_pool_item.dart';
 
 /// quiz_schedule/{dateKey} 문서 모델
@@ -24,18 +25,19 @@ class QuizSchedule {
     required this.createdAt,
   });
 
-  factory QuizSchedule.fromFirestore(DocumentSnapshot doc) {
+  factory QuizSchedule.fromFirestore(
+    DocumentSnapshot doc, {
+    QuizContentConfig? contentConfig,
+  }) {
     final d = doc.data() as Map<String, dynamic>;
+    final cfg = contentConfig ?? QuizContentConfig.defaultLegacy();
 
     // items: 스냅샷 리스트 역직렬화
     final rawItems = d['items'] as List<dynamic>? ?? [];
     final items = rawItems.map((e) {
       // items는 자동ID 없이 저장되므로 임시 id=''로 처리
       final map = Map<String, dynamic>.from(e as Map);
-      final rawType = map['questionType'] as String?;
-      final qType = rawType == QuizPoolItem.kNationalExam
-          ? QuizPoolItem.kNationalExam
-          : QuizPoolItem.kClinical;
+      final qType = QuizPoolItem.resolveQuestionTypeForScheduleSnapshot(map, cfg);
       return QuizPoolItem(
         id:              map['id'] as String? ?? '',
         order:           (map['order'] as num?)?.toInt() ?? 0,

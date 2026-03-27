@@ -108,61 +108,6 @@ class AppErrorItem {
   }
 }
 
-// ─── 기록하기 항목 — 대시보드 피드용 ──────────────────────────────
-class NoteFeedItem {
-  final String id;
-  final String userId;
-  final String text;
-  final DateTime createdAt;
-  final List<String> imageUrls;
-
-  const NoteFeedItem({
-    required this.id,
-    required this.userId,
-    required this.text,
-    required this.createdAt,
-    this.imageUrls = const [],
-  });
-}
-
-// ─── 감정 기록 항목 (EmotionLog — emotionLogs 컬렉션용, 레거시) ─
-class EmotionLogItem {
-  final String id;
-  final String userId;
-  final DateTime timestamp;
-  final int? score;
-  final String? text;
-  final List<String> tags;
-  final String? careerGroupSnapshot;
-
-  const EmotionLogItem({
-    required this.id,
-    required this.userId,
-    required this.timestamp,
-    this.score,
-    this.text,
-    this.tags = const [],
-    this.careerGroupSnapshot,
-  });
-
-  factory EmotionLogItem.fromMap(String id, Map<String, dynamic> m) {
-    List<String> parsedTags = [];
-    final rawTags = m['tags'];
-    if (rawTags is List) {
-      parsedTags = rawTags.map((e) => e.toString()).toList();
-    }
-    return EmotionLogItem(
-      id: id,
-      userId: m['userId'] as String? ?? '',
-      timestamp: (m['timestamp'] as dynamic)?.toDate() ?? DateTime.now(),
-      score: (m['score'] as num?)?.toInt(),
-      text: m['text'] as String?,
-      tags: parsedTags,
-      careerGroupSnapshot: m['careerGroupSnapshot'] as String?,
-    );
-  }
-}
-
 // ─── 연차 분포 항목 ──────────────────────────────────────────
 class CareerGroupCount {
   final String group; // careerBucket: '0-2', '3-5', '6+'

@@ -6,7 +6,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// 앱 기능 소개 온보딩 관리 서비스
 ///
 /// - [appOnboardingCompleted] : Firestore `users/{uid}.appOnboardingCompleted`
-/// - [pendingOnboarding]      : SharedPreferences — 로그인 직후 온보딩 실행 신호
+/// - [pendingOnboarding]      : SharedPreferences — 로그인 직전 [forceSchedule]로 예약.
+///   온보딩을 **완료**할 때만 제거한다. (시작 시점에 지우면 앱 중간 종료 후 재실행 시 온보딩이 안 뜸)
+///   [shouldRunOnboarding]은 Firestore [appOnboardingCompleted]를 우선하며, Firestore 오류 시에만 pending을 본다.
 class OnboardingService {
   static final _db = FirebaseFirestore.instance;
   static const _pendingKey = 'pendingOnboarding';
@@ -65,45 +67,51 @@ class OnboardingService {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // HomeShell 진입 시 온보딩을 실행해야 하는지 판단
+  // HomeShell 진입 시 앱 기능 소개 온보딩을 실행해야 하는지 판단
   //
-  // true 반환 조건:
-  //   1) pendingOnboarding == true (이번 로그인에서 처음 진입)
-  //      AND
-  //   2) appOnboardingCompleted == false (아직 온보딩 미완료)
+  // - Firestore [appOnboardingCompleted]가 있으면 그것이 기준이다.
+  //   · true  → pending 정리 후 스킵 (재로그인해도 반복 안 함)
+  //   · false → 온보딩 실행. pending은 여기서 지우지 않는다 → 앱 강제 종료 후에도 재실행 시 다시 표시.
+  // - Firestore 조회 실패 시에만 [pendingOnboarding]으로 판단 (로그인 직전 forceSchedule 대비)
   // ─────────────────────────────────────────────────────────────
   static Future<bool> shouldRunOnboarding() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return false;
 
-      // pendingOnboarding 플래그 확인 (이번 로그인이 첫 HomeShell 진입인지)
       final prefs = await SharedPreferences.getInstance();
-      final isPending = prefs.getBool(_pendingKey) ?? false;
-      if (!isPending) {
-        debugPrint('🔍 OnboardingService: pendingOnboarding=false → 스킵');
-        return false;
-      }
 
-      // ✅ Firestore에서 이미 온보딩 완료했는지 확인
-      // 기존 유저가 재로그인/앱 재빌드해도 온보딩이 반복되는 문제 방지
       try {
         final doc = await _db.collection('users').doc(user.uid).get();
-        final completed = doc.data()?['appOnboardingCompleted'] as bool? ?? false;
+        final completed =
+            doc.data()?['appOnboardingCompleted'] as bool? ?? false;
         if (completed) {
-          // 이미 완료한 사용자 → 플래그 제거하고 스킵
           await prefs.remove(_pendingKey);
-          debugPrint('✅ OnboardingService: appOnboardingCompleted=true → 스킵 (기존 유저)');
+          debugPrint(
+            '✅ OnboardingService: appOnboardingCompleted=true → 스킵 (기존 유저)',
+          );
           return false;
         }
+        debugPrint(
+          '✅ OnboardingService: appOnboarding 미완료 → 온보딩 실행 (pending 유지)',
+        );
+        return true;
       } catch (e) {
-        debugPrint('⚠️ OnboardingService: Firestore 확인 실패 → pendingOnboarding 기준 사용: $e');
+        debugPrint(
+          '⚠️ OnboardingService: Firestore 확인 실패 → pendingOnboarding 기준: $e',
+        );
       }
 
-      // pendingOnboarding=true + appOnboardingCompleted=false → 신규 유저 온보딩 실행
-      // 즉시 플래그 제거 (OnboardingGate가 재빌드되어도 온보딩 중복 실행 방지)
-      await prefs.remove(_pendingKey);
-      debugPrint('✅ OnboardingService: 신규 유저 → 온보딩 실행');
+      final isPending = prefs.getBool(_pendingKey) ?? false;
+      if (!isPending) {
+        debugPrint(
+          '🔍 OnboardingService: pendingOnboarding=false → 스킵 (Firestore 오류)',
+        );
+        return false;
+      }
+      debugPrint(
+        '✅ OnboardingService: Firestore 오류 + pending → 온보딩 실행',
+      );
       return true;
     } catch (e) {
       debugPrint('⚠️ OnboardingService.shouldRunOnboarding 실패: $e');

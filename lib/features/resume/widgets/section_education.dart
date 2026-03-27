@@ -141,7 +141,7 @@ class _EducationCardState extends State<_EducationCard> {
       margin: const EdgeInsets.only(bottom: 14),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -166,6 +166,8 @@ class _EducationCardState extends State<_EducationCard> {
               ],
             ),
             const SizedBox(height: 10),
+            Divider(height: 1, color: AppColors.divider.withOpacity(0.6)),
+            const SizedBox(height: 14),
             _field('학교명', _schoolCtrl, '예: OO대학교'),
             _field('전공', _majorCtrl, '치위생학과'),
             _field('졸업년도', _yearCtrl, '2021',

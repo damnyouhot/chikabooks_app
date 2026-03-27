@@ -69,7 +69,7 @@ class _GrowthPageState extends State<GrowthPage>
             // 세그먼트 탭바 → AppSegmentedControl
             AppSegmentedControl(
               controller: _tabCtrl,
-              labels: const ['오늘 퀴즈', '제도 변경', '치과책방', '내 서재'],
+              labels: const ['오늘 퀴즈', '보험정보', '치과책방', '내 서재'],
             ),
             Expanded(
               child: TabBarView(
@@ -156,7 +156,7 @@ class _GrowthPageState extends State<GrowthPage>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('퀴즈, 제도 변경, 책으로 치과 직무를 배우고 기록하는 공간이에요.', style: TextStyle(fontSize: 13, height: 1.5)),
+                  Text('퀴즈, 보험정보, 책으로 치과 직무를 배우고 기록하는 공간이에요.', style: TextStyle(fontSize: 13, height: 1.5)),
                   SizedBox(height: 16),
                   Text('📝 오늘 퀴즈', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                   SizedBox(height: 8),
@@ -165,9 +165,9 @@ class _GrowthPageState extends State<GrowthPage>
                     style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary),
                   ),
                   SizedBox(height: 16),
-                  Text('📋 제도 변경', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  Text('📋 보험정보', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                   SizedBox(height: 8),
-                  Text('HIRA 급여·수가 등 변경 소식을 확인하고 저장해요.', style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
+                  Text('수가 조회와 HIRA 급여·수가 제도 변경 소식을 확인해요.', style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
                   SizedBox(height: 16),
                   Text('📖 하이진랩', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                   SizedBox(height: 8),
@@ -585,7 +585,7 @@ class _SavedHiraTab extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
-                  '제도 변경 탭에서 항목을 저장하세요.',
+                  '보험정보 탭에서 항목을 저장하세요.',
                   style: TextStyle(fontSize: 12, color: AppColors.textDisabled),
                 ),
               ],

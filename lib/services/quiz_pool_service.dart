@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import '../models/quiz_content_config.dart';
 import '../models/quiz_pool_item.dart';
 import '../models/quiz_schedule.dart';
 
@@ -39,14 +40,16 @@ class QuizPoolService {
 
   /// 오늘 날짜의 quiz_schedule 문서를 가져옴.
   /// 없으면 null 반환 (Cloud Function이 생성하기 전이거나 풀 없음).
-  static Future<QuizSchedule?> getTodaySchedule() async {
+  static Future<QuizSchedule?> getTodaySchedule({
+    QuizContentConfig? contentConfig,
+  }) async {
     try {
       final doc = await _db
           .collection(_scheduleCollection)
           .doc(todayKey)
           .get();
       if (!doc.exists) return null;
-      return QuizSchedule.fromFirestore(doc);
+      return QuizSchedule.fromFirestore(doc, contentConfig: contentConfig);
     } catch (e) {
       debugPrint('⚠️ QuizPoolService.getTodaySchedule: $e');
       return null;
@@ -54,7 +57,10 @@ class QuizPoolService {
   }
 
   /// 최근 N일간의 퀴즈 스케줄 목록 (지난 퀴즈 보기)
-  static Future<List<QuizSchedule>> getRecentSchedules({int days = 3}) async {
+  static Future<List<QuizSchedule>> getRecentSchedules({
+    int days = 3,
+    QuizContentConfig? contentConfig,
+  }) async {
     try {
       final results = <QuizSchedule>[];
       final todayKst = DateTime.now().toUtc().add(const Duration(hours: 9));
@@ -64,7 +70,9 @@ class QuizPoolService {
             .collection(_scheduleCollection)
             .doc(_dateKey(date))
             .get();
-        if (doc.exists) results.add(QuizSchedule.fromFirestore(doc));
+        if (doc.exists) {
+          results.add(QuizSchedule.fromFirestore(doc, contentConfig: contentConfig));
+        }
       }
       return results;
     } catch (e) {

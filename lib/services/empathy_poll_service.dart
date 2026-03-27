@@ -1,9 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/poll.dart';
 import '../models/poll_comment.dart';
 import '../models/poll_option.dart';
+import 'user_profile_service.dart';
 
 /// 공감투표 서비스
 ///
@@ -13,11 +15,14 @@ import '../models/poll_option.dart';
 /// - 공감 변경 시 기존 option -1, 새 option +1, totalEmpathyCount 불변
 /// - 첫 공감 시에만 totalEmpathyCount +1
 /// - 보기 추가: 유저당 투표 1개에 최대 2개, 50자 제한
-/// - 신고: 사용자 추가 보기(isSystem=false)만 가능
+/// - 신고: 사용자 추가 보기(isSystem=false)만 가능, 사유 필수, 5건 누적 시 Functions로 보기 삭제
+/// - 삭제: 작성자만 — 공감 0(클라이언트) 또는 공감 본인 1표(Callable)
 /// ──────────────────────────────────────────────────────────────
 class EmpathyPollService {
   static final _db = FirebaseFirestore.instance;
   static final _auth = FirebaseAuth.instance;
+
+  static const String _functionsRegion = 'us-central1';
 
   static CollectionReference<Map<String, dynamic>> get _pollsRef =>
       _db.collection('polls');
@@ -43,24 +48,37 @@ class EmpathyPollService {
 
   /// 현재 진행 중인 투표 1개 (없으면 null)
   ///
-  /// `startsAt <= now < endsAt` 인 문서만 (status는 `scheduled`/`active` 모두 가능)
+  /// `startsAt <= now < endsAt` 인 문서만 (status는 `scheduled`/`active` 모두 가능).
+  /// 동시에 겹치는 경우 [Poll.displayOrder]가 가장 작은 투표를 선택한다.
   static Future<Poll?> getActivePoll() async {
     try {
       final now = DateTime.now();
       final nowTs = Timestamp.fromDate(now);
+      // 아직 종료되지 않은 투표 후보만 가져온 뒤, 클라이언트에서 진행 중 + displayOrder로 고른다.
       final snap = await _pollsRef
-          .where('startsAt', isLessThanOrEqualTo: nowTs)
-          .orderBy('startsAt', descending: true)
-          .limit(12)
+          .where('endsAt', isGreaterThan: nowTs)
+          .orderBy('endsAt')
+          .limit(500)
           .get();
 
       if (snap.docs.isEmpty) return null;
 
+      Poll? best;
       for (final doc in snap.docs) {
         final poll = Poll.fromDoc(doc);
-        if (poll.isVotingOpen) return poll;
+        if (!poll.isVotingOpen) continue;
+        if (best == null) {
+          best = poll;
+          continue;
+        }
+        final cur = best;
+        if (poll.displayOrder < cur.displayOrder ||
+            (poll.displayOrder == cur.displayOrder &&
+                poll.startsAt.isBefore(cur.startsAt))) {
+          best = poll;
+        }
       }
-      return null;
+      return best;
     } catch (e) {
       debugPrint('⚠️ EmpathyPollService.getActivePoll: $e');
       return null;
@@ -125,6 +143,21 @@ class EmpathyPollService {
     } catch (e) {
       debugPrint('⚠️ EmpathyPollService.getClosedPolls: $e');
       return ClosedPollsPage(polls: [], lastDoc: null);
+    }
+  }
+
+  /// 투표의 전체 보기 (공유 이미지용, 공감 수 내림차순)
+  static Future<List<PollOption>> getOptionsOrderedForPoll(String pollId) async {
+    try {
+      final snap = await _optionsRef(pollId)
+          .where('isHidden', isEqualTo: false)
+          .orderBy('empathyCount', descending: true)
+          .get();
+
+      return snap.docs.map((d) => PollOption.fromDoc(d)).toList();
+    } catch (e) {
+      debugPrint('⚠️ EmpathyPollService.getOptionsOrderedForPoll: $e');
+      return [];
     }
   }
 
@@ -249,6 +282,7 @@ class EmpathyPollService {
 
   static const int maxUserOptionsPerPoll = 2;
   static const int maxOptionLength = 50;
+  static const int maxAuthorNicknameLength = 30;
 
   /// 사용자 보기 추가
   static Future<AddOptionResult> addOption(String pollId, String content) async {
@@ -281,9 +315,16 @@ class EmpathyPollService {
         );
       }
 
+      final profile = await UserProfileService.getMyProfile();
+      var nickname = profile?.nickname.trim() ?? '';
+      if (nickname.length > maxAuthorNicknameLength) {
+        nickname = nickname.substring(0, maxAuthorNicknameLength);
+      }
+
       final docRef = await _optionsRef(pollId).add({
         'content': trimmed,
         'authorUid': uid,
+        'authorNickname': nickname,
         'isSystem': false,
         'createdAt': FieldValue.serverTimestamp(),
         'empathyCount': 0,
@@ -345,24 +386,54 @@ class EmpathyPollService {
   // 신고
   // ═══════════════════════════════════════════════════════════
 
-  static const int reportHideThreshold = 3;
+  /// 누적 시 Cloud Functions로 보기 완전 삭제
+  static const int reportDeleteThreshold = 5;
+
+  /// 신고 사유 키 → UI 라벨
+  static const Map<String, String> pollReportReasonLabels = {
+    'spam': '스팸·광고',
+    'abuse': '욕설·비방',
+    'sexual': '선정적·불쾌한 내용',
+    'privacy': '개인정보 노출',
+    'other': '기타',
+  };
+
+  static final Set<String> _allowedReportReasons = pollReportReasonLabels.keys.toSet();
+
+  static Future<void> _invokePurgeAfterReports(String pollId, String optionId) async {
+    try {
+      final callable = FirebaseFunctions.instanceFor(region: _functionsRegion)
+          .httpsCallable('purgePollOptionAfterReports');
+      await callable.call(<String, dynamic>{
+        'pollId': pollId,
+        'optionId': optionId,
+      });
+    } catch (e) {
+      debugPrint('⚠️ purgePollOptionAfterReports: $e');
+    }
+  }
 
   /// 사용자 추가 보기 신고
   ///
   /// - 시스템 보기(isSystem=true)는 신고 불가
   /// - 동일 uid 중복 신고 불가
-  /// - 임계값 초과 시 isHidden=true
+  /// - [reasonKey]는 [pollReportReasonLabels] 키 중 하나
+  /// - 5건 이상이면 Callable로 보기·votes·집계 정리
   static Future<ReportResult> reportOption(
     String pollId,
-    String optionId,
-  ) async {
+    String optionId, {
+    required String reasonKey,
+  }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return ReportResult.fail('로그인이 필요합니다.');
+    if (!_allowedReportReasons.contains(reasonKey)) {
+      return ReportResult.fail('신고 사유를 선택해주세요.');
+    }
 
     try {
       final optionRef = _optionsRef(pollId).doc(optionId);
 
-      return await _db.runTransaction((tx) async {
+      final result = await _db.runTransaction((tx) async {
         final optionSnap = await tx.get(optionRef);
         if (!optionSnap.exists) return ReportResult.fail('보기를 찾을 수 없습니다.');
 
@@ -380,23 +451,84 @@ class EmpathyPollService {
 
         tx.set(reportRef, {
           'uid': uid,
+          'reason': reasonKey,
           'reportedAt': FieldValue.serverTimestamp(),
         });
 
         final newCount = option.reportCount + 1;
-        final updates = <String, dynamic>{
+        tx.update(optionRef, {
           'reportCount': FieldValue.increment(1),
-        };
-        if (newCount >= reportHideThreshold) {
-          updates['isHidden'] = true;
-        }
-        tx.update(optionRef, updates);
+        });
 
-        return ReportResult.ok(hidden: newCount >= reportHideThreshold);
+        return ReportResult.ok(reachedRemovalThreshold: newCount >= reportDeleteThreshold);
       });
+
+      if (result.success && result.reachedRemovalThreshold) {
+        await _invokePurgeAfterReports(pollId, optionId);
+      }
+      return result;
     } catch (e) {
       debugPrint('⚠️ EmpathyPollService.reportOption: $e');
       return ReportResult.fail('신고 처리 중 오류가 발생했습니다.');
+    }
+  }
+
+  /// 본인이 추가한 보기 삭제
+  ///
+  /// - 공감 0: 클라이언트 배치 직접 삭제
+  /// - 공감 1~5: Cloud Function(`authorDeletePollOptionWithVote`)으로 votes·집계 정리 후 삭제
+  /// - 공감 6 이상: 거절
+  static Future<DeleteOptionResult> deleteMyOption(
+    String pollId,
+    String optionId,
+  ) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return DeleteOptionResult.fail('로그인이 필요합니다.');
+
+    try {
+      final optionRef = _optionsRef(pollId).doc(optionId);
+      final optionSnap = await optionRef.get();
+      if (!optionSnap.exists) {
+        return DeleteOptionResult.fail('보기를 찾을 수 없습니다.');
+      }
+
+      final option = PollOption.fromDoc(optionSnap);
+      if (option.isSystem) {
+        return DeleteOptionResult.fail('기본 보기는 삭제할 수 없습니다.');
+      }
+      if (option.authorUid != uid) {
+        return DeleteOptionResult.fail('본인이 추가한 보기만 삭제할 수 있습니다.');
+      }
+      if (option.empathyCount > 5) {
+        return DeleteOptionResult.fail('공감 인원이 많아 삭제할 수 없어요.');
+      }
+
+      if (option.empathyCount > 0) {
+        try {
+          final callable = FirebaseFunctions.instanceFor(region: _functionsRegion)
+              .httpsCallable('authorDeletePollOptionWithVote');
+          await callable.call(<String, dynamic>{
+            'pollId': pollId,
+            'optionId': optionId,
+          });
+          return DeleteOptionResult.ok();
+        } on FirebaseFunctionsException catch (e) {
+          return DeleteOptionResult.fail(e.message ?? '삭제에 실패했습니다.');
+        }
+      }
+
+      // empathyCount == 0: 신고 서브컬렉션 정리 후 직접 삭제
+      final reportsSnap = await optionRef.collection('reports').get();
+      final batch = _db.batch();
+      for (final d in reportsSnap.docs) {
+        batch.delete(d.reference);
+      }
+      batch.delete(optionRef);
+      await batch.commit();
+      return DeleteOptionResult.ok();
+    } catch (e) {
+      debugPrint('⚠️ EmpathyPollService.deleteMyOption: $e');
+      return DeleteOptionResult.fail('보기 삭제 중 오류가 발생했습니다.');
     }
   }
 }
@@ -441,14 +573,30 @@ class PollCommentResult {
 
 class ReportResult {
   final bool success;
-  final bool hidden;
+  /// 신고 직후 누적이 5건 이상이면 true (이어서 Functions로 보기 삭제 시도)
+  final bool reachedRemovalThreshold;
   final String? error;
 
-  const ReportResult._({required this.success, this.hidden = false, this.error});
-  factory ReportResult.ok({required bool hidden}) =>
-      ReportResult._(success: true, hidden: hidden);
+  const ReportResult._({
+    required this.success,
+    this.reachedRemovalThreshold = false,
+    this.error,
+  });
+  factory ReportResult.ok({bool reachedRemovalThreshold = false}) =>
+      ReportResult._(success: true, reachedRemovalThreshold: reachedRemovalThreshold);
   factory ReportResult.fail(String msg) =>
       ReportResult._(success: false, error: msg);
+}
+
+class DeleteOptionResult {
+  final bool success;
+  final String? error;
+
+  const DeleteOptionResult._({required this.success, this.error});
+  factory DeleteOptionResult.ok() =>
+      const DeleteOptionResult._(success: true);
+  factory DeleteOptionResult.fail(String msg) =>
+      DeleteOptionResult._(success: false, error: msg);
 }
 
 /// 종료된 투표 페이지 결과 (커서 포함)

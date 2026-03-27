@@ -3,6 +3,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 /// 이력서 엔티티
 /// Firestore 경로: `resumes/{resumeId}`
 class Resume {
+  /// 신규/복원 시 기본 제목 (UI·Firestore 기본값과 동일하게 유지)
+  static const kDefaultResumeTitle = '하이진랩에서 작성한 이력서';
+
   final String id;
   final String ownerUid;
   final String title;
@@ -24,7 +27,7 @@ class Resume {
   const Resume({
     required this.id,
     required this.ownerUid,
-    this.title = '기본 이력서',
+    this.title = kDefaultResumeTitle,
     this.createdAt,
     this.updatedAt,
     this.visibility = const ResumeVisibility(),
@@ -42,7 +45,7 @@ class Resume {
     return Resume(
       id: id,
       ownerUid: data['ownerUid'] as String? ?? '',
-      title: data['title'] as String? ?? '기본 이력서',
+      title: data['title'] as String? ?? kDefaultResumeTitle,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
       visibility: ResumeVisibility.fromMap(

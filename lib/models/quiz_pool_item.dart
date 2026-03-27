@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'quiz_content_config.dart';
+
 /// quiz_pool 컬렉션 문서 모델
 ///
 /// 날짜와 무관한 "원본 문제 은행".
@@ -55,6 +57,22 @@ class QuizPoolItem {
 
   static const String kNationalExam = 'national_exam';
   static const String kClinical = 'clinical';
+
+  /// `quiz_schedule.items[]` 스냅샷용: 필드가 빠진 레거시 문서는 packId·config 로 국시 여부 복원
+  /// (Cloud Function `quizQuestionType` + 국시 pack 휴리스틱과 맞춤)
+  static String resolveQuestionTypeForScheduleSnapshot(
+    Map<String, dynamic> map,
+    QuizContentConfig contentConfig,
+  ) {
+    final raw = map['questionType'] as String?;
+    if (raw == kNationalExam) return kNationalExam;
+    if (raw == kClinical) return kClinical;
+    final pid = (map['packId'] as String?)?.trim() ?? '';
+    if (pid == 'national_default') return kNationalExam;
+    final nid = contentConfig.currentNationalPackId;
+    if (nid.isNotEmpty && pid == nid) return kNationalExam;
+    return kClinical;
+  }
 
   /// 앱·관리자 UI용 유형 표기
   static String badgeLabelForType(String questionType) =>
