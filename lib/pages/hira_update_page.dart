@@ -10,8 +10,12 @@ import '../core/widgets/app_segmented_control.dart';
 /// 소탭 2개:
 ///   1. 수가 조회 — data.go.kr API 기반 수가 코드/이름 검색
 ///   2. 제도 변경 — HIRA RSS + 심평원 전체 DB 검색
+///
+/// [tabRequestNotifier] 값이 0 또는 1일 때 해당 소탭으로 전환 (홈 1탭 정책 카드 등)
 class HiraUpdatePage extends StatefulWidget {
-  const HiraUpdatePage({super.key});
+  const HiraUpdatePage({super.key, this.tabRequestNotifier});
+
+  final ValueNotifier<int>? tabRequestNotifier;
 
   @override
   State<HiraUpdatePage> createState() => _HiraUpdatePageState();
@@ -26,13 +30,23 @@ class _HiraUpdatePageState extends State<HiraUpdatePage>
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 2, vsync: this);
+    widget.tabRequestNotifier?.addListener(_onExternalTabRequest);
   }
 
   @override
   void dispose() {
+    widget.tabRequestNotifier?.removeListener(_onExternalTabRequest);
     _tabCtrl.dispose();
     _policySearchRequest.dispose();
     super.dispose();
+  }
+
+  void _onExternalTabRequest() {
+    final n = widget.tabRequestNotifier?.value ?? -1;
+    if (n < 0 || n > 1 || !mounted) return;
+    if (_tabCtrl.index != n) {
+      _tabCtrl.animateTo(n);
+    }
   }
 
   void _openPolicySearchWithKeyword(String keyword) {

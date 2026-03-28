@@ -2054,11 +2054,11 @@ async function loadQuizContentConfig(): Promise<QuizContentConfig> {
     currentClinicalPackId: typeof d.currentClinicalPackId === "string"
       ? d.currentClinicalPackId.trim()
       : "",
-    includeClinicalWithoutPack: d.includeClinicalWithoutPack !== false,
+    includeClinicalWithoutPack: d.includeClinicalWithoutPack === true,
     currentNationalPackId: typeof d.currentNationalPackId === "string"
       ? d.currentNationalPackId.trim()
       : "",
-    includeNationalWithoutPack: d.includeNationalWithoutPack !== false,
+    includeNationalWithoutPack: d.includeNationalWithoutPack === true,
   };
 }
 

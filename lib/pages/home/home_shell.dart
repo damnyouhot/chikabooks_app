@@ -43,6 +43,7 @@ class _HomeShellState extends State<HomeShell> {
   late final GrowthPage _growthPage;
 
   final ValueNotifier<int> _growthSubTabNotifier = ValueNotifier<int>(-1);
+  final ValueNotifier<int> _hiraTabRequest = ValueNotifier<int>(-1);
 
   // ── 앱 온보딩 ──
   // OnboardingGate에서 이미 판단 완료 → 즉시 true로 설정
@@ -57,7 +58,10 @@ class _HomeShellState extends State<HomeShell> {
   void initState() {
     super.initState();
     _bondPage = BondPage(key: _bondKey);
-    _growthPage = GrowthPage(subTabNotifier: _growthSubTabNotifier);
+    _growthPage = GrowthPage(
+      subTabNotifier: _growthSubTabNotifier,
+      hiraTabRequestNotifier: _hiraTabRequest,
+    );
 
     _onboardingCtrl = AppOnboardingController();
     _onboardingCtrl.addListener(() {
@@ -87,6 +91,7 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void dispose() {
     _growthSubTabNotifier.dispose();
+    _hiraTabRequest.dispose();
     _onboardingCtrl.dispose();
     super.dispose();
   }
@@ -235,12 +240,20 @@ class _HomeShellState extends State<HomeShell> {
     _setTab(index);
   }
 
-  void _onGrowthSubTabRequested(int subTab) {
+  void _onGrowthSubTabRequested(int subTab, {int? hiraInnerTab}) {
     if (_onboardingActive) return;
     _setTab(2);
     _growthSubTabNotifier.value = -1;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _growthSubTabNotifier.value = subTab;
+      if (hiraInnerTab != null && (hiraInnerTab == 0 || hiraInnerTab == 1)) {
+        _hiraTabRequest.value = -1;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _hiraTabRequest.value = hiraInnerTab;
+          });
+        });
+      }
     });
   }
 

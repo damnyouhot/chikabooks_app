@@ -10,7 +10,11 @@ import '../services/funnel_onboarding_service.dart';
 import '../services/base_message_service.dart';
 import '../services/job_service.dart';
 import '../services/ebook_service.dart';
+import '../services/hira_update_service.dart';
+import '../services/quiz_content_config_service.dart';
+import '../services/quiz_pool_service.dart';
 import '../data/base_message_data.dart';
+import '../models/hira_update.dart';
 import '../models/ebook.dart';
 import '../widgets/speech_overlay.dart';
 import '../pages/ebook/ebook_detail_page.dart';
@@ -24,7 +28,8 @@ enum _LoopState { idle, showingBase, showingReaction }
 /// 돌보기(1탭) — 4개 정보 카드 + 원형 게이지 + 캐릭터 + 3버튼
 class CaringPage extends StatefulWidget {
   final ValueChanged<int>? onTabRequested;
-  final ValueChanged<int>? onGrowthSubTabRequested;
+  /// [hiraInnerTab]: 보험정보 내 0=수가 조회, 1=제도 변경 (null이면 보험정보 기본 소탭 유지)
+  final void Function(int subTab, {int? hiraInnerTab})? onGrowthSubTabRequested;
   final bool isOnboardingActive;
   final String? onboardingDialogue;
 
@@ -140,6 +145,8 @@ class _CaringPageState extends State<CaringPage>
     Future.microtask(() => _bootstrapCaringTab());
     _loadJobCard();
     _loadBookCard();
+    _loadPolicyCard();
+    _loadQuizCard();
   }
 
   @override
@@ -148,6 +155,14 @@ class _CaringPageState extends State<CaringPage>
     if (old.isOnboardingActive && !widget.isOnboardingActive) {
       _revealCtrl.forward(from: 0.0);
       if (_loopState == _LoopState.idle && _baseMsgText == null) _startMsgLoop();
+    }
+    // 다른 탭에서 「나」로 복귀 시 정책·주간책·퀴즈만 갱신 (Jobs 카드는 초기 로드만)
+    if (!widget.isOnboardingActive &&
+        widget.currentTabIndex == 0 &&
+        old.currentTabIndex != 0) {
+      _loadPolicyCard();
+      _loadBookCard();
+      _loadQuizCard();
     }
   }
 
@@ -204,19 +219,62 @@ class _CaringPageState extends State<CaringPage>
     try {
       final state = await CaringStateService.loadState(applyTimeDecay: applyTimeDecay);
       if (!mounted) return;
-      final policies = [
-        {'title': '2026 스케일링 급여 개정', 'dday': 'D-12', 'date': '3월 1일'},
-        {'title': '치주질환 급여 인정 기준 변경', 'dday': 'D-21', 'date': '3월 10일'},
-        {'title': '근관치료 행위 산정 지침 개정', 'dday': 'D-26', 'date': '3월 15일'},
-      ];
-      setState(() {
-        _caringState = state;
-        _upcomingPolicies = policies;
-        _quizSummary = '치주낭 측정 시 올바른 탐침 방향은?';
-      });
-      _startPolicyRolling();
+      setState(() => _caringState = state);
     } catch (e) {
       debugPrint('❌ _loadCaringState 실패: $e');
+    }
+  }
+
+  /// Policy 카드 — `content_hira_updates`와 동일 소스 (성장 탭 HIRA 목록과 정합)
+  Map<String, String> _hiraToPolicyRow(HiraUpdate u) {
+    final ref = u.effectiveDate ?? u.publishedAt;
+    return {
+      'title': u.title,
+      'date': '${ref.month}월 ${ref.day}일',
+      'dday': u.getBadgeText(),
+    };
+  }
+
+  Future<void> _loadPolicyCard() async {
+    try {
+      final list = await HiraUpdateService.getAllUpdates();
+      if (!mounted) return;
+      list.sort((a, b) {
+        final ae = a.effectiveDate;
+        final be = b.effectiveDate;
+        if (ae != null && be != null) return ae.compareTo(be);
+        if (ae != null) return -1;
+        if (be != null) return 1;
+        return b.publishedAt.compareTo(a.publishedAt);
+      });
+      final policies =
+          list.take(6).map(_hiraToPolicyRow).toList(growable: false);
+      setState(() => _upcomingPolicies = policies);
+      _startPolicyRolling();
+    } catch (e, st) {
+      debugPrint('❌ _loadPolicyCard: $e\n$st');
+      if (mounted) setState(() => _upcomingPolicies = []);
+      _startPolicyRolling(); // 빈 목록이면 타이머만 정리
+    }
+  }
+
+  /// Daily Quiz 카드 — `quiz_schedule/{오늘}` 첫 문항 (퀴즈 탭과 동일 출처)
+  Future<void> _loadQuizCard() async {
+    try {
+      final cfg = await QuizContentConfigService.getConfig();
+      final schedule = await QuizPoolService.getTodaySchedule(contentConfig: cfg);
+      if (!mounted) return;
+      var summary = '오늘 배포된 퀴즈가 아직 없어요';
+      if (schedule != null && schedule.items.isNotEmpty) {
+        final q = schedule.items.first.question.trim();
+        if (q.isNotEmpty) summary = q;
+      }
+      setState(() => _quizSummary = summary);
+    } catch (e, st) {
+      debugPrint('❌ _loadQuizCard: $e\n$st');
+      if (mounted) {
+        setState(() => _quizSummary = '퀴즈 정보를 불러오지 못했어요');
+      }
     }
   }
 
@@ -239,11 +297,23 @@ class _CaringPageState extends State<CaringPage>
     }
   }
 
+  /// Weekly Book — `publishedAt` 내림차순 목록에서 주(월요일 기준)마다 안정적으로 1권 선택
   Future<void> _loadBookCard() async {
     try {
       final ebooks = await EbookService().fetchAllEbooks().catchError((_) => <Ebook>[]);
       if (!mounted) return;
-      setState(() { _weeklyBook = ebooks.isNotEmpty ? ebooks.first : null; _bookLoading = false; });
+      Ebook? pick;
+      if (ebooks.isNotEmpty) {
+        final nowKst = DateTime.now().toUtc().add(const Duration(hours: 9));
+        final monday = nowKst.subtract(Duration(days: nowKst.weekday - 1));
+        final seed =
+            '${monday.year}-${monday.month}-${monday.day}'.hashCode.abs();
+        pick = ebooks[seed % ebooks.length];
+      }
+      setState(() {
+        _weeklyBook = pick;
+        _bookLoading = false;
+      });
     } catch (e) {
       debugPrint('❌ _loadBookCard 실패: $e');
       if (mounted) setState(() => _bookLoading = false);
@@ -591,7 +661,10 @@ class _CaringPageState extends State<CaringPage>
                       FadeTransition(
                         opacity: isOnboarding ? const AlwaysStoppedAnimation(0.0) : _cardAnims[1],
                         child: _PolicyRollingCard(policies: _upcomingPolicies, index: _policyIndex,
-                            onTap: () { widget.onTabRequested?.call(2); widget.onGrowthSubTabRequested?.call(1); }),
+                            onTap: () {
+                              widget.onTabRequested?.call(2);
+                              widget.onGrowthSubTabRequested?.call(1, hiraInnerTab: 1);
+                            }),
                       ),
                       FadeTransition(
                         opacity: isOnboarding ? const AlwaysStoppedAnimation(0.0) : _cardAnims[2],
@@ -657,8 +730,12 @@ class _CaringPageState extends State<CaringPage>
             behavior: isOnboarding ? HitTestBehavior.translucent : HitTestBehavior.opaque,
             child: _dogController != null
                 ? LayoutBuilder(builder: (ctx, constraints) {
-                    final screenH = MediaQuery.of(ctx).size.height;
-                    final rawScale = ((screenH * 0.32) / 284.0).clamp(0.90, 1.10);
+                    // 실제 캐릭터 영역 높이 기준 스케일 계산
+                    // (전체 화면 높이 대신 실제 할당된 공간 사용)
+                    // Pixel 7 Pro 기준 캐릭터 영역 ≈ 320dp → rawScale ≈ 1.0 → scale ≈ 1.09
+                    // 작은 기기(iPhone 16e 등)는 최소 1.00으로 클램프 → 동일한 줌 수준 유지
+                    final availableH = constraints.maxHeight;
+                    final rawScale = (availableH / 320.0).clamp(1.00, 1.20);
                     final scale = isOnboarding ? rawScale * 0.98 : rawScale * 1.09;
 
                     Widget character = Transform.scale(

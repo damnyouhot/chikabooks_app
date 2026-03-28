@@ -96,7 +96,8 @@ class QuizMetaState {
   final int usedClinicalCount;
   final String lastScheduledDate; // 마지막 스케줄 생성일 e.g. '2026-03-16'
   final int dailyCount;        // 하루 배포 수 (기본 2)
-  final int usedCount;         // 이번 사이클에서 배포된 문제 수 (usedQuizIds.length)
+  /// 이번 사이클 배포 문제 수 (팩 필터 적용된 국시+임상 합산)
+  final int usedCount;
 
   const QuizMetaState({
     required this.cycleCount,
@@ -112,9 +113,8 @@ class QuizMetaState {
 
   factory QuizMetaState.fromFirestore(DocumentSnapshot doc) {
     final d = doc.data() as Map<String, dynamic>;
-    // usedQuizIds: 이번 사이클에서 배포된 문제 ID 누적 배열
-    // 풀 소진 시 CF가 []로 초기화하므로 "이번 사이클 배포 수"를 나타냄
-    final usedQuizIds = d['usedQuizIds'] as List<dynamic>? ?? [];
+    final usedNat  = (d['usedNationalCount'] as num?)?.toInt() ?? 0;
+    final usedClin = (d['usedClinicalCount'] as num?)?.toInt() ?? 0;
     return QuizMetaState(
       cycleCount:         (d['cycleCount'] as num?)?.toInt() ?? 1,
       totalActiveCount:   (d['totalActiveCount'] as num?)?.toInt() ?? 0,
@@ -122,11 +122,11 @@ class QuizMetaState {
           (d['totalNationalActiveCount'] as num?)?.toInt() ?? 0,
       totalClinicalActiveCount:
           (d['totalClinicalActiveCount'] as num?)?.toInt() ?? 0,
-      usedNationalCount: (d['usedNationalCount'] as num?)?.toInt() ?? 0,
-      usedClinicalCount: (d['usedClinicalCount'] as num?)?.toInt() ?? 0,
+      usedNationalCount:  usedNat,
+      usedClinicalCount:  usedClin,
       lastScheduledDate:  d['lastScheduledDate'] as String? ?? '',
       dailyCount:         (d['dailyCount'] as num?)?.toInt() ?? 2,
-      usedCount:          usedQuizIds.length,
+      usedCount:          usedNat + usedClin,
     );
   }
 

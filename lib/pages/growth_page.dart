@@ -26,8 +26,10 @@ import 'settings/settings_page.dart';
 /// 4. 내 서재 — 구매한 e-Book 목록
 class GrowthPage extends StatefulWidget {
   final ValueNotifier<int>? subTabNotifier;
+  /// 보험정보(HiraUpdatePage) 내부 소탭: 0=수가 조회, 1=제도 변경
+  final ValueNotifier<int>? hiraTabRequestNotifier;
 
-  const GrowthPage({super.key, this.subTabNotifier});
+  const GrowthPage({super.key, this.subTabNotifier, this.hiraTabRequestNotifier});
 
   @override
   State<GrowthPage> createState() => _GrowthPageState();
@@ -74,11 +76,11 @@ class _GrowthPageState extends State<GrowthPage>
             Expanded(
               child: TabBarView(
                 controller: _tabCtrl,
-                children: const [
-                  QuizTodayPage(),
-                  HiraUpdatePage(),
+                children: [
+                  const QuizTodayPage(),
+                  HiraUpdatePage(tabRequestNotifier: widget.hiraTabRequestNotifier),
                   const EbookListPage(),
-                  _MyLibraryView(),
+                  const _MyLibraryView(),
                 ],
               ),
             ),

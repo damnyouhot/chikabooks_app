@@ -20,9 +20,9 @@ class QuizContentConfig {
     final d = doc.data() as Map<String, dynamic>? ?? {};
     return QuizContentConfig(
       currentClinicalPackId: (d['currentClinicalPackId'] as String? ?? '').trim(),
-      includeClinicalWithoutPack: d['includeClinicalWithoutPack'] as bool? ?? true,
+      includeClinicalWithoutPack: d['includeClinicalWithoutPack'] as bool? ?? false,
       currentNationalPackId: (d['currentNationalPackId'] as String? ?? '').trim(),
-      includeNationalWithoutPack: d['includeNationalWithoutPack'] as bool? ?? true,
+      includeNationalWithoutPack: d['includeNationalWithoutPack'] as bool? ?? false,
       updatedAt: (d['updatedAt'] as Timestamp?)?.toDate(),
     );
   }
@@ -30,9 +30,9 @@ class QuizContentConfig {
   /// 문서 없을 때: 기존 동작(전체 임상·국시 후보)과 동일
   factory QuizContentConfig.defaultLegacy() => const QuizContentConfig(
         currentClinicalPackId: '',
-        includeClinicalWithoutPack: true,
+        includeClinicalWithoutPack: false,
         currentNationalPackId: '',
-        includeNationalWithoutPack: true,
+        includeNationalWithoutPack: false,
       );
 }
 
