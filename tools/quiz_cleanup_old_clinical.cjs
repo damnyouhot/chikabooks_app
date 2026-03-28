@@ -19,15 +19,35 @@ const readline = require("readline");
 const functionsDir = path.join(__dirname, "../functions");
 const admin = require(path.join(functionsDir, "node_modules/firebase-admin"));
 
-function loadServiceAccount() {
-  const envPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-  const p = path.join(functionsDir, "serviceAccountKey.json");
-  const keyPath = envPath && fs.existsSync(envPath) ? envPath : p;
-  if (!fs.existsSync(keyPath)) {
-    console.error("❌ serviceAccountKey.json 없음:", p);
+function initFirebase() {
+  if (admin.apps.length) return;
+  const saPath = path.join(functionsDir, "serviceAccountKey.json");
+  if (fs.existsSync(saPath)) {
+    const sa = JSON.parse(fs.readFileSync(saPath, "utf8"));
+    admin.initializeApp({ credential: admin.credential.cert(sa) });
+    return;
+  }
+  // Firebase CLI 토큰 → ADC 형식으로 Firestore 접근
+  const cfgPath = path.join(require("os").homedir(), ".config/configstore/firebase-tools.json");
+  if (!fs.existsSync(cfgPath)) {
+    console.error("❌ Firebase 인증 없음. firebase login 후 재시도하세요.");
     process.exit(1);
   }
-  return JSON.parse(fs.readFileSync(keyPath, "utf8"));
+  const cfg = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
+  const rt = cfg.tokens && cfg.tokens.refresh_token;
+  if (!rt) {
+    console.error("❌ refresh_token 없음. firebase login 후 재시도하세요.");
+    process.exit(1);
+  }
+  const adcPath = "/tmp/_quiz_cleanup_adc.json";
+  fs.writeFileSync(adcPath, JSON.stringify({
+    type: "authorized_user",
+    client_id: cfg.tokens.client_id || "563584335869-fgrhgmd47bqnekij5i8b5pr03ho849e6.apps.googleusercontent.com",
+    client_secret: cfg.tokens.client_secret || "j9iVZfS8kkCEFUPaAeJV0sAi",
+    refresh_token: rt,
+  }));
+  process.env.GOOGLE_APPLICATION_CREDENTIALS = adcPath;
+  admin.initializeApp({ credential: admin.credential.applicationDefault(), projectId: "chikabooks3rd" });
 }
 
 function parseArgs(argv) {
@@ -56,9 +76,7 @@ function quizQuestionType(d) {
 async function main() {
   const args = parseArgs(process.argv);
 
-  if (!admin.apps.length) {
-    admin.initializeApp({ credential: admin.credential.cert(loadServiceAccount()) });
-  }
+  initFirebase();
   const db = admin.firestore();
 
   // ── 1. config/quiz_content 읽기 → 현재 팩 ID 확인 ──

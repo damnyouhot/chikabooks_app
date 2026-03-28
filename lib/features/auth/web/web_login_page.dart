@@ -1089,9 +1089,8 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
       case 'user-not-found':
         return '등록되지 않은 이메일이에요.';
       case 'wrong-password':
-        return '비밀번호가 올바르지 않아요.';
       case 'invalid-credential':
-        return '이메일 또는 비밀번호가 올바르지 않아요.';
+        return '로그인 정보를 확인해 주세요. 치과 계정이 없으면 회원가입으로 진행해 주세요.';
       case 'user-disabled':
         return '이 계정은 비활성화 상태예요.';
       case 'too-many-requests':

@@ -424,21 +424,27 @@ class _BookmarkCard extends StatelessWidget {
               runSpacing: 6,
               children: [
                 AppBadge(
-                  label: job.type,
-                  bgColor: AppColors.accent.withOpacity(0.10),  // 이전 Color(0xFFE3F2FD)
-                  textColor: AppColors.accent,                  // 이전 Color(0xFF1976D2)
+                  label: job.type.isNotEmpty ? job.type : '직무',
+                  bgColor: AppColors.accent.withOpacity(0.10),
+                  textColor: AppColors.accent,
                 ),
-                AppBadge(
-                  label: job.career,
-                  bgColor: AppColors.surfaceMuted,              // 이전 Color(0xFFF3E5F5)
-                  textColor: AppColors.textSecondary,           // 이전 Color(0xFF7B1FA2)
-                ),
-                if (job.salaryRange[0] > 0)
+                if (job.employmentType.isNotEmpty)
                   AppBadge(
-                    label: '${job.salaryRange[0]}~${job.salaryRange[1]}만',
-                    bgColor: AppColors.warning.withOpacity(0.12), // 이전 Color(0xFFFFF8E1)
-                    textColor: AppColors.warning,                 // 이전 Color(0xFFF57F17)
+                    label: job.employmentType,
+                    bgColor: AppColors.surfaceMuted,
+                    textColor: AppColors.textSecondary,
                   ),
+                if (job.career.isNotEmpty && job.career != '미정')
+                  AppBadge(
+                    label: job.career,
+                    bgColor: AppColors.surfaceMuted,
+                    textColor: AppColors.textSecondary,
+                  ),
+                AppBadge(
+                  label: job.salaryDisplayLine,
+                  bgColor: AppColors.warning.withOpacity(0.12),
+                  textColor: AppColors.warning,
+                ),
               ],
             ),
             const SizedBox(height: 8),

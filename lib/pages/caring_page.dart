@@ -761,10 +761,15 @@ class _CaringPageState extends State<CaringPage>
                         (screenH * kScreenRatio / availableH).clamp(0.85, 2.5);
                     final finalScale = isOnboarding ? scale * 0.90 : scale;
 
-                    Widget character = Transform.scale(
-                      alignment: Alignment.bottomCenter,
-                      scale: finalScale,
-                      child: RiveWidget(controller: _dogController!, fit: Fit.contain),
+                    // 캐릭터만 2줄(48dp) 아래로 이동 (기존 96의 절반)
+                    // Transform.translate는 레이아웃·텍스트 위치에 영향 없음
+                    Widget character = Transform.translate(
+                      offset: const Offset(0, 48),
+                      child: Transform.scale(
+                        alignment: Alignment.bottomCenter,
+                        scale: finalScale,
+                        child: RiveWidget(controller: _dogController!, fit: Fit.contain),
+                      ),
                     );
 
                     // 배고픔 낮을 때 채도 감소
@@ -826,21 +831,24 @@ class _CaringPageState extends State<CaringPage>
           child: IgnorePointer(
             child: LayoutBuilder(builder: (ctx, constraints) {
               final h = constraints.maxHeight;
-              // 기본 멘트: 캐릭터 영역 상단에서 고정 14dp 아래
-              // (비율 계산 대신 고정값 → 기기 무관하게 동일 위치)
-              final baseMsgTop = isOnboarding ? h * 0.028 : 14.0;
+              // 기본 멘트: 원위치(14dp) 기준 1줄(24dp) 위 → 0으로 고정
+              // 캐릭터는 Transform.translate로 독립 이동하므로 텍스트 위치 영향 없음
+              final baseMsgTop = isOnboarding ? h * 0.028 : 0.0;
               final reactionTop = h * 0.86;
               final displayText = isOnboarding ? widget.onboardingDialogue : _baseMsgText;
               final isDismissing = isOnboarding ? false : _isBaseMsgDismissing;
               return Stack(children: [
                 Positioned(top: baseMsgTop, left: 0, right: 0,
                   child: Center(
-                    child: SpeechOverlay(
-                      text: displayText,
-                      isDismissing: isDismissing,
-                      isOnboarding: isOnboarding,
-                      onboardingBoldWord:
-                          isOnboarding ? widget.onboardingBoldWord : null,
+                    child: Transform.translate(
+                      offset: isOnboarding ? Offset.zero : const Offset(0, -12),
+                      child: SpeechOverlay(
+                        text: displayText,
+                        isDismissing: isDismissing,
+                        isOnboarding: isOnboarding,
+                        onboardingBoldWord:
+                            isOnboarding ? widget.onboardingBoldWord : null,
+                      ),
                     ),
                   )),
                 if (!isOnboarding)
@@ -1133,12 +1141,11 @@ class _TapCard extends StatelessWidget {
               Flexible(
                 flex: 4,
                 fit: FlexFit.tight,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        title,
+                child: Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: title,
                         style: GoogleFonts.poppins(
                           fontSize: 14,
                           fontWeight: FontWeight.w800,
@@ -1147,12 +1154,18 @@ class _TapCard extends StatelessWidget {
                           height: 1.1,
                         ),
                       ),
-                    ),
-                    if (showPrepBadge) ...[
-                      const SizedBox(width: 6),
-                      const PrepInProgressBadge(),
+                      if (showPrepBadge)
+                        WidgetSpan(
+                          alignment: PlaceholderAlignment.middle,
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 6),
+                            child: const PrepInProgressBadge(),
+                          ),
+                        ),
                     ],
-                  ],
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               const SizedBox(width: 8),

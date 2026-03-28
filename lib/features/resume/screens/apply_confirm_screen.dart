@@ -254,6 +254,15 @@ class _ApplyConfirmScreenState extends State<ApplyConfirmScreen> {
               color: AppColors.textSecondary,
             ),
           ),
+          const SizedBox(height: 4),
+          Text(
+            job.salaryDisplayLine,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
           if (job.address.isNotEmpty) ...[
             const SizedBox(height: 4),
             Row(

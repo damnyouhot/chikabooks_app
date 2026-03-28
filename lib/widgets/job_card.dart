@@ -69,7 +69,7 @@ class JobCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${job.salaryRange[0]}~${job.salaryRange[1]}만원',
+                    job.salaryDisplayLine,
                     style: const TextStyle(
                       fontSize: 13,
                       color: AppColors.textSecondary,

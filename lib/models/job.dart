@@ -1,27 +1,50 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+/// 구인 공고 (Firestore `jobs` + 목업 공통)
+///
+/// 웹 등록 필드(`role`, `description`, `salary` 등)와 앱 레거시 필드(`type`, `details`,
+/// `salaryRange`)를 [fromJson]에서 한 번에 정규화한다.
 class Job {
   final String id;
   final String title;
   final String clinicName;
   final String address;
-  final String district;   // 동/구 짧은 표시용 (예: "역삼동 · 강남구")
+  final String district; // 동/구 짧은 표시용 (예: "역삼동 · 강남구")
   final double lat;
   final double lng;
+
+  /// 직종/직무 (목록 필터·매칭) — 웹 `role`과 동기화
   final String type;
+
+  /// 경력 조건 텍스트 (예: 신입, 2년 이상). 없으면 `미정`
   final String career;
+
+  /// 급여 범위 [만원] (필터·정렬·매칭). 미파싱 시 [0,0]
   final List<int> salaryRange;
+
+  /// 급여 표시용 원문 (웹 `salary` / `salaryText`)
+  final String salaryText;
+
+  /// 고용 형태 (정규직, 파트타임 등) — 웹 `employmentType`
+  final String employmentType;
+
+  final String workHours;
+  final String contact;
+
+  /// 공개 상태: active, pending, closed … ([isListedInApp] 참고)
+  final String? status;
+
   final DateTime postedAt;
   final String details;
   final List<String> benefits;
   final List<String> images;
 
   // ── 레벨/매칭 필드 ──────────────────────────────
-  final int jobLevel;       // 1=프리미엄, 2=추천, 3=일반
-  final int matchScore;     // 커리어 매칭 점수 0~100
-  final bool isNearStation; // 역세권 여부
-  final DateTime? closingDate; // 마감일 (null=상시)
-  final bool canApplyNow;   // 즉시지원 가능 여부
+  final int jobLevel; // 1=프리미엄, 2=추천, 3=일반
+  final int matchScore;
+  final bool isNearStation;
+  final DateTime? closingDate;
+  final bool canApplyNow;
 
   Job({
     required this.id,
@@ -34,6 +57,11 @@ class Job {
     required this.type,
     required this.career,
     required this.salaryRange,
+    this.salaryText = '',
+    this.employmentType = '',
+    this.workHours = '',
+    this.contact = '',
+    this.status,
     required this.postedAt,
     required this.details,
     required this.benefits,
@@ -45,8 +73,36 @@ class Job {
     this.canApplyNow = false,
   });
 
+  /// 앱 목록·지도에 노출할지 (마감/삭제/반려 제외)
+  bool get isListedInApp {
+    final s = (status ?? '').trim().toLowerCase();
+    if (s.isEmpty) return true;
+    const hidden = {'closed', 'deleted', 'rejected', 'draft'};
+    return !hidden.contains(s);
+  }
+
+  /// 카드·상세·배지 공통 급여 문구
+  String get salaryDisplayLine {
+    final t = salaryText.trim();
+    if (t.isNotEmpty) return t;
+    final lo = salaryRange.isNotEmpty ? salaryRange[0] : 0;
+    final hi = salaryRange.length > 1 ? salaryRange[1] : lo;
+    if (lo <= 0 && hi <= 0) return '협의';
+    if (lo == hi) return '$lo만원';
+    return '$lo~$hi만원';
+  }
+
+  /// 목록 2행: 직무 · 고용 · 경력 (빈 값·`미정`은 생략)
+  String get listRoleLine {
+    final parts = <String>[];
+    if (type.trim().isNotEmpty) parts.add(type.trim());
+    if (employmentType.trim().isNotEmpty) parts.add(employmentType.trim());
+    final c = career.trim();
+    if (c.isNotEmpty && c != '미정') parts.add(c);
+    return parts.join(' · ');
+  }
+
   factory Job.fromDoc(DocumentSnapshot doc) {
-    // ◀◀◀ 타입 수정
     final json = doc.data() as Map<String, dynamic>;
     return Job.fromJson(json, docId: doc.id);
   }
@@ -54,18 +110,20 @@ class Job {
   factory Job.fromJson(Map<String, dynamic> json, {String? docId}) {
     final loc = json['location'];
 
-    // postedAt 파싱
-    DateTime posted;
-    final pa = json['postedAt'];
-    if (pa is Timestamp) {
-      posted = pa.toDate();
-    } else if (pa is String) {
-      posted = DateTime.parse(pa);
-    } else {
-      posted = DateTime.now();
+    DateTime? parseTs(dynamic v) {
+      if (v is Timestamp) return v.toDate();
+      if (v is String) {
+        try {
+          return DateTime.parse(v);
+        } catch (_) {}
+      }
+      return null;
     }
 
-    // closingDate 파싱
+    final postedAt = parseTs(json['postedAt']);
+    final createdAt = parseTs(json['createdAt']);
+    final DateTime posted = postedAt ?? createdAt ?? DateTime.now();
+
     DateTime? closing;
     final cl = json['closingDate'];
     if (cl is Timestamp) {
@@ -76,7 +134,6 @@ class Job {
       } catch (_) {}
     }
 
-    // location이 GeoPoint 또는 Map일 수 있음
     double lat = 0;
     double lng = 0;
     String address = '';
@@ -84,26 +141,61 @@ class Job {
     if (loc is GeoPoint) {
       lat = loc.latitude;
       lng = loc.longitude;
-      address = json['address'] ?? '';
+      address = (json['address'] as String?)?.trim() ?? '';
     } else if (loc is Map) {
       lat = (loc['lat'] ?? 0).toDouble();
       lng = (loc['lng'] ?? 0).toDouble();
-      address = loc['address'] ?? '';
+      address = (loc['address'] as String?)?.trim() ?? '';
+    } else {
+      address = (json['address'] as String?)?.trim() ?? '';
     }
 
+    final salaryRaw = (json['salaryText'] ?? json['salary'] ?? '').toString().trim();
+    var range = _parseSalaryRange(json['salaryRange']);
+    final smin = json['salaryMin'];
+    final smax = json['salaryMax'];
+    if (range[0] == 0 &&
+        range[1] == 0 &&
+        smin is num &&
+        smax is num) {
+      range = [smin.toInt(), smax.toInt()];
+    }
+    if (range[0] == 0 && range[1] == 0 && salaryRaw.isNotEmpty) {
+      range = _inferSalaryRangeFromText(salaryRaw);
+    }
+
+    final typeFromJson = (json['type'] as String?)?.trim() ?? '';
+    final role = (json['role'] as String?)?.trim() ?? '';
+    final resolvedType = typeFromJson.isNotEmpty ? typeFromJson : role;
+
+    final careerRaw = (json['career'] as String?)?.trim() ?? '';
+    final resolvedCareer = careerRaw.isNotEmpty ? careerRaw : '미정';
+
+    final detailsRaw = (json['details'] as String?)?.trim() ?? '';
+    final description = (json['description'] as String?)?.trim() ?? '';
+    final resolvedDetails =
+        detailsRaw.isNotEmpty ? detailsRaw : description;
+
+    final emp = (json['employmentType'] as String?)?.trim() ?? '';
+
     return Job(
-      id: docId ?? (json['id'] ?? ''),
-      title: json['title'] ?? '',
-      clinicName: json['clinicName'] ?? '',
+      id: docId ?? (json['id'] as String? ?? ''),
+      title: (json['title'] as String?)?.trim() ?? '',
+      clinicName: (json['clinicName'] as String?)?.trim() ?? '',
       address: address,
-      district: json['district'] ?? '',
+      district: (json['district'] as String?)?.trim() ?? '',
       lat: lat,
       lng: lng,
-      type: json['type'] ?? '',
-      career: json['career'] ?? '미정',
-      salaryRange: _parseSalaryRange(json['salaryRange']),
+      type: resolvedType,
+      career: resolvedCareer,
+      salaryRange: range,
+      salaryText: salaryRaw,
+      employmentType: emp,
+      workHours: (json['workHours'] as String?)?.trim() ?? '',
+      contact: (json['contact'] as String?)?.trim() ?? '',
+      status: json['status'] as String?,
       postedAt: posted,
-      details: json['details'] ?? '',
+      details: resolvedDetails,
       benefits: List<String>.from(json['benefits'] ?? []),
       images: List<String>.from(json['images'] ?? []),
       jobLevel: (json['jobLevel'] as int?) ?? 3,
@@ -124,6 +216,24 @@ class Job {
     return [0, 0];
   }
 
+  /// 급여 문자열에서 만원 단위 숫자 범위 추정 (예: "250~300만", "월 280")
+  static List<int> _inferSalaryRangeFromText(String raw) {
+    final s = raw.replaceAll(RegExp(r'\s'), '');
+    if (s.isEmpty) return [0, 0];
+    final tilde = RegExp(r'(\d{2,4})[~～\-](\d{2,4})');
+    final m = tilde.firstMatch(s);
+    if (m != null) {
+      return [int.parse(m.group(1)!), int.parse(m.group(2)!)];
+    }
+    final nums = RegExp(r'\d{2,4}')
+        .allMatches(s)
+        .map((x) => int.parse(x.group(0)!))
+        .toList();
+    if (nums.length >= 2) return [nums[0], nums[1]];
+    if (nums.length == 1) return [nums[0], nums[0]];
+    return [0, 0];
+  }
+
   Map<String, dynamic> toJson() => {
         'title': title,
         'clinicName': clinicName,
@@ -136,6 +246,11 @@ class Job {
         'type': type,
         'career': career,
         'salaryRange': salaryRange,
+        'salaryText': salaryText,
+        'employmentType': employmentType,
+        'workHours': workHours,
+        'contact': contact,
+        if (status != null) 'status': status,
         'postedAt': Timestamp.fromDate(postedAt),
         'details': details,
         'benefits': benefits,

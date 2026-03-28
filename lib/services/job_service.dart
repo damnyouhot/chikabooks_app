@@ -22,9 +22,12 @@ class JobService {
     final snapshot =
         await _db
             .collection('jobs')
-            .orderBy('postedAt', descending: true)
+            .orderBy('createdAt', descending: true)
             .get();
-    List<Job> jobs = snapshot.docs.map((d) => Job.fromDoc(d)).toList();
+    List<Job> jobs = snapshot.docs
+        .map((d) => Job.fromDoc(d))
+        .where((j) => j.isListedInApp)
+        .toList();
 
     if (careerFilter != '전체') {
       jobs = jobs.where((job) => job.career == careerFilter).toList();
@@ -107,7 +110,7 @@ class JobService {
   }) async {
     Query<Map<String, dynamic>> q = _db
         .collection('jobs')
-        .orderBy('postedAt', descending: true)
+        .orderBy('createdAt', descending: true)
         .limit(pageSize);
 
     if (startAfter != null) {
@@ -115,7 +118,10 @@ class JobService {
     }
 
     final snap = await q.get();
-    final jobs = snap.docs.map((d) => Job.fromDoc(d)).toList();
+    final jobs = snap.docs
+        .map((d) => Job.fromDoc(d))
+        .where((j) => j.isListedInApp)
+        .toList();
     final lastDoc = snap.docs.isNotEmpty ? snap.docs.last : null;
     final hasMore = snap.docs.length >= pageSize;
 
@@ -138,11 +144,14 @@ class JobService {
       final snapshot =
           await _db
               .collection('jobs')
-              .orderBy('postedAt', descending: true)
+              .orderBy('createdAt', descending: true)
               .limit(200) // 성능을 위해 제한
               .get();
 
-      List<Job> jobs = snapshot.docs.map((d) => Job.fromDoc(d)).toList();
+      List<Job> jobs = snapshot.docs
+          .map((d) => Job.fromDoc(d))
+          .where((j) => j.isListedInApp)
+          .toList();
 
       // 2. 반경 필터링
       jobs =
@@ -164,8 +173,9 @@ class JobService {
       if (conditions != null && conditions.isNotEmpty) {
         jobs =
             jobs.where((job) {
-              if (conditions.contains('신입가능') && job.career != '신입')
+              if (conditions.contains('신입가능') && job.career != '신입') {
                 return false;
+              }
               // 추후 benefits에서 조건 체크 가능
               return true;
             }).toList();
@@ -204,7 +214,7 @@ class JobService {
       final snapshot =
           await _db
               .collection('jobs')
-              .where('postedAt', isGreaterThan: Timestamp.fromDate(lastVisit))
+              .where('createdAt', isGreaterThan: Timestamp.fromDate(lastVisit))
               .get();
       return snapshot.docs.length;
     } catch (e) {
@@ -229,19 +239,22 @@ class JobService {
       try {
         snapshot = await _db
             .collection('jobs')
-            .orderBy('postedAt', descending: true)
+            .orderBy('createdAt', descending: true)
             .limit(kPreviewLimit)
             .get(const GetOptions(source: Source.cache));
         if (snapshot.docs.isEmpty) throw Exception('cache empty');
       } catch (_) {
         snapshot = await _db
             .collection('jobs')
-            .orderBy('postedAt', descending: true)
+            .orderBy('createdAt', descending: true)
             .limit(kPreviewLimit)
             .get();
       }
 
-      List<Job> jobs = snapshot.docs.map((d) => Job.fromDoc(d)).toList();
+      List<Job> jobs = snapshot.docs
+          .map((d) => Job.fromDoc(d))
+          .where((j) => j.isListedInApp)
+          .toList();
 
       // 위치 기반 필터링 (옵션)
       if (userLocation != null) {

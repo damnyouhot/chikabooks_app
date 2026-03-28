@@ -256,9 +256,9 @@ class _Level1Card extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
 
-                    // 2줄: 직무/경력
+                    // 2줄: 직무 · 고용 · 경력
                     Text(
-                      '${job.type} · ${job.career}',
+                      job.listRoleLine.isEmpty ? '—' : job.listRoleLine,
                       style: const TextStyle(
                         fontSize: 11,
                         color: AppColors.textSecondary,

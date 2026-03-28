@@ -1486,6 +1486,25 @@ export const parseJobImagesToForm = functions
   });
 
 // ========== 구인공고: 공고 생성 ==========
+/** 앱 [Job] salaryRange(만원)와 동기화하기 위한 급여 문자열 파싱 */
+function parseJobSalaryRange(salary: string): { min: number; max: number } {
+  const t = String(salary ?? "").replace(/\s/g, "");
+  if (!t) return { min: 0, max: 0 };
+  const range = t.match(/(\d{2,4})[~～\-](\d{2,4})/);
+  if (range) {
+    return { min: parseInt(range[1], 10), max: parseInt(range[2], 10) };
+  }
+  const singles = t.match(/(\d{2,4})/g);
+  if (singles && singles.length >= 2) {
+    return { min: parseInt(singles[0], 10), max: parseInt(singles[1], 10) };
+  }
+  if (singles && singles.length === 1) {
+    const v = parseInt(singles[0], 10);
+    return { min: v, max: v };
+  }
+  return { min: 0, max: 0 };
+}
+
 /**
  * createJobPosting
  *
@@ -1531,22 +1550,34 @@ export const createJobPosting = functions.https.onCall(
     }
     const clinicId = clinicAccData.clinicId || uid;
 
+    const salaryStr = String(data.salary ?? "").trim();
+    const sr = parseJobSalaryRange(salaryStr);
+    const roleStr = String(data.role ?? "").trim();
+    const descStr = String(data.description ?? "").trim();
+
     const jobData = {
       createdBy: uid,
       clinicId,
       clinicName: String(data.clinicName ?? "").trim(),
       title: String(data.title ?? "").trim(),
-      role: String(data.role ?? "").trim(),
+      role: roleStr,
+      type: roleStr,
       employmentType: String(data.employmentType ?? "").trim(),
       workHours: String(data.workHours ?? "").trim(),
-      salary: String(data.salary ?? "").trim(),
+      salary: salaryStr,
+      salaryText: salaryStr,
+      salaryMin: sr.min,
+      salaryMax: sr.max,
+      salaryRange: [sr.min, sr.max],
       benefits: Array.isArray(data.benefits) ? data.benefits : [],
-      description: String(data.description ?? "").trim(),
+      description: descStr,
+      details: descStr,
       address: String(data.address ?? "").trim(),
       contact: String(data.contact ?? "").trim(),
       images: Array.isArray(data.images) ? data.images : [],
       status: "pending",
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      postedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
 
     const ref = await db.collection("jobs").add(jobData);

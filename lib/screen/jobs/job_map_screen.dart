@@ -995,28 +995,36 @@ class _PreviewCard extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.sm),
 
-              // 태그: 직무 · 경력
+              // 태그: 직무 · 고용 · 경력 · 급여
               Row(
                 children: [
                   _MiniTag(
-                    label: job.type,
-                    color: const Color(0xFFE3F2FD),
-                    textColor: const Color(0xFF1976D2),
+                    label: job.type.isNotEmpty ? job.type : '직무',
+                    color: AppColors.accent.withValues(alpha: 0.12),
+                    textColor: AppColors.accent,
                   ),
-                  const SizedBox(width: 5),
-                  _MiniTag(
-                    label: job.career,
-                    color: const Color(0xFFF3E5F5),
-                    textColor: const Color(0xFF7B1FA2),
-                  ),
-                  if (job.salaryRange[0] > 0) ...[
+                  if (job.employmentType.isNotEmpty) ...[
                     const SizedBox(width: 5),
                     _MiniTag(
-                      label: '${job.salaryRange[0]}~${job.salaryRange[1]}만',
-                      color: const Color(0xFFFFF8E1),
-                      textColor: const Color(0xFFF57F17),
+                      label: job.employmentType,
+                      color: AppColors.surfaceMuted,
+                      textColor: AppColors.textSecondary,
                     ),
                   ],
+                  if (job.career.isNotEmpty && job.career != '미정') ...[
+                    const SizedBox(width: 5),
+                    _MiniTag(
+                      label: job.career,
+                      color: AppColors.surfaceMuted,
+                      textColor: AppColors.textSecondary,
+                    ),
+                  ],
+                  const SizedBox(width: 5),
+                  _MiniTag(
+                    label: job.salaryDisplayLine,
+                    color: AppColors.warning.withValues(alpha: 0.14),
+                    textColor: AppColors.warning,
+                  ),
                   if (userLocation != null) ...[
                     const Spacer(),
                     Text(

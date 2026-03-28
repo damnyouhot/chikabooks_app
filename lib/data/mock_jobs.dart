@@ -1,8 +1,10 @@
 import '../models/job.dart';
 
 /// 레벨1/2/3 공고 Mock 데이터
-/// Stage 1에서 화면 구조 테스트용으로 사용.
-/// Firestore에 실제 데이터가 생기면 이 데이터는 서비스 레이어로 대체됨.
+///
+/// 웹 구인 폼(`JobPostData`)과 동일 항목을 갖추도록 구성:
+/// 치과명·제목·직무(type)·고용형태·근무시간·급여(salaryRange + salaryText)·복리·상세(details)·주소·연락처
+/// 급여 [min,max]는 만원 단위.
 
 final List<Job> mockLevel1Jobs = [
   Job(
@@ -15,7 +17,11 @@ final List<Job> mockLevel1Jobs = [
     lng: 127.039,
     type: '치위생사',
     career: '신입/경력 무관',
-    salaryRange: [2800, 3500],
+    salaryRange: [280, 350],
+    salaryText: '월 280~350만원 (면접 협의)',
+    employmentType: '정규직',
+    workHours: '평일 09:00~18:00 (금 17:30), 토 격주 반일',
+    contact: '02-2001-1001',
     postedAt: DateTime.now().subtract(const Duration(days: 2)),
     details:
         '스케일링·PMTC 등 예방진료, 진료 보조 및 기구 소독·관리를 담당합니다. '
@@ -40,7 +46,11 @@ final List<Job> mockLevel1Jobs = [
     lng: 127.017,
     type: '치위생사',
     career: '1년 이상',
-    salaryRange: [3000, 3800],
+    salaryRange: [300, 380],
+    salaryText: '월 300~380만원 (경력 우대)',
+    employmentType: '정규직',
+    workHours: '09:00~18:30 (토 09:00~13:00 격주)',
+    contact: '02-2002-1002',
     postedAt: DateTime.now().subtract(const Duration(days: 1)),
     details:
         '임플란트·교정 등 다양한 진료 보조와 위생 관리 업무를 수행합니다. '
@@ -65,7 +75,11 @@ final List<Job> mockLevel1Jobs = [
     lng: 126.922,
     type: '치위생사',
     career: '신입 가능',
-    salaryRange: [2600, 3200],
+    salaryRange: [260, 320],
+    salaryText: '월 260~320만원 (직무·경력 반영)',
+    employmentType: '정규직',
+    workHours: '주 5일 09:00~19:00 (점심 13:00~14:00)',
+    contact: '02-2003-1003',
     postedAt: DateTime.now().subtract(const Duration(hours: 12)),
     details:
         '치과위생사는 스케일링·진료 보조, 조무사는 접수·수납·방사선 촬영 보조 등 역할에 따라 배치합니다. '
@@ -90,7 +104,11 @@ final List<Job> mockLevel1Jobs = [
     lng: 126.937,
     type: '데스크',
     career: '1년 이상',
-    salaryRange: [2500, 3000],
+    salaryRange: [250, 300],
+    salaryText: '월 250~300만원 (경력 반영)',
+    employmentType: '정규직',
+    workHours: '10:00~19:00 (월~금), 토 격주',
+    contact: '02-2004-1004',
     postedAt: DateTime.now().subtract(const Duration(days: 3)),
     details:
         '전화·온라인 예약 접수, 내원 환자 응대, 수납 및 보험 청구 관련 업무를 담당합니다. '
@@ -115,7 +133,11 @@ final List<Job> mockLevel1Jobs = [
     lng: 127.100,
     type: '치위생사',
     career: '신입/경력',
-    salaryRange: [2700, 3300],
+    salaryRange: [270, 330],
+    salaryText: '월 270~330만원 (신입·경력 협의)',
+    employmentType: '정규직',
+    workHours: '평일 09:00~18:00, 잠실역 도보 8분',
+    contact: '02-2005-1005',
     postedAt: DateTime.now().subtract(const Duration(days: 4)),
     details:
         '예방·보존 진료 위주 클리닉으로 스케일링, 플루오라이드 도포, 진료 보조를 주 업무로 합니다. '
@@ -140,7 +162,11 @@ final List<Job> mockLevel1Jobs = [
     lng: 127.070,
     type: '치과조무사',
     career: '신입 가능',
-    salaryRange: [2400, 2800],
+    salaryRange: [240, 280],
+    salaryText: '월 240~280만원 (수습 후 조정)',
+    employmentType: '정규직',
+    workHours: '09:00~18:00 (주 5일)',
+    contact: '02-2006-1006',
     postedAt: DateTime.now().subtract(const Duration(days: 5)),
     details:
         '접수·안내, 진료실 보조, 기구 준비 및 소독, 방사선 촬영 보조 업무를 합니다. '
@@ -165,7 +191,11 @@ final List<Job> mockLevel1Jobs = [
     lng: 126.901,
     type: '치위생사',
     career: '경력 2년 이상',
-    salaryRange: [3200, 4000],
+    salaryRange: [320, 400],
+    salaryText: '월 320~400만원 + 성과급 (경력별)',
+    employmentType: '정규직',
+    workHours: '08:30~17:30 또는 09:00~18:00 (면접 협의)',
+    contact: '02-2007-1007',
     postedAt: DateTime.now().subtract(const Duration(days: 6)),
     details:
         '진료 보조와 스케일링 등 위생 업무 외에 원장 일정·내원 조율, 간행물·서류 정리 등 보조 업무가 포함될 수 있습니다. '
@@ -190,7 +220,11 @@ final List<Job> mockLevel1Jobs = [
     lng: 126.982,
     type: '치위생사',
     career: '1~3년',
-    salaryRange: [2900, 3600],
+    salaryRange: [290, 360],
+    salaryText: '월 290~360만원 (야간 1회 시 수당)',
+    employmentType: '정규직',
+    workHours: '주 5일, 야간 진료 주 1회(면접 시 확정)',
+    contact: '02-2008-1008',
     postedAt: DateTime.now().subtract(const Duration(days: 7)),
     details:
         '체어별 진료 보조, 감염 관리, 환자 교육(칫솔질·치간 관리 등)을 담당합니다. '
@@ -215,7 +249,11 @@ final List<Job> mockLevel1Jobs = [
     lng: 127.065,
     type: '치위생사',
     career: '3년 이상',
-    salaryRange: [3400, 4200],
+    salaryRange: [340, 420],
+    salaryText: '월 340~420만원 (고난도 진료 보조)',
+    employmentType: '정규직',
+    workHours: '09:00~18:30 (토요일 격주 반일)',
+    contact: '02-2009-1009',
     postedAt: DateTime.now().subtract(const Duration(days: 8)),
     details:
         '풀타임 정규직으로 상급종합병원급 진료 보조 경험이나 교정·임플 진료 보조 경험을 살릴 수 있습니다. '
@@ -243,7 +281,11 @@ final List<Job> mockLevel2Jobs = [
     lng: 126.913,
     type: '치위생사',
     career: '신입',
-    salaryRange: [2500, 2900],
+    salaryRange: [250, 290],
+    salaryText: '월 250~290만원 (수습 OJT)',
+    employmentType: '정규직',
+    workHours: '09:00~18:00 (주 5일)',
+    contact: '02-2010-1010',
     postedAt: DateTime.now().subtract(const Duration(days: 3)),
     details:
         '신규 면허 취득자를 위한 체계적 OJT를 제공합니다. '
@@ -268,7 +310,11 @@ final List<Job> mockLevel2Jobs = [
     lng: 127.056,
     type: '치과조무사',
     career: '1년 이상',
-    salaryRange: [2600, 3000],
+    salaryRange: [260, 300],
+    salaryText: '월 260~300만원',
+    employmentType: '정규직',
+    workHours: '09:30~18:30',
+    contact: '02-2011-1011',
     postedAt: DateTime.now().subtract(const Duration(days: 2)),
     details:
         '수납·예약 관리, 진료실 기구 준비, 방사선 촬영, 멸균실 관리 등 조무사 표준 업무를 수행합니다. '
@@ -293,7 +339,11 @@ final List<Job> mockLevel2Jobs = [
     lng: 126.866,
     type: '데스크',
     career: '경력 무관',
-    salaryRange: [2400, 2800],
+    salaryRange: [240, 280],
+    salaryText: '월 240~280만원',
+    employmentType: '정규직',
+    workHours: '10:00~19:00',
+    contact: '02-2012-1012',
     postedAt: DateTime.now().subtract(const Duration(days: 4)),
     details:
         '데스크 전담으로 예약·취소 처리, 초진 상담 안내, 수납 및 카드·현금 정산을 맡습니다. '
@@ -318,7 +368,11 @@ final List<Job> mockLevel2Jobs = [
     lng: 126.929,
     type: '치위생사',
     career: '1~5년',
-    salaryRange: [2700, 3300],
+    salaryRange: [270, 330],
+    salaryText: '월 270~330만원 (오전 집중 근무)',
+    employmentType: '정규직',
+    workHours: '08:00~15:00 전후 (면접 시 확정)',
+    contact: '02-2013-1013',
     postedAt: DateTime.now().subtract(const Duration(days: 5)),
     details:
         '오전 시간대 집중 진료(약 8시~15시 전후)로 스케줄이 고정되어 있어 저녁 여유를 원하시는 분께 적합합니다. '
@@ -343,7 +397,11 @@ final List<Job> mockLevel2Jobs = [
     lng: 127.123,
     type: '치위생사',
     career: '3년 이상',
-    salaryRange: [3100, 3900],
+    salaryRange: [310, 390],
+    salaryText: '월 310~390만원 + 성과급',
+    employmentType: '정규직',
+    workHours: '09:00~18:30',
+    contact: '02-2014-1014',
     postedAt: DateTime.now().subtract(const Duration(days: 6)),
     details:
         '크라운·브릿지 등 보철 진료 비중이 높아 인상 채득 보조, 임시치아 관리, 보철물 시착 보조 등 세심한 업무가 포함됩니다. '
@@ -368,7 +426,11 @@ final List<Job> mockLevel2Jobs = [
     lng: 127.086,
     type: '치과조무사',
     career: '신입',
-    salaryRange: [2300, 2700],
+    salaryRange: [230, 270],
+    salaryText: '월 230~270만원 (교육 지원)',
+    employmentType: '정규직',
+    workHours: '09:00~18:00',
+    contact: '02-2015-1015',
     postedAt: DateTime.now().subtract(const Duration(days: 7)),
     details:
         '신입 조무사를 위한 단계별 교육 일정을 마련해 두었습니다. '
@@ -393,7 +455,11 @@ final List<Job> mockLevel2Jobs = [
     lng: 126.848,
     type: '치위생사',
     career: '2년 이상',
-    salaryRange: [2900, 3500],
+    salaryRange: [290, 350],
+    salaryText: '월 290~350만원',
+    employmentType: '정규직',
+    workHours: '주 5일, 야간 주 1~2회 협의',
+    contact: '02-2016-1016',
     postedAt: DateTime.now().subtract(const Duration(days: 8)),
     details:
         '2년 이상 실무 경력자를 우대하며, 자가 치석제거·아동 진료 보조 등 다양한 케이스를 경험할 수 있습니다. '
@@ -418,7 +484,11 @@ final List<Job> mockLevel2Jobs = [
     lng: 127.046,
     type: '기타',
     career: '경력 무관',
-    salaryRange: [2500, 3000],
+    salaryRange: [250, 300],
+    salaryText: '월 250~300만원 (행정·보조)',
+    employmentType: '계약직',
+    workHours: '09:00~18:00 (수습 후 정규 전환 검토)',
+    contact: '02-2017-1017',
     postedAt: DateTime.now().subtract(const Duration(days: 9)),
     details:
         '원장 일정 관리, 내·외부 연락, 간단한 문서 작성, 진료실 비품 발주 등 행정·보조 업무를 맡습니다. '
@@ -443,7 +513,11 @@ final List<Job> mockLevel2Jobs = [
     lng: 126.887,
     type: '치위생사',
     career: '신입/경력',
-    salaryRange: [2600, 3200],
+    salaryRange: [260, 320],
+    salaryText: '월 260~320만원 (파트·정규 협의)',
+    employmentType: '파트타임',
+    workHours: '주 3~5일 협의 (면접 시 확정)',
+    contact: '02-2018-1018',
     postedAt: DateTime.now().subtract(const Duration(days: 10)),
     details:
         '파트(주 3~4일) 또는 정규직 모두 지원 가능하며, 면접 시 근무일·시간을 조율합니다. '
@@ -468,7 +542,11 @@ final List<Job> mockLevel2Jobs = [
     lng: 126.952,
     type: '치위생사',
     career: '1년 이상',
-    salaryRange: [2700, 3300],
+    salaryRange: [270, 330],
+    salaryText: '월 270~330만원 (직종별 배치)',
+    employmentType: '정규직',
+    workHours: '09:00~18:30',
+    contact: '02-2019-1019',
     postedAt: DateTime.now().subtract(const Duration(days: 11)),
     details:
         '지원 자격에 따라 조무사 또는 위생사 포지션으로 채용합니다. '
@@ -534,6 +612,23 @@ Job _buildMockLevel3JobAt(int i) {
   final clinic = clinics[i % clinics.length];
   final title = titles[i % titles.length];
   final type = types[i % types.length];
+  final minSal = 248 + (i % 8) * 8;
+  final maxSal = minSal + 28 + (i % 5) * 6;
+  const employmentTypes = ['정규직', '계약직', '파트타임', '인턴'];
+  final employmentType = employmentTypes[i % employmentTypes.length];
+  const hoursOpts = [
+    '평일 09:00~18:00',
+    '09:30~18:30 (토 격주)',
+    '주 5일, 점심 13:00~14:00',
+    '오전 집중 근무 협의',
+    '파트 주 3~4일 협의',
+  ];
+  final benefitSets = [
+    ['4대보험', '퇴직금', '연차'],
+    ['4대보험', '식비지원', '명절상여'],
+    ['4대보험', '퇴직금', '주차지원'],
+    ['4대보험', '연차', '교육지원'],
+  ];
 
   return Job(
     id: 'mock_l3_$i',
@@ -545,7 +640,12 @@ Job _buildMockLevel3JobAt(int i) {
     lng: clinic.$5,
     type: type,
     career: careers[i % careers.length],
-    salaryRange: [2400 + (i % 6) * 100, 2900 + (i % 6) * 100],
+    salaryRange: [minSal, maxSal],
+    salaryText: '월 $minSal~$maxSal만원 (면접 협의)',
+    employmentType: employmentType,
+    workHours: hoursOpts[i % hoursOpts.length],
+    contact:
+        '02-3${(i % 10)}${(i % 9)}-${2100 + (i % 899)}',
     postedAt: DateTime.now().subtract(Duration(days: i + 1)),
     details: _mockLevel3Details(
       clinicName: clinic.$1,
@@ -553,7 +653,7 @@ Job _buildMockLevel3JobAt(int i) {
       title: title,
       variant: i,
     ),
-    benefits: ['4대보험'],
+    benefits: benefitSets[i % benefitSets.length],
     images: [],
     jobLevel: 3,
     matchScore: 0,

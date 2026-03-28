@@ -280,9 +280,14 @@ class _JobListingsScreenState extends State<JobListingsScreen> {
     }
 
     if (jobFilter.employmentType != '전체') {
-      jobs = jobs
-          .where((j) => j.type.contains(jobFilter.employmentType))
-          .toList();
+      final want = jobFilter.employmentType;
+      jobs = jobs.where((j) {
+        final et = j.employmentType.trim();
+        if (et.isNotEmpty) {
+          return et.contains(want) || want.contains(et);
+        }
+        return j.type.contains(want);
+      }).toList();
     }
 
     switch (jobFilter.sortBy) {
@@ -826,7 +831,7 @@ class _Level2Card extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${_shortDistrict(job)} · ${job.type} · ${job.career}',
+                    _districtAndRoles(job),
                     style: const TextStyle(
                       fontSize: 10,
                       color: AppColors.textDisabled,
@@ -859,6 +864,14 @@ class _Level2Card extends StatelessWidget {
     }
     final parts = job.address.split(' ');
     return parts.length >= 2 ? parts.take(2).join(' ') : job.address;
+  }
+
+  String _districtAndRoles(Job job) {
+    final d = _shortDistrict(job);
+    final r = job.listRoleLine;
+    if (d.isEmpty) return r.isEmpty ? '—' : r;
+    if (r.isEmpty) return d;
+    return '$d · $r';
   }
 }
 
@@ -987,7 +1000,7 @@ class _Level3Row extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${job.type} · ${job.career}',
+                    job.listRoleLine,
                     style: const TextStyle(
                       fontSize: 11,
                       color: AppColors.textDisabled,

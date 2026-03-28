@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
@@ -31,9 +32,21 @@ class _PublisherForgotPageState extends State<PublisherForgotPage> {
       _errorMsg = null;
     });
     try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(
-        email: _emailCtrl.text.trim(),
-      );
+      // 웹: 재설정 링크가 호스팅 도메인의 /set-password 로 열리도록 지정
+      // (Firebase Console → Authorized domains 에 chikabooks3rd.web.app 필요)
+      if (kIsWeb) {
+        await FirebaseAuth.instance.sendPasswordResetEmail(
+          email: _emailCtrl.text.trim(),
+          actionCodeSettings: ActionCodeSettings(
+            url: 'https://chikabooks3rd.web.app/set-password',
+            handleCodeInApp: false,
+          ),
+        );
+      } else {
+        await FirebaseAuth.instance.sendPasswordResetEmail(
+          email: _emailCtrl.text.trim(),
+        );
+      }
       if (mounted) setState(() => _sent = true);
     } on FirebaseAuthException catch (e) {
       setState(() {
@@ -208,6 +221,16 @@ class _PublisherForgotPageState extends State<PublisherForgotPage> {
               fontSize: 13,
               color: kPubText.withOpacity(0.5),
               height: 1.6,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            '가입한 적이 없다면 비밀번호 재설정 메일은 오지 않을 수 있어요. 치과 계정이 필요하면 회원가입을 이용해 주세요.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12,
+              color: kPubText.withOpacity(0.45),
+              height: 1.55,
             ),
           ),
           const SizedBox(height: 28),
