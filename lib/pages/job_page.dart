@@ -62,7 +62,7 @@ class _CareerSkillAutoHintScopeState extends State<_CareerSkillAutoHintScope> {
 
 /// 커리어(도전하기) 탭 - 탭4
 ///
-/// - 소탭 0: 공고보기 (JobListingsScreen ↔ JobMapScreen)
+/// - 소탭 0: 채용 (JobListingsScreen ↔ JobMapScreen, 출시 전 시각 오버레이)
 /// - 소탭 1: 커리어 카드 (CareerTab)
 ///
 /// [isOnboardingActive] 온보딩 진행 중이면 커리어 카드(소탭1)로 바로 열림
@@ -157,7 +157,7 @@ class _JobPageState extends State<JobPage> {
               children: [
                 // ── 공통 타이틀 + 인포/설정 (두 소탭 모두 항상 표시) ──
                 const _JobPageTitleBar(),
-                // ── 공통 소탭바 (공고보기 / 커리어카드) ──
+                // ── 공통 소탭바 (채용 / 커리어 카드) ──
                 const CareerTabHeader(),
                 // 소탭 본문
                 Expanded(
@@ -178,24 +178,46 @@ class _JobPageState extends State<JobPage> {
   }
 
   Widget _buildJobsTab() {
+    final Widget content;
     if (_loadingLocation) {
-      return const Center(child: CircularProgressIndicator());
+      content = const Center(child: CircularProgressIndicator());
+    } else {
+      // IndexedStack으로 목록/지도를 동시에 유지 → 전환 시 Maps 재초기화 없음
+      content = IndexedStack(
+        index: _isMapView ? 1 : 0,
+        children: [
+          JobListingsScreen(
+            userLocation: _userLocation,
+            onMapToggle: () => setState(() => _isMapView = true),
+          ),
+          JobMapScreen(
+            userLocation: _userLocation,
+            onListToggle: () => setState(() => _isMapView = false),
+          ),
+        ],
+      );
     }
 
-    // IndexedStack으로 목록/지도를 동시에 유지 → 전환 시 Maps 재초기화 없음
-    return IndexedStack(
-      index: _isMapView ? 1 : 0,
+    return Stack(
+      fit: StackFit.expand,
       children: [
-        // 인덱스 0: 공고 목록
-        JobListingsScreen(
-          userLocation: _userLocation,
-          onMapToggle: () => setState(() => _isMapView = true),
-        ),
-        // 인덱스 1: 지도 (미리 빌드되어 전환 즉시 표시)
-        // 목록 버튼은 JobMapScreen 내부 RadiusChipRow 우측에 통합됨
-        JobMapScreen(
-          userLocation: _userLocation,
-          onListToggle: () => setState(() => _isMapView = false),
+        content,
+        // 온보딩 스포트라이트와 동일 농도 · 터치는 하위(목록/지도)로 통과
+        IgnorePointer(
+          child: ColoredBox(
+            color: AppColors.black.withValues(alpha: 0.85),
+            child: const Center(
+              child: Text(
+                '하이진랩 채용 서비스 준비중',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
         ),
       ],
     );
@@ -278,7 +300,7 @@ class _JobPageTitleBar extends StatelessWidget {
             children: [
               Text('이력서와 구인 공고를 관리하는 공간이에요.', style: TextStyle(fontSize: 13, height: 1.5)),
               SizedBox(height: 16),
-              Text('📍 공고 보기', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              Text('📍 채용', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
               SizedBox(height: 8),
               Text('근처 치과 구인 공고를 목록·지도로 확인해요.', style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
               SizedBox(height: 16),

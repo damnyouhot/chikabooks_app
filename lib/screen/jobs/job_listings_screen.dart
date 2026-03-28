@@ -18,7 +18,7 @@ import '../../widgets/job/job_level1_carousel.dart';
 import '../../widgets/job/filter_bottom_sheet.dart';
 import '../jobs/job_detail_screen.dart';
 
-/// 공고보기 소탭 - 목록 모드
+/// 채용 소탭 - 목록 모드
 ///
 /// ## Sliver 구조
 /// - 타이틀 섹션 (일반 스크롤, 스크롤 시 사라짐): 커리어 제목 + 인포/설정 + 커리어 요약

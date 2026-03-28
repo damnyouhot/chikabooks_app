@@ -151,7 +151,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
           ),
           const SizedBox(height: 6),
           const Text(
-            '공고 보기 탭에서 마음에 드는 공고를 찾아보세요!',
+            '채용 탭에서 마음에 드는 공고를 찾아보세요!',
             style: TextStyle(
               fontSize: 12,
               color: AppColors.textDisabled,

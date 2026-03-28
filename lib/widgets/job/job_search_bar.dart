@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
 
-/// 공고보기 탭 상단 고정 검색/요약 바 (Sticky)
+/// 채용 소탭 상단 고정 검색/요약 바 (Sticky)
 ///
 /// 원칙: Shadow 없음 / Border(하단 구분선만 유지)
 /// - 검색창: surfaceMuted fill, 포커스 시 accent border

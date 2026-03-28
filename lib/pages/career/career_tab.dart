@@ -16,7 +16,7 @@ import 'career_stage_section.dart';
 /// 커리어 탭 소탭바 (AppSegmentedControl 전용 헤더)
 ///
 /// 타이틀·인포·설정은 [job_page.dart]의 [_JobPageTitleBar]가 처리하며,
-/// 이 위젯은 소탭('공고 보기' / '커리어 카드')만 렌더링합니다.
+/// 이 위젯은 소탭('채용' / '커리어 카드')만 렌더링합니다.
 class CareerTabHeader extends StatelessWidget {
   const CareerTabHeader({super.key});
 
@@ -24,7 +24,7 @@ class CareerTabHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppSegmentedControl(
       controller: DefaultTabController.of(context),
-      labels: const ['공고 보기', '커리어 카드'],
+      labels: const ['채용', '커리어 카드'],
       wipIndices: const {0},
       margin: const EdgeInsets.symmetric(
         horizontal: AppSpacing.xl,

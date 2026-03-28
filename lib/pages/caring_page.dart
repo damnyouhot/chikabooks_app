@@ -20,6 +20,7 @@ import '../widgets/speech_overlay.dart';
 import '../pages/ebook/ebook_detail_page.dart';
 import 'settings/settings_page.dart';
 import '../core/theme/app_colors.dart';
+import '../core/widgets/app_badge.dart';
 import '../services/admin_activity_service.dart';
 import '../data/caring_ments.dart';
 
@@ -655,8 +656,13 @@ class _CaringPageState extends State<CaringPage>
                       _buildTopBar(titleVisible: false),
                       FadeTransition(
                         opacity: isOnboarding ? const AlwaysStoppedAnimation(0.0) : _cardAnims[0],
-                        child: _TapCard(title: 'Jobs', bigText: _jobsSummary, subtitle: _jobsSub,
-                            onTap: () => widget.onTabRequested?.call(3), isLoading: _jobLoading),
+                        child: _TapCard(
+                            title: 'Jobs',
+                            bigText: _jobsSummary,
+                            subtitle: _jobsSub,
+                            onTap: () => widget.onTabRequested?.call(3),
+                            isLoading: _jobLoading,
+                            showPrepBadge: true),
                       ),
                       FadeTransition(
                         opacity: isOnboarding ? const AlwaysStoppedAnimation(0.0) : _cardAnims[1],
@@ -686,14 +692,25 @@ class _CaringPageState extends State<CaringPage>
 
             if (!isOnboarding) _buildGaugeRow(),
 
-            Expanded(child: ClipRect(child: _buildCharacterStack(isOnboarding))),
+            Expanded(
+              // ClipRect를 Padding 바깥에 둬야 padding이 줄인 availableH만큼
+              // ClipRect 여유 공간이 생겨 캐릭터 상단 잘림이 최소화됨
+              child: ClipRect(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 18),
+                  child: _buildCharacterStack(
+                      isOnboarding,
+                      MediaQuery.of(context).size.height),
+                ),
+              ),
+            ),
 
             Visibility(
               visible: true, maintainSize: true,
               maintainAnimation: true, maintainState: true,
               child: Container(
                 color: AppColors.appBg,
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
                 child: _buildBottomSection(isOnboarding: isOnboarding),
               ),
             ),
@@ -720,7 +737,12 @@ class _CaringPageState extends State<CaringPage>
   }
 
   // ── 캐릭터 스택 (수면 페이드 애니메이션) ──
-  Widget _buildCharacterStack(bool isOnboarding) {
+  //
+  // [screenH]: MediaQuery 전체 화면 높이(dp).
+  // 스케일 = screenH × kScreenRatio / availableH 로 계산해
+  // 기기가 달라져도 캐릭터가 항상 화면 높이 대비 동일 비율로 보임.
+  // (Pixel 7 Pro 892dp 기준 kScreenRatio = 0.38 → 캐릭터 ≈ 339dp)
+  Widget _buildCharacterStack(bool isOnboarding, double screenH) {
     return Stack(
       children: [
         Positioned.fill(
@@ -730,16 +752,18 @@ class _CaringPageState extends State<CaringPage>
             behavior: isOnboarding ? HitTestBehavior.translucent : HitTestBehavior.opaque,
             child: _dogController != null
                 ? LayoutBuilder(builder: (ctx, constraints) {
-                    // 실제 캐릭터 영역 높이 기준 스케일 계산
-                    // (전체 화면 높이 대신 실제 할당된 공간 사용)
-                    // Pixel 7 Pro 기준 캐릭터 영역 ≈ 320dp → rawScale ≈ 1.0 → scale ≈ 1.09
-                    // 작은 기기(iPhone 16e 등)는 최소 1.00으로 클램프 → 동일한 줌 수준 유지
+                    // screenH 비율 기반 스케일 (Pixel 7 Pro 892dp 기준)
+                    // scale = 목표 캐릭터 높이(screenH×0.38) / 실제 영역 높이
+                    // → 기기가 달라져도 화면 대비 동일 비율로 표시
                     final availableH = constraints.maxHeight;
-                    final rawScale = (availableH / 320.0).clamp(1.00, 1.20);
-                    final scale = isOnboarding ? rawScale * 0.98 : rawScale * 1.09;
+                    const kScreenRatio = 0.38;
+                    final scale =
+                        (screenH * kScreenRatio / availableH).clamp(0.85, 2.5);
+                    final finalScale = isOnboarding ? scale * 0.90 : scale;
 
                     Widget character = Transform.scale(
-                      scale: scale,
+                      alignment: Alignment.bottomCenter,
+                      scale: finalScale,
                       child: RiveWidget(controller: _dogController!, fit: Fit.contain),
                     );
 
@@ -802,7 +826,9 @@ class _CaringPageState extends State<CaringPage>
           child: IgnorePointer(
             child: LayoutBuilder(builder: (ctx, constraints) {
               final h = constraints.maxHeight;
-              final baseMsgTop = isOnboarding ? h * 0.034 : h * 0.126;
+              // 기본 멘트: 캐릭터 영역 상단에서 고정 14dp 아래
+              // (비율 계산 대신 고정값 → 기기 무관하게 동일 위치)
+              final baseMsgTop = isOnboarding ? h * 0.028 : 14.0;
               final reactionTop = h * 0.86;
               final displayText = isOnboarding ? widget.onboardingDialogue : _baseMsgText;
               final isDismissing = isOnboarding ? false : _isBaseMsgDismissing;
@@ -1080,10 +1106,18 @@ class _ZzzAnimationState extends State<_ZzzAnimation>
 // ══════════════════════════════════════════════
 
 class _TapCard extends StatelessWidget {
-  const _TapCard({required this.title, required this.bigText, required this.subtitle, required this.onTap, this.isLoading = false});
+  const _TapCard({
+    required this.title,
+    required this.bigText,
+    required this.subtitle,
+    required this.onTap,
+    this.isLoading = false,
+    this.showPrepBadge = false,
+  });
   final String title, bigText, subtitle;
   final VoidCallback onTap;
   final bool isLoading;
+  final bool showPrepBadge;
 
   @override
   Widget build(BuildContext context) {
@@ -1096,9 +1130,31 @@ class _TapCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(borderRadius: radius),
             child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-              Flexible(flex: 4, fit: FlexFit.tight,
-                child: Text(title, style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w800,
-                    color: AppColors.onCardPrimary, letterSpacing: -0.5, height: 1.1))),
+              Flexible(
+                flex: 4,
+                fit: FlexFit.tight,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.onCardPrimary,
+                          letterSpacing: -0.5,
+                          height: 1.1,
+                        ),
+                      ),
+                    ),
+                    if (showPrepBadge) ...[
+                      const SizedBox(width: 6),
+                      const PrepInProgressBadge(),
+                    ],
+                  ],
+                ),
+              ),
               const SizedBox(width: 8),
               Flexible(flex: 5, fit: FlexFit.tight,
                 child: isLoading

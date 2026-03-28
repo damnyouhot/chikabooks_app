@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_tokens.dart';
+import 'app_badge.dart';
 
 /// ══════════════════════════════════════════════════════════════
 /// AppSegmentedControl — 세그먼트 탭 컨트롤
@@ -87,25 +88,7 @@ class AppSegmentedControl extends StatelessWidget {
               children: [
                 Text(label),
                 const SizedBox(width: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 5,
-                    vertical: 1,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2E7D32).withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Text(
-                    '준비중',
-                    style: TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.onCardEmphasis,
-                      letterSpacing: -0.2,
-                    ),
-                  ),
-                ),
+                const PrepInProgressBadge(),
               ],
             ),
           );

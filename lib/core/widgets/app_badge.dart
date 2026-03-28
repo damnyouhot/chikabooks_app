@@ -134,3 +134,31 @@ class AppStatusBadge extends StatelessWidget {
   }
 }
 
+/// '준비중' — 어두운 녹색 배경 + 크림 화이트 텍스트 ([AppColors.appBg])
+///
+/// 사용: 나 탭 Jobs 카드, 커리어 소탭(채용) 등
+class PrepInProgressBadge extends StatelessWidget {
+  const PrepInProgressBadge({super.key});
+
+  static const Color _bg = Color(0xFF14532D);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: _bg,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: const Text(
+        '준비중',
+        style: TextStyle(
+          fontSize: 9,
+          fontWeight: FontWeight.w700,
+          color: AppColors.appBg,
+          letterSpacing: -0.2,
+        ),
+      ),
+    );
+  }
+}

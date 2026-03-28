@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 ///   탭1 (index 0) : 나      (CaringPage)
 ///   탭2 (index 1) : 같이    (BondPage)   ← 온보딩 중 잠금
 ///   탭3 (index 2) : 성장하기 (GrowthPage)
-///   탭4 (index 3) : 커리어  (JobPage → 소탭: 공고보기 / 커리어카드)
+///   탭4 (index 3) : 커리어  (JobPage → 소탭: 채용 / 커리어 카드)
 enum AppOnboardingStepId {
   step1a, // 탭1(나)  "안녕 난 저니라고 해."
   step1b, // 탭1(나)  "넌 이름이 뭐야?"
