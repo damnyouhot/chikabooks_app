@@ -105,6 +105,12 @@ class AppColors {
   /// 카드 내부 VerticalDivider / Divider 색상
   static const divider = Color(0xFFE2DDD6);
 
+  // ── 이력서 편집 폼 블록 (appBg 위 밝은 패널 — 기본정보·경력 등) ───
+  /// 근무지별 경력 등 복수 블록 배경
+  static const resumeFormSurface = white;
+  /// 블록 외곽선 (Theme [Card]의 진한색 대신 사용)
+  static const resumeFormBlockBorder = divider;
+
   // ── 크림 화이트 (진한 배경 위 부드러운 강조 텍스트) ──────────────
   /// Green/Orange 카드 등 진한 배경 위 부드러운 화이트 텍스트
   /// 나중에 색상 변경 시 이 토큰 한 곳만 수정하면 전체 반영됨

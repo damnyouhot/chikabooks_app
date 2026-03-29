@@ -172,145 +172,146 @@ class _ExperienceCardState extends State<_ExperienceCard> {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 14),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 헤더
-            Row(
-              children: [
-                Text(
-                  '경력 ${widget.index + 1}',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                  ),
+      decoration: BoxDecoration(
+        color: AppColors.resumeFormSurface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.resumeFormBlockBorder),
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                '경력 ${widget.index + 1}',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
                 ),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline, size: 18),
-                  color: AppColors.error.withOpacity(0.6),
-                  onPressed: widget.onRemove,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Divider(height: 1, color: AppColors.divider.withOpacity(0.6)),
-            const SizedBox(height: 14),
-
-            _field('병원명 *', _clinicCtrl, '예: 서울밝은치과'),
-            _field('지역', _regionCtrl, '서울시 강남구'),
-            Row(
-              children: [
-                Expanded(child: _field('시작 (YYYY-MM)', _startCtrl, '2023-03')),
-                const SizedBox(width: 10),
-                Expanded(
-                    child:
-                        _field('종료 (YYYY-MM)', _endCtrl, '재직중')),
-              ],
-            ),
-
-            // 담당업무 체크리스트
-            const SizedBox(height: 8),
-            Text(
-              '담당 업무',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textSecondary,
               ),
-            ),
-            const SizedBox(height: 6),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                const gap = 8.0;
-                final cellW = (constraints.maxWidth - gap) / 2;
-                return Wrap(
-                  spacing: gap,
-                  runSpacing: gap,
-                  children: widget.taskOptions.map((t) {
-                    final selected = _tasks.contains(t);
-                    return SizedBox(
-                      width: cellW,
-                      child: FilterChip(
-                        label: Text(
-                          t,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            height: 1.25,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        selected: selected,
-                        selectedColor: AppColors.accent.withOpacity(0.12),
-                        checkmarkColor: AppColors.accent,
-                        visualDensity: VisualDensity.compact,
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        side: BorderSide(
-                          color: selected
-                              ? AppColors.accent.withOpacity(0.45)
-                              : AppColors.divider,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        onSelected: (val) {
-                          setState(() {
-                            if (val) {
-                              _tasks.add(t);
-                            } else {
-                              _tasks.remove(t);
-                            }
-                          });
-                          _emit();
-                        },
-                      ),
-                    );
-                  }).toList(),
-                );
-              },
-            ),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.delete_outline, size: 18),
+                color: AppColors.error.withValues(alpha: 0.75),
+                onPressed: widget.onRemove,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          const Divider(height: 1, color: AppColors.divider),
+          const SizedBox(height: 14),
 
-            const SizedBox(height: 10),
-            _field('사용 툴/장비 (콤마 구분)', _toolsCtrl, 'CEREC, Medit i700'),
-            _field('성과 (선택)', _achieveCtrl, '하루 평균 환자 30명 처치'),
-          ],
-        ),
+          _field('병원명 *', _clinicCtrl, '예: 서울밝은치과'),
+          _field('지역', _regionCtrl, '서울시 강남구'),
+          Row(
+            children: [
+              Expanded(child: _field('시작 (YYYY-MM)', _startCtrl, '2023-03')),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _field('종료 (YYYY-MM)', _endCtrl, '재직중'),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 8),
+          Text(
+            '담당 업무',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              const gap = 8.0;
+              final cellW = (constraints.maxWidth - gap) / 2;
+              return Wrap(
+                spacing: gap,
+                runSpacing: gap,
+                children: widget.taskOptions.map((t) {
+                  final selected = _tasks.contains(t);
+                  return SizedBox(
+                    width: cellW,
+                    child: FilterChip(
+                      label: Text(
+                        t,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          height: 1.25,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      selected: selected,
+                      selectedColor: AppColors.accent.withValues(alpha: 0.15),
+                      checkmarkColor: AppColors.accent,
+                      visualDensity: VisualDensity.compact,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      side: BorderSide(
+                        color: selected
+                            ? AppColors.accent.withValues(alpha: 0.5)
+                            : AppColors.divider,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      onSelected: (val) {
+                        setState(() {
+                          if (val) {
+                            _tasks.add(t);
+                          } else {
+                            _tasks.remove(t);
+                          }
+                        });
+                        _emit();
+                      },
+                    ),
+                  );
+                }).toList(),
+              );
+            },
+          ),
+
+          const SizedBox(height: 10),
+          _field('사용 툴/장비 (콤마 구분)', _toolsCtrl, 'CEREC, Medit i700'),
+          _field('성과 (선택)', _achieveCtrl, '하루 평균 환자 30명 처치'),
+        ],
       ),
     );
   }
 
+  /// [SectionProfile] 기본정보 필드와 동일 톤
   Widget _field(String label, TextEditingController ctrl, String hint) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: 14),
       child: TextField(
         controller: ctrl,
         onChanged: (_) => _emit(),
         decoration: InputDecoration(
           labelText: label,
           hintText: hint,
-          hintStyle: TextStyle(color: AppColors.textDisabled),
-          border: const OutlineInputBorder(),
+          hintStyle: const TextStyle(color: AppColors.textDisabled),
+          border: const OutlineInputBorder(
+            borderRadius: BorderRadius.all(Radius.circular(8)),
+          ),
           contentPadding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          isDense: true,
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         ),
-        style: const TextStyle(fontSize: 13),
+        style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
       ),
     );
   }
 }
-
