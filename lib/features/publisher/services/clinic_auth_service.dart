@@ -63,7 +63,33 @@ class ClinicAuthService {
 
   static const _collection = 'clinics_accounts';
 
+  /// 위생사(지원자) 로그인 경로에서 치과(공고자) 계정을 막을 때 사용하는 안내 문구
+  static const String applicantLoginBlockedMessage =
+      '이 계정은 치과(공고자) 전용으로 등록되어 있어\n'
+      '위생사 앱·지원자 로그인으로는 이용할 수 없습니다.\n\n'
+      '추후 치과 전용 관리 페이지 서비스를 준비하고 있어요.\n'
+      '공고·채용 이용은 웹의 치과(공고자) 로그인을 이용해 주세요.';
+
   static String? get _uid => _auth.currentUser?.uid;
+
+  /// 지원자 로그인 직후 호출. `clinics_accounts`가 있으면 로그아웃하고 차단 사유 문자열 반환.
+  /// Firestore 오류 시에도 확인 불가이므로 로그아웃 후 안내 반환.
+  static Future<String?> blockClinicAccountFromApplicantLogin() async {
+    final uid = _uid;
+    if (uid == null) return null;
+    try {
+      final doc = await _db.collection(_collection).doc(uid).get();
+      if (!doc.exists) return null;
+      await _auth.signOut();
+      return applicantLoginBlockedMessage;
+    } catch (e) {
+      debugPrint('⚠️ blockClinicAccountFromApplicantLogin: $e');
+      try {
+        await _auth.signOut();
+      } catch (_) {}
+      return '로그인 확인 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.';
+    }
+  }
 
   // ── 상태 조회 ─────────────────────────────────────────
 

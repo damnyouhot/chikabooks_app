@@ -276,7 +276,7 @@ class _ApplicationCardState extends State<_ApplicationCard> {
               ),
               const SizedBox(height: 2),
               Text(
-                _job!.title,
+                _job!.displayTitle,
                 style: const TextStyle(
                   fontSize: 13,
                   color: AppColors.textSecondary,

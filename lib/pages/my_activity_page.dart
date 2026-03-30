@@ -207,7 +207,7 @@ class _ApplicationCard extends StatelessWidget {
 
                 // 병원명
                 Text(
-                  job.clinicName,
+                  job.displayClinicName,
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -218,7 +218,7 @@ class _ApplicationCard extends StatelessWidget {
 
                 // 공고 제목
                 Text(
-                  job.title,
+                  job.displayTitle,
                   style: const TextStyle(
                     fontSize: 13,
                     color: AppColors.textSecondary, // 이전 _kText.withOpacity(0.7)
@@ -385,7 +385,7 @@ class _BookmarkCard extends StatelessWidget {
                     children: [
                       // 병원명
                       Text(
-                        job.clinicName,
+                        job.displayClinicName,
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -396,7 +396,7 @@ class _BookmarkCard extends StatelessWidget {
 
                       // 공고 제목
                       Text(
-                        job.title,
+                        job.displayTitle,
                         style: const TextStyle(
                           fontSize: 13,
                           color: AppColors.textSecondary, // 이전 _kText.withOpacity(0.7)

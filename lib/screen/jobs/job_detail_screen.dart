@@ -95,7 +95,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
 
         return Scaffold(
           appBar: AppBar(
-            title: Text(job.clinicName),
+            title: Text(job.displayClinicName),
             actions: [
               IconButton(
                 icon: Icon(
@@ -212,7 +212,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                 ),
 
               Text(
-                job.title,
+                job.displayTitle,
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,

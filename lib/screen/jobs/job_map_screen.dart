@@ -13,6 +13,7 @@ import '../../data/mock_jobs.dart';
 import '../../models/job.dart';
 import '../../notifiers/job_filter_notifier.dart';
 import '../../services/job_service.dart';
+import '../../widgets/job/filter_bottom_sheet.dart';
 import '../../widgets/job/floating_search_bar.dart';
 import '../../widgets/job/map_empty_state_card.dart';
 import '../../widgets/job/quick_apply_sheet.dart';
@@ -483,12 +484,14 @@ class _JobMapScreenState extends State<JobMapScreen> {
                     onCreateJob: () {},
                   ),
 
-                // 검색 바
+                // 검색 바 (목록 탭과 동일 스케일·필터 칩)
                 FloatingSearchBar(
                   searchQuery: _jobFilter.searchQuery,
                   onSearchChanged: (q) => _jobFilter.setSearchQuery(q),
-                  onFilterPressed: () {},
+                  onFilterPressed: () =>
+                      FilterBottomSheet.show(context, _jobFilter),
                   filterSummary: _filterSummary(),
+                  activeFilterCount: _jobFilter.activeCount,
                   onListToggle: widget.onListToggle,
                 ),
 
@@ -504,8 +507,7 @@ class _JobMapScreenState extends State<JobMapScreen> {
                 // 줌 컨트롤 — 반경칩 + 검색바 위
                 Positioned(
                   right: 12,
-                  // 검색바(41) + 칩행(30) + 간격(6) + 하단여백(8) + 여유(12) ≒ 97
-                  bottom: 97,
+                  bottom: 112,
                   child: _ZoomControls(
                     onZoomIn: () =>
                         _mapController?.animateCamera(CameraUpdate.zoomIn()),
@@ -520,8 +522,7 @@ class _JobMapScreenState extends State<JobMapScreen> {
                   curve: Curves.easeOutCubic,
                   left: 16,
                   right: 16,
-                  // 검색바(41) + 칩행(30) + 간격(6) + 하단여백(8) + 여유(6) ≒ 91
-                  bottom: _selectedJob != null ? 91 : -260,
+                  bottom: _selectedJob != null ? 106 : -260,
                   child: _selectedJob != null
                       ? _PreviewCard(
                           job: _selectedJob!,
@@ -723,7 +724,7 @@ class _PremiumAdCard extends StatelessWidget {
 
                     // 병원명
                     Text(
-                      job.clinicName,
+                      job.displayClinicName,
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
@@ -737,7 +738,7 @@ class _PremiumAdCard extends StatelessWidget {
 
                     // 공고 제목
                     Text(
-                      job.title,
+                      job.displayTitle,
                       style: const TextStyle(
                         fontSize: 11,
                         color: AppColors.textSecondary,
@@ -975,7 +976,7 @@ class _PreviewCard extends StatelessWidget {
                   const SizedBox(width: 7),
                   Expanded(
                     child: Text(
-                      job.clinicName,
+                      job.displayClinicName,
                       style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
@@ -1020,7 +1021,7 @@ class _PreviewCard extends StatelessWidget {
 
               // 공고 제목
               Text(
-                job.title,
+                job.displayTitle,
                 style: const TextStyle(
                   fontSize: 13,
                   color: AppColors.textSecondary,

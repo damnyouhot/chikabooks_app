@@ -239,7 +239,7 @@ class _ApplyConfirmScreenState extends State<ApplyConfirmScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            job.clinicName,
+            job.displayClinicName,
             style: const TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w700,
@@ -248,7 +248,7 @@ class _ApplyConfirmScreenState extends State<ApplyConfirmScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            job.title,
+            job.displayTitle,
             style: TextStyle(
               fontSize: 13,
               color: AppColors.textSecondary,

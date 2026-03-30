@@ -695,15 +695,36 @@ class _Level2Section extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       color: AppColors.white,
-      margin: const EdgeInsets.only(top: AppSpacing.lg),
+      margin: const EdgeInsets.only(top: AppSpacing.lg + 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              0,
+              AppSpacing.lg,
+              AppSpacing.sm,
+            ),
+            child: Center(
+              child: Text(
+                '채용 서비스 곧 정식 오픈 예정입니다',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.accent,
+                  letterSpacing: -0.2,
+                  height: 1.35,
+                ),
+              ),
+            ),
+          ),
           // 섹션 헤더
           Padding(
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.lg,
-              AppSpacing.md,
+              AppSpacing.sm,
               AppSpacing.lg,
               AppSpacing.sm + 2,
             ),
@@ -837,7 +858,7 @@ class _Level2Card extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    job.clinicName,
+                    job.displayClinicName,
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
@@ -997,7 +1018,7 @@ class _Level3Row extends StatelessWidget {
                     const SizedBox(height: 2),
                   ],
                   Text(
-                    job.title,
+                    job.displayTitle,
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
@@ -1009,7 +1030,7 @@ class _Level3Row extends StatelessWidget {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    job.clinicName,
+                    job.displayClinicName,
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,

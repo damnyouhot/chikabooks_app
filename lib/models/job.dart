@@ -141,6 +141,24 @@ class Job {
     return '$lo~$hi만원';
   }
 
+  /// 앱 노출용 공고 제목 — `(샘플)` 접두사 (중복 방지)
+  static const String kSamplePrefix = '(샘플)';
+
+  String get displayTitle {
+    final t = title.trim();
+    if (t.isEmpty) return kSamplePrefix;
+    if (t.startsWith(kSamplePrefix)) return title;
+    return '$kSamplePrefix$t';
+  }
+
+  /// 카드 1행 등 병원명 표시용
+  String get displayClinicName {
+    final n = clinicName.trim();
+    if (n.isEmpty) return kSamplePrefix;
+    if (n.startsWith(kSamplePrefix)) return clinicName;
+    return '$kSamplePrefix$n';
+  }
+
   /// 목록 2행: 직무 · 고용 · 경력 (빈 값·`미정`은 생략)
   String get listRoleLine {
     final parts = <String>[];

@@ -46,6 +46,9 @@ class AppColors {
   /// 비활성 텍스트
   static const textDisabled = Color(0xFF999999);
 
+  /// 네이버 로그인 버튼·관련 배지 — `assets/auth/sns_naver.png` 배경과 동일 톤
+  static const naverLoginGreen = Color(0xFF54B73B);
+
   // ── 카드 시스템 (2종) ────────────────────────────────────────
   /// 일반 카드 배경: Green
   static const cardPrimary = blue;

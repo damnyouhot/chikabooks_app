@@ -3,15 +3,19 @@ import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../../services/apple_auth_service.dart';
 import '../../services/email_auth_service.dart';
 import '../../services/kakao_auth_service.dart';
 import '../../services/naver_auth_service.dart';
+import '../../features/publisher/services/clinic_auth_service.dart';
 import '../../services/sign_in_tracker.dart';
 import '../../services/onboarding_service.dart';
 import '../../services/admin_activity_service.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/hygiene_lab_english_title.dart';
+import 'auth_gate.dart';
 
 /// 다중 소셜 로그인 페이지
 /// Google / Apple / Kakao / Naver / Email 지원
@@ -40,17 +44,50 @@ class _SignInPageState extends State<SignInPage> {
     if (mounted && p != null) setState(() => _lastProvider = p);
   }
 
+  Future<void> _showApplicantBlockedDialog(
+    BuildContext parentContext,
+    String msg,
+  ) async {
+    if (!parentContext.mounted) return;
+    await showDialog<void>(
+      context: parentContext,
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('로그인 제한'),
+            content: SingleChildScrollView(
+              child: Text(msg, style: const TextStyle(height: 1.45)),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('확인'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  /// 공고자(치과) 계정이면 로그아웃 처리 후 true — 지원자 로그인 경로 차단
+  Future<bool> _rejectIfClinicAccount() async {
+    final msg = await ClinicAuthService.blockClinicAccountFromApplicantLogin();
+    if (msg == null) return false;
+    if (!mounted) return true;
+    await _showApplicantBlockedDialog(context, msg);
+    return true;
+  }
+
   /// Google 로그인
   Future<void> _signInWithGoogle() async {
     AdminActivityService.log(ActivityEventType.tapLoginGoogle, page: 'sign_in');
     setState(() => _isLoading = true);
+    AuthGate.clinicBlocked.value = true;
     try {
       debugPrint('🔑 Google 로그인 시작');
 
       final googleUser = await googleSignIn.signIn();
       if (googleUser == null) {
         debugPrint('⚠️ Google 로그인 취소됨 (사용자가 취소)');
-        return; // 사용자가 취소한 경우 - 스낵바 표시 안 함
+        return;
       }
 
       final googleAuth = await googleUser.authentication;
@@ -61,7 +98,7 @@ class _SignInPageState extends State<SignInPage> {
             const SnackBar(content: Text('Google 로그인 실패. 다시 시도해주세요.')),
           );
         }
-        return; // ← 여기서 종료!
+        return;
       }
 
       final credential = GoogleAuthProvider.credential(
@@ -69,15 +106,10 @@ class _SignInPageState extends State<SignInPage> {
         idToken: googleAuth.idToken,
       );
 
-      // ✅ auth 상태 변경 전에 온보딩 플래그 설정 (race condition 방지)
       await OnboardingService.forceSchedule();
-
       await FirebaseAuth.instance.signInWithCredential(credential);
-
       debugPrint('✅ Firebase Auth signInWithCredential 성공');
 
-      // currentUser는 authStateChanges를 통해 비동기로 업데이트됨
-      // 짧은 대기 후 재확인
       await Future.delayed(const Duration(milliseconds: 200));
 
       final currentUser = FirebaseAuth.instance.currentUser;
@@ -88,26 +120,20 @@ class _SignInPageState extends State<SignInPage> {
             const SnackBar(content: Text('Google 로그인 실패. 다시 시도해주세요.')),
           );
         }
-        return; // ← 여기서 종료!
+        return;
       }
 
-      // ✅ 성공 시에만 이 줄까지 도달
       debugPrint('✅ Google 로그인 성공: ${currentUser.uid} (${currentUser.email})');
-      debugPrint(
-        '✅ Provider data: ${currentUser.providerData.map((e) => e.providerId).toList()}',
-      );
 
-      // provider 기록 (Firestore + 로컬)
+      if (await _rejectIfClinicAccount()) return;
+
       await SignInTracker.record('google');
-      // 퍼널 이벤트: 로그인 화면 진입 + 로그인 성공 (로그인 전에는 uid 없으므로 여기서 함께 기록)
       AdminActivityService.log(ActivityEventType.viewSignInPage, page: 'sign_in');
       AdminActivityService.log(ActivityEventType.loginSuccess, page: 'sign_in', extra: {'provider': 'google'});
       AdminActivityService.logFunnel(
         FunnelEventType.signupComplete,
         extra: {'provider': 'google'},
       );
-
-      // AuthGate가 자동으로 홈으로 보내므로 추가 라우팅 불필요
     } catch (e) {
       debugPrint('❌ Google 로그인 에러: $e');
       if (mounted) {
@@ -115,8 +141,8 @@ class _SignInPageState extends State<SignInPage> {
           context,
         ).showSnackBar(SnackBar(content: Text('Google 로그인 오류: $e')));
       }
-      return; // ← 에러 시 종료!
     } finally {
+      AuthGate.clinicBlocked.value = false;
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -125,8 +151,8 @@ class _SignInPageState extends State<SignInPage> {
   Future<void> _signInWithApple() async {
     AdminActivityService.log(ActivityEventType.tapLoginApple, page: 'sign_in');
     setState(() => _isLoading = true);
+    AuthGate.clinicBlocked.value = true;
     try {
-      // ✅ auth 상태 변경 전에 온보딩 플래그 설정 (race condition 방지)
       await OnboardingService.forceSchedule();
 
       final user = await AppleAuthService.signInWithApple();
@@ -135,7 +161,7 @@ class _SignInPageState extends State<SignInPage> {
           context,
         ).showSnackBar(const SnackBar(content: Text('Apple 로그인 실패')));
       } else if (user != null) {
-        // 로컬 provider 기록 (배지용)
+        if (await _rejectIfClinicAccount()) return;
         await SignInTracker.record('apple');
         AdminActivityService.log(ActivityEventType.viewSignInPage, page: 'sign_in');
         AdminActivityService.log(ActivityEventType.loginSuccess, page: 'sign_in', extra: {'provider': 'apple'});
@@ -145,6 +171,7 @@ class _SignInPageState extends State<SignInPage> {
         );
       }
     } finally {
+      AuthGate.clinicBlocked.value = false;
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -178,27 +205,26 @@ class _SignInPageState extends State<SignInPage> {
     }
 
     setState(() => _isLoading = true);
+    AuthGate.clinicBlocked.value = true;
     try {
-      // ✅ auth 상태 변경 전에 온보딩 플래그 설정 (race condition 방지)
       await OnboardingService.forceSchedule();
 
       debugPrint('🔑 카카오 로그인 시작');
       final user = await KakaoAuthService.signInWithKakao();
 
       if (user == null) {
-        // ✅ 실패 시 명시적으로 return (절대 홈으로 이동하지 않음)
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('카카오 로그인 실패. 다시 시도해주세요.')),
           );
         }
-        return; // ← 여기서 종료!
+        return;
       }
 
-      // ✅ 성공 시에만 이 줄까지 도달
       debugPrint('✅ 카카오 로그인 성공: ${user.uid} (${user.email})');
 
-      // 로컬 provider 기록 (배지용, Firestore는 Function에서 이미 저장)
+      if (await _rejectIfClinicAccount()) return;
+
       await SignInTracker.record('kakao');
       AdminActivityService.log(ActivityEventType.viewSignInPage, page: 'sign_in');
       AdminActivityService.log(ActivityEventType.loginSuccess, page: 'sign_in', extra: {'provider': 'kakao'});
@@ -206,8 +232,6 @@ class _SignInPageState extends State<SignInPage> {
         FunnelEventType.signupComplete,
         extra: {'provider': 'kakao'},
       );
-
-      // AuthGate가 자동으로 홈으로 보내므로 추가 라우팅 불필요
     } catch (e) {
       debugPrint('❌ 카카오 로그인 에러: $e');
       if (mounted) {
@@ -215,8 +239,8 @@ class _SignInPageState extends State<SignInPage> {
           context,
         ).showSnackBar(SnackBar(content: Text('카카오 로그인 오류: $e')));
       }
-      return; // ← 에러 시 종료!
     } finally {
+      AuthGate.clinicBlocked.value = false;
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -225,30 +249,26 @@ class _SignInPageState extends State<SignInPage> {
   Future<void> _signInWithNaver() async {
     AdminActivityService.log(ActivityEventType.tapLoginNaver, page: 'sign_in');
     setState(() => _isLoading = true);
+    AuthGate.clinicBlocked.value = true;
     try {
-      // ✅ auth 상태 변경 전에 온보딩 플래그 설정 (race condition 방지)
       await OnboardingService.forceSchedule();
 
       debugPrint('🔑 네이버 로그인 시작');
       final user = await NaverAuthService.signInWithNaver();
 
       if (user == null) {
-        // ✅ 실패 시 명시적으로 return (절대 홈으로 이동하지 않음)
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('네이버 로그인 실패. 다시 시도해주세요.')),
           );
         }
-        return; // ← 여기서 종료!
+        return;
       }
 
-      // ✅ 성공 시에만 이 줄까지 도달
       debugPrint('✅ 네이버 로그인 성공: ${user.uid} (${user.email})');
-      debugPrint(
-        '✅ Provider data: ${user.providerData.map((e) => e.providerId).toList()}',
-      );
 
-      // 로컬 provider 기록 (배지용)
+      if (await _rejectIfClinicAccount()) return;
+
       await SignInTracker.record('naver');
       AdminActivityService.log(ActivityEventType.viewSignInPage, page: 'sign_in');
       AdminActivityService.log(ActivityEventType.loginSuccess, page: 'sign_in', extra: {'provider': 'naver'});
@@ -256,8 +276,6 @@ class _SignInPageState extends State<SignInPage> {
         FunnelEventType.signupComplete,
         extra: {'provider': 'naver'},
       );
-
-      // AuthGate가 자동으로 홈으로 보내므로 추가 라우팅 불필요
     } catch (e) {
       debugPrint('❌ 네이버 로그인 에러: $e');
       if (mounted) {
@@ -265,8 +283,8 @@ class _SignInPageState extends State<SignInPage> {
           context,
         ).showSnackBar(SnackBar(content: Text('네이버 로그인 오류: $e')));
       }
-      return; // ← 에러 시 종료!
     } finally {
+      AuthGate.clinicBlocked.value = false;
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -274,6 +292,7 @@ class _SignInPageState extends State<SignInPage> {
   /// 이메일/비밀번호 로그인 (다이얼로그)
   Future<void> _showEmailSignInDialog() async {
     AdminActivityService.log(ActivityEventType.tapLoginEmail, page: 'sign_in');
+    final shellContext = context;
     final emailController = TextEditingController();
     final passwordController = TextEditingController();
     final passwordConfirmController = TextEditingController();
@@ -390,8 +409,8 @@ class _SignInPageState extends State<SignInPage> {
                           }
                         }
 
-                        // ✅ auth 상태 변경 전에 온보딩 플래그 설정
                         await OnboardingService.forceSchedule();
+                        AuthGate.clinicBlocked.value = true;
 
                         User? user;
                         String? authError;
@@ -408,12 +427,12 @@ class _SignInPageState extends State<SignInPage> {
                           );
                           }
                         } catch (e) {
-                          // Exception 메시지에서 'Exception: ' 접두사 제거
                           authError = e.toString().replaceFirst('Exception: ', '');
                         }
 
                         if (context.mounted) {
                           if (user == null) {
+                            AuthGate.clinicBlocked.value = false;
                             Navigator.pop(context);
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
@@ -421,7 +440,19 @@ class _SignInPageState extends State<SignInPage> {
                               ),
                             );
                           } else {
-                            // ✅ pop 전에 먼저 실행 — HomeShell 생성 전에 플래그 보장
+                            final blockedMsg =
+                                await ClinicAuthService.blockClinicAccountFromApplicantLogin();
+                            AuthGate.clinicBlocked.value = false;
+                            if (blockedMsg != null) {
+                              if (context.mounted) Navigator.pop(context);
+                              if (shellContext.mounted) {
+                                await _showApplicantBlockedDialog(
+                                  shellContext,
+                                  blockedMsg,
+                                );
+                              }
+                              return;
+                            }
                             await SignInTracker.record('email');
                             AdminActivityService.log(ActivityEventType.viewSignInPage, page: 'sign_in');
                             AdminActivityService.log(ActivityEventType.loginSuccess, page: 'sign_in', extra: {'provider': 'email', 'isSignUp': isSignUp});
@@ -608,14 +639,9 @@ class _SignInPageState extends State<SignInPage> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text(
-                        'HygieneLab',
-                        style: TextStyle(
-                          fontSize: 29,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.blue,
-                          letterSpacing: 0.35,
-                        ),
+                      const HygieneLabEnglishTitle(
+                        fontSize: 34.8,
+                        letterSpacing: 0.35,
                       ),
                       const SizedBox(height: 2),
                       Text(
@@ -629,10 +655,10 @@ class _SignInPageState extends State<SignInPage> {
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        '치과인들의 커리어 만들기',
+                        '치과인의 커리어 연구소',
                         style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 16.9,
+                          fontWeight: FontWeight.w700,
                           color: AppColors.textSecondary.withValues(alpha: 0.9),
                         ),
                       ),
@@ -692,17 +718,47 @@ class _SignInPageState extends State<SignInPage> {
   /// 마지막 로그인 provider를 맨 위로 올려서 버튼 리스트 생성
   List<Widget> _buildOrderedButtons() {
     final buttons = <_BtnDef>[
-      _BtnDef('google', Icons.g_mobiledata, 'Google로 로그인',
-          Colors.white, Colors.black87, _signInWithGoogle),
+      _BtnDef(
+        'google',
+        _LoginSnsAssets.google,
+        'Google로 로그인',
+        Colors.white,
+        Colors.black87,
+        _signInWithGoogle,
+      ),
       if (!kIsWeb && Platform.isIOS)
-        _BtnDef('apple', Icons.apple, 'Apple로 로그인',
-            Colors.black, Colors.white, _signInWithApple),
-      _BtnDef('kakao', Icons.chat_bubble, '카카오로 로그인',
-          const Color(0xFFFEE500), Colors.black87, _signInWithKakao),
-      _BtnDef('naver', Icons.language, '네이버로 로그인',
-          const Color(0xFF03C75A), Colors.white, _signInWithNaver),
-      _BtnDef('email', Icons.email, '이메일로 로그인',
-          Colors.blueGrey, Colors.white, _showEmailSignInDialog),
+        _BtnDef(
+          'apple',
+          _LoginSnsAssets.apple,
+          'Apple로 로그인',
+          Colors.black,
+          Colors.white,
+          _signInWithApple,
+        ),
+      _BtnDef(
+        'kakao',
+        _LoginSnsAssets.kakao,
+        '카카오로 로그인',
+        const Color(0xFFFEE500),
+        Colors.black87,
+        _signInWithKakao,
+      ),
+      _BtnDef(
+        'naver',
+        _LoginSnsAssets.naver,
+        '네이버로 로그인',
+        AppColors.naverLoginGreen,
+        Colors.white,
+        _signInWithNaver,
+      ),
+      _BtnDef(
+        'email',
+        _LoginSnsAssets.email,
+        '이메일로 로그인',
+        Colors.blueGrey,
+        Colors.white,
+        _showEmailSignInDialog,
+      ),
     ];
 
     // 마지막 로그인 provider 를 맨 위로
@@ -719,7 +775,7 @@ class _SignInPageState extends State<SignInPage> {
       widgets.add(
         _buildLoginButton(
           provider: b.provider,
-          icon: b.icon,
+          iconAsset: b.iconAsset,
           label: b.label,
           color: b.color,
           textColor: b.textColor,
@@ -735,13 +791,32 @@ class _SignInPageState extends State<SignInPage> {
   /// 로그인 버튼 위젯
   Widget _buildLoginButton({
     required String provider,
-    required IconData icon,
+    required String iconAsset,
     required String label,
     required Color color,
     required Color textColor,
     required VoidCallback onPressed,
     bool isLast = false,
   }) {
+    final Widget iconChild =
+        iconAsset.endsWith('.png')
+            ? Semantics(
+              label: label,
+              child: Image.asset(
+                iconAsset,
+                width: 24,
+                height: 24,
+                fit: BoxFit.contain,
+                filterQuality: FilterQuality.medium,
+              ),
+            )
+            : SvgPicture.asset(
+              iconAsset,
+              fit: BoxFit.contain,
+              semanticsLabel: label,
+            );
+    final iconWidget = SizedBox(width: 24, height: 24, child: iconChild);
+
     return Stack(
       clipBehavior: Clip.none,
       children: [
@@ -749,7 +824,7 @@ class _SignInPageState extends State<SignInPage> {
           width: double.infinity,
           height: 50,
           child: ElevatedButton.icon(
-            icon: Icon(icon, color: textColor),
+            icon: iconWidget,
             label: Text(
               label,
               style: TextStyle(
@@ -792,17 +867,26 @@ class _SignInPageState extends State<SignInPage> {
   }
 }
 
+/// SNS 로그인 버튼용 에셋 경로 (`assets/auth/`)
+abstract final class _LoginSnsAssets {
+  static const google = 'assets/auth/sns_google.svg';
+  static const apple = 'assets/auth/sns_apple.svg';
+  static const kakao = 'assets/auth/sns_kakao.svg';
+  static const naver = 'assets/auth/sns_naver.png';
+  static const email = 'assets/auth/sns_email.svg';
+}
+
 /// 로그인 버튼 정의 (순서 변경용)
 class _BtnDef {
   final String provider;
-  final IconData icon;
+  final String iconAsset;
   final String label;
   final Color color;
   final Color textColor;
   final VoidCallback onPressed;
   const _BtnDef(
     this.provider,
-    this.icon,
+    this.iconAsset,
     this.label,
     this.color,
     this.textColor,

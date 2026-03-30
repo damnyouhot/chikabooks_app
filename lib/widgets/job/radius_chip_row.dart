@@ -5,7 +5,7 @@ import '../../core/theme/app_tokens.dart';
 /// 반경 선택 칩 행 (지도 하단, 검색바 바로 위)
 ///
 /// [반경] [3km] [5km] [10km] [20km]  ···  [목록]
-/// 검색바 높이(약 41px) + 하단 여백(8px) + 칩행-검색바 간격(6px) = bottom 55
+/// 검색바 높이(패딩·큰 아이콘 기준 약 56px) + 칩행 간격 — [FloatingSearchBar]와 맞춤
 /// 키보드 대응: viewInsets.bottom을 동일하게 반영
 class RadiusChipRow extends StatelessWidget {
   final double selectedRadius;
@@ -14,8 +14,8 @@ class RadiusChipRow extends StatelessWidget {
   /// 목록보기로 전환하는 콜백 (null이면 버튼 숨김)
   final VoidCallback? onListToggle;
 
-  // 검색바 전체 높이 (패딩 8*2 + 아이콘 17 + 내부 여유) ≒ 41
-  static const double _searchBarH = 41.0;
+  // 검색바 전체 높이 — [FloatingSearchBar] (패딩 10*2 + 행 높이) 와 동기화
+  static const double _searchBarH = 56.0;
   static const double _bottomGap = AppSpacing.md + _searchBarH + 6;
 
   const RadiusChipRow({

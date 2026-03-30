@@ -1,6 +1,6 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -13,11 +13,20 @@ import '../../publisher/services/clinic_auth_service.dart';
 import '../../publisher/pages/publisher_shared.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_tokens.dart';
+import '../../../core/widgets/hygiene_lab_english_title.dart';
 
 /// 통합 로그인 페이지 (/login)
 ///
 /// 좌: 지원자 로그인 (카카오 · 구글 · 애플 · 이메일  /  네이버는 앱 전용)
 /// 우: 치과 로그인 (이메일/비밀번호)
+abstract final class _WebLoginSnsAssets {
+  static const google = 'assets/auth/sns_google.svg';
+  static const apple = 'assets/auth/sns_apple.svg';
+  static const kakao = 'assets/auth/sns_kakao.svg';
+  static const naver = 'assets/auth/sns_naver.png';
+  static const email = 'assets/auth/sns_email.svg';
+}
+
 class WebLoginPage extends StatefulWidget {
   final String? nextRoute;
   const WebLoginPage({super.key, this.nextRoute});
@@ -106,14 +115,10 @@ class _WebLoginPageState extends State<WebLoginPage> {
   Widget _buildLogo() {
     return Column(
       children: [
-        Text(
-          'HygieneLab',
-          style: GoogleFonts.notoSansKr(
-            fontSize: 26,
-            fontWeight: FontWeight.w900,
-            color: AppColors.blue,
-            letterSpacing: 0.3,
-          ),
+        const HygieneLabEnglishTitle(
+          fontSize: 31.2,
+          letterSpacing: 0.3,
+          color: AppColors.textSecondary,
         ),
         const SizedBox(height: 2),
         Text(
@@ -127,9 +132,10 @@ class _WebLoginPageState extends State<WebLoginPage> {
         ),
         const SizedBox(height: AppSpacing.sm),
         Text(
-          '치과인들의 커리어 연구소',
+          '치과인의 커리어 연구소',
           style: GoogleFonts.notoSansKr(
-            fontSize: 13,
+            fontSize: 16.9,
+            fontWeight: FontWeight.w700,
             color: AppColors.textSecondary,
           ),
         ),
@@ -232,22 +238,13 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
   }) async {
     if (!mounted) return;
 
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return;
+    if (FirebaseAuth.instance.currentUser?.uid == null) return;
 
     try {
-      // 공고자 계정인지 확인 → clinics_accounts 문서 존재 시 차단
-      final clinicDoc = await FirebaseFirestore.instance
-          .collection('clinics_accounts')
-          .doc(uid)
-          .get();
-      if (clinicDoc.exists) {
-        await FirebaseAuth.instance.signOut();
+      final blocked = await ClinicAuthService.blockClinicAccountFromApplicantLogin();
+      if (blocked != null) {
         if (!mounted) return;
-        _showError(
-          '이 계정은 공고자 계정으로 등록되어 있어 위생사 로그인을 할 수 없습니다.\n'
-          '오른쪽의 치과 로그인을 이용해주세요.',
-        );
+        _showError(blocked);
         return;
       }
 
@@ -273,7 +270,14 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
       if (!mounted) return;
       context.go(widget.nextRoute ?? '/applicant/resumes');
     } catch (_) {
-      if (mounted) context.go(widget.nextRoute ?? '/applicant/resumes');
+      try {
+        await FirebaseAuth.instance.signOut();
+      } catch (_) {}
+      if (mounted) {
+        _showError(
+          '로그인 확인 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.',
+        );
+      }
     }
   }
 
@@ -539,7 +543,7 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
           // ── 소셜 로그인 버튼들 ──────────────
           _snsBtn(
             'kakao',
-            Icons.chat_bubble,
+            _WebLoginSnsAssets.kakao,
             '카카오로 로그인',
             const Color(0xFFFEE500),
             Colors.black87,
@@ -548,7 +552,7 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
           const SizedBox(height: AppSpacing.sm),
           _snsBtn(
             'google',
-            Icons.g_mobiledata,
+            _WebLoginSnsAssets.google,
             'Google로 로그인',
             AppColors.white,
             Colors.black87,
@@ -558,7 +562,7 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
           const SizedBox(height: AppSpacing.sm),
           _snsBtn(
             'apple',
-            Icons.apple,
+            _WebLoginSnsAssets.apple,
             'Apple로 로그인',
             Colors.black,
             AppColors.white,
@@ -569,11 +573,11 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
           // 네이버 (웹: 비밀번호 설정 링크 방식)
           _snsBtn(
             'naver',
-            Icons.language,
+            _WebLoginSnsAssets.naver,
             '네이버로 로그인',
             _naverPwSetEmail != null
                 ? AppColors.textDisabled
-                : const Color(0xFF03C75A),
+                : AppColors.naverLoginGreen,
             AppColors.white,
             _naverPwSetEmail != null
                 ? null
@@ -590,7 +594,7 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
                 : '웹에서는 비밀번호 설정이 필요해요',
             trailingBadgeBg: _naverPwSetEmail != null
                 ? AppColors.textDisabled.withOpacity(0.25)
-                : const Color(0xFF03C75A).withOpacity(0.3),
+                : AppColors.naverLoginGreen.withOpacity(0.3),
           ),
 
           // 네이버 비밀번호 설정 완료 시 이메일 폼 안내
@@ -599,10 +603,10 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
-                color: const Color(0xFF03C75A).withOpacity(0.07),
+                color: AppColors.naverLoginGreen.withOpacity(0.07),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                  color: const Color(0xFF03C75A).withOpacity(0.25),
+                  color: AppColors.naverLoginGreen.withOpacity(0.25),
                 ),
               ),
               child: Row(
@@ -610,7 +614,7 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
                   const Icon(
                     Icons.info_outline_rounded,
                     size: 15,
-                    color: Color(0xFF03C75A),
+                    color: AppColors.naverLoginGreen,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -656,10 +660,10 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
               duration: const Duration(milliseconds: 200),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFF03C75A).withOpacity(0.06),
+                color: AppColors.naverLoginGreen.withOpacity(0.06),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: const Color(0xFF03C75A).withOpacity(0.25),
+                  color: AppColors.naverLoginGreen.withOpacity(0.25),
                 ),
               ),
               child: _naverResetSent
@@ -667,7 +671,7 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
                       children: [
                         const Icon(
                           Icons.mark_email_read_outlined,
-                          color: Color(0xFF03C75A),
+                          color: AppColors.naverLoginGreen,
                           size: 28,
                         ),
                         const SizedBox(height: 8),
@@ -691,7 +695,7 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
                             '다시 입력하기',
                             style: TextStyle(
                               fontSize: 12,
-                              color: Color(0xFF03C75A),
+                              color: AppColors.naverLoginGreen,
                             ),
                           ),
                         ),
@@ -723,7 +727,7 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
                                 ? null
                                 : _sendNaverPasswordReset,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF03C75A),
+                              backgroundColor: AppColors.naverLoginGreen,
                               foregroundColor: AppColors.white,
                               elevation: 0,
                               padding:
@@ -763,10 +767,18 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
               width: double.infinity,
               height: 48,
               child: OutlinedButton.icon(
-                icon: const Icon(
-                  Icons.email_outlined,
-                  size: 18,
-                  color: AppColors.textSecondary,
+                icon: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: SvgPicture.asset(
+                    _WebLoginSnsAssets.email,
+                    fit: BoxFit.contain,
+                    colorFilter: const ColorFilter.mode(
+                      AppColors.textSecondary,
+                      BlendMode.srcIn,
+                    ),
+                    semanticsLabel: '이메일로 로그인',
+                  ),
                 ),
                 label: const Text(
                   '이메일로 로그인',
@@ -883,7 +895,7 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
   /// 소셜 로그인 버튼 (마지막 로그인 배지 포함)
   Widget _snsBtn(
     String provider,
-    IconData icon,
+    String iconAsset,
     String label,
     Color bgColor,
     Color fgColor,
@@ -912,7 +924,27 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
                         color: fgColor,
                       ),
                     )
-                    : Icon(icon, color: fgColor, size: 22),
+                    : SizedBox(
+                      width: 24,
+                      height: 24,
+                      child:
+                          iconAsset.endsWith('.png')
+                              ? Semantics(
+                                label: label,
+                                child: Image.asset(
+                                  iconAsset,
+                                  width: 24,
+                                  height: 24,
+                                  fit: BoxFit.contain,
+                                  filterQuality: FilterQuality.medium,
+                                ),
+                              )
+                              : SvgPicture.asset(
+                                iconAsset,
+                                fit: BoxFit.contain,
+                                semanticsLabel: label,
+                              ),
+                    ),
             label: Row(
               mainAxisSize: MainAxisSize.min,
               children: [

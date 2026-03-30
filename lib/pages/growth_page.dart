@@ -528,7 +528,7 @@ class _MyBooksTabState extends State<_MyBooksTab> {
                         ),
                         const SizedBox(height: AppSpacing.xs),
                         Text(
-                          '하이진랩에서 도서를 만나보세요.',
+                          '치과책방 홈페이지에서 구매가 가능합니다',
                           style: TextStyle(
                             color: AppColors.textDisabled,
                             fontSize: 12,

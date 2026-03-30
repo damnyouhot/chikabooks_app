@@ -27,6 +27,7 @@ import '../../features/resume/screens/resume_home_screen.dart';
 import '../../features/resume/screens/resume_edit_screen.dart';
 import '../../features/resume/screens/ocr_review_screen.dart';
 import '../../services/user_profile_service.dart';
+import '../../pages/support_page.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/',
@@ -119,6 +120,7 @@ final appRouter = GoRouter(
     // ── 로그인 불필요 — 법적 문서 페이지 ──────────────────
     GoRoute(path: '/privacy', builder: (_, __) => buildPrivacyPage()),
     GoRoute(path: '/terms', builder: (_, __) => buildTermsPage()),
+    GoRoute(path: '/support', builder: (_, __) => const SupportPage()),
 
     // ── Firebase 이메일 액션 링크 (비밀번호 재설정) ──────────
     GoRoute(

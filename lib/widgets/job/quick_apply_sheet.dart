@@ -156,7 +156,7 @@ class _QuickApplySheetState extends State<QuickApplySheet> {
                           ),
                           const SizedBox(height: AppSpacing.xs),
                           Text(
-                            widget.job.clinicName,
+                            widget.job.displayClinicName,
                             style: const TextStyle(
                               fontSize: 14,
                               color: AppColors.textSecondary,

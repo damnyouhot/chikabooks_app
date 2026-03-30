@@ -51,7 +51,7 @@ class JobCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    job.clinicName,
+                    job.displayClinicName,
                     style: const TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,

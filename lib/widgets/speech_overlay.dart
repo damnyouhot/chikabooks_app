@@ -7,6 +7,8 @@ import '../core/theme/app_colors.dart';
 /// text=null 시 SizedBox.shrink() 반환 → 캐릭터 크기에 영향 없음.
 /// isOnboarding=true 이면 온보딩 전용, false 이면 일반 — 기준 17/16pt의 85% 스케일
 ///
+/// [contentScale]은 그 위에 곱해지는 배율(탭0 온보딩 안내에서 1.5 등).
+///
 /// [onboardingBoldWord]가 텍스트에 포함되면 해당 구간만 볼드 처리 (온보딩 1a 등)
 class SpeechOverlay extends StatefulWidget {
   final String? text;
@@ -16,12 +18,16 @@ class SpeechOverlay extends StatefulWidget {
   /// 온보딩 말풍선에서 이 문자열이 등장하면 해당 부분만 굵게 (예: '저니')
   final String? onboardingBoldWord;
 
+  /// 글자·패딩 등 본문 표시 배율 (기본 1.0)
+  final double contentScale;
+
   const SpeechOverlay({
     super.key,
     this.text,
     this.isDismissing = false,
     this.isOnboarding = false,
     this.onboardingBoldWord,
+    this.contentScale = 1.0,
   });
 
   @override
@@ -112,12 +118,14 @@ class _SpeechOverlayState extends State<SpeechOverlay>
   TextStyle _baseStyle() {
     const baseOnboarding = 17.0;
     const baseNormal = 16.0;
-    const scale = 0.85;
+    const inner = 0.85;
+    final m = widget.contentScale;
     return TextStyle(
-      fontSize: (widget.isOnboarding ? baseOnboarding : baseNormal) * scale,
+      fontSize:
+          (widget.isOnboarding ? baseOnboarding : baseNormal) * inner * m,
       fontWeight: FontWeight.w400,
       color: AppColors.textPrimary,
-      letterSpacing: 0.2 * scale,
+      letterSpacing: 0.2 * inner * m,
       height: 1.5,
     );
   }
@@ -179,8 +187,8 @@ class _SpeechOverlayState extends State<SpeechOverlay>
       opacity: _opacity,
       child: Padding(
         padding: EdgeInsets.symmetric(
-          vertical: 8 * 0.85,
-          horizontal: 16 * 0.85,
+          vertical: 8 * 0.85 * widget.contentScale,
+          horizontal: 16 * 0.85 * widget.contentScale,
         ),
         child: Center(
           child: ConstrainedBox(

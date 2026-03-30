@@ -326,6 +326,7 @@ class _FilterBarDelegate extends SliverPersistentHeaderDelegate {
               AppSpacing.xs,
             ),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 const Text(
                   '전체 전자책',
@@ -333,6 +334,19 @@ class _FilterBarDelegate extends SliverPersistentHeaderDelegate {
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    '치과책방 홈페이지에서 구매가 가능합니다',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                      height: 1.25,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 if (selectedCategory != '전체') ...[

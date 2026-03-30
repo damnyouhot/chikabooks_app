@@ -33,6 +33,9 @@ class CaringPage extends StatefulWidget {
   final bool isOnboardingActive;
   final String? onboardingDialogue;
 
+  /// 탭0(나) 온보딩 전체 구간 — `kStepDialogue`가 없는 step2·4 팝업에서도 캐릭터·말풍선 스케일 유지
+  final bool onboardingTab0LayoutBoost;
+
   /// 온보딩 말풍선에서 굵게 표시할 단어 (예: step1a의 '저니')
   final String? onboardingBoldWord;
   final int currentTabIndex;
@@ -43,6 +46,7 @@ class CaringPage extends StatefulWidget {
     this.onGrowthSubTabRequested,
     this.isOnboardingActive = false,
     this.onboardingDialogue,
+    this.onboardingTab0LayoutBoost = false,
     this.onboardingBoldWord,
     this.currentTabIndex = 0,
   });
@@ -98,6 +102,11 @@ class _CaringPageState extends State<CaringPage>
   static const Duration _eventBaseDisplay = Duration(seconds: 4);
   static const Duration _reactionDisplay = Duration(seconds: 2);
   static const Duration _randomBaseInterval = Duration(seconds: 5);
+
+  /// 캐릭터 위 말풍선 — 일반 모드 한 줄 높이(16×0.85×1.5)의 0.75배만큼 아래
+  /// (직전에 1.5줄 분 내렸다가, 그중 절반만큼 다시 올린 위치)
+  static const double _kSpeechOverlayExtraTop =
+      0.75 * (16.0 * 0.85 * 1.5);
 
   File? _riveFile;
   RiveWidgetController? _dogController;
@@ -777,6 +786,10 @@ class _CaringPageState extends State<CaringPage>
   // 기기가 달라져도 캐릭터가 항상 화면 높이 대비 동일 비율로 보임.
   // (Pixel 7 Pro 892dp 기준 kScreenRatio = 0.38 → 캐릭터 ≈ 339dp)
   Widget _buildCharacterStack(bool isOnboarding, double screenH) {
+    // 탭0(나) 온보딩 전체(step2·4 팝업 포함) — 대사 유무와 무관하게 캐릭터 크기 유지
+    final tab0LayoutBoost =
+        isOnboarding && widget.onboardingTab0LayoutBoost;
+
     return Stack(
       children: [
         Positioned.fill(
@@ -793,7 +806,11 @@ class _CaringPageState extends State<CaringPage>
                     const kScreenRatio = 0.38;
                     final scale =
                         (screenH * kScreenRatio / availableH).clamp(0.85, 2.5);
-                    final finalScale = isOnboarding ? scale * 0.90 : scale;
+                    var finalScale = isOnboarding ? scale * 0.90 : scale;
+                    if (tab0LayoutBoost) {
+                      // 온보딩 캐릭터 파트: 1.8 × 85% × 90%
+                      finalScale *= 1.8 * 0.85 * 0.9;
+                    }
 
                     // 캐릭터만 60dp 아래로 이동
                     // Transform.translate는 레이아웃·텍스트 위치에 영향 없음
@@ -866,7 +883,8 @@ class _CaringPageState extends State<CaringPage>
             child: LayoutBuilder(builder: (ctx, constraints) {
               final h = constraints.maxHeight;
               // 기본·리액션: 같은 위치, 리액션 우선 (`_reactionMsgText ?? _baseMsgText`)
-              final baseMsgTop = isOnboarding ? h * 0.028 : 0.0;
+              final baseMsgTop =
+                  (isOnboarding ? h * 0.028 : 0.0) + _kSpeechOverlayExtraTop;
               final displayText = isOnboarding
                   ? widget.onboardingDialogue
                   : (_reactionMsgText ?? _baseMsgText);
@@ -886,6 +904,8 @@ class _CaringPageState extends State<CaringPage>
                         isOnboarding: isOnboarding,
                         onboardingBoldWord:
                             isOnboarding ? widget.onboardingBoldWord : null,
+                        contentScale:
+                            tab0LayoutBoost ? 1.5 * 0.85 * 0.9 : 1.0,
                       ),
                     ),
                   )),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/hygiene_lab_english_title.dart';
 import '../../publisher/pages/publisher_shared.dart';
 
 /// Firebase 비밀번호 재설정 이메일 링크로 진입하는 커스텀 비밀번호 설정 화면.
@@ -127,13 +128,9 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
                       ),
                     ),
                     const SizedBox(width: 10),
-                    const Text(
-                      'HygieneLab',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                        color: kPubText,
-                      ),
+                    const HygieneLabEnglishTitle(
+                      fontSize: 20.4,
+                      letterSpacing: 0.25,
                     ),
                   ],
                 ),

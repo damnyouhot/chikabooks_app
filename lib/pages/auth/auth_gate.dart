@@ -13,20 +13,29 @@ import '../../core/theme/app_colors.dart';
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
 
+  /// 치과(공고자) 계정 차단 확인 중 HomeShell 진입을 막는 플래그.
+  /// SignInPage의 로그인 메서드에서 true로 설정 → clinics_accounts 확인이
+  /// 끝난 뒤 finally에서 false로 복원한다.
+  static final ValueNotifier<bool> clinicBlocked = ValueNotifier(false);
+
   @override
   Widget build(BuildContext context) {
     final user = context.watch<User?>();
-    if (user == null) {
-      // 로그아웃 상태: 모든 세션 캐시 초기화
-      // (어떤 경로로 로그아웃해도 캐시가 정리되도록 방어적 처리)
-      AdminActivityService.clearCache();
-      AppErrorLogger.clearCache();
-      UserProfileService.clearCache();
-      return const SignInPage();
-    }
 
-    // HomeShell 진입 전에 온보딩 여부를 확정 → race condition 원천 차단
-    return const OnboardingGate();
+    return ValueListenableBuilder<bool>(
+      valueListenable: clinicBlocked,
+      builder: (context, blocked, _) {
+        if (user == null || blocked) {
+          if (user == null) {
+            AdminActivityService.clearCache();
+            AppErrorLogger.clearCache();
+            UserProfileService.clearCache();
+          }
+          return const SignInPage();
+        }
+        return const OnboardingGate();
+      },
+    );
   }
 }
 

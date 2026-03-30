@@ -206,7 +206,7 @@ class _Level1Card extends StatelessWidget {
                             TextSpan(
                               children: [
                                 TextSpan(
-                                  text: job.clinicName,
+                                  text: job.displayClinicName,
                                   style: const TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w700,

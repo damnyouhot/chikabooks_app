@@ -277,6 +277,8 @@ class _HomeShellState extends State<HomeShell> {
             (_onboardingActive && _onboardingCtrl.isTab0Step)
                 ? kStepDialogue[_onboardingCtrl.current]
                 : null,
+        onboardingTab0LayoutBoost:
+            _onboardingActive && _onboardingCtrl.isTab0Step,
         onboardingBoldWord:
             (_onboardingActive &&
                 _onboardingCtrl.current == AppOnboardingStepId.step1a)
