@@ -8,7 +8,6 @@ import '../services/caring_state_service.dart';
 import '../services/caring_action_service.dart';
 import '../services/funnel_onboarding_service.dart';
 import '../services/base_message_service.dart';
-import '../services/job_service.dart';
 import '../services/ebook_service.dart';
 import '../services/hira_update_service.dart';
 import '../services/quiz_content_config_service.dart';
@@ -54,20 +53,22 @@ class CaringPage extends StatefulWidget {
 
 class _CaringPageState extends State<CaringPage>
     with TickerProviderStateMixin {
-  bool _jobLoading  = true;
   bool _bookLoading = true;
 
   late AnimationController _revealCtrl;
   late List<Animation<double>> _cardAnims;
   late List<Animation<double>> _btnAnims;
 
-  String _jobsSummary = '근처 신규 구인 확인 중...';
-  String _jobsSub = '';
   List<Map<String, String>> _upcomingPolicies = [];
   int _policyIndex = 0;
+  /// 정책·퀴즈 카드 공통 롤링 (3초) — [_startCardRolling]
   Timer? _policyTimer;
   Ebook? _weeklyBook;
-  String _quizSummary = '오늘의 퀴즈 확인 중...';
+  /// 오늘 일정에서 최대 2문항 — 2개일 때 [_quizRollIndex]로 롤링
+  List<String> _quizRollQuestions = [];
+  int _quizRollIndex = 0;
+  /// 문항 없음·로딩·오류 시 카드 오른쪽 큰 글씨
+  String _quizFallbackText = '오늘의 퀴즈 확인 중...';
 
   CaringState _caringState = CaringState.initial();
 
@@ -83,18 +84,19 @@ class _CaringPageState extends State<CaringPage>
 
   _LoopState _loopState = _LoopState.idle;
   Timer? _msgLoopTimer;
-  DateTime? _baseShowStart;
+  /// 기본 멘트(랜덤 풀·이벤트 줄) — `BaseMessageService` / `BaseMessageData.eventMessages`
   String? _baseMsgText;
   bool _isBaseMsgDismissing = false;
-  String? _currentSpeech;
-  bool _isDismissingSpeech = false;
+  /// 리액션 멘트(밥·쓰다듬기·수면 등 액션) — `CaringMents`·폴백 문자열
+  String? _reactionMsgText;
+  bool _isReactionMsgDismissing = false;
   final Queue<String> _reactionQueue = Queue<String>();
   final Queue<String> _eventQueue = Queue<String>();
   final Set<String> _shownEventIds = <String>{};
-  /// true = 위쪽 멘트가 이벤트 큐에서 온 줄 (false = 랜덤 풀)
   bool _baseFromEventQueue = false;
 
   static const Duration _eventBaseDisplay = Duration(seconds: 4);
+  static const Duration _reactionDisplay = Duration(seconds: 2);
   static const Duration _randomBaseInterval = Duration(seconds: 5);
 
   File? _riveFile;
@@ -144,7 +146,6 @@ class _CaringPageState extends State<CaringPage>
 
     _loadRiveFile();
     Future.microtask(() => _bootstrapCaringTab());
-    _loadJobCard();
     _loadBookCard();
     _loadPolicyCard();
     _loadQuizCard();
@@ -155,9 +156,13 @@ class _CaringPageState extends State<CaringPage>
     super.didUpdateWidget(old);
     if (old.isOnboardingActive && !widget.isOnboardingActive) {
       _revealCtrl.forward(from: 0.0);
-      if (_loopState == _LoopState.idle && _baseMsgText == null) _startMsgLoop();
+      if (_loopState == _LoopState.idle &&
+          _baseMsgText == null &&
+          _reactionMsgText == null) {
+        _startMsgLoop();
+      }
     }
-    // 다른 탭에서 「나」로 복귀 시 정책·주간책·퀴즈만 갱신 (Jobs 카드는 초기 로드만)
+    // 다른 탭에서 「나」로 복귀 시 정책·주간책·퀴즈만 갱신
     if (!widget.isOnboardingActive &&
         widget.currentTabIndex == 0 &&
         old.currentTabIndex != 0) {
@@ -251,50 +256,46 @@ class _CaringPageState extends State<CaringPage>
       final policies =
           list.take(6).map(_hiraToPolicyRow).toList(growable: false);
       setState(() => _upcomingPolicies = policies);
-      _startPolicyRolling();
+      _startCardRolling();
     } catch (e, st) {
       debugPrint('❌ _loadPolicyCard: $e\n$st');
       if (mounted) setState(() => _upcomingPolicies = []);
-      _startPolicyRolling(); // 빈 목록이면 타이머만 정리
+      _startCardRolling();
     }
   }
 
-  /// Daily Quiz 카드 — `quiz_schedule/{오늘}` 첫 문항 (퀴즈 탭과 동일 출처)
+  /// Daily Quiz 카드 — `quiz_schedule/{오늘}` 문항 최대 2개 (퀴즈 탭과 동일 출처)
   Future<void> _loadQuizCard() async {
     try {
       final cfg = await QuizContentConfigService.getConfig();
       final schedule = await QuizPoolService.getTodaySchedule(contentConfig: cfg);
       if (!mounted) return;
-      var summary = '오늘 배포된 퀴즈가 아직 없어요';
+      final qs = <String>[];
       if (schedule != null && schedule.items.isNotEmpty) {
-        final q = schedule.items.first.question.trim();
-        if (q.isNotEmpty) summary = q;
+        for (final item in schedule.items) {
+          if (qs.length >= 2) break;
+          final q = item.question.trim();
+          if (q.isNotEmpty) qs.add(q);
+        }
       }
-      setState(() => _quizSummary = summary);
+      setState(() {
+        _quizRollQuestions = qs;
+        _quizRollIndex = 0;
+        if (qs.isEmpty) {
+          _quizFallbackText = '오늘 배포된 퀴즈가 아직 없어요';
+        }
+      });
+      _startCardRolling();
     } catch (e, st) {
       debugPrint('❌ _loadQuizCard: $e\n$st');
       if (mounted) {
-        setState(() => _quizSummary = '퀴즈 정보를 불러오지 못했어요');
+        setState(() {
+          _quizRollQuestions = [];
+          _quizRollIndex = 0;
+          _quizFallbackText = '퀴즈 정보를 불러오지 못했어요';
+        });
+        _startCardRolling();
       }
-    }
-  }
-
-  Future<void> _loadJobCard() async {
-    try {
-      final d = await JobService().getRecentJobsSummary();
-      final count = (d['count'] as int?) ?? 0;
-      final hasMore = (d['hasMore'] as bool?) ?? false;
-      final clinic = (d['clinicName'] as String?) ?? '';
-      if (!mounted) return;
-      setState(() {
-        if (count == 0) { _jobsSummary = '새로운 구인 공고가 없어요'; _jobsSub = ''; }
-        else if (hasMore) { _jobsSummary = '최근 구인 $count건+'; _jobsSub = clinic; }
-        else { _jobsSummary = '최근 구인 $count건'; _jobsSub = clinic; }
-        _jobLoading = false;
-      });
-    } catch (e) {
-      debugPrint('❌ _loadJobCard 실패: $e');
-      if (mounted) setState(() { _jobsSummary = '구인 정보를 불러오지 못했어요'; _jobLoading = false; });
     }
   }
 
@@ -321,13 +322,30 @@ class _CaringPageState extends State<CaringPage>
     }
   }
 
-  void _startPolicyRolling() {
+  static const Duration _kCardRollInterval = Duration(seconds: 3);
+
+  /// 정책 카드·퀴즈 카드 롤링 타이밍 공유 (2번·4번 카드 동일 3초)
+  void _startCardRolling() {
     _policyTimer?.cancel();
-    if (_upcomingPolicies.isEmpty) return;
+    final pLen = _upcomingPolicies.length;
+    final qLen = _quizRollQuestions.length;
+    if (pLen <= 1 && qLen <= 1) {
+      _policyIndex = 0;
+      _quizRollIndex = 0;
+      return;
+    }
     _policyIndex = 0;
-    _policyTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+    _quizRollIndex = 0;
+    _policyTimer = Timer.periodic(_kCardRollInterval, (_) {
       if (!mounted) return;
-      setState(() => _policyIndex = (_policyIndex + 1) % _upcomingPolicies.length);
+      setState(() {
+        if (pLen > 1) {
+          _policyIndex = (_policyIndex + 1) % pLen;
+        }
+        if (qLen > 1) {
+          _quizRollIndex = (_quizRollIndex + 1) % qLen;
+        }
+      });
     });
   }
 
@@ -343,7 +361,6 @@ class _CaringPageState extends State<CaringPage>
     _msgLoopTimer?.cancel();
     if (_eventQueue.isNotEmpty) {
       _loopState = _LoopState.showingBase;
-      _baseShowStart = DateTime.now();
       _baseFromEventQueue = true;
       final msg = _eventQueue.removeFirst();
       setState(() {
@@ -373,7 +390,6 @@ class _CaringPageState extends State<CaringPage>
       return;
     }
     _loopState = _LoopState.showingBase;
-    _baseShowStart = DateTime.now();
     _baseFromEventQueue = false;
     setState(() {
       _baseMsgText = BaseMessageService.generate();
@@ -425,14 +441,20 @@ class _CaringPageState extends State<CaringPage>
     }
     _loopState = _LoopState.showingReaction;
     final msg = _reactionQueue.removeFirst();
-    setState(() { _currentSpeech = msg; _isDismissingSpeech = false; });
+    setState(() {
+      _reactionMsgText = msg;
+      _isReactionMsgDismissing = false;
+    });
     _msgLoopTimer?.cancel();
-    _msgLoopTimer = Timer(const Duration(seconds: 2), () {
+    _msgLoopTimer = Timer(_reactionDisplay, () {
       if (!mounted) return;
-      setState(() => _isDismissingSpeech = true);
+      setState(() => _isReactionMsgDismissing = true);
       Future.delayed(const Duration(milliseconds: 300), () {
         if (!mounted) return;
-        setState(() { _currentSpeech = null; _isDismissingSpeech = false; });
+        setState(() {
+          _reactionMsgText = null;
+          _isReactionMsgDismissing = false;
+        });
         _showNextReaction();
       });
     });
@@ -440,18 +462,13 @@ class _CaringPageState extends State<CaringPage>
 
   void _enqueueReaction(String msg) {
     _reactionQueue.add(msg);
-    switch (_loopState) {
-      case _LoopState.showingBase:
-        final elapsed = _baseShowStart != null
-            ? DateTime.now().difference(_baseShowStart!).inMilliseconds : 2001;
-        _msgLoopTimer?.cancel();
-        elapsed >= 2000 ? _onBaseShowEnd()
-            : _msgLoopTimer = Timer(Duration(milliseconds: 2000 - elapsed), _onBaseShowEnd);
-      case _LoopState.idle:
-        _msgLoopTimer?.cancel(); _showNextReaction();
-      case _LoopState.showingReaction:
-        break;
-    }
+    _msgLoopTimer?.cancel();
+    // 어떤 상태든 즉시 기본 멘트를 끊고 리액션을 보여줌
+    setState(() {
+      _baseMsgText = null;
+      _isBaseMsgDismissing = false;
+    });
+    _showNextReaction();
   }
 
   void _queueEventIfNew(String eventId) {
@@ -475,7 +492,9 @@ class _CaringPageState extends State<CaringPage>
       _showNextBase();
       return;
     }
-    if (_loopState == _LoopState.idle && _currentSpeech == null) {
+    if (_loopState == _LoopState.idle &&
+        _baseMsgText == null &&
+        _reactionMsgText == null) {
       _showNextBase();
     }
   }
@@ -637,83 +656,98 @@ class _CaringPageState extends State<CaringPage>
     return Scaffold(
       backgroundColor: AppColors.appBg,
       body: SafeArea(
-        child: Column(
+        child: Stack(
+          clipBehavior: Clip.none,
           children: [
-            if (!isOnboarding) _buildTopBar(titleVisible: true),
-            Visibility(
-              visible: true, maintainSize: true,
-              maintainAnimation: true, maintainState: true,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxHeight: (MediaQuery.of(context).size.height * 0.38).clamp(240.0, 320.0),
-                ),
-                child: Container(
-                  color: AppColors.appBg,
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _buildTopBar(titleVisible: false),
-                      FadeTransition(
-                        opacity: isOnboarding ? const AlwaysStoppedAnimation(0.0) : _cardAnims[0],
-                        child: _TapCard(
-                            title: 'Jobs',
-                            bigText: _jobsSummary,
-                            subtitle: _jobsSub,
-                            onTap: () => widget.onTabRequested?.call(3),
-                            isLoading: _jobLoading,
-                            showPrepBadge: true),
+            Positioned.fill(
+              child: Column(
+                children: [
+                  if (!isOnboarding) _buildTopBar(titleVisible: true),
+                  Visibility(
+                    visible: true, maintainSize: true,
+                    maintainAnimation: true, maintainState: true,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: (MediaQuery.of(context).size.height * 0.38).clamp(240.0, 320.0),
                       ),
-                      FadeTransition(
-                        opacity: isOnboarding ? const AlwaysStoppedAnimation(0.0) : _cardAnims[1],
-                        child: _PolicyRollingCard(policies: _upcomingPolicies, index: _policyIndex,
-                            onTap: () {
-                              widget.onTabRequested?.call(2);
-                              widget.onGrowthSubTabRequested?.call(1, hiraInnerTab: 1);
-                            }),
+                      child: Container(
+                        color: AppColors.appBg,
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _buildTopBar(titleVisible: false),
+                            FadeTransition(
+                              opacity: isOnboarding ? const AlwaysStoppedAnimation(0.0) : _cardAnims[0],
+                              child: _TapCard(
+                                  title: 'Jobs',
+                                  bigText: '채용 서비스 준비중',
+                                  subtitle: '',
+                                  onTap: () => widget.onTabRequested?.call(3),
+                                  isLoading: false,
+                                  showPrepBadge: true),
+                            ),
+                            FadeTransition(
+                              opacity: isOnboarding ? const AlwaysStoppedAnimation(0.0) : _cardAnims[1],
+                              child: _PolicyRollingCard(policies: _upcomingPolicies, index: _policyIndex,
+                                  onTap: () {
+                                    widget.onTabRequested?.call(2);
+                                    widget.onGrowthSubTabRequested?.call(1, hiraInnerTab: 1);
+                                  }),
+                            ),
+                            FadeTransition(
+                              opacity: isOnboarding ? const AlwaysStoppedAnimation(0.0) : _cardAnims[2],
+                              child: _TapCard(title: 'Weekly Book',
+                                  bigText: _weeklyBook?.title ?? '이번 주 추천 책이 없어요',
+                                  subtitle: (_weeklyBook != null && _weeklyBook!.author.isNotEmpty) ? '저자: ${_weeklyBook!.author}' : '',
+                                  onTap: _goBookDetail, isLoading: _bookLoading),
+                            ),
+                            FadeTransition(
+                              opacity: isOnboarding ? const AlwaysStoppedAnimation(0.0) : _cardAnims[3],
+                              child: _QuizRollingCard(
+                                questions: _quizRollQuestions,
+                                index: _quizRollIndex,
+                                fallbackBig: _quizFallbackText,
+                                onTap: () {
+                                  widget.onTabRequested?.call(2);
+                                  widget.onGrowthSubTabRequested?.call(0);
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      FadeTransition(
-                        opacity: isOnboarding ? const AlwaysStoppedAnimation(0.0) : _cardAnims[2],
-                        child: _TapCard(title: 'Weekly Book',
-                            bigText: _weeklyBook?.title ?? '이번 주 추천 책이 없어요',
-                            subtitle: (_weeklyBook != null && _weeklyBook!.author.isNotEmpty) ? '저자: ${_weeklyBook!.author}' : '',
-                            onTap: _goBookDetail, isLoading: _bookLoading),
-                      ),
-                      FadeTransition(
-                        opacity: isOnboarding ? const AlwaysStoppedAnimation(0.0) : _cardAnims[3],
-                        child: _TapCard(title: 'Daily Quiz', bigText: _quizSummary, subtitle: '터치해서 풀기',
-                            onTap: () { widget.onTabRequested?.call(2); widget.onGrowthSubTabRequested?.call(0); }),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
+
+                  if (!isOnboarding) _buildGaugeRow(),
+
+                  Expanded(
+                    // ClipRect를 Padding 바깥에 둬야 padding이 줄인 availableH만큼
+                    // ClipRect 여유 공간이 생겨 캐릭터 상단 잘림이 최소화됨
+                    child: ClipRect(
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 18),
+                        child: _buildCharacterStack(
+                            isOnboarding,
+                            MediaQuery.of(context).size.height),
+                      ),
+                    ),
+                  ),
+
+                  Visibility(
+                    visible: true, maintainSize: true,
+                    maintainAnimation: true, maintainState: true,
+                    child: Container(
+                      color: AppColors.appBg,
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+                      child: _buildBottomSection(isOnboarding: isOnboarding),
+                    ),
+                  ),
+                ],
               ),
             ),
-
-            if (!isOnboarding) _buildGaugeRow(),
-
-            Expanded(
-              // ClipRect를 Padding 바깥에 둬야 padding이 줄인 availableH만큼
-              // ClipRect 여유 공간이 생겨 캐릭터 상단 잘림이 최소화됨
-              child: ClipRect(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 18),
-                  child: _buildCharacterStack(
-                      isOnboarding,
-                      MediaQuery.of(context).size.height),
-                ),
-              ),
-            ),
-
-            Visibility(
-              visible: true, maintainSize: true,
-              maintainAnimation: true, maintainState: true,
-              child: Container(
-                color: AppColors.appBg,
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-                child: _buildBottomSection(isOnboarding: isOnboarding),
-              ),
-            ),
+            // 기본·리액션 멘트는 캐릭터 위 SpeechOverlay (`_baseMsgText` / `_reactionMsgText`)
           ],
         ),
       ),
@@ -727,7 +761,7 @@ class _CaringPageState extends State<CaringPage>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _CircleGauge(emoji: '🍖', value: _caringState.hungerInt, color: const Color(0xFFFF8A65)),
+          _CircleGauge(emoji: '🍖', value: _caringState.hungerInt, color: AppColors.lime),
           _CircleGauge(emoji: '😊', value: _caringState.moodInt, color: const Color(0xFFFFD54F)),
           _CircleGauge(emoji: '⚡', value: _caringState.energyInt, color: const Color(0xFF81C784)),
           _CircleGauge(emoji: '💕', value: _caringState.bondInt, color: const Color(0xFFF48FB1)),
@@ -761,10 +795,10 @@ class _CaringPageState extends State<CaringPage>
                         (screenH * kScreenRatio / availableH).clamp(0.85, 2.5);
                     final finalScale = isOnboarding ? scale * 0.90 : scale;
 
-                    // 캐릭터만 2줄(48dp) 아래로 이동 (기존 96의 절반)
+                    // 캐릭터만 60dp 아래로 이동
                     // Transform.translate는 레이아웃·텍스트 위치에 영향 없음
                     Widget character = Transform.translate(
-                      offset: const Offset(0, 48),
+                      offset: const Offset(0, 60),
                       child: Transform.scale(
                         alignment: Alignment.bottomCenter,
                         scale: finalScale,
@@ -831,12 +865,16 @@ class _CaringPageState extends State<CaringPage>
           child: IgnorePointer(
             child: LayoutBuilder(builder: (ctx, constraints) {
               final h = constraints.maxHeight;
-              // 기본 멘트: 원위치(14dp) 기준 1줄(24dp) 위 → 0으로 고정
-              // 캐릭터는 Transform.translate로 독립 이동하므로 텍스트 위치 영향 없음
+              // 기본·리액션: 같은 위치, 리액션 우선 (`_reactionMsgText ?? _baseMsgText`)
               final baseMsgTop = isOnboarding ? h * 0.028 : 0.0;
-              final reactionTop = h * 0.86;
-              final displayText = isOnboarding ? widget.onboardingDialogue : _baseMsgText;
-              final isDismissing = isOnboarding ? false : _isBaseMsgDismissing;
+              final displayText = isOnboarding
+                  ? widget.onboardingDialogue
+                  : (_reactionMsgText ?? _baseMsgText);
+              final isDismissing = isOnboarding
+                  ? false
+                  : (_reactionMsgText != null
+                      ? _isReactionMsgDismissing
+                      : _isBaseMsgDismissing);
               return Stack(children: [
                 Positioned(top: baseMsgTop, left: 0, right: 0,
                   child: Center(
@@ -851,9 +889,6 @@ class _CaringPageState extends State<CaringPage>
                       ),
                     ),
                   )),
-                if (!isOnboarding)
-                  Positioned(top: reactionTop, left: 0, right: 0,
-                    child: Center(child: SpeechOverlay(text: _currentSpeech, isDismissing: _isDismissingSpeech))),
               ]);
             }),
           ),
@@ -1247,6 +1282,158 @@ class _PolicyRollingCard extends StatelessWidget {
                 const Icon(Icons.chevron_right, color: AppColors.onCardPrimary, size: 20),
               ]);
             }),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Daily Quiz 카드 — 오른쪽 레이아웃·롤링은 [_PolicyRollingCard]와 동일 (`LayoutBuilder`·`rightMaxW`·`ClipRect`)
+class _QuizRollingCard extends StatelessWidget {
+  const _QuizRollingCard({
+    required this.questions,
+    required this.index,
+    required this.fallbackBig,
+    required this.onTap,
+  });
+
+  final List<String> questions;
+  final int index;
+  final String fallbackBig;
+  final VoidCallback onTap;
+
+  static const String _subtitle = '터치해서 풀기';
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(12);
+    final hasRoll = questions.length > 1;
+    final big = questions.isEmpty
+        ? fallbackBig
+        : questions[index.clamp(0, questions.length - 1)];
+
+    Widget rightColumn(String line) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            line,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.end,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: AppColors.onCardPrimary,
+            ),
+          ),
+          Text(
+            _subtitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.end,
+            style: TextStyle(
+              fontSize: 10,
+              color: AppColors.onCardPrimary.withOpacity(0.7),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      child: Material(
+        color: AppColors.cardPrimary,
+        elevation: 0,
+        borderRadius: radius,
+        child: InkWell(
+          borderRadius: radius,
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(borderRadius: radius),
+            child: LayoutBuilder(
+              builder: (ctx, constraints) {
+                final rightMaxW =
+                    (constraints.maxWidth * 0.55).clamp(0.0, 200.0);
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Daily Quiz',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.onCardPrimary,
+                          letterSpacing: -0.5,
+                          height: 1.1,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ClipRect(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(maxWidth: rightMaxW),
+                        child: hasRoll
+                            ? AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 350),
+                                layoutBuilder: (current, previous) => Stack(
+                                  alignment: Alignment.centerRight,
+                                  children: [
+                                    ...previous,
+                                    if (current != null) current,
+                                  ],
+                                ),
+                                transitionBuilder: (child, animation) {
+                                  final leaving =
+                                      animation.status ==
+                                              AnimationStatus.reverse ||
+                                          animation.status ==
+                                              AnimationStatus.dismissed;
+                                  return SlideTransition(
+                                    position: Tween<Offset>(
+                                      begin: Offset(0, leaving ? -1.0 : 1.0),
+                                      end: Offset.zero,
+                                    ).animate(
+                                      CurvedAnimation(
+                                        parent: animation,
+                                        curve: Curves.easeInOut,
+                                      ),
+                                    ),
+                                    child: FadeTransition(
+                                      opacity: animation,
+                                      child: child,
+                                    ),
+                                  );
+                                },
+                                child: SizedBox(
+                                  key: ValueKey<String>(big),
+                                  width: rightMaxW,
+                                  child: rightColumn(big),
+                                ),
+                              )
+                            : SizedBox(
+                                width: rightMaxW,
+                                child: rightColumn(big),
+                              ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(
+                      Icons.chevron_right,
+                      color: AppColors.onCardPrimary,
+                      size: 20,
+                    ),
+                  ],
+                );
+              },
+            ),
           ),
         ),
       ),
