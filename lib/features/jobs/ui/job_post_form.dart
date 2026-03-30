@@ -314,7 +314,7 @@ class _JobPostFormState extends State<JobPostForm> {
   bool _isSavingDraft = false;
   DateTime? _lastSavedAt;
 
-  static const _roles = ['치과위생사', '치과조무사', '데스크', '원장', '기타'];
+  static const _roles = ['치과위생사', '간호조무사', '데스크', '원장', '기타'];
   static const _careers = ['신입', '경력 무관', '1년 이상', '2년 이상', '3년 이상', '5년 이상'];
   static const _employmentTypes = ['정규직', '계약직', '파트타임', '인턴'];
   static const _commonBenefits = ['4대보험', '퇴직금', '연차', '식비지원', '주차지원', '명절상여'];

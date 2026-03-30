@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 /// 공고 목록/지도 필터 상태 관리
 ///
 /// ## 필터 항목
-/// - `positionFilter`  직종 (전체/치위생사/치과조무사/치과의사/기타)
+/// - `positionFilter`  직종 (전체/치위생사/간호조무사/치과의사/기타)
 /// - `careerFilter`    경력 (전체/신입/경력)
 /// - `regionFilter`    지역 (드롭다운)
 /// - `employmentType`  근무형태 (전체/풀타임/파트타임/계약직)

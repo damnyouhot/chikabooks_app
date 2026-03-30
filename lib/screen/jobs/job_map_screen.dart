@@ -72,7 +72,8 @@ class _JobMapScreenState extends State<JobMapScreen> {
 
   late JobService _jobService;
   late JobFilterNotifier _jobFilter;
-  bool _initialized = false;
+  /// 필터·검색·반경 등 변경 시 마커 재로드
+  String? _lastMarkerFilterSignature;
 
   // Level 1 프리미엄 공고 (광고 카드 + Rose 마커)
   final List<Job> _premiumJobs = mockLevel1Jobs;
@@ -116,10 +117,46 @@ class _JobMapScreenState extends State<JobMapScreen> {
     super.didChangeDependencies();
     _jobService = context.read<JobService>();
     _jobFilter = context.watch<JobFilterNotifier>();
-    if (!_initialized) {
-      _initialized = true;
+    final sig = _markerFilterSignature(_jobFilter);
+    if (_lastMarkerFilterSignature != sig) {
+      _lastMarkerFilterSignature = sig;
       _loadJobMarkers();
     }
+  }
+
+  /// 캐시/재로드 키 — 목록 탭과 동일하게 검색·근무형태까지 포함
+  String _markerFilterSignature(JobFilterNotifier f) {
+    final lat = widget.userLocation?.latitude.toStringAsFixed(2) ?? 'null';
+    final lng = widget.userLocation?.longitude.toStringAsFixed(2) ?? 'null';
+    final cond = List<String>.from(f.conditions)..sort();
+    return '$lat|$lng|${f.radiusKm}|${f.positionFilter}|${cond.join(',')}|${f.employmentType}|${f.searchQuery.trim()}';
+  }
+
+  /// 목록(Level3)과 동일한 클라이언트 필터 (검색어·근무형태)
+  List<Job> _applyClientFilters(List<Job> jobs) {
+    final f = _jobFilter;
+    var out = jobs;
+    final sq = f.searchQuery.trim().toLowerCase();
+    if (sq.isNotEmpty) {
+      out =
+          out.where((j) {
+            return j.clinicName.toLowerCase().contains(sq) ||
+                j.address.toLowerCase().contains(sq) ||
+                j.district.toLowerCase().contains(sq);
+          }).toList();
+    }
+    if (f.employmentType != '전체') {
+      final want = f.employmentType;
+      out =
+          out.where((j) {
+            final et = j.employmentType.trim();
+            if (et.isNotEmpty) {
+              return et.contains(want) || want.contains(et);
+            }
+            return j.type.contains(want);
+          }).toList();
+    }
+    return out;
   }
 
   @override
@@ -135,14 +172,9 @@ class _JobMapScreenState extends State<JobMapScreen> {
     try {
       List<Job> jobs;
 
-      // 캐시 키: 위치 반올림(소수점 2자리) + 반경 + 직무필터 + 조건필터
-      final lat = widget.userLocation?.latitude.toStringAsFixed(2) ?? 'null';
-      final lng = widget.userLocation?.longitude.toStringAsFixed(2) ?? 'null';
-      final cacheKey =
-          '$lat,$lng,${_jobFilter.radiusKm},${_jobFilter.positionFilter},${_jobFilter.conditions.join(",")}';
+      final cacheKey = _markerFilterSignature(_jobFilter);
 
       if (_jobCache.containsKey(cacheKey)) {
-        // 캐시 히트 → 즉시 표시 후 백그라운드 갱신
         jobs = _jobCache[cacheKey]!;
         _applyMarkers(jobs);
         _fetchAndRefreshCache(cacheKey);
@@ -165,6 +197,7 @@ class _JobMapScreenState extends State<JobMapScreen> {
         jobs = [...mockLevel2Jobs, ...generateMockLevel3Jobs(count: 10)];
       }
 
+      jobs = _applyClientFilters(jobs);
       _jobCache[cacheKey] = jobs;
       _applyMarkers(jobs);
     } catch (_) {
@@ -187,8 +220,9 @@ class _JobMapScreenState extends State<JobMapScreen> {
         fresh = await _jobService.fetchJobs();
       }
       if (fresh.isEmpty) return;
-      _jobCache[cacheKey] = fresh;
-      _applyMarkers(fresh);
+      final filtered = _applyClientFilters(fresh);
+      _jobCache[cacheKey] = filtered;
+      _applyMarkers(filtered);
     } catch (_) {}
   }
 

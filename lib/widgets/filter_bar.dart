@@ -90,7 +90,7 @@ class _FilterBarState extends State<FilterBar> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  ...['전체', '치과위생사', '치과조무사', '치과의사', '기타'].map(
+                  ...['전체', '치과위생사', '간호조무사', '치과의사', '기타'].map(
                     (position) => Padding(
                       padding: const EdgeInsets.only(right: 6),
                       child: FilterChip(

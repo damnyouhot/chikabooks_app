@@ -120,7 +120,7 @@ final List<Job> mockLevel1Jobs = [
   ),
   Job(
     id: 'mock_l1_3',
-    title: '치과위생사/치과조무사 모집',
+    title: '치과위생사/간호조무사 모집',
     clinicName: '홍대스마일치과',
     address: '서울 마포구 서교동 345-6',
     district: '서교동 · 마포구',
@@ -264,13 +264,13 @@ final List<Job> mockLevel1Jobs = [
   ),
   Job(
     id: 'mock_l1_6',
-    title: '치과조무사 모집 (신입 환영)',
+    title: '간호조무사 모집 (신입 환영)',
     clinicName: '건대좋은치과',
     address: '서울 광진구 화양동 678-9',
     district: '화양동 · 광진구',
     lat: 37.541,
     lng: 127.070,
-    type: '치과조무사',
+    type: '간호조무사',
     career: '신입 가능',
     salaryRange: [240, 280],
     salaryText: '월 240~280만원 (수습 후 조정)',
@@ -506,13 +506,13 @@ final List<Job> mockLevel2Jobs = [
   ),
   Job(
     id: 'mock_l2_2',
-    title: '치과조무사 경력직',
+    title: '간호조무사 경력직',
     clinicName: '성수연세치과',
     address: '서울 성동구 성수동 222-2',
     district: '성수동 · 성동구',
     lat: 37.545,
     lng: 127.056,
-    type: '치과조무사',
+    type: '간호조무사',
     career: '1년 이상',
     salaryRange: [260, 300],
     salaryText: '월 260~300만원',
@@ -698,13 +698,13 @@ final List<Job> mockLevel2Jobs = [
   ),
   Job(
     id: 'mock_l2_6',
-    title: '치과조무사 신입 우대',
+    title: '간호조무사 신입 우대',
     clinicName: '중랑행복치과',
     address: '서울 중랑구 면목동 666-6',
     district: '면목동 · 중랑구',
     lat: 37.589,
     lng: 127.086,
-    type: '치과조무사',
+    type: '간호조무사',
     career: '신입',
     salaryRange: [230, 270],
     salaryText: '월 230~270만원 (교육 지원)',
@@ -890,7 +890,7 @@ final List<Job> mockLevel2Jobs = [
   ),
   Job(
     id: 'mock_l2_10',
-    title: '치과조무사/위생사 동시 모집',
+    title: '간호조무사/위생사 동시 모집',
     clinicName: '관악새날치과',
     address: '서울 관악구 봉천동 101-1',
     district: '봉천동 · 관악구',
@@ -973,7 +973,7 @@ Job _buildMockLevel3JobAt(int i) {
   ];
   final titles = [
     '치위생사 정규직 채용',
-    '치과조무사 모집',
+    '간호조무사 모집',
     '데스크 직원 채용',
     '치과위생사 경력직',
     '신입 치위생사 환영',
@@ -981,7 +981,7 @@ Job _buildMockLevel3JobAt(int i) {
     '야간 진료 치위생사',
     '임시직/정규직 동시 모집',
   ];
-  final types = ['치위생사', '치과조무사', '데스크', '기타'];
+  final types = ['치위생사', '간호조무사', '데스크', '기타'];
   final careers = ['신입', '1년 이상', '2년 이상', '3년 이상', '경력 무관'];
 
   final clinic = clinics[i % clinics.length];

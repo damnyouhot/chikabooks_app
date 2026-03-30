@@ -165,6 +165,9 @@ class AppColors {
   /// 강조 배지 텍스트: onCardEmphasis (creamWhite)
   static const emphasisBadgeText = onCardEmphasis;
 
+  // ── '준비중' 배지 등 — 어두운 포레스트 그린 ([PrepInProgressBadge]와 동일)
+  static const prepBadgeGreen = Color(0xFF14532D);
+
   // ── 의미 컬러 (상태) ─────────────────────────────────────────
   static const success = Color(0xFF00E676);
   static const warning = Color(0xFFFF9100);

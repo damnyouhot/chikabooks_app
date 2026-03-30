@@ -62,7 +62,7 @@ class _CareerSkillAutoHintScopeState extends State<_CareerSkillAutoHintScope> {
 
 /// 커리어(도전하기) 탭 - 탭4
 ///
-/// - 소탭 0: 채용 (JobListingsScreen ↔ JobMapScreen, 출시 전 시각 오버레이)
+/// - 소탭 0: 채용 (JobListingsScreen ↔ JobMapScreen)
 /// - 소탭 1: 커리어 카드 (CareerTab)
 ///
 /// [isOnboardingActive] 온보딩 진행 중이면 커리어 카드(소탭1)로 바로 열림
@@ -198,29 +198,7 @@ class _JobPageState extends State<JobPage> {
       );
     }
 
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        content,
-        // 온보딩 스포트라이트와 동일 농도 · 터치는 하위(목록/지도)로 통과
-        IgnorePointer(
-          child: ColoredBox(
-            color: AppColors.black.withValues(alpha: 0.85),
-            child: const Center(
-              child: Text(
-                '하이진랩 채용 서비스 준비중',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
+    return content;
   }
 }
 

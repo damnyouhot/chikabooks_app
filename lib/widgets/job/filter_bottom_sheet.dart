@@ -168,7 +168,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                   const SizedBox(height: AppSpacing.sm),
                   _ChipGroup(
                     options: const [
-                      '전체', '치위생사', '치과조무사', '치과의사', '기공사', '기타',
+                      '전체', '치위생사', '간호조무사', '치과의사', '기공사', '기타',
                     ],
                     selected: _positionFilter,
                     onTap: (v) => setState(() => _positionFilter = v),

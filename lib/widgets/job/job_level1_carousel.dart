@@ -17,8 +17,8 @@ import 'job_cover_image.dart';
 class JobLevel1Carousel extends StatefulWidget {
   final List<Job> jobs;
 
-  /// 섹션헤더(40) + PageView카드(96) + 하단여백(8) = 144px
-  static const double stickyHeight = 144.0;
+  /// 섹션헤더(40) + PageView카드(116) + 하단여백(8) = 164px
+  static const double stickyHeight = 164.0;
 
   const JobLevel1Carousel({
     super.key,
@@ -127,7 +127,7 @@ class JobLevel1CarouselState extends State<JobLevel1Carousel> {
 
         // ── 수평 PageView (스와이프 + 자동 슬라이드) ─────────────
         SizedBox(
-          height: 96,
+          height: 116,
           child: PageView.builder(
             controller: _pageCtrl,
             onPageChanged: (i) {
@@ -238,7 +238,7 @@ class _Level1Card extends StatelessWidget {
                             Icon(
                               Icons.verified_rounded,
                               size: 11,
-                              color: AppColors.success.withValues(alpha: 0.75),
+                              color: AppColors.prepBadgeGreen,
                             ),
                             const SizedBox(width: 2),
                             Text(
@@ -246,7 +246,7 @@ class _Level1Card extends StatelessWidget {
                               style: const TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w600,
-                                color: AppColors.success,
+                                color: AppColors.prepBadgeGreen,
                                 letterSpacing: -0.2,
                               ),
                             ),

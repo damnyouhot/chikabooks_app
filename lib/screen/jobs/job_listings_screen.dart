@@ -236,7 +236,7 @@ class _JobListingsScreenState extends State<JobListingsScreen> {
 
             // 하단 여백 (검색 바 + safe area)
             SliverPadding(
-              padding: EdgeInsets.only(bottom: 76 + safeBottom),
+              padding: EdgeInsets.only(bottom: 92 + safeBottom),
             ),
           ],
         ),
@@ -245,7 +245,10 @@ class _JobListingsScreenState extends State<JobListingsScreen> {
         _BottomSearchBar(
           searchQuery: _searchQuery,
           activeFilterCount: _activeFilterCount(jobFilter),
-          onSearchChanged: (q) => setState(() => _searchQuery = q),
+          onSearchChanged: (q) {
+            setState(() => _searchQuery = q);
+            context.read<JobFilterNotifier>().setSearchQuery(q);
+          },
           onFilterPressed: () => FilterBottomSheet.show(context, jobFilter),
           onMapToggle: widget.onMapToggle,
         ),
@@ -504,28 +507,28 @@ class _BottomSearchBarState extends State<_BottomSearchBar> {
           ],
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: Row(
             children: [
               const Icon(
                 Icons.search,
                 color: AppColors.textDisabled,
-                size: 17,
+                size: 22,
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
               Expanded(
                 child: TextField(
                   controller: _ctrl,
                   focusNode: _focusNode,
                   onChanged: widget.onSearchChanged,
                   style: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 15,
                     color: AppColors.textPrimary,
                   ),
                   decoration: const InputDecoration(
                     hintText: '치과명, 동네로 검색',
                     hintStyle: TextStyle(
-                      fontSize: 13,
+                      fontSize: 15,
                       color: AppColors.textDisabled,
                     ),
                     border: InputBorder.none,
@@ -554,13 +557,11 @@ class _BottomSearchBarState extends State<_BottomSearchBar> {
                   ),
                 )
               else ...[
-                // 필터 버튼 (활성 시 배지 표시)
-                _FilterBadgeButton(
+                _FilterChipButton(
                   count: widget.activeFilterCount,
                   onTap: widget.onFilterPressed,
                 ),
-                const SizedBox(width: 6),
-                // 지도 전환
+                const SizedBox(width: 8),
                 _MapToggleChip(onTap: widget.onMapToggle),
               ],
             ],
@@ -571,12 +572,12 @@ class _BottomSearchBarState extends State<_BottomSearchBar> {
   }
 }
 
-// ── 필터 배지 버튼 ────────────────────────────────────────────────
-class _FilterBadgeButton extends StatelessWidget {
+// ── 필터 칩 (지도 버튼과 동일 accent + '필터' 라벨, 적용 개수 뱃지) ───
+class _FilterChipButton extends StatelessWidget {
   final int count;
   final VoidCallback onTap;
 
-  const _FilterBadgeButton({required this.count, required this.onTap});
+  const _FilterChipButton({required this.count, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -587,35 +588,51 @@ class _FilterBadgeButton extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(AppRadius.sm),
           child: Container(
-            padding: const EdgeInsets.all(6),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: count > 0 ? AppColors.accent : AppColors.surfaceMuted,
+              color: AppColors.accent,
               borderRadius: BorderRadius.circular(AppRadius.sm),
             ),
-            child: Icon(
-              Icons.tune_rounded,
-              color: count > 0 ? AppColors.onAccent : AppColors.textSecondary,
-              size: 15,
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.tune_rounded,
+                  size: 18,
+                  color: AppColors.onAccent,
+                ),
+                SizedBox(width: 4),
+                Text(
+                  '필터',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.onAccent,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
         if (count > 0)
           Positioned(
-            right: -4,
-            top: -4,
+            right: -2,
+            top: -5,
             child: Container(
-              padding: const EdgeInsets.all(3),
-              decoration: const BoxDecoration(
-                color: AppColors.accent,
-                shape: BoxShape.circle,
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.appBg,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.accent, width: 1.2),
               ),
-              constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+              constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
               child: Text(
                 '$count',
                 style: const TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.onAccent,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.accent,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -638,7 +655,7 @@ class _MapToggleChip extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(AppRadius.sm),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: AppColors.accent,
           borderRadius: BorderRadius.circular(AppRadius.sm),
@@ -648,15 +665,15 @@ class _MapToggleChip extends StatelessWidget {
           children: [
             Icon(
               Icons.map_outlined,
-              size: 13,
+              size: 18,
               color: AppColors.onAccent,
             ),
-            SizedBox(width: 3),
+            SizedBox(width: 4),
             Text(
               '지도',
               style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
                 color: AppColors.onAccent,
                 letterSpacing: -0.2,
               ),
