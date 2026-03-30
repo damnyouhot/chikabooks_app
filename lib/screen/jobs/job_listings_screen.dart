@@ -17,6 +17,7 @@ import '../../services/job_service.dart';
 import '../../widgets/job/job_level1_carousel.dart';
 import '../../widgets/job/filter_bottom_sheet.dart';
 import '../jobs/job_detail_screen.dart';
+import '../../widgets/job/job_cover_image.dart';
 
 /// 채용 소탭 - 목록 모드
 ///
@@ -780,8 +781,8 @@ class _Level2Card extends StatelessWidget {
                   top: Radius.circular(AppRadius.md),
                 ),
                 child: job.images.isNotEmpty
-                    ? Image.network(
-                        job.images.first,
+                    ? JobCoverImage(
+                        source: job.images.first,
                         fit: BoxFit.cover,
                         width: double.infinity,
                       )
@@ -844,7 +845,7 @@ class _Level2Card extends StatelessWidget {
                   Wrap(
                     spacing: 3,
                     runSpacing: 0,
-                    children: job.benefits
+                    children: (job.tags.isNotEmpty ? job.tags : job.benefits)
                         .take(2)
                         .map((b) => _SmallChip(label: b))
                         .toList(),
@@ -933,6 +934,7 @@ class _Level3Row extends StatelessWidget {
   const _Level3Row({required this.job, required this.onTap});
 
   String get _dDayText {
+    if (job.isAlwaysHiring) return '상시채용';
     if (job.closingDate == null) return '상시';
     final diff = job.closingDate!.difference(DateTime.now()).inDays;
     if (diff < 0) return '마감';
@@ -1032,15 +1034,39 @@ class _Level3Row extends StatelessWidget {
                       ],
                     ],
                   ),
+                  if (job.tags.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 3,
+                      runSpacing: 0,
+                      children: job.tags
+                          .take(3)
+                          .map((t) => _SmallChip(label: t))
+                          .toList(),
+                    ),
+                  ],
                 ],
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
 
-            // 우: D-day + 즉시지원
+            // 우: 썸네일 (이미지 있을 때) + D-day + 즉시지원
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
+                if (job.images.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                      child: JobCoverImage(
+                        source: job.images.first,
+                        width: 64,
+                        height: 64,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
                 Text(
                   _dDayText,
                   style: TextStyle(

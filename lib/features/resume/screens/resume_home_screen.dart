@@ -159,6 +159,19 @@ class _WrittenResumeTabState extends State<_WrittenResumeTab> {
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.lg, 20, AppSpacing.lg, 40),
           children: [
+            Center(
+              child: Text(
+                '이력서 작성/ 관리 기능, 공고 작성/ 관리 기능은\n'
+                '추후 웹에서도 가능하게 제작됩니다.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.45,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
             _ActionButton(
               icon: Icons.add_rounded,
               label: '새 이력서 만들기',
@@ -170,7 +183,6 @@ class _WrittenResumeTabState extends State<_WrittenResumeTab> {
               icon: Icons.camera_alt_outlined,
               label: '사진으로 자동 입력 (OCR)',
               color: AppColors.success,
-              showWipBadge: true,
               onTap: () => _openOcr(context),
             ),
 
@@ -181,7 +193,7 @@ class _WrittenResumeTabState extends State<_WrittenResumeTab> {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.warning,
+                  color: AppColors.resumeEmphasis,
                 ),
               ),
               const SizedBox(height: 8),
@@ -747,14 +759,12 @@ class _ActionButton extends StatelessWidget {
   final String label;
   final Color color;
   final VoidCallback onTap;
-  final bool showWipBadge;
 
   const _ActionButton({
     required this.icon,
     required this.label,
     required this.color,
     required this.onTap,
-    this.showWipBadge = false,
   });
 
   @override
@@ -794,27 +804,6 @@ class _ActionButton extends StatelessWidget {
                   ),
                 ),
               ),
-              if (showWipBadge)
-                Container(
-                  margin: const EdgeInsets.only(right: 6),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2E7D32).withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Text(
-                    '준비중',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.onCardEmphasis,
-                      letterSpacing: -0.2,
-                    ),
-                  ),
-                ),
               const Icon(Icons.chevron_right,
                   color: AppColors.textDisabled, size: 20),
             ],
@@ -968,7 +957,7 @@ class _ResumeCard extends StatelessWidget {
 
   Color _completionColor(int count) {
     if (count >= 6) return AppColors.success;
-    if (count >= 3) return AppColors.warning;
+    if (count >= 3) return AppColors.resumeEmphasis;
     return AppColors.textSecondary;
   }
 
@@ -1010,7 +999,7 @@ class _DraftCard extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(AppRadius.md),
             border:
-                Border.all(color: AppColors.warning.withOpacity(0.2)),
+                Border.all(color: AppColors.resumeEmphasis.withValues(alpha: 0.2)),
           ),
           child: Row(
             children: [
@@ -1018,12 +1007,12 @@ class _DraftCard extends StatelessWidget {
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                  color: AppColors.warning.withOpacity(0.1),
+                  color: AppColors.resumeEmphasis.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(AppRadius.sm),
                 ),
                 child: Icon(
                   Icons.edit_note,
-                  color: AppColors.warning.withOpacity(0.7),
+                  color: AppColors.resumeEmphasis.withValues(alpha: 0.75),
                   size: 18,
                 ),
               ),
@@ -1046,7 +1035,7 @@ class _DraftCard extends StatelessWidget {
                       '임시저장됨',
                       style: TextStyle(
                         fontSize: 11,
-                        color: AppColors.warning.withOpacity(0.7),
+                        color: AppColors.resumeEmphasis.withValues(alpha: 0.85),
                       ),
                     ),
                   ],

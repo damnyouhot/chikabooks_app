@@ -3,7 +3,10 @@ import * as admin from "firebase-admin";
 import axios from "axios";
 import {parseStringPromise} from "xml2js";
 import * as crypto from "crypto";
+import { defineSecret } from "firebase-functions/params";
 import { resolvePollOpsFromRows } from "./poll-ops-hub";
+
+const GOOGLE_MAPS_API_KEY = defineSecret("GOOGLE_MAPS_API_KEY");
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -1533,6 +1536,32 @@ export const createJobPosting = functions.https.onCall(
       }
     }
 
+    // ── images 다층 검증 ──────────────────────────────────────
+    const rawImages = data.images;
+    if (rawImages !== undefined && !Array.isArray(rawImages)) {
+      throw new functions.https.HttpsError("invalid-argument", "images는 배열이어야 합니다.");
+    }
+    const imagesArr: unknown[] = Array.isArray(rawImages) ? rawImages : [];
+    if (imagesArr.length > 10) {
+      throw new functions.https.HttpsError("invalid-argument", "이미지는 최대 10장입니다.");
+    }
+    const storagePrefix = "https://firebasestorage.googleapis.com/";
+    const validImages: string[] = [];
+    for (const url of imagesArr) {
+      if (
+        typeof url !== "string" ||
+        url.trim().length === 0 ||
+        url.length > 2000 ||
+        !url.startsWith(storagePrefix)
+      ) {
+        throw new functions.https.HttpsError(
+          "invalid-argument",
+          "유효하지 않은 이미지 URL이 포함되어 있습니다."
+        );
+      }
+      validImages.push(url.trim());
+    }
+
     // clinics_accounts/{uid}에서 공고자 승인 상태 확인
     const clinicAccDoc = await db.collection("clinics_accounts").doc(uid).get();
     if (!clinicAccDoc.exists) {
@@ -1553,15 +1582,105 @@ export const createJobPosting = functions.https.onCall(
     const salaryStr = String(data.salary ?? "").trim();
     const sr = parseJobSalaryRange(salaryStr);
     const roleStr = String(data.role ?? "").trim();
+    const careerStr = String(data.career ?? "").trim();
     const descStr = String(data.description ?? "").trim();
 
-    const jobData = {
+    // district 자동 생성: 주소에서 시/구/동 추출
+    const addressStr = String(data.address ?? "").trim();
+    let district = "";
+    if (addressStr.length > 0) {
+      const parts = addressStr.split(/\s+/);
+      // 패턴: "서울시 강남구 역삼동 ..." → "역삼동 · 강남구"
+      // 또는: "서울 강남구 역삼동 ..." → "역삼동 · 강남구"
+      const guIdx = parts.findIndex((p) => p.endsWith("구") || p.endsWith("군"));
+      const dongIdx = parts.findIndex(
+        (p) => p.endsWith("동") || p.endsWith("읍") || p.endsWith("면") || p.endsWith("로") || p.endsWith("길")
+      );
+      const gu = guIdx >= 0 ? parts[guIdx] : "";
+      const dong = dongIdx >= 0 && dongIdx > guIdx ? parts[dongIdx] : "";
+      if (dong && gu) {
+        district = `${dong} · ${gu}`;
+      } else if (gu) {
+        district = gu;
+      } else if (parts.length >= 2) {
+        district = parts.slice(0, 2).join(" ");
+      }
+    }
+
+    // ── 신규 필드 검증 ────────────────────────────────────
+
+    // 병원 정보
+    const validHospitalTypes = ["clinic", "network", "hospital", "general"];
+    const hospitalType = typeof data.hospitalType === "string" && validHospitalTypes.includes(data.hospitalType)
+      ? data.hospitalType : null;
+    const chairCount = typeof data.chairCount === "number" && data.chairCount > 0
+      ? Math.floor(data.chairCount) : null;
+    const staffCount = typeof data.staffCount === "number" && data.staffCount > 0
+      ? Math.floor(data.staffCount) : null;
+
+    // 근무 조건
+    const validDays = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+    const workDays: string[] = Array.isArray(data.workDays)
+      ? data.workDays.filter((d: unknown) => typeof d === "string" && validDays.includes(d as string))
+      : [];
+    const weekendWork = data.weekendWork === true;
+    const nightShift = data.nightShift === true;
+
+    // 지원 관련
+    const validMethods = ["online", "phone", "email"];
+    const applyMethod: string[] = Array.isArray(data.applyMethod)
+      ? data.applyMethod.filter((m: unknown) => typeof m === "string" && validMethods.includes(m as string))
+      : [];
+    const isAlwaysHiring = data.isAlwaysHiring === true;
+
+    // 마감일
+    let closingDate: admin.firestore.Timestamp | null = null;
+    if (!isAlwaysHiring && typeof data.closingDate === "string" && data.closingDate.trim()) {
+      try {
+        const d = new Date(data.closingDate.trim());
+        if (!isNaN(d.getTime())) closingDate = admin.firestore.Timestamp.fromDate(d);
+      } catch (_) { /* ignore */ }
+    }
+
+    // 교통편
+    let transportation: Record<string, unknown> | null = null;
+    if (data.transportation && typeof data.transportation === "object") {
+      const t = data.transportation;
+      transportation = {
+        subwayLines: Array.isArray(t.subwayLines) ? t.subwayLines.filter((s: unknown) => typeof s === "string") : [],
+        ...(typeof t.subwayStationName === "string" && t.subwayStationName.trim()
+          ? { subwayStationName: t.subwayStationName.trim() } : {}),
+        ...(typeof t.walkingDistanceMeters === "number" ? { walkingDistanceMeters: Math.floor(t.walkingDistanceMeters) } : {}),
+        ...(typeof t.walkingMinutes === "number" ? { walkingMinutes: Math.floor(t.walkingMinutes) } : {}),
+        ...(typeof t.exitNumber === "string" && t.exitNumber.trim() ? { exitNumber: t.exitNumber.trim() } : {}),
+        parking: t.parking === true,
+      };
+    }
+    const subwayLines: string[] = transportation
+      ? (transportation.subwayLines as string[]) ?? []
+      : [];
+    const hasParking = transportation ? transportation.parking === true : false;
+    const walkMin = transportation ? (transportation.walkingMinutes as number | undefined) : undefined;
+    const stationName = transportation ? (transportation.subwayStationName as string | undefined) : undefined;
+    const isNearStation = !!stationName && typeof walkMin === "number" && walkMin <= 10;
+
+    // 태그
+    const tags: string[] = Array.isArray(data.tags)
+      ? data.tags.filter((t: unknown) => typeof t === "string" && (t as string).trim().length > 0).slice(0, 30)
+      : [];
+
+    // 좌표
+    const lat = typeof data.lat === "number" && isFinite(data.lat) ? data.lat : null;
+    const lng = typeof data.lng === "number" && isFinite(data.lng) ? data.lng : null;
+
+    const jobData: Record<string, unknown> = {
       createdBy: uid,
       clinicId,
       clinicName: String(data.clinicName ?? "").trim(),
       title: String(data.title ?? "").trim(),
       role: roleStr,
       type: roleStr,
+      career: careerStr || "미정",
       employmentType: String(data.employmentType ?? "").trim(),
       workHours: String(data.workHours ?? "").trim(),
       salary: salaryStr,
@@ -1572,21 +1691,219 @@ export const createJobPosting = functions.https.onCall(
       benefits: Array.isArray(data.benefits) ? data.benefits : [],
       description: descStr,
       details: descStr,
-      address: String(data.address ?? "").trim(),
+      address: addressStr,
+      district,
       contact: String(data.contact ?? "").trim(),
-      images: Array.isArray(data.images) ? data.images : [],
+      images: validImages,
+      ...(lat != null && lng != null ? { lat, lng } : {}),
       status: "pending",
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       postedAt: admin.firestore.FieldValue.serverTimestamp(),
+      // 병원 정보
+      ...(hospitalType ? { hospitalType } : {}),
+      ...(chairCount ? { chairCount } : {}),
+      ...(staffCount ? { staffCount } : {}),
+      // 근무 조건
+      ...(workDays.length > 0 ? { workDays } : {}),
+      weekendWork,
+      nightShift,
+      // 지원 관련
+      ...(applyMethod.length > 0 ? { applyMethod } : {}),
+      isAlwaysHiring,
+      ...(closingDate ? { closingDate } : {}),
+      // 교통편
+      ...(transportation ? { transportation } : {}),
+      ...(subwayLines.length > 0 ? { subwayLines } : {}),
+      hasParking,
+      isNearStation,
+      // 태그
+      ...(tags.length > 0 ? { tags } : {}),
     };
 
-    const ref = await db.collection("jobs").add(jobData);
+    // 클라이언트가 미리 생성한 jobId가 있으면 사용 (Storage 경로 일치)
+    const providedJobId = typeof data.jobId === "string" && data.jobId.trim() ? data.jobId.trim() : null;
+    let jobId: string;
+    if (providedJobId) {
+      await db.collection("jobs").doc(providedJobId).set(jobData);
+      jobId = providedJobId;
+    } else {
+      const ref = await db.collection("jobs").add(jobData);
+      jobId = ref.id;
+    }
 
-    functions.logger.info("createJobPosting", { uid, jobId: ref.id });
+    functions.logger.info("createJobPosting", { uid, jobId });
 
-    return { jobId: ref.id, status: "pending" };
+    return { jobId, status: "pending" };
   }
 );
+
+/**
+ * lookupNearbyStation
+ *
+ * 좌표(lat/lng) 또는 주소(address)를 받아 가장 가까운 지하철역을 자동 조회한다.
+ * address만 보내면 Geocoding API로 좌표 변환 후 진행.
+ * Google Geocoding API + Places API (Nearby Search) + Routes API (walking) 사용.
+ *
+ * Input:  { lat?: number, lng?: number, address?: string }
+ * Output: { subwayStationName, subwayLines, walkingDistanceMeters, walkingMinutes, lat, lng } | { found: false }
+ */
+export const lookupNearbyStation = functions
+  .runWith({ secrets: [GOOGLE_MAPS_API_KEY] })
+  .https.onCall(
+  async (data, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+
+    const apiKey = GOOGLE_MAPS_API_KEY.value();
+    if (!apiKey) {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        "서버에 Google Maps API 키가 설정되지 않았습니다."
+      );
+    }
+
+    let lat = Number(data.lat);
+    let lng = Number(data.lng);
+    const address = typeof data.address === "string" ? data.address.trim() : "";
+
+    // 좌표가 없거나 유효하지 않으면 주소로 지오코딩
+    if ((!isFinite(lat) || !isFinite(lng) || (lat === 0 && lng === 0)) && address.length > 0) {
+      try {
+        const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json`;
+        const geoRes = await axios.get(geocodeUrl, {
+          params: { address, key: apiKey, language: "ko", region: "kr" },
+        });
+        const geoResult = geoRes.data?.results?.[0];
+        if (!geoResult) {
+          return { found: false, reason: "주소를 찾을 수 없습니다." };
+        }
+        lat = geoResult.geometry.location.lat;
+        lng = geoResult.geometry.location.lng;
+      } catch (e) {
+        functions.logger.error("lookupNearbyStation geocoding error", e);
+        throw new functions.https.HttpsError("internal", "주소 변환 중 오류가 발생했습니다.");
+      }
+    }
+
+    if (!isFinite(lat) || !isFinite(lng) || (lat === 0 && lng === 0)) {
+      throw new functions.https.HttpsError("invalid-argument", "유효한 좌표 또는 주소가 필요합니다.");
+    }
+
+    try {
+      // 1) Places API (Nearby Search) - 반경 1500m 내 subway_station
+      const placesUrl = "https://places.googleapis.com/v1/places:searchNearby";
+      const placesBody = {
+        includedTypes: ["subway_station"],
+        maxResultCount: 5,
+        locationRestriction: {
+          circle: {
+            center: { latitude: lat, longitude: lng },
+            radius: 1500.0,
+          },
+        },
+      };
+      const placesRes = await axios.post(placesUrl, placesBody, {
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": apiKey,
+          "X-Goog-FieldMask": "places.displayName,places.location",
+        },
+      });
+
+      const places = placesRes.data?.places ?? [];
+      if (places.length === 0) {
+        return { found: false };
+      }
+
+      // 가장 가까운 역 선택 (직선 거리 기준)
+      let nearest = places[0];
+      let nearestDist = Infinity;
+      for (const p of places) {
+        const dlat = p.location.latitude - lat;
+        const dlng = p.location.longitude - lng;
+        const dist = Math.sqrt(dlat * dlat + dlng * dlng);
+        if (dist < nearestDist) {
+          nearestDist = dist;
+          nearest = p;
+        }
+      }
+
+      const stationName = nearest.displayName?.text ?? "";
+      const stationLat = nearest.location.latitude;
+      const stationLng = nearest.location.longitude;
+
+      // 2) Routes API (walking mode) - 도보 거리/시간 계산
+      const routesUrl = "https://routes.googleapis.com/directions/v2:computeRoutes";
+      const routesBody = {
+        origin: {
+          location: { latLng: { latitude: lat, longitude: lng } },
+        },
+        destination: {
+          location: { latLng: { latitude: stationLat, longitude: stationLng } },
+        },
+        travelMode: "WALK",
+      };
+      const routesRes = await axios.post(routesUrl, routesBody, {
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": apiKey,
+          "X-Goog-FieldMask": "routes.distanceMeters,routes.duration",
+        },
+      });
+
+      const route = routesRes.data?.routes?.[0];
+      const distMeters = route?.distanceMeters ?? 0;
+      const durationStr: string = route?.duration ?? "0s";
+      const durationSec = parseInt(durationStr.replace("s", ""), 10) || 0;
+      const walkingMinutes = Math.round(durationSec / 60);
+
+      // 노선 추출: 역 이름에 호선 정보가 포함된 경우 파싱 시도
+      const lineMatch = stationName.match(/(\d+호선)/g);
+      const subwayLines: string[] = lineMatch ?? [];
+
+      return {
+        found: true,
+        lat,
+        lng,
+        subwayStationName: stationName.replace(/\s*\d+호선/g, "").trim() || stationName,
+        subwayLines,
+        walkingDistanceMeters: distMeters,
+        walkingMinutes,
+      };
+    } catch (e: unknown) {
+      functions.logger.error("lookupNearbyStation error", e);
+      throw new functions.https.HttpsError("internal", "교통편 조회 중 오류가 발생했습니다.");
+    }
+  }
+);
+
+/**
+ * onJobDeleted
+ *
+ * 공고 문서 삭제 시 Storage에 연결된 이미지 파일도 함께 정리한다.
+ */
+export const onJobDeleted = functions.firestore
+  .document("jobs/{jobId}")
+  .onDelete(async (snap) => {
+    const images: unknown[] = snap.data().images ?? [];
+    const bucket = admin.storage().bucket();
+
+    for (const url of images) {
+      if (typeof url !== "string") continue;
+      try {
+        // Storage download URL → 파일 경로 추출
+        // 형식: https://firebasestorage.googleapis.com/v0/b/{bucket}/o/{encodedPath}?...
+        const match = url.match(/\/o\/(.+?)(\?|$)/);
+        if (!match) continue;
+        const filePath = decodeURIComponent(match[1]);
+        await bucket.file(filePath).delete();
+      } catch (e) {
+        functions.logger.warn("onJobDeleted: 이미지 삭제 실패", { url, error: e });
+      }
+    }
+    functions.logger.info("onJobDeleted: 이미지 정리 완료", { jobId: snap.id, count: images.length });
+  });
 
 // ========== 치과 사업자 인증 ==========
 /**

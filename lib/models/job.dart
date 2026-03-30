@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'transportation_info.dart';
+
 /// 구인 공고 (Firestore `jobs` + 목업 공통)
 ///
 /// 웹 등록 필드(`role`, `description`, `salary` 등)와 앱 레거시 필드(`type`, `details`,
@@ -46,6 +48,37 @@ class Job {
   final DateTime? closingDate;
   final bool canApplyNow;
 
+  // ── 병원 정보 (3.1) ─────────────────────────────
+  /// clinic | network | hospital | general (null = 미입력)
+  final String? hospitalType;
+  final int? chairCount;
+  final int? staffCount;
+
+  // ── 근무 조건 (3.2) ─────────────────────────────
+  /// 영문 코드 리스트: mon, tue, wed, thu, fri, sat, sun
+  final List<String> workDays;
+  final bool weekendWork;
+  final bool nightShift;
+
+  // ── 지원 관련 (3.3) ─────────────────────────────
+  /// online | phone | email (복수 선택)
+  final List<String> applyMethod;
+  final bool isAlwaysHiring;
+
+  // ── 교통편 (3.4) ────────────────────────────────
+  final TransportationInfo? transportation;
+  /// 필터용 최상위 배열 (transportation.subwayLines와 동일값)
+  final List<String> subwayLines;
+  final bool hasParking;
+
+  // ── 태그 (3.5) ──────────────────────────────────
+  final List<String> tags;
+
+  // ── 광고·노출 구조 (3.6) ────────────────────────
+  final DateTime? adStartAt;
+  final DateTime? adEndAt;
+  final int priorityScore;
+
   Job({
     required this.id,
     required this.title,
@@ -71,6 +104,22 @@ class Job {
     this.isNearStation = false,
     this.closingDate,
     this.canApplyNow = false,
+    // 신규 optional 필드
+    this.hospitalType,
+    this.chairCount,
+    this.staffCount,
+    this.workDays = const [],
+    this.weekendWork = false,
+    this.nightShift = false,
+    this.applyMethod = const [],
+    this.isAlwaysHiring = false,
+    this.transportation,
+    this.subwayLines = const [],
+    this.hasParking = false,
+    this.tags = const [],
+    this.adStartAt,
+    this.adEndAt,
+    this.priorityScore = 0,
   });
 
   /// 앱 목록·지도에 노출할지 (마감/삭제/반려 제외)
@@ -178,6 +227,16 @@ class Job {
 
     final emp = (json['employmentType'] as String?)?.trim() ?? '';
 
+    // ── 교통편 ──
+    final transRaw = json['transportation'];
+    final TransportationInfo? trans = transRaw is Map<String, dynamic>
+        ? TransportationInfo.fromJson(transRaw)
+        : null;
+
+    // isNearStation: 명시 값 우선, 없으면 transportation 기반 자동 판정
+    final bool nearStation = (json['isNearStation'] as bool?) ??
+        (trans?.isNearStation ?? false);
+
     return Job(
       id: docId ?? (json['id'] as String? ?? ''),
       title: (json['title'] as String?)?.trim() ?? '',
@@ -200,9 +259,30 @@ class Job {
       images: List<String>.from(json['images'] ?? []),
       jobLevel: (json['jobLevel'] as int?) ?? 3,
       matchScore: (json['matchScore'] as int?) ?? 0,
-      isNearStation: (json['isNearStation'] as bool?) ?? false,
+      isNearStation: nearStation,
       closingDate: closing,
       canApplyNow: (json['canApplyNow'] as bool?) ?? false,
+      // 병원 정보
+      hospitalType: json['hospitalType'] as String?,
+      chairCount: (json['chairCount'] as num?)?.toInt(),
+      staffCount: (json['staffCount'] as num?)?.toInt(),
+      // 근무 조건
+      workDays: List<String>.from(json['workDays'] ?? []),
+      weekendWork: (json['weekendWork'] as bool?) ?? false,
+      nightShift: (json['nightShift'] as bool?) ?? false,
+      // 지원 관련
+      applyMethod: List<String>.from(json['applyMethod'] ?? []),
+      isAlwaysHiring: (json['isAlwaysHiring'] as bool?) ?? false,
+      // 교통편
+      transportation: trans,
+      subwayLines: List<String>.from(json['subwayLines'] ?? []),
+      hasParking: (json['hasParking'] as bool?) ?? false,
+      // 태그
+      tags: List<String>.from(json['tags'] ?? []),
+      // 광고
+      adStartAt: parseTs(json['adStartAt']),
+      adEndAt: parseTs(json['adEndAt']),
+      priorityScore: (json['priorityScore'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -234,6 +314,61 @@ class Job {
     return [0, 0];
   }
 
+  /// 병원 유형 enum → 한글 표시
+  static const hospitalTypeLabels = {
+    'clinic': '개인의원',
+    'network': '네트워크',
+    'hospital': '치과병원',
+    'general': '종합병원/대학병원',
+  };
+
+  String get hospitalTypeLabel =>
+      hospitalTypeLabels[hospitalType] ?? hospitalType ?? '';
+
+  /// 근무 요일 영문 코드 → 한글 약자
+  static const workDayLabels = {
+    'mon': '월',
+    'tue': '화',
+    'wed': '수',
+    'thu': '목',
+    'fri': '금',
+    'sat': '토',
+    'sun': '일',
+  };
+
+  /// 근무요일 한글 요약 (예: "월~금")
+  String get workDaysSummary {
+    if (workDays.isEmpty) return '';
+    const weekdayOrder = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+    final sorted = List<String>.from(workDays)
+      ..sort((a, b) =>
+          weekdayOrder.indexOf(a).compareTo(weekdayOrder.indexOf(b)));
+    final labels = sorted
+        .map((d) => workDayLabels[d] ?? d)
+        .toList();
+
+    if (_isConsecutiveRange(sorted, weekdayOrder)) {
+      return '${labels.first}~${labels.last}';
+    }
+    return labels.join('·');
+  }
+
+  static bool _isConsecutiveRange(List<String> days, List<String> order) {
+    if (days.length < 2) return false;
+    final indices = days.map((d) => order.indexOf(d)).toList();
+    for (int i = 1; i < indices.length; i++) {
+      if (indices[i] != indices[i - 1] + 1) return false;
+    }
+    return true;
+  }
+
+  /// 지원 방법 한글 표시
+  static const applyMethodLabels = {
+    'online': '앱 간편지원',
+    'phone': '전화 지원',
+    'email': '이메일 지원',
+  };
+
   Map<String, dynamic> toJson() => {
         'title': title,
         'clinicName': clinicName,
@@ -258,7 +393,29 @@ class Job {
         'jobLevel': jobLevel,
         'matchScore': matchScore,
         'isNearStation': isNearStation,
-        if (closingDate != null) 'closingDate': Timestamp.fromDate(closingDate!),
+        if (closingDate != null)
+          'closingDate': Timestamp.fromDate(closingDate!),
         'canApplyNow': canApplyNow,
+        // 병원 정보
+        if (hospitalType != null) 'hospitalType': hospitalType,
+        if (chairCount != null) 'chairCount': chairCount,
+        if (staffCount != null) 'staffCount': staffCount,
+        // 근무 조건
+        if (workDays.isNotEmpty) 'workDays': workDays,
+        'weekendWork': weekendWork,
+        'nightShift': nightShift,
+        // 지원 관련
+        if (applyMethod.isNotEmpty) 'applyMethod': applyMethod,
+        'isAlwaysHiring': isAlwaysHiring,
+        // 교통편
+        if (transportation != null) 'transportation': transportation!.toJson(),
+        if (subwayLines.isNotEmpty) 'subwayLines': subwayLines,
+        'hasParking': hasParking,
+        // 태그
+        if (tags.isNotEmpty) 'tags': tags,
+        // 광고
+        if (adStartAt != null) 'adStartAt': Timestamp.fromDate(adStartAt!),
+        if (adEndAt != null) 'adEndAt': Timestamp.fromDate(adEndAt!),
+        if (priorityScore != 0) 'priorityScore': priorityScore,
       };
 }

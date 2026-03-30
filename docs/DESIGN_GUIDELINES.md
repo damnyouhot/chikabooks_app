@@ -237,8 +237,6 @@ match /users/{uid}/notes/{noteId} {
 - [x] `lib/widgets/speech_overlay.dart` - 바람 효과 말풍선
 - [x] `lib/widgets/floating_delta.dart` - 떠오르는 수치
 - [x] `lib/widgets/diary_input_sheet.dart` - 한 줄 기록 팝업
-- [x] `lib/services/speech_engine_service.dart` - 멘트 엔진
-
 ### Phase 2: caring_page.dart 개편
 - [x] 새 위젯들 import
 - [x] 상태 변수 추가
@@ -272,7 +270,8 @@ commit 2c520b5
 - `lib/widgets/speech_overlay.dart` - 말풍선
 - `lib/widgets/floating_delta.dart` - 수치 표시
 - `lib/widgets/diary_input_sheet.dart` - 한 줄 기록
-- `lib/services/speech_engine_service.dart` - 멘트 엔진
+- `lib/data/base_message_data.dart`, `lib/services/base_message_service.dart` - 기본 멘트 풀
+- `lib/data/caring_ments.dart` - 돌보기 액션 멘트
 - `firestore.rules` - 보안 규칙
 
 ---

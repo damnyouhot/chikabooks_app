@@ -4,6 +4,7 @@ import '../../core/theme/app_tokens.dart';
 import '../../core/widgets/app_muted_card.dart';
 import '../../models/job.dart';
 import '../../screen/jobs/job_detail_screen.dart';
+import 'job/job_cover_image.dart';
 
 /// 공고 목록 타일 카드
 ///
@@ -33,12 +34,11 @@ class JobCard extends StatelessWidget {
             if (job.images.isNotEmpty)
               ClipRRect(
                 borderRadius: BorderRadius.circular(AppRadius.lg),
-                child: Image.network(
-                  job.images.first,
+                child: JobCoverImage(
+                  source: job.images.first,
                   width: 72,
                   height: 72,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => _imagePlaceholder(),
                 ),
               )
             else
@@ -75,6 +75,28 @@ class JobCard extends StatelessWidget {
                       color: AppColors.textSecondary,
                     ),
                   ),
+                  if (job.tags.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 4,
+                      runSpacing: 2,
+                      children: job.tags.take(3).map((t) => Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceMuted,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          t,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: AppColors.textSecondary,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                      )).toList(),
+                    ),
+                  ],
                 ],
               ),
             ),

@@ -111,6 +111,10 @@ class AppColors {
   /// 블록 외곽선 (Theme [Card]의 진한색 대신 사용)
   static const resumeFormBlockBorder = divider;
 
+  /// 이력서 임시저장·작성 진행 중간 단계 등 강조 (구 주황 대체)
+  /// [cardEmphasis] 단일 소스 — 팔레트 일괄 변경 시 연동
+  static const resumeEmphasis = cardEmphasis;
+
   // ── 크림 화이트 (진한 배경 위 부드러운 강조 텍스트) ──────────────
   /// Green/Orange 카드 등 진한 배경 위 부드러운 화이트 텍스트
   /// 나중에 색상 변경 시 이 토큰 한 곳만 수정하면 전체 반영됨

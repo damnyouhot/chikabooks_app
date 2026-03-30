@@ -5,7 +5,7 @@ import '../core/theme/app_colors.dart';
 ///
 /// Stack 안에서 캐릭터 위에 겹쳐서 사용.
 /// text=null 시 SizedBox.shrink() 반환 → 캐릭터 크기에 영향 없음.
-/// isOnboarding=true 이면 온보딩 전용 크기(17pt), false 이면 일반 크기(16pt)
+/// isOnboarding=true 이면 온보딩 전용, false 이면 일반 — 기준 17/16pt의 85% 스케일
 ///
 /// [onboardingBoldWord]가 텍스트에 포함되면 해당 구간만 볼드 처리 (온보딩 1a 등)
 class SpeechOverlay extends StatefulWidget {
@@ -76,12 +76,16 @@ class _SpeechOverlayState extends State<SpeechOverlay>
       final textChanged = widget.text != oldWidget.text;
       final boldChanged =
           widget.onboardingBoldWord != oldWidget.onboardingBoldWord;
-      if (textChanged || boldChanged) {
+      // `isDismissing` true였을 때 위 분기에서 _displayText를 비운 뒤,
+      // 새 텍스트가 이전과 동일하면 textChanged가 false라 복구되지 않음 → 리액션 미표시.
+      final needsResyncAfterDismiss =
+          (_displayText == null || _displayText!.isEmpty);
+      if (textChanged || boldChanged || needsResyncAfterDismiss) {
         setState(() {
           _displayText = widget.text;
           _displayBoldWord = widget.onboardingBoldWord;
         });
-        if (textChanged) {
+        if (textChanged || needsResyncAfterDismiss) {
           _controller.forward(from: 0.0);
         }
       }
@@ -106,13 +110,22 @@ class _SpeechOverlayState extends State<SpeechOverlay>
   }
 
   TextStyle _baseStyle() {
+    const baseOnboarding = 17.0;
+    const baseNormal = 16.0;
+    const scale = 0.85;
     return TextStyle(
-      fontSize: widget.isOnboarding ? 17.0 : 16.0,
+      fontSize: (widget.isOnboarding ? baseOnboarding : baseNormal) * scale,
       fontWeight: FontWeight.w400,
       color: AppColors.textPrimary,
-      letterSpacing: 0.2,
+      letterSpacing: 0.2 * scale,
       height: 1.5,
     );
+  }
+
+  /// 한 줄 높이 — 두 줄 분 `minHeight`·아래 정렬 기준
+  double _lineHeight() {
+    final s = _baseStyle();
+    return s.fontSize! * (s.height ?? 1.0);
   }
 
   Widget _buildMessageText() {
@@ -165,11 +178,20 @@ class _SpeechOverlayState extends State<SpeechOverlay>
     return FadeTransition(
       opacity: _opacity,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+        padding: EdgeInsets.symmetric(
+          vertical: 8 * 0.85,
+          horizontal: 16 * 0.85,
+        ),
         child: Center(
           child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: maxWidth),
-            child: _buildMessageText(),
+            constraints: BoxConstraints(
+              maxWidth: maxWidth,
+              minHeight: 2 * _lineHeight(),
+            ),
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: _buildMessageText(),
+            ),
           ),
         ),
       ),

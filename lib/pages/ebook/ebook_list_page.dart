@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
@@ -45,9 +46,15 @@ class _EbookListPageState extends State<EbookListPage> {
   EbookSort _selectedSort = EbookSort.newest;
 
   List<Ebook>? _allEbooks;
+  QueryDocumentSnapshot<Map<String, dynamic>>? _pageCursor;
+  bool _hasMoreCatalog = false;
+
   bool _loading = true;
   String? _error;
   bool _initialized = false;
+
+  /// [RefreshIndicator] 등으로 목록을 다시 불러올 때 이전 페이지 순차 로드와 충돌하지 않게 함
+  int _catalogLoadGen = 0;
 
   @override
   void didChangeDependencies() {
@@ -59,16 +66,22 @@ class _EbookListPageState extends State<EbookListPage> {
   }
 
   Future<void> _loadEbooks() async {
+    final gen = ++_catalogLoadGen;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final service = context.read<EbookService>();
-      final books = await service.fetchAllEbooks();
-      if (mounted) {
-        setState(() {
-          _allEbooks = books;
-          _loading = false;
-          _error = null;
-        });
-      }
+      final first = await service.fetchEbooksPage();
+      if (!mounted || gen != _catalogLoadGen) return;
+      setState(() {
+        _allEbooks = first.books;
+        _pageCursor = first.lastDocument;
+        _hasMoreCatalog = first.hasMore;
+        _loading = false;
+      });
+      await _loadRemainingCatalogPages(gen);
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -76,6 +89,20 @@ class _EbookListPageState extends State<EbookListPage> {
           _loading = false;
         });
       }
+    }
+  }
+
+  /// 첫 페이지 이후 나머지 전자책을 순차 로드 (정렬·필터가 전체 목록을 쓰도록)
+  Future<void> _loadRemainingCatalogPages(int gen) async {
+    final service = context.read<EbookService>();
+    while (mounted && gen == _catalogLoadGen && _hasMoreCatalog && _pageCursor != null) {
+      final next = await service.fetchEbooksPage(startAfter: _pageCursor);
+      if (!mounted || gen != _catalogLoadGen) return;
+      setState(() {
+        _allEbooks = [..._allEbooks!, ...next.books];
+        _pageCursor = next.lastDocument;
+        _hasMoreCatalog = next.hasMore;
+      });
     }
   }
 
@@ -114,7 +141,14 @@ class _EbookListPageState extends State<EbookListPage> {
     final filtered = _applyFilters(all);
 
     return RefreshIndicator(
-      onRefresh: _loadEbooks,
+      onRefresh: () async {
+        setState(() {
+          _allEbooks = null;
+          _pageCursor = null;
+          _hasMoreCatalog = false;
+        });
+        await _loadEbooks();
+      },
       child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
@@ -166,6 +200,22 @@ class _EbookListPageState extends State<EbookListPage> {
                     ),
                   ),
                 ),
+          if (filtered.isNotEmpty && _hasMoreCatalog)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+                child: Center(
+                  child: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.cardPrimary.withValues(alpha: 0.85),
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -189,11 +239,10 @@ class _FilterBarDelegate extends SliverPersistentHeaderDelegate {
     required this.onSortChanged,
   });
 
-  // minExtent를 maxExtent보다 작게 설정해야
-  // paintExtent < layoutExtent 오류가 발생하지 않음.
-  // 기기마다 inset 계산이 달라 layoutExtent > paintExtent가 되는 경우를 방지.
+  /// 스크롤 시 높이가 줄면 `SizedBox`가 부모보다 커져 BOTTOM OVERFLOW가 난다.
+  /// min/max 동일 + [build]에서 현재 extent 사용으로 맞춘다.
   @override
-  double get minExtent => _kBarHeight - 8;
+  double get minExtent => _kBarHeight;
   @override
   double get maxExtent => _kBarHeight;
 
@@ -217,12 +266,14 @@ class _FilterBarDelegate extends SliverPersistentHeaderDelegate {
     bool overlapsContent,
   ) {
     final visibleCats = _visibleCategories();
+    final extent =
+        (maxExtent - shrinkOffset).clamp(minExtent, maxExtent).toDouble();
 
     return Material(
       color: AppColors.appBg,
       elevation: overlapsContent ? 2 : 0,
       child: SizedBox(
-        height: maxExtent,
+        height: extent,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,

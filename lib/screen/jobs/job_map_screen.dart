@@ -17,6 +17,7 @@ import '../../widgets/job/floating_search_bar.dart';
 import '../../widgets/job/map_empty_state_card.dart';
 import '../../widgets/job/quick_apply_sheet.dart';
 import '../../widgets/job/radius_chip_row.dart';
+import '../../widgets/job/job_cover_image.dart';
 import 'job_detail_screen.dart';
 
 // 앱 세션 내 공고 목록 캐시 (반경/필터 조합 → 결과)
@@ -763,7 +764,7 @@ class _CardThumbnail extends StatelessWidget {
         width: size,
         height: size,
         child: job.images.isNotEmpty
-            ? Image.network(job.images.first, fit: BoxFit.cover)
+            ? JobCoverImage(source: job.images.first, fit: BoxFit.cover)
             : Container(
                 color: AppColors.surfaceMuted,
                 child: Column(

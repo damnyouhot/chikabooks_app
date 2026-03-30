@@ -25,6 +25,27 @@ class EbookService {
     return qs.docs.map((doc) => Ebook.fromDoc(doc)).toList();
   }
 
+  /// `publishedAt` 내림차순 페이지 조회 (목록 첫 화면·무한 스크롤용)
+  static const int ebookPageSize = 24;
+
+  Future<EbookPageResult> fetchEbooksPage({
+    int limit = ebookPageSize,
+    DocumentSnapshot<Map<String, dynamic>>? startAfter,
+  }) async {
+    Query<Map<String, dynamic>> q = _db
+        .collection('ebooks')
+        .orderBy('publishedAt', descending: true)
+        .limit(limit);
+    if (startAfter != null) {
+      q = q.startAfterDocument(startAfter);
+    }
+    final snap = await q.get();
+    final books = snap.docs.map(Ebook.fromDoc).toList();
+    final last = snap.docs.isEmpty ? null : snap.docs.last;
+    final hasMore = snap.docs.length >= limit;
+    return EbookPageResult(books: books, lastDocument: last, hasMore: hasMore);
+  }
+
   Future<Ebook> fetchEbook(String id) async {
     final doc = await _db.collection('ebooks').doc(id).get();
     return Ebook.fromDoc(doc);
@@ -173,4 +194,17 @@ class EbookService {
       rethrow;
     }
   }
+}
+
+/// [fetchEbooksPage] 한 번의 결과
+class EbookPageResult {
+  const EbookPageResult({
+    required this.books,
+    required this.lastDocument,
+    required this.hasMore,
+  });
+
+  final List<Ebook> books;
+  final QueryDocumentSnapshot<Map<String, dynamic>>? lastDocument;
+  final bool hasMore;
 }

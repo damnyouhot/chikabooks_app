@@ -476,6 +476,7 @@ class _ShortcutRow extends StatelessWidget {
             icon: Icons.description_outlined,
             label: '내 이력서',
             description: '이력서 작성 및 지원',
+            showOcrPrepBadge: true,
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const ResumeHomeScreen()),
@@ -502,12 +503,15 @@ class _ShortcutCard extends StatelessWidget {
   final String label;
   final String description;
   final VoidCallback onTap;
+  /// 사진 OCR 자동입력 준비중 안내 (내 이력서 메뉴 전용)
+  final bool showOcrPrepBadge;
 
   const _ShortcutCard({
     required this.icon,
     required this.label,
     required this.description,
     required this.onTap,
+    this.showOcrPrepBadge = false,
   });
 
   @override
@@ -528,13 +532,24 @@ class _ShortcutCard extends StatelessWidget {
             child: Icon(icon, color: AppColors.accent, size: 18),
           ),
           const SizedBox(height: 10),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              if (showOcrPrepBadge) ...[
+                const SizedBox(width: 6),
+                const PrepInProgressBadge(),
+              ],
+            ],
           ),
           const SizedBox(height: 2),
           Text(

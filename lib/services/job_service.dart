@@ -73,6 +73,11 @@ class JobService {
   }
 
   Future<Job> fetchJob(String id) async {
+    // 목업 공고는 Firestore 조회 없이 즉시 로컬 데이터 사용 (불필요한 네트워크 지연 방지)
+    if (id.startsWith('mock_')) {
+      return _jobFetchFallback(id);
+    }
+
     DocumentSnapshot<Map<String, dynamic>>? doc;
     try {
       doc = await _db.collection('jobs').doc(id).get();

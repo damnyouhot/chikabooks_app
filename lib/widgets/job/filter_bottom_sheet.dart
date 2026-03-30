@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
+import '../../models/job.dart';
 import '../../notifiers/job_filter_notifier.dart';
 
 /// 상세 필터 바텀시트
@@ -35,6 +36,9 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
   late String _regionFilter;
   late RangeValues _salaryRange;
   late Set<String> _conditions;
+  late String _hospitalType;
+  late Set<String> _selectedWorkDays;
+  late Set<String> _selectedSubwayLines;
 
   @override
   void initState() {
@@ -46,6 +50,9 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
     _regionFilter = widget.filter.regionFilter;
     _salaryRange = widget.filter.salaryRange;
     _conditions = Set.from(widget.filter.conditions);
+    _hospitalType = widget.filter.hospitalType;
+    _selectedWorkDays = Set.from(widget.filter.selectedWorkDays);
+    _selectedSubwayLines = Set.from(widget.filter.selectedSubwayLines);
   }
 
   void _applyFilters() {
@@ -56,6 +63,9 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
     widget.filter.setRegionFilter(_regionFilter);
     widget.filter.setSalaryRange(_salaryRange);
     widget.filter.setConditions(_conditions);
+    widget.filter.setHospitalType(_hospitalType);
+    widget.filter.setSelectedWorkDays(_selectedWorkDays);
+    widget.filter.setSelectedSubwayLines(_selectedSubwayLines);
     Navigator.pop(context);
   }
 
@@ -68,6 +78,9 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
       _regionFilter = '전체';
       _salaryRange = const RangeValues(0, 10000);
       _conditions.clear();
+      _hospitalType = '전체';
+      _selectedWorkDays.clear();
+      _selectedSubwayLines.clear();
     });
   }
 
@@ -200,7 +213,59 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                   ),
                   const SizedBox(height: AppSpacing.xl),
 
-                  // ⑦ 기타 조건
+                  // ⑦ 병원 유형
+                  const _SectionTitle(title: '병원 유형'),
+                  const SizedBox(height: AppSpacing.sm),
+                  _ChipGroup(
+                    options: const ['전체', '개인의원', '네트워크', '치과병원', '종합병원/대학병원'],
+                    selected: Job.hospitalTypeLabels[_hospitalType] ?? _hospitalType,
+                    onTap: (v) {
+                      final key = Job.hospitalTypeLabels.entries
+                          .firstWhere((e) => e.value == v,
+                              orElse: () => const MapEntry('전체', '전체'))
+                          .key;
+                      setState(() => _hospitalType = key == '전체' ? '전체' : key);
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+
+                  // ⑧ 근무 요일
+                  const _SectionTitle(title: '근무 요일'),
+                  const SizedBox(height: AppSpacing.sm),
+                  _MultiChipGroup(
+                    options: Job.workDayLabels,
+                    selected: _selectedWorkDays,
+                    onToggle: (code) => setState(() {
+                      if (_selectedWorkDays.contains(code)) {
+                        _selectedWorkDays.remove(code);
+                      } else {
+                        _selectedWorkDays.add(code);
+                      }
+                    }),
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+
+                  // ⑨ 지하철 노선
+                  const _SectionTitle(title: '지하철 노선'),
+                  const SizedBox(height: AppSpacing.sm),
+                  _MultiChipGroup(
+                    options: const {
+                      '1호선': '1호선', '2호선': '2호선', '3호선': '3호선',
+                      '4호선': '4호선', '5호선': '5호선', '6호선': '6호선',
+                      '7호선': '7호선', '8호선': '8호선', '9호선': '9호선',
+                    },
+                    selected: _selectedSubwayLines,
+                    onToggle: (line) => setState(() {
+                      if (_selectedSubwayLines.contains(line)) {
+                        _selectedSubwayLines.remove(line);
+                      } else {
+                        _selectedSubwayLines.add(line);
+                      }
+                    }),
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+
+                  // ⑩ 기타 조건
                   const _SectionTitle(title: '기타 조건'),
                   const SizedBox(height: AppSpacing.sm),
                   _ConditionsChips(
@@ -372,6 +437,57 @@ class _ConditionsChips extends StatelessWidget {
                 fontSize: 12,
                 fontWeight:
                     isSelected ? FontWeight.w700 : FontWeight.w400,
+                color: isSelected
+                    ? AppColors.onSegmentSelected
+                    : AppColors.textSecondary,
+                letterSpacing: -0.2,
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+}
+
+// ── 다중 선택 칩 (Map<code, label> 기반) ──────────────────────────
+class _MultiChipGroup extends StatelessWidget {
+  final Map<String, String> options;
+  final Set<String> selected;
+  final ValueChanged<String> onToggle;
+
+  const _MultiChipGroup({
+    required this.options,
+    required this.selected,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: AppSpacing.sm,
+      runSpacing: AppSpacing.sm,
+      children: options.entries.map((e) {
+        final isSelected = selected.contains(e.key);
+        return GestureDetector(
+          onTap: () => onToggle(e.key),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: 7,
+            ),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? AppColors.segmentSelected
+                  : AppColors.surfaceMuted,
+              borderRadius: BorderRadius.circular(AppRadius.full),
+            ),
+            child: Text(
+              e.value,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
                 color: isSelected
                     ? AppColors.onSegmentSelected
                     : AppColors.textSecondary,

@@ -27,6 +27,11 @@ class JobFilterNotifier extends ChangeNotifier {
   // ── 기타 조건 칩 ────────────────────────────────────────────────
   Set<String> _conditions = {};
 
+  // ── 신규 필터 (1차 확장) ─────────────────────────────────────────
+  String _hospitalType = '전체';
+  Set<String> _selectedWorkDays = {};
+  Set<String> _selectedSubwayLines = {};
+
   // ── 지도 전용 ────────────────────────────────────────────────────
   double _radiusKm = 3.0;
 
@@ -41,6 +46,9 @@ class JobFilterNotifier extends ChangeNotifier {
   RangeValues get salaryRange => _salaryRange;
   String get sortBy => _sortBy;
   Set<String> get conditions => _conditions;
+  String get hospitalType => _hospitalType;
+  Set<String> get selectedWorkDays => _selectedWorkDays;
+  Set<String> get selectedSubwayLines => _selectedSubwayLines;
   double get radiusKm => _radiusKm;
   String get searchQuery => _searchQuery;
 
@@ -54,6 +62,9 @@ class JobFilterNotifier extends ChangeNotifier {
     if (_salaryRange.start > 0 || _salaryRange.end < 10000) count++;
     if (_sortBy != '최신순') count++;
     count += _conditions.length;
+    if (_hospitalType != '전체') count++;
+    count += _selectedWorkDays.length;
+    count += _selectedSubwayLines.length;
     return count;
   }
 
@@ -99,6 +110,23 @@ class JobFilterNotifier extends ChangeNotifier {
     }
   }
 
+  void setHospitalType(String v) {
+    if (_hospitalType != v) {
+      _hospitalType = v;
+      notifyListeners();
+    }
+  }
+
+  void setSelectedWorkDays(Set<String> v) {
+    _selectedWorkDays = Set.from(v);
+    notifyListeners();
+  }
+
+  void setSelectedSubwayLines(Set<String> v) {
+    _selectedSubwayLines = Set.from(v);
+    notifyListeners();
+  }
+
   /// 기타 조건 칩 Set 전체 교체 (바텀시트 적용 시)
   void setConditions(Set<String> v) {
     _conditions = Set.from(v);
@@ -139,6 +167,9 @@ class JobFilterNotifier extends ChangeNotifier {
     _salaryRange = const RangeValues(0, 10000);
     _sortBy = '최신순';
     _conditions.clear();
+    _hospitalType = '전체';
+    _selectedWorkDays.clear();
+    _selectedSubwayLines.clear();
     _radiusKm = 3.0;
     notifyListeners();
   }
@@ -151,6 +182,9 @@ class JobFilterNotifier extends ChangeNotifier {
     _salaryRange = const RangeValues(0, 10000);
     _sortBy = '최신순';
     _conditions.clear();
+    _hospitalType = '전체';
+    _selectedWorkDays.clear();
+    _selectedSubwayLines.clear();
     notifyListeners();
   }
 
@@ -161,3 +195,4 @@ class JobFilterNotifier extends ChangeNotifier {
     notifyListeners();
   }
 }
+

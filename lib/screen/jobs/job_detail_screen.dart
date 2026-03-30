@@ -7,6 +7,7 @@ import '../../core/widgets/app_muted_card.dart';
 import '../../models/job.dart';
 import '../../services/job_service.dart';
 import '../../widgets/job/job_detail_widgets.dart';
+import '../../widgets/job/job_cover_image.dart';
 import '../../features/resume/screens/apply_confirm_screen.dart';
 import '../../services/job_stats_service.dart';
 import '../../services/admin_activity_service.dart';
@@ -134,6 +135,11 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
           body: ListView(
             padding: const EdgeInsets.all(AppSpacing.lg),
             children: [
+              if (job.images.isNotEmpty) ...[
+                const JobDetailSectionTitle('사진'),
+                _JobImageGallery(images: job.images),
+                const SizedBox(height: AppSpacing.lg),
+              ],
               if (job.lat != 0 || job.lng != 0)
                 ClipRRect(
                   borderRadius: BorderRadius.circular(AppRadius.xl),
@@ -184,6 +190,27 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                   ),
                 ),
               const SizedBox(height: AppSpacing.md),
+
+              // 태그 + 마감일 배지
+              if (job.tags.isNotEmpty || job.isAlwaysHiring || job.closingDate != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: [
+                      if (job.isAlwaysHiring)
+                        _DetailBadge(label: '상시채용', color: AppColors.success),
+                      if (!job.isAlwaysHiring && job.closingDate != null)
+                        _DetailBadge(
+                          label: 'D-${job.closingDate!.difference(DateTime.now()).inDays}',
+                          color: AppColors.error,
+                        ),
+                      ...job.tags.map((t) => _DetailBadge(label: t, color: AppColors.accent)),
+                    ],
+                  ),
+                ),
+
               Text(
                 job.title,
                 style: const TextStyle(
@@ -211,9 +238,75 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                   letterSpacing: -0.3,
                 ),
               ),
+
+              // 교통편 정보
+              if (job.transportation != null && job.transportation!.detailLine != null) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Row(
+                  children: [
+                    const Icon(Icons.subway, size: 16, color: AppColors.accent),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        job.transportation!.detailLine!,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                    if (job.hasParking)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          SizedBox(width: 8),
+                          Icon(Icons.local_parking, size: 14, color: AppColors.textDisabled),
+                          SizedBox(width: 2),
+                          Text('주차', style: TextStyle(fontSize: 11, color: AppColors.textDisabled)),
+                        ],
+                      ),
+                  ],
+                ),
+              ],
+
               Divider(height: AppSpacing.xxl, color: AppColors.divider),
-              if (job.workHours.isNotEmpty || job.contact.isNotEmpty) ...[
+
+              // 병원 정보
+              if (job.hospitalType != null || job.chairCount != null || job.staffCount != null) ...[
+                const JobDetailSectionTitle('병원 정보'),
+                if (job.hospitalType != null)
+                  JobDetailInfoRow(
+                    icon: Icons.business_outlined,
+                    label: '유형',
+                    value: job.hospitalTypeLabel,
+                  ),
+                if (job.chairCount != null)
+                  JobDetailInfoRow(
+                    icon: Icons.airline_seat_recline_normal_outlined,
+                    label: '체어 수',
+                    value: '${job.chairCount}대',
+                  ),
+                if (job.staffCount != null)
+                  JobDetailInfoRow(
+                    icon: Icons.group_outlined,
+                    label: '스탭 수',
+                    value: '${job.staffCount}명',
+                  ),
+                Divider(height: AppSpacing.xxl, color: AppColors.divider),
+              ],
+
+              // 근무 조건
+              if (job.workHours.isNotEmpty || job.contact.isNotEmpty ||
+                  job.workDays.isNotEmpty || job.applyMethod.isNotEmpty) ...[
                 const JobDetailSectionTitle('근무 조건'),
+                if (job.workDays.isNotEmpty)
+                  JobDetailInfoRow(
+                    icon: Icons.calendar_month_outlined,
+                    label: '근무 요일',
+                    value: job.workDaysSummary +
+                        (job.weekendWork ? ' (주말근무)' : '') +
+                        (job.nightShift ? ' · 야간진료' : ''),
+                  ),
                 if (job.workHours.isNotEmpty)
                   JobDetailInfoRow(
                     icon: Icons.schedule_outlined,
@@ -225,6 +318,14 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                     icon: Icons.phone_outlined,
                     label: '연락처',
                     value: job.contact,
+                  ),
+                if (job.applyMethod.isNotEmpty)
+                  JobDetailInfoRow(
+                    icon: Icons.send_outlined,
+                    label: '지원 방법',
+                    value: job.applyMethod
+                        .map((m) => Job.applyMethodLabels[m] ?? m)
+                        .join(', '),
                   ),
                 Divider(height: AppSpacing.xxl, color: AppColors.divider),
               ],
@@ -246,28 +347,6 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                   children: job.benefits
                       .map((b) => JobBenefitChip(label: b))
                       .toList(),
-                ),
-                const SizedBox(height: AppSpacing.lg),
-              ],
-              if (job.images.isNotEmpty) ...[
-                const JobDetailSectionTitle('사진'),
-                SizedBox(
-                  height: 140,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: job.images.length,
-                    itemBuilder: (_, i) => Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                        child: Image.network(
-                          job.images[i],
-                          width: 200,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    ),
-                  ),
                 ),
                 const SizedBox(height: AppSpacing.lg),
               ],
@@ -301,6 +380,105 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+// ── 채용공고 이미지 갤러리 (PageView + 인디케이터) ──────────────
+class _JobImageGallery extends StatefulWidget {
+  final List<String> images;
+
+  const _JobImageGallery({required this.images});
+
+  @override
+  State<_JobImageGallery> createState() => _JobImageGalleryState();
+}
+
+class _JobImageGalleryState extends State<_JobImageGallery> {
+  late final PageController _ctrl;
+  int _current = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = PageController();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final count = widget.images.length;
+    return Column(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          child: SizedBox(
+            height: 220,
+            child: PageView.builder(
+              controller: _ctrl,
+              itemCount: count,
+              onPageChanged: (i) => setState(() => _current = i),
+              itemBuilder: (_, i) => SizedBox.expand(
+                child: JobCoverImage(
+                  source: widget.images[i],
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+          ),
+        ),
+        if (count > 1) ...[
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(count, (i) {
+              final active = i == _current;
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                width: active ? 16 : 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: active ? AppColors.accent : AppColors.divider,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              );
+            }),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _DetailBadge extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _DetailBadge({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: color,
+          letterSpacing: -0.2,
+        ),
+      ),
     );
   }
 }

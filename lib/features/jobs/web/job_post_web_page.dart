@@ -63,6 +63,7 @@ class _JobPostWebPageState extends State<JobPostWebPage>
         clinicName: draft.clinicName,
         title: draft.title,
         role: draft.role,
+        career: draft.career,
         employmentType: draft.employmentType,
         workHours: draft.workHours,
         salary: draft.salary,
@@ -70,9 +71,26 @@ class _JobPostWebPageState extends State<JobPostWebPage>
         description: draft.description,
         address: draft.address,
         contact: draft.contact,
+        hospitalType: draft.hospitalType,
+        chairCount: draft.chairCount,
+        staffCount: draft.staffCount,
+        workDays: List.from(draft.workDays),
+        weekendWork: draft.weekendWork,
+        nightShift: draft.nightShift,
+        applyMethod: List.from(draft.applyMethod),
+        isAlwaysHiring: draft.isAlwaysHiring,
+        closingDate: draft.closingDate,
+        subwayStationName: draft.subwayStationName,
+        subwayLines: List.from(draft.subwayLines),
+        walkingDistanceMeters: draft.walkingDistanceMeters,
+        walkingMinutes: draft.walkingMinutes,
+        exitNumber: draft.exitNumber,
+        parking: draft.parking,
+        lat: draft.lat,
+        lng: draft.lng,
+        tags: List.from(draft.tags),
       );
     });
-    // 공고 등록 탭으로 이동
     _tabCtrl.animateTo(0);
   }
 

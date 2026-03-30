@@ -476,6 +476,24 @@ class _ApplyConfirmScreenState extends State<ApplyConfirmScreen> {
           ),
           const SizedBox(height: 12),
 
+          // 익명 모드: 기본 아바타 (사진 비공개)
+          Center(
+            child: Container(
+              width: 60,
+              height: 80,
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: AppColors.divider,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                Icons.person,
+                size: 32,
+                color: AppColors.textDisabled.withOpacity(0.5),
+              ),
+            ),
+          ),
+
           _anonRow('표시명', anonProfile['displayName'] ?? '-'),
           _anonRow('경력', anonProfile['careerYears'] ?? '-'),
           _anonRow('지역', anonProfile['region'] ?? '-'),

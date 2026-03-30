@@ -1,25 +1,50 @@
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:uuid/uuid.dart';
 
-/// 웹 전용 — Firebase Storage 직접 업로드 대신 Mock 반환
-/// (향후 firebase_storage 웹 지원 안정화 시 실 연동으로 교체 가능)
+/// 웹 전용 — Firebase Storage putData(bytes) 실 업로드
 class JobImageUploaderImpl {
+  static final _storage = FirebaseStorage.instance;
+  static const _uuid = Uuid();
+
   static Future<List<String>> uploadImages({
     required String jobId,
     required List<XFile> images,
     void Function(int index, double progress)? onProgress,
   }) async {
+    final urls = <String>[];
+
     for (int i = 0; i < images.length; i++) {
-      for (double p = 0.25; p <= 1.0; p += 0.25) {
-        await Future.delayed(const Duration(milliseconds: 80));
-        onProgress?.call(i, p);
-      }
+      final bytes = await images[i].readAsBytes();
+      final name = images[i].name;
+      final ext = name.contains('.')
+          ? name.split('.').last.toLowerCase()
+          : 'jpg';
+      final fileName = '${_uuid.v4()}.$ext';
+      final path = 'jobs/$jobId/images/$fileName';
+      final ref = _storage.ref(path);
+
+      final task = ref.putData(
+        bytes,
+        SettableMetadata(contentType: 'image/$ext'),
+      );
+
+      task.snapshotEvents.listen((snap) {
+        if (snap.totalBytes > 0) {
+          onProgress?.call(i, snap.bytesTransferred / snap.totalBytes);
+        }
+      });
+
+      await task;
+      urls.add(await ref.getDownloadURL());
     }
-    return List.generate(images.length, (i) => 'mock://web-upload/$jobId/$i');
+
+    return urls;
   }
 
   static Future<void> deleteImage(String downloadUrl) async {
-    // 웹 Mock — 아무 동작 없음
+    try {
+      await _storage.refFromURL(downloadUrl).delete();
+    } catch (_) {}
   }
 }
-
-

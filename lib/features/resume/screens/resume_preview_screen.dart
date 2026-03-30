@@ -104,6 +104,9 @@ class _ResumePreviewScreenState extends State<ResumePreviewScreen>
             ),
           ),
 
+        // ── 프로필 사진 + 이름/한줄소개 ──
+        _buildProfileHeader(profile, anonymous: anonymous),
+
         // ── A. 기본정보 ──
         _PreviewSection(
           title: '기본정보',
@@ -389,6 +392,83 @@ class _ResumePreviewScreenState extends State<ResumePreviewScreen>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildProfileHeader(ResumeProfile? profile, {required bool anonymous}) {
+    final photoUrl = anonymous ? null : profile?.selectedPhotoUrl;
+    final name = anonymous
+        ? _mask(profile?.name ?? '')
+        : (profile?.name ?? '');
+    final headline = profile?.headline ?? '';
+
+    return AppMutedCard(
+      margin: const EdgeInsets.only(bottom: AppSpacing.md),
+      padding: const EdgeInsets.all(AppSpacing.md),
+      radius: AppRadius.md,
+      child: Row(
+        children: [
+          // 대표 사진 (3:4 직사각형)
+          Container(
+            width: 72,
+            height: 96,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              color: AppColors.divider,
+            ),
+            child: photoUrl != null
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.network(
+                      photoUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => _defaultAvatar(),
+                    ),
+                  )
+                : _defaultAvatar(),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (name.isNotEmpty)
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                if (headline.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    headline,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _defaultAvatar() {
+    return Center(
+      child: Icon(
+        Icons.person,
+        size: 36,
+        color: AppColors.textDisabled.withOpacity(0.5),
       ),
     );
   }

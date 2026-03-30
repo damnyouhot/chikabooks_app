@@ -5,6 +5,7 @@ import '../../core/theme/app_tokens.dart';
 import '../../core/widgets/app_muted_card.dart';
 import '../../models/job.dart';
 import '../../screen/jobs/job_detail_screen.dart';
+import 'job_cover_image.dart';
 
 /// Level 1 프리미엄 캐러셀 (수평 PageView)
 ///
@@ -179,10 +180,9 @@ class _Level1Card extends StatelessWidget {
                 child: AspectRatio(
                   aspectRatio: 4 / 3,
                   child: job.images.isNotEmpty
-                      ? Image.network(
-                          job.images.first,
+                      ? JobCoverImage(
+                          source: job.images.first,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => const _ImagePlaceholder(),
                         )
                       : const _ImagePlaceholder(),
                 ),
@@ -267,14 +267,17 @@ class _Level1Card extends StatelessWidget {
                     ),
                     const SizedBox(height: 5),
 
-                    // 3줄: 복지 태그
+                    // 3줄: 태그 (tags 우선, 없으면 benefits fallback) + 교통편
                     Wrap(
                       spacing: 4,
                       runSpacing: 2,
-                      children: job.benefits
-                          .take(3)
-                          .map((b) => _BenefitChip(label: b))
-                          .toList(),
+                      children: [
+                        if (job.transportation?.summaryLine != null)
+                          _BenefitChip(label: '🚇 ${job.transportation!.summaryLine!}'),
+                        ...(job.tags.isNotEmpty ? job.tags : job.benefits)
+                            .take(3)
+                            .map((b) => _BenefitChip(label: b)),
+                      ],
                     ),
                   ],
                 ),

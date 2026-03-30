@@ -69,8 +69,7 @@ class JobMatchService {
       }
     }
 
-    // ⑤ 스킬 매칭 (15점)
-    //    enabled 상태인 스킬 ID → 레이블 변환 → job.benefits와 키워드 대조
+    // ⑤ 스킬 매칭 (10점, 기존 15→10으로 축소)
     final skills =
         (profile['skills'] as Map?)?.cast<String, dynamic>() ?? {};
     final enabledLabels = skills.entries
@@ -86,7 +85,26 @@ class JobMatchService {
             ),
           )
           .length;
-      score += (hits * 5).clamp(0, 15);
+      score += (hits * 5).clamp(0, 10);
+    }
+
+    // ⑥ 태그 매칭 보너스 (5점, 신규)
+    if (job.tags.isNotEmpty && enabledLabels.isNotEmpty) {
+      final tagHits = job.tags
+          .where(
+            (t) => enabledLabels.any(
+              (label) => t.contains(label) || label.contains(t),
+            ),
+          )
+          .length;
+      score += (tagHits * 3).clamp(0, 5);
+    }
+
+    // ⑦ 광고 레벨 가중치 (프리미엄 +5, 추천 +3)
+    if (job.jobLevel == 1) {
+      score += 5;
+    } else if (job.jobLevel == 2) {
+      score += 3;
     }
 
     return score.clamp(0, 100);

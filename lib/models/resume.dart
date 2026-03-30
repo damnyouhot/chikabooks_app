@@ -143,6 +143,12 @@ class ResumeProfile {
   final String headline;
   final String summary;
 
+  /// 프로필 사진 URL 목록 (최대 3장)
+  final List<String> photoUrls;
+
+  /// 대표 사진 인덱스 (photoUrls 내)
+  final int selectedPhotoIndex;
+
   const ResumeProfile({
     this.name = '',
     this.phone = '',
@@ -151,7 +157,16 @@ class ResumeProfile {
     this.workTypes = const [],
     this.headline = '',
     this.summary = '',
+    this.photoUrls = const [],
+    this.selectedPhotoIndex = 0,
   });
+
+  /// 대표 사진 URL (없으면 null)
+  String? get selectedPhotoUrl {
+    if (photoUrls.isEmpty) return null;
+    final idx = selectedPhotoIndex.clamp(0, photoUrls.length - 1);
+    return photoUrls[idx];
+  }
 
   factory ResumeProfile.fromMap(Map<String, dynamic> data) {
     return ResumeProfile(
@@ -162,6 +177,8 @@ class ResumeProfile {
       workTypes: List<String>.from(data['workTypes'] ?? []),
       headline: data['headline'] as String? ?? '',
       summary: data['summary'] as String? ?? '',
+      photoUrls: List<String>.from(data['photoUrls'] ?? []),
+      selectedPhotoIndex: (data['selectedPhotoIndex'] as int?) ?? 0,
     );
   }
 
@@ -173,7 +190,33 @@ class ResumeProfile {
         'workTypes': workTypes,
         'headline': headline,
         'summary': summary,
+        'photoUrls': photoUrls,
+        'selectedPhotoIndex': selectedPhotoIndex,
       };
+
+  ResumeProfile copyWith({
+    String? name,
+    String? phone,
+    String? email,
+    String? region,
+    List<String>? workTypes,
+    String? headline,
+    String? summary,
+    List<String>? photoUrls,
+    int? selectedPhotoIndex,
+  }) {
+    return ResumeProfile(
+      name: name ?? this.name,
+      phone: phone ?? this.phone,
+      email: email ?? this.email,
+      region: region ?? this.region,
+      workTypes: workTypes ?? this.workTypes,
+      headline: headline ?? this.headline,
+      summary: summary ?? this.summary,
+      photoUrls: photoUrls ?? this.photoUrls,
+      selectedPhotoIndex: selectedPhotoIndex ?? this.selectedPhotoIndex,
+    );
+  }
 }
 
 // ── 면허/자격 ────────────────────────────────────────────

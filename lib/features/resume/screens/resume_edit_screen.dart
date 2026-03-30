@@ -98,7 +98,7 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text(
-                '온보딩·커리어 카드 정보를 이력서에 반영했어요. 저장하면 확정돼요.',
+                '가입·커리어 카드에 적어 둔 내용을 이력서에 자동으로 넣었어요. 저장하면 반영돼요.',
               ),
               duration: Duration(seconds: 3),
             ),
