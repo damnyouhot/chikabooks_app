@@ -16,12 +16,14 @@ class KakaoAuthService {
     try {
       debugPrint('🔑 카카오 로그인 시작');
 
-      // 🔐 디버그: 현재 앱의 키 해시 출력
-      try {
-        final keyHash = await kakao.KakaoSdk.origin;
-        debugPrint('🔑 현재 앱의 Kakao KeyHash: $keyHash');
-      } catch (e) {
-        debugPrint('⚠️ KeyHash 확인 실패: $e');
+      // 릴리스에서는 KeyHash 미출력 (크래시/원격 로그 수집 시 불필요 노출 방지)
+      if (kDebugMode) {
+        try {
+          final keyHash = await kakao.KakaoSdk.origin;
+          debugPrint('🔑 현재 앱의 Kakao KeyHash: $keyHash');
+        } catch (e) {
+          debugPrint('⚠️ KeyHash 확인 실패: $e');
+        }
       }
 
       // 1. 카카오 SDK로 로그인

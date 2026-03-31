@@ -21,6 +21,7 @@ dependencies:
 
   google_sign_in: ^6.3.0
   sign_in_with_apple: ^6.1.2
+  crypto: ^3.0.6
   kakao_flutter_sdk_user: ^1.10.0
   flutter_naver_login: ^2.0.1
   shimmer: ^3.0.0

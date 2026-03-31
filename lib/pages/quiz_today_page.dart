@@ -1260,7 +1260,7 @@ class _QuizCardState extends State<_QuizCard> {
                         child: Text(
                           () {
                             // sourceFileName에서 .pdf 제거 후 '_' → 공백 (표시용)
-                            // 스토리지 파일명 접두 '치과책방'은 UI에서는 '하이진랩'으로 표시
+                            // 출처 브랜드: 이미 '치과책방'이면 유지, 없으면 접두(구 '하이진랩' 접두는 치과책방으로 치환)
                             String bookName = widget.sourceFileName.isNotEmpty
                                 ? widget.sourceFileName.replaceAll(
                                     RegExp(r'\.pdf$', caseSensitive: false), '')
@@ -1268,12 +1268,15 @@ class _QuizCardState extends State<_QuizCard> {
 
                             if (bookName.isNotEmpty) {
                               bookName = bookName.replaceAll('_', ' ');
-                              const legacyStorePrefix = '치과책방';
-                              if (bookName.startsWith(legacyStorePrefix)) {
-                                bookName =
-                                    '하이진랩${bookName.substring(legacyStorePrefix.length)}';
-                              } else if (!bookName.startsWith('하이진랩')) {
-                                bookName = '하이진랩 $bookName';
+                              const kChikabooks = '치과책방';
+                              const kHygieneLab = '하이진랩';
+                              if (!bookName.startsWith(kChikabooks)) {
+                                if (bookName.startsWith(kHygieneLab)) {
+                                  bookName =
+                                      '$kChikabooks${bookName.substring(kHygieneLab.length)}';
+                                } else {
+                                  bookName = '$kChikabooks $bookName';
+                                }
                               }
                             }
 

@@ -22,7 +22,7 @@ import '../services/funnel_onboarding_service.dart';
 ///   3회차: 1시간 쿨타임 차단
 ///   과식(hunger≥85, 우선): hunger+5, mood-2, energy-3
 ///   mood<30 → bond 절반(내림), energy<30 → 리액션 확률 50%
-/// 터치:
+/// 터치 (최근 3시간 슬라이딩 윈도우 내 횟수):
 ///   1~3회: mood+5, bond+1
 ///   4~6회: mood+1, bond+0
 ///   7회+: mood-1
@@ -183,7 +183,7 @@ class CaringActionService {
 
   // ═══════════════════════ 터치 (Touch) ═══════════════════════
 
-  /// 1~3: mood+5, bond+1 | 4~6: mood+1, bond+0 | 7+: mood-1
+  /// 최근 3시간 내 횟수 — 1~3: mood+5, bond+1 | 4~6: mood+1, bond+0 | 7+: mood-1
   /// energy<30 → mood 보상 절반 | mood<30 → bond 절반
   ///
   /// [fromLocal]: [tryFeed]와 동일. null이면 로드 후 저장, 아니면 저장 생략.
@@ -205,7 +205,12 @@ class CaringActionService {
       }
 
       final now = DateTime.now();
-      final count = state.touchCountToday;
+      final trimmed = CaringState.trimTouchesToWindow(
+        state.touchTimestamps,
+        now,
+        CaringStateService.touchCountWindow,
+      );
+      final count = trimmed.length;
 
       double moodDelta;
       double bondDelta;
@@ -231,7 +236,7 @@ class CaringActionService {
       final updated = state.copyWith(
         mood: state.mood + moodDelta,
         bond: state.bond + bondDelta,
-        touchCountToday: count + 1,
+        touchTimestamps: [...trimmed, now],
         lastActiveAt: now,
       );
 

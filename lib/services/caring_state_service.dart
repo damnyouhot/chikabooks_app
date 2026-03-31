@@ -43,6 +43,9 @@ class CaringStateService {
   static const double bondAbsencePenaltyPerDay = 3.0;
   static const double bondAbsenceMaxPenalty = 9.0;
 
+  /// 쓰다듬기 효과 구간 — 최근 이 시간 안의 터치만 집계
+  static const Duration touchCountWindow = Duration(hours: 3);
+
   // ═══════════════════════ 읽기 ═══════════════════════
 
   /// 상태 로드 → 시간 경과 반영 → 반환
@@ -134,11 +137,12 @@ class CaringStateService {
       debugPrint('✅ 일일 첫 접속 bond +1');
     }
 
-    // ── 날짜가 바뀌었으면 일일 카운터 리셋 ──
-    int touchCount = state.touchCountToday;
-    if (lastDateKey != todayKey) {
-      touchCount = 0;
-    }
+    // ── 쓰다듬기: 3시간 밖 타임스탬프 제거 ──
+    final touchTimestamps = CaringState.trimTouchesToWindow(
+      state.touchTimestamps,
+      now,
+      touchCountWindow,
+    );
 
     return state.copyWith(
       hunger: hunger,
@@ -146,7 +150,7 @@ class CaringStateService {
       energy: energy,
       bond: bond,
       lastActiveAt: now,
-      touchCountToday: touchCount,
+      touchTimestamps: touchTimestamps,
     );
   }
 
@@ -278,6 +282,17 @@ class CaringStateService {
 // CaringState 값 객체
 // ═══════════════════════════════════════════════════════════
 
+List<DateTime> _touchTimestampsFromMap(Map<String, dynamic> m) {
+  final raw = m['touchTimestamps'];
+  if (raw is List && raw.isNotEmpty) {
+    return raw
+        .map((e) => e is Timestamp ? e.toDate() : null)
+        .whereType<DateTime>()
+        .toList(growable: false);
+  }
+  return const [];
+}
+
 /// 캐릭터 상태 — hunger / mood / energy / bond (0~100)
 class CaringState {
   // ── 핵심 4대 상태 ──
@@ -293,8 +308,8 @@ class CaringState {
   // ── 시간 추적 ──
   final DateTime? lastActiveAt;
 
-  // ── 일일 카운터 ──
-  final int touchCountToday;
+  // ── 쓰다듬기: 최근 3시간 안의 터치 시각 목록 (Firestore `touchTimestamps` 배열) ──
+  final List<DateTime> touchTimestamps;
 
   // ── 밥주기 연속 카운터 (시간 기반) ──
   final int consecutiveFeedCount;
@@ -318,7 +333,7 @@ class CaringState {
     this.isSleeping = false,
     this.sleepStartedAt,
     this.lastActiveAt,
-    this.touchCountToday = 0,
+    this.touchTimestamps = const [],
     this.consecutiveFeedCount = 0,
     this.lastFeedAt,
     this.hasGreetedDate,
@@ -326,6 +341,16 @@ class CaringState {
   });
 
   factory CaringState.initial() => const CaringState();
+
+  /// [window] 이전 시각은 제외한 목록 (슬라이딩 윈도우)
+  static List<DateTime> trimTouchesToWindow(
+    List<DateTime> times,
+    DateTime now,
+    Duration window,
+  ) {
+    final cutoff = now.subtract(window);
+    return times.where((t) => !t.isBefore(cutoff)).toList(growable: false);
+  }
 
   /// Firestore → Dart
   factory CaringState.fromMap(Map<String, dynamic> m) {
@@ -337,7 +362,7 @@ class CaringState {
       isSleeping: m['isSleeping'] ?? false,
       sleepStartedAt: (m['sleepStartedAt'] as Timestamp?)?.toDate(),
       lastActiveAt: (m['lastActiveAt'] as Timestamp?)?.toDate(),
-      touchCountToday: m['touchCountToday'] ?? m['touchBondCountToday'] ?? 0,
+      touchTimestamps: _touchTimestampsFromMap(m),
       consecutiveFeedCount: m['consecutiveFeedCount'] ?? 0,
       lastFeedAt: (m['lastFeedAt'] as Timestamp?)?.toDate(),
       hasGreetedDate: m['hasGreetedDate'],
@@ -355,7 +380,9 @@ class CaringState {
       'isSleeping': isSleeping,
       'sleepStartedAt': sleepStartedAt != null ? Timestamp.fromDate(sleepStartedAt!) : null,
       'lastActiveAt': lastActiveAt != null ? Timestamp.fromDate(lastActiveAt!) : null,
-      'touchCountToday': touchCountToday,
+      'touchTimestamps': touchTimestamps
+          .map((t) => Timestamp.fromDate(t))
+          .toList(growable: false),
       'consecutiveFeedCount': consecutiveFeedCount,
       'lastFeedAt': lastFeedAt != null ? Timestamp.fromDate(lastFeedAt!) : null,
       'hasGreetedDate': hasGreetedDate,
@@ -371,7 +398,7 @@ class CaringState {
     bool? isSleeping,
     DateTime? sleepStartedAt,
     DateTime? lastActiveAt,
-    int? touchCountToday,
+    List<DateTime>? touchTimestamps,
     int? consecutiveFeedCount,
     DateTime? lastFeedAt,
     String? hasGreetedDate,
@@ -385,7 +412,7 @@ class CaringState {
       isSleeping: isSleeping ?? this.isSleeping,
       sleepStartedAt: sleepStartedAt ?? this.sleepStartedAt,
       lastActiveAt: lastActiveAt ?? this.lastActiveAt,
-      touchCountToday: touchCountToday ?? this.touchCountToday,
+      touchTimestamps: touchTimestamps ?? this.touchTimestamps,
       consecutiveFeedCount: consecutiveFeedCount ?? this.consecutiveFeedCount,
       lastFeedAt: lastFeedAt ?? this.lastFeedAt,
       hasGreetedDate: hasGreetedDate ?? this.hasGreetedDate,

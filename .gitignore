@@ -70,3 +70,5 @@ key.properties
 # 4. Firebase 서비스 계정 키 (절대 커밋 금지)
 **/serviceAccountKey.json
 **/service-account*.json
+# macOS 등에서 잘못 저장된 이중 경로/특수 파일명 (**/ 패턴에 안 걸릴 수 있음)
+functions/functions:serviceAccountKey.json

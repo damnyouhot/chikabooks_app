@@ -1003,14 +1003,14 @@ class _CaringPageState extends State<CaringPage>
             Text('🐾 쓰다듬기', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
             SizedBox(height: 8),
             Text(
-              '하루 초반에는 기분과 유대에 도움이 되지만, 너무 자주 하면 오히려 컨디션이 떨어질 수 있어요.',
+              '쓰다듬기는 가까이 다가가는 느낌으로 기분이나 유대에 닿을 수 있어요. 한꺼번에 너무 잦으면 쉴 틈이 없어져서 오히려 컨디션이 나빠질 수 있어요. 최근 3시간 내 최대 6회까지만 긍정적으로 받아들여요.',
               style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary),
             ),
             SizedBox(height: 16),
             Text('🌙 재우기', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
             SizedBox(height: 8),
             Text(
-              '충분히 재워야 에너지가 회복돼요. 너무 짧게 깨우면 기분 회복이 잘 안 될 수 있어요.',
+              '충분히 재워야 에너지가 회복돼요. 너무 짧게 깨우면 오히려 기분이 나빠지고 힘들어해요.',
               style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary),
             ),
             SizedBox(height: 16),

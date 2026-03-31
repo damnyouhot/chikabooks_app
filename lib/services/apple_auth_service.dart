@@ -1,29 +1,47 @@
-import 'package:cloud_functions/cloud_functions.dart';
+import 'dart:convert';
+import 'dart:math';
+
+import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 /// Apple 로그인 서비스
-/// Custom Token 방식으로 Firebase Auth 연동
+/// Firebase OAuthCredential 직접 방식 (Cloud Functions 불필요)
 class AppleAuthService {
-  static final _functions = FirebaseFunctions.instanceFor(region: 'us-central1');
   static final _auth = FirebaseAuth.instance;
 
-  // 웹용 Apple Service ID (Apple Developer Console에서 생성한 Services ID)
   static const _webClientId = 'com.chikabooks.web';
-  // Apple 로그인 후 리디렉션 URL
-  static const _webRedirectUri = 'https://chikabooks3rd.web.app/__/auth/handler';
+  static const _webRedirectUri =
+      'https://chikabooks3rd.web.app/__/auth/handler';
+
+  /// nonce를 생성하여 replay attack 방지
+  static String _generateNonce([int length = 32]) {
+    const charset =
+        '0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._';
+    final random = Random.secure();
+    return List.generate(length, (_) => charset[random.nextInt(charset.length)])
+        .join();
+  }
+
+  static String _sha256ofString(String input) {
+    final bytes = utf8.encode(input);
+    final digest = sha256.convert(bytes);
+    return digest.toString();
+  }
 
   /// Apple 로그인 실행
   static Future<User?> signInWithApple() async {
     try {
-      // 1. Apple 로그인 (SDK)
+      final rawNonce = _generateNonce();
+      final nonce = _sha256ofString(rawNonce);
+
       final appleCredential = await SignInWithApple.getAppleIDCredential(
         scopes: [
           AppleIDAuthorizationScopes.email,
           AppleIDAuthorizationScopes.fullName,
         ],
-        // 웹에서는 webAuthenticationOptions 필수
+        nonce: kIsWeb ? null : nonce,
         webAuthenticationOptions: kIsWeb
             ? WebAuthenticationOptions(
                 clientId: _webClientId,
@@ -32,38 +50,43 @@ class AppleAuthService {
             : null,
       );
 
-      final String? providerId = appleCredential.userIdentifier;
-      final String? email = appleCredential.email;
-      final String? givenName = appleCredential.givenName;
-      final String? familyName = appleCredential.familyName;
-      final String? displayName = givenName != null && familyName != null
-          ? '$givenName $familyName'
-          : null;
-
-      if (providerId == null) {
-        debugPrint('⚠️ Apple 사용자 ID를 가져올 수 없습니다');
+      final identityToken = appleCredential.identityToken;
+      if (identityToken == null) {
+        debugPrint('⚠️ Apple identityToken이 null');
         return null;
       }
 
-      debugPrint('✅ Apple 로그인 성공: $providerId ($email)');
+      final oauthCredential = OAuthProvider('apple.com').credential(
+        idToken: identityToken,
+        rawNonce: rawNonce,
+        accessToken: appleCredential.authorizationCode,
+      );
 
-      // 2. Firebase Custom Token 발급 요청
-      final result = await _functions.httpsCallable('createCustomToken').call({
-        'provider': 'apple',
-        'providerId': providerId,
-        'email': email,
-        'displayName': displayName,
-      });
+      final userCredential =
+          await _auth.signInWithCredential(oauthCredential);
 
-      final String customToken = result.data['customToken'];
+      // Apple은 이름을 최초 1회만 제공 → displayName 업데이트
+      final givenName = appleCredential.givenName;
+      final familyName = appleCredential.familyName;
+      if (givenName != null || familyName != null) {
+        final displayName =
+            [familyName, givenName].where((s) => s != null).join(' ').trim();
+        if (displayName.isNotEmpty) {
+          await userCredential.user?.updateDisplayName(displayName);
+        }
+      }
 
-      // 3. Firebase Auth에 Custom Token으로 로그인
-      final credential = await _auth.signInWithCustomToken(customToken);
+      debugPrint(
+        '✅ Apple 로그인 성공: ${userCredential.user?.uid} '
+        '(${userCredential.user?.email})',
+      );
 
-      debugPrint('✅ Firebase 로그인 완료: ${credential.user?.uid}');
-
-      return credential.user;
+      return userCredential.user;
     } catch (e) {
+      if (e.toString().contains('AuthorizationErrorCode.canceled')) {
+        debugPrint('ℹ️ Apple 로그인 취소');
+        return null;
+      }
       debugPrint('⚠️ Apple 로그인 실패: $e');
       return null;
     }
@@ -82,8 +105,6 @@ class AppleAuthService {
   /// Apple 연결 해제 (회원 탈퇴)
   static Future<void> unlink() async {
     try {
-      // Apple은 SDK에서 연결 해제 API를 제공하지 않으므로
-      // Firebase Auth 사용자만 삭제
       await _auth.currentUser?.delete();
       debugPrint('✅ Apple 연결 해제 완료');
     } catch (e) {
@@ -91,4 +112,3 @@ class AppleAuthService {
     }
   }
 }
-

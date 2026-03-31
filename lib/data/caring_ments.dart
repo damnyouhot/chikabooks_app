@@ -6,12 +6,13 @@
 ///   정상 급식 성공 → feedSuccessSimple (단일 풀)
 ///   과식(hunger ≥ 85) → feedOverfed
 ///
-/// ── 터치 ──
-///   첫 터치(0회) → touchFirst
-///   hunger < 40  → touchHungry (배고파 보일 때)
-///   mood > 70    → touchHappy (기분 좋을 때)
-///   bond > 60    → touchClose (친밀도 높을 때)
-///   그 외        → touchGeneral
+/// ── 터치 (최근 3시간 슬라이딩 윈도우 안의 횟수 = count) ──
+///   count ≥ 7   → touchTired (같은 구간 안 8번째 터치~, 과다)
+///   count == 0  → touchFirst (이번 3시간 구간에서 첫 터치)
+///   hunger < 40 → touchHungry
+///   mood > 70   → touchHappy
+///   bond > 60   → touchClose
+///   그 외       → touchGeneral
 ///
 /// ── 수면 ──
 ///   재우기       → sleepStart
@@ -82,13 +83,13 @@ class CaringMents {
   ];
 
   // ════════════════════════════════════════════
-  // 2) 터치 (Touch) — 상태 기반
+  // 2) 터치 (Touch) — 최근 3시간 내 횟수(count) + 상태
   // ════════════════════════════════════════════
 
-  /// 오늘 첫 터치
+  /// 이번 3시간 구간에서 첫 터치 직후 (count == 0)
   static const touchFirst = [
-    "오늘의 첫 인사, 조용히 받았어.",
-    "오늘도 쓰다듬어 줘서 고마워!",
+    "한동안 첫 쓰다듬기네. 조용히 받았어.",
+    "쓰다듬어 줘서 고마워!",
     "안녕! 여기 있었어.",
     "와줘서 반가워!",
     "손이 따뜻하네.",
@@ -97,7 +98,7 @@ class CaringMents {
 
   /// 배고파 보일 때 (hunger < 40)
   static const touchHungry = [
-    "오늘은 좀 가벼운 날이었나 봐.",
+    "속이 좀 가벼운 느낌이야.",
     "나는 기다리는 법도 배웠어.",
   ];
 
@@ -112,7 +113,7 @@ class CaringMents {
 
   /// 친밀도 높을 때 (bond > 60)
   static const touchClose = [
-    "오늘은 이미 충분히 가까워.",
+    "지금은 이미 충분히 가까워.",
     "우리는 이런 걸로 이어지나 봐.",
     "너랑은 편해.",
   ];
@@ -124,14 +125,14 @@ class CaringMents {
     "다시 온 걸로 충분해.",
   ];
 
-  /// 터치 과다 (7회+, 역효과)
+  /// 터치 과다 (같은 3시간 안 8번째~, 집계 count ≥ 7)
   static const touchTired = [
     "너무 많이 만지면 지쳐…",
     "좀 쉬자… 살살.",
     "이제 그만…",
     "피부가 예민해졌어.",
     "손이 좀 무거워.",
-    "오늘은 이만하자.",
+    "잠깐만 쉬자. 이만할게.",
     "좀만 쉬었다가.",
     "귀찮… 아니, 고마운데…",
   ];

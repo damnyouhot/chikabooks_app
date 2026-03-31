@@ -61,11 +61,11 @@ service cloud.firestore {
     }
 
     // ══════════════════════════════════════════════════
-    // 🔐 API 키 (로그인한 모든 사용자 읽기 가능, 쓰기는 금지)
+    // 🔐 API 키 (클라이언트 접근 금지 — Admin SDK/콘솔만)
+    // Cloud Functions는 보안 규칙을 우회하므로 sync 등 서버 코드는 그대로 동작함.
     // ══════════════════════════════════════════════════
     match /api_keys/{keyDoc} {
-      allow read: if request.auth != null; // 로그인한 모든 사용자
-      allow write: if false; // 콘솔 또는 서버에서만 수정
+      allow read, write: if false;
     }
 
     // ══════════════════════════════════════════════════

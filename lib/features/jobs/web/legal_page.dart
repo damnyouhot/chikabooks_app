@@ -274,7 +274,7 @@ LegalPage buildPrivacyPage() {
           LegalContent.subheading('돌보기(캐릭터 상호작용)'),
           LegalContent.bullets([
             '배고픔·기분·에너지·유대(친밀도) 등 돌보기 상태 값',
-            '수면 여부, 밥주기·쓰다듬기 등 상호작용 및 일일 카운터',
+            '수면 여부, 밥주기·쓰다듬기 등 상호작용 및 쓰다듬기 횟수(최근 3시간 기준)',
           ]),
           LegalContent.subheading('전자책·학습·퀴즈'),
           LegalContent.bullets([
