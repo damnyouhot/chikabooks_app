@@ -79,6 +79,7 @@ class _SignInPageState extends State<SignInPage> {
   /// Google 로그인
   Future<void> _signInWithGoogle() async {
     AdminActivityService.log(ActivityEventType.tapLoginGoogle, page: 'sign_in');
+    if (_isLoading) return;
     setState(() => _isLoading = true);
     AuthGate.clinicBlocked.value = true;
     try {
@@ -150,19 +151,24 @@ class _SignInPageState extends State<SignInPage> {
   /// Apple 로그인
   Future<void> _signInWithApple() async {
     AdminActivityService.log(ActivityEventType.tapLoginApple, page: 'sign_in');
+    if (_isLoading) return;
     setState(() => _isLoading = true);
     AuthGate.clinicBlocked.value = true;
     try {
       await OnboardingService.forceSchedule();
 
-      final user = await AppleAuthService.signInWithApple();
-      if (user == null && mounted) {
+      final appleRes = await AppleAuthService.signInWithApple();
+      if (appleRes == null && mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('Apple 로그인 실패')));
-      } else if (user != null) {
+      } else if (appleRes != null) {
+        final (user, appleIdEmail) = appleRes;
         if (await _rejectIfClinicAccount()) return;
-        await SignInTracker.record('apple');
+        await SignInTracker.record(
+          'apple',
+          email: appleIdEmail ?? user.email,
+        );
         AdminActivityService.log(ActivityEventType.viewSignInPage, page: 'sign_in');
         AdminActivityService.log(ActivityEventType.loginSuccess, page: 'sign_in', extra: {'provider': 'apple'});
         AdminActivityService.logFunnel(
@@ -204,6 +210,7 @@ class _SignInPageState extends State<SignInPage> {
       return;
     }
 
+    if (_isLoading) return;
     setState(() => _isLoading = true);
     AuthGate.clinicBlocked.value = true;
     try {
@@ -248,15 +255,16 @@ class _SignInPageState extends State<SignInPage> {
   /// 네이버 로그인
   Future<void> _signInWithNaver() async {
     AdminActivityService.log(ActivityEventType.tapLoginNaver, page: 'sign_in');
+    if (_isLoading) return;
     setState(() => _isLoading = true);
     AuthGate.clinicBlocked.value = true;
     try {
       await OnboardingService.forceSchedule();
 
       debugPrint('🔑 네이버 로그인 시작');
-      final user = await NaverAuthService.signInWithNaver();
+      final naverRes = await NaverAuthService.signInWithNaver();
 
-      if (user == null) {
+      if (naverRes == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('네이버 로그인 실패. 다시 시도해주세요.')),
@@ -265,11 +273,17 @@ class _SignInPageState extends State<SignInPage> {
         return;
       }
 
-      debugPrint('✅ 네이버 로그인 성공: ${user.uid} (${user.email})');
+      final (user, naverProfileEmail) = naverRes;
+      debugPrint(
+        '✅ 네이버 로그인 성공: ${user.uid} (Auth.email=${user.email}, sdk=$naverProfileEmail)',
+      );
 
       if (await _rejectIfClinicAccount()) return;
 
-      await SignInTracker.record('naver');
+      await SignInTracker.record(
+        'naver',
+        email: naverProfileEmail ?? user.email,
+      );
       AdminActivityService.log(ActivityEventType.viewSignInPage, page: 'sign_in');
       AdminActivityService.log(ActivityEventType.loginSuccess, page: 'sign_in', extra: {'provider': 'naver'});
       AdminActivityService.logFunnel(
@@ -641,7 +655,7 @@ class _SignInPageState extends State<SignInPage> {
                     children: [
                       const HygieneLabEnglishTitle(
                         fontSize: 34.8,
-                        letterSpacing: 0.35,
+                        letterSpacing: 0.21,
                       ),
                       const SizedBox(height: 2),
                       Text(

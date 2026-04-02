@@ -5,6 +5,10 @@ import {parseStringPromise} from "xml2js";
 import * as crypto from "crypto";
 import { defineSecret } from "firebase-functions/params";
 import { resolvePollOpsFromRows } from "./poll-ops-hub";
+import { runCheckBusinessStatus } from "./business-verification";
+import { haversineMeters, linesForStationDisplayName } from "./metro_station_lines";
+
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
 const GOOGLE_MAPS_API_KEY = defineSecret("GOOGLE_MAPS_API_KEY");
 
@@ -934,7 +938,12 @@ export const verifyNaverToken = functions.https.onCall(
       const userData = response.data;
 
       // ========== 5. 응답 검증 ==========
-      if (!userData.response || userData.resultcode !== "00") {
+      const resultCode = userData.resultcode;
+      const resultOk =
+        resultCode === "00" ||
+        resultCode === 0 ||
+        String(resultCode) === "00";
+      if (!userData.response || !resultOk) {
         throw new functions.https.HttpsError(
           "unauthenticated",
           "네이버 토큰 검증 실패",
@@ -942,16 +951,43 @@ export const verifyNaverToken = functions.https.onCall(
         );
       }
 
-      const naverUser = userData.response;
-      const naverId = naverUser.id;
-      const email = naverUser.email || null;
-      const displayName = naverUser.name || null;
+      const raw = userData.response as Record<string, unknown>;
+      const pickStr = (obj: Record<string, unknown>, keys: string[]): string | null => {
+        for (const k of keys) {
+          const v = obj[k];
+          if (typeof v === "string" && v.trim().length > 0) return v.trim();
+        }
+        return null;
+      };
 
-      console.log(`✅ 네이버 토큰 검증 성공 (네이버ID: ${naverId})`);
+      const pickEmail = (obj: Record<string, unknown>): string | null => {
+        for (const k of ["email", "user_email", "userEmail"]) {
+          const v = obj[k];
+          if (typeof v === "string" && v.trim().length > 0) return v.trim();
+        }
+        return null;
+      };
+
+      const naverId = String(raw.id ?? "");
+      let email = pickEmail(raw);
+      const profileEmailHint = (data.profileEmail as string | undefined)?.trim().toLowerCase();
+      if (!email && profileEmailHint && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profileEmailHint)) {
+        email = profileEmailHint;
+        console.log(
+          "verifyNaverToken: nid/me에 email 없음 → 앱에서 전달한 프로필 이메일 사용 (동일 세션)"
+        );
+      }
+      const displayName = pickStr(raw, ["name", "nickname"]);
+
+      const responseKeys = Object.keys(raw);
+      console.log(
+        `✅ 네이버 토큰 검증 성공 (네이버ID: ${naverId}, nid/me keys: ${responseKeys.join(",")}, emailPresent: ${!!pickEmail(raw)})`
+      );
 
       // ========== 6. Firebase UID 생성 (prefix로 충돌 방지) ==========
-      const uid = `naver:${naverId}`;
-      const legacyUid = `naver_${naverId}`; // 기존 형식
+      const legacyUid = `naver_${naverId}`;
+      /** Firebase Auth 커스텀 UID는 `:` 미허용 → 레거시와 동일한 `naver_` 접두사만 사용 */
+      const uid = legacyUid;
 
       // ========== 6-1. 기존 사용자 마이그레이션 체크 ==========
       try {
@@ -989,6 +1025,17 @@ export const verifyNaverToken = functions.https.onCall(
 
             transaction.set(naverLegacyUserRef, baseData, {merge: true});
           });
+
+          if (email && email.trim().length > 0) {
+            try {
+              await admin.auth().updateUser(legacyUid, {email: email.trim()});
+            } catch (authUpdErr: unknown) {
+              console.warn(
+                "verifyNaverToken: 기존 사용자 Auth email 갱신 실패(무시)",
+                String(authUpdErr)
+              );
+            }
+          }
 
           console.log(`✅ 기존 사용자 로그인 완료 (UID: ${legacyUid})`);
 
@@ -1064,6 +1111,10 @@ export const verifyNaverToken = functions.https.onCall(
       };
     } catch (error: any) {
       console.error("⚠️ verifyNaverToken error:", error.message);
+
+      if (error instanceof functions.https.HttpsError) {
+        throw error;
+      }
 
       // ========== 10. 에러 분류 및 전달 ==========
       if (axios.isAxiosError(error)) {
@@ -1212,8 +1263,9 @@ export const verifyKakaoToken = functions.https.onCall(
       console.log(`✅ 카카오 토큰 검증 성공 (카카오ID: ${kakaoId})`);
 
       // ========== 6. Firebase UID 생성 (prefix로 충돌 방지) ==========
-      const uid = `kakao:${kakaoId}`;
-      const legacyUid = `kakao_${kakaoId}`; // 기존 형식
+      const legacyUid = `kakao_${kakaoId}`;
+      /** Firebase Auth 커스텀 UID는 `:` 미허용 → 레거시와 동일한 `kakao_` 접두사만 사용 */
+      const uid = legacyUid;
 
       // ========== 6-1. 기존 사용자 마이그레이션 체크 ==========
       try {
@@ -1270,9 +1322,9 @@ export const verifyKakaoToken = functions.https.onCall(
       await checkApplicantRoleDuplicate(uid, email);
 
       // ========== 7. Firebase Auth 사용자 생성/조회 (email-already-exists 방지) ==========
-      let resolvedUid = uid; // 기본값: kakao:{kakaoId}
+      let resolvedUid = uid; // 기본값: kakao_<카카오숫자ID>
 
-      // 7-1. 먼저 kakao: UID로 기존 계정 존재 여부 확인
+      // 7-1. 먼저 kakao_* UID로 기존 계정 존재 여부 확인
       let userExists = false;
       try {
         await admin.auth().getUser(uid);
@@ -1360,6 +1412,13 @@ export const verifyKakaoToken = functions.https.onCall(
       };
     } catch (error: any) {
       console.error("⚠️ verifyKakaoToken error:", error.message);
+      if (error?.code) {
+        console.error("⚠️ verifyKakaoToken error.code:", error.code);
+      }
+
+      if (error instanceof functions.https.HttpsError) {
+        throw error;
+      }
 
       // ========== 10. 에러 분류 및 전달 ==========
       if (axios.isAxiosError(error)) {
@@ -1440,7 +1499,7 @@ export {
  *            benefits, description, address, contact, clinicName }
  */
 export const parseJobImagesToForm = functions
-  .runWith({ timeoutSeconds: 60, memory: "512MB" })
+  .runWith({ timeoutSeconds: 60, memory: "512MB", secrets: ["GEMINI_API_KEY"] })
   .https.onCall(async (data, context) => {
     if (!context.auth) {
       throw new functions.https.HttpsError(
@@ -1457,35 +1516,100 @@ export const parseJobImagesToForm = functions
       );
     }
 
-    // ── TODO: OpenAI Vision 실제 연동 ──────────────────────────
-    // const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    // const response = await openai.chat.completions.create({ ... });
-    // ────────────────────────────────────────────────────────────
+    // ── sourceType 분기 (image / text / mixed) ────────────────
+    const sourceType: string = data.sourceType ?? "image";
+    const rawText: string = data.rawText ?? "";
 
-    // ── Mock 응답 (이미지 분석 없이 샘플 반환) ──────────────────
-    functions.logger.info("parseJobImagesToForm called (mock)", {
-      uid: context.auth.uid,
-      imageCount: imageUrls.length,
+    if (sourceType === "text" && !rawText.trim()) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "텍스트 입력이 비어 있습니다."
+      );
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new functions.https.HttpsError("internal", "AI API 키가 설정되지 않았습니다.");
+    }
+
+    functions.logger.info("parseJobImagesToForm", {
+      uid: context.auth.uid, sourceType, imageCount: imageUrls.length, textLength: rawText.length,
     });
 
-    // 실제 연동 전까지 샘플 데이터 반환
-    const mockResult = {
-      clinicName: "",
-      title: "",
-      role: "",
-      employmentType: "",
-      workHours: "",
-      salary: "",
-      benefits: [] as string[],
-      description: "",
-      address: "",
-      contact: "",
-      _mock: true,
-      _message:
-        "AI 자동입력은 OpenAI 키 연동 후 활성화됩니다. 현재는 Mock 모드입니다.",
-    };
+    const systemPrompt = `아래 치과 채용 공고 내용을 분석하여 반드시 아래 JSON 형식으로만 응답해줘.
+다른 텍스트 없이 순수 JSON만 반환해.
+필드가 파악되지 않으면 빈 문자열 또는 빈 배열로 남겨. 절대 추측하지 말고 원문에 명시된 정보만 추출해.
+benefits는 문자열 배열로 반환해.
 
-    return mockResult;
+{
+  "clinicName": "치과명",
+  "title": "공고 제목",
+  "role": "직종 (예: 치과위생사, 치과조무사 등)",
+  "career": "경력 조건 (예: 신입, 경력 3년 이상)",
+  "employmentType": "고용 형태 (예: 정규직, 계약직, 파트타임)",
+  "workHours": "근무 시간 (예: 09:00~18:00)",
+  "salary": "급여 (예: 월 250~300만원)",
+  "benefits": ["복리후생1", "복리후생2"],
+  "description": "상세 내용",
+  "address": "근무지 주소",
+  "contact": "연락처",
+  "hospitalType": "병원 유형 (예: 일반치과, 교정과 등)",
+  "workDays": ["월", "화", "수", "목", "금"],
+  "weekendWork": "주말 근무 여부 (예: 격주 토요일)",
+  "nightShift": "야간 근무 여부"
+}`;
+
+    const parts: Array<{text?: string; inlineData?: {mimeType: string; data: string}}> = [];
+    parts.push({text: systemPrompt});
+
+    if (sourceType === "text" || sourceType === "mixed") {
+      parts.push({text: "아래는 공고 텍스트입니다:\n" + rawText});
+    }
+
+    if ((sourceType === "image" || sourceType === "mixed") && imageUrls.length > 0) {
+      for (const url of imageUrls.slice(0, 5)) {
+        try {
+          const imgResp = await axios.get(url, {responseType: "arraybuffer", timeout: 15000});
+          const base64 = Buffer.from(imgResp.data).toString("base64");
+          const contentType = imgResp.headers["content-type"] || "image/jpeg";
+          parts.push({inlineData: {mimeType: contentType, data: base64}});
+        } catch (e) {
+          functions.logger.warn("이미지 다운로드 실패", {url, error: String(e)});
+        }
+      }
+    }
+
+    try {
+      const geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/" + GEMINI_MODEL + ":generateContent?key=" + apiKey;
+      const resp = await axios.post(geminiUrl, {
+        contents: [{parts}],
+        generationConfig: {responseMimeType: "application/json"},
+      }, {timeout: 45000});
+
+      const text = resp.data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
+      const parsed = JSON.parse(text);
+
+      return {
+        clinicName: parsed.clinicName ?? "",
+        title: parsed.title ?? "",
+        role: parsed.role ?? "",
+        career: parsed.career ?? "",
+        employmentType: parsed.employmentType ?? "",
+        workHours: parsed.workHours ?? "",
+        salary: parsed.salary ?? "",
+        benefits: Array.isArray(parsed.benefits) ? parsed.benefits : [],
+        description: parsed.description ?? "",
+        address: parsed.address ?? "",
+        contact: parsed.contact ?? "",
+        hospitalType: parsed.hospitalType ?? "",
+        workDays: Array.isArray(parsed.workDays) ? parsed.workDays : [],
+        weekendWork: parsed.weekendWork ?? "",
+        nightShift: parsed.nightShift ?? "",
+      };
+    } catch (e: unknown) {
+      functions.logger.error("Gemini API 호출 실패", {error: String(e)});
+      throw new functions.https.HttpsError("internal", "AI 분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+    }
   });
 
 // ========== 구인공고: 공고 생성 ==========
@@ -1620,8 +1744,20 @@ export const createJobPosting = functions.https.onCall(
 
     // 근무 조건
     const validDays = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+    const korDayMap: Record<string, string> = {
+      "월": "mon", "화": "tue", "수": "wed", "목": "thu",
+      "금": "fri", "토": "sat", "일": "sun",
+      "월요일": "mon", "화요일": "tue", "수요일": "wed", "목요일": "thu",
+      "금요일": "fri", "토요일": "sat", "일요일": "sun",
+    };
     const workDays: string[] = Array.isArray(data.workDays)
-      ? data.workDays.filter((d: unknown) => typeof d === "string" && validDays.includes(d as string))
+      ? data.workDays
+        .map((d: unknown) => {
+          if (typeof d !== "string") return null;
+          const trimmed = (d as string).trim();
+          return korDayMap[trimmed] ?? (validDays.includes(trimmed) ? trimmed : null);
+        })
+        .filter((d: string | null): d is string => d !== null)
       : [];
     const weekendWork = data.weekendWork === true;
     const nightShift = data.nightShift === true;
@@ -1767,6 +1903,8 @@ export const lookupNearbyStation = functions
     let lng = Number(data.lng);
     const address = typeof data.address === "string" ? data.address.trim() : "";
 
+    functions.logger.info("lookupNearbyStation input", { lat, lng, address, hasLat: isFinite(lat), hasLng: isFinite(lng) });
+
     // 좌표가 없거나 유효하지 않으면 주소로 지오코딩
     if ((!isFinite(lat) || !isFinite(lng) || (lat === 0 && lng === 0)) && address.length > 0) {
       try {
@@ -1774,12 +1912,21 @@ export const lookupNearbyStation = functions
         const geoRes = await axios.get(geocodeUrl, {
           params: { address, key: apiKey, language: "ko", region: "kr" },
         });
+        const geoStatus = geoRes.data?.status ?? "UNKNOWN";
+        const geoError = geoRes.data?.error_message ?? "";
+        functions.logger.info("lookupNearbyStation geocoding response", {
+          status: geoStatus, error: geoError, resultCount: geoRes.data?.results?.length ?? 0,
+        });
+        if (geoStatus !== "OK" && geoStatus !== "ZERO_RESULTS") {
+          return { found: false, reason: "Geocoding API 오류: " + geoStatus + " " + geoError };
+        }
         const geoResult = geoRes.data?.results?.[0];
         if (!geoResult) {
-          return { found: false, reason: "주소를 찾을 수 없습니다." };
+          return { found: false, reason: "주소를 찾을 수 없습니다 (" + geoStatus + ")" };
         }
         lat = geoResult.geometry.location.lat;
         lng = geoResult.geometry.location.lng;
+        functions.logger.info("lookupNearbyStation geocoded", { lat, lng, formattedAddress: geoResult.formatted_address });
       } catch (e) {
         functions.logger.error("lookupNearbyStation geocoding error", e);
         throw new functions.https.HttpsError("internal", "주소 변환 중 오류가 발생했습니다.");
@@ -1791,85 +1938,147 @@ export const lookupNearbyStation = functions
     }
 
     try {
-      // 1) Places API (Nearby Search) - 반경 1500m 내 subway_station
+      // 1) Places API (Nearby Search) - 반경 1000m 내 subway_station
+      const SEARCH_RADIUS = 1000;
       const placesUrl = "https://places.googleapis.com/v1/places:searchNearby";
       const placesBody = {
         includedTypes: ["subway_station"],
-        maxResultCount: 5,
+        maxResultCount: 10,
+        languageCode: "ko",
+        regionCode: "KR",
         locationRestriction: {
           circle: {
             center: { latitude: lat, longitude: lng },
-            radius: 1500.0,
+            radius: SEARCH_RADIUS,
           },
         },
       };
-      const placesRes = await axios.post(placesUrl, placesBody, {
-        headers: {
-          "Content-Type": "application/json",
-          "X-Goog-Api-Key": apiKey,
-          "X-Goog-FieldMask": "places.displayName,places.location",
-        },
-      });
+      let placesRes;
+      try {
+        placesRes = await axios.post(placesUrl, placesBody, {
+          headers: {
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": apiKey,
+            "X-Goog-FieldMask": "places.displayName,places.location",
+          },
+        });
+      } catch (placesErr: any) {
+        const status = placesErr?.response?.status ?? "unknown";
+        const msg = placesErr?.response?.data?.error?.message ?? placesErr?.message ?? "unknown";
+        functions.logger.error("lookupNearbyStation Places API call failed", { status, msg, lat, lng });
+        return { found: false, reason: `지하철역 검색 API 오류 (${status}): ${msg}` };
+      }
 
       const places = placesRes.data?.places ?? [];
-      if (places.length === 0) {
-        return { found: false };
-      }
-
-      // 가장 가까운 역 선택 (직선 거리 기준)
-      let nearest = places[0];
-      let nearestDist = Infinity;
-      for (const p of places) {
-        const dlat = p.location.latitude - lat;
-        const dlng = p.location.longitude - lng;
-        const dist = Math.sqrt(dlat * dlat + dlng * dlng);
-        if (dist < nearestDist) {
-          nearestDist = dist;
-          nearest = p;
-        }
-      }
-
-      const stationName = nearest.displayName?.text ?? "";
-      const stationLat = nearest.location.latitude;
-      const stationLng = nearest.location.longitude;
-
-      // 2) Routes API (walking mode) - 도보 거리/시간 계산
-      const routesUrl = "https://routes.googleapis.com/directions/v2:computeRoutes";
-      const routesBody = {
-        origin: {
-          location: { latLng: { latitude: lat, longitude: lng } },
-        },
-        destination: {
-          location: { latLng: { latitude: stationLat, longitude: stationLng } },
-        },
-        travelMode: "WALK",
-      };
-      const routesRes = await axios.post(routesUrl, routesBody, {
-        headers: {
-          "Content-Type": "application/json",
-          "X-Goog-Api-Key": apiKey,
-          "X-Goog-FieldMask": "routes.distanceMeters,routes.duration",
-        },
+      functions.logger.info("lookupNearbyStation Places API response", {
+        status: placesRes.status,
+        placeCount: places.length,
+        lat, lng, radius: SEARCH_RADIUS,
       });
+      if (places.length === 0) {
+        return { found: false, reason: `반경 ${SEARCH_RADIUS}m 내 지하철역을 찾지 못했습니다.` };
+      }
 
-      const route = routesRes.data?.routes?.[0];
-      const distMeters = route?.distanceMeters ?? 0;
-      const durationStr: string = route?.duration ?? "0s";
-      const durationSec = parseInt(durationStr.replace("s", ""), 10) || 0;
-      const walkingMinutes = Math.round(durationSec / 60);
+      // 2) 역별 직선거리 + Routes 도보거리(없으면 직선거리로 표시)
+      const routesUrl = "https://routes.googleapis.com/directions/v2:computeRoutes";
+      const parseRouteDurationSec = (route: Record<string, unknown> | undefined): number => {
+        if (!route) return 0;
+        const dur = route.duration;
+        if (typeof dur === "string") {
+          return parseInt(dur.replace("s", ""), 10) || 0;
+        }
+        if (dur && typeof dur === "object" && dur !== null && "seconds" in dur) {
+          const s = (dur as { seconds?: string }).seconds;
+          return s ? parseInt(s, 10) || 0 : 0;
+        }
+        return 0;
+      };
+      type StationRow = {
+        name: string;
+        stationLat: number;
+        stationLng: number;
+        lines: string[];
+        straightMeters: number;
+        walkingDistanceMeters: number;
+        walkingMinutes: number;
+      };
+      const stationResults: StationRow[] = [];
 
-      // 노선 추출: 역 이름에 호선 정보가 포함된 경우 파싱 시도
-      const lineMatch = stationName.match(/(\d+호선)/g);
-      const subwayLines: string[] = lineMatch ?? [];
+      for (const p of places) {
+        let rawName: string = p.displayName?.text ?? "";
+        rawName = rawName.replace(/\s*\d+호선/g, "").trim() || rawName;
+        const sLat = p.location.latitude;
+        const sLng = p.location.longitude;
+        const straight = Math.round(haversineMeters(lat, lng, sLat, sLng));
+        const lines = linesForStationDisplayName(rawName);
+        let walkM = 0;
+        let walkMin = 0;
+        try {
+          const routesRes = await axios.post(routesUrl, {
+            origin: { location: { latLng: { latitude: lat, longitude: lng } } },
+            destination: { location: { latLng: { latitude: sLat, longitude: sLng } } },
+            travelMode: "WALK",
+          }, {
+            headers: {
+              "Content-Type": "application/json",
+              "X-Goog-Api-Key": apiKey,
+              "X-Goog-FieldMask": "routes.distanceMeters,routes.duration",
+            },
+          });
+          const route = routesRes.data?.routes?.[0] as Record<string, unknown> | undefined;
+          walkM = (route?.distanceMeters as number) ?? 0;
+          const durationSec = parseRouteDurationSec(route);
+          walkMin = durationSec > 0 ? Math.max(1, Math.round(durationSec / 60)) : 0;
+        } catch (routeErr) {
+          functions.logger.warn("lookupNearbyStation route calc failed for " + rawName, routeErr);
+        }
+        if (walkM <= 0) {
+          walkM = straight;
+        }
+        if (walkMin <= 0 && walkM > 0) {
+          walkMin = Math.max(1, Math.round(walkM / 80));
+        }
+        stationResults.push({
+          name: rawName,
+          stationLat: sLat,
+          stationLng: sLng,
+          lines,
+          straightMeters: straight,
+          walkingDistanceMeters: walkM,
+          walkingMinutes: walkMin,
+        });
+      }
 
+      if (stationResults.length === 0) {
+        return { found: false, reason: "역 도보 경로 계산에 실패했습니다." };
+      }
+
+      stationResults.sort((a, b) => a.straightMeters - b.straightMeters);
+      const deduped: StationRow[] = [];
+      const seenKeys = new Set<string>();
+      for (const s of stationResults) {
+        const key = `${s.stationLat.toFixed(4)},${s.stationLng.toFixed(4)}`;
+        if (seenKeys.has(key)) continue;
+        seenKeys.add(key);
+        deduped.push(s);
+      }
+      deduped.sort((a, b) => a.walkingDistanceMeters - b.walkingDistanceMeters);
+
+      const nearest = deduped[0];
       return {
         found: true,
         lat,
         lng,
-        subwayStationName: stationName.replace(/\s*\d+호선/g, "").trim() || stationName,
-        subwayLines,
-        walkingDistanceMeters: distMeters,
-        walkingMinutes,
+        subwayStationName: nearest.name,
+        subwayLines: nearest.lines,
+        walkingDistanceMeters: nearest.walkingDistanceMeters,
+        walkingMinutes: nearest.walkingMinutes,
+        stations: deduped.map((s) => ({
+          name: s.name,
+          lines: s.lines,
+          distanceMeters: s.walkingDistanceMeters,
+          walkingMinutes: s.walkingMinutes,
+        })),
       };
     } catch (e: unknown) {
       functions.logger.error("lookupNearbyStation error", e);
@@ -2050,7 +2259,7 @@ export const submitClinicVerification = functions.https.onCall(
 );
 
 // ================================================================
-// syncImwebPurchases (v4 - imweb_orders 통합)
+// syncImwebPurchases (v5 - 취소/환불 제외)
 // ================================================================
 // 아임웹 구매내역을 Firestore users/{uid}/purchases/ 에 동기화한다.
 //
@@ -2058,8 +2267,10 @@ export const submitClinicVerification = functions.https.onCall(
 //   A) imweb_orders 컬렉션 검색 (CSV 과거 주문 보관소)
 //      - email + emailAliases 로 검색
 //      - linkedUid == null 인 항목만 처리 (코드 필터)
+//      - 취소사유·취소 상태 필드가 있으면 동기화하지 않음
 //
 //   B) 아임웹 API (최근 3개월, 신규 주문 감지)
+//      - 주문/품목주문/라인의 status·claim_* 등으로 취소·환불·반품 건 제외
 //      - 위 A에서 못 찾은 경우 보완
 //
 // 입력: { email: string }
@@ -2080,6 +2291,92 @@ function extractImwebList(body: Record<string, unknown>): Record<string, unknown
 // Rate Limit 방지: API 호출 간 딜레이 (1.5초)
 function imwebDelay(ms = 1500): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** 아임웹 상태 문자열이 취소·환불·반품·클레임 완료 등인지 (한·영, 부분 문자열) */
+function imwebStatusIndicatesCancelledOrRefunded(value: unknown): boolean {
+  if (value === null || value === undefined) return false;
+  const s = String(value).trim();
+  if (!s) return false;
+  const lower = s.toLowerCase();
+  const asciiBad = [
+    "cancel",
+    "refund",
+    "return",
+    "exchange",
+    "void",
+    "reject",
+    "fail",
+  ];
+  for (const w of asciiBad) {
+    if (lower.includes(w)) return true;
+  }
+  const koBad = ["취소", "환불", "반품", "교환", "클레임", "부분취소", "부분환불"];
+  for (const w of koBad) {
+    if (s.includes(w)) return true;
+  }
+  return false;
+}
+
+/** 주문 목록 API 한 건이 통째로 취소/환불 등이면 동기화 대상에서 제외 */
+function shouldExcludeImwebOrderSummary(order: Record<string, unknown>): boolean {
+  if (imwebStatusIndicatesCancelledOrRefunded(order["order_status"])) return true;
+  if (imwebStatusIndicatesCancelledOrRefunded(order["status"])) return true;
+  if (imwebStatusIndicatesCancelledOrRefunded(order["payment_status"])) return true;
+  if (imwebStatusIndicatesCancelledOrRefunded(order["order_section_status"])) return true;
+  if (order["is_cancel"] === true || order["is_cancel"] === 1 || order["is_cancel"] === "Y") {
+    return true;
+  }
+  const cancelTs =
+    order["cancel_date"] ??
+    order["canceled_at"] ??
+    order["refund_finish_date"] ??
+    order["cancel_finish_date"];
+  if (cancelTs !== null && cancelTs !== undefined && cancelTs !== "" && cancelTs !== 0) {
+    return true;
+  }
+  return false;
+}
+
+/** 품목 주문(prod-order) 단위가 취소/클레임이면 라인 전체 제외 */
+function imwebProdOrderExcluded(po: Record<string, unknown>): boolean {
+  for (const v of [
+    po["status"],
+    po["claim_status"],
+    po["claim_type"],
+    po["delivery_status"],
+  ]) {
+    if (imwebStatusIndicatesCancelledOrRefunded(v)) return true;
+  }
+  return false;
+}
+
+/** 주문 + 품목 라인: 취소/환불 등이면 전자책 동기화 제외 */
+function shouldExcludeImwebLineAfterProdOk(
+  order: Record<string, unknown>,
+  item: Record<string, unknown>
+): boolean {
+  if (shouldExcludeImwebOrderSummary(order)) return true;
+  for (const v of [
+    item["status"],
+    item["order_item_status"],
+    item["claim_status"],
+    item["claim_type"],
+  ]) {
+    if (imwebStatusIndicatesCancelledOrRefunded(v)) return true;
+  }
+  return false;
+}
+
+/** Firestore imweb_orders 문서가 취소/환불 건이면 동기화 제외 (CSV에 취소사유 등) */
+function imwebOrderFirestoreDocIndicatesCancelled(data: Record<string, unknown>): boolean {
+  const reason =
+    data["cancelReason"] ?? data["cancel_reason"] ?? data["취소사유"];
+  if (reason != null && String(reason).trim() !== "") return true;
+  if (data["isCancelled"] === true || data["is_cancelled"] === true) return true;
+  const st = data["orderStatus"] ?? data["order_status"];
+  if (st != null && imwebStatusIndicatesCancelledOrRefunded(st)) return true;
+  return false;
 }
 
 export const syncImwebPurchases = functions
@@ -2150,6 +2447,11 @@ export const syncImwebPurchases = functions
 
       for (const doc of ordersSnap.docs) {
         const orderData = doc.data();
+
+        if (imwebOrderFirestoreDocIndicatesCancelled(orderData as Record<string, unknown>)) {
+          functions.logger.info("imweb_orders: 취소/환불 건 스킵", { docId: doc.id });
+          continue;
+        }
 
         // linkedUid == null 인 것만 처리 (코드 레벨 필터)
         if (orderData.linkedUid !== null && orderData.linkedUid !== undefined) {
@@ -2258,6 +2560,15 @@ export const syncImwebPurchases = functions
 
               // searchEmails 중 하나와 매칭
               if (ordererEmail && searchEmails.includes(ordererEmail)) {
+                const o = order as Record<string, unknown>;
+                if (shouldExcludeImwebOrderSummary(o)) {
+                  functions.logger.info("API: 주문 목록에서 제외(취소/환불)", {
+                    orderNo,
+                    order_status: o["order_status"],
+                    status: o["status"],
+                  });
+                  continue;
+                }
                 myOrders.push(order);
                 seenOrderNos.add(orderNo);
               }
@@ -2282,13 +2593,31 @@ export const syncImwebPurchases = functions
               { headers }
             );
             const prodOrderList = extractImwebList(prodRes.data);
+            const orderRec = order as Record<string, unknown>;
 
             for (const prodOrder of prodOrderList) {
+              const po = prodOrder as Record<string, unknown>;
+              if (imwebProdOrderExcluded(po)) {
+                functions.logger.info("API: prod-order 제외", {
+                  orderNo,
+                  status: po["status"],
+                  claim_status: po["claim_status"],
+                });
+                continue;
+              }
               const items = prodOrder["items"];
               if (!Array.isArray(items)) continue;
 
               for (const item of items) {
                 const itemObj = item as Record<string, unknown>;
+                if (shouldExcludeImwebLineAfterProdOk(orderRec, itemObj)) {
+                  functions.logger.info("API: 품목 라인 제외", {
+                    orderNo,
+                    prodNo: itemObj["prod_no"],
+                    status: itemObj["status"],
+                  });
+                  continue;
+                }
                 const prodNo = String(itemObj["prod_no"] ?? "");
                 if (!prodNo || processedProductCodes.has(prodNo)) continue;
                 processedProductCodes.add(prodNo);
@@ -3825,3 +4154,656 @@ export const searchFeeSchedule = functions
     }
   }
 );
+
+
+// ════════════════════════════════════════════════════════════════
+// 새 공고자 플로우 Callable (v2)
+// ════════════════════════════════════════════════════════════════
+
+/**
+ * verifyBusinessLicense
+ *
+ * 1) 사업자등록증 이미지를 Gemini로 OCR
+ * 2) clinic_profiles 에 OCR 결과·pending_auto 저장
+ * 3) runCheckBusinessStatus — 국세청(Mock 가능) 검증 (별도 모듈)
+ *
+ * Input: { docUrl, profileId }
+ * Output: { bizNo, clinicName, ownerName, address, openedAt, status, failReason?, checkMethod?, skipped? }
+ */
+export const verifyBusinessLicense = functions
+  .runWith({ timeoutSeconds: 120, memory: "512MB", secrets: ["GEMINI_API_KEY"] })
+  .https.onCall(async (data, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+    const uid = context.auth.uid;
+    const docUrl = String(data.docUrl ?? "").trim();
+    const profileId = String(data.profileId ?? "").trim();
+
+    if (!docUrl) {
+      throw new functions.https.HttpsError("invalid-argument", "등록증 이미지 URL이 없습니다.");
+    }
+    if (!profileId) {
+      throw new functions.https.HttpsError("invalid-argument", "profileId가 없습니다.");
+    }
+
+    const profileRef = db
+      .collection("clinics_accounts").doc(uid)
+      .collection("clinic_profiles").doc(profileId);
+    const profileDoc = await profileRef.get();
+    if (!profileDoc.exists) {
+      throw new functions.https.HttpsError("not-found", "치과 프로필을 찾을 수 없습니다.");
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new functions.https.HttpsError("internal", "AI API 키가 설정되지 않았습니다.");
+    }
+
+    functions.logger.info("verifyBusinessLicense", { uid, profileId, docUrl });
+
+    const bizPrompt = `아래 사업자등록증 이미지를 분석하여 반드시 아래 JSON 형식으로만 응답해줘.
+다른 텍스트 없이 순수 JSON만 반환해.
+필드가 파악되지 않으면 빈 문자열로 남겨. 절대 추측하지 말고 이미지에서 읽을 수 있는 정보만 추출해.
+
+{
+  "bizNo": "사업자등록번호 (예: 123-45-67890)",
+  "clinicName": "상호명",
+  "ownerName": "대표자명",
+  "address": "사업장 소재지",
+  "openedAt": "개업일 (예: 2020-01-15)"
+}`;
+
+    let extracted = { bizNo: "", clinicName: "", ownerName: "", address: "", openedAt: "" };
+
+    try {
+      const imgResp = await axios.get(docUrl, { responseType: "arraybuffer", timeout: 15000 });
+      const base64 = Buffer.from(imgResp.data).toString("base64");
+      const contentType = imgResp.headers["content-type"] || "image/jpeg";
+
+      const geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/" + GEMINI_MODEL + ":generateContent?key=" + apiKey;
+      const resp = await axios.post(geminiUrl, {
+        contents: [{
+          parts: [
+            { text: bizPrompt },
+            { inlineData: { mimeType: contentType, data: base64 } },
+          ],
+        }],
+        generationConfig: { responseMimeType: "application/json" },
+      }, { timeout: 45000 });
+
+      const text = resp.data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
+      const parsed = JSON.parse(text);
+      extracted = {
+        bizNo: parsed.bizNo ?? "",
+        clinicName: parsed.clinicName ?? "",
+        ownerName: parsed.ownerName ?? "",
+        address: parsed.address ?? "",
+        openedAt: parsed.openedAt ?? "",
+      };
+    } catch (e) {
+      functions.logger.error("Gemini OCR 실패", { error: String(e) });
+    }
+
+    const hasData = !!(extracted.bizNo || extracted.clinicName);
+
+    if (!hasData) {
+      await profileRef.update({
+        "businessVerification.status": "rejected",
+        "businessVerification.docUrl": docUrl,
+        "businessVerification.method": "gemini_v1",
+        "businessVerification.ocrResult": extracted,
+        "businessVerification.failReason": "ocr_failed",
+        "businessVerification.verifiedAt": null,
+        "bizRegImageUrl": docUrl,
+        "updatedAt": admin.firestore.FieldValue.serverTimestamp(),
+      });
+      return {
+        ...extracted,
+        status: "rejected",
+        failReason: "ocr_failed",
+      };
+    }
+
+    await profileRef.update({
+      ...(extracted.clinicName ? { clinicName: extracted.clinicName } : {}),
+      ...(extracted.ownerName ? { ownerName: extracted.ownerName } : {}),
+      ...(extracted.address ? { address: extracted.address } : {}),
+      "businessVerification.status": "pending_auto",
+      "businessVerification.bizNo": extracted.bizNo,
+      "businessVerification.docUrl": docUrl,
+      "businessVerification.method": "gemini_v1",
+      "businessVerification.ocrResult": extracted,
+      "businessVerification.failReason": admin.firestore.FieldValue.delete(),
+      "businessVerification.verifiedAt": null,
+      "bizRegImageUrl": docUrl,
+      "updatedAt": admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    const check = await runCheckBusinessStatus(db, uid, profileId);
+
+    return {
+      ...extracted,
+      status: check.status,
+      failReason: check.failReason,
+      checkMethod: check.method,
+      skipped: check.skipped,
+    };
+  });
+
+/**
+ * checkBusinessStatus
+ *
+ * OCR 이후 국세청·Mock 검증만 재실행 (재시도·수동 트리거).
+ * Input: { profileId }
+ */
+export const checkBusinessStatus = functions
+  .runWith({ timeoutSeconds: 60, memory: "256MB" })
+  .https.onCall(async (data, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+    const uid = context.auth.uid;
+    const profileId = String(data.profileId ?? "").trim();
+    if (!profileId) {
+      throw new functions.https.HttpsError("invalid-argument", "profileId가 필요합니다.");
+    }
+    const result = await runCheckBusinessStatus(db, uid, profileId);
+    return result;
+  });
+
+/**
+ * createOrder
+ *
+ * 게시 버튼 클릭 시 호출. Draft 유효성 검증 후 Order 문서를 생성한다.
+ * 공고권 적용 시 amount=0으로 처리.
+ *
+ * Input: { draftId, clinicProfileId, voucherId? }
+ * Output: { orderId, amount, requiresPayment }
+ */
+export const createOrder = functions.https.onCall(
+  async (data, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+    const uid = context.auth.uid;
+    const draftId = String(data.draftId ?? "").trim();
+    const clinicProfileId = String(data.clinicProfileId ?? "").trim();
+    const voucherId: string | null = data.voucherId ? String(data.voucherId).trim() : null;
+
+    if (!draftId || !clinicProfileId) {
+      throw new functions.https.HttpsError("invalid-argument", "draftId와 clinicProfileId는 필수입니다.");
+    }
+
+    // Draft 존재 및 소유권 확인
+    const draftDoc = await db.collection("jobDrafts").doc(draftId).get();
+    if (!draftDoc.exists || draftDoc.data()?.ownerUid !== uid) {
+      throw new functions.https.HttpsError("not-found", "Draft를 찾을 수 없습니다.");
+    }
+
+    // 계정 상태 확인
+    const accountDoc = await db.collection("clinics_accounts").doc(uid).get();
+    if (!accountDoc.exists) {
+      throw new functions.https.HttpsError("permission-denied", "공고자 계정이 없습니다.");
+    }
+    const accountData = accountDoc.data() || {};
+    const identityVerified = accountData.identityVerified === true || accountData.phoneVerified === true;
+    if (!identityVerified) {
+      throw new functions.https.HttpsError("failed-precondition", "본인인증이 필요합니다.");
+    }
+
+    // 프로필 사업자 인증 확인
+    const profileDoc = await db
+      .collection("clinics_accounts").doc(uid)
+      .collection("clinic_profiles").doc(clinicProfileId)
+      .get();
+    if (!profileDoc.exists) {
+      throw new functions.https.HttpsError("not-found", "치과 프로필을 찾을 수 없습니다.");
+    }
+    const profileData = profileDoc.data() || {};
+    const bizStatus = profileData.businessVerification?.status;
+    if (bizStatus !== "verified") {
+      throw new functions.https.HttpsError("failed-precondition", "사업자 인증이 필요합니다.");
+    }
+
+    // 동일 Draft 중복 주문 방지
+    const existingOrders = await db.collection("orders")
+      .where("ownerUid", "==", uid)
+      .where("draftId", "==", draftId)
+      .where("status", "in", ["created", "payment_pending"])
+      .limit(1)
+      .get();
+    if (!existingOrders.empty) {
+      const existing = existingOrders.docs[0];
+      return {
+        orderId: existing.id,
+        amount: existing.data().amount ?? 0,
+        requiresPayment: (existing.data().amount ?? 0) > 0,
+      };
+    }
+
+    // 기본 금액 (상품 정책에 따라 조정)
+    let amount = 50000; // 기본 30일 노출
+    let appliedVoucherId: string | null = null;
+
+    // 공고권 적용
+    if (voucherId) {
+      const voucherDoc = await db.collection("vouchers").doc(voucherId).get();
+      if (voucherDoc.exists) {
+        const v = voucherDoc.data()!;
+        if (v.ownerUid === uid && v.status === "active") {
+          const expiresAt = v.expiresAt?.toDate?.();
+          if (!expiresAt || expiresAt > new Date()) {
+            amount = 0;
+            appliedVoucherId = voucherId;
+          }
+        }
+      }
+    }
+
+    // Order 생성
+    const orderData = {
+      ownerUid: uid,
+      draftId,
+      clinicProfileId,
+      status: amount > 0 ? "created" : "created",
+      amount,
+      currency: "KRW",
+      voucherId: appliedVoucherId,
+      paymentProvider: appliedVoucherId ? "voucher_only" : null,
+      exposureDays: 30,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    const orderRef = await db.collection("orders").add(orderData);
+    functions.logger.info("createOrder", { uid, orderId: orderRef.id, amount, voucherId: appliedVoucherId });
+
+    return {
+      orderId: orderRef.id,
+      amount,
+      requiresPayment: amount > 0,
+    };
+  }
+);
+
+/**
+ * confirmPayment
+ *
+ * 결제 완료(또는 공고권 전용 0원 결제) 후 호출.
+ * PG 검증 → Order 상태 갱신 → Draft에서 jobs 문서 생성.
+ *
+ * Input: { orderId, paymentKey? }
+ * Output: { jobId, success }
+ */
+export const confirmPayment = functions.https.onCall(
+  async (data, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+    const uid = context.auth.uid;
+    const orderId = String(data.orderId ?? "").trim();
+    const paymentKey: string | null = data.paymentKey ? String(data.paymentKey).trim() : null;
+
+    if (!orderId) {
+      throw new functions.https.HttpsError("invalid-argument", "orderId는 필수입니다.");
+    }
+
+    const orderRef = db.collection("orders").doc(orderId);
+    const orderDoc = await orderRef.get();
+    if (!orderDoc.exists || orderDoc.data()?.ownerUid !== uid) {
+      throw new functions.https.HttpsError("not-found", "주문을 찾을 수 없습니다.");
+    }
+
+    const orderData = orderDoc.data()!;
+    if (orderData.status === "paid") {
+      // 멱등성: 이미 처리된 주문
+      return { jobId: orderData.jobId ?? "", success: true };
+    }
+    if (orderData.status !== "created" && orderData.status !== "payment_pending") {
+      throw new functions.https.HttpsError("failed-precondition", "처리할 수 없는 주문 상태입니다.");
+    }
+
+    const amount = orderData.amount ?? 0;
+
+    // 유료 결제: 토스페이먼츠 검증 (Phase 8에서 실제 연동)
+    if (amount > 0) {
+      if (!paymentKey) {
+        throw new functions.https.HttpsError("invalid-argument", "paymentKey가 필요합니다.");
+      }
+      // TODO: 토스페이먼츠 서버 검증 API 호출
+      functions.logger.info("confirmPayment: toss verification placeholder", { orderId, paymentKey });
+    }
+
+    // Draft 데이터 로드
+    const draftDoc = await db.collection("jobDrafts").doc(orderData.draftId).get();
+    if (!draftDoc.exists) {
+      throw new functions.https.HttpsError("not-found", "Draft를 찾을 수 없습니다.");
+    }
+    const draftData = draftDoc.data()!;
+
+    // 프로필에서 치과 정보 병합
+    const profileDoc = await db
+      .collection("clinics_accounts").doc(uid)
+      .collection("clinic_profiles").doc(orderData.clinicProfileId)
+      .get();
+    const profileData = profileDoc.exists ? profileDoc.data()! : {};
+
+    const now = new Date();
+    const exposureDays = orderData.exposureDays ?? 30;
+    const expiresAt = new Date(now.getTime() + exposureDays * 24 * 60 * 60 * 1000);
+
+    // 급여 파싱
+    const salaryStr = String(draftData.salary ?? "").trim();
+    const sr = parseJobSalaryRange(salaryStr);
+
+    // jobs 문서 생성
+    const jobData: Record<string, unknown> = {
+      createdBy: uid,
+      clinicProfileId: orderData.clinicProfileId,
+      orderId,
+      clinicName: profileData.displayName || profileData.clinicName || draftData.clinicName || "",
+      title: draftData.title || "",
+      role: draftData.role || "",
+      type: draftData.role || "",
+      career: draftData.career || "미정",
+      employmentType: draftData.employmentType || "",
+      workHours: draftData.workHours || "",
+      salary: salaryStr,
+      salaryText: salaryStr,
+      salaryMin: sr.min,
+      salaryMax: sr.max,
+      salaryRange: [sr.min, sr.max],
+      benefits: draftData.benefits || [],
+      description: draftData.description || "",
+      details: draftData.description || "",
+      address: profileData.address || draftData.address || "",
+      contact: draftData.contact || "",
+      images: draftData.imageUrls || [],
+      tags: draftData.tags || [],
+      status: "active",
+      paymentStatus: "paid",
+      publishedAt: admin.firestore.FieldValue.serverTimestamp(),
+      expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      postedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    const jobRef = await db.collection("jobs").add(jobData);
+
+    // Order 상태 업데이트
+    const orderUpdates: Record<string, unknown> = {
+      status: "paid",
+      jobId: jobRef.id,
+      paidAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    if (paymentKey) {
+      orderUpdates.providerTxId = paymentKey;
+      orderUpdates.paymentProvider = "toss";
+    }
+    await orderRef.update(orderUpdates);
+
+    // 공고권 사용 처리
+    if (orderData.voucherId) {
+      await db.collection("vouchers").doc(orderData.voucherId).update({
+        status: "used",
+        usedForOrderId: orderId,
+        usedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+
+    // Draft 상태 업데이트
+    await db.collection("jobDrafts").doc(orderData.draftId).update({
+      currentStep: "published",
+      publishedJobId: jobRef.id,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    functions.logger.info("confirmPayment success", { uid, orderId, jobId: jobRef.id });
+
+    return { jobId: jobRef.id, success: true };
+  }
+);
+
+/**
+ * expireJobs (스케줄러)
+ *
+ * 매일 00:30 KST에 실행. expiresAt이 지난 active 공고를 closed로 전환.
+ */
+export const expireJobs = functions
+  .pubsub.schedule("30 0 * * *")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const now = admin.firestore.Timestamp.now();
+    const snap = await db.collection("jobs")
+      .where("status", "==", "active")
+      .where("expiresAt", "<=", now)
+      .get();
+
+    if (snap.empty) {
+      functions.logger.info("expireJobs: no expired jobs");
+      return null;
+    }
+
+    const batch = db.batch();
+    for (const doc of snap.docs) {
+      batch.update(doc.ref, {
+        status: "closed",
+        closedAt: admin.firestore.FieldValue.serverTimestamp(),
+        closedReason: "expired",
+      });
+    }
+    await batch.commit();
+    functions.logger.info("expireJobs: closed", { count: snap.size });
+    return null;
+  });
+
+/**
+ * onClinicAccountCreated
+ *
+ * clinics_accounts 문서 생성 시 가입 축하 무료 공고권(90일)을 자동 발급.
+ * CI 중복 체크는 추후 토스 본인확인 연동 시 추가.
+ */
+export const onClinicAccountCreated = functions.firestore
+  .document("clinics_accounts/{uid}")
+  .onCreate(async (snap, context) => {
+    const uid = context.params.uid;
+
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 90);
+
+    await db.collection("vouchers").add({
+      ownerUid: uid,
+      type: "signup_free",
+      status: "active",
+      issuedBy: "system",
+      issuedAt: admin.firestore.FieldValue.serverTimestamp(),
+      expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
+    });
+
+    functions.logger.info("onClinicAccountCreated: signup voucher issued", { uid });
+  });
+
+// ════════════════════════════════════════════════════════════════
+// 🔔 알림 스케줄러 (Phase 8-3)
+// ════════════════════════════════════════════════════════════════
+
+/**
+ * notifyJobExpiringSoon
+ *
+ * 매일 09:00 KST 실행.
+ * expiresAt이 7일 이내인 active 공고를 찾아 알림 문서를 생성합니다.
+ * notifications/{uid}/items/{notificationId} 서브컬렉션에 기록.
+ */
+export const notifyJobExpiringSoon = functions
+  .runWith({ timeoutSeconds: 120 })
+  .pubsub.schedule("every day 09:00")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const now = new Date();
+    const sevenDaysLater = new Date();
+    sevenDaysLater.setDate(now.getDate() + 7);
+
+    const snap = await db.collection("jobs")
+      .where("status", "==", "active")
+      .where("expiresAt", "<=", admin.firestore.Timestamp.fromDate(sevenDaysLater))
+      .where("expiresAt", ">", admin.firestore.Timestamp.fromDate(now))
+      .get();
+
+    if (snap.empty) {
+      functions.logger.info("notifyJobExpiringSoon: no expiring jobs");
+      return null;
+    }
+
+    const batch = db.batch();
+    const notified = new Set<string>();
+
+    for (const doc of snap.docs) {
+      const data = doc.data();
+      const uid = data.createdBy as string;
+      if (!uid || notified.has(`${uid}_${doc.id}`)) continue;
+
+      const expiresAt = (data.expiresAt as admin.firestore.Timestamp).toDate();
+      const daysLeft = Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      const title = data.title || "(제목 없음)";
+
+      const ref = db.collection("notifications").doc(uid)
+        .collection("items").doc();
+      batch.set(ref, {
+        type: "job_expiring",
+        jobId: doc.id,
+        title: `공고 만료 예정 (${daysLeft}일 남음)`,
+        body: `"${title}" 공고가 ${daysLeft}일 후 만료됩니다.`,
+        read: false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      notified.add(`${uid}_${doc.id}`);
+    }
+
+    await batch.commit();
+    functions.logger.info("notifyJobExpiringSoon: sent", { count: notified.size });
+    return null;
+  });
+
+/**
+ * remindStaleDrafts
+ *
+ * 매일 10:00 KST 실행.
+ * 24시간 이상 방치된 임시저장(jobDrafts)에 대해 리마인드 알림을 보냅니다.
+ * 동일 드래프트에 대해 24시간 내 중복 알림은 보내지 않습니다.
+ */
+export const remindStaleDrafts = functions
+  .runWith({ timeoutSeconds: 120 })
+  .pubsub.schedule("every day 10:00")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const now = new Date();
+    const oneDayAgo = new Date();
+    oneDayAgo.setDate(now.getDate() - 1);
+    const threeDaysAgo = new Date();
+    threeDaysAgo.setDate(now.getDate() - 3);
+
+    // 1~3일 사이 방치된 드래프트 (너무 오래된 건 제외)
+    const snap = await db.collection("jobDrafts")
+      .where("updatedAt", "<=", admin.firestore.Timestamp.fromDate(oneDayAgo))
+      .where("updatedAt", ">=", admin.firestore.Timestamp.fromDate(threeDaysAgo))
+      .where("status", "in", ["draft", "ai_generated", "editing"])
+      .get();
+
+    if (snap.empty) {
+      functions.logger.info("remindStaleDrafts: no stale drafts");
+      return null;
+    }
+
+    const batch = db.batch();
+    let count = 0;
+
+    for (const doc of snap.docs) {
+      const data = doc.data();
+      const uid = data.ownerUid as string;
+      if (!uid) continue;
+
+      const title = data.title || data.clinicName || "작성 중인 공고";
+
+      // 중복 방지: 같은 draftId로 24시간 내 알림이 있는지 확인
+      const existing = await db.collection("notifications").doc(uid)
+        .collection("items")
+        .where("type", "==", "draft_reminder")
+        .where("draftId", "==", doc.id)
+        .where("createdAt", ">", admin.firestore.Timestamp.fromDate(oneDayAgo))
+        .limit(1)
+        .get();
+
+      if (!existing.empty) continue;
+
+      const ref = db.collection("notifications").doc(uid)
+        .collection("items").doc();
+      batch.set(ref, {
+        type: "draft_reminder",
+        draftId: doc.id,
+        title: "임시저장 공고가 있어요",
+        body: `"${title}" 공고를 이어서 작성해보세요.`,
+        read: false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      count++;
+    }
+
+    if (count > 0) await batch.commit();
+    functions.logger.info("remindStaleDrafts: sent", { count });
+    return null;
+  });
+
+/**
+ * notifyVoucherExpiringSoon
+ *
+ * 매일 09:30 KST 실행.
+ * 7일 이내 만료 예정인 active 공고권에 대해 알림을 보냅니다.
+ */
+export const notifyVoucherExpiringSoon = functions
+  .runWith({ timeoutSeconds: 120 })
+  .pubsub.schedule("every day 09:30")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const now = new Date();
+    const sevenDaysLater = new Date();
+    sevenDaysLater.setDate(now.getDate() + 7);
+
+    const snap = await db.collection("vouchers")
+      .where("status", "==", "active")
+      .where("expiresAt", "<=", admin.firestore.Timestamp.fromDate(sevenDaysLater))
+      .where("expiresAt", ">", admin.firestore.Timestamp.fromDate(now))
+      .get();
+
+    if (snap.empty) {
+      functions.logger.info("notifyVoucherExpiringSoon: no expiring vouchers");
+      return null;
+    }
+
+    const batch = db.batch();
+    const notified = new Set<string>();
+
+    for (const doc of snap.docs) {
+      const data = doc.data();
+      const uid = data.ownerUid as string;
+      if (!uid || notified.has(uid)) continue;
+
+      const expiresAt = (data.expiresAt as admin.firestore.Timestamp).toDate();
+      const daysLeft = Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+      const ref = db.collection("notifications").doc(uid)
+        .collection("items").doc();
+      batch.set(ref, {
+        type: "voucher_expiring",
+        voucherId: doc.id,
+        title: "무료 공고권 만료 예정",
+        body: `보유한 무료 공고권이 ${daysLeft}일 후 만료됩니다. 지금 공고를 등록해보세요!`,
+        read: false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      notified.add(uid);
+    }
+
+    await batch.commit();
+    functions.logger.info("notifyVoucherExpiringSoon: sent", { count: notified.size });
+    return null;
+  });

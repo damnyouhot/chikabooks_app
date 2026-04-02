@@ -130,7 +130,7 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
                     const SizedBox(width: 10),
                     const HygieneLabEnglishTitle(
                       fontSize: 20.4,
-                      letterSpacing: 0.25,
+                      letterSpacing: 0.15,
                     ),
                   ],
                 ),

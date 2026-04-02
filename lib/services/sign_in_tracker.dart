@@ -8,9 +8,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// 대상 컬렉션: `users/{uid}` (위생사 전용)
 /// 공고자 로그인 기록은 `ClinicAuthService.recordLogin()`으로 별도 처리
 ///
-/// - Firestore `users/{uid}` 에 `provider`, `lastLoginAt`, `email` 저장
-///   (카카오/네이버/애플은 Cloud Function에서 이미 저장하지만,
-///    Google / Email 은 여기서 저장)
+/// - Firestore `users/{uid}` 에 `provider`, `lastLoginAt`, `email`, `normalizedEmail` 저장
+///   (네이버는 Cloud Function에서도 저장하지만, Auth에 email 이 없을 때를 위해
+///    [email] 인자로 SDK/애플 크리덴셜 이메일을 넘기면 여기서 보강)
 /// - SharedPreferences 에도 저장하여 로그인 페이지 "마지막 로그인" 배지에 활용
 class SignInTracker {
   static final _db = FirebaseFirestore.instance;
@@ -59,10 +59,10 @@ class SignInTracker {
         debugPrint('✅ SignInTracker: 신규 가입 createdAt + excludeFromStats 기록');
       }
 
-      // 이메일이 있고, 기존에 없는 경우에만 덮어쓰도록 merge 사용
-      // (애플: 첫 로그인 이후 null이 되어도 기존 값 유지)
+      // 이메일이 있으면 merge (애플: 첫 로그인 credential / Firebase User)
       if (resolvedEmail != null && resolvedEmail.isNotEmpty) {
         data['email'] = resolvedEmail;
+        data['normalizedEmail'] = resolvedEmail.trim().toLowerCase();
       }
 
       await userRef.set(

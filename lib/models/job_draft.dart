@@ -40,6 +40,17 @@ class JobDraft {
   final double? lng;
   final List<String> tags;
 
+  // AI 파이프라인 필드
+  final String? currentStep;
+  final String? aiParseStatus;
+  final String? sourceType;
+  final String? rawInputText;
+  final List<String> rawImageUrls;
+  final String? clinicProfileId;
+
+  /// 웹 공고 Stepper 상태 (`step1` | `step2` | `step3`) — 클라이언트 전용, 미설정 시 기본 흐름
+  final String? editorStep;
+
   const JobDraft({
     required this.id,
     required this.ownerUid,
@@ -75,6 +86,13 @@ class JobDraft {
     this.lat,
     this.lng,
     this.tags = const [],
+    this.currentStep,
+    this.aiParseStatus,
+    this.sourceType,
+    this.rawInputText,
+    this.rawImageUrls = const [],
+    this.clinicProfileId,
+    this.editorStep,
   });
 
   factory JobDraft.fromMap(Map<String, dynamic> data, {required String id}) {
@@ -121,6 +139,13 @@ class JobDraft {
       lat: (data['lat'] as num?)?.toDouble(),
       lng: (data['lng'] as num?)?.toDouble(),
       tags: List<String>.from(data['tags'] ?? []),
+      currentStep: data['currentStep'] as String?,
+      aiParseStatus: data['aiParseStatus'] as String?,
+      sourceType: data['sourceType'] as String?,
+      rawInputText: data['rawInputText'] as String?,
+      rawImageUrls: List<String>.from(data['rawImageUrls'] ?? []),
+      clinicProfileId: data['clinicProfileId'] as String?,
+      editorStep: data['editorStep'] as String?,
     );
   }
 
@@ -163,6 +188,13 @@ class JobDraft {
         if (lat != null) 'lat': lat,
         if (lng != null) 'lng': lng,
         if (tags.isNotEmpty) 'tags': tags,
+        if (currentStep != null) 'currentStep': currentStep,
+        if (aiParseStatus != null) 'aiParseStatus': aiParseStatus,
+        if (sourceType != null) 'sourceType': sourceType,
+        if (rawInputText != null) 'rawInputText': rawInputText,
+        if (rawImageUrls.isNotEmpty) 'rawImageUrls': rawImageUrls,
+        if (clinicProfileId != null) 'clinicProfileId': clinicProfileId,
+        if (editorStep != null) 'editorStep': editorStep,
         'updatedAt': FieldValue.serverTimestamp(),
       };
 

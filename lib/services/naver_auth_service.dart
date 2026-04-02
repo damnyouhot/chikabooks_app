@@ -1,7 +1,10 @@
+import 'dart:convert';
+
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_naver_login/flutter_naver_login.dart';
+import 'package:http/http.dart' as http;
 import 'package:flutter_naver_login/interface/types/naver_login_status.dart';
 
 /// 네이버 로그인 서비스 (서버 기반 인증)
@@ -11,7 +14,9 @@ class NaverAuthService {
   static final _auth = FirebaseAuth.instance;
 
   /// 네이버 로그인 실행
-  static Future<User?> signInWithNaver() async {
+  ///
+  /// 성공 시 `(User, nid/SDK에서 확보한 이메일)` — Auth에 이메일이 없어도 SDK에서 온 주소는 두 번째 값으로 전달( SignInTracker용 ).
+  static Future<(User user, String? profileEmail)?> signInWithNaver() async {
     try {
       debugPrint('🔑 네이버 로그인 시작');
       
@@ -41,7 +46,7 @@ class NaverAuthService {
     
     debugPrint('🧩 tokenResult: $tokenResult');
       
-      if (tokenResult == null || tokenResult.accessToken.isEmpty) {
+      if (tokenResult.accessToken.isEmpty) {
         debugPrint('❌ 네이버 Access Token이 없습니다');
         
         // 토큰이 없으면 로그아웃 후 재시도 권장
@@ -51,11 +56,50 @@ class NaverAuthService {
       
       debugPrint('✅ 네이버 Access Token 획득: ${tokenResult.accessToken.substring(0, 20)}...');
 
+      // 2b. 동일 세션에서 nid/me 를 한 번 더 호출해 이메일 누락 보완
+      String? profileEmail = account.email?.trim();
+      debugPrint('🧩 logIn account.email: ${account.email}');
+      try {
+        final acc2 = await FlutterNaverLogin.getCurrentAccount();
+        debugPrint('🧩 getCurrentAccount.email: ${acc2.email}');
+        final e2 = acc2.email?.trim();
+        if (e2 != null && e2.isNotEmpty) {
+          profileEmail = e2;
+        }
+      } catch (e) {
+        debugPrint('⚠️ getCurrentAccount 실패(무시): $e');
+      }
+
+      // 2c. 토큰으로 직접 nid/me 호출 (SDK→Dart 맵에 email 이 비는 경우 대비)
+      if (profileEmail == null || profileEmail.isEmpty) {
+        try {
+          final res = await http.get(
+            Uri.parse('https://openapi.naver.com/v1/nid/me'),
+            headers: {
+              'Authorization': 'Bearer ${tokenResult.accessToken}',
+            },
+          );
+          if (res.statusCode == 200) {
+            final map = jsonDecode(res.body) as Map<String, dynamic>?;
+            final resp = map?['response'] as Map<String, dynamic>?;
+            final em = resp?['email'] as String?;
+            if (em != null && em.trim().isNotEmpty) {
+              profileEmail = em.trim();
+              debugPrint('🧩 직접 nid/me email: $profileEmail');
+            }
+          }
+        } catch (e) {
+          debugPrint('⚠️ 직접 nid/me 조회 실패(무시): $e');
+        }
+      }
+
       // 3. 서버로 Access Token 전송하여 검증 및 Custom Token 발급
       debugPrint('🔧 서버로 토큰 검증 요청...');
       final callable = _functions.httpsCallable('verifyNaverToken');
       final response = await callable.call({
         'accessToken': tokenResult.accessToken,
+        if (profileEmail != null && profileEmail.isNotEmpty)
+          'profileEmail': profileEmail,
       });
 
       debugPrint('✅ 서버 검증 완료: ${response.data}');
@@ -80,9 +124,9 @@ class NaverAuthService {
       
       debugPrint('✅✅✅ 네이버 로그인 완전 성공!');
       debugPrint('✅ UID: ${currentUser.uid}');
-      debugPrint('✅ Email: ${currentUser.email}');
+      debugPrint('✅ Auth.email: ${currentUser.email} / SDK profileEmail: $profileEmail');
       
-      return currentUser;
+      return (currentUser, profileEmail);
     } catch (e, stackTrace) {
       debugPrint('❌ 네이버 로그인 예외 발생');
       debugPrint('❌ Error: $e');

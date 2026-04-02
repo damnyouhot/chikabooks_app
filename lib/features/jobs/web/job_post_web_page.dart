@@ -8,6 +8,7 @@ import 'job_manage_section.dart';
 import 'job_analytics_section.dart';
 import 'web_typography.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_tokens.dart' show AppPublisher, AppRadius;
 import '../../../models/job_draft.dart';
 import '../../../services/job_draft_service.dart';
 
@@ -31,6 +32,7 @@ class _JobPostWebPageState extends State<JobPostWebPage>
   JobPostData _data = JobPostData();
   bool _submitted = false;
   String? _currentDraftId;
+  DateTime? _draftUpdatedAt;
 
   @override
   void initState() {
@@ -52,6 +54,7 @@ class _JobPostWebPageState extends State<JobPostWebPage>
 
   Future<void> _onSubmit(JobPostData d) async {
     _currentDraftId = null;
+    _draftUpdatedAt = null;
     if (mounted) setState(() => _submitted = true);
   }
 
@@ -59,6 +62,7 @@ class _JobPostWebPageState extends State<JobPostWebPage>
   Future<void> _loadDraft(JobDraft draft) async {
     setState(() {
       _currentDraftId = draft.id;
+      _draftUpdatedAt = draft.updatedAt;
       _data = JobPostData(
         clinicName: draft.clinicName,
         title: draft.title,
@@ -108,7 +112,10 @@ class _JobPostWebPageState extends State<JobPostWebPage>
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.cardEmphasis,
+              foregroundColor: AppColors.onCardEmphasis,
+            ),
             child: const Text('삭제'),
           ),
         ],
@@ -119,6 +126,7 @@ class _JobPostWebPageState extends State<JobPostWebPage>
       if (_currentDraftId == draftId) {
         setState(() {
           _currentDraftId = null;
+          _draftUpdatedAt = null;
           _data = JobPostData();
         });
       }
@@ -178,7 +186,7 @@ class _JobPostWebPageState extends State<JobPostWebPage>
                   height: 36,
                   decoration: BoxDecoration(
                     color: AppColors.accent,
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(AppPublisher.softRadius),
                   ),
                   child: const Icon(
                     Icons.local_hospital_outlined,
@@ -230,24 +238,12 @@ class _JobPostWebPageState extends State<JobPostWebPage>
     );
   }
 
-  // ── 공고 등록 탭 (기존 레이아웃) ──────────────────────
+  // ── 공고 등록 탭 → 새 플로우로 리다이렉트 ────────────────
   Widget _buildPostTab() {
-    return LayoutBuilder(
-      builder: (context, constraints) => SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: SizedBox(
-          width: constraints.maxWidth < 940 ? 940 : constraints.maxWidth,
-          height: constraints.maxHeight,
-          child: _buildDesktopLayout(
-            BoxConstraints(
-              maxWidth:
-                  constraints.maxWidth < 940 ? 940 : constraints.maxWidth,
-              maxHeight: constraints.maxHeight,
-            ),
-          ),
-        ),
-      ),
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.go('/post-job/input');
+    });
+    return const Center(child: CircularProgressIndicator());
   }
 
   // ── 데스크톱: 좌 프리뷰 + 우 폼 ─────────────────────
@@ -267,9 +263,9 @@ class _JobPostWebPageState extends State<JobPostWebPage>
             Container(
               width: leftWidth,
               decoration: const BoxDecoration(
-                color: Color(0xFFEDE6F5),
+                color: AppColors.white,
                 border: Border(
-                  right: BorderSide(color: Color(0xFFD8CDE8), width: 0.8),
+                  right: BorderSide(color: AppColors.divider, width: 0.8),
                 ),
               ),
               child: Column(
@@ -298,10 +294,12 @@ class _JobPostWebPageState extends State<JobPostWebPage>
                     child: JobPostForm(
                       key: ValueKey(_currentDraftId ?? 'new'),
                       initialData: _data,
+                      publisherWebStyle: true,
                       onDataChanged: _onDataChanged,
                       onSubmit: _onSubmit,
                       draftId: _currentDraftId,
                       onDraftIdChanged: _onDraftIdChanged,
+                      initialDraftUpdatedAt: _draftUpdatedAt,
                     ),
                   ),
                 ],
@@ -319,7 +317,7 @@ class _JobPostWebPageState extends State<JobPostWebPage>
       padding: const EdgeInsets.fromLTRB(24, 40, 24, 20),
       decoration: const BoxDecoration(
         border: Border(
-          bottom: BorderSide(color: Color(0xFFD8CDE8), width: 0.8),
+          bottom: BorderSide(color: AppColors.divider, width: 0.8),
         ),
       ),
       child: Column(
@@ -332,7 +330,7 @@ class _JobPostWebPageState extends State<JobPostWebPage>
                 height: 36,
                 decoration: BoxDecoration(
                   color: AppColors.accent,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(AppPublisher.softRadius),
                 ),
                 child: const Icon(
                   Icons.local_hospital_outlined,
@@ -371,7 +369,7 @@ class _JobPostWebPageState extends State<JobPostWebPage>
         return Container(
           decoration: const BoxDecoration(
             border: Border(
-              bottom: BorderSide(color: Color(0xFFD8CDE8), width: 0.8),
+              bottom: BorderSide(color: AppColors.divider, width: 0.8),
             ),
           ),
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
@@ -412,10 +410,10 @@ class _JobPostWebPageState extends State<JobPostWebPage>
       child: Material(
         color: isActive
             ? AppColors.accent.withOpacity(0.08)
-            : AppColors.white.withOpacity(0.6),
-        borderRadius: BorderRadius.circular(8),
+            : AppColors.surfaceMuted.withOpacity(0.35),
+        borderRadius: BorderRadius.circular(AppPublisher.softRadius),
         child: InkWell(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(AppPublisher.softRadius),
           onTap: () => _loadDraft(draft),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -454,7 +452,7 @@ class _JobPostWebPageState extends State<JobPostWebPage>
                   ),
                 ),
                 InkWell(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppPublisher.softRadius),
                   onTap: () => _deleteDraft(draft.id),
                   child: const Padding(
                     padding: EdgeInsets.all(4),
@@ -547,7 +545,7 @@ class _JobPostWebPageState extends State<JobPostWebPage>
           webOnlyWindowName: '_blank',
         );
       },
-      borderRadius: BorderRadius.circular(4),
+      borderRadius: BorderRadius.circular(AppPublisher.softRadius),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
         child: Text(
@@ -581,7 +579,7 @@ class _JobPostWebPageState extends State<JobPostWebPage>
           padding: const EdgeInsets.all(40),
           decoration: BoxDecoration(
             color: AppColors.white,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(AppRadius.lg),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -590,13 +588,13 @@ class _JobPostWebPageState extends State<JobPostWebPage>
                 width: 72,
                 height: 72,
                 decoration: BoxDecoration(
-                  color: AppColors.error.withOpacity(0.12),
+                  color: AppColors.accent.withOpacity(0.12),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   Icons.check_circle_outline,
                   size: 40,
-                  color: AppColors.error.withOpacity(0.8),
+                  color: AppColors.accent.withOpacity(0.9),
                 ),
               ),
               const SizedBox(height: 24),
@@ -621,6 +619,7 @@ class _JobPostWebPageState extends State<JobPostWebPage>
               const SizedBox(height: 32),
               // 공고 관리로 이동
               SizedBox(
+                height: AppPublisher.ctaHeight,
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () {
@@ -634,9 +633,8 @@ class _JobPostWebPageState extends State<JobPostWebPage>
                     backgroundColor: AppColors.accent,
                     foregroundColor: AppColors.white,
                     elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppPublisher.buttonRadius),
                     ),
                   ),
                   child: const Text(
@@ -651,6 +649,7 @@ class _JobPostWebPageState extends State<JobPostWebPage>
               const SizedBox(height: 12),
               // 새 공고 등록
               SizedBox(
+                height: AppPublisher.ctaHeight,
                 width: double.infinity,
                 child: OutlinedButton(
                   onPressed: () => setState(() {
@@ -660,9 +659,8 @@ class _JobPostWebPageState extends State<JobPostWebPage>
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.textPrimary,
                     side: BorderSide(color: AppColors.textPrimary.withOpacity(0.2)),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppPublisher.buttonRadius),
                     ),
                   ),
                   child: const Text(

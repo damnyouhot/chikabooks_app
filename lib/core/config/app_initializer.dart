@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -45,6 +46,15 @@ class AppInitializer {
     } on FirebaseException catch (e) {
       if (e.code != 'duplicate-app') {
         rethrow;
+      }
+    }
+
+    // 웹: 로그인 상태를 브라우저에 명시적으로 유지 (탭·주소 재입력 후에도 세션 복원)
+    if (kIsWeb) {
+      try {
+        await FirebaseAuth.instance.setPersistence(Persistence.INDEXED_DB);
+      } catch (e) {
+        debugPrint('⚠️ FirebaseAuth.setPersistence: $e');
       }
     }
   }

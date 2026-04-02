@@ -74,9 +74,9 @@ class QuizPoolItem {
     return kClinical;
   }
 
-  /// 앱·관리자 UI용 유형 표기
+  /// 앱·관리자 UI용 유형 표기 (퀴즈 카드·공유 캡처 뱃지)
   static String badgeLabelForType(String questionType) =>
-      questionType == kNationalExam ? '국시' : '임상';
+      questionType == kNationalExam ? '이론' : '임상';
 
   factory QuizPoolItem.fromFirestore(DocumentSnapshot doc) {
     final d = doc.data() as Map<String, dynamic>;

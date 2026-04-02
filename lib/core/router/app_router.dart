@@ -7,6 +7,10 @@ import '../../pages/ebook/ebook_list_page.dart';
 import '../../pages/quiz_today_page.dart';
 import '../../pages/admin/admin_dashboard_page.dart';
 import '../../features/jobs/web/job_post_web_page.dart';
+import '../../features/jobs/web/job_input_page.dart';
+import '../../features/jobs/web/job_draft_editor_page.dart';
+import '../../features/jobs/web/job_publish_page.dart';
+import '../../features/jobs/web/job_publish_success_page.dart';
 import '../../features/jobs/web/legal_page.dart';
 import '../../features/jobs/ui/clinic_verify_page.dart';
 import '../../features/auth/web/web_login_page.dart';
@@ -16,13 +20,15 @@ import '../../features/feedback/feedback_write_page.dart';
 import '../../features/feedback/feedback_detail_page.dart';
 import '../../features/publisher/pages/publisher_signup_page.dart';
 import '../../features/publisher/pages/publisher_forgot_page.dart';
-import '../../features/publisher/pages/publisher_onboarding_page.dart';
-import '../../features/publisher/pages/publisher_verify_phone_page.dart';
-import '../../features/publisher/pages/publisher_profile_page.dart';
-import '../../features/publisher/pages/publisher_verify_business_page.dart';
-import '../../features/publisher/pages/publisher_pending_page.dart';
-import '../../features/publisher/pages/publisher_done_page.dart';
+// 레거시 온보딩 페이지 — 모든 라우트가 /post-job/input으로 리다이렉트
+// import '../../features/publisher/pages/publisher_onboarding_page.dart';
+// import '../../features/publisher/pages/publisher_verify_phone_page.dart';
+// import '../../features/publisher/pages/publisher_profile_page.dart';
+// import '../../features/publisher/pages/publisher_verify_business_page.dart';
+// import '../../features/publisher/pages/publisher_pending_page.dart';
+// import '../../features/publisher/pages/publisher_done_page.dart';
 import '../../features/publisher/services/clinic_auth_service.dart';
+import '../../features/publisher/services/clinic_profile_service.dart';
 import '../../features/resume/screens/resume_home_screen.dart';
 import '../../features/resume/screens/resume_edit_screen.dart';
 import '../../features/resume/screens/ocr_review_screen.dart';
@@ -41,30 +47,22 @@ final appRouter = GoRouter(
     const guardedPrefixes = ['/post-job', '/applicant', '/clinic-verify'];
     final needsAuth = guardedPrefixes.any((p) => path.startsWith(p));
     if (needsAuth && user == null) {
-      return '/login?next=$path';
+      return '/login?next=${Uri.encodeComponent(path)}';
     }
 
-    // Publisher 온보딩 경로 가드 (signup/forgot 제외)
-    const publisherGuarded = [
-      '/publisher/onboarding',
-      '/publisher/verify-phone',
-      '/publisher/profile',
-      '/publisher/verify-business',
-      '/publisher/pending',
-      '/publisher/done',
-    ];
-    if (publisherGuarded.contains(path)) {
-      if (user == null) return '/login';
-      final status = await ClinicAuthService.getStatus();
-      if (!status.exists) return '/login';
-    }
+    // 레거시 온보딩 경로는 이제 모두 /post-job/input으로 redirect되므로
+    // 별도 가드 불필요 (post-job 가드에서 처리)
 
-    // 공고 작성 경로 가드: 승인된 공고자만 접근
-    if (path == '/post-job' && user != null) {
+    // 새 공고 플로우: 로그인만 되어 있으면 진입 가능
+    // (인증·결제는 게시 직전 단계에서 검증)
+    if (path.startsWith('/post-job') && user != null) {
       final status = await ClinicAuthService.getStatus();
-      if (status.exists && !status.isApprovedAndCanPost) {
-        return '/publisher/onboarding';
+      if (!status.exists) {
+        // clinics_accounts 문서가 없으면 → 마스터 문서 자동 생성
+        await ClinicAuthService.initClinicAccount();
       }
+      // Lazy Migration: 기존 사용자 프로필 자동 생성
+      await ClinicProfileService.migrateIfNeeded();
     }
 
     // 관리자 대시보드 접근 가드
@@ -79,7 +77,26 @@ final appRouter = GoRouter(
 
   routes: [
     GoRoute(path: '/', builder: (_, __) => const AuthGate()),
+
+    // ── 새 공고 플로우 ──────────────────────────────────────
     GoRoute(path: '/post-job', builder: (_, __) => const JobPostWebPage()),
+    GoRoute(path: '/post-job/input', builder: (_, __) => const JobInputPage()),
+    GoRoute(
+      path: '/post-job/edit/:draftId',
+      builder: (_, state) =>
+          JobDraftEditorPage(draftId: state.pathParameters['draftId']!),
+    ),
+    GoRoute(
+      path: '/post-job/publish/:draftId',
+      builder: (_, state) =>
+          JobPublishPage(draftId: state.pathParameters['draftId']!),
+    ),
+    GoRoute(
+      path: '/post-job/success/:jobId',
+      builder: (_, state) =>
+          JobPublishSuccessPage(jobId: state.pathParameters['jobId']!),
+    ),
+
     GoRoute(
       path: '/clinic-verify',
       builder: (_, __) => const ClinicVerifyPage(),
@@ -174,29 +191,30 @@ final appRouter = GoRouter(
       path: '/publisher/forgot',
       builder: (_, __) => const PublisherForgotPage(),
     ),
+    // ── 레거시 온보딩 → 새 플로우 리다이렉트 ──────────────
     GoRoute(
       path: '/publisher/onboarding',
-      builder: (_, __) => const PublisherOnboardingPage(),
+      redirect: (_, __) => '/post-job/input',
     ),
     GoRoute(
       path: '/publisher/verify-phone',
-      builder: (_, __) => const PublisherVerifyPhonePage(),
+      redirect: (_, __) => '/post-job/input',
     ),
     GoRoute(
       path: '/publisher/profile',
-      builder: (_, __) => const PublisherProfilePage(),
+      redirect: (_, __) => '/post-job/input',
     ),
     GoRoute(
       path: '/publisher/verify-business',
-      builder: (_, __) => const PublisherVerifyBusinessPage(),
+      redirect: (_, __) => '/post-job/input',
     ),
     GoRoute(
       path: '/publisher/pending',
-      builder: (_, __) => const PublisherPendingPage(),
+      redirect: (_, __) => '/post-job/input',
     ),
     GoRoute(
       path: '/publisher/done',
-      builder: (_, __) => const PublisherDonePage(),
+      redirect: (_, __) => '/post-job/input',
     ),
   ],
 );

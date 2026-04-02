@@ -55,23 +55,17 @@ class EmailAuthService {
       return credential.user;
     } on FirebaseAuthException catch (e) {
       debugPrint('⚠️ 이메일 로그인 실패: ${e.code}');
-      switch (e.code) {
-        case 'user-not-found':
-          debugPrint('등록되지 않은 이메일입니다');
-          break;
-        case 'wrong-password':
-          debugPrint('비밀번호가 틀렸습니다');
-          break;
-        case 'invalid-email':
-          debugPrint('유효하지 않은 이메일입니다');
-          break;
-        case 'user-disabled':
-          debugPrint('비활성화된 계정입니다');
-          break;
-        default:
-          debugPrint('알 수 없는 오류: ${e.message}');
-      }
-      return null;
+      final msg = switch (e.code) {
+        'user-not-found' =>
+          '등록되지 않은 이메일이거나 비밀번호가 일치하지 않아요.',
+        'wrong-password' => '비밀번호가 일치하지 않아요.',
+        'invalid-credential' =>
+          '이메일 또는 비밀번호를 확인해주세요. (소셜 전용 계정일 수도 있어요)',
+        'invalid-email' => '올바른 이메일 형식인지 확인해주세요.',
+        'user-disabled' => '비활성화된 계정이에요. 고객센터로 문의해주세요.',
+        _ => '로그인에 실패했어요. 잠시 후 다시 시도해주세요.',
+      };
+      throw Exception(msg);
     }
   }
 

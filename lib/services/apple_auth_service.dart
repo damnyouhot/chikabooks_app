@@ -31,7 +31,9 @@ class AppleAuthService {
   }
 
   /// Apple 로그인 실행
-  static Future<User?> signInWithApple() async {
+  ///
+  /// 성공 시 `(Firebase User, Apple이 첫 인증에만 넘겨주는 이메일)` — 두 번째 인자는 재로그인 시 null 인 경우가 많음.
+  static Future<(User user, String? emailFromCredential)?> signInWithApple() async {
     try {
       final rawNonce = _generateNonce();
       final nonce = _sha256ofString(rawNonce);
@@ -49,6 +51,8 @@ class AppleAuthService {
               )
             : null,
       );
+
+      final emailFromApple = appleCredential.email?.trim();
 
       final identityToken = appleCredential.identityToken;
       if (identityToken == null) {
@@ -76,12 +80,18 @@ class AppleAuthService {
         }
       }
 
+      final u = userCredential.user;
+      if (u == null) {
+        debugPrint('⚠️ Apple userCredential.user가 null');
+        return null;
+      }
+
       debugPrint(
-        '✅ Apple 로그인 성공: ${userCredential.user?.uid} '
-        '(${userCredential.user?.email})',
+        '✅ Apple 로그인 성공: ${u.uid} (${u.email}) '
+        'credentialEmail=${emailFromApple ?? "(없음·재로그인 또는 숨김)"}',
       );
 
-      return userCredential.user;
+      return (u, emailFromApple);
     } catch (e) {
       if (e.toString().contains('AuthorizationErrorCode.canceled')) {
         debugPrint('ℹ️ Apple 로그인 취소');

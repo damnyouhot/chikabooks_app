@@ -50,6 +50,44 @@
       cMapPacked: true,
     }
   </script>
+  <script>
+    // 이전 Service Worker 캐시 강제 갱신
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for (var reg of registrations) {
+          reg.update();
+        }
+      });
+      navigator.serviceWorker.addEventListener('controllerchange', function() {
+        window.location.reload();
+      });
+    }
+  </script>
+  <!--
+    파일 드롭 시 브라우저 기본 동작(이미지/파일을 새 탭에서 열기)을 막습니다.
+    Flutter Web 로딩 후 엔진이 window.ondrop 을 교체하면 desktop_drop 의
+    preventDefault 가 사라질 수 있어, document 캡처 단계에서 Files 드래그만 차단합니다.
+    stopPropagation 은 쓰지 않아 desktop_drop 의 드롭 처리는 그대로 전달됩니다.
+  -->
+  <script>
+    (function () {
+      function isFileDrag(e) {
+        var dt = e.dataTransfer;
+        if (!dt || !dt.types) return false;
+        var types = dt.types;
+        for (var i = 0; i < types.length; i++) {
+          if (types[i] === 'Files') return true;
+        }
+        return false;
+      }
+      function preventFileDropDefault(e) {
+        if (isFileDrag(e)) e.preventDefault();
+      }
+      document.addEventListener('dragenter', preventFileDropDefault, true);
+      document.addEventListener('dragover', preventFileDropDefault, true);
+      document.addEventListener('drop', preventFileDropDefault, true);
+    })();
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

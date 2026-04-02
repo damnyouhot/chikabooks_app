@@ -12,7 +12,8 @@
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
     "setup-admin": "node ../tools/setup_admin.js",
-    "setup-admin:yhgjd": "node ../tools/setup_admin.js --by-email-prefix Yhgjd"
+    "setup-admin:yhgjd": "node ../tools/setup_admin.js --by-email-prefix Yhgjd",
+    "mass-delete-except": "node ../tools/mass-delete-users-except.cjs"
   },
   "engines": {
     "node": "22"

@@ -20,15 +20,30 @@ class JobDraftService {
   // 조회
   // ══════════════════════════════════════════════
 
+  /// 최근 수정순 정렬 (클라이언트)
+  ///
+  /// `where + orderBy(updatedAt)` 는 복합 인덱스가 필요해, 인덱스 미배포 시 쿼리가 실패한다.
+  /// 동일 필터(`ownerUid`)만 사용한 뒤 메모리에서 정렬하면 단일 필드 인덱스로 동작한다.
+  static List<JobDraft> _sortDraftsByUpdatedDesc(List<JobDraft> list) {
+    list.sort((a, b) {
+      final ta = a.updatedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final tb = b.updatedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return tb.compareTo(ta);
+    });
+    return list;
+  }
+
   /// 내 드래프트 목록 실시간 스트림 (최근 수정순)
   static Stream<List<JobDraft>> watchMyDrafts() {
     final uid = _uid;
     if (uid == null) return Stream.value([]);
     return _col
         .where('ownerUid', isEqualTo: uid)
-        .orderBy('updatedAt', descending: true)
         .snapshots()
-        .map((s) => s.docs.map((d) => JobDraft.fromDoc(d)).toList());
+        .map((s) {
+          final list = s.docs.map((d) => JobDraft.fromDoc(d)).toList();
+          return _sortDraftsByUpdatedDesc(list);
+        });
   }
 
   /// 내 드래프트 목록 1회 조회
@@ -36,11 +51,9 @@ class JobDraftService {
     final uid = _uid;
     if (uid == null) return [];
     try {
-      final snap = await _col
-          .where('ownerUid', isEqualTo: uid)
-          .orderBy('updatedAt', descending: true)
-          .get();
-      return snap.docs.map((d) => JobDraft.fromDoc(d)).toList();
+      final snap = await _col.where('ownerUid', isEqualTo: uid).get();
+      final list = snap.docs.map((d) => JobDraft.fromDoc(d)).toList();
+      return _sortDraftsByUpdatedDesc(list);
     } catch (e) {
       debugPrint('⚠️ fetchMyDrafts error: $e');
       return [];

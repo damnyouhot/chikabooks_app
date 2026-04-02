@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/share_position_origin.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../core/widgets/app_badge.dart';
 import '../../models/poll.dart';
@@ -28,6 +29,8 @@ class PollShareCapture {
     required int totalEmpathy,
     String? selectedOptionId,
   }) async {
+    final shareOrigin = sharePositionOriginForShare(context);
+
     final overlay = Overlay.maybeOf(context, rootOverlay: true);
     if (overlay == null) {
       throw StateError('Overlay 없음');
@@ -81,7 +84,10 @@ class PollShareCapture {
       final file = File(path);
       await file.writeAsBytes(byteData.buffer.asUint8List());
 
-      await Share.shareXFiles([XFile(path, mimeType: 'image/png')]);
+      await Share.shareXFiles(
+        [XFile(path, mimeType: 'image/png')],
+        sharePositionOrigin: shareOrigin,
+      );
     } finally {
       entry.remove();
     }

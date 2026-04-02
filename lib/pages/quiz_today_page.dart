@@ -1213,37 +1213,10 @@ class _QuizCardState extends State<_QuizCard> {
                     ),
                   ),
                 ],
-                // 출처 표시 (국시: sourceName 우선 / 임상: 책·파일명 기존 로직)
-                if (widget.questionType == QuizPoolItem.kNationalExam &&
-                    widget.sourceName.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.school_outlined,
-                        size: 11,
-                        color:
-                            widget.glassMode
-                                ? AppColors.white.withValues(alpha: 0.35)
-                                : AppColors.textDisabled,
-                      ),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          '출처: ${widget.sourceName}',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color:
-                                widget.glassMode
-                                    ? AppColors.white.withValues(alpha: 0.35)
-                                    : AppColors.textDisabled,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ] else if (widget.sourceBook.isNotEmpty ||
-                    widget.sourceFileName.isNotEmpty) ...[
+                // 출처 표시 (임상만 — 국시는 표시하지 않음)
+                if (widget.questionType == QuizPoolItem.kClinical &&
+                    (widget.sourceBook.isNotEmpty ||
+                        widget.sourceFileName.isNotEmpty)) ...[
                   const SizedBox(height: 8),
                   Row(
                     children: [

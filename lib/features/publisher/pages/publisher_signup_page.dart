@@ -87,7 +87,7 @@ class _PublisherSignupPageState extends State<PublisherSignupPage> {
 
       await ClinicAuthService.initClinicAccount();
       if (!mounted) return;
-      context.go('/publisher/onboarding');
+      context.go('/post-job/input');
     } on FirebaseAuthException catch (e) {
       setState(() {
         _errorMsg = _mapError(e.code);

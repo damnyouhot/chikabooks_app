@@ -543,12 +543,51 @@ async function deleteAuthAccount(uid: string) {
 }
 
 /**
+ * 계정 완전 삭제 (deleteMyAccount Callable 및 관리 스크립트에서 공통 사용)
+ */
+export async function performAccountDeletion(uid: string): Promise<void> {
+  // ── 1단계: 익명화 (uid 흔적 제거) ──────────────────
+  await anonymizeBondPosts(uid);
+  await anonymizePartnerGroupPosts(uid);
+  await anonymizePartnerGroupReplies(uid);
+  await anonymizePartnerGroupReactions(uid);
+  await deletePartnerGroupEnthrones(uid);
+  await anonymizePartnerGroupActivityLogs(uid);
+  await anonymizeApplications(uid);
+  await anonymizeHiraComments(uid);
+  await anonymizeDailyWallPosts(uid);
+  await deleteDailyWallReactions(uid);
+  await deleteBondPostReports(uid);
+
+  // ── 2단계: 개인 데이터 삭제 ────────────────────────
+  await deleteWeeklyGoals(uid);
+
+  // ── 3단계: 그룹 멤버 제거 ──────────────────────────
+  await removeFromPartnerGroups(uid);
+
+  // ── 4단계: Storage 삭제 ─────────────────────────────
+  await Promise.all([
+    deleteStorageByPrefix(`users/${uid}/`),
+    deleteStorageByPrefix(`profileImages/${uid}/`),
+    deleteStorageByPrefix(`avatars/${uid}/`),
+  ]);
+
+  // ── 5단계: Firestore 사용자 문서 삭제 ───────────────
+  await deleteUserData(uid);
+
+  // ── 5.5단계: 탈퇴 이력 저장 (재가입 온보딩 판단용) ──
+  await saveDeletedUserRecord(uid);
+
+  // ── 6단계: Auth 계정 삭제 (최후) ────────────────────
+  await deleteAuthAccount(uid);
+}
+
+/**
  * 📞 Callable Function: 계정 완전 삭제
  */
 export const deleteMyAccount = functions
   .region("asia-northeast3")
   .https.onCall(async (data: any, context: functions.https.CallableContext) => {
-    // 1. 인증 확인
     if (!context.auth) {
       throw new functions.https.HttpsError(
         "unauthenticated",
@@ -560,64 +599,7 @@ export const deleteMyAccount = functions
     console.log(`🗑️ 계정 삭제 시작: ${uid}`);
 
     try {
-      // ── 1단계: 익명화 (uid 흔적 제거) ──────────────────
-      // bondPosts 익명화 (공개 피드 보호)
-      await anonymizeBondPosts(uid);
-
-      // partnerGroups 내 게시물 익명화
-      await anonymizePartnerGroupPosts(uid);
-
-      // partnerGroups 내 replies 익명화
-      await anonymizePartnerGroupReplies(uid);
-
-      // partnerGroups 내 reactions 익명화
-      await anonymizePartnerGroupReactions(uid);
-
-      // partnerGroups 내 enthrones 삭제 (docId = uid)
-      await deletePartnerGroupEnthrones(uid);
-
-      // partnerGroups activityLogs 익명화
-      await anonymizePartnerGroupActivityLogs(uid);
-
-      // 구직 지원 내역 익명화
-      await anonymizeApplications(uid);
-
-      // HIRA 댓글 익명화
-      await anonymizeHiraComments(uid);
-
-      // dailyWallPosts 익명화
-      await anonymizeDailyWallPosts(uid);
-
-      // dailyWallPosts reactions 삭제
-      await deleteDailyWallReactions(uid);
-
-      // bondPosts reports 삭제 (신고자 정보 제거)
-      await deleteBondPostReports(uid);
-
-      // ── 2단계: 개인 데이터 삭제 ────────────────────────
-      // 주간 목표 삭제
-      await deleteWeeklyGoals(uid);
-
-      // ── 3단계: 그룹 멤버 제거 ──────────────────────────
-      // (익명화 후 제거해야 쿼리가 정상 작동)
-      await removeFromPartnerGroups(uid);
-
-      // ── 4단계: Storage 삭제 ─────────────────────────────
-      await Promise.all([
-        deleteStorageByPrefix(`users/${uid}/`),
-        deleteStorageByPrefix(`profileImages/${uid}/`),
-        deleteStorageByPrefix(`avatars/${uid}/`),
-      ]);
-
-      // ── 5단계: Firestore 사용자 문서 삭제 ───────────────
-      await deleteUserData(uid);
-
-      // ── 5.5단계: 탈퇴 이력 저장 (재가입 온보딩 판단용) ──
-      await saveDeletedUserRecord(uid);
-
-      // ── 6단계: Auth 계정 삭제 (최후) ────────────────────
-      await deleteAuthAccount(uid);
-
+      await performAccountDeletion(uid);
       console.log(`✅ 계정 삭제 완료: ${uid}`);
       return { success: true, message: "계정이 완전히 삭제되었습니다." };
     } catch (error) {

@@ -171,6 +171,10 @@ class AppColors {
   // ── '준비중' 배지 등 — 어두운 포레스트 그린 ([PrepInProgressBadge]와 동일)
   static const prepBadgeGreen = Color(0xFF14532D);
 
+  // ── 웹 공고자 로그인 · 게시자 인증 진행 ────────────────────────
+  /// 페이지 배경: 뉴트럴 라이트 그레이 (크림 대체, 노란기 없음)
+  static const webPublisherPageBg = Color(0xFFF0F0F0);
+
   // ── 의미 컬러 (상태) ─────────────────────────────────────────
   static const success = Color(0xFF00E676);
   static const warning = Color(0xFFFF9100);

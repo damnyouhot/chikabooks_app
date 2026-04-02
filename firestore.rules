@@ -22,25 +22,55 @@ service cloud.firestore {
     }
 
     // ══════════════════════════════════════════════════
-    // 공고자(치과) 계정
+    // 공고자(치과) 마스터 계정
     // ══════════════════════════════════════════════════
     match /clinics_accounts/{uid} {
-      // 읽기: 본인만
       allow read: if request.auth != null && request.auth.uid == uid;
 
-      // 생성: 본인만 + 승인 관련 필드는 초기값 고정
+      // 생성: 본인만 + 서버 전용 필드 초기값 고정
       allow create: if request.auth != null && request.auth.uid == uid
         && request.resource.data.approvalStatus == 'pending'
         && request.resource.data.canPost == false;
 
-      // 수정: 본인만 + 승인 관련 필드 변경 불가 (서버만 가능)
+      // 수정: 본인만 + 서버 전용 필드(승인·인증) 변경 불가
       allow update: if request.auth != null && request.auth.uid == uid
         && request.resource.data.approvalStatus == resource.data.approvalStatus
         && request.resource.data.canPost == resource.data.canPost
-        && request.resource.data.clinicVerified == resource.data.clinicVerified;
+        && request.resource.data.clinicVerified == resource.data.clinicVerified
+        && request.resource.data.get('identityVerified', false) == resource.data.get('identityVerified', false);
 
-      // 삭제: 금지 (서버만)
       allow delete: if false;
+
+      // ── 치과 프로필 (다중 지점 지원) ──
+      match /clinic_profiles/{profileId} {
+        allow read: if request.auth != null && request.auth.uid == uid;
+        allow create: if request.auth != null && request.auth.uid == uid;
+        // 사업자 인증 상태는 서버만 변경 가능
+        allow update: if request.auth != null && request.auth.uid == uid
+          && request.resource.data.get('businessVerification', {}).get('status', 'none')
+             == resource.data.get('businessVerification', {}).get('status', 'none');
+        allow delete: if false;
+      }
+    }
+
+    // ══════════════════════════════════════════════════
+    // 🎫 공고권 (Vouchers)
+    // ══════════════════════════════════════════════════
+    match /vouchers/{voucherId} {
+      allow read: if request.auth != null
+        && resource.data.ownerUid == request.auth.uid;
+      // 생성·수정·삭제: 서버만 (발급/사용/만료 처리)
+      allow create, update, delete: if false;
+    }
+
+    // ══════════════════════════════════════════════════
+    // 🧾 주문 (Orders)
+    // ══════════════════════════════════════════════════
+    match /orders/{orderId} {
+      allow read: if request.auth != null
+        && resource.data.ownerUid == request.auth.uid;
+      // 생성·수정·삭제: 서버만 (결제 검증 후 상태 전환)
+      allow create, update, delete: if false;
     }
 
     // ══════════════════════════════════════════════════
@@ -429,6 +459,20 @@ service cloud.firestore {
     match /quiz_packs/{packId} {
       allow read: if request.auth != null;
       allow write: if false;
+    }
+
+    // ══════════════════════════════════════════════════
+    // 🔔 알림 (Notifications)
+    // ══════════════════════════════════════════════════
+    match /notifications/{uid} {
+      match /items/{itemId} {
+        allow read: if request.auth != null && request.auth.uid == uid;
+        // 클라이언트는 read 플래그만 변경 가능
+        allow update: if request.auth != null && request.auth.uid == uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+        // 생성·삭제: 서버만
+        allow create, delete: if false;
+      }
     }
 
     // ══════════════════════════════════════════════════

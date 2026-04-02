@@ -18,6 +18,7 @@ class JobManageSection extends StatefulWidget {
 
 class _JobManageSectionState extends State<JobManageSection> {
   String _filter = 'all'; // all | pending | active | closed
+  String? _clinicProfileId; // null = 전체
 
   Stream<QuerySnapshot>? _stream;
 
@@ -33,11 +34,21 @@ class _JobManageSectionState extends State<JobManageSection> {
       _stream = null;
       return;
     }
-    _stream = FirebaseFirestore.instance
+    Query q = FirebaseFirestore.instance
         .collection('jobs')
-        .where('createdBy', isEqualTo: uid)
-        .orderBy('createdAt', descending: true)
-        .snapshots();
+        .where('createdBy', isEqualTo: uid);
+
+    if (_clinicProfileId != null) {
+      q = q.where('clinicProfileId', isEqualTo: _clinicProfileId);
+    }
+
+    _stream = q.orderBy('createdAt', descending: true).snapshots();
+  }
+
+  void _onClinicProfileChanged(String? profileId) {
+    setState(() => _clinicProfileId = profileId);
+    _initStream();
+    setState(() {});
   }
 
   @override
@@ -54,6 +65,9 @@ class _JobManageSectionState extends State<JobManageSection> {
         child: Column(
           children: [
             const SizedBox(height: 24),
+            // ── 지점 필터 ──
+            _buildClinicFilter(),
+            const SizedBox(height: 12),
             // ── 상태 필터 ──
             _buildFilterChips(),
             const SizedBox(height: 16),
@@ -61,6 +75,78 @@ class _JobManageSectionState extends State<JobManageSection> {
             Expanded(child: _buildJobList()),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildClinicFilter() {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return const SizedBox.shrink();
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('clinics_accounts')
+          .doc(uid)
+          .collection('clinic_profiles')
+          .orderBy('createdAt', descending: false)
+          .snapshots(),
+      builder: (context, snapshot) {
+        final docs = snapshot.data?.docs ?? [];
+        if (docs.length <= 1) return const SizedBox.shrink();
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(
+            children: [
+              Icon(Icons.local_hospital_outlined,
+                  size: 16, color: AppColors.textSecondary),
+              const SizedBox(width: 6),
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _clinicChip(null, '전체'),
+                      ...docs.map((d) {
+                        final data = d.data() as Map<String, dynamic>;
+                        final name = data['clinicName'] as String? ?? '(이름 없음)';
+                        return _clinicChip(d.id, name);
+                      }),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _clinicChip(String? profileId, String label) {
+    final selected = _clinicProfileId == profileId;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: FilterChip(
+        label: Text(label),
+        selected: selected,
+        onSelected: (_) => _onClinicProfileChanged(profileId),
+        selectedColor: AppColors.accent.withOpacity(0.15),
+        checkmarkColor: AppColors.accent,
+        labelStyle: GoogleFonts.notoSansKr(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: selected ? AppColors.accent : AppColors.textSecondary,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(
+            color: selected
+                ? AppColors.accent.withOpacity(0.4)
+                : AppColors.divider,
+          ),
+        ),
+        backgroundColor: AppColors.white,
       ),
     );
   }

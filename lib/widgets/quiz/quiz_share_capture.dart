@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/share_position_origin.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../core/widgets/app_badge.dart';
 import '../../models/quiz_pool_item.dart';
@@ -24,6 +25,9 @@ class QuizShareCapture {
     required String questionType,
     required String quizId,
   }) async {
+    // 비동기 전에 앵커 계산 (async gap 이후 context 사용 방지)
+    final shareOrigin = sharePositionOriginForShare(context);
+
     final overlay = Overlay.maybeOf(context, rootOverlay: true);
     if (overlay == null) {
       throw StateError('Overlay 없음');
@@ -74,7 +78,10 @@ class QuizShareCapture {
       final file = File(path);
       await file.writeAsBytes(byteData.buffer.asUint8List());
 
-      await Share.shareXFiles([XFile(path, mimeType: 'image/png')]);
+      await Share.shareXFiles(
+        [XFile(path, mimeType: 'image/png')],
+        sharePositionOrigin: shareOrigin,
+      );
     } finally {
       entry.remove();
     }

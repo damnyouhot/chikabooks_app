@@ -69,24 +69,27 @@ class DefaultFirebaseOptions {
     measurementId: 'G-GYVF2JVZ1H',
   );
 
+  /// iOS `GoogleService-Info.plist` 및 Firebase 콘솔 앱 `com.chikabooks.tenth`와 동일해야 함.
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyAFSsIsl1dtspv1l7r8v6zNHo28TfGwZwM',
-    appId: '1:215876124758:ios:1623d705fd4073912bee19',
+    apiKey: 'AIzaSyDL9NULB688P8ARZYEIjZIwQsO_tnpD-H4',
+    appId: '1:215876124758:ios:eab6b27b85ed0dba723bf7',
     messagingSenderId: '215876124758',
     projectId: 'chikabooks3rd',
     storageBucket: 'chikabooks3rd.firebasestorage.app',
-    iosClientId: '215876124758-aise0ql6la51arel1m0ou6csb80bsrda.apps.googleusercontent.com',
-    iosBundleId: 'com.example.chikabooksApp',
+    iosClientId:
+        '215876124758-dohntuqr94krtq5rnev7gm3agt1qhooo.apps.googleusercontent.com',
+    iosBundleId: 'com.chikabooks.tenth',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyAFSsIsl1dtspv1l7r8v6zNHo28TfGwZwM',
-    appId: '1:215876124758:ios:1623d705fd4073912bee19',
+    apiKey: 'AIzaSyDL9NULB688P8ARZYEIjZIwQsO_tnpD-H4',
+    appId: '1:215876124758:ios:eab6b27b85ed0dba723bf7',
     messagingSenderId: '215876124758',
     projectId: 'chikabooks3rd',
     storageBucket: 'chikabooks3rd.firebasestorage.app',
-    iosClientId: '215876124758-aise0ql6la51arel1m0ou6csb80bsrda.apps.googleusercontent.com',
-    iosBundleId: 'com.example.chikabooksApp',
+    iosClientId:
+        '215876124758-dohntuqr94krtq5rnev7gm3agt1qhooo.apps.googleusercontent.com',
+    iosBundleId: 'com.chikabooks.tenth',
   );
 
 }

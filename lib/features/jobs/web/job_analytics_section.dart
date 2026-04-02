@@ -28,10 +28,16 @@ class _JobAnalyticsSectionState extends State<JobAnalyticsSection> {
   Map<String, int> _totalStats = {};
   bool _loading = true;
   int _periodDays = 7; // 7 or 30
+  String? _clinicProfileId; // null = 전체
 
   @override
   void initState() {
     super.initState();
+    _loadJobs();
+  }
+
+  void _onClinicProfileChanged(String? profileId) {
+    _clinicProfileId = profileId;
     _loadJobs();
   }
 
@@ -43,14 +49,18 @@ class _JobAnalyticsSectionState extends State<JobAnalyticsSection> {
     }
 
     try {
-      final snap = await FirebaseFirestore.instance
+      Query q = FirebaseFirestore.instance
           .collection('jobs')
-          .where('createdBy', isEqualTo: uid)
-          .orderBy('createdAt', descending: true)
-          .get();
+          .where('createdBy', isEqualTo: uid);
+
+      if (_clinicProfileId != null) {
+        q = q.where('clinicProfileId', isEqualTo: _clinicProfileId);
+      }
+
+      final snap = await q.orderBy('createdAt', descending: true).get();
 
       final jobs = snap.docs.map((d) {
-        final data = d.data();
+        final data = d.data() as Map<String, dynamic>;
         return _JobInfo(
           id: d.id,
           title: data['title'] as String? ?? '(제목 없음)',
@@ -66,6 +76,12 @@ class _JobAnalyticsSectionState extends State<JobAnalyticsSection> {
 
       if (jobs.isNotEmpty) {
         _selectJob(jobs.first);
+      } else {
+        setState(() {
+          _selectedJob = null;
+          _dailyStats = [];
+          _totalStats = {};
+        });
       }
     } catch (e) {
       debugPrint('⚠️ loadJobs error: $e');
@@ -105,6 +121,9 @@ class _JobAnalyticsSectionState extends State<JobAnalyticsSection> {
         child: ListView(
           padding: const EdgeInsets.all(24),
           children: [
+            // ── 지점 필터 ──
+            _buildClinicFilter(uid),
+            const SizedBox(height: 12),
             // ── 공고 선택 드롭다운 ──
             _buildJobSelector(),
             const SizedBox(height: 20),
@@ -132,6 +151,73 @@ class _JobAnalyticsSectionState extends State<JobAnalyticsSection> {
   // ═══════════════════════════════════════════════════════════
   // 위젯 빌더들
   // ═══════════════════════════════════════════════════════════
+
+  Widget _buildClinicFilter(String uid) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('clinics_accounts')
+          .doc(uid)
+          .collection('clinic_profiles')
+          .orderBy('createdAt', descending: false)
+          .snapshots(),
+      builder: (context, snapshot) {
+        final docs = snapshot.data?.docs ?? [];
+        if (docs.length <= 1) return const SizedBox.shrink();
+
+        return Row(
+          children: [
+            Icon(Icons.local_hospital_outlined,
+                size: 16, color: AppColors.textSecondary),
+            const SizedBox(width: 6),
+            Expanded(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _clinicChip(null, '전체'),
+                    ...docs.map((d) {
+                      final data = d.data() as Map<String, dynamic>;
+                      final name =
+                          data['clinicName'] as String? ?? '(이름 없음)';
+                      return _clinicChip(d.id, name);
+                    }),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _clinicChip(String? profileId, String label) {
+    final selected = _clinicProfileId == profileId;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: FilterChip(
+        label: Text(label),
+        selected: selected,
+        onSelected: (_) => _onClinicProfileChanged(profileId),
+        selectedColor: AppColors.accent.withOpacity(0.15),
+        checkmarkColor: AppColors.accent,
+        labelStyle: GoogleFonts.notoSansKr(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: selected ? AppColors.accent : AppColors.textSecondary,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(
+            color: selected
+                ? AppColors.accent.withOpacity(0.4)
+                : AppColors.divider,
+          ),
+        ),
+        backgroundColor: AppColors.white,
+      ),
+    );
+  }
 
   Widget _buildLoginRequired() {
     return Center(
@@ -574,7 +660,7 @@ class _BarChartPainter extends CustomPainter {
 
     // 그리드 라인
     final gridPaint = Paint()
-      ..color = const Color(0xFFE0E0E0)
+      ..color = AppColors.divider
       ..strokeWidth = 0.5;
 
     for (int i = 0; i <= 4; i++) {
@@ -628,7 +714,7 @@ class _BarChartPainter extends CustomPainter {
         final tp = TextPainter(
           text: TextSpan(
             text: label,
-            style: const TextStyle(fontSize: 9, color: Color(0xFF999999)),
+            style: const TextStyle(fontSize: 9, color: AppColors.textDisabled),
           ),
           textDirection: TextDirection.ltr,
         )..layout();
@@ -642,7 +728,7 @@ class _BarChartPainter extends CustomPainter {
       final tp = TextPainter(
         text: TextSpan(
           text: '$val',
-          style: const TextStyle(fontSize: 9, color: Color(0xFF999999)),
+          style: const TextStyle(fontSize: 9, color: AppColors.textDisabled),
         ),
         textDirection: TextDirection.ltr,
       )..layout();

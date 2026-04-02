@@ -84,18 +84,26 @@ class _PublisherVerifyBusinessPageState
       _uploadProgress = 0;
     });
     try {
-      // Storage 업로드
-      final ext = _docImage!.name.split('.').last;
+      // Storage 업로드 (규칙: clinicVerifications/**, image/jpeg|png)
+      final ext = _docImage!.name.split('.').last.toLowerCase();
+      final contentType =
+          ext == 'png' ? 'image/png' : 'image/jpeg';
       final ref = FirebaseStorage.instance.ref(
-        'clinic_verifications/$uid/bizreg.$ext',
+        'clinicVerifications/$uid/bizreg.$ext',
       );
 
       late UploadTask task;
       if (kIsWeb) {
         final bytes = await _docImage!.readAsBytes();
-        task = ref.putData(bytes);
+        task = ref.putData(
+          bytes,
+          SettableMetadata(contentType: contentType),
+        );
       } else {
-        task = ref.putFile(File(_docImage!.path));
+        task = ref.putFile(
+          File(_docImage!.path),
+          SettableMetadata(contentType: contentType),
+        );
       }
 
       task.snapshotEvents.listen((s) {

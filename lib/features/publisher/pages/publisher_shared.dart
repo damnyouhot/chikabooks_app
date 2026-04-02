@@ -24,6 +24,10 @@ class PubTextField extends StatelessWidget {
   final String? Function(String?)? validator;
   final Widget? suffixIcon;
 
+  /// true: 라운드 없는 테두리 + [fieldFillColor] (웹 통합 로그인 등)
+  final bool squareOutline;
+  final Color? fieldFillColor;
+
   const PubTextField({
     super.key,
     required this.controller,
@@ -33,10 +37,16 @@ class PubTextField extends StatelessWidget {
     this.keyboardType = TextInputType.text,
     this.validator,
     this.suffixIcon,
+    this.squareOutline = false,
+    this.fieldFillColor,
   });
 
   @override
   Widget build(BuildContext context) {
+    final radius =
+        squareOutline ? BorderRadius.zero : BorderRadius.circular(12);
+    final fill = fieldFillColor ?? AppColors.appBg;
+
     return TextFormField(
       controller: controller,
       obscureText: obscure,
@@ -45,7 +55,7 @@ class PubTextField extends StatelessWidget {
       style: GoogleFonts.notoSansKr(
         fontSize: 14,
         fontWeight: FontWeight.w500,
-        letterSpacing: -0.3,
+        letterSpacing: -0.18,
         color: AppColors.textPrimary,
       ),
       decoration: InputDecoration(
@@ -54,13 +64,13 @@ class PubTextField extends StatelessWidget {
         suffixIcon: suffixIcon,
         hintStyle: GoogleFonts.notoSansKr(
           fontSize: 13,
-          letterSpacing: -0.2,
+          letterSpacing: -0.12,
           color: AppColors.textDisabled,
         ),
         labelStyle: GoogleFonts.notoSansKr(
           fontSize: 13,
           fontWeight: FontWeight.w500,
-          letterSpacing: -0.2,
+          letterSpacing: -0.12,
           color: AppColors.textSecondary,
         ),
         contentPadding: const EdgeInsets.symmetric(
@@ -68,23 +78,23 @@ class PubTextField extends StatelessWidget {
           vertical: 14,
         ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: radius,
           borderSide: const BorderSide(color: AppColors.divider),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: radius,
           borderSide: const BorderSide(color: AppColors.divider),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: radius,
           borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: radius,
           borderSide: BorderSide(color: AppColors.error.withOpacity(0.7)),
         ),
         filled: true,
-        fillColor: AppColors.appBg,
+        fillColor: fill,
       ),
     );
   }
@@ -107,13 +117,14 @@ class PubPrimaryButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: double.infinity,
+      height: 48,
       child: ElevatedButton(
         onPressed: isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.accent,
           foregroundColor: AppColors.white,
           elevation: 0,
-          padding: const EdgeInsets.symmetric(vertical: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
@@ -133,7 +144,7 @@ class PubPrimaryButton extends StatelessWidget {
                   style: GoogleFonts.notoSansKr(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
-                    letterSpacing: -0.3,
+                    letterSpacing: -0.18,
                   ),
                 ),
       ),
@@ -148,22 +159,36 @@ class PubScaffold extends StatelessWidget {
   final Widget child;
   final bool showBack;
 
+  /// true: 웹 공고자 인증 진행(흰 배경·상단 라인 구분)
+  final bool webPublisherShell;
+
   const PubScaffold({
     super.key,
     required this.title,
     this.subtitle,
     required this.child,
     this.showBack = true,
+    this.webPublisherShell = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final bg = webPublisherShell ? AppColors.white : AppColors.appBg;
+
     return Scaffold(
-      backgroundColor: AppColors.appBg,
+      backgroundColor: bg,
       appBar: AppBar(
         backgroundColor: AppColors.white,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
         automaticallyImplyLeading: showBack,
+        bottom:
+            webPublisherShell
+                ? PreferredSize(
+                  preferredSize: const Size.fromHeight(1),
+                  child: Container(height: 1, color: AppColors.divider),
+                )
+                : null,
         leading:
             showBack
                 ? IconButton(
@@ -188,7 +213,7 @@ class PubScaffold extends StatelessWidget {
                 color: AppColors.textPrimary,
                 fontSize: 16,
                 fontWeight: FontWeight.w800,
-                letterSpacing: -0.5,
+                letterSpacing: -0.3,
               ),
             ),
             if (subtitle != null)
@@ -198,7 +223,7 @@ class PubScaffold extends StatelessWidget {
                   color: AppColors.textSecondary,
                   fontSize: 11,
                   fontWeight: FontWeight.w500,
-                  letterSpacing: -0.1,
+                  letterSpacing: -0.06,
                 ),
               ),
           ],

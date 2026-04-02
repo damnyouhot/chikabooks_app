@@ -9,7 +9,7 @@ class HygieneLabEnglishTitle extends StatelessWidget {
   const HygieneLabEnglishTitle({
     super.key,
     this.fontSize = 29,
-    this.letterSpacing = 0.35,
+    this.letterSpacing = 0.21,
     this.color,
   });
 

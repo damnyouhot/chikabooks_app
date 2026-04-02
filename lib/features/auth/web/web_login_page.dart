@@ -39,7 +39,7 @@ class _WebLoginPageState extends State<WebLoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.appBg,
+      backgroundColor: AppColors.white,
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(
@@ -117,7 +117,7 @@ class _WebLoginPageState extends State<WebLoginPage> {
       children: [
         const HygieneLabEnglishTitle(
           fontSize: 31.2,
-          letterSpacing: 0.3,
+          letterSpacing: 0.18,
           color: AppColors.textSecondary,
         ),
         const SizedBox(height: 2),
@@ -235,6 +235,7 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
   Future<void> _handlePostLogin(
     String provider, {
     bool isSignUp = false,
+    String? emailHint,
   }) async {
     if (!mounted) return;
 
@@ -248,7 +249,10 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
         return;
       }
 
-      await SignInTracker.record(provider);
+      await SignInTracker.record(
+        provider,
+        email: emailHint,
+      );
       // 앱 [SignInPage]와 동일: 로그인 성공 후 uid가 있을 때만 기록 (①~③)
       AdminActivityService.log(
         ActivityEventType.viewSignInPage,
@@ -339,12 +343,16 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
     );
     _setLoading('apple');
     try {
-      final user = await AppleAuthService.signInWithApple();
-      if (user == null) {
+      final appleRes = await AppleAuthService.signInWithApple();
+      if (appleRes == null) {
         _showError('Apple 로그인에 실패했어요.');
         return;
       }
-      await _handlePostLogin('apple');
+      final (user, appleIdEmail) = appleRes;
+      await _handlePostLogin(
+        'apple',
+        emailHint: appleIdEmail ?? user.email,
+      );
     } catch (e) {
       _showError('Apple 로그인 오류: $e');
     } finally {
@@ -761,41 +769,47 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
 
           const SizedBox(height: 12),
 
-          // ── 이메일 로그인 ──────────────────
+          // ── 이메일 로그인 (앱 블루 · 흰색 볼드 + 아이콘) ───────
           if (!_showEmailForm)
             SizedBox(
               width: double.infinity,
               height: 48,
-              child: OutlinedButton.icon(
-                icon: SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: SvgPicture.asset(
-                    _WebLoginSnsAssets.email,
-                    fit: BoxFit.contain,
-                    colorFilter: const ColorFilter.mode(
-                      AppColors.textSecondary,
-                      BlendMode.srcIn,
-                    ),
-                    semanticsLabel: '이메일로 로그인',
-                  ),
-                ),
-                label: const Text(
-                  '이메일로 로그인',
-                  style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
-                ),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: AppColors.divider),
-                  padding: EdgeInsets.zero,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
+              child: ElevatedButton.icon(
                 onPressed:
                     () => setState(() {
                       _showEmailForm = true;
                       _errorMsg = null;
                     }),
+                icon: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: SvgPicture.asset(
+                    _WebLoginSnsAssets.email,
+                    fit: BoxFit.contain,
+                    colorFilter: const ColorFilter.mode(
+                      AppColors.white,
+                      BlendMode.srcIn,
+                    ),
+                    semanticsLabel: '이메일로 로그인',
+                  ),
+                ),
+                label: Text(
+                  '이메일로 로그인',
+                  style: GoogleFonts.notoSansKr(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.white,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: AppColors.white,
+                  elevation: 0,
+                  padding: EdgeInsets.zero,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
               ),
             )
           else ...[
@@ -810,13 +824,14 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
             const SizedBox(height: 14),
             SizedBox(
               width: double.infinity,
+              height: 48,
               child: ElevatedButton(
                 onPressed: (_loadingProvider == 'email') ? null : _loginEmail,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.success,
+                  backgroundColor: AppColors.accent,
                   foregroundColor: AppColors.white,
                   elevation: 0,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -824,19 +839,34 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
                 child:
                     (_loadingProvider == 'email')
                         ? const SizedBox(
-                          width: 20,
-                          height: 20,
+                          width: 22,
+                          height: 22,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
                             color: AppColors.white,
                           ),
                         )
-                        : Text(
-                          _isSignUp ? '회원가입' : '로그인',
-                          style: GoogleFonts.notoSansKr(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                          ),
+                        : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _isSignUp
+                                  ? Icons.person_add_outlined
+                                  : Icons.login_rounded,
+                              color: AppColors.white,
+                              size: 22,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              _isSignUp ? '회원가입' : '로그인',
+                              style: GoogleFonts.notoSansKr(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.white,
+                              ),
+                            ),
+                          ],
                         ),
               ),
             ),
@@ -1044,6 +1074,77 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
   }
 }
 
+/// 공고자 로그인 전용 — 밑줄(라인) 입력, 크림 배경 없음
+class _ClinicLineTextField extends StatelessWidget {
+  final TextEditingController controller;
+  final String label;
+  final String? hint;
+  final bool obscure;
+  final TextInputType keyboardType;
+  final String? Function(String?)? validator;
+  final Widget? suffixIcon;
+
+  const _ClinicLineTextField({
+    required this.controller,
+    required this.label,
+    this.hint,
+    this.obscure = false,
+    this.keyboardType = TextInputType.text,
+    this.validator,
+    this.suffixIcon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TextFormField(
+      controller: controller,
+      obscureText: obscure,
+      keyboardType: keyboardType,
+      validator: validator,
+      style: GoogleFonts.notoSansKr(
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
+        letterSpacing: -0.18,
+        color: AppColors.textPrimary,
+      ),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        suffixIcon: suffixIcon,
+        hintStyle: GoogleFonts.notoSansKr(
+          fontSize: 13,
+          letterSpacing: -0.12,
+          color: AppColors.textDisabled,
+        ),
+        labelStyle: GoogleFonts.notoSansKr(
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+          letterSpacing: -0.12,
+          color: AppColors.textSecondary,
+        ),
+        contentPadding: const EdgeInsets.symmetric(vertical: 10),
+        isDense: true,
+        border: UnderlineInputBorder(
+          borderSide: BorderSide(color: AppColors.divider),
+        ),
+        enabledBorder: UnderlineInputBorder(
+          borderSide: BorderSide(color: AppColors.divider),
+        ),
+        focusedBorder: UnderlineInputBorder(
+          borderSide: BorderSide(color: AppColors.accent, width: 2),
+        ),
+        errorBorder: UnderlineInputBorder(
+          borderSide: BorderSide(color: AppColors.cardEmphasis),
+        ),
+        focusedErrorBorder: UnderlineInputBorder(
+          borderSide: BorderSide(color: AppColors.cardEmphasis, width: 1.5),
+        ),
+        filled: false,
+      ),
+    );
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════
 // 치과 로그인 카드 (이메일/비밀번호)
 // ═══════════════════════════════════════════════════════════════
@@ -1087,26 +1188,14 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
       if (!mounted) return;
 
       if (!status.exists) {
-        // clinics_accounts 문서 없음 → 공고자 계정이 아님
-        await FirebaseAuth.instance.signOut();
-        if (!mounted) return;
-        setState(() {
-          _errorMsg = '이 이메일은 공고자 계정으로 등록되어 있지 않습니다.\n'
-              '위생사(지원자) 계정이라면 왼쪽의 지원자 로그인을 이용해주세요.\n'
-              '공고자 계정이 없다면 아래 회원가입을 진행해주세요.';
-        });
-        return;
+        await ClinicAuthService.initClinicAccount();
       }
 
       await SignInTracker.record('email');
       await ClinicAuthService.recordLogin();
 
       if (!mounted) return;
-      if (status.isApprovedAndCanPost) {
-        context.go(widget.nextRoute ?? '/post-job');
-      } else {
-        context.go('/publisher/onboarding');
-      }
+      context.go(widget.nextRoute ?? '/post-job/input');
     } on FirebaseAuthException catch (e) {
       setState(() => _errorMsg = _mapError(e.code));
     } catch (_) {
@@ -1138,75 +1227,50 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
       padding: const EdgeInsets.all(AppSpacing.xl),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(AppRadius.xl),
+        borderRadius: BorderRadius.zero,
         border: Border.all(color: AppColors.divider),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.divider.withOpacity(0.25),
-            blurRadius: 30,
-            offset: const Offset(0, 20),
-          ),
-        ],
       ),
       child: Form(
         key: _formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 아이콘 + 제목
-            Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: AppColors.accent.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.business_center_rounded,
-                    color: AppColors.accent,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '치과 로그인',
-                      style: GoogleFonts.notoSansKr(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    Text(
-                      '공고 등록 · 지원자 관리',
-                      style: GoogleFonts.notoSansKr(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-
-            // ── 안내 문구 ─────────────────────────────
             Text(
-              '치과 계정은 기존 일반유저 계정으로 가입할 수 없습니다.',
-              textAlign: TextAlign.center,
+              '공고 등록 시작',
+              style: GoogleFonts.notoSansKr(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.18,
+                color: AppColors.textPrimary,
+                height: 1.2,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '이미지나 텍스트만 넣으면 AI가 공고를 만들어 드려요',
+              style: GoogleFonts.notoSansKr(
+                fontSize: 13,
+                letterSpacing: -0.12,
+                color: AppColors.textSecondary,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(height: 1, color: AppColors.divider),
+            const SizedBox(height: 20),
+
+            Text(
+              '계정을 만들면 작성 중인 공고를 저장하고\n다음에도 이어서 등록할 수 있어요',
               style: GoogleFonts.notoSansKr(
                 fontSize: 12,
+                letterSpacing: -0.12,
                 color: AppColors.textSecondary,
+                height: 1.45,
               ),
             ),
             const SizedBox(height: 16),
 
-            // 이메일
-            PubTextField(
+            _ClinicLineTextField(
               controller: _emailCtrl,
               label: '이메일',
               hint: 'admin@clinic.com',
@@ -1219,8 +1283,7 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
             ),
             const SizedBox(height: AppSpacing.md),
 
-            // 비밀번호
-            PubTextField(
+            _ClinicLineTextField(
               controller: _pwCtrl,
               label: '비밀번호',
               obscure: _obscurePw,
@@ -1240,32 +1303,40 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
               },
             ),
 
-            // 에러
             if (_errorMsg != null) ...[
               const SizedBox(height: AppSpacing.sm),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
-                  vertical: 8,
+                  vertical: 10,
                 ),
                 decoration: BoxDecoration(
-                  color: AppColors.error.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(8),
+                  color: AppColors.cardEmphasis.withOpacity(0.08),
+                  borderRadius: BorderRadius.zero,
+                  border: Border(
+                    left: BorderSide(
+                      color: AppColors.cardEmphasis,
+                      width: 3,
+                    ),
+                  ),
                 ),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Icon(
                       Icons.error_outline,
                       size: 16,
-                      color: AppColors.error.withOpacity(0.8),
+                      color: AppColors.cardEmphasis,
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         _errorMsg!,
-                        style: TextStyle(
+                        style: GoogleFonts.notoSansKr(
                           fontSize: 12,
-                          color: AppColors.error.withOpacity(0.9),
+                          letterSpacing: -0.12,
+                          color: AppColors.textPrimary,
+                          height: 1.45,
                         ),
                       ),
                     ),
@@ -1274,16 +1345,57 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
               ),
             ],
 
-            const SizedBox(height: 20),
-            PubPrimaryButton(
-              label: '로그인',
-              isLoading: _isLoading,
-              onPressed: _login,
+            const SizedBox(height: 22),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: _isLoading ? null : _login,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: AppColors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.zero,
+                  ),
+                ),
+                child:
+                    _isLoading
+                        ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.white,
+                          ),
+                        )
+                        : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.business_center_outlined,
+                              color: AppColors.white,
+                              size: 22,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '로그인',
+                              style: GoogleFonts.notoSansKr(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.18,
+                                color: AppColors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+              ),
             ),
 
             const SizedBox(height: AppSpacing.md),
 
-            // 비밀번호 찾기 + 회원가입
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -1292,20 +1404,24 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
                   style: TextButton.styleFrom(padding: EdgeInsets.zero),
                   child: Text(
                     '비밀번호를 잊으셨나요?',
-                    style: TextStyle(
+                    style: GoogleFonts.notoSansKr(
                       fontSize: 12,
+                      letterSpacing: -0.12,
                       color: AppColors.textSecondary,
+                      decoration: TextDecoration.underline,
+                      decorationColor: AppColors.textDisabled,
                     ),
                   ),
                 ),
                 TextButton(
                   onPressed: () => context.push('/publisher/signup'),
                   style: TextButton.styleFrom(padding: EdgeInsets.zero),
-                  child: const Text(
+                  child: Text(
                     '회원가입',
-                    style: TextStyle(
+                    style: GoogleFonts.notoSansKr(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
+                      letterSpacing: -0.18,
                       color: AppColors.accent,
                     ),
                   ),

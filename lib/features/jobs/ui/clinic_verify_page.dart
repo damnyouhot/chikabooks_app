@@ -71,9 +71,9 @@ class _ClinicVerifyPageState extends State<ClinicVerifyPage> {
     try {
       final uid = FirebaseAuth.instance.currentUser?.uid ?? 'anonymous';
 
-      // 1) Storage 업로드
+      // 1) Storage 업로드 (jobs/{jobId}/images — jobId는 단일 세그먼트여야 규칙 매칭됨)
       final urls = await JobImageUploader.uploadImages(
-        jobId: 'clinic_verifications/$uid',
+        jobId: 'cv_$uid',
         images: [_docImage!],
         onProgress: (_, p) => setState(() => _uploadProgress = p),
       );

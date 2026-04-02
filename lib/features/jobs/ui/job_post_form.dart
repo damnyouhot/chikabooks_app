@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -13,6 +14,8 @@ import '../../../services/transportation_lookup_service.dart';
 import '../../../utils/tag_generator.dart';
 import '../../../models/job.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_tokens.dart';
+import '../utils/job_image_attach_helpers.dart';
 
 // ── 폼 전용 타이포그래피 헬퍼 ─────────────────────────────
 TextStyle _ft({
@@ -251,12 +254,21 @@ class JobPostData {
 /// [onSubmit]      : 제출 버튼 클릭 시 호출
 /// [draftId]       : 기존 드래프트 ID (임시저장 불러오기용)
 /// [onDraftIdChanged] : 드래프트 생성/변경 시 부모에 알림
+/// [publisherWebStyle] : 웹 공고자 플로우 — 흰 패널+구분선만 (`job_input_page`와 동일 톤, 그림자 없음)
+/// [extraDraftFields] : `currentStep`·`rawImageUrls` 등 [JobPostData.toMap]에 없는 필드 — 매 저장 시 병합
+/// [initialDraftUpdatedAt] : Firestore `updatedAt` — 재접속 후에도 「마지막 저장」 시각 표시용
+/// [publisherWebEditorStep] : 웹 편집기 Stepper — `step1`(사진만)·`step3`(사진 제외 상세). null 이면 기존 전체 폼.
 class JobPostForm extends StatefulWidget {
   final JobPostData? initialData;
   final ValueChanged<JobPostData>? onDataChanged;
   final Future<void> Function(JobPostData data)? onSubmit;
   final String? draftId;
   final ValueChanged<String>? onDraftIdChanged;
+  final bool publisherWebStyle;
+  final Map<String, dynamic>? extraDraftFields;
+  final DateTime? initialDraftUpdatedAt;
+  /// `step1` | `step3` — [publisherWebStyle] true 일 때만 사용
+  final String? publisherWebEditorStep;
 
   const JobPostForm({
     super.key,
@@ -265,6 +277,10 @@ class JobPostForm extends StatefulWidget {
     this.onSubmit,
     this.draftId,
     this.onDraftIdChanged,
+    this.publisherWebStyle = false,
+    this.extraDraftFields,
+    this.initialDraftUpdatedAt,
+    this.publisherWebEditorStep,
   });
 
   @override
@@ -301,6 +317,7 @@ class _JobPostFormState extends State<JobPostForm> {
   bool _isLoadingAi = false;
   bool _isSubmitting = false;
   bool _isLookingUpStation = false;
+  List<NearbyStation> _nearbyStations = [];
 
   // 업로드 진행도 (이미지 인덱스 → 0.0~1.0)
   final Map<int, double> _uploadProgress = {};
@@ -313,17 +330,82 @@ class _JobPostFormState extends State<JobPostForm> {
   Timer? _autoSaveTimer;
   bool _isSavingDraft = false;
   DateTime? _lastSavedAt;
+  bool _imageDropActive = false;
+  static const _autoSaveDebounce = Duration(milliseconds: 1800);
 
   static const _roles = ['치과위생사', '간호조무사', '데스크', '원장', '기타'];
   static const _careers = ['신입', '경력 무관', '1년 이상', '2년 이상', '3년 이상', '5년 이상'];
   static const _employmentTypes = ['정규직', '계약직', '파트타임', '인턴'];
   static const _commonBenefits = ['4대보험', '퇴직금', '연차', '식비지원', '주차지원', '명절상여'];
 
+  /// 공고자 웹(`job_input_page` 텍스트 탭 등과 동일: 직각·구분선 중심)
+  bool get _pubWeb => widget.publisherWebStyle;
+  /// 웹 편집기 Stepper: AI 자동채우기·최종 등록 버튼 숨김
+  bool get _webEditorMode =>
+      _pubWeb && widget.publisherWebEditorStep != null;
+  /// 웹 공고자: 썸네일·레거시 아웃라인 필드 등
+  BorderRadius get _rBox =>
+      _pubWeb ? BorderRadius.circular(AppPublisher.softRadius) : BorderRadius.circular(10);
+  BorderRadius get _rChip =>
+      _pubWeb ? BorderRadius.circular(AppPublisher.softRadius) : BorderRadius.circular(8);
+  /// 웹 공고자: 주요 버튼(사진 추가·AI·임시저장·등록 등)
+  BorderRadius get _rBtn =>
+      _pubWeb ? BorderRadius.circular(AppPublisher.buttonRadius) : BorderRadius.circular(10);
+
+  @override
+  void didUpdateWidget(JobPostForm oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.draftId != oldWidget.draftId) {
+      _draftId = widget.draftId;
+    }
+    if (widget.initialDraftUpdatedAt != oldWidget.initialDraftUpdatedAt &&
+        widget.initialDraftUpdatedAt != null) {
+      _lastSavedAt = widget.initialDraftUpdatedAt;
+    }
+    _maybeRehydrateControllersAfterParentDraftLoad(oldWidget);
+  }
+
+  /// 부모가 비동기로 드래프트를 채운 뒤 같은 [draftId]로 리빌드할 때 컨트롤러 동기화
+  void _maybeRehydrateControllersAfterParentDraftLoad(JobPostForm oldWidget) {
+    final id = widget.draftId;
+    if (id == null || id.isEmpty || id != oldWidget.draftId) return;
+    final oldD = oldWidget.initialData ?? JobPostData();
+    final newD = widget.initialData ?? JobPostData();
+    final wasBlank =
+        oldD.title.trim().isEmpty && oldD.clinicName.trim().isEmpty;
+    final hasNow =
+        newD.title.trim().isNotEmpty || newD.clinicName.trim().isNotEmpty;
+    if (wasBlank && hasNow) {
+      _hydrateControllersFromData(newD);
+    }
+  }
+
+  void _hydrateControllersFromData(JobPostData d) {
+    _data = _sanitizeFormData(d);
+    _clinicNameCtrl.text = _data.clinicName;
+    _titleCtrl.text = _data.title;
+    _workHoursCtrl.text = _data.workHours;
+    _salaryCtrl.text = _data.salary;
+    _descriptionCtrl.text = _data.description;
+    _addressCtrl.text = _data.address;
+    _contactCtrl.text = _data.contact;
+    _chairCountCtrl.text = _data.chairCount != null ? '${_data.chairCount}' : '';
+    _staffCountCtrl.text = _data.staffCount != null ? '${_data.staffCount}' : '';
+    _exitNumberCtrl.text = _data.exitNumber ?? '';
+    _selectedRole = _data.role.isEmpty ? null : _data.role;
+    _selectedCareer = _data.career.isEmpty ? null : _data.career;
+    _selectedEmploymentType =
+        _data.employmentType.isEmpty ? null : _data.employmentType;
+    _selectedHospitalType = _data.hospitalType;
+    setState(() {});
+  }
+
   @override
   void initState() {
     super.initState();
-    _data = widget.initialData ?? JobPostData();
+    _data = _sanitizeFormData(widget.initialData ?? JobPostData());
     _draftId = widget.draftId;
+    _lastSavedAt = widget.initialDraftUpdatedAt;
     _clinicNameCtrl = TextEditingController(text: _data.clinicName);
     _titleCtrl = TextEditingController(text: _data.title);
     _workHoursCtrl = TextEditingController(text: _data.workHours);
@@ -405,17 +487,29 @@ class _JobPostFormState extends State<JobPostForm> {
     _scheduleAutoSave();
   }
 
+  bool _hasMeaningfulPayload() {
+    for (final v in _data.toMap().values) {
+      if (v is String && v.isNotEmpty) return true;
+      if (v is List && v.isNotEmpty) return true;
+      if (v is Map && v.isNotEmpty) return true;
+    }
+    return false;
+  }
+
+  Map<String, dynamic> _mergedFormData() => {
+        ..._data.toMap(),
+        ...?widget.extraDraftFields,
+      };
+
   // ── 임시저장 (auto-save with debounce) ──
   void _scheduleAutoSave() {
     _autoSaveTimer?.cancel();
-    _autoSaveTimer = Timer(const Duration(seconds: 3), _autoSave);
+    _autoSaveTimer = Timer(_autoSaveDebounce, _autoSave);
   }
 
   Future<void> _autoSave() async {
-    // 내용이 비어 있으면 저장하지 않음
-    if (!_data.toMap().values.any(
-      (v) => v is String && v.isNotEmpty || v is List && v.isNotEmpty,
-    )) return;
+    // 기존 드래프트 편집 중이면 메타/타임스탬프 유지를 위해 항상 저장 가능
+    if (_draftId == null && !_hasMeaningfulPayload()) return;
 
     if (_isSavingDraft) return;
     if (!mounted) return;
@@ -424,7 +518,7 @@ class _JobPostFormState extends State<JobPostForm> {
     try {
       final id = await JobDraftService.saveDraft(
         draftId: _draftId,
-        formData: _data.toMap(),
+        formData: _mergedFormData(),
       );
       if (id != null && mounted) {
         final isNew = _draftId == null;
@@ -491,6 +585,9 @@ class _JobPostFormState extends State<JobPostForm> {
             _roles.contains(res['role'])) {
           _selectedRole = res['role'] as String;
         }
+        if ((res['career'] as String? ?? '').isNotEmpty) {
+          _selectedCareer = _matchCareer(res['career'] as String);
+        }
         if ((res['employmentType'] as String? ?? '').isNotEmpty &&
             _employmentTypes.contains(res['employmentType'])) {
           _selectedEmploymentType = res['employmentType'] as String;
@@ -510,15 +607,44 @@ class _JobPostFormState extends State<JobPostForm> {
         if ((res['contact'] as String? ?? '').isNotEmpty) {
           _contactCtrl.text = res['contact'] as String;
         }
-        final benefits =
-            (res['benefits'] as List?)?.map((e) => e.toString()).toList();
-        if (benefits != null && benefits.isNotEmpty) {
-          _data = _data.copyWith(benefits: benefits);
+
+        // ── workDays: 한글("월","화"…) → 영문 코드("mon","tue"…) ──
+        final rawDays =
+            (res['workDays'] as List?)?.map((e) => e.toString()).toList();
+        if (rawDays != null && rawDays.isNotEmpty) {
+          _data = _data.copyWith(workDays: _koreanDaysToKeys(rawDays));
         }
+
+        // ── weekendWork / nightShift: 문자열 → bool ──
+        final ww = res['weekendWork'];
+        if (ww != null) {
+          _data = _data.copyWith(weekendWork: _toBoolField(ww));
+        }
+        final ns = res['nightShift'];
+        if (ns != null) {
+          _data = _data.copyWith(nightShift: _toBoolField(ns));
+        }
+
+        // ── hospitalType: 한글 label → 영문 key ──
+        final ht = res['hospitalType'] as String? ?? '';
+        if (ht.isNotEmpty) {
+          _selectedHospitalType = _matchHospitalType(ht);
+        }
+
+        // ── benefits: 공통 목록과 정규화 후 반영 ──
+        final rawBenefits =
+            (res['benefits'] as List?)?.map((e) => e.toString()).toList();
+        if (rawBenefits != null && rawBenefits.isNotEmpty) {
+          _data = _data.copyWith(benefits: _normalizeBenefits(rawBenefits));
+        }
+
         _uploadProgress.clear();
         _aiReviewed = false;
       });
       _notify();
+      // 추출 직후 1회 즉시 임시저장 (디바운스와 무관)
+      _autoSaveTimer?.cancel();
+      await _autoSave();
 
       if (res['_mock'] == true) {
         _showSnack('이미지 업로드 완료! AI 키 미설정 상태로 직접 입력해주세요.');
@@ -533,29 +659,169 @@ class _JobPostFormState extends State<JobPostForm> {
     }
   }
 
-  // ── 이미지 선택 ────────────────────────────────────────
+  /// draft나 initialData 로딩 시 한글 workDays·benefits 등을 정규화
+  JobPostData _sanitizeFormData(JobPostData d) {
+    var result = d;
+    // workDays: 한글이 섞여있으면 영문 코드로 변환
+    if (d.workDays.isNotEmpty) {
+      final hasKorean = d.workDays.any((v) => _korDayToKey.containsKey(v.trim()));
+      if (hasKorean) {
+        result = result.copyWith(workDays: _koreanDaysToKeys(d.workDays));
+      }
+    }
+    // benefits: 공통 항목과 부분 매칭 정규화
+    if (d.benefits.isNotEmpty) {
+      result = result.copyWith(benefits: _normalizeBenefits(d.benefits));
+    }
+    return result;
+  }
+
+  // ── AI 추출 결과 정규화 헬퍼 ─────────────────────────────
+
+  /// 한글 요일("월","화"…) → 영문 키("mon","tue"…)
+  static const _korDayToKey = {
+    '월': 'mon', '화': 'tue', '수': 'wed',
+    '목': 'thu', '금': 'fri', '토': 'sat', '일': 'sun',
+    '월요일': 'mon', '화요일': 'tue', '수요일': 'wed',
+    '목요일': 'thu', '금요일': 'fri', '토요일': 'sat', '일요일': 'sun',
+  };
+  static const _validDayCodes = {'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'};
+  List<String> _koreanDaysToKeys(List<String> raw) {
+    final keys = <String>[];
+    for (final d in raw) {
+      final t = d.trim();
+      // 이미 영문 코드면 그대로 사용
+      if (_validDayCodes.contains(t)) {
+        if (!keys.contains(t)) keys.add(t);
+        continue;
+      }
+      final k = _korDayToKey[t];
+      if (k != null && !keys.contains(k)) keys.add(k);
+    }
+    return keys;
+  }
+
+  /// 자유형 career 텍스트 → _careers 목록 가장 가까운 항목
+  String? _matchCareer(String raw) {
+    final t = raw.trim();
+    if (t.isEmpty) return null;
+    if (_careers.contains(t)) return t;
+    // "경력 무관" 변형
+    if (t.contains('무관')) return '경력 무관';
+    // "신입" 변형
+    if (t.contains('신입')) return '신입';
+    // "n년 이상" 패턴
+    final m = RegExp(r'(\d+)\s*년').firstMatch(t);
+    if (m != null) {
+      final y = int.tryParse(m.group(1)!) ?? 0;
+      if (y >= 5) return '5년 이상';
+      if (y >= 3) return '3년 이상';
+      if (y >= 2) return '2년 이상';
+      if (y >= 1) return '1년 이상';
+    }
+    return null;
+  }
+
+  /// 문자열/bool 혼합 → bool (AI가 "격주 토요일" 같은 텍스트를 줄 수 있음)
+  bool _toBoolField(dynamic v) {
+    if (v is bool) return v;
+    if (v is String) {
+      final s = v.trim().toLowerCase();
+      if (s.isEmpty || s == 'false' || s == '없음' || s == '없어요' || s == 'no') {
+        return false;
+      }
+      return true;
+    }
+    return false;
+  }
+
+  /// 한글 hospitalType label → 영문 key
+  String? _matchHospitalType(String raw) {
+    final t = raw.trim();
+    if (t.isEmpty) return null;
+    for (final e in Job.hospitalTypeLabels.entries) {
+      if (e.value == t || e.key == t) return e.key;
+    }
+    if (t.contains('네트워크')) return 'network';
+    if (t.contains('종합') || t.contains('대학')) return 'general';
+    if (t.contains('병원')) return 'hospital';
+    return 'clinic';
+  }
+
+  /// AI 추출 benefits → _commonBenefits 정규화
+  /// "4대보험 지원" → "4대보험" 매칭, 나머지는 그대로
+  List<String> _normalizeBenefits(List<String> raw) {
+    final result = <String>[];
+    for (final b in raw) {
+      final t = b.trim();
+      if (t.isEmpty) continue;
+      // 정확 매칭
+      if (_commonBenefits.contains(t)) {
+        if (!result.contains(t)) result.add(t);
+        continue;
+      }
+      // 공통 항목 부분 매칭 ("4대보험 지원" → "4대보험")
+      bool matched = false;
+      for (final c in _commonBenefits) {
+        if (t.contains(c) || c.contains(t)) {
+          if (!result.contains(c)) result.add(c);
+          matched = true;
+          break;
+        }
+      }
+      if (!matched && !result.contains(t)) result.add(t);
+    }
+    return result;
+  }
+
+  // ── 이미지 선택 · 드롭 ─────────────────────────────────
   Future<void> _pickImages() async {
-    final picker = ImagePicker();
     final remaining = 10 - _data.images.length;
     if (remaining <= 0) return;
+    final picker = ImagePicker();
     final picked = await picker.pickMultiImage(limit: remaining);
     if (picked.isEmpty) return;
+    await _appendImagesFromXFiles(picked);
+  }
 
-    // 웹에서 미리보기 bytes를 선택 시점에 캐싱
+  Future<void> _appendImagesFromXFiles(List<XFile> picked) async {
+    if (picked.isEmpty) return;
+    final remaining = 10 - _data.images.length;
+    if (remaining <= 0) return;
+
+    final allowed = <XFile>[];
+    for (final f in picked) {
+      if (!isAllowedJobImageFileName(f.name)) continue;
+      allowed.add(f);
+      if (allowed.length >= remaining) break;
+    }
+    if (allowed.isEmpty) {
+      if (mounted) {
+        _showSnack('지원 이미지(jpg, png, gif, webp 등)만 추가할 수 있어요.');
+      }
+      return;
+    }
+
     if (kIsWeb) {
-      for (final f in picked) {
+      for (final f in allowed) {
         if (!_previewCache.containsKey(f.name)) {
           _previewCache[f.name] = await f.readAsBytes();
         }
       }
     }
 
-    final combined = [..._data.images, ...picked];
+    final combined = [..._data.images, ...allowed];
     final limited = combined.take(10).toList();
     setState(() {
       _data = _data.copyWith(images: limited);
     });
     _notify();
+  }
+
+  Future<void> _onImageDropDone(DropDoneDetails details) async {
+    setState(() => _imageDropActive = false);
+    final flat = flattenDropItems(details.files);
+    await _appendImagesFromXFiles(flat);
   }
 
   // ── 복리후생 토글 ──────────────────────────────────────
@@ -573,7 +839,7 @@ class _JobPostFormState extends State<JobPostForm> {
   // ── 제출 ───────────────────────────────────────────────
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_data.images.isNotEmpty && !_aiReviewed) {
+    if (_data.images.isNotEmpty && !_aiReviewed && !_webEditorMode) {
       _showSnack('AI 자동입력 내용을 검토했다고 체크해주세요.');
       return;
     }
@@ -626,8 +892,44 @@ class _JobPostFormState extends State<JobPostForm> {
       SnackBar(
         content: Text(msg),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(borderRadius: _rBox),
       ),
+    );
+  }
+
+  /// 웹 공고자: `web_login_page`와 동일한 밑줄 입력
+  InputDecoration _pubUnderlineDecoration({required String? label, String? hint}) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      hintStyle: _ft(
+        size: 13,
+        weight: FontWeight.w400,
+        color: AppColors.textDisabled,
+      ),
+      labelStyle: _ft(
+        size: 13,
+        weight: FontWeight.w600,
+        color: AppColors.textSecondary,
+      ),
+      contentPadding: const EdgeInsets.symmetric(vertical: 10),
+      isDense: true,
+      border: UnderlineInputBorder(
+        borderSide: BorderSide(color: AppColors.divider),
+      ),
+      enabledBorder: UnderlineInputBorder(
+        borderSide: BorderSide(color: AppColors.divider),
+      ),
+      focusedBorder: UnderlineInputBorder(
+        borderSide: BorderSide(color: AppColors.accent, width: 2),
+      ),
+      errorBorder: UnderlineInputBorder(
+        borderSide: BorderSide(color: AppColors.cardEmphasis),
+      ),
+      focusedErrorBorder: UnderlineInputBorder(
+        borderSide: BorderSide(color: AppColors.cardEmphasis, width: 1.5),
+      ),
+      filled: false,
     );
   }
 
@@ -637,40 +939,140 @@ class _JobPostFormState extends State<JobPostForm> {
       key: _formKey,
       onChanged: _notify,
       child: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-        children: [
-          _sectionCard(
-            title: '📷 공고 사진 / AI 자동입력',
-            child: _buildImageSection(),
-          ),
-          const SizedBox(height: 16),
-          _sectionCard(title: '🏥 기본 정보', child: _buildBasicInfo()),
-          const SizedBox(height: 16),
-          _sectionCard(title: '🏢 병원 정보', child: _buildHospitalInfo()),
-          const SizedBox(height: 16),
-          _sectionCard(title: '⏰ 근무 조건', child: _buildWorkConditions()),
-          const SizedBox(height: 16),
-          _sectionCard(title: '📋 지원 방법 / 마감일', child: _buildApplySection()),
-          const SizedBox(height: 16),
-          _sectionCard(title: '🎁 복리후생', child: _buildBenefits()),
-          const SizedBox(height: 16),
-          _sectionCard(title: '📝 상세 내용', child: _buildDescription()),
-          const SizedBox(height: 16),
-          _sectionCard(title: '📍 주소 / 연락처 / 교통편', child: _buildAddressContact()),
-          const SizedBox(height: 16),
-          if (_data.tags.isNotEmpty)
-            _sectionCard(title: '🏷️ 자동 생성 태그', child: _buildTagsPreview()),
-          if (_data.tags.isNotEmpty) const SizedBox(height: 16),
-          const SizedBox(height: 8),
-          _buildSubmitSection(),
-          const SizedBox(height: 40),
-        ],
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        padding: widget.publisherWebStyle
+            ? const EdgeInsets.symmetric(vertical: 12, horizontal: 0)
+            : const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        children: _buildMainFormSections(),
       ),
     );
   }
 
+  List<Widget> _buildMainFormSections() {
+    final full = !_webEditorMode;
+    final step1 = widget.publisherWebEditorStep == 'step1';
+    final step3 = widget.publisherWebEditorStep == 'step3';
+
+    final out = <Widget>[];
+    void gap() =>
+        out.add(const SizedBox(height: AppPublisher.formSectionSpacing));
+
+    if (full || step1) {
+      out.add(
+        _sectionCard(
+          title: _sectionTitle(
+            publisher: step1 ? '치과 이미지 (공고에 노출)' : '공고 사진 · AI 자동입력',
+            legacy: '📷 공고 사진 / AI 자동입력',
+          ),
+          child: _buildImageSection(),
+        ),
+      );
+      gap();
+    }
+
+    if (full || step3) {
+      out.add(
+        _sectionCard(
+          title: _sectionTitle(publisher: '기본 정보', legacy: '🏥 기본 정보'),
+          child: _buildBasicInfo(),
+        ),
+      );
+      gap();
+      out.add(
+        _sectionCard(
+          title: _sectionTitle(publisher: '병원 정보', legacy: '🏢 병원 정보'),
+          child: _buildHospitalInfo(),
+        ),
+      );
+      gap();
+      out.add(
+        _sectionCard(
+          title: _sectionTitle(publisher: '근무 조건', legacy: '⏰ 근무 조건'),
+          child: _buildWorkConditions(),
+        ),
+      );
+      gap();
+      out.add(
+        _sectionCard(
+          title: _sectionTitle(
+            publisher: '지원 방법 · 마감일',
+            legacy: '📋 지원 방법 / 마감일',
+          ),
+          child: _buildApplySection(),
+        ),
+      );
+      gap();
+      out.add(
+        _sectionCard(
+          title: _sectionTitle(publisher: '복리후생', legacy: '🎁 복리후생'),
+          child: _buildBenefits(),
+        ),
+      );
+      gap();
+      out.add(
+        _sectionCard(
+          title: _sectionTitle(publisher: '상세 내용', legacy: '📝 상세 내용'),
+          child: _buildDescription(),
+        ),
+      );
+      gap();
+      out.add(
+        _sectionCard(
+          title: _sectionTitle(
+            publisher: '주소 · 연락처 · 교통',
+            legacy: '📍 주소 / 연락처 / 교통편',
+          ),
+          child: _buildAddressContact(),
+        ),
+      );
+      gap();
+      if (_data.tags.isNotEmpty) {
+        out.add(
+          _sectionCard(
+            title: _sectionTitle(
+              publisher: '자동 생성 태그',
+              legacy: '🏷️ 자동 생성 태그',
+            ),
+            child: _buildTagsPreview(),
+          ),
+        );
+        gap();
+      }
+    }
+
+    out.add(const SizedBox(height: AppPublisher.formSectionSpacing));
+    out.add(_buildSubmitSection());
+    out.add(const SizedBox(height: 40));
+    return out;
+  }
+
+  String _sectionTitle({required String publisher, required String legacy}) =>
+      widget.publisherWebStyle ? publisher : legacy;
+
   // ── 섹션 카드 래퍼 ─────────────────────────────────────
   Widget _sectionCard({required String title, required Widget child}) {
+    if (widget.publisherWebStyle) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: _ft(
+                size: AppPublisher.formSectionTitleSize,
+                weight: FontWeight.w800,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: AppPublisher.formSectionTitleGap),
+            child,
+            const SizedBox(height: AppPublisher.formSectionBottomGap),
+          ],
+        ),
+      );
+    }
     return Container(
       decoration: BoxDecoration(
         color: AppColors.white,
@@ -701,20 +1103,54 @@ class _JobPostFormState extends State<JobPostForm> {
 
   // ── 이미지 + AI 섹션 ───────────────────────────────────
   Widget _buildImageSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '공고 이미지를 업로드하면 AI가 자동으로 폼을 채워줘요. (최대 10장, jpg/png, 장당 5MB 이하)',
-          style: _ft(
-            size: 12,
-            weight: FontWeight.w500,
-            color: AppColors.textSecondary,
-          ),
-        ),
-        const SizedBox(height: 12),
-        // 이미지 그리드
-        if (_data.images.isNotEmpty) ...[
+    return DropTarget(
+      onDragEntered: (_) => setState(() => _imageDropActive = true),
+      onDragExited: (_) => setState(() => _imageDropActive = false),
+      onDragDone: _onImageDropDone,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: _imageDropActive
+            ? const EdgeInsets.all(10)
+            : EdgeInsets.zero,
+        decoration: _pubWeb
+            ? (_imageDropActive
+                ? BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(color: AppColors.accent, width: 2),
+                    ),
+                  )
+                : null)
+            : BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(
+                    color: _imageDropActive ? AppColors.accent : AppColors.divider,
+                    width: _imageDropActive ? 2 : 1,
+                  ),
+                ),
+              ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '아래 영역을 눌러 폴더에서 사진을 고르거나, 이미지 파일을 이곳으로 끌어다 놓을 수 있어요.',
+              style: _ft(
+                size: 12,
+                weight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '공고 이미지를 올리면 AI가 폼을 채워줘요. (최대 10장, jpg/png, 장당 5MB 이하)',
+              style: _ft(
+                size: 12,
+                weight: FontWeight.w500,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            // 이미지 그리드
+            if (_data.images.isNotEmpty) ...[
           SizedBox(
             height: 100,
             child: ListView.separated(
@@ -726,14 +1162,14 @@ class _JobPostFormState extends State<JobPostForm> {
                 return Stack(
                   children: [
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: _rBox,
                       child: _buildThumbnail(_data.images[i]),
                     ),
                     // 업로드 진행도 오버레이
                     if (progress != null && progress < 1.0)
                       Positioned.fill(
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: _rBox,
                           child: Container(
                             color: AppColors.black.withOpacity(0.45),
                             child: Center(
@@ -791,54 +1227,58 @@ class _JobPostFormState extends State<JobPostForm> {
         Row(
           children: [
             // 이미지 추가 버튼
-            OutlinedButton.icon(
-              onPressed: _data.images.length < 10 ? _pickImages : null,
-              icon: const Icon(Icons.add_photo_alternate_outlined, size: 18),
-              label: Text('사진 추가 (${_data.images.length}/10)'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.textPrimary,
-                side: BorderSide(color: AppColors.divider),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            // AI 자동채움 버튼
-            ElevatedButton.icon(
-              onPressed: _isLoadingAi ? null : _runAiAutofill,
-              icon:
-                  _isLoadingAi
-                      ? const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: AppColors.white,
-                        ),
-                      )
-                      : const Icon(Icons.auto_awesome, size: 18),
-              label: Text(_isLoadingAi ? '분석 중...' : 'AI로 자동 채우기'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.error,
-                foregroundColor: AppColors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
+            SizedBox(
+              height: _pubWeb ? AppPublisher.ctaHeight : null,
+              child: OutlinedButton.icon(
+                onPressed: _data.images.length < 10 ? _pickImages : null,
+                icon: const Icon(Icons.add_photo_alternate_outlined, size: 18),
+                label: Text('사진 추가 (${_data.images.length}/10)'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.textPrimary,
+                  side: BorderSide(color: AppColors.divider),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: _rBtn,
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
                 ),
               ),
             ),
+            if (!_webEditorMode) ...[
+              SizedBox(width: _pubWeb ? AppPublisher.formButtonRowGap : 10),
+              // AI 자동채움 (웹 편집기 Stepper 에서는 숨김 — 상단 AI 초안과 중복)
+              SizedBox(
+                height: _pubWeb ? AppPublisher.ctaHeight : null,
+                child: ElevatedButton.icon(
+                  onPressed: _isLoadingAi ? null : _runAiAutofill,
+                  icon:
+                      _isLoadingAi
+                          ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.white,
+                            ),
+                          )
+                          : const Icon(Icons.auto_awesome, size: 18),
+                  label: Text(_isLoadingAi ? '분석 중...' : 'AI로 자동 채우기'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.cardEmphasis,
+                    foregroundColor: AppColors.onCardEmphasis,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: _rBtn,
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ],
+        ),
+      ),
     );
   }
 
@@ -942,8 +1382,8 @@ class _JobPostFormState extends State<JobPostForm> {
         Text('근무 요일', style: _ft(size: 13, weight: FontWeight.w600, color: AppColors.textSecondary)),
         const SizedBox(height: 8),
         Wrap(
-          spacing: 6,
-          runSpacing: 6,
+          spacing: _pubWeb ? AppPublisher.formChipSpacing : 6,
+          runSpacing: _pubWeb ? AppPublisher.formChipRunSpacing : 6,
           children: Job.workDayLabels.entries.map((e) {
             final selected = _data.workDays.contains(e.key);
             return FilterChip(
@@ -962,7 +1402,7 @@ class _JobPostFormState extends State<JobPostForm> {
               labelStyle: _ft(size: 13, weight: FontWeight.w600,
                 color: selected ? AppColors.accent : AppColors.textSecondary),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: _rChip,
                 side: BorderSide(color: selected ? AppColors.accent.withOpacity(0.4) : AppColors.divider),
               ),
               backgroundColor: AppColors.white,
@@ -996,8 +1436,8 @@ class _JobPostFormState extends State<JobPostForm> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Wrap(
-          spacing: 8,
-          runSpacing: 8,
+          spacing: _pubWeb ? AppPublisher.formChipSpacing : 8,
+          runSpacing: _pubWeb ? AppPublisher.formChipRunSpacing : 8,
           children:
               _commonBenefits.map((b) {
                 final selected = _data.benefits.contains(b);
@@ -1005,7 +1445,7 @@ class _JobPostFormState extends State<JobPostForm> {
                   label: Text(b),
                   selected: selected,
                   onSelected: (_) => _toggleBenefit(b),
-                  selectedColor: AppColors.error.withOpacity(0.25),
+                  selectedColor: AppColors.cardEmphasis.withOpacity(0.18),
                   checkmarkColor: AppColors.textPrimary,
                   labelStyle: _ft(
                     size: 13,
@@ -1013,9 +1453,9 @@ class _JobPostFormState extends State<JobPostForm> {
                     color: _data.benefits.contains(b) ? AppColors.textPrimary : AppColors.textSecondary,
                   ),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: _rChip,
                     side: BorderSide(
-                      color: selected ? AppColors.error.withOpacity(0.4) : AppColors.divider,
+                      color: selected ? AppColors.cardEmphasis.withOpacity(0.45) : AppColors.divider,
                     ),
                   ),
                   backgroundColor: AppColors.white,
@@ -1030,29 +1470,38 @@ class _JobPostFormState extends State<JobPostForm> {
               child: TextField(
                 controller: _benefitInputCtrl,
                 style: _ft(size: 13, weight: FontWeight.w600, color: AppColors.textPrimary),
-                decoration: InputDecoration(
-                  hintText: '기타 복리후생 직접 입력',
-                  hintStyle: _ft(
-                    size: 13,
-                    weight: FontWeight.w400,
-                    color: AppColors.textDisabled,
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: AppColors.divider),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: AppColors.divider),
-                  ),
-                ),
+                decoration: _pubWeb
+                    ? _pubUnderlineDecoration(
+                        label: null,
+                        hint: '기타 복리후생 직접 입력',
+                      )
+                    : InputDecoration(
+                        hintText: '기타 복리후생 직접 입력',
+                        hintStyle: _ft(
+                          size: 13,
+                          weight: FontWeight.w400,
+                          color: AppColors.textDisabled,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: _rBox,
+                          borderSide: const BorderSide(color: AppColors.divider),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: _rBox,
+                          borderSide: const BorderSide(color: AppColors.divider),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: _rBox,
+                          borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
+                        ),
+                      ),
               ),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: _pubWeb ? AppPublisher.formButtonRowGap : 8),
             TextButton(
               onPressed: () {
                 final v = _benefitInputCtrl.text.trim();
@@ -1065,8 +1514,11 @@ class _JobPostFormState extends State<JobPostForm> {
               },
               style: TextButton.styleFrom(
                 foregroundColor: AppColors.accent,
+                padding: _pubWeb
+                    ? const EdgeInsets.symmetric(horizontal: 12, vertical: 10)
+                    : null,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: _rChip,
                 ),
               ),
               child: const Text('추가'),
@@ -1076,7 +1528,8 @@ class _JobPostFormState extends State<JobPostForm> {
         if (_data.benefits.any((b) => !_commonBenefits.contains(b))) ...[
           const SizedBox(height: 8),
           Wrap(
-            spacing: 6,
+            spacing: _pubWeb ? AppPublisher.formChipSpacing : 6,
+            runSpacing: _pubWeb ? AppPublisher.formChipRunSpacing : 6,
             children:
                 _data.benefits
                     .where((b) => !_commonBenefits.contains(b))
@@ -1095,8 +1548,14 @@ class _JobPostFormState extends State<JobPostForm> {
                           );
                           _notify();
                         },
-                        backgroundColor: AppColors.accent.withOpacity(0.1),
-                        side: BorderSide.none,
+                        backgroundColor: AppColors.accent.withValues(alpha: 0.08),
+                        side: _pubWeb
+                            ? BorderSide(color: AppColors.divider)
+                            : BorderSide.none,
+                        shape: RoundedRectangleBorder(borderRadius: _rChip),
+                        padding: _pubWeb
+                            ? const EdgeInsets.symmetric(horizontal: 4)
+                            : null,
                       ),
                     )
                     .toList(),
@@ -1137,39 +1596,124 @@ class _JobPostFormState extends State<JobPostForm> {
         // 교통편 자동 조회
         Text('교통편', style: _ft(size: 13, weight: FontWeight.w600, color: AppColors.textSecondary)),
         const SizedBox(height: 8),
-        if (_data.subwayStationName != null && _data.subwayStationName!.isNotEmpty) ...[
+        if (_nearbyStations.isNotEmpty) ...[
+          ..._nearbyStations.asMap().entries.map((entry) {
+            final idx = entry.key;
+            final s = entry.value;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                decoration: _pubWeb
+                    ? BoxDecoration(
+                        color: idx == 0
+                            ? AppColors.accent.withOpacity(0.06)
+                            : AppColors.accent.withOpacity(0.02),
+                        border: Border(
+                          bottom: BorderSide(color: AppColors.divider),
+                        ),
+                      )
+                    : BoxDecoration(
+                        color: AppColors.accent.withOpacity(0.06),
+                        borderRadius: _rBox,
+                        border: Border.all(color: AppColors.accent.withOpacity(0.2)),
+                      ),
+                child: Row(
+                  children: [
+                    Icon(Icons.subway, size: 16,
+                        color: idx == 0 ? AppColors.accent : AppColors.textDisabled),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _nearbyStationLabel(s),
+                        style: _ft(
+                          size: 13,
+                          weight: idx == 0 ? FontWeight.w600 : FontWeight.w400,
+                          color: idx == 0 ? AppColors.textPrimary : AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                      width: 28, height: 28,
+                      child: IconButton(
+                        icon: const Icon(Icons.close, size: 14),
+                        onPressed: () {
+                          setState(() {
+                            _nearbyStations.removeAt(idx);
+                            if (_nearbyStations.isEmpty) {
+                              _data.subwayStationName = null;
+                              _data.subwayLines = [];
+                              _data.walkingDistanceMeters = null;
+                              _data.walkingMinutes = null;
+                            } else {
+                              final first = _nearbyStations.first;
+                              _data.subwayStationName = first.name;
+                              _data.subwayLines = List.from(first.lines);
+                              _data.walkingDistanceMeters = first.distanceMeters;
+                              _data.walkingMinutes = first.walkingMinutes;
+                            }
+                          });
+                          _notify();
+                        },
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        color: AppColors.textDisabled,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+          const SizedBox(height: 8),
+          _field(
+            controller: _exitNumberCtrl,
+            label: '출구 번호 (선택)',
+            hint: '예) 11번 출구',
+          ),
+          const SizedBox(height: 8),
+        ] else if (_data.subwayStationName != null && _data.subwayStationName!.isNotEmpty) ...[
           Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.accent.withOpacity(0.06),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.accent.withOpacity(0.2)),
-            ),
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+            decoration: _pubWeb
+                ? BoxDecoration(
+                    color: AppColors.accent.withOpacity(0.04),
+                    border: Border(bottom: BorderSide(color: AppColors.divider)),
+                  )
+                : BoxDecoration(
+                    color: AppColors.accent.withOpacity(0.06),
+                    borderRadius: _rBox,
+                    border: Border.all(color: AppColors.accent.withOpacity(0.2)),
+                  ),
             child: Row(
               children: [
-                const Icon(Icons.subway, size: 18, color: AppColors.accent),
+                const Icon(Icons.subway, size: 16, color: AppColors.accent),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '${_data.subwayStationName}'
-                    '${_data.walkingMinutes != null ? " 도보 ${_data.walkingMinutes}분" : ""}'
-                    '${_data.walkingDistanceMeters != null ? " (${_data.walkingDistanceMeters}m)" : ""}',
+                    _legacySubwayOneLine(),
                     style: _ft(size: 13, weight: FontWeight.w600, color: AppColors.textPrimary),
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.close, size: 16),
-                  onPressed: () {
-                    setState(() {
-                      _data.subwayStationName = null;
-                      _data.subwayLines = [];
-                      _data.walkingDistanceMeters = null;
-                      _data.walkingMinutes = null;
-                    });
-                    _notify();
-                  },
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                SizedBox(
+                  width: 28, height: 28,
+                  child: IconButton(
+                    icon: const Icon(Icons.close, size: 14),
+                    onPressed: () {
+                      setState(() {
+                        _data.subwayStationName = null;
+                        _data.subwayLines = [];
+                        _data.walkingDistanceMeters = null;
+                        _data.walkingMinutes = null;
+                      });
+                      _notify();
+                    },
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    color: AppColors.textDisabled,
+                  ),
                 ),
               ],
             ),
@@ -1182,19 +1726,29 @@ class _JobPostFormState extends State<JobPostForm> {
           ),
           const SizedBox(height: 8),
         ] else ...[
-          OutlinedButton.icon(
-            onPressed: _isLookingUpStation ? null : _lookupStation,
-            icon: _isLookingUpStation
-                ? const SizedBox(width: 14, height: 14,
-                    child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.search, size: 18),
-            label: Text(_isLookingUpStation ? '조회 중...' : '가까운 역 찾기'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.accent,
-              side: const BorderSide(color: AppColors.accent),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              OutlinedButton.icon(
+                onPressed: _isLookingUpStation ? null : _lookupStation,
+                icon: _isLookingUpStation
+                    ? const SizedBox(width: 14, height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.search, size: 18),
+                label: Text(_isLookingUpStation ? '조회 중...' : '가까운 역 찾기'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.accent,
+                  side: const BorderSide(color: AppColors.accent),
+                  shape: RoundedRectangleBorder(borderRadius: _rBtn),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '반경 1,000m',
+                style: _ft(size: 11, weight: FontWeight.w400, color: AppColors.textDisabled),
+              ),
+            ],
           ),
           const SizedBox(height: 4),
           Text(
@@ -1215,6 +1769,22 @@ class _JobPostFormState extends State<JobPostForm> {
     );
   }
 
+  String _nearbyStationLabel(NearbyStation s) {
+    final lineStr =
+        s.lines.isEmpty ? '' : ' ${s.lines.join(' · ')}';
+    return '${s.name}$lineStr · ${s.distanceMeters}m';
+  }
+
+  /// _nearbyStations 없이 draft 등으로만 역이 있을 때
+  String _legacySubwayOneLine() {
+    final name = _data.subwayStationName ?? '';
+    final lines = _data.subwayLines;
+    final lineStr = lines.isEmpty ? '' : ' ${lines.join(' · ')}';
+    final m = _data.walkingDistanceMeters;
+    final dist = m != null ? ' · ${m}m' : '';
+    return '$name$lineStr$dist';
+  }
+
   Future<void> _lookupStation() async {
     final address = _addressCtrl.text.trim();
     if (address.isEmpty) {
@@ -1229,19 +1799,27 @@ class _JobPostFormState extends State<JobPostForm> {
         if (mounted) _showSnack('주변 지하철역을 찾을 수 없습니다.');
         return;
       }
+      if (result.failReason != null) {
+        if (mounted) _showSnack('역 조회 실패: ${result.failReason}');
+        return;
+      }
       if (!mounted) return;
       setState(() {
-        _data.subwayStationName = result.info.subwayStationName;
-        _data.subwayLines = result.info.subwayLines;
-        _data.walkingDistanceMeters = result.info.walkingDistanceMeters;
-        _data.walkingMinutes = result.info.walkingMinutes;
+        _nearbyStations = List.from(result.stations);
         _data.lat = result.lat;
         _data.lng = result.lng;
+        // 가장 가까운 역을 기본 대표역으로 설정
+        if (_nearbyStations.isNotEmpty) {
+          final first = _nearbyStations.first;
+          _data.subwayStationName = first.name;
+          _data.subwayLines = List.from(first.lines);
+          _data.walkingDistanceMeters = first.distanceMeters;
+          _data.walkingMinutes = first.walkingMinutes;
+        }
       });
       _notify();
       if (mounted) {
-        _showSnack(
-            '${result.info.subwayStationName ?? "역"} 도보 ${result.info.walkingMinutes ?? "?"}분 조회 완료');
+        _showSnack('${_nearbyStations.length}개 역 조회 완료');
       }
     } catch (e) {
       if (mounted) _showSnack('교통편 조회 실패: $e');
@@ -1277,7 +1855,7 @@ class _JobPostFormState extends State<JobPostForm> {
                 hint: '예) 5',
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: _pubWeb ? AppPublisher.formFieldRowGap : 12),
             Expanded(
               child: _field(
                 controller: _staffCountCtrl,
@@ -1300,8 +1878,8 @@ class _JobPostFormState extends State<JobPostForm> {
         Text('지원 방법', style: _ft(size: 13, weight: FontWeight.w600, color: AppColors.textSecondary)),
         const SizedBox(height: 8),
         Wrap(
-          spacing: 6,
-          runSpacing: 6,
+          spacing: _pubWeb ? AppPublisher.formChipSpacing : 6,
+          runSpacing: _pubWeb ? AppPublisher.formChipRunSpacing : 6,
           children: methods.entries.map((e) {
             final selected = _data.applyMethod.contains(e.key);
             return FilterChip(
@@ -1320,7 +1898,7 @@ class _JobPostFormState extends State<JobPostForm> {
               labelStyle: _ft(size: 13, weight: FontWeight.w600,
                 color: selected ? AppColors.accent : AppColors.textSecondary),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: _rChip,
                 side: BorderSide(color: selected ? AppColors.accent.withOpacity(0.4) : AppColors.divider),
               ),
               backgroundColor: AppColors.white,
@@ -1355,12 +1933,18 @@ class _JobPostFormState extends State<JobPostForm> {
               }
             },
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                border: Border.all(color: AppColors.divider),
-                borderRadius: BorderRadius.circular(10),
-                color: AppColors.appBg,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 12),
+              decoration: _pubWeb
+                  ? const BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(color: AppColors.divider),
+                      ),
+                    )
+                  : BoxDecoration(
+                      border: Border.all(color: AppColors.divider),
+                      borderRadius: _rBox,
+                      color: AppColors.appBg,
+                    ),
               child: Row(
                 children: [
                   const Icon(Icons.calendar_today_outlined, size: 16, color: AppColors.textSecondary),
@@ -1384,12 +1968,15 @@ class _JobPostFormState extends State<JobPostForm> {
   // ── 태그 프리뷰 ─────────────────────────────────────────
   Widget _buildTagsPreview() {
     return Wrap(
-      spacing: 6,
-      runSpacing: 6,
+      spacing: _pubWeb ? AppPublisher.formChipSpacing : 6,
+      runSpacing: _pubWeb ? AppPublisher.formChipRunSpacing : 6,
       children: _data.tags.map((t) => Chip(
         label: Text(t, style: _ft(size: 12, weight: FontWeight.w600)),
         backgroundColor: AppColors.accent.withOpacity(0.08),
-        side: BorderSide.none,
+        side: _pubWeb
+            ? BorderSide(color: AppColors.divider)
+            : BorderSide.none,
+        shape: RoundedRectangleBorder(borderRadius: _rChip),
         visualDensity: VisualDensity.compact,
       )).toList(),
     );
@@ -1401,21 +1988,101 @@ class _JobPostFormState extends State<JobPostForm> {
     required bool value,
     required ValueChanged<bool> onChanged,
   }) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: _ft(size: 13, weight: FontWeight.w600, color: AppColors.textSecondary)),
-        Switch(
-          value: value,
-          onChanged: onChanged,
-          activeColor: AppColors.accent,
-        ),
-      ],
+    return Padding(
+      padding: _pubWeb ? const EdgeInsets.symmetric(vertical: 2) : EdgeInsets.zero,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: _ft(size: 13, weight: FontWeight.w600, color: AppColors.textSecondary),
+            ),
+          ),
+          Switch(
+            value: value,
+            onChanged: onChanged,
+            activeThumbColor: AppColors.white,
+            activeTrackColor: AppColors.accent,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 웹 편집기: 임시저장만 (게시는 상단 「게시 단계로」)
+  Widget _buildWebEditorSubmitFooter() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            height: AppPublisher.ctaHeight,
+            child: OutlinedButton.icon(
+              onPressed: _isSavingDraft ? null : _manualSaveDraft,
+              icon: _isSavingDraft
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.save_outlined, size: 18),
+              label: Text(
+                '임시저장',
+                style: _ft(
+                  size: 14,
+                  weight: FontWeight.w600,
+                  color: AppColors.accent,
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.accent,
+                side: const BorderSide(color: AppColors.accent),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppPublisher.buttonRadius),
+                ),
+              ),
+            ),
+          ),
+          if (_lastSavedAt != null || _draftId != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Center(
+                child: Text(
+                  _lastSavedAt != null
+                      ? '마지막 저장: ${_lastSavedAt!.hour.toString().padLeft(2, '0')}:${_lastSavedAt!.minute.toString().padLeft(2, '0')}'
+                      : '임시저장됨',
+                  style: _ft(
+                    size: 11,
+                    weight: FontWeight.w500,
+                    color: AppColors.textDisabled,
+                  ),
+                ),
+              ),
+            ),
+          const SizedBox(height: 12),
+          Center(
+            child: Text(
+              '게시는 상단의 「게시 단계로」에서 진행할 수 있어요.',
+              textAlign: TextAlign.center,
+              style: _ft(
+                size: 12,
+                weight: FontWeight.w500,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   // ── 제출 섹션 ──────────────────────────────────────────
   Widget _buildSubmitSection() {
+    if (_webEditorMode) {
+      return _buildWebEditorSubmitFooter();
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1431,34 +2098,65 @@ class _JobPostFormState extends State<JobPostForm> {
             controlAffinity: ListTileControlAffinity.leading,
             contentPadding: EdgeInsets.zero,
             activeColor: AppColors.accent,
+            checkboxShape: _pubWeb
+                ? RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppPublisher.softRadius),
+                  )
+                : null,
+            side: _pubWeb ? const BorderSide(color: AppColors.divider, width: 1.5) : null,
           ),
         const SizedBox(height: 12),
         // ── 임시저장 버튼 + 상태 표시 ──
         Row(
           children: [
             Expanded(
-              child: OutlinedButton.icon(
-                onPressed: _isSavingDraft ? null : _manualSaveDraft,
-                icon: _isSavingDraft
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.save_outlined, size: 18),
-                label: Text(
-                  '임시저장',
-                  style: _ft(size: 14, weight: FontWeight.w600, color: AppColors.accent),
-                ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.accent,
-                  side: const BorderSide(color: AppColors.accent),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-              ),
+              child: widget.publisherWebStyle
+                  ? SizedBox(
+                      height: AppPublisher.ctaHeight,
+                      child: OutlinedButton.icon(
+                        onPressed: _isSavingDraft ? null : _manualSaveDraft,
+                        icon: _isSavingDraft
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.save_outlined, size: 18),
+                        label: Text(
+                          '임시저장',
+                          style: _ft(size: 14, weight: FontWeight.w600, color: AppColors.accent),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.accent,
+                          side: const BorderSide(color: AppColors.accent),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppPublisher.buttonRadius),
+                          ),
+                        ),
+                      ),
+                    )
+                  : OutlinedButton.icon(
+                      onPressed: _isSavingDraft ? null : _manualSaveDraft,
+                      icon: _isSavingDraft
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.save_outlined, size: 18),
+                      label: Text(
+                        '임시저장',
+                        style: _ft(size: 14, weight: FontWeight.w600, color: AppColors.accent),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.accent,
+                        side: const BorderSide(color: AppColors.accent),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                    ),
             ),
           ],
         ),
@@ -1482,15 +2180,20 @@ class _JobPostFormState extends State<JobPostForm> {
         // ── 제출 버튼 ──
         SizedBox(
           width: double.infinity,
+          height: widget.publisherWebStyle ? AppPublisher.ctaHeight : null,
           child: ElevatedButton(
             onPressed: _isSubmitting ? null : _submit,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.accent,
               foregroundColor: AppColors.white,
               elevation: 0,
-              padding: const EdgeInsets.symmetric(vertical: 16),
+              padding: widget.publisherWebStyle
+                  ? EdgeInsets.zero
+                  : const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(
+                  widget.publisherWebStyle ? AppPublisher.buttonRadius : 14,
+                ),
               ),
             ),
             child:
@@ -1537,37 +2240,66 @@ class _JobPostFormState extends State<JobPostForm> {
       maxLines: maxLines,
       validator: validator,
       style: _ft(size: 14, weight: FontWeight.w600, color: AppColors.textPrimary),
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        hintStyle: _ft(
-          size: 13,
-          weight: FontWeight.w400,
-          color: AppColors.textDisabled,
-        ),
-        labelStyle: _ft(
-          size: 13,
-          weight: FontWeight.w600,
-          color: AppColors.textSecondary,
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 12,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.divider),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.divider),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
-        ),
-        filled: true,
-        fillColor: AppColors.appBg,
+      decoration: _pubWeb
+          ? _pubUnderlineDecoration(label: label, hint: hint)
+          : InputDecoration(
+              labelText: label,
+              hintText: hint,
+              hintStyle: _ft(
+                size: 13,
+                weight: FontWeight.w400,
+                color: AppColors.textDisabled,
+              ),
+              labelStyle: _ft(
+                size: 13,
+                weight: FontWeight.w600,
+                color: AppColors.textSecondary,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 12,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: _rBox,
+                borderSide: const BorderSide(color: AppColors.divider),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: _rBox,
+                borderSide: const BorderSide(color: AppColors.divider),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: _rBox,
+                borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
+              ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: _rBox,
+                borderSide: const BorderSide(color: AppColors.error),
+              ),
+              focusedErrorBorder: OutlineInputBorder(
+                borderRadius: _rBox,
+                borderSide: const BorderSide(color: AppColors.error, width: 1.5),
+              ),
+              filled: true,
+              fillColor: AppColors.appBg,
+            ),
+    );
+  }
+
+  /// 웹 공고: 드롭다운 패널·항목 호버가 M3 기본(보라/라벤더 톤)으로 나가지 않도록
+  ThemeData _pubDropdownMenuTheme(ThemeData base) {
+    return base.copyWith(
+      canvasColor: AppColors.white,
+      highlightColor: AppColors.accent.withValues(alpha: 0.12),
+      hoverColor: AppColors.accent.withValues(alpha: 0.10),
+      splashColor: AppColors.accent.withValues(alpha: 0.14),
+      colorScheme: base.colorScheme.copyWith(
+        surface: AppColors.white,
+        onSurface: AppColors.textPrimary,
+        primary: AppColors.accent,
+        onPrimary: AppColors.white,
+        surfaceContainerHighest: AppColors.accent.withValues(alpha: 0.10),
+        surfaceContainerHigh: AppColors.surfaceMuted,
+        surfaceContainer: AppColors.white,
       ),
     );
   }
@@ -1579,8 +2311,11 @@ class _JobPostFormState extends State<JobPostForm> {
     required List<String> items,
     required ValueChanged<String?> onChanged,
   }) {
-    return DropdownButtonFormField<String>(
+    final field = DropdownButtonFormField<String>(
       value: value,
+      dropdownColor: _pubWeb ? AppColors.white : null,
+      borderRadius:
+          _pubWeb ? BorderRadius.circular(AppPublisher.buttonRadius) : null,
       items:
           items
               .map(
@@ -1599,32 +2334,47 @@ class _JobPostFormState extends State<JobPostForm> {
               .toList(),
       onChanged: onChanged,
       style: _ft(size: 14, weight: FontWeight.w600, color: AppColors.textPrimary),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: _ft(
-          size: 13,
-          weight: FontWeight.w600,
-          color: AppColors.textSecondary,
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 12,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.divider),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.divider),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
-        ),
-        filled: true,
-        fillColor: AppColors.appBg,
-      ),
+      decoration: _pubWeb
+          ? _pubUnderlineDecoration(label: label, hint: null)
+          : InputDecoration(
+              labelText: label,
+              labelStyle: _ft(
+                size: 13,
+                weight: FontWeight.w600,
+                color: AppColors.textSecondary,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 12,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: _rBox,
+                borderSide: const BorderSide(color: AppColors.divider),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: _rBox,
+                borderSide: const BorderSide(color: AppColors.divider),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: _rBox,
+                borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
+              ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: _rBox,
+                borderSide: const BorderSide(color: AppColors.error),
+              ),
+              focusedErrorBorder: OutlineInputBorder(
+                borderRadius: _rBox,
+                borderSide: const BorderSide(color: AppColors.error, width: 1.5),
+              ),
+              filled: true,
+              fillColor: AppColors.appBg,
+            ),
+    );
+    if (!_pubWeb) return field;
+    return Theme(
+      data: _pubDropdownMenuTheme(Theme.of(context)),
+      child: field,
     );
   }
 }

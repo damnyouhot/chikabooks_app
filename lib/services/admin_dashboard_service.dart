@@ -611,6 +611,80 @@ class AdminDashboardService {
     }
   }
 
+  /// 본인인증 완료 공고자 수
+  static Future<int> getIdentityVerifiedPublisherCount() async {
+    try {
+      final snap = await _db
+          .collection('clinics_accounts')
+          .where('identityVerified', isEqualTo: true)
+          .count()
+          .get();
+      return snap.count ?? 0;
+    } catch (e) {
+      debugPrint('⚠️ getIdentityVerifiedPublisherCount: $e');
+      return 0;
+    }
+  }
+
+  /// 주문 상태별 집계
+  static Future<Map<String, int>> getOrderStatusCounts() async {
+    final result = <String, int>{
+      'created': 0,
+      'paid': 0,
+      'failed': 0,
+      'refunded': 0,
+    };
+    for (final status in result.keys.toList()) {
+      try {
+        final snap = await _db
+            .collection('orders')
+            .where('status', isEqualTo: status)
+            .count()
+            .get();
+        result[status] = snap.count ?? 0;
+      } catch (_) {}
+    }
+    return result;
+  }
+
+  /// 공고권 사용 현황 (active / used / expired)
+  static Future<Map<String, int>> getVoucherStatusCounts() async {
+    final result = <String, int>{
+      'active': 0,
+      'used': 0,
+      'expired': 0,
+    };
+    for (final status in result.keys.toList()) {
+      try {
+        final snap = await _db
+            .collection('vouchers')
+            .where('status', isEqualTo: status)
+            .count()
+            .get();
+        result[status] = snap.count ?? 0;
+      } catch (_) {}
+    }
+    return result;
+  }
+
+  /// 최근 결제 건수 ([since] 이후)
+  static Future<int> getRecentPaidOrderCount({
+    required DateTime since,
+  }) async {
+    try {
+      final snap = await _db
+          .collection('orders')
+          .where('status', isEqualTo: 'paid')
+          .where('paidAt', isGreaterThan: Timestamp.fromDate(since))
+          .count()
+          .get();
+      return snap.count ?? 0;
+    } catch (e) {
+      debugPrint('⚠️ getRecentPaidOrderCount: $e');
+      return 0;
+    }
+  }
+
   // ─── Error Monitor ────────────────────────────────────────────
 
   /// 페이지별 오류 빈도 TOP N ([since] 필터 포함)

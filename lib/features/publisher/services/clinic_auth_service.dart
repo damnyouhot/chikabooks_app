@@ -2,21 +2,41 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
-/// 공고자(치과) 계정 상태 모델
+/// 공고자(치과) 마스터 계정 상태 모델
 ///
-/// 판별 기준: `clinics_accounts/{uid}` 문서 존재 여부 + 승인 상태
-/// (기존 role 문자열 기반 구조 제거)
+/// 판별 기준: `clinics_accounts/{uid}` 문서 존재 여부 + 인증/권한 상태
 class ClinicStatus {
   final bool exists;
+
+  // ── 새 플로우 필드 ──
+  /// 본인인증 완료 여부 (토스 본인확인 / Firebase OTP fallback)
+  final bool identityVerified;
+
+  /// 본인인증 방식 ('toss' | 'firebase' | null)
+  final String? identityMethod;
+
+  /// 프로필(치과) 마이그레이션 완료
+  final bool profilesMigrated;
+
+  // ── 레거시 호환 필드 (기존 코드 참조용, 점진 제거 예정) ──
+  @Deprecated('새 플로우에서는 identityVerified 사용')
   final bool phoneVerified;
+  @Deprecated('새 플로우에서는 clinic_profiles 서브컬렉션 사용')
   final bool profileDone;
+  @Deprecated('새 플로우에서는 clinic_profiles.businessVerification 사용')
   final bool clinicVerified;
+  @Deprecated('새 플로우에서는 개별 프로필 인증 상태로 판별')
   final bool isPending;
-  final String approvalStatus; // pending, approved, rejected, suspended
+  @Deprecated('새 플로우에서는 결제 기반 게시 전환')
+  final String approvalStatus;
+  @Deprecated('새 플로우에서는 결제 완료 시 서버가 jobs 생성')
   final bool canPost;
 
   const ClinicStatus({
     this.exists = false,
+    this.identityVerified = false,
+    this.identityMethod,
+    this.profilesMigrated = false,
     this.phoneVerified = false,
     this.profileDone = false,
     this.clinicVerified = false,
@@ -28,8 +48,16 @@ class ClinicStatus {
   factory ClinicStatus.fromMap(Map<String, dynamic> data) {
     final onboarding = data['onboarding'] as Map<String, dynamic>? ?? {};
     final approval = data['approvalStatus'] as String? ?? 'pending';
+    // identityVerified: 새 필드 우선, 없으면 기존 phoneVerified fallback
+    final identity = data['identityVerified'] as bool?
+        ?? data['phoneVerified'] as bool?
+        ?? false;
     return ClinicStatus(
       exists: true,
+      identityVerified: identity,
+      identityMethod: data['identityMethod'] as String?,
+      profilesMigrated: data['profilesMigrated'] as bool? ?? false,
+      // 레거시
       phoneVerified: data['phoneVerified'] as bool? ?? false,
       profileDone: onboarding['profile'] == 'done',
       clinicVerified: data['clinicVerified'] as bool? ?? false,
@@ -39,11 +67,13 @@ class ClinicStatus {
     );
   }
 
-  /// 온보딩 완료 + 승인 상태에 따른 공고 작성 가능 여부
+  /// 레거시 호환: 기존 라우터/로그인 로직에서 아직 참조 중
+  @Deprecated('새 플로우에서는 사용하지 않음')
   bool get isApprovedAndCanPost =>
       approvalStatus == 'approved' && canPost;
 
-  /// 다음에 가야 할 온보딩 라우트
+  /// 레거시 호환: 기존 온보딩 라우트 판정
+  @Deprecated('새 플로우에서는 사용하지 않음')
   String get nextRoute {
     if (!phoneVerified) return '/publisher/verify-phone';
     if (!profileDone) return '/publisher/profile';
@@ -186,8 +216,9 @@ class ClinicAuthService {
     return null; // 통과
   }
 
-  // ── 초기 공고자 계정 생성 ─────────────────────────────
+  // ── 초기 공고자 마스터 계정 생성 ─────────────────────
 
+  /// 마스터 문서만 생성. 치과 정보는 clinic_profiles에서 별도 관리.
   static Future<void> initClinicAccount() async {
     final uid = _uid;
     if (uid == null) return;
@@ -198,6 +229,10 @@ class ClinicAuthService {
     await _db.collection(_collection).doc(uid).set({
       'email': email,
       'normalizedEmail': normalizedEmail,
+      // 새 플로우 필드
+      'identityVerified': false,
+      'profilesMigrated': false,
+      // 레거시 호환 (기존 라우터·관리자 대시보드가 참조)
       'clinicName': '',
       'managerName': '',
       'phone': '',
@@ -216,7 +251,7 @@ class ClinicAuthService {
       'lastLoginAt': FieldValue.serverTimestamp(),
     });
 
-    debugPrint('✅ ClinicAuthService: clinics_accounts/$uid 초기 문서 생성');
+    debugPrint('✅ ClinicAuthService: clinics_accounts/$uid 마스터 문서 생성');
   }
 
   // ── 기본 정보 저장 ────────────────────────────────────
@@ -271,5 +306,30 @@ class ClinicAuthService {
     } catch (e) {
       debugPrint('⚠️ ClinicAuthService.recordLogin 실패: $e');
     }
+  }
+
+  // ── 본인인증 완료 기록 (서버에서 호출 권장, 클라이언트 fallback) ──
+
+  /// 본인인증 완료 시 마스터 문서 갱신
+  static Future<void> markIdentityVerified({
+    required String method,
+    required String verifiedName,
+    required String verifiedPhone,
+    String? ci,
+  }) async {
+    final uid = _uid;
+    if (uid == null) return;
+    await _db.collection(_collection).doc(uid).update({
+      'identityVerified': true,
+      'identityMethod': method,
+      'verifiedName': verifiedName,
+      'verifiedPhone': verifiedPhone,
+      if (ci != null) 'ci': ci,
+      // 레거시 호환
+      'phoneVerified': true,
+      'phone': verifiedPhone,
+      'onboarding.phone': 'done',
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
   }
 }

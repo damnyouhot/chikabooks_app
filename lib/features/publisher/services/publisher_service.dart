@@ -2,6 +2,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 /// 게시자(치과 측) 온보딩 상태 모델
+///
+/// **Deprecated**: 새 플로우에서는 [ClinicAuthService] + [ClinicProfileService]를 사용합니다.
+/// 이 클래스는 레거시 온보딩 페이지 호환용으로만 유지됩니다.
+@Deprecated('Use ClinicAuthService + ClinicProfileService instead')
 class PublisherStatus {
   final String role; // 'publisher' 또는 ''
   final bool phoneVerified; // 휴대폰 인증 완료
@@ -42,6 +46,10 @@ class PublisherStatus {
 }
 
 /// 게시자 관련 Firestore 서비스
+///
+/// **Deprecated**: 새 플로우에서는 [ClinicAuthService] + [ClinicProfileService]를 사용합니다.
+/// 이 클래스는 레거시 온보딩 페이지 호환용으로만 유지됩니다.
+@Deprecated('Use ClinicAuthService + ClinicProfileService instead')
 class PublisherService {
   static final _db = FirebaseFirestore.instance;
   static final _auth = FirebaseAuth.instance;
