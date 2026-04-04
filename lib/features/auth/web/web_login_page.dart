@@ -97,7 +97,21 @@ class _WebLoginPageState extends State<WebLoginPage> {
                           return Column(
                             children: [
                               _ApplicantLoginCard(nextRoute: widget.nextRoute),
-                              const SizedBox(height: 20),
+                              Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 20),
+                                child: Center(
+                                  child: Container(
+                                    width: 96,
+                                    height: 1,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.divider,
+                                      borderRadius:
+                                          BorderRadius.circular(0.5),
+                                    ),
+                                  ),
+                                ),
+                              ),
                               _ClinicLoginCard(nextRoute: widget.nextRoute),
                             ],
                           );
@@ -110,9 +124,23 @@ class _WebLoginPageState extends State<WebLoginPage> {
                                 nextRoute: widget.nextRoute,
                               ),
                             ),
-                            const SizedBox(width: 24),
+                            SizedBox(
+                              width: 48,
+                              child: Center(
+                                child: Container(
+                                  width: 1,
+                                  height: 108,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.divider,
+                                    borderRadius: BorderRadius.circular(0.5),
+                                  ),
+                                ),
+                              ),
+                            ),
                             Expanded(
-                              child: _ClinicLoginCard(nextRoute: widget.nextRoute),
+                              child: _ClinicLoginCard(
+                                nextRoute: widget.nextRoute,
+                              ),
                             ),
                           ],
                         );
@@ -1269,19 +1297,16 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
   }
 
   String _mapError(String code) {
-    switch (code) {
-      case 'user-not-found':
-        return '등록되지 않은 이메일이에요.';
-      case 'wrong-password':
-      case 'invalid-credential':
-        return '로그인 정보를 확인해 주세요. 치과 계정이 없으면 회원가입으로 진행해 주세요.';
-      case 'user-disabled':
-        return '이 계정은 비활성화 상태예요.';
-      case 'too-many-requests':
-        return '시도 횟수를 초과했어요. 잠시 후 다시 시도해주세요.';
-      default:
-        return '로그인 중 오류가 발생했어요. 다시 시도해주세요.';
-    }
+    return switch (code) {
+      'user-not-found' => '등록되지 않은 이메일이에요.',
+      'wrong-password' => '비밀번호가 올바르지 않아요.',
+      'invalid-credential' =>
+        '이메일 또는 비밀번호를 다시 확인해주세요.\n치과 계정이 없으면 회원가입으로 진행해 주세요.',
+      'user-disabled' => '이 계정은 비활성화 상태예요.',
+      'too-many-requests' =>
+        '로그인 시도가 너무 많아 일시적으로 차단됐어요.\n잠시 후(1~2분) 다시 시도해주세요.',
+      _ => '로그인 중 오류가 발생했어요. 다시 시도해주세요.',
+    };
   }
 
   @override
@@ -1455,10 +1480,10 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(
-                              Icons.business_center_outlined,
+                            Icon(
+                              Icons.lock_outlined,
                               color: AppColors.white,
-                              size: 22,
+                              size: 20,
                             ),
                             const SizedBox(width: 8),
                             Text(
@@ -1491,7 +1516,7 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                   child: Text(
-                    '비밀번호를 잊으셨나요?',
+                    '비밀번호 찾기',
                     style: GoogleFonts.notoSansKr(
                       fontSize: 12,
                       letterSpacing: -0.12,
@@ -1510,7 +1535,7 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
-                      vertical: 6,
+                      vertical: 18,
                     ),
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,

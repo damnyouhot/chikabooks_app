@@ -9,14 +9,11 @@ import '../../services/apple_auth_service.dart';
 import '../../services/email_auth_service.dart';
 import '../../services/kakao_auth_service.dart';
 import '../../services/naver_auth_service.dart';
-import '../../features/publisher/services/clinic_auth_service.dart';
 import '../../services/sign_in_tracker.dart';
 import '../../services/onboarding_service.dart';
 import '../../services/admin_activity_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/hygiene_lab_english_title.dart';
-import 'auth_gate.dart';
-
 /// 다중 소셜 로그인 페이지
 /// Google / Apple / Kakao / Naver / Email 지원
 class SignInPage extends StatefulWidget {
@@ -44,47 +41,15 @@ class _SignInPageState extends State<SignInPage> {
     if (mounted && p != null) setState(() => _lastProvider = p);
   }
 
-  Future<void> _showApplicantBlockedDialog(
-    BuildContext parentContext,
-    String msg,
-  ) async {
-    if (!parentContext.mounted) return;
-    await showDialog<void>(
-      context: parentContext,
-      builder:
-          (ctx) => AlertDialog(
-            title: const Text('로그인 제한'),
-            content: SingleChildScrollView(
-              child: Text(msg, style: const TextStyle(height: 1.45)),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('확인'),
-              ),
-            ],
-          ),
-    );
-  }
-
-  /// 공고자(치과) 계정이면 로그아웃 처리 후 true — 지원자 로그인 경로 차단
-  Future<bool> _rejectIfClinicAccount() async {
-    final msg = await ClinicAuthService.blockClinicAccountFromApplicantLogin();
-    if (msg == null) return false;
-    if (!mounted) return true;
-    await _showApplicantBlockedDialog(context, msg);
-    return true;
-  }
-
   /// Google 로그인
   Future<void> _signInWithGoogle() async {
     AdminActivityService.log(ActivityEventType.tapLoginGoogle, page: 'sign_in');
     if (_isLoading) return;
     setState(() => _isLoading = true);
-    AuthGate.clinicBlocked.value = true;
     try {
       debugPrint('🔑 Google 로그인 시작');
 
+      await googleSignIn.signOut();
       final googleUser = await googleSignIn.signIn();
       if (googleUser == null) {
         debugPrint('⚠️ Google 로그인 취소됨 (사용자가 취소)');
@@ -126,8 +91,6 @@ class _SignInPageState extends State<SignInPage> {
 
       debugPrint('✅ Google 로그인 성공: ${currentUser.uid} (${currentUser.email})');
 
-      if (await _rejectIfClinicAccount()) return;
-
       await SignInTracker.record('google');
       AdminActivityService.log(ActivityEventType.viewSignInPage, page: 'sign_in');
       AdminActivityService.log(ActivityEventType.loginSuccess, page: 'sign_in', extra: {'provider': 'google'});
@@ -143,7 +106,6 @@ class _SignInPageState extends State<SignInPage> {
         ).showSnackBar(SnackBar(content: Text('Google 로그인 오류: $e')));
       }
     } finally {
-      AuthGate.clinicBlocked.value = false;
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -153,7 +115,6 @@ class _SignInPageState extends State<SignInPage> {
     AdminActivityService.log(ActivityEventType.tapLoginApple, page: 'sign_in');
     if (_isLoading) return;
     setState(() => _isLoading = true);
-    AuthGate.clinicBlocked.value = true;
     try {
       await OnboardingService.forceSchedule();
 
@@ -164,7 +125,6 @@ class _SignInPageState extends State<SignInPage> {
         ).showSnackBar(const SnackBar(content: Text('Apple 로그인 실패')));
       } else if (appleRes != null) {
         final (user, appleIdEmail) = appleRes;
-        if (await _rejectIfClinicAccount()) return;
         await SignInTracker.record(
           'apple',
           email: appleIdEmail ?? user.email,
@@ -177,7 +137,6 @@ class _SignInPageState extends State<SignInPage> {
         );
       }
     } finally {
-      AuthGate.clinicBlocked.value = false;
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -212,7 +171,6 @@ class _SignInPageState extends State<SignInPage> {
 
     if (_isLoading) return;
     setState(() => _isLoading = true);
-    AuthGate.clinicBlocked.value = true;
     try {
       await OnboardingService.forceSchedule();
 
@@ -230,8 +188,6 @@ class _SignInPageState extends State<SignInPage> {
 
       debugPrint('✅ 카카오 로그인 성공: ${user.uid} (${user.email})');
 
-      if (await _rejectIfClinicAccount()) return;
-
       await SignInTracker.record('kakao');
       AdminActivityService.log(ActivityEventType.viewSignInPage, page: 'sign_in');
       AdminActivityService.log(ActivityEventType.loginSuccess, page: 'sign_in', extra: {'provider': 'kakao'});
@@ -247,7 +203,6 @@ class _SignInPageState extends State<SignInPage> {
         ).showSnackBar(SnackBar(content: Text('카카오 로그인 오류: $e')));
       }
     } finally {
-      AuthGate.clinicBlocked.value = false;
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -257,7 +212,6 @@ class _SignInPageState extends State<SignInPage> {
     AdminActivityService.log(ActivityEventType.tapLoginNaver, page: 'sign_in');
     if (_isLoading) return;
     setState(() => _isLoading = true);
-    AuthGate.clinicBlocked.value = true;
     try {
       await OnboardingService.forceSchedule();
 
@@ -278,8 +232,6 @@ class _SignInPageState extends State<SignInPage> {
         '✅ 네이버 로그인 성공: ${user.uid} (Auth.email=${user.email}, sdk=$naverProfileEmail)',
       );
 
-      if (await _rejectIfClinicAccount()) return;
-
       await SignInTracker.record(
         'naver',
         email: naverProfileEmail ?? user.email,
@@ -298,7 +250,6 @@ class _SignInPageState extends State<SignInPage> {
         ).showSnackBar(SnackBar(content: Text('네이버 로그인 오류: $e')));
       }
     } finally {
-      AuthGate.clinicBlocked.value = false;
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -306,7 +257,6 @@ class _SignInPageState extends State<SignInPage> {
   /// 이메일/비밀번호 로그인 (다이얼로그)
   Future<void> _showEmailSignInDialog() async {
     AdminActivityService.log(ActivityEventType.tapLoginEmail, page: 'sign_in');
-    final shellContext = context;
     final emailController = TextEditingController();
     final passwordController = TextEditingController();
     final passwordConfirmController = TextEditingController();
@@ -424,7 +374,6 @@ class _SignInPageState extends State<SignInPage> {
                         }
 
                         await OnboardingService.forceSchedule();
-                        AuthGate.clinicBlocked.value = true;
 
                         User? user;
                         String? authError;
@@ -446,7 +395,6 @@ class _SignInPageState extends State<SignInPage> {
 
                         if (context.mounted) {
                           if (user == null) {
-                            AuthGate.clinicBlocked.value = false;
                             Navigator.pop(context);
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
@@ -454,19 +402,6 @@ class _SignInPageState extends State<SignInPage> {
                               ),
                             );
                           } else {
-                            final blockedMsg =
-                                await ClinicAuthService.blockClinicAccountFromApplicantLogin();
-                            AuthGate.clinicBlocked.value = false;
-                            if (blockedMsg != null) {
-                              if (context.mounted) Navigator.pop(context);
-                              if (shellContext.mounted) {
-                                await _showApplicantBlockedDialog(
-                                  shellContext,
-                                  blockedMsg,
-                                );
-                              }
-                              return;
-                            }
                             await SignInTracker.record('email');
                             AdminActivityService.log(ActivityEventType.viewSignInPage, page: 'sign_in');
                             AdminActivityService.log(ActivityEventType.loginSuccess, page: 'sign_in', extra: {'provider': 'email', 'isSignUp': isSignUp});

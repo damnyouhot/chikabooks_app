@@ -251,9 +251,15 @@ class QuizPoolService {
         final isCountedInGlobal = statsData['countedInGlobal'] == true;
         final newTotalCorrect = prevTotalCorrect + (isCorrect ? 1 : 0);
 
-        if (!isCountedInGlobal) {
-          // 글로벌 집계에 아직 등록되지 않은 유저:
-          // 참여자 수 +1, 실제 누적 정답 수 기반 구간에 추가
+        // 분포 내 이전 구간 존재 여부 확인:
+        // isCountedInGlobal=true 이지만 scoreDistribution 에 없으면
+        // cleanup 등으로 글로벌 데이터가 초기화된 "팬텀 유저" 케이스
+        final prevBucketCount =
+            (distribution[prevTotalCorrect.toString()] as num?)?.toInt() ?? 0;
+        final isPhantomUser = isCountedInGlobal && prevBucketCount <= 0;
+
+        if (!isCountedInGlobal || isPhantomUser) {
+          // 신규 유저 OR 팬텀 유저: 글로벌 집계에 (재)등록
           totalParticipants += 1;
           final newKey = newTotalCorrect.toString();
           distribution[newKey] =

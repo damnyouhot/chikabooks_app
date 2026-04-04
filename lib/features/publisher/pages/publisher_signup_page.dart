@@ -69,10 +69,20 @@ class _PublisherSignupPageState extends State<PublisherSignupPage> {
       }
 
       // Firebase Auth 계정 생성
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: email,
-        password: _pwCtrl.text,
-      );
+      try {
+        await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          email: email,
+          password: _pwCtrl.text,
+        );
+      } on FirebaseAuthException catch (e) {
+        if (e.code == 'email-already-in-use') {
+          // Auth 계정은 있는데 Firestore 문서가 없을 수 있음 → 복구 시도
+          await _handleAlreadyInUse(email, _pwCtrl.text);
+          return;
+        }
+        setState(() => _errorMsg = _mapError(e.code));
+        return;
+      }
 
       // Auth 계정 생성 후: uid 기준 중복 체크 + clinics_accounts 문서 생성
       final dupMsg = await ClinicAuthService.checkDuplicateForClinicSignup(email);
@@ -87,26 +97,90 @@ class _PublisherSignupPageState extends State<PublisherSignupPage> {
       await ClinicAuthService.initClinicAccount();
       if (!mounted) return;
       context.go('/post-job/input');
-    } on FirebaseAuthException catch (e) {
-      setState(() {
-        _errorMsg = _mapError(e.code);
-      });
+    } catch (_) {
+      if (mounted) setState(() => _errorMsg = '회원가입 중 오류가 발생했어요. 다시 시도해주세요.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  String _mapError(String code) {
-    switch (code) {
-      case 'email-already-in-use':
-        return '이미 사용 중인 이메일이에요. 로그인해주세요.';
-      case 'invalid-email':
-        return '올바른 이메일 형식이 아니에요.';
-      case 'weak-password':
-        return '비밀번호가 너무 단순해요. 좀 더 복잡하게 설정해주세요.';
-      default:
-        return '회원가입 중 오류가 발생했어요. 다시 시도해주세요.';
+  /// email-already-in-use 에러 처리:
+  /// Auth 계정은 있지만 Firestore(clinics_accounts) 문서가 날아간 경우를 복구한다.
+  ///
+  /// - 같은 비번으로 로그인 성공 + clinics_accounts 없음 → 문서만 재생성 후 진행
+  /// - 같은 비번으로 로그인 성공 + clinics_accounts 있음 → 이미 정상 계정, 로그인 유도
+  /// - 같은 비번으로 로그인 성공 + users 문서 있음       → 위생사 계정, 차단
+  /// - 비번 틀림                                        → 비밀번호 찾기 안내
+  Future<void> _handleAlreadyInUse(String email, String password) async {
+    try {
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      final status = await ClinicAuthService.getStatus();
+
+      // users 문서 존재 여부 확인 (위생사 계정 체크)
+      final usersDoc =
+          uid != null
+              ? await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(uid)
+                  .get()
+              : null;
+
+      if (usersDoc != null && usersDoc.exists) {
+        await FirebaseAuth.instance.signOut();
+        if (mounted) {
+          setState(() {
+            _errorMsg =
+                '이 이메일은 이미 위생사 계정으로 가입되어 있어\n'
+                '공고자 계정으로 사용할 수 없습니다.\n'
+                '공고자 가입은 별도의 이메일로 진행해 주세요.';
+          });
+        }
+      } else if (status.exists) {
+        // clinics_accounts가 이미 있음 → 정상 계정, 로그인으로 안내
+        await FirebaseAuth.instance.signOut();
+        if (mounted) {
+          setState(() {
+            _errorMsg = '이미 가입된 계정이에요.\n로그인 화면에서 로그인해주세요.';
+          });
+        }
+      } else {
+        // Auth만 있고 Firestore 문서 없음 → clinics_accounts만 재생성해서 복구
+        final dupMsg =
+            await ClinicAuthService.checkDuplicateForClinicSignup(email);
+        if (dupMsg != null) {
+          await FirebaseAuth.instance.signOut();
+          if (mounted) setState(() => _errorMsg = dupMsg);
+          return;
+        }
+        await ClinicAuthService.initClinicAccount();
+        if (mounted) context.go('/post-job/input');
+      }
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMsg = switch (e.code) {
+          'wrong-password' || 'invalid-credential' =>
+            '이미 가입된 이메일이에요.\n비밀번호가 기억나지 않으면 로그인 화면의 비밀번호 찾기를 이용해주세요.',
+          'too-many-requests' =>
+            '로그인 시도가 너무 많아 일시적으로 차단됐어요.\n잠시 후(1~2분) 다시 시도해주세요.',
+          _ => '회원가입 중 오류가 발생했어요. 다시 시도해주세요.',
+        };
+      });
     }
+  }
+
+  String _mapError(String code) {
+    return switch (code) {
+      'email-already-in-use' => '이미 사용 중인 이메일이에요. 로그인해주세요.',
+      'invalid-email' => '올바른 이메일 형식이 아니에요.',
+      'weak-password' => '비밀번호가 너무 단순해요. 좀 더 복잡하게 설정해주세요.',
+      _ => '회원가입 중 오류가 발생했어요. 다시 시도해주세요.',
+    };
   }
 
   Widget _policyCheckRow({

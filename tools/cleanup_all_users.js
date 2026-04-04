@@ -185,14 +185,35 @@ async function main() {
   const dailySnap = await db.collection("analytics_daily").get();
   await deleteInBatches(dailySnap.docs, "analytics_daily");
 
+  // quiz_global/stats 리셋 (유저 삭제 후 분포 데이터가 오염되지 않도록)
+  console.log("\n[bonus] quiz_global/stats 리셋 중...");
+  await db.collection("quiz_global").doc("stats").delete();
+  console.log("  ✅ quiz_global/stats 삭제 완료");
+
+  // KEEP_UID 의 countedInGlobal 초기화 (다음 퀴즈 풀 때 깨끗하게 재등록)
+  console.log("\n[bonus] KEEP_UID quizStats countedInGlobal 초기화 중...");
+  const keepStatsRef = db
+    .collection("users")
+    .doc(KEEP_UID)
+    .collection("quizStats")
+    .doc("summary");
+  const keepStatsSnap = await keepStatsRef.get();
+  if (keepStatsSnap.exists) {
+    await keepStatsRef.update({ countedInGlobal: false });
+    console.log("  ✅ countedInGlobal = false 로 초기화");
+  } else {
+    console.log("  ℹ️  quizStats/summary 없음 (건너뜀)");
+  }
+
   console.log("\n========================================");
   console.log(" ✅ 초기화 완료");
   console.log(`  - 삭제된 Firestore users:    ${firestoreUids.length}명`);
   console.log(`  - 삭제된 notes:              ${notesTotal}건`);
-  console.log(`  - 삭제된 clinics_accounts:   ${clinicUids.length}건`);
+  console.log(`  - 삭제된 clinics_accounts:   ${clinicUids.length}명`);
   console.log(`  - 삭제된 activityLogs:       ${logsDeleted}건`);
   console.log(`  - 삭제된 analytics_daily:    ${dailySnap.size}건`);
   console.log(`  - 삭제된 Auth 유저:          ${authDeleted}명`);
+  console.log(`  - quiz_global/stats:         리셋 완료`);
   console.log(`  - 보존된 UID:                ${KEEP_UID}`);
   console.log("========================================");
   process.exit(0);

@@ -97,8 +97,10 @@ class ClinicAuthService {
   static const String applicantLoginBlockedMessage =
       '이 계정은 치과(공고자) 전용으로 등록되어 있어\n'
       '위생사 앱·지원자 로그인으로는 이용할 수 없습니다.\n\n'
-      '추후 치과 전용 관리 페이지 서비스를 준비하고 있어요.\n'
-      '공고·채용 이용은 웹의 치과(공고자) 로그인을 이용해 주세요.';
+      '공고·채용 이용은 웹의 치과(공고자) 로그인을 이용해 주세요.\n\n'
+      '※ 직전에 로그인을 여러 번 시도하셨다면\n'
+      '   1~2분 후 웹 치과 로그인을 시도해주세요.\n'
+      '   (Firebase가 반복 시도를 일시적으로 차단할 수 있어요)';
 
   static String? get _uid => _auth.currentUser?.uid;
 

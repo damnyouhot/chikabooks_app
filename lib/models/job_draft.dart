@@ -8,10 +8,14 @@ class JobDraft {
   final String clinicName;
   final String title;
   final String role;
+  final List<String> hireRoles;
   final String career;
+  final String education;
   final String employmentType;
   final String workHours;
   final String salary;
+  final String salaryPayType;
+  final String salaryAmount;
   final List<String> benefits;
   final String description;
   final String address;
@@ -73,10 +77,14 @@ class JobDraft {
     this.clinicName = '',
     this.title = '',
     this.role = '',
+    this.hireRoles = const [],
     this.career = '',
+    this.education = '',
     this.employmentType = '',
     this.workHours = '',
     this.salary = '',
+    this.salaryPayType = '',
+    this.salaryAmount = '',
     this.benefits = const [],
     this.description = '',
     this.address = '',
@@ -137,10 +145,14 @@ class JobDraft {
       clinicName: data['clinicName'] as String? ?? '',
       title: data['title'] as String? ?? '',
       role: data['role'] as String? ?? '',
+      hireRoles: List<String>.from(data['hireRoles'] ?? []),
       career: data['career'] as String? ?? '',
+      education: data['education'] as String? ?? '',
       employmentType: data['employmentType'] as String? ?? '',
       workHours: data['workHours'] as String? ?? '',
       salary: data['salary'] as String? ?? '',
+      salaryPayType: data['salaryPayType'] as String? ?? '',
+      salaryAmount: data['salaryAmount'] as String? ?? '',
       benefits: List<String>.from(data['benefits'] ?? []),
       description: data['description'] as String? ?? '',
       address: data['address'] as String? ?? '',
@@ -198,10 +210,14 @@ class JobDraft {
         'clinicName': clinicName,
         'title': title,
         'role': role,
+        if (hireRoles.isNotEmpty) 'hireRoles': hireRoles,
         'career': career,
+        if (education.isNotEmpty) 'education': education,
         'employmentType': employmentType,
         'workHours': workHours,
         'salary': salary,
+        if (salaryPayType.isNotEmpty) 'salaryPayType': salaryPayType,
+        if (salaryAmount.isNotEmpty) 'salaryAmount': salaryAmount,
         'benefits': benefits,
         'description': description,
         'address': address,
@@ -261,6 +277,7 @@ class JobDraft {
       clinicName.isNotEmpty ||
       title.isNotEmpty ||
       role.isNotEmpty ||
+      hireRoles.isNotEmpty ||
       description.isNotEmpty ||
       address.isNotEmpty;
 }

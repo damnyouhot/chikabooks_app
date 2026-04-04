@@ -36,11 +36,21 @@ TextStyle _ft({
 class JobPostData {
   String clinicName;
   String title;
+  /// 게시·레거시 호환 (`hireRoles`를 `, `로 잇는 값과 [syncRoleFromHireRoles]로 동기화)
   String role;
+  /// 채용직 — 치과위생사·간호조무사·기타(직접 입력) 다중
+  List<String> hireRoles;
   String career;            // 경력 조건: '신입', '경력 무관', '1년 이상' 등
+  /// 학력: 무관, 고등학교 졸업 이상, 전문대 졸업 이상
+  String education;
   String employmentType;
   String workHours;
+  /// 표시·게시용 급여 한 줄 (composeSalaryLine 결과 등)
   String salary;
+  /// 협의 | 시 | 월 | 연 — [salaryAmount]와 함께 저장
+  String salaryPayType;
+  /// 만원 단위 숫자만(쉼표 없이)
+  String salaryAmount;
   List<String> benefits;
   String description;
   String address;
@@ -98,10 +108,14 @@ class JobPostData {
     this.clinicName = '',
     this.title = '',
     this.role = '',
+    List<String>? hireRoles,
     this.career = '',
+    this.education = '',
     this.employmentType = '',
     this.workHours = '',
     this.salary = '',
+    this.salaryPayType = '',
+    this.salaryAmount = '',
     List<String>? benefits,
     this.description = '',
     this.address = '',
@@ -136,7 +150,8 @@ class JobPostData {
     this.recruitmentStart,
     this.fieldStatus,
     this.fieldSources,
-  }) : benefits = benefits ?? [],
+  }) : hireRoles = hireRoles ?? [],
+       benefits = benefits ?? [],
        images = images ?? [],
        promotionalImageUrls = promotionalImageUrls ?? [],
        specialties = specialties ?? [],
@@ -150,10 +165,14 @@ class JobPostData {
     String? clinicName,
     String? title,
     String? role,
+    List<String>? hireRoles,
     String? career,
+    String? education,
     String? employmentType,
     String? workHours,
     String? salary,
+    String? salaryPayType,
+    String? salaryAmount,
     List<String>? benefits,
     String? description,
     String? address,
@@ -193,10 +212,14 @@ class JobPostData {
       clinicName: clinicName ?? this.clinicName,
       title: title ?? this.title,
       role: role ?? this.role,
+      hireRoles: hireRoles ?? List.from(this.hireRoles),
       career: career ?? this.career,
+      education: education ?? this.education,
       employmentType: employmentType ?? this.employmentType,
       workHours: workHours ?? this.workHours,
       salary: salary ?? this.salary,
+      salaryPayType: salaryPayType ?? this.salaryPayType,
+      salaryAmount: salaryAmount ?? this.salaryAmount,
       benefits: benefits ?? List.from(this.benefits),
       description: description ?? this.description,
       address: address ?? this.address,
@@ -238,10 +261,14 @@ class JobPostData {
     'clinicName': clinicName,
     'title': title,
     'role': role,
+    if (hireRoles.isNotEmpty) 'hireRoles': hireRoles,
     'career': career,
+    if (education.isNotEmpty) 'education': education,
     'employmentType': employmentType,
     'workHours': workHours,
     'salary': salary,
+    if (salaryPayType.isNotEmpty) 'salaryPayType': salaryPayType,
+    if (salaryAmount.isNotEmpty) 'salaryAmount': salaryAmount,
     'benefits': benefits,
     'description': description,
     'address': address,
@@ -280,6 +307,62 @@ class JobPostData {
     if (fieldSources != null && fieldSources!.isNotEmpty) 'fieldSources': fieldSources,
   };
 
+  /// 급여 표시 문자열 (저장·프리뷰 공통)
+  static String composeSalaryLine(String payType, String amount) {
+    final a = amount.trim().replaceAll(',', '');
+    switch (payType) {
+      case '협의':
+        return '협의';
+      case '시':
+        return a.isEmpty ? '' : '시 $a만원';
+      case '월':
+        return a.isEmpty ? '' : '월 $a만원';
+      case '연':
+        return a.isEmpty ? '' : '연 $a만원';
+      default:
+        return '';
+    }
+  }
+
+  /// 기존 `salary` 한 줄만 있을 때 드롭다운·입력란 복원용
+  static (String payType, String amount) inferSalaryPartsFromLegacy(String salary) {
+    final t = salary.trim();
+    if (t.isEmpty) return ('', '');
+    if (t.contains('협의')) return ('협의', '');
+    final m = RegExp(r'([\d,]+)').firstMatch(t);
+    final digits = m?.group(1)?.replaceAll(',', '') ?? '';
+    if (t.contains('시') || t.contains('시급')) return ('시', digits);
+    if (t.contains('연') || t.contains('연봉')) return ('연', digits);
+    return ('월', digits);
+  }
+
+  /// 채용직 다중 선택 → 게시용 `role` 한 줄
+  static String joinHireRoles(List<String> list) {
+    final seen = <String>{};
+    final out = <String>[];
+    for (final e in list) {
+      final t = e.trim();
+      if (t.isEmpty || seen.contains(t)) continue;
+      seen.add(t);
+      out.add(t);
+    }
+    return out.join(', ');
+  }
+
+  static List<String> parseHireRolesFromData(Map<String, dynamic> data) {
+    final hr = data['hireRoles'];
+    if (hr is List) {
+      return hr.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
+    }
+    final r = (data['role'] as String? ?? '').trim();
+    if (r.isEmpty) return [];
+    return r
+        .split(RegExp(r'\s*,\s*'))
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+  }
+
   /// Firestore 또는 드래프트 데이터에서 복원
   factory JobPostData.fromMap(Map<String, dynamic> data) {
     final trans = data['transportation'] as Map<String, dynamic>?;
@@ -287,14 +370,34 @@ class JobPostData {
     if (data['closingDate'] is String) {
       try { closing = DateTime.parse(data['closingDate'] as String); } catch (_) {}
     }
+    final originalSalary = (data['salary'] as String? ?? '').trim();
+    var education = data['education'] as String? ?? '';
+    var salaryPayType = data['salaryPayType'] as String? ?? '';
+    var salaryAmount = data['salaryAmount'] as String? ?? '';
+    var salary = originalSalary;
+    if (salaryPayType.isEmpty && originalSalary.isNotEmpty) {
+      final inf = JobPostData.inferSalaryPartsFromLegacy(originalSalary);
+      salaryPayType = inf.$1;
+      salaryAmount = inf.$2;
+    }
+    final composed = JobPostData.composeSalaryLine(salaryPayType, salaryAmount);
+    if (composed.isNotEmpty) {
+      salary = composed;
+    }
+    final hireRoles = JobPostData.parseHireRolesFromData(data);
+    final roleLine = JobPostData.joinHireRoles(hireRoles);
     return JobPostData(
       clinicName: data['clinicName'] as String? ?? '',
       title: data['title'] as String? ?? '',
-      role: data['role'] as String? ?? '',
+      role: roleLine,
+      hireRoles: hireRoles,
       career: data['career'] as String? ?? '',
+      education: education,
       employmentType: data['employmentType'] as String? ?? '',
       workHours: data['workHours'] as String? ?? '',
-      salary: data['salary'] as String? ?? '',
+      salary: salary,
+      salaryPayType: salaryPayType,
+      salaryAmount: salaryAmount,
       benefits: List<String>.from(data['benefits'] ?? []),
       description: data['description'] as String? ?? '',
       address: data['address'] as String? ?? '',
@@ -380,11 +483,13 @@ class _JobPostFormState extends State<JobPostForm> {
   late final TextEditingController _clinicNameCtrl;
   late final TextEditingController _titleCtrl;
   late final TextEditingController _workHoursCtrl;
-  late final TextEditingController _salaryCtrl;
+  late final TextEditingController _salaryAmountCtrl;
   late final TextEditingController _descriptionCtrl;
   late final TextEditingController _addressCtrl;
   late final TextEditingController _contactCtrl;
   late final TextEditingController _benefitInputCtrl;
+  late final TextEditingController _hireOtherCtrl;
+  late final TextEditingController _dutyOtherCtrl;
 
   // 신규 컨트롤러
   late final TextEditingController _chairCountCtrl;
@@ -404,11 +509,13 @@ class _JobPostFormState extends State<JobPostForm> {
   late final FocusNode _fStaffCount;
   late final FocusNode _fExitNumber;
   late final FocusNode _fDigitalEquipment;
+  late final FocusNode _fDutyOther;
 
   // 드롭다운
-  String? _selectedRole;
   String? _selectedEmploymentType;
   String? _selectedCareer;
+  String? _selectedEducation;
+  String? _selectedSalaryPayType;
   String? _selectedHospitalType;
 
   // AI 관련
@@ -439,9 +546,12 @@ class _JobPostFormState extends State<JobPostForm> {
   /// 웹 편집기 3단계(공고 상세) — 항목별 「항목 빼기」 표시
   bool get _step3 => widget.publisherWebEditorStep == 'step3';
 
-  static const _roles = ['치과위생사', '간호조무사', '데스크', '원장', '기타'];
+  static const _hireRolePresets = ['치과위생사', '간호조무사'];
+  static const _dutyPresets = ['데스크', '보험청구', '상담', '진료실'];
   static const _careers = ['신입', '경력 무관', '1년 이상', '2년 이상', '3년 이상', '5년 이상'];
+  static const _educations = ['무관', '고등학교 졸업 이상', '전문대 졸업 이상'];
   static const _employmentTypes = ['정규직', '계약직', '파트타임', '인턴'];
+  static const _salaryPayTypes = ['협의', '시', '월', '연'];
   static const _commonBenefits = ['4대보험', '퇴직금', '연차', '식비지원', '주차지원', '명절상여'];
 
   /// 공고자 웹(`job_input_page` 텍스트 탭 등과 동일: 직각·구분선 중심)
@@ -491,7 +601,7 @@ class _JobPostFormState extends State<JobPostForm> {
     _clinicNameCtrl.text = _data.clinicName;
     _titleCtrl.text = _data.title;
     _workHoursCtrl.text = _data.workHours;
-    _salaryCtrl.text = _data.salary;
+    _hydrateSalaryAndEducationFromData();
     _descriptionCtrl.text = _data.description;
     _addressCtrl.text = _data.address;
     _contactCtrl.text = _data.contact;
@@ -499,7 +609,6 @@ class _JobPostFormState extends State<JobPostForm> {
     _staffCountCtrl.text = _data.staffCount != null ? '${_data.staffCount}' : '';
     _exitNumberCtrl.text = _data.exitNumber ?? '';
     _digitalEquipmentRawCtrl.text = _data.digitalEquipmentRaw ?? '';
-    _selectedRole = _data.role.isEmpty ? null : _data.role;
     _selectedCareer = _data.career.isEmpty ? null : _data.career;
     _selectedEmploymentType =
         _data.employmentType.isEmpty ? null : _data.employmentType;
@@ -516,11 +625,13 @@ class _JobPostFormState extends State<JobPostForm> {
     _clinicNameCtrl = TextEditingController(text: _data.clinicName);
     _titleCtrl = TextEditingController(text: _data.title);
     _workHoursCtrl = TextEditingController(text: _data.workHours);
-    _salaryCtrl = TextEditingController(text: _data.salary);
+    _salaryAmountCtrl = TextEditingController();
     _descriptionCtrl = TextEditingController(text: _data.description);
     _addressCtrl = TextEditingController(text: _data.address);
     _contactCtrl = TextEditingController(text: _data.contact);
     _benefitInputCtrl = TextEditingController();
+    _hireOtherCtrl = TextEditingController();
+    _dutyOtherCtrl = TextEditingController();
     _chairCountCtrl = TextEditingController(
       text: _data.chairCount != null ? '${_data.chairCount}' : '',
     );
@@ -529,11 +640,11 @@ class _JobPostFormState extends State<JobPostForm> {
     );
     _exitNumberCtrl = TextEditingController(text: _data.exitNumber ?? '');
     _digitalEquipmentRawCtrl = TextEditingController(text: _data.digitalEquipmentRaw ?? '');
-    _selectedRole = _data.role.isEmpty ? null : _data.role;
     _selectedCareer = _data.career.isEmpty ? null : _data.career;
     _selectedEmploymentType =
         _data.employmentType.isEmpty ? null : _data.employmentType;
     _selectedHospitalType = _data.hospitalType;
+    _hydrateSalaryAndEducationFromData();
     _aiFieldStatus = _data.fieldStatus != null && _data.fieldStatus!.isNotEmpty
         ? Map<String, String>.from(_data.fieldStatus!)
         : null;
@@ -548,6 +659,7 @@ class _JobPostFormState extends State<JobPostForm> {
     _fStaffCount = FocusNode(debugLabel: 'job_staffCount');
     _fExitNumber = FocusNode(debugLabel: 'job_exitNumber');
     _fDigitalEquipment = FocusNode(debugLabel: 'job_digitalEquipment');
+    _fDutyOther = FocusNode(debugLabel: 'job_dutyOther');
   }
 
   @override
@@ -557,11 +669,13 @@ class _JobPostFormState extends State<JobPostForm> {
       _clinicNameCtrl,
       _titleCtrl,
       _workHoursCtrl,
-      _salaryCtrl,
+      _salaryAmountCtrl,
       _descriptionCtrl,
       _addressCtrl,
       _contactCtrl,
       _benefitInputCtrl,
+      _hireOtherCtrl,
+      _dutyOtherCtrl,
       _chairCountCtrl,
       _staffCountCtrl,
       _exitNumberCtrl,
@@ -581,25 +695,44 @@ class _JobPostFormState extends State<JobPostForm> {
       _fStaffCount,
       _fExitNumber,
       _fDigitalEquipment,
+      _fDutyOther,
     ]) {
       f.dispose();
     }
     super.dispose();
   }
 
+  void _hydrateSalaryAndEducationFromData() {
+    var pay = _data.salaryPayType.trim();
+    if (pay.isNotEmpty && !_salaryPayTypes.contains(pay)) pay = '';
+    _selectedSalaryPayType = pay.isEmpty ? null : pay;
+    _salaryAmountCtrl.text = _data.salaryAmount;
+    final edu = _data.education.trim();
+    _selectedEducation =
+        edu.isNotEmpty && _educations.contains(edu) ? edu : null;
+  }
+
   void _notify() {
     final chair = int.tryParse(_chairCountCtrl.text.trim());
     final staff = int.tryParse(_staffCountCtrl.text.trim());
     final exit = _exitNumberCtrl.text.trim();
+    final payType = (_selectedSalaryPayType ?? '').trim();
+    final amountRaw = _salaryAmountCtrl.text.trim().replaceAll(',', '');
+    var salaryLine = JobPostData.composeSalaryLine(
+      payType.isEmpty ? '' : payType,
+      amountRaw,
+    );
 
     _data = _data.copyWith(
       clinicName: _clinicNameCtrl.text,
       title: _titleCtrl.text,
-      role: _selectedRole ?? '',
       career: _selectedCareer ?? '',
+      education: _selectedEducation ?? '',
       employmentType: _selectedEmploymentType ?? '',
       workHours: _workHoursCtrl.text,
-      salary: _salaryCtrl.text,
+      salaryPayType: payType,
+      salaryAmount: amountRaw,
+      salary: salaryLine,
       description: _descriptionCtrl.text,
       address: _addressCtrl.text,
       contact: _contactCtrl.text,
@@ -609,6 +742,10 @@ class _JobPostFormState extends State<JobPostForm> {
       exitNumber: exit.isNotEmpty ? exit : null,
       digitalEquipmentRaw: _digitalEquipmentRawCtrl.text.trim().isEmpty ? null : _digitalEquipmentRawCtrl.text.trim(),
     );
+    final roleJoined = JobPostData.joinHireRoles(_data.hireRoles);
+    if (roleJoined != _data.role) {
+      _data = _data.copyWith(role: roleJoined);
+    }
 
     // 태그 자동 생성
     _data.tags = TagGenerator.generate(
@@ -835,9 +972,20 @@ class _JobPostFormState extends State<JobPostForm> {
         if ((res['title'] as String? ?? '').isNotEmpty) {
           _titleCtrl.text = res['title'] as String;
         }
-        if ((res['role'] as String? ?? '').isNotEmpty &&
-            _roles.contains(res['role'])) {
-          _selectedRole = res['role'] as String;
+        final roleRaw = (res['role'] as String? ?? '').trim();
+        if (roleRaw.isNotEmpty) {
+          final list = <String>[];
+          if (_hireRolePresets.contains(roleRaw)) {
+            list.add(roleRaw);
+          } else if (roleRaw == '원장' || roleRaw == '데스크') {
+            list.add('기타');
+          } else {
+            list.add(roleRaw);
+          }
+          _data = _data.copyWith(
+            hireRoles: list,
+            role: JobPostData.joinHireRoles(list),
+          );
         }
         if ((res['career'] as String? ?? '').isNotEmpty) {
           _selectedCareer = _matchCareer(res['career'] as String);
@@ -850,7 +998,12 @@ class _JobPostFormState extends State<JobPostForm> {
           _workHoursCtrl.text = res['workHours'] as String;
         }
         if ((res['salary'] as String? ?? '').isNotEmpty) {
-          _salaryCtrl.text = res['salary'] as String;
+          final raw = (res['salary'] as String).trim();
+          final inf = JobPostData.inferSalaryPartsFromLegacy(raw);
+          var pt = inf.$1;
+          if (pt.isNotEmpty && !_salaryPayTypes.contains(pt)) pt = '';
+          _selectedSalaryPayType = pt.isEmpty ? null : pt;
+          _salaryAmountCtrl.text = inf.$2;
         }
         if ((res['description'] as String? ?? '').isNotEmpty) {
           _descriptionCtrl.text = res['description'] as String;
@@ -997,6 +1150,46 @@ class _JobPostFormState extends State<JobPostForm> {
   /// draft나 initialData 로딩 시 한글 workDays·benefits 등을 정규화
   JobPostData _sanitizeFormData(JobPostData d) {
     var result = d;
+    // 채용직: hireRoles 우선, 레거시 `role` 한 줄은 파싱
+    var hr = List<String>.from(result.hireRoles);
+    if (hr.isEmpty && result.role.trim().isNotEmpty) {
+      hr = result.role
+          .split(RegExp(r'\s*,\s*'))
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+    }
+    final md = List<String>.from(result.mainDutiesList);
+    hr = hr.map((e) {
+      if (e == '원장') return '기타';
+      return e;
+    }).toList();
+    var mdTouched = false;
+    if (hr.remove('데스크') && !md.contains('데스크')) {
+      md.add('데스크');
+      mdTouched = true;
+    }
+    result = result.copyWith(
+      hireRoles: hr,
+      role: JobPostData.joinHireRoles(hr),
+      mainDutiesList: md,
+      mainDutiesRaw: mdTouched ? md.join('\n') : result.mainDutiesRaw,
+    );
+    // 학력: 선택지 외 값은 무관으로 맞춤 (드롭다운 value 오류 방지)
+    final eduIn = result.education.trim();
+    if (eduIn.isNotEmpty && !_educations.contains(eduIn)) {
+      result = result.copyWith(education: '무관');
+    }
+    // 급여: 구버전 한 줄만 있을 때 구분·금액 복원
+    if (result.salaryPayType.isEmpty && result.salary.trim().isNotEmpty) {
+      final inf = JobPostData.inferSalaryPartsFromLegacy(result.salary);
+      final composed = JobPostData.composeSalaryLine(inf.$1, inf.$2);
+      result = result.copyWith(
+        salaryPayType: inf.$1,
+        salaryAmount: inf.$2,
+        salary: composed.isNotEmpty ? composed : result.salary.trim(),
+      );
+    }
     // workDays: 한글이 섞여있으면 영문 코드로 변환
     if (d.workDays.isNotEmpty) {
       final hasKorean = d.workDays.any((v) => _korDayToKey.containsKey(v.trim()));
@@ -1329,13 +1522,6 @@ class _JobPostFormState extends State<JobPostForm> {
         _sectionCard(
           title: _sectionTitle(publisher: '근무 조건', legacy: '⏰ 근무 조건'),
           child: _buildWorkConditions(),
-        ),
-      );
-      gap();
-      out.add(
-        _sectionCard(
-          title: _sectionTitle(publisher: '담당 업무', legacy: '💼 담당 업무'),
-          child: _buildMainDuties(),
         ),
       );
       gap();
@@ -1723,26 +1909,10 @@ class _JobPostFormState extends State<JobPostForm> {
     );
   }
 
-  // ── 기본 정보 ──────────────────────────────────────────
+  // ── 기본 정보 (순서: 제목 → 치과명 → 경력 → 채용직 → 담당 업무 → 학력 → 고용 → 급여) ──
   Widget _buildBasicInfo() {
     return Column(
       children: [
-        _wrapStep3Clear(
-          child: _field(
-            controller: _clinicNameCtrl,
-            label: '치과명',
-            hint: '예) 서울미소치과',
-            validator: (v) => (v?.isEmpty ?? true) ? '치과명을 입력해주세요.' : null,
-            focusNode: _fClinicName,
-          ),
-          isEmpty: _clinicNameCtrl.text.trim().isEmpty,
-          onMinus: () {
-            setState(() => _clinicNameCtrl.clear());
-            _notify();
-          },
-          focusWhenEmpty: _fClinicName,
-        ),
-        const SizedBox(height: 12),
         _wrapStep3Clear(
           child: _field(
             controller: _titleCtrl,
@@ -1760,20 +1930,19 @@ class _JobPostFormState extends State<JobPostForm> {
         ),
         const SizedBox(height: 12),
         _wrapStep3Clear(
-          child: _dropdown(
-            label: '채용 직무',
-            value: _selectedRole,
-            items: _roles,
-            onChanged: (v) {
-              setState(() => _selectedRole = v);
-              _notify();
-            },
+          child: _field(
+            controller: _clinicNameCtrl,
+            label: '치과명',
+            hint: '예) 서울미소치과',
+            validator: (v) => (v?.isEmpty ?? true) ? '치과명을 입력해주세요.' : null,
+            focusNode: _fClinicName,
           ),
-          isEmpty: _selectedRole == null,
+          isEmpty: _clinicNameCtrl.text.trim().isEmpty,
           onMinus: () {
-            setState(() => _selectedRole = null);
+            setState(() => _clinicNameCtrl.clear());
             _notify();
           },
+          focusWhenEmpty: _fClinicName,
         ),
         const SizedBox(height: 12),
         _wrapStep3Clear(
@@ -1789,6 +1958,27 @@ class _JobPostFormState extends State<JobPostForm> {
           isEmpty: _selectedCareer == null,
           onMinus: () {
             setState(() => _selectedCareer = null);
+            _notify();
+          },
+        ),
+        const SizedBox(height: 12),
+        _buildHireRolesBlock(),
+        const SizedBox(height: 12),
+        _buildDutiesBlock(),
+        const SizedBox(height: 12),
+        _wrapStep3Clear(
+          child: _dropdown(
+            label: '학력',
+            value: _selectedEducation,
+            items: _educations,
+            onChanged: (v) {
+              setState(() => _selectedEducation = v);
+              _notify();
+            },
+          ),
+          isEmpty: _selectedEducation == null,
+          onMinus: () {
+            setState(() => _selectedEducation = null);
             _notify();
           },
         ),
@@ -1809,7 +1999,444 @@ class _JobPostFormState extends State<JobPostForm> {
             _notify();
           },
         ),
+        const SizedBox(height: 12),
+        _buildSalaryRow(),
       ],
+    );
+  }
+
+  void _toggleHirePreset(String p) {
+    setState(() {
+      final list = List<String>.from(_data.hireRoles);
+      if (list.contains(p)) {
+        list.remove(p);
+      } else {
+        list.add(p);
+      }
+      _data = _data.copyWith(
+        hireRoles: list,
+        role: JobPostData.joinHireRoles(list),
+      );
+    });
+    _notify();
+  }
+
+  void _addHireCustom() {
+    final v = _hireOtherCtrl.text.trim();
+    if (v.isEmpty) return;
+    setState(() {
+      final list = List<String>.from(_data.hireRoles);
+      if (!list.contains(v)) list.add(v);
+      _hireOtherCtrl.clear();
+      _data = _data.copyWith(
+        hireRoles: list,
+        role: JobPostData.joinHireRoles(list),
+      );
+    });
+    _notify();
+  }
+
+  void _removeHireRole(String s) {
+    setState(() {
+      final list = List<String>.from(_data.hireRoles)..remove(s);
+      _data = _data.copyWith(
+        hireRoles: list,
+        role: JobPostData.joinHireRoles(list),
+      );
+    });
+    _notify();
+  }
+
+  void _toggleDutyPreset(String p) {
+    setState(() {
+      final list = List<String>.from(_data.mainDutiesList);
+      if (list.contains(p)) {
+        list.remove(p);
+      } else {
+        list.add(p);
+      }
+      _data = _data.copyWith(
+        mainDutiesList: list,
+        mainDutiesRaw: list.join('\n'),
+      );
+    });
+    _notify();
+  }
+
+  void _addDutyCustom() {
+    final v = _dutyOtherCtrl.text.trim();
+    if (v.isEmpty) return;
+    setState(() {
+      final list = List<String>.from(_data.mainDutiesList);
+      if (!list.contains(v)) list.add(v);
+      _dutyOtherCtrl.clear();
+      _data = _data.copyWith(
+        mainDutiesList: list,
+        mainDutiesRaw: list.join('\n'),
+      );
+    });
+    _notify();
+  }
+
+  void _removeDuty(String s) {
+    setState(() {
+      final list = List<String>.from(_data.mainDutiesList)..remove(s);
+      _data = _data.copyWith(
+        mainDutiesList: list,
+        mainDutiesRaw: list.isEmpty ? null : list.join('\n'),
+      );
+    });
+    _notify();
+  }
+
+  Widget _buildHireRolesBlock() {
+    final customs =
+        _data.hireRoles.where((e) => !_hireRolePresets.contains(e)).toList();
+    return _wrapStep3Clear(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _labelWithBadge('채용직', 'role'),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: _pubWeb ? AppPublisher.formChipSpacing : 6,
+            runSpacing: _pubWeb ? AppPublisher.formChipRunSpacing : 6,
+            children: [
+              ..._hireRolePresets.map((p) {
+                final selected = _data.hireRoles.contains(p);
+                return FilterChip(
+                  label: Text(p),
+                  selected: selected,
+                  onSelected: (_) => _toggleHirePreset(p),
+                  selectedColor: AppColors.accent.withOpacity(0.2),
+                  checkmarkColor: AppColors.accent,
+                  labelStyle: _ft(
+                    size: 13,
+                    weight: FontWeight.w600,
+                    color: selected ? AppColors.accent : AppColors.textSecondary,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: _rChip,
+                    side: BorderSide(
+                      color: selected
+                          ? AppColors.accent.withOpacity(0.4)
+                          : AppColors.divider,
+                    ),
+                  ),
+                  backgroundColor: AppColors.white,
+                );
+              }),
+              ...customs.map(
+                (c) => Chip(
+                  label: Text(c, style: _ft(size: 13, weight: FontWeight.w600)),
+                  deleteIcon: const Icon(Icons.close_rounded, size: 16),
+                  onDeleted: () => _removeHireRole(c),
+                  backgroundColor: AppColors.accent.withOpacity(0.07),
+                  side: BorderSide(color: AppColors.accent.withOpacity(0.25)),
+                  shape: RoundedRectangleBorder(borderRadius: _rChip),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _hireOtherCtrl,
+                  style: _ft(size: 13, weight: FontWeight.w600, color: AppColors.textPrimary),
+                  decoration: _pubWeb
+                      ? _pubUnderlineDecoration(
+                          label: null,
+                          hint: '기타 직무 직접 입력',
+                        )
+                      : InputDecoration(
+                          hintText: '기타 직무 직접 입력',
+                          hintStyle: _ft(
+                            size: 13,
+                            weight: FontWeight.w400,
+                            color: AppColors.textDisabled,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: _rBox,
+                            borderSide: const BorderSide(color: AppColors.divider),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: _rBox,
+                            borderSide: const BorderSide(color: AppColors.divider),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: _rBox,
+                            borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
+                          ),
+                        ),
+                ),
+              ),
+              SizedBox(width: _pubWeb ? AppPublisher.formButtonRowGap : 8),
+              TextButton(
+                onPressed: _addHireCustom,
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.accent,
+                  padding: _pubWeb
+                      ? const EdgeInsets.symmetric(horizontal: 12, vertical: 10)
+                      : null,
+                  shape: RoundedRectangleBorder(borderRadius: _rChip),
+                ),
+                child: const Text('추가'),
+              ),
+            ],
+          ),
+        ],
+      ),
+      isEmpty: _data.hireRoles.isEmpty && _hireOtherCtrl.text.trim().isEmpty,
+      onMinus: () {
+        setState(() {
+          _hireOtherCtrl.clear();
+          _data = _data.copyWith(hireRoles: [], role: '');
+        });
+        _notify();
+      },
+    );
+  }
+
+  Widget _buildDutiesBlock() {
+    final customs =
+        _data.mainDutiesList.where((e) => !_dutyPresets.contains(e)).toList();
+    return _wrapStep3Clear(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _labelWithBadge('담당 업무', 'mainDuties'),
+              const Spacer(),
+              if (_step3)
+                IconButton(
+                  tooltip: _data.mainDutiesList.isEmpty ? '담당 업무 추가' : '담당 업무 모두 비우기',
+                  padding: const EdgeInsets.all(8),
+                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  icon: Icon(
+                    _data.mainDutiesList.isEmpty ? Icons.add : Icons.remove,
+                    size: 20,
+                    color: _data.mainDutiesList.isEmpty
+                        ? AppColors.accent
+                        : AppColors.cardEmphasis,
+                  ),
+                  onPressed: _data.mainDutiesList.isEmpty
+                      ? () => _fDutyOther.requestFocus()
+                      : () {
+                          setState(() {
+                            _dutyOtherCtrl.clear();
+                            _data = _data.copyWith(mainDutiesList: [], mainDutiesRaw: null);
+                          });
+                          _notify();
+                        },
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: _pubWeb ? AppPublisher.formChipSpacing : 6,
+            runSpacing: _pubWeb ? AppPublisher.formChipRunSpacing : 6,
+            children: [
+              ..._dutyPresets.map((p) {
+                final selected = _data.mainDutiesList.contains(p);
+                return FilterChip(
+                  label: Text(p),
+                  selected: selected,
+                  onSelected: (_) => _toggleDutyPreset(p),
+                  selectedColor: AppColors.accent.withOpacity(0.2),
+                  checkmarkColor: AppColors.accent,
+                  labelStyle: _ft(
+                    size: 13,
+                    weight: FontWeight.w600,
+                    color: selected ? AppColors.accent : AppColors.textSecondary,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: _rChip,
+                    side: BorderSide(
+                      color: selected
+                          ? AppColors.accent.withOpacity(0.4)
+                          : AppColors.divider,
+                    ),
+                  ),
+                  backgroundColor: AppColors.white,
+                );
+              }),
+              ...customs.map(
+                (c) => Chip(
+                  label: Text(c, style: _ft(size: 13, weight: FontWeight.w600)),
+                  deleteIcon: const Icon(Icons.close_rounded, size: 16),
+                  onDeleted: () => _removeDuty(c),
+                  backgroundColor: AppColors.accent.withOpacity(0.07),
+                  side: BorderSide(color: AppColors.accent.withOpacity(0.25)),
+                  shape: RoundedRectangleBorder(borderRadius: _rChip),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _dutyOtherCtrl,
+                  focusNode: _fDutyOther,
+                  style: _ft(size: 13, weight: FontWeight.w600, color: AppColors.textPrimary),
+                  decoration: _pubWeb
+                      ? _pubUnderlineDecoration(
+                          label: null,
+                          hint: '기타 업무 직접 입력',
+                        )
+                      : InputDecoration(
+                          hintText: '기타 업무 직접 입력',
+                          hintStyle: _ft(
+                            size: 13,
+                            weight: FontWeight.w400,
+                            color: AppColors.textDisabled,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: _rBox,
+                            borderSide: const BorderSide(color: AppColors.divider),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: _rBox,
+                            borderSide: const BorderSide(color: AppColors.divider),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: _rBox,
+                            borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
+                          ),
+                        ),
+                ),
+              ),
+              SizedBox(width: _pubWeb ? AppPublisher.formButtonRowGap : 8),
+              TextButton(
+                onPressed: _addDutyCustom,
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.accent,
+                  padding: _pubWeb
+                      ? const EdgeInsets.symmetric(horizontal: 12, vertical: 10)
+                      : null,
+                  shape: RoundedRectangleBorder(borderRadius: _rChip),
+                ),
+                child: const Text('추가'),
+              ),
+            ],
+          ),
+        ],
+      ),
+      isEmpty: _data.mainDutiesList.isEmpty && _dutyOtherCtrl.text.trim().isEmpty,
+      onMinus: () {
+        setState(() {
+          _dutyOtherCtrl.clear();
+          _data = _data.copyWith(mainDutiesList: [], mainDutiesRaw: null);
+        });
+        _notify();
+      },
+    );
+  }
+
+  Widget _buildSalaryRow() {
+    final negotiation = _selectedSalaryPayType == '협의';
+    final amountEmpty = _salaryAmountCtrl.text.trim().isEmpty;
+    final payEmpty = _selectedSalaryPayType == null;
+    final salaryRow = Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Expanded(
+          child: _dropdown(
+            label: '급여',
+            value: _selectedSalaryPayType,
+            items: _salaryPayTypes,
+            onChanged: (v) {
+              setState(() {
+                _selectedSalaryPayType = v;
+                if (v == '협의') {
+                  _salaryAmountCtrl.clear();
+                }
+              });
+              _notify();
+            },
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: TextFormField(
+            controller: _salaryAmountCtrl,
+            focusNode: _fSalary,
+            enabled: !negotiation && _selectedSalaryPayType != null,
+            keyboardType: TextInputType.number,
+            style: _ft(size: 14, weight: FontWeight.w600, color: AppColors.textPrimary),
+            decoration: _pubWeb
+                ? _pubUnderlineDecoration(
+                    label: '금액',
+                    hint: negotiation ? '—' : '예) 250',
+                  )
+                : InputDecoration(
+                    labelText: '금액',
+                    hintText: negotiation ? '—' : '예) 250',
+                    hintStyle: _ft(
+                      size: 13,
+                      weight: FontWeight.w400,
+                      color: AppColors.textDisabled,
+                    ),
+                    labelStyle: _ft(
+                      size: 13,
+                      weight: FontWeight.w600,
+                      color: AppColors.textSecondary,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: _rBox,
+                      borderSide: const BorderSide(color: AppColors.divider),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: _rBox,
+                      borderSide: const BorderSide(color: AppColors.divider),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: _rBox,
+                      borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
+                    ),
+                    filled: true,
+                    fillColor: AppColors.appBg,
+                  ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(left: 8, bottom: 12),
+          child: Text(
+            '만원',
+            style: _ft(size: 14, weight: FontWeight.w600, color: AppColors.textSecondary),
+          ),
+        ),
+      ],
+    );
+    return _wrapStep3Clear(
+      child: salaryRow,
+      isEmpty: payEmpty && amountEmpty,
+      onMinus: () {
+        setState(() {
+          _selectedSalaryPayType = null;
+          _salaryAmountCtrl.clear();
+        });
+        _notify();
+      },
+      focusWhenEmpty: _fSalary,
     );
   }
 
@@ -1832,22 +2459,6 @@ class _JobPostFormState extends State<JobPostForm> {
             _notify();
           },
           focusWhenEmpty: _fWorkHours,
-        ),
-        const SizedBox(height: 12),
-        _wrapStep3Clear(
-          child: _field(
-            controller: _salaryCtrl,
-            label: '급여',
-            hint: '예) 월 250~300만원 (경력 협의)',
-            fieldKey: 'salary',
-            focusNode: _fSalary,
-          ),
-          isEmpty: _salaryCtrl.text.trim().isEmpty,
-          onMinus: () {
-            setState(() => _salaryCtrl.clear());
-            _notify();
-          },
-          focusWhenEmpty: _fSalary,
         ),
         const SizedBox(height: 16),
         _wrapStep3Clear(
@@ -2909,132 +3520,6 @@ class _JobPostFormState extends State<JobPostForm> {
     );
   }
 
-  // ── 담당 업무 섹션 ─────────────────────────────────────────
-
-  Widget _buildMainDuties() {
-    final duties = _data.mainDutiesList;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            _labelWithBadge('담당 업무', 'mainDuties'),
-            const Spacer(),
-            if (_step3)
-              IconButton(
-                tooltip: duties.isEmpty ? '담당 업무 추가' : '담당 업무 모두 비우기',
-                padding: const EdgeInsets.all(8),
-                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                icon: Icon(
-                  duties.isEmpty ? Icons.add : Icons.remove,
-                  size: 20,
-                  color: duties.isEmpty ? AppColors.accent : AppColors.cardEmphasis,
-                ),
-                onPressed: duties.isEmpty
-                    ? _showAddMainDutyDialog
-                    : () {
-                        setState(() {
-                          _data = _data.copyWith(mainDutiesList: [], mainDutiesRaw: null);
-                        });
-                        _notify();
-                      },
-              ),
-            if (!_step3)
-              TextButton.icon(
-                onPressed: () => _showAddMainDutyDialog(),
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                icon: const Icon(Icons.add_rounded, size: 16),
-                label: Text('추가', style: _ft(size: 12, weight: FontWeight.w600, color: AppColors.accent)),
-              ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        if (duties.isEmpty)
-          Text(
-            'AI가 담당 업무를 추출하면 여기에 표시됩니다.\n직접 추가할 수도 있습니다.',
-            style: _ft(size: 12, color: AppColors.textDisabled),
-          )
-        else
-          Wrap(
-            spacing: _pubWeb ? AppPublisher.formChipSpacing : 6,
-            runSpacing: _pubWeb ? AppPublisher.formChipRunSpacing : 4,
-            children: duties.asMap().entries.map((entry) {
-              final idx = entry.key;
-              final duty = entry.value;
-              return Chip(
-                label: Text(duty, style: _ft(size: 12, weight: FontWeight.w500)),
-                deleteIcon: const Icon(Icons.close_rounded, size: 14),
-                onDeleted: () {
-                  final list = List<String>.from(_data.mainDutiesList)..removeAt(idx);
-                  setState(() {
-                    _data = _data.copyWith(
-                      mainDutiesList: list,
-                      mainDutiesRaw: list.join('\n'),
-                    );
-                  });
-                  _notify();
-                },
-                backgroundColor: AppColors.accent.withOpacity(0.07),
-                side: BorderSide(color: AppColors.accent.withOpacity(0.25)),
-                shape: RoundedRectangleBorder(borderRadius: _rChip),
-                visualDensity: VisualDensity.compact,
-                labelPadding: const EdgeInsets.only(left: 4),
-              );
-            }).toList(),
-          ),
-      ],
-    );
-  }
-
-  void _showAddMainDutyDialog() {
-    final ctrl = TextEditingController();
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('담당 업무 추가', style: _ft(size: 15, weight: FontWeight.w700)),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          maxLength: 80,
-          decoration: InputDecoration(
-            hintText: '예) 스케일링, 구강 위생 관리',
-            hintStyle: _ft(size: 13, color: AppColors.textDisabled),
-          ),
-          style: _ft(size: 13),
-          onSubmitted: (_) => _addMainDuty(ctrl.text, ctx),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('취소'),
-          ),
-          TextButton(
-            onPressed: () => _addMainDuty(ctrl.text, ctx),
-            child: Text('추가', style: TextStyle(color: AppColors.accent)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _addMainDuty(String text, BuildContext dialogCtx) {
-    final t = text.trim();
-    if (t.isEmpty) return;
-    final list = [..._data.mainDutiesList, t];
-    setState(() {
-      _data = _data.copyWith(
-        mainDutiesList: list,
-        mainDutiesRaw: list.join('\n'),
-      );
-    });
-    _notify();
-    Navigator.pop(dialogCtx);
-  }
   Widget _switchRow({
     required String label,
     required bool value,

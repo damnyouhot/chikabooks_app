@@ -39,6 +39,33 @@ class _JobPostPreviewState extends State<JobPostPreview> {
 
   bool _hasText(String? s) => (s?.trim().isNotEmpty ?? false);
 
+  String _hireRolesLine() {
+    if (data.hireRoles.isNotEmpty) return data.hireRoles.join(', ');
+    final r = data.role.trim();
+    return r;
+  }
+
+  Widget _buildPreviewTitleHeader() {
+    final hasTitle = _hasText(data.title);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          hasTitle ? data.title.trim() : '제목 미입력 · 오른쪽에서 입력해 주세요',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.35,
+            height: 1.25,
+            color: hasTitle ? AppColors.textPrimary : AppColors.textDisabled,
+            fontStyle: hasTitle ? FontStyle.normal : FontStyle.italic,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.lg),
+      ],
+    );
+  }
+
   /// 연속 [JobDetailInfoRow]를 2열로 배치 (모바일 프리뷰 폭 활용)
   Widget _previewInfoGrid(List<Widget> rows) {
     final out = <Widget>[];
@@ -88,6 +115,10 @@ class _JobPostPreviewState extends State<JobPostPreview> {
       '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   List<Widget> _sectionBasicInfo() {
+    final hireLine = _hireRolesLine();
+    final dutyLine = data.mainDutiesList.isNotEmpty
+        ? data.mainDutiesList.join(', ')
+        : '';
     final rows = <Widget>[
       if (_hasText(data.clinicName))
         JobDetailInfoRow(
@@ -95,29 +126,41 @@ class _JobPostPreviewState extends State<JobPostPreview> {
           label: '치과명',
           value: data.clinicName.trim(),
         ),
-      if (_hasText(data.title))
-        JobDetailInfoRow(
-          icon: Icons.title,
-          label: '공고 제목',
-          value: data.title.trim(),
-        ),
-      if (_hasText(data.role))
-        JobDetailInfoRow(
-          icon: Icons.work_outline,
-          label: '채용 직무',
-          value: data.role.trim(),
-        ),
       if (_hasText(data.career))
         JobDetailInfoRow(
-          icon: Icons.school_outlined,
-          label: '경력 조건',
+          icon: Icons.work_history_outlined,
+          label: '경력',
           value: data.career.trim(),
+        ),
+      if (_hasText(hireLine))
+        JobDetailInfoRow(
+          icon: Icons.badge_outlined,
+          label: '채용직',
+          value: hireLine.trim(),
+        ),
+      if (_hasText(dutyLine))
+        JobDetailInfoRow(
+          icon: Icons.task_alt_outlined,
+          label: '담당 업무',
+          value: dutyLine.trim(),
+        ),
+      if (_hasText(data.education))
+        JobDetailInfoRow(
+          icon: Icons.school_outlined,
+          label: '학력',
+          value: data.education.trim(),
         ),
       if (_hasText(data.employmentType))
         JobDetailInfoRow(
-          icon: Icons.badge_outlined,
+          icon: Icons.work_outline,
           label: '고용 형태',
           value: data.employmentType.trim(),
+        ),
+      if (_hasText(data.salary))
+        JobDetailInfoRow(
+          icon: Icons.payments_outlined,
+          label: '급여',
+          value: data.salary.trim(),
         ),
     ];
     if (rows.isEmpty) return [];
@@ -133,7 +176,6 @@ class _JobPostPreviewState extends State<JobPostPreview> {
     final urls = data.promotionalImageUrls;
     if (urls.isEmpty) return [];
     return [
-      const JobDetailSectionTitle('홍보 이미지'),
       ...urls.map((url) => Padding(
             padding: const EdgeInsets.only(bottom: AppSpacing.sm),
             child: ClipRRect(
@@ -223,12 +265,6 @@ class _JobPostPreviewState extends State<JobPostPreview> {
           icon: Icons.schedule_outlined,
           label: '근무 시간',
           value: data.workHours.trim(),
-        ),
-      if (_hasText(data.salary))
-        JobDetailInfoRow(
-          icon: Icons.payments_outlined,
-          label: '급여',
-          value: data.salary.trim(),
         ),
       if (_hasText(wd))
         JobDetailInfoRow(
@@ -425,40 +461,17 @@ class _JobPostPreviewState extends State<JobPostPreview> {
               ),
               physics: const BouncingScrollPhysics(),
               children: [
+                _buildPreviewTitleHeader(),
                 if (data.images.isNotEmpty) ...[
-                  const JobDetailSectionTitle('사진'),
                   _buildImageGallery(),
                   const SizedBox(height: AppSpacing.lg),
                 ],
 
-                // ── 그룹 A: 기본 정보 → 홍보이미지 → 근무 조건 → 담당 업무 ──
+                // ── 기본 정보 → 근무 조건 → 홍보이미지 … ──
                 ..._sectionBasicInfo(),
                 ..._sectionWorkConditions(),
 
-                // ── 담당 업무 ──
-                const JobDetailSectionTitle('담당 업무'),
-                if (data.mainDutiesList.isEmpty)
-                  Text(
-                    '담당 업무 미확인 · 오른쪽에서 입력해 주세요',
-                    style: TextStyle(
-                      fontSize: 14,
-                      height: 1.5,
-                      color: AppColors.textDisabled,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  )
-                else ...[
-                  Wrap(
-                    spacing: AppSpacing.sm,
-                    runSpacing: AppSpacing.xs,
-                    children: data.mainDutiesList
-                        .map((d) => JobBenefitChip(label: d))
-                        .toList(),
-                  ),
-                ],
-                const Divider(height: AppSpacing.xxl, color: AppColors.divider),
-
-                // ── 홍보이미지 (담당업무 ↔ 병원정보 사이) ──
+                // ── 홍보이미지 (근무 조건 ↔ 병원정보 사이) ──
                 ..._sectionPromotionalImages(),
 
                 // ── 그룹 B: 병원 정보 → 복리후생 ──

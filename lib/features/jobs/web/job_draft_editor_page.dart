@@ -175,10 +175,10 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
       if (!mounted) return;
       final extra = GoRouterState.of(context).extra as Map<String, dynamic>?;
       await _callAiParsing(
+        draft: draft,
         sourceType: extra?['sourceType'] as String? ??
             draft.sourceType ?? 'text',
         rawText: draft.rawInputText ?? '',
-        imageUrls: draft.rawImageUrls.isNotEmpty ? draft.rawImageUrls : draft.imageUrls,
       );
     }
   }
@@ -217,10 +217,14 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
         clinicName: draft.clinicName,
         title: draft.title,
         role: draft.role,
+        hireRoles: List.from(draft.hireRoles),
         career: draft.career,
+        education: draft.education,
         employmentType: draft.employmentType,
         workHours: draft.workHours,
         salary: draft.salary,
+        salaryPayType: draft.salaryPayType,
+        salaryAmount: draft.salaryAmount,
         benefits: List.from(draft.benefits),
         description: draft.description,
         address: draft.address,
@@ -261,10 +265,264 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
     });
   }
 
-  Future<void> _callAiParsing({
+  /// 1차 입력(캡처/치과)과 2차(홍보)가 같은 URL 집합이면 보조 패스 생략
+  bool _urlListsSameSet(List<String> a, List<String> b) {
+    final sa = a.map((e) => e.trim()).where((e) => e.isNotEmpty).toSet();
+    final sb = b.map((e) => e.trim()).where((e) => e.isNotEmpty).toSet();
+    return sa.length == sb.length && sa.containsAll(sb);
+  }
+
+  Future<Map<String, dynamic>> _fetchParseJobForm({
+    required List<String> imageUrls,
     required String sourceType,
     required String rawText,
-    required List<String> imageUrls,
+  }) async {
+    final callable = FirebaseFunctions.instance.httpsCallable(
+      'parseJobImagesToForm',
+      options: HttpsCallableOptions(
+        timeout: const Duration(seconds: 180),
+      ),
+    );
+    final result = await callable.call({
+      'imageUrls': imageUrls,
+      'sourceType': sourceType,
+      'rawText': rawText,
+    });
+    return JobAiExtractNormalizer.normalize(
+      Map<String, dynamic>.from(result.data as Map),
+    );
+  }
+
+  /// [mergeEmptyOnly]: true면 이미 채워진 필드는 유지(홍보 이미지 2차 패스용)
+  void _applyNormalizedResult(
+    Map<String, dynamic> res, {
+    required bool mergeEmptyOnly,
+  }) {
+    if (!mounted) return;
+
+    final wd = JobAiExtractNormalizer.workDaysToCodes(res['workDays'] as List?);
+    final htKey = JobAiExtractNormalizer.hospitalTypeToKey(
+      res['hospitalType'] as String?,
+    );
+    final cc = res['chairCount'];
+    final sc = res['staffCount'];
+    final chairN = cc is int
+        ? cc
+        : (cc is num
+            ? cc.round()
+            : int.tryParse('$cc'.replaceAll(RegExp(r'[^\d]'), '')));
+    final staffN = sc is int
+        ? sc
+        : (sc is num
+            ? sc.round()
+            : int.tryParse('$sc'.replaceAll(RegExp(r'[^\d]'), '')));
+
+    final mainDutiesListRaw = res['mainDutiesList'];
+    final mainDutiesList = mainDutiesListRaw is List
+        ? mainDutiesListRaw
+            .map((e) => e.toString())
+            .where((s) => s.isNotEmpty)
+            .toList()
+        : <String>[];
+
+    final specialtiesRaw = res['specialties'];
+    final specialties = specialtiesRaw is List
+        ? specialtiesRaw
+            .map((e) => e.toString())
+            .where((s) => s.isNotEmpty)
+            .toList()
+        : <String>[];
+
+    final hasOralScanner =
+        res['hasOralScanner'] is bool ? res['hasOralScanner'] as bool : null;
+    final hasCT = res['hasCT'] is bool ? res['hasCT'] as bool : null;
+    final has3DPrinter =
+        res['has3DPrinter'] is bool ? res['has3DPrinter'] as bool : null;
+    final digitalEquipmentRaw = res['digitalEquipmentRaw'] as String?;
+
+    DateTime? closingDate = _data.closingDate;
+    final closingRaw = res['closingDate'] as String?;
+    if (mergeEmptyOnly) {
+      if (_data.closingDate == null &&
+          closingRaw != null &&
+          closingRaw.isNotEmpty) {
+        try {
+          closingDate = DateTime.parse(closingRaw);
+        } catch (_) {}
+      }
+    } else if (closingRaw != null && closingRaw.isNotEmpty) {
+      try {
+        closingDate = DateTime.parse(closingRaw);
+      } catch (_) {}
+    }
+
+    DateTime? recruitmentStartParsed;
+    final recruitRaw = res['recruitmentStart'] as String?;
+    if (recruitRaw != null && recruitRaw.isNotEmpty) {
+      try {
+        recruitmentStartParsed = DateTime.parse(recruitRaw);
+      } catch (_) {}
+    }
+    final DateTime? recruitmentStart = mergeEmptyOnly
+        ? (_data.recruitmentStart ?? recruitmentStartParsed)
+        : (recruitmentStartParsed ?? _data.recruitmentStart);
+
+    final fsRaw = res['fieldStatus'];
+    final Map<String, String>? fieldStatusParsed = fsRaw is Map
+        ? fsRaw.map((k, v) => MapEntry(k.toString(), v.toString()))
+        : null;
+
+    final Map<String, String>? mergedFieldStatus;
+    if (mergeEmptyOnly) {
+      final base = Map<String, String>.from(_data.fieldStatus ?? {});
+      if (fieldStatusParsed != null) {
+        for (final e in fieldStatusParsed.entries) {
+          final existing = base[e.key];
+          if (existing == null || existing.trim().isEmpty) {
+            base[e.key] = e.value;
+          }
+        }
+      }
+      mergedFieldStatus = base.isNotEmpty ? base : _data.fieldStatus;
+    } else {
+      mergedFieldStatus = fieldStatusParsed ?? _data.fieldStatus;
+    }
+
+    final newBenefits = (res['benefits'] as List?)
+            ?.map((e) => e.toString())
+            .where((s) => s.isNotEmpty)
+            .toList() ??
+        <String>[];
+    final newSubwayLines = (res['subwayLines'] as List?)
+            ?.map((e) => e.toString())
+            .where((s) => s.isNotEmpty)
+            .toList() ??
+        <String>[];
+
+    setState(() {
+      final d = _data;
+      _data = d.copyWith(
+        clinicName: mergeEmptyOnly
+            ? _mergeStrPreferExisting(d.clinicName, res['clinicName'])
+            : _firstNonEmpty(res['clinicName'], d.clinicName),
+        title: mergeEmptyOnly
+            ? _mergeStrPreferExisting(d.title, res['title'])
+            : _firstNonEmpty(res['title'], d.title),
+        role: mergeEmptyOnly
+            ? _mergeStrPreferExisting(d.role, res['role'])
+            : _firstNonEmpty(res['role'], d.role),
+        career: mergeEmptyOnly
+            ? _mergeStrPreferExisting(d.career, res['career'])
+            : _firstNonEmpty(res['career'], d.career),
+        employmentType: mergeEmptyOnly
+            ? _mergeStrPreferExisting(d.employmentType, res['employmentType'])
+            : _firstNonEmpty(res['employmentType'], d.employmentType),
+        workHours: mergeEmptyOnly
+            ? _mergeStrPreferExisting(d.workHours, res['workHours'])
+            : _firstNonEmpty(res['workHours'], d.workHours),
+        salary: mergeEmptyOnly
+            ? _mergeStrPreferExisting(d.salary, res['salary'])
+            : _firstNonEmpty(res['salary'], d.salary),
+        benefits: mergeEmptyOnly
+            ? (d.benefits.isNotEmpty
+                ? d.benefits
+                : (newBenefits.isNotEmpty ? newBenefits : d.benefits))
+            : (newBenefits.isNotEmpty ? newBenefits : d.benefits),
+        description: mergeEmptyOnly
+            ? _mergeStrPreferExisting(d.description, res['description'])
+            : _firstNonEmpty(res['description'], d.description),
+        address: mergeEmptyOnly
+            ? _mergeStrPreferExisting(d.address, res['address'])
+            : _firstNonEmpty(res['address'], d.address),
+        contact: mergeEmptyOnly
+            ? _mergeStrPreferExisting(d.contact, res['contact'])
+            : _firstNonEmpty(res['contact'], d.contact),
+        hospitalType: mergeEmptyOnly
+            ? ((d.hospitalType != null && d.hospitalType!.trim().isNotEmpty)
+                ? d.hospitalType
+                : (htKey ?? d.hospitalType))
+            : (htKey ?? d.hospitalType),
+        workDays: mergeEmptyOnly
+            ? (d.workDays.isNotEmpty
+                ? d.workDays
+                : (wd.isNotEmpty ? wd : d.workDays))
+            : (wd.isNotEmpty ? wd : d.workDays),
+        weekendWork: mergeEmptyOnly
+            ? d.weekendWork
+            : (_parseBool(res['weekendWork']) ?? d.weekendWork),
+        nightShift:
+            mergeEmptyOnly ? d.nightShift : (_parseBool(res['nightShift']) ?? d.nightShift),
+        chairCount: mergeEmptyOnly
+            ? (d.chairCount ?? chairN)
+            : (chairN ?? d.chairCount),
+        staffCount: mergeEmptyOnly
+            ? (d.staffCount ?? staffN)
+            : (staffN ?? d.staffCount),
+        subwayStationName: mergeEmptyOnly
+            ? _mergeStrNullablePreferExisting(
+                d.subwayStationName, res['subwayStationName'] as String?)
+            : _firstNonEmptyNullable(
+                res['subwayStationName'] as String?, d.subwayStationName),
+        subwayLines: mergeEmptyOnly
+            ? (d.subwayLines.isNotEmpty
+                ? d.subwayLines
+                : (newSubwayLines.isNotEmpty ? newSubwayLines : d.subwayLines))
+            : (newSubwayLines.isNotEmpty ? newSubwayLines : d.subwayLines),
+        mainDutiesList: mergeEmptyOnly
+            ? (d.mainDutiesList.isNotEmpty
+                ? d.mainDutiesList
+                : (mainDutiesList.isNotEmpty ? mainDutiesList : d.mainDutiesList))
+            : (mainDutiesList.isNotEmpty ? mainDutiesList : d.mainDutiesList),
+        mainDutiesRaw: mergeEmptyOnly
+            ? (d.mainDutiesList.isNotEmpty
+                ? d.mainDutiesRaw
+                : (mainDutiesList.isNotEmpty
+                    ? res['mainDutiesRaw'] as String?
+                    : d.mainDutiesRaw))
+            : (mainDutiesList.isNotEmpty
+                ? res['mainDutiesRaw'] as String?
+                : d.mainDutiesRaw),
+        specialties: mergeEmptyOnly
+            ? (d.specialties.isNotEmpty
+                ? d.specialties
+                : (specialties.isNotEmpty ? specialties : d.specialties))
+            : (specialties.isNotEmpty ? specialties : d.specialties),
+        hasOralScanner: mergeEmptyOnly
+            ? (d.hasOralScanner ?? hasOralScanner)
+            : (hasOralScanner ?? d.hasOralScanner),
+        hasCT: mergeEmptyOnly ? (d.hasCT ?? hasCT) : (hasCT ?? d.hasCT),
+        has3DPrinter: mergeEmptyOnly
+            ? (d.has3DPrinter ?? has3DPrinter)
+            : (has3DPrinter ?? d.has3DPrinter),
+        digitalEquipmentRaw: mergeEmptyOnly
+            ? (d.digitalEquipmentRaw?.trim().isNotEmpty == true
+                ? d.digitalEquipmentRaw
+                : (digitalEquipmentRaw ?? d.digitalEquipmentRaw))
+            : (digitalEquipmentRaw ?? d.digitalEquipmentRaw),
+        closingDate: closingDate,
+        recruitmentStart: recruitmentStart,
+        fieldStatus: mergedFieldStatus,
+      );
+    });
+  }
+
+  String _mergeStrPreferExisting(String current, dynamic resVal) {
+    final c = current.trim();
+    if (c.isNotEmpty) return current;
+    final r = (resVal as String?)?.trim() ?? '';
+    return r.isNotEmpty ? r : current;
+  }
+
+  String? _mergeStrNullablePreferExisting(String? current, String? resVal) {
+    if (current != null && current.trim().isNotEmpty) return current;
+    final r = resVal?.trim() ?? '';
+    return r.isNotEmpty ? r : current;
+  }
+
+  Future<void> _callAiParsing({
+    required JobDraft draft,
+    required String sourceType,
+    required String rawText,
   }) async {
     setState(() {
       _isLoadingAi = true;
@@ -272,103 +530,39 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
     });
 
     try {
-      final callable = FirebaseFunctions.instance.httpsCallable(
-        'parseJobImagesToForm',
-        options: HttpsCallableOptions(
-          timeout: const Duration(seconds: 180),
-        ),
-      );
-      final result = await callable.call({
-        'imageUrls': imageUrls,
-        'sourceType': sourceType,
-        'rawText': rawText,
-      });
+      final raw = draft.rawImageUrls;
+      final clinic = draft.imageUrls;
+      final promo = draft.promotionalImageUrls;
 
-      final res = JobAiExtractNormalizer.normalize(
-        Map<String, dynamic>.from(result.data as Map),
+      /// 우선순위: 캡처(raw) → 치과 자료(clinic) → 홍보(promo)
+      final List<String> pass1ImageUrls = raw.isNotEmpty
+          ? raw
+          : (clinic.isNotEmpty ? clinic : promo);
+
+      final bool runPromoSecondPass =
+          promo.isNotEmpty && !_urlListsSameSet(pass1ImageUrls, promo);
+
+      final res1 = await _fetchParseJobForm(
+        imageUrls: pass1ImageUrls,
+        sourceType: sourceType,
+        rawText: rawText,
       );
       if (!mounted) return;
+      _applyNormalizedResult(res1, mergeEmptyOnly: false);
 
-      final wd = JobAiExtractNormalizer.workDaysToCodes(res['workDays'] as List?);
-      final htKey = JobAiExtractNormalizer.hospitalTypeToKey(
-        res['hospitalType'] as String?,
-      );
-      final cc = res['chairCount'];
-      final sc = res['staffCount'];
-      final chairN = cc is int ? cc : (cc is num ? cc.round() : int.tryParse('$cc'.replaceAll(RegExp(r'[^\d]'), '')));
-      final staffN = sc is int ? sc : (sc is num ? sc.round() : int.tryParse('$sc'.replaceAll(RegExp(r'[^\d]'), '')));
-
-      // ── mainDuties ──
-      final mainDutiesListRaw = res['mainDutiesList'];
-      final mainDutiesList = mainDutiesListRaw is List
-          ? mainDutiesListRaw.map((e) => e.toString()).where((s) => s.isNotEmpty).toList()
-          : <String>[];
-
-      // ── specialties ──
-      final specialtiesRaw = res['specialties'];
-      final specialties = specialtiesRaw is List
-          ? specialtiesRaw.map((e) => e.toString()).where((s) => s.isNotEmpty).toList()
-          : <String>[];
-
-      // ── 디지털 장비 ──
-      final hasOralScanner = res['hasOralScanner'] is bool ? res['hasOralScanner'] as bool : null;
-      final hasCT = res['hasCT'] is bool ? res['hasCT'] as bool : null;
-      final has3DPrinter = res['has3DPrinter'] is bool ? res['has3DPrinter'] as bool : null;
-      final digitalEquipmentRaw = res['digitalEquipmentRaw'] as String?;
-
-      // ── closingDate (AI 추출) ──
-      DateTime? closingDate = _data.closingDate;
-      final closingRaw = res['closingDate'] as String?;
-      if (closingRaw != null && closingRaw.isNotEmpty) {
-        try { closingDate = DateTime.parse(closingRaw); } catch (_) {}
+      if (runPromoSecondPass) {
+        try {
+          final res2 = await _fetchParseJobForm(
+            imageUrls: promo,
+            sourceType: 'promotional',
+            rawText: '',
+          );
+          if (!mounted) return;
+          _applyNormalizedResult(res2, mergeEmptyOnly: true);
+        } catch (_) {
+          /* 1차 결과는 유지 */
+        }
       }
-
-      // ── recruitmentStart ──
-      DateTime? recruitmentStart;
-      final recruitRaw = res['recruitmentStart'] as String?;
-      if (recruitRaw != null && recruitRaw.isNotEmpty) {
-        try { recruitmentStart = DateTime.parse(recruitRaw); } catch (_) {}
-      }
-
-      // ── fieldStatus ──
-      final fsRaw = res['fieldStatus'];
-      final fieldStatus = fsRaw is Map
-          ? fsRaw.map((k, v) => MapEntry(k.toString(), v.toString()))
-          : null;
-
-      setState(() {
-        _data = _data.copyWith(
-          clinicName: _firstNonEmpty(res['clinicName'], _data.clinicName),
-          title: _firstNonEmpty(res['title'], _data.title),
-          role: _firstNonEmpty(res['role'], _data.role),
-          career: _firstNonEmpty(res['career'], _data.career),
-          employmentType: _firstNonEmpty(res['employmentType'], _data.employmentType),
-          workHours: _firstNonEmpty(res['workHours'], _data.workHours),
-          salary: _firstNonEmpty(res['salary'], _data.salary),
-          benefits: (res['benefits'] as List?)?.map((e) => e.toString()).where((s) => s.isNotEmpty).toList() ?? _data.benefits,
-          description: _firstNonEmpty(res['description'], _data.description),
-          address: _firstNonEmpty(res['address'], _data.address),
-          contact: _firstNonEmpty(res['contact'], _data.contact),
-          hospitalType: htKey ?? _data.hospitalType,
-          workDays: wd.isNotEmpty ? wd : _data.workDays,
-          weekendWork: _parseBool(res['weekendWork']) ?? _data.weekendWork,
-          nightShift: _parseBool(res['nightShift']) ?? _data.nightShift,
-          chairCount: chairN ?? _data.chairCount,
-          staffCount: staffN ?? _data.staffCount,
-          subwayStationName: _firstNonEmptyNullable(res['subwayStationName'] as String?, _data.subwayStationName),
-          subwayLines: (res['subwayLines'] as List?)?.map((e) => e.toString()).where((s) => s.isNotEmpty).toList() ?? _data.subwayLines,
-          mainDutiesList: mainDutiesList.isNotEmpty ? mainDutiesList : _data.mainDutiesList,
-          mainDutiesRaw: mainDutiesList.isNotEmpty ? res['mainDutiesRaw'] as String? : _data.mainDutiesRaw,
-          specialties: specialties.isNotEmpty ? specialties : _data.specialties,
-          hasOralScanner: hasOralScanner ?? _data.hasOralScanner,
-          hasCT: hasCT ?? _data.hasCT,
-          has3DPrinter: has3DPrinter ?? _data.has3DPrinter,
-          digitalEquipmentRaw: digitalEquipmentRaw ?? _data.digitalEquipmentRaw,
-          closingDate: closingDate,
-          recruitmentStart: recruitmentStart ?? _data.recruitmentStart,
-          fieldStatus: fieldStatus ?? _data.fieldStatus,
-        );
-      });
 
       await JobDraftService.saveDraft(
         draftId: widget.draftId,

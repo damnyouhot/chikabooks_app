@@ -274,13 +274,20 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
       } else if (isCorrect && _scoreDistribution.isNotEmpty) {
         final oldKey = prevTotalCorrect.toString();
         final newKey = _totalCorrect.toString();
-        final oldCount = (_scoreDistribution[oldKey] ?? 0) - 1;
-        if (oldCount > 0) {
-          _scoreDistribution[oldKey] = oldCount;
+        final prevBucketCount = _scoreDistribution[oldKey] ?? 0;
+        if (prevBucketCount <= 0) {
+          // 팬텀 유저: 분포에 이전 구간 없음 → 신규 등록과 동일하게 처리
+          _totalUsers += 1;
+          _scoreDistribution[newKey] = (_scoreDistribution[newKey] ?? 0) + 1;
         } else {
-          _scoreDistribution.remove(oldKey);
+          final oldCount = prevBucketCount - 1;
+          if (oldCount > 0) {
+            _scoreDistribution[oldKey] = oldCount;
+          } else {
+            _scoreDistribution.remove(oldKey);
+          }
+          _scoreDistribution[newKey] = (_scoreDistribution[newKey] ?? 0) + 1;
         }
-        _scoreDistribution[newKey] = (_scoreDistribution[newKey] ?? 0) + 1;
         _recomputeLocalRank();
       }
     });
@@ -556,7 +563,7 @@ class _QuizStatsCard extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          '순위',
+                          '상위',
                           style: TextStyle(
                             fontSize: 11,
                             color:
@@ -570,7 +577,7 @@ class _QuizStatsCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '$myRank위',
+                          '$topPctStr%',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
@@ -578,24 +585,6 @@ class _QuizStatsCard extends StatelessWidget {
                                 glassMode
                                     ? AppColors.white
                                     : AppColors.creamWhite,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '전체 $totalUsers명 · 상위 $topPctStr%',
-                          textAlign: TextAlign.center,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w500,
-                            height: 1.25,
-                            color:
-                                glassMode
-                                    ? AppColors.white.withValues(alpha: 0.55)
-                                    : AppColors.onCardPrimary.withValues(
-                                      alpha: 0.55,
-                                    ),
                           ),
                         ),
                       ],
