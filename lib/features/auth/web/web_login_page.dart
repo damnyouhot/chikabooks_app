@@ -36,77 +36,139 @@ class WebLoginPage extends StatefulWidget {
 }
 
 class _WebLoginPageState extends State<WebLoginPage> {
+  bool _redirectScheduled = false;
+
+  /// 라우터 [redirect]와 동일 정책: `next`가 안전할 때만 사용, 아니면 홈
+  String _postAuthDestination() {
+    final next = widget.nextRoute;
+    if (next != null &&
+        next.isNotEmpty &&
+        next.startsWith('/') &&
+        !next.startsWith('//')) {
+      return next;
+    }
+    return '/';
+  }
+
   @override
   Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildSessionGateScaffold(
+            message: '세션 확인 중…',
+          );
+        }
+
+        final user = snapshot.data;
+        if (user != null) {
+          if (!_redirectScheduled) {
+            _redirectScheduled = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+              context.go(_postAuthDestination());
+            });
+          }
+          return _buildSessionGateScaffold(
+            message: '이미 로그인되어 있습니다. 이동 중…',
+          );
+        }
+
+        return Scaffold(
+          backgroundColor: AppColors.white,
+          body: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.xxl,
+                vertical: AppSpacing.xxl,
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 960),
+                child: Column(
+                  children: [
+                    _buildLogo(),
+                    const SizedBox(height: AppSpacing.xxl),
+
+                    // ── 좌(지원자) / 우(치과) ────────────────
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        if (constraints.maxWidth < 620) {
+                          return Column(
+                            children: [
+                              _ApplicantLoginCard(nextRoute: widget.nextRoute),
+                              const SizedBox(height: 20),
+                              _ClinicLoginCard(nextRoute: widget.nextRoute),
+                            ],
+                          );
+                        }
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(
+                              child: _ApplicantLoginCard(
+                                nextRoute: widget.nextRoute,
+                              ),
+                            ),
+                            const SizedBox(width: 24),
+                            Expanded(
+                              child: _ClinicLoginCard(nextRoute: widget.nextRoute),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+
+                    const SizedBox(height: AppSpacing.xxl),
+
+                    // ── 하단 링크 ────────────────────────────
+                    Padding(
+                      padding: const EdgeInsets.only(top: AppSpacing.md),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            '© 하이진랩',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textDisabled,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          _link('개인정보처리방침', '/privacy'),
+                          _dot(),
+                          _link('이용약관', '/terms'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSessionGateScaffold({required String message}) {
     return Scaffold(
       backgroundColor: AppColors.white,
       body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.xxl,
-            vertical: AppSpacing.xxl,
-          ),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 960),
-            child: Column(
-              children: [
-                _buildLogo(),
-                const SizedBox(height: AppSpacing.xxl),
-
-                // ── 좌(지원자) / 우(치과) ────────────────
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    if (constraints.maxWidth < 620) {
-                      return Column(
-                        children: [
-                          _ApplicantLoginCard(nextRoute: widget.nextRoute),
-                          const SizedBox(height: 20),
-                          _ClinicLoginCard(nextRoute: widget.nextRoute),
-                        ],
-                      );
-                    }
-                    return Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: _ApplicantLoginCard(
-                            nextRoute: widget.nextRoute,
-                          ),
-                        ),
-                        const SizedBox(width: 24),
-                        Expanded(
-                          child: _ClinicLoginCard(nextRoute: widget.nextRoute),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-
-                const SizedBox(height: AppSpacing.xxl),
-
-                // ── 하단 링크 ────────────────────────────
-                Padding(
-                  padding: const EdgeInsets.only(top: AppSpacing.md),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        '© 하이진랩',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textDisabled,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      _link('개인정보처리방침', '/privacy'),
-                      _dot(),
-                      _link('이용약관', '/terms'),
-                    ],
-                  ),
-                ),
-              ],
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const CircularProgressIndicator(color: AppColors.accent),
+            const SizedBox(height: 20),
+            Text(
+              message,
+              style: GoogleFonts.notoSansKr(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -917,6 +979,7 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
               ),
             ),
           ],
+          const Spacer(),
         ],
       ),
     );
@@ -1227,48 +1290,65 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
       padding: const EdgeInsets.all(AppSpacing.xl),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.zero,
+        borderRadius: BorderRadius.circular(AppRadius.xl),
         border: Border.all(color: AppColors.divider),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.divider.withOpacity(0.25),
+            blurRadius: 30,
+            offset: const Offset(0, 20),
+          ),
+        ],
       ),
       child: Form(
         key: _formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              '공고 등록 시작',
-              style: GoogleFonts.notoSansKr(
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.18,
-                color: AppColors.textPrimary,
-                height: 1.2,
-              ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppColors.accent.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.business_center_outlined,
+                    color: AppColors.accent,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '치과 로그인',
+                        style: GoogleFonts.notoSansKr(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '이미지나 텍스트만 넣으면 AI가 공고를 만들어 드려요',
+                        style: GoogleFonts.notoSansKr(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 6),
-            Text(
-              '이미지나 텍스트만 넣으면 AI가 공고를 만들어 드려요',
-              style: GoogleFonts.notoSansKr(
-                fontSize: 13,
-                letterSpacing: -0.12,
-                color: AppColors.textSecondary,
-                height: 1.4,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Container(height: 1, color: AppColors.divider),
-            const SizedBox(height: 20),
-
-            Text(
-              '계정을 만들면 작성 중인 공고를 저장하고\n다음에도 이어서 등록할 수 있어요',
-              style: GoogleFonts.notoSansKr(
-                fontSize: 12,
-                letterSpacing: -0.12,
-                color: AppColors.textSecondary,
-                height: 1.45,
-              ),
-            ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.xl),
 
             _ClinicLineTextField(
               controller: _emailCtrl,
@@ -1312,7 +1392,7 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
                 ),
                 decoration: BoxDecoration(
                   color: AppColors.cardEmphasis.withOpacity(0.08),
-                  borderRadius: BorderRadius.zero,
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
                   border: Border(
                     left: BorderSide(
                       color: AppColors.cardEmphasis,
@@ -1348,7 +1428,7 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
             const SizedBox(height: 22),
             SizedBox(
               width: double.infinity,
-              height: 48,
+              height: AppPublisher.ctaHeight,
               child: ElevatedButton(
                 onPressed: _isLoading ? null : _login,
                 style: ElevatedButton.styleFrom(
@@ -1356,8 +1436,9 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
                   foregroundColor: AppColors.white,
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  shape: const RoundedRectangleBorder(
-                    borderRadius: BorderRadius.zero,
+                  shape: RoundedRectangleBorder(
+                    borderRadius:
+                        BorderRadius.circular(AppPublisher.buttonRadius),
                   ),
                 ),
                 child:
@@ -1396,12 +1477,19 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
 
             const SizedBox(height: AppSpacing.md),
 
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 10,
+              runSpacing: 10,
               children: [
                 TextButton(
                   onPressed: () => context.push('/publisher/forgot'),
-                  style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
                   child: Text(
                     '비밀번호를 잊으셨나요?',
                     style: GoogleFonts.notoSansKr(
@@ -1413,21 +1501,37 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
                     ),
                   ),
                 ),
-                TextButton(
+                OutlinedButton(
                   onPressed: () => context.push('/publisher/signup'),
-                  style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.accent,
+                    side: BorderSide(color: AppColors.accent.withOpacity(0.45)),
+                    backgroundColor: AppColors.accent.withOpacity(0.04),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(
+                      borderRadius:
+                          BorderRadius.circular(AppPublisher.buttonRadius),
+                    ),
+                  ),
                   child: Text(
-                    '회원가입',
+                    '10초만에 회원 가입하기',
                     style: GoogleFonts.notoSansKr(
-                      fontSize: 13,
+                      fontSize: 11.5,
                       fontWeight: FontWeight.w700,
-                      letterSpacing: -0.18,
-                      color: AppColors.accent,
+                      letterSpacing: -0.2,
+                      height: 1.2,
                     ),
                   ),
                 ),
               ],
             ),
+            const Spacer(),
           ],
         ),
       ),

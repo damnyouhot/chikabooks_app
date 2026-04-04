@@ -179,4 +179,13 @@ class AppColors {
   static const success = Color(0xFF00E676);
   static const warning = Color(0xFFFF9100);
   static const error = Color(0xFFFF1744);
+
+  /// 삭제 등 파괴적 액션 — 브랜드 레드 ([lime] / Lobster Red, Material error 아님)
+  static const destructive = lime;
+
+  // ── 공고 초안 미리보기 (JobPostPreview) ─────────────────────
+  /// '+N' 오버플로 칩 배경 — [surfaceMuted] 별칭 (팔레트 일괄 변경 시 의미 유지)
+  static const jobPreviewOverflowChipBg = surfaceMuted;
+  /// '+N' 오버플로 칩 글자
+  static const jobPreviewOverflowChipText = textSecondary;
 }

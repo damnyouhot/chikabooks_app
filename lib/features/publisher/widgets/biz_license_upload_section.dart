@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_tokens.dart';
 
 /// 사업자등록증 업로드 인라인 섹션
 ///
@@ -227,9 +228,17 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
                 ),
               ),
             ),
-            GestureDetector(
-              onTap: () => setState(() => _dismissed = true),
-              child: Icon(Icons.close, size: 16, color: AppColors.textDisabled),
+            IconButton(
+              onPressed: () => setState(() => _dismissed = true),
+              icon: const Icon(Icons.close, size: 18),
+              tooltip: '닫기',
+              style: IconButton.styleFrom(
+                foregroundColor: AppColors.textDisabled,
+                padding: const EdgeInsets.all(4),
+                minimumSize: const Size(32, 32),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                visualDensity: VisualDensity.compact,
+              ),
             ),
           ],
         ),
@@ -255,7 +264,7 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
         Row(
           children: [
             SizedBox(
-              height: 36,
+              height: AppPublisher.ctaHeight,
               child: ElevatedButton.icon(
                 onPressed: _pickAndUpload,
                 icon: const Icon(Icons.upload_file, size: 16),
@@ -267,7 +276,9 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
                   backgroundColor: AppColors.accent,
                   foregroundColor: AppColors.white,
                   elevation: 0,
-                  shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppPublisher.buttonRadius),
+                  ),
                   padding: const EdgeInsets.symmetric(horizontal: 14),
                 ),
               ),
@@ -351,15 +362,15 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
         Row(
           children: [
             SizedBox(
-              height: 36,
+              height: AppPublisher.ctaHeight,
               child: ElevatedButton(
                 onPressed: _applyOcrToProfile,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accent,
                   foregroundColor: AppColors.white,
                   elevation: 0,
-                  shape: const RoundedRectangleBorder(
-                    borderRadius: BorderRadius.zero,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppPublisher.buttonRadius),
                   ),
                   padding: const EdgeInsets.symmetric(horizontal: 14),
                 ),

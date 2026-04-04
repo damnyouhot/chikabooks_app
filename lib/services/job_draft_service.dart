@@ -1,7 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../models/job.dart';
 import '../models/job_draft.dart';
+import '../models/published_job_to_draft_mapper.dart';
 
 /// 공고 임시저장(Draft) Firestore 서비스
 ///
@@ -137,6 +139,42 @@ class JobDraftService {
       }
     } catch (e) {
       debugPrint('⚠️ saveDraft error: $e');
+      return null;
+    }
+  }
+
+  /// 임시저장 초안을 복제해 새 임시저장을 만든 뒤 새 문서 ID를 반환한다.
+  static Future<String?> saveDraftAsCopyFromDraft(JobDraft d) async {
+    final uid = _uid;
+    if (uid == null) return null;
+    try {
+      final map = Map<String, dynamic>.from(d.toMap());
+      map.remove('updatedAt');
+      map.remove('ownerUid');
+      return saveDraft(
+        formData: {
+          ...map,
+          'sourceType': 'copy',
+          'copiedFromDraftId': d.id,
+          'currentStep': 'ai_generated',
+          'aiParseStatus': 'done',
+          'editorStep': 'step3',
+        },
+      );
+    } catch (e) {
+      debugPrint('⚠️ saveDraftAsCopyFromDraft error: $e');
+      return null;
+    }
+  }
+
+  /// 게시된 공고([Job])를 복제해 새 임시저장을 만든 뒤 새 문서 ID를 반환한다.
+  static Future<String?> saveDraftAsCopyFromPublishedJob(Job job) async {
+    final uid = _uid;
+    if (uid == null) return null;
+    try {
+      return saveDraft(formData: publishedJobCopyDraftFormData(job));
+    } catch (e) {
+      debugPrint('⚠️ saveDraftAsCopyFromPublishedJob error: $e');
       return null;
     }
   }

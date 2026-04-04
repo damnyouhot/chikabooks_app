@@ -1,5 +1,9 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:go_router/go_router.dart';
+
+import 'go_router_refresh_stream.dart';
+import 'app_route_observer.dart';
 import '../../pages/auth/auth_gate.dart';
 import '../../pages/job_page.dart';
 import '../../pages/hira_update_page.dart';
@@ -35,13 +39,40 @@ import '../../features/resume/screens/ocr_review_screen.dart';
 import '../../services/user_profile_service.dart';
 import '../../pages/support_page.dart';
 
+/// 웹에서 세션 복원 후 [redirect]가 재실행되도록 함 (초기 `currentUser == null` 레이스 방지)
+final _authRefreshListenable = GoRouterRefreshStream(
+  FirebaseAuth.instance.authStateChanges(),
+);
+
 final appRouter = GoRouter(
   initialLocation: '/',
+  refreshListenable: _authRefreshListenable,
+  observers: [appRouteObserver],
 
   // ── 글로벌 리다이렉트: 인증 필요 경로 가드 ──────────────────
   redirect: (context, state) async {
     final user = FirebaseAuth.instance.currentUser;
     final path = state.uri.path;
+
+    // ── 웹 전용: 루트(/) 진입 시 항상 웹 플로우로 보냄 ──────────
+    // 모바일 HomeShell·앱 온보딩이 웹에 노출되는 것을 차단한다.
+    if (kIsWeb && path == '/') {
+      if (user != null) {
+        return '/post-job/input';
+      }
+      return '/login';
+    }
+
+    // /login 은 비로그인 전용: 이미 로그인됨 → next 우선, 없으면 공고 입력
+    if (path == '/login' && user != null) {
+      final next = state.uri.queryParameters['next'];
+      if (next != null && next.isNotEmpty) {
+        if (next.startsWith('/') && !next.startsWith('//')) {
+          return next;
+        }
+      }
+      return kIsWeb ? '/post-job/input' : '/';
+    }
 
     // 인증 필요 경로 목록
     const guardedPrefixes = ['/post-job', '/applicant', '/clinic-verify'];

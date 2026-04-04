@@ -1499,7 +1499,7 @@ export {
  *            benefits, description, address, contact, clinicName }
  */
 export const parseJobImagesToForm = functions
-  .runWith({ timeoutSeconds: 60, memory: "512MB", secrets: ["GEMINI_API_KEY"] })
+  .runWith({ timeoutSeconds: 180, memory: "512MB", secrets: ["GEMINI_API_KEY"] })
   .https.onCall(async (data, context) => {
     if (!context.auth) {
       throw new functions.https.HttpsError(
@@ -1538,25 +1538,78 @@ export const parseJobImagesToForm = functions
 
     const systemPrompt = `아래 치과 채용 공고 내용을 분석하여 반드시 아래 JSON 형식으로만 응답해줘.
 다른 텍스트 없이 순수 JSON만 반환해.
-필드가 파악되지 않으면 빈 문자열 또는 빈 배열로 남겨. 절대 추측하지 말고 원문에 명시된 정보만 추출해.
-benefits는 문자열 배열로 반환해.
+원문에 명시된 정보만 추출하고, 없으면 빈 문자열·null·빈 배열을 사용해.
+
+[추출 우선순위 — 반드시 이 순서로 정보를 분리할 것]
+
+1순위 (핵심 구조화 필드 — 절대 description에 섞지 말 것):
+- mainDuties: 담당 업무 항목 (배열, 한 항목당 80자 이내)
+- workHours / salary / workDays: 근무 시간·급여·요일
+- applyMethod / closingDate: 지원 방법·마감일
+- benefits: 복리후생·수당·휴가·식대 등 복지성 항목 (배열)
+- subwayStationName / subwayLines / address: 교통·주소
+
+2순위 (병원 정보):
+- hospitalType / chairCount / staffCount
+- specialties: 주요 진료 과목 배열 (일반진료/교정/임플란트/소아치과/치주/보존/기타 중 해당하는 것)
+- hasOralScanner / hasCT / has3DPrinter: 장비 보유 여부 (true/false/null)
+- digitalEquipmentRaw: 위 3가지로 분류 안 된 기타 장비 설명 문자열
+
+3순위 (description — 분류 실패한 나머지만):
+- 병원 소개, 진료 철학, 팀 문화, 분위기 설명
+- 위 1·2순위로 분류된 내용은 절대 description에 다시 쓰지 말 것
+
+[상세 규칙]
+A) salary에는 급여만, workHours에는 근무 시간만. 이 내용을 description에 반복하지 않는다.
+B) 역·출구·도보 거리·지하철 노선은 benefits에 넣지 않는다.
+C) 체어·에어석션·스툴 등 시설은 description에 서술하고 benefits에 넣지 않는다.
+D) hospitalType은 clinic | network | hospital | general 중 하나. 모르면 빈 문자열.
+E) chairCount·staffCount는 원문에 숫자 있을 때만 정수, 없으면 null.
+F) workDays는 한글 요일 그대로 반환 (예: ["월","화","수","목","금"]).
+G) closingDate·recruitmentStart는 YYYY-MM-DD. 원문에 없으면 null.
+H) fieldStatus: 각 주요 필드에 confirmed(원문 명시) / inferred(추론) / missing(없음) 중 하나.
 
 {
   "clinicName": "치과명",
   "title": "공고 제목",
-  "role": "직종 (예: 치과위생사, 치과조무사 등)",
-  "career": "경력 조건 (예: 신입, 경력 3년 이상)",
-  "employmentType": "고용 형태 (예: 정규직, 계약직, 파트타임)",
-  "workHours": "근무 시간 (예: 09:00~18:00)",
-  "salary": "급여 (예: 월 250~300만원)",
+  "role": "직종",
+  "career": "경력 조건",
+  "employmentType": "고용 형태",
+  "workHours": "근무 시간",
+  "workDays": ["월", "화", "수", "목", "금"],
+  "weekendWork": "주말 근무 여부",
+  "nightShift": "야간 근무 여부",
+  "salary": "급여",
+  "mainDuties": ["업무1", "업무2"],
   "benefits": ["복리후생1", "복리후생2"],
-  "description": "상세 내용",
+  "description": "병원 소개·팀 문화 등 분류 안 된 나머지만",
   "address": "근무지 주소",
   "contact": "연락처",
-  "hospitalType": "병원 유형 (예: 일반치과, 교정과 등)",
-  "workDays": ["월", "화", "수", "목", "금"],
-  "weekendWork": "주말 근무 여부 (예: 격주 토요일)",
-  "nightShift": "야간 근무 여부"
+  "hospitalType": "clinic | network | hospital | general",
+  "chairCount": null,
+  "staffCount": null,
+  "specialties": ["일반진료", "임플란트"],
+  "hasOralScanner": null,
+  "hasCT": null,
+  "has3DPrinter": null,
+  "digitalEquipmentRaw": "",
+  "subwayStationName": "강남역",
+  "subwayLines": ["2호선", "신분당선"],
+  "recruitmentStart": null,
+  "closingDate": null,
+  "fieldStatus": {
+    "clinicName": "confirmed",
+    "title": "confirmed",
+    "role": "confirmed",
+    "salary": "confirmed",
+    "workHours": "confirmed",
+    "workDays": "confirmed",
+    "mainDuties": "confirmed",
+    "benefits": "confirmed",
+    "address": "confirmed",
+    "closingDate": "missing",
+    "specialties": "missing"
+  }
 }`;
 
     const parts: Array<{text?: string; inlineData?: {mimeType: string; data: string}}> = [];
@@ -1567,7 +1620,7 @@ benefits는 문자열 배열로 반환해.
     }
 
     if ((sourceType === "image" || sourceType === "mixed") && imageUrls.length > 0) {
-      for (const url of imageUrls.slice(0, 5)) {
+      for (const url of imageUrls.slice(0, 10)) {
         try {
           const imgResp = await axios.get(url, {responseType: "arraybuffer", timeout: 15000});
           const base64 = Buffer.from(imgResp.data).toString("base64");
@@ -1584,27 +1637,77 @@ benefits는 문자열 배열로 반환해.
       const resp = await axios.post(geminiUrl, {
         contents: [{parts}],
         generationConfig: {responseMimeType: "application/json"},
-      }, {timeout: 45000});
+      }, {timeout: 110000});
 
       const text = resp.data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
       const parsed = JSON.parse(text);
 
+      const pickInt = (v: unknown): number | null => {
+        if (typeof v === "number" && Number.isFinite(v)) return Math.round(v);
+        if (typeof v === "string") {
+          const n = parseInt(String(v).replace(/[^\d]/g, ""), 10);
+          return Number.isFinite(n) ? n : null;
+        }
+        return null;
+      };
+
+      const subwayLinesRaw = Array.isArray(parsed.subwayLines)
+        ? parsed.subwayLines.map((s: unknown) => String(s).trim()).filter(Boolean)
+        : [];
+      const mainDutiesRaw = Array.isArray(parsed.mainDuties)
+        ? parsed.mainDuties.map((s: unknown) => String(s).trim()).filter(Boolean)
+        : [];
+      const specialtiesRaw = Array.isArray(parsed.specialties)
+        ? parsed.specialties.map((s: unknown) => String(s).trim()).filter(Boolean)
+        : [];
+
+      const pickBool = (v: unknown): boolean | null => {
+        if (typeof v === "boolean") return v;
+        if (typeof v === "string") {
+          const l = v.toLowerCase().trim();
+          if (l === "true" || l === "있음" || l === "있다" || l === "보유") return true;
+          if (l === "false" || l === "없음" || l === "없다") return false;
+        }
+        return null;
+      };
+
+      // fieldStatus: Gemini 응답 그대로 전달, 없으면 빈 객체
+      const fieldStatus: Record<string, string> = {};
+      if (parsed.fieldStatus && typeof parsed.fieldStatus === "object") {
+        for (const [k, v] of Object.entries(parsed.fieldStatus)) {
+          if (typeof v === "string") fieldStatus[k] = v;
+        }
+      }
+
       return {
-        clinicName: parsed.clinicName ?? "",
-        title: parsed.title ?? "",
-        role: parsed.role ?? "",
-        career: parsed.career ?? "",
-        employmentType: parsed.employmentType ?? "",
-        workHours: parsed.workHours ?? "",
-        salary: parsed.salary ?? "",
+        clinicName: String(parsed.clinicName ?? "").trim(),
+        title: String(parsed.title ?? "").trim(),
+        role: String(parsed.role ?? "").trim(),
+        career: String(parsed.career ?? "").trim(),
+        employmentType: String(parsed.employmentType ?? "").trim(),
+        workHours: String(parsed.workHours ?? "").trim(),
+        salary: String(parsed.salary ?? "").trim(),
         benefits: Array.isArray(parsed.benefits) ? parsed.benefits : [],
-        description: parsed.description ?? "",
-        address: parsed.address ?? "",
-        contact: parsed.contact ?? "",
-        hospitalType: parsed.hospitalType ?? "",
+        description: String(parsed.description ?? "").trim(),
+        address: String(parsed.address ?? "").trim(),
+        contact: String(parsed.contact ?? "").trim(),
+        hospitalType: String(parsed.hospitalType ?? "").trim(),
         workDays: Array.isArray(parsed.workDays) ? parsed.workDays : [],
         weekendWork: parsed.weekendWork ?? "",
         nightShift: parsed.nightShift ?? "",
+        chairCount: pickInt(parsed.chairCount),
+        staffCount: pickInt(parsed.staffCount),
+        specialties: specialtiesRaw,
+        hasOralScanner: pickBool(parsed.hasOralScanner),
+        hasCT: pickBool(parsed.hasCT),
+        has3DPrinter: pickBool(parsed.has3DPrinter),
+        digitalEquipmentRaw: parsed.digitalEquipmentRaw ? String(parsed.digitalEquipmentRaw).trim() : null,
+        subwayStationName: String(parsed.subwayStationName ?? "").trim(),
+        subwayLines: subwayLinesRaw,
+        mainDuties: mainDutiesRaw,
+        recruitmentStart: parsed.recruitmentStart ? String(parsed.recruitmentStart).trim() : null,
+        closingDate: parsed.closingDate ? String(parsed.closingDate).trim() : null,
+        fieldStatus,
       };
     } catch (e: unknown) {
       functions.logger.error("Gemini API 호출 실패", {error: String(e)});

@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
@@ -12,6 +14,7 @@ import '../../publisher/widgets/biz_license_upload_section.dart';
 import '../../publisher/widgets/publisher_clinic_identity_section.dart';
 import '../ui/job_post_form.dart';
 import '../ui/job_post_preview.dart';
+import '../utils/job_ai_extract_normalize.dart';
 
 /// AI 초안 편집 페이지 (/post-job/edit/:draftId)
 ///
@@ -55,6 +58,10 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
       m['rawInputText'] = d.rawInputText;
     }
     if (d.rawImageUrls.isNotEmpty) m['rawImageUrls'] = d.rawImageUrls;
+    if (d.imageUrls.isNotEmpty) m['imageUrls'] = d.imageUrls;
+    if (d.promotionalImageUrls.isNotEmpty) {
+      m['promotionalImageUrls'] = d.promotionalImageUrls;
+    }
     if (d.clinicProfileId != null && d.clinicProfileId!.isNotEmpty) {
       m['clinicProfileId'] = d.clinicProfileId;
     }
@@ -62,6 +69,59 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
       m['editorStep'] = d.editorStep;
     }
     return m;
+  }
+
+  /// Firestore에 저장된 URL → 폼 [JobPostData.images] (치과·자료 첨부 = [JobDraft.imageUrls]만)
+  /// [rawImageUrls]는 캡처 AI 입력용이며 여기에 넣지 않는다.
+  List<XFile> _imagesFromDraft(JobDraft d) {
+    return d.imageUrls.map((u) {
+      final seg = Uri.tryParse(u)?.pathSegments.last;
+      final name = (seg != null && seg.isNotEmpty) ? seg : 'image.jpg';
+      return XFile(u, name: name);
+    }).toList();
+  }
+
+  /// 좌측 미리보기: [JobPostData.images]가 비어 있거나 비HTTP 경로(blob/로컬)를
+  /// 포함하면 드래프트 메타 URL(Firebase Storage)로 갤러리 표시.
+  /// [promotionalImageUrls]도 `_extraDraftFields` 폴백 처리.
+  JobPostData _dataForPreview() {
+    // ── 홍보이미지: _data 우선, 없으면 extraDraftFields 폴백 ──
+    List<String> promoUrls = _data.promotionalImageUrls;
+    if (promoUrls.isEmpty) {
+      final extra = _extraDraftFields['promotionalImageUrls'];
+      if (extra is List && extra.isNotEmpty) {
+        promoUrls = extra.map((e) => e.toString()).where((s) => _isHttpUrl(s)).toList();
+      }
+    }
+
+    // ── 일반 이미지 ──
+    if (_data.images.isNotEmpty &&
+        _data.images.every((x) => _isHttpUrl(x.path))) {
+      return _data.copyWith(promotionalImageUrls: promoUrls);
+    }
+
+    final imgs = _extraDraftFields['imageUrls'];
+    final List<String> urls = [];
+    if (imgs is List && imgs.isNotEmpty) {
+      urls.addAll(imgs.map((e) => e.toString()).where((s) => _isHttpUrl(s)));
+    }
+
+    if (urls.isEmpty) {
+      return _data.copyWith(images: [], promotionalImageUrls: promoUrls);
+    }
+    return _data.copyWith(
+      promotionalImageUrls: promoUrls,
+      images: urls.map((u) {
+        final seg = Uri.tryParse(u)?.pathSegments.last;
+        final name = (seg != null && seg.isNotEmpty) ? seg : 'image.jpg';
+        return XFile(u, name: name);
+      }).toList(),
+    );
+  }
+
+  static bool _isHttpUrl(String s) {
+    final t = s.trim().toLowerCase();
+    return t.startsWith('http://') || t.startsWith('https://');
   }
 
   @override
@@ -118,7 +178,7 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
         sourceType: extra?['sourceType'] as String? ??
             draft.sourceType ?? 'text',
         rawText: draft.rawInputText ?? '',
-        imageUrls: draft.rawImageUrls,
+        imageUrls: draft.rawImageUrls.isNotEmpty ? draft.rawImageUrls : draft.imageUrls,
       );
     }
   }
@@ -165,9 +225,16 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
         description: draft.description,
         address: draft.address,
         contact: draft.contact,
+        images: _imagesFromDraft(draft),
+        promotionalImageUrls: List.from(draft.promotionalImageUrls),
         hospitalType: draft.hospitalType,
         chairCount: draft.chairCount,
         staffCount: draft.staffCount,
+        specialties: List.from(draft.specialties),
+        hasOralScanner: draft.hasOralScanner,
+        hasCT: draft.hasCT,
+        has3DPrinter: draft.has3DPrinter,
+        digitalEquipmentRaw: draft.digitalEquipmentRaw,
         workDays: List.from(draft.workDays),
         weekendWork: draft.weekendWork,
         nightShift: draft.nightShift,
@@ -183,6 +250,13 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
         lat: draft.lat,
         lng: draft.lng,
         tags: List.from(draft.tags),
+        mainDutiesRaw: draft.mainDutiesRaw,
+        mainDutiesList: List.from(draft.mainDutiesList),
+        recruitmentStart: draft.recruitmentStart,
+        fieldStatus: draft.fieldStatus != null
+            ? Map<String, String>.from(draft.fieldStatus!)
+            : null,
+        fieldSources: draft.fieldSources,
       );
     });
   }
@@ -200,6 +274,9 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
     try {
       final callable = FirebaseFunctions.instance.httpsCallable(
         'parseJobImagesToForm',
+        options: HttpsCallableOptions(
+          timeout: const Duration(seconds: 180),
+        ),
       );
       final result = await callable.call({
         'imageUrls': imageUrls,
@@ -207,8 +284,57 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
         'rawText': rawText,
       });
 
-      final res = Map<String, dynamic>.from(result.data as Map);
+      final res = JobAiExtractNormalizer.normalize(
+        Map<String, dynamic>.from(result.data as Map),
+      );
       if (!mounted) return;
+
+      final wd = JobAiExtractNormalizer.workDaysToCodes(res['workDays'] as List?);
+      final htKey = JobAiExtractNormalizer.hospitalTypeToKey(
+        res['hospitalType'] as String?,
+      );
+      final cc = res['chairCount'];
+      final sc = res['staffCount'];
+      final chairN = cc is int ? cc : (cc is num ? cc.round() : int.tryParse('$cc'.replaceAll(RegExp(r'[^\d]'), '')));
+      final staffN = sc is int ? sc : (sc is num ? sc.round() : int.tryParse('$sc'.replaceAll(RegExp(r'[^\d]'), '')));
+
+      // ── mainDuties ──
+      final mainDutiesListRaw = res['mainDutiesList'];
+      final mainDutiesList = mainDutiesListRaw is List
+          ? mainDutiesListRaw.map((e) => e.toString()).where((s) => s.isNotEmpty).toList()
+          : <String>[];
+
+      // ── specialties ──
+      final specialtiesRaw = res['specialties'];
+      final specialties = specialtiesRaw is List
+          ? specialtiesRaw.map((e) => e.toString()).where((s) => s.isNotEmpty).toList()
+          : <String>[];
+
+      // ── 디지털 장비 ──
+      final hasOralScanner = res['hasOralScanner'] is bool ? res['hasOralScanner'] as bool : null;
+      final hasCT = res['hasCT'] is bool ? res['hasCT'] as bool : null;
+      final has3DPrinter = res['has3DPrinter'] is bool ? res['has3DPrinter'] as bool : null;
+      final digitalEquipmentRaw = res['digitalEquipmentRaw'] as String?;
+
+      // ── closingDate (AI 추출) ──
+      DateTime? closingDate = _data.closingDate;
+      final closingRaw = res['closingDate'] as String?;
+      if (closingRaw != null && closingRaw.isNotEmpty) {
+        try { closingDate = DateTime.parse(closingRaw); } catch (_) {}
+      }
+
+      // ── recruitmentStart ──
+      DateTime? recruitmentStart;
+      final recruitRaw = res['recruitmentStart'] as String?;
+      if (recruitRaw != null && recruitRaw.isNotEmpty) {
+        try { recruitmentStart = DateTime.parse(recruitRaw); } catch (_) {}
+      }
+
+      // ── fieldStatus ──
+      final fsRaw = res['fieldStatus'];
+      final fieldStatus = fsRaw is Map
+          ? fsRaw.map((k, v) => MapEntry(k.toString(), v.toString()))
+          : null;
 
       setState(() {
         _data = _data.copyWith(
@@ -219,14 +345,28 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
           employmentType: _firstNonEmpty(res['employmentType'], _data.employmentType),
           workHours: _firstNonEmpty(res['workHours'], _data.workHours),
           salary: _firstNonEmpty(res['salary'], _data.salary),
-          benefits: (res['benefits'] as List?)?.cast<String>().where((s) => s.isNotEmpty).toList() ?? _data.benefits,
+          benefits: (res['benefits'] as List?)?.map((e) => e.toString()).where((s) => s.isNotEmpty).toList() ?? _data.benefits,
           description: _firstNonEmpty(res['description'], _data.description),
           address: _firstNonEmpty(res['address'], _data.address),
           contact: _firstNonEmpty(res['contact'], _data.contact),
-          hospitalType: _firstNonEmptyNullable(res['hospitalType'], _data.hospitalType),
-          workDays: (res['workDays'] as List?)?.cast<String>().where((s) => s.isNotEmpty).toList() ?? _data.workDays,
+          hospitalType: htKey ?? _data.hospitalType,
+          workDays: wd.isNotEmpty ? wd : _data.workDays,
           weekendWork: _parseBool(res['weekendWork']) ?? _data.weekendWork,
           nightShift: _parseBool(res['nightShift']) ?? _data.nightShift,
+          chairCount: chairN ?? _data.chairCount,
+          staffCount: staffN ?? _data.staffCount,
+          subwayStationName: _firstNonEmptyNullable(res['subwayStationName'] as String?, _data.subwayStationName),
+          subwayLines: (res['subwayLines'] as List?)?.map((e) => e.toString()).where((s) => s.isNotEmpty).toList() ?? _data.subwayLines,
+          mainDutiesList: mainDutiesList.isNotEmpty ? mainDutiesList : _data.mainDutiesList,
+          mainDutiesRaw: mainDutiesList.isNotEmpty ? res['mainDutiesRaw'] as String? : _data.mainDutiesRaw,
+          specialties: specialties.isNotEmpty ? specialties : _data.specialties,
+          hasOralScanner: hasOralScanner ?? _data.hasOralScanner,
+          hasCT: hasCT ?? _data.hasCT,
+          has3DPrinter: has3DPrinter ?? _data.has3DPrinter,
+          digitalEquipmentRaw: digitalEquipmentRaw ?? _data.digitalEquipmentRaw,
+          closingDate: closingDate,
+          recruitmentStart: recruitmentStart ?? _data.recruitmentStart,
+          fieldStatus: fieldStatus ?? _data.fieldStatus,
         );
       });
 
@@ -301,7 +441,20 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
     return null;
   }
 
-  void _onDataChanged(JobPostData d) => setState(() => _data = d);
+  void _onDataChanged(JobPostData d) {
+    setState(() {
+      _data = d;
+      final httpUrls = d.images
+          .map((x) => x.path.trim())
+          .where((p) => p.startsWith('http://') || p.startsWith('https://'))
+          .toList();
+      // 자료 첨부(치과) 갤러리 → imageUrls만. rawImageUrls(캡처 AI)와 혼동하지 않음.
+      _extraDraftFields = {
+        ..._extraDraftFields,
+        'imageUrls': httpUrls,
+      };
+    });
+  }
 
   Future<void> _setEditorStep(String step) async {
     setState(() => _editorStep = step);
@@ -373,12 +526,16 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
       return;
     }
     setState(() => _selectedProfile = fresh);
-    // 최종 데이터 저장
+    // 최종 저장: 폼의 toMap에는 이미지 URL이 없으므로 Firestore 최신본과 병합
+    final latest = await JobDraftService.fetchDraft(widget.draftId);
     await JobDraftService.saveDraft(
       draftId: widget.draftId,
       formData: {
         ..._data.toMap(),
         ..._extraDraftFields,
+        if (latest != null && latest.rawImageUrls.isNotEmpty)
+          'rawImageUrls': latest.rawImageUrls,
+        if (latest != null && latest.imageUrls.isNotEmpty) 'imageUrls': latest.imageUrls,
         'currentStep': 'review',
       },
     );
@@ -499,8 +656,17 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
       child: Row(
         children: [
           IconButton(
-            onPressed: () => context.canPop() ? context.pop() : context.go('/post-job/input'),
-            icon: const Icon(Icons.arrow_back, size: 20, color: AppColors.textPrimary),
+            onPressed: () =>
+                context.canPop() ? context.pop() : context.go('/post-job/input'),
+            icon: const Icon(Icons.arrow_back, size: 20),
+            tooltip: '뒤로',
+            style: IconButton.styleFrom(
+              foregroundColor: AppColors.textPrimary,
+              padding: const EdgeInsets.all(8),
+              minimumSize: const Size(40, 40),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              visualDensity: VisualDensity.compact,
+            ),
           ),
           const SizedBox(width: 8),
           Text(
@@ -564,7 +730,7 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
             child: Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 390),
-                child: JobPostPreview(data: _data),
+                child: JobPostPreview(data: _dataForPreview()),
               ),
             ),
           ),
@@ -584,38 +750,7 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
 
   Widget _buildFormSection() {
     if (_isLoadingAi) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(60),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(
-                width: 48,
-                height: 48,
-                child: CircularProgressIndicator(strokeWidth: 3, color: AppColors.accent),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'AI가 공고 내용을 분석하고 있어요...',
-                style: GoogleFonts.notoSansKr(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '이미지·텍스트에서 치과 정보와 근무 조건을 추출합니다',
-                style: GoogleFonts.notoSansKr(
-                  fontSize: 13,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
+      return const _AiLoadingView();
     }
 
     final pid = _selectedProfile?.id;
@@ -922,6 +1057,136 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
             ),
           ),
       ],
+    );
+  }
+}
+
+// ── AI 로딩 단계별 메시지 위젯 ──────────────────────────────────
+
+class _AiLoadingView extends StatefulWidget {
+  const _AiLoadingView();
+
+  @override
+  State<_AiLoadingView> createState() => _AiLoadingViewState();
+}
+
+class _AiLoadingViewState extends State<_AiLoadingView> {
+  static const _stages = [
+    (sec: 0,  icon: Icons.cloud_upload_outlined,         msg: '이미지를 업로드하는 중이에요...'),
+    (sec: 6,  icon: Icons.image_search_outlined,          msg: 'AI가 공고 이미지를 분석하고 있어요...'),
+    (sec: 18, icon: Icons.manage_search_outlined,         msg: '치과 정보와 근무 조건을 추출하는 중이에요...'),
+    (sec: 45, icon: Icons.playlist_add_check_outlined,    msg: '담당 업무와 복리후생을 정리하는 중이에요...'),
+    (sec: 95, icon: Icons.check_circle_outline_rounded,   msg: '거의 다 됐어요! 조금만 기다려주세요...'),
+  ];
+
+  /// 진행 바 최대 예상 시간 (초) — Callable/함수 상한(180초)에 맞춤, 실제 완료 전 95%까지만 채움
+  static const _maxSec = 170.0;
+
+  late final DateTime _startTime;
+  Timer? _ticker;
+  int _elapsed = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _startTime = DateTime.now();
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() {
+        _elapsed = DateTime.now().difference(_startTime).inSeconds;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  int get _stageIndex {
+    for (var i = _stages.length - 1; i >= 0; i--) {
+      if (_elapsed >= _stages[i].sec) return i;
+    }
+    return 0;
+  }
+
+  double get _progress {
+    final raw = (_elapsed / _maxSec).clamp(0.0, 0.95);
+    // easeOut: 빠르게 오르다 느려짐
+    return 1 - (1 - raw) * (1 - raw);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final stage = _stages[_stageIndex];
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 60),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 400),
+              child: Icon(
+                stage.icon,
+                key: ValueKey(_stageIndex),
+                size: 48,
+                color: AppColors.accent,
+              ),
+            ),
+            const SizedBox(height: 24),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              child: Text(
+                stage.msg,
+                key: ValueKey(_stageIndex),
+                textAlign: TextAlign.center,
+                style: GoogleFonts.notoSansKr(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                  height: 1.45,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '이미지가 많을수록 시간이 걸릴 수 있어요',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.notoSansKr(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 28),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0, end: _progress),
+                duration: const Duration(milliseconds: 800),
+                curve: Curves.easeOut,
+                builder: (_, value, __) => LinearProgressIndicator(
+                  value: value,
+                  minHeight: 6,
+                  backgroundColor: AppColors.divider,
+                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.accent),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              '${(_progress * 100).toInt()}%',
+              style: GoogleFonts.notoSansKr(
+                fontSize: 11,
+                color: AppColors.textDisabled,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

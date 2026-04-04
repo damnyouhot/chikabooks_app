@@ -24,6 +24,13 @@ class JobDraft {
   final String? hospitalType;
   final int? chairCount;
   final int? staffCount;
+  /// 주요 진료 과목
+  final List<String> specialties;
+  /// 디지털 장비 보유
+  final bool? hasOralScanner;
+  final bool? hasCT;
+  final bool? has3DPrinter;
+  final String? digitalEquipmentRaw;
   final List<String> workDays;
   final bool weekendWork;
   final bool nightShift;
@@ -46,7 +53,16 @@ class JobDraft {
   final String? sourceType;
   final String? rawInputText;
   final List<String> rawImageUrls;
+  /// 홍보이미지 URL — AI 추출 없이 공고에 직접 노출
+  final List<String> promotionalImageUrls;
   final String? clinicProfileId;
+
+  // ── AI 추출 품질 필드 ────────────────────────────
+  final String? mainDutiesRaw;
+  final List<String> mainDutiesList;
+  final DateTime? recruitmentStart;
+  final Map<String, String>? fieldStatus;
+  final Map<String, dynamic>? fieldSources;
 
   /// 웹 공고 Stepper 상태 (`step1` | `step2` | `step3`) — 클라이언트 전용, 미설정 시 기본 흐름
   final String? editorStep;
@@ -71,6 +87,11 @@ class JobDraft {
     this.hospitalType,
     this.chairCount,
     this.staffCount,
+    this.specialties = const [],
+    this.hasOralScanner,
+    this.hasCT,
+    this.has3DPrinter,
+    this.digitalEquipmentRaw,
     this.workDays = const [],
     this.weekendWork = false,
     this.nightShift = false,
@@ -91,7 +112,13 @@ class JobDraft {
     this.sourceType,
     this.rawInputText,
     this.rawImageUrls = const [],
+    this.promotionalImageUrls = const [],
     this.clinicProfileId,
+    this.mainDutiesRaw,
+    this.mainDutiesList = const [],
+    this.recruitmentStart,
+    this.fieldStatus,
+    this.fieldSources,
     this.editorStep,
   });
 
@@ -124,6 +151,11 @@ class JobDraft {
       hospitalType: data['hospitalType'] as String?,
       chairCount: (data['chairCount'] as num?)?.toInt(),
       staffCount: (data['staffCount'] as num?)?.toInt(),
+      specialties: List<String>.from(data['specialties'] ?? []),
+      hasOralScanner: data['hasOralScanner'] as bool?,
+      hasCT: data['hasCT'] as bool?,
+      has3DPrinter: data['has3DPrinter'] as bool?,
+      digitalEquipmentRaw: data['digitalEquipmentRaw'] as String?,
       workDays: List<String>.from(data['workDays'] ?? []),
       weekendWork: (data['weekendWork'] as bool?) ?? false,
       nightShift: (data['nightShift'] as bool?) ?? false,
@@ -144,8 +176,16 @@ class JobDraft {
       sourceType: data['sourceType'] as String?,
       rawInputText: data['rawInputText'] as String?,
       rawImageUrls: List<String>.from(data['rawImageUrls'] ?? []),
+      promotionalImageUrls: List<String>.from(data['promotionalImageUrls'] ?? []),
       clinicProfileId: data['clinicProfileId'] as String?,
       editorStep: data['editorStep'] as String?,
+      mainDutiesRaw: data['mainDutiesRaw'] as String?,
+      mainDutiesList: List<String>.from(data['mainDutiesList'] ?? []),
+      recruitmentStart: data['recruitmentStart'] is String
+          ? (() { try { return DateTime.parse(data['recruitmentStart'] as String); } catch (_) { return null; } })()
+          : null,
+      fieldStatus: (data['fieldStatus'] as Map?)?.map((k, v) => MapEntry(k.toString(), v.toString())),
+      fieldSources: data['fieldSources'] as Map<String, dynamic>?,
     );
   }
 
@@ -170,6 +210,11 @@ class JobDraft {
         if (hospitalType != null) 'hospitalType': hospitalType,
         if (chairCount != null) 'chairCount': chairCount,
         if (staffCount != null) 'staffCount': staffCount,
+        if (specialties.isNotEmpty) 'specialties': specialties,
+        if (hasOralScanner != null) 'hasOralScanner': hasOralScanner,
+        if (hasCT != null) 'hasCT': hasCT,
+        if (has3DPrinter != null) 'has3DPrinter': has3DPrinter,
+        if (digitalEquipmentRaw != null) 'digitalEquipmentRaw': digitalEquipmentRaw,
         if (workDays.isNotEmpty) 'workDays': workDays,
         'weekendWork': weekendWork,
         'nightShift': nightShift,
@@ -193,8 +238,14 @@ class JobDraft {
         if (sourceType != null) 'sourceType': sourceType,
         if (rawInputText != null) 'rawInputText': rawInputText,
         if (rawImageUrls.isNotEmpty) 'rawImageUrls': rawImageUrls,
+        if (promotionalImageUrls.isNotEmpty) 'promotionalImageUrls': promotionalImageUrls,
         if (clinicProfileId != null) 'clinicProfileId': clinicProfileId,
         if (editorStep != null) 'editorStep': editorStep,
+        if (mainDutiesRaw != null) 'mainDutiesRaw': mainDutiesRaw,
+        if (mainDutiesList.isNotEmpty) 'mainDutiesList': mainDutiesList,
+        if (recruitmentStart != null) 'recruitmentStart': recruitmentStart!.toIso8601String(),
+        if (fieldStatus != null && fieldStatus!.isNotEmpty) 'fieldStatus': fieldStatus,
+        if (fieldSources != null && fieldSources!.isNotEmpty) 'fieldSources': fieldSources,
         'updatedAt': FieldValue.serverTimestamp(),
       };
 

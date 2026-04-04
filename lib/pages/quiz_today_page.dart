@@ -41,6 +41,8 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
   int _totalUsers = 1;
   int _myRank = 1;
   bool _statsLoaded = false;
+  /// `users/.../quizStats/summary` 의 `countedInGlobal` — 글로벌 집계 반영 여부 (로컬 순위 갱신 규칙용)
+  bool _countedInGlobal = false;
   Map<String, int> _scoreDistribution = {};
 
   // ── 오늘 스케줄 & 유저 기록 ──
@@ -146,16 +148,25 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
               isSameWeek ? ((data['weekWrong'] as num?)?.toInt() ?? 0) : 0;
           _myRank = peopleAboveMe + 1;
           _totalUsers = totalParticipants;
+          _countedInGlobal = data['countedInGlobal'] == true;
           _scoreDistribution = distribution.map(
             (k, v) => MapEntry(k, (v as num).toInt()),
           );
           _statsLoaded = true;
         });
       } else {
-        // 퀴즈 미참여자: 점수 0 → 모든 참여자보다 아래
+        // 퀴즈 미참여자: summary 없음 — 글로벌 분포는 그대로 두어 첫 답 시 로컬 순위 보정 가능
         setState(() {
+          _totalCorrect = 0;
+          _totalWrong = 0;
+          _weekCorrect = 0;
+          _weekWrong = 0;
           _myRank = totalParticipants;
           _totalUsers = totalParticipants;
+          _countedInGlobal = false;
+          _scoreDistribution = distribution.map(
+            (k, v) => MapEntry(k, (v as num).toInt()),
+          );
           _statsLoaded = true;
         });
       }
@@ -209,6 +220,19 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
     }
   }
 
+  /// [QuizPoolService.saveAnswer] 트랜잭션과 동일한 규칙으로 `_myRank` 갱신
+  void _recomputeLocalRank() {
+    if (_scoreDistribution.isEmpty) return;
+    var peopleAboveMe = 0;
+    for (final entry in _scoreDistribution.entries) {
+      final score = int.tryParse(entry.key) ?? 0;
+      if (score > _totalCorrect) {
+        peopleAboveMe += entry.value;
+      }
+    }
+    _myRank = peopleAboveMe + 1;
+  }
+
   void _onQuizAnswered({
     required String dateKey,
     required String quizId,
@@ -217,6 +241,7 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
     required List<String> allIds,
   }) {
     final prevTotalCorrect = _totalCorrect;
+    final wasCountedInGlobal = _countedInGlobal;
 
     setState(() {
       if (isCorrect) {
@@ -239,8 +264,14 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
         rewardGranted: prev?.rewardGranted ?? false,
       );
 
-      // 로컬 순위 즉시 반영 (서버 왕복 대기 없이)
-      if (isCorrect && _scoreDistribution.isNotEmpty) {
+      // 로컬 순위 즉시 반영 (saveAnswer 트랜잭션과 동일)
+      if (!wasCountedInGlobal) {
+        _totalUsers += 1;
+        final bucketKey = _totalCorrect.toString();
+        _scoreDistribution[bucketKey] = (_scoreDistribution[bucketKey] ?? 0) + 1;
+        _countedInGlobal = true;
+        _recomputeLocalRank();
+      } else if (isCorrect && _scoreDistribution.isNotEmpty) {
         final oldKey = prevTotalCorrect.toString();
         final newKey = _totalCorrect.toString();
         final oldCount = (_scoreDistribution[oldKey] ?? 0) - 1;
@@ -250,15 +281,7 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
           _scoreDistribution.remove(oldKey);
         }
         _scoreDistribution[newKey] = (_scoreDistribution[newKey] ?? 0) + 1;
-
-        int peopleAboveMe = 0;
-        for (final entry in _scoreDistribution.entries) {
-          final score = int.tryParse(entry.key) ?? 0;
-          if (score > _totalCorrect) {
-            peopleAboveMe += entry.value;
-          }
-        }
-        _myRank = peopleAboveMe + 1;
+        _recomputeLocalRank();
       }
     });
 
@@ -484,8 +507,12 @@ class _QuizStatsCard extends StatelessWidget {
     final weekTotal = weekCorrect + weekWrong;
     final totalRate = totalTotal > 0 ? (totalCorrect / totalTotal * 100) : 0.0;
     final weekRate = weekTotal > 0 ? (weekCorrect / weekTotal * 100) : 0.0;
-    final topPercent =
-        totalUsers > 0 ? (myRank / totalUsers * 100).clamp(1.0, 100.0) : 100.0;
+    final rawTopPct =
+        totalUsers > 0 ? (myRank / totalUsers * 100).clamp(0.0, 100.0) : 0.0;
+    final topPctStr =
+        rawTopPct >= 10
+            ? rawTopPct.toStringAsFixed(1)
+            : rawTopPct.toStringAsFixed(2);
 
     final dividerColor =
         glassMode
@@ -541,9 +568,9 @@ class _QuizStatsCard extends StatelessWidget {
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 4),
                         Text(
-                          '상위 ${topPercent.toStringAsFixed(1)}%',
+                          '$myRank위',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
@@ -551,6 +578,24 @@ class _QuizStatsCard extends StatelessWidget {
                                 glassMode
                                     ? AppColors.white
                                     : AppColors.creamWhite,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '전체 $totalUsers명 · 상위 $topPctStr%',
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                            height: 1.25,
+                            color:
+                                glassMode
+                                    ? AppColors.white.withValues(alpha: 0.55)
+                                    : AppColors.onCardPrimary.withValues(
+                                      alpha: 0.55,
+                                    ),
                           ),
                         ),
                       ],

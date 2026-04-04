@@ -28,10 +28,10 @@
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLName</key>
-			<string>com.chikabooks.tenth</string>
+			<string>com.chikabooks.chikabooksApp</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.chikabooks.tenth</string>
+				<string>com.chikabooks.chikabooksApp</string>
 			</array>
 		</dict>
 		<dict>
@@ -51,7 +51,7 @@
 			<string>google</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.googleusercontent.apps.215876124758-dohntuqr94krtq5rnev7gm3agt1qhooo</string>
+				<string>com.googleusercontent.apps.215876124758-4dghmea4dv8uf2br7d9st4njg0j5jth7</string>
 			</array>
 		</dict>
 	</array>
@@ -66,6 +66,10 @@
 	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>백그라운드에서 주변 구인 알림을 받기 위해 위치 권한이 필요합니다.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
@@ -79,7 +83,7 @@
 	<key>NidClientSecret</key>
 	<string>ZQ9vUktdbW</string>
 	<key>NidUrlScheme</key>
-	<string>com.chikabooks.tenth</string>
+	<string>com.chikabooks.chikabooksApp</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

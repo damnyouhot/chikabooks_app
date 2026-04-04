@@ -80,5 +80,8 @@ class AppPublisher {
 
   /// 이미지 행·보조 버튼 줄 사이 가로 간격
   static const double formButtonRowGap = 14.0;
+
+  /// 웹 공고 자료 입력(`/post-job/input`) 흰 패널·임시저장 카드 모서리 — [AppRadius.md]와 동일 스케일
+  static const double inputPanelRadius = 10.0;
 }
 

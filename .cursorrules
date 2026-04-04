@@ -35,3 +35,10 @@ Your goal is to write clean, maintainable, and production-ready code.
 - Be concise and direct.
 - When fixing errors, explain the "Root Cause" briefly before providing the code.
 - Always check existing code styles before generating new code to maintain consistency.
+
+# Design tokens & UI consistency
+- **Single source for colors**: `lib/core/theme/app_colors.dart` (`AppColors`). Do not introduce ad-hoc hex colors in widgets when a semantic token exists; add a token there if needed.
+- **Single source for radius/spacing (app-wide)**: `lib/core/theme/app_tokens.dart` — `AppRadius`, `AppSpacing`, and web job flows `AppPublisher` (e.g. `buttonRadius`, `ctaHeight`, `inputPanelRadius`).
+- **Web job publisher surfaces** (`/post-job/input`, draft editor, login card): prefer `AppPublisher` + `AppColors` together so CTAs and panels stay aligned.
+- Figma or external design files are not in-repo; when implementing UI, match existing token usage in nearby screens or ask for a link/frame name if specs are unclear.
+- **Build verification (required)**: If a single task updates **both** design token sources — `lib/core/theme/app_colors.dart` **and** `lib/core/theme/app_tokens.dart` — you **must** run `flutter build web --release` after applying those changes and confirm it succeeds before considering the work done. Same requirement when a UI change intentionally depends on edits in both files in one pass.

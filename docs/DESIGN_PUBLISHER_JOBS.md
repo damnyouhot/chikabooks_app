@@ -25,6 +25,34 @@
 - **강조 색**: **네이비(`accent` = `blue`)**와 **레드(`cardEmphasis` = `lime`)** 위주. 구형 주황 `warning`에 의존한 CTA는 피하고, 의미 있는 강조는 토큰으로 통일.
 - **배경**: 웹 공고자 전용 페이지 배경은 크림 앱 배경과 구분 — **`AppColors.webPublisherPageBg` (`#F0F0F0`)**. `PubScaffold`의 `webPublisherShell: true`일 때 셸은 **흰색 + AppBar 하단 1px 라인**.
 
+### 라인 우선 · 박스 라운드 (웹 공고 자료 입력 등)
+
+- **네 면 테두리 박스(`Border.all`)는 최소화**한다. 구역 구분은 **`Divider`**, **하단(또는 상단) 한 줄 `BorderSide`**, **왼쪽 강조 보더(배너)** 등 **라인**을 우선한다. 불가피하게 카드형 박스가 필요할 때만 사각 테두리를 쓴다.
+- **박스/칩/썸네일/패널을 쓸 때 모서리는 임의 숫자 금지** — 아래 토큰만 사용한다:
+  - 작은 요소·썸네일·점선 드롭존 내부: **`AppPublisher.softRadius` (3px)**
+  - 주요 CTA·큰 패널(불가피 시): **`AppPublisher.buttonRadius` (8px)** 또는 패널용 **`AppPublisher.inputPanelRadius` (10px)** — 정의는 **`lib/core/theme/app_tokens.dart`**
+- **`/post-job/input` (`job_input_page`)** 는 위 원칙을 따른다: 임시저장 초안은 **`OutlinedButton` 풍 버튼**(구분은 `divider` 테두리), 본문 블록은 **구분선·탭 인디케이터 위주**, 텍스트 입력은 **`JobPostForm`과 동일한 밑줄 필드(`UnderlineInputBorder`)** 톤을 사용한다.
+
+### `/post-job/input` 좌우 2-column 레이아웃
+
+- **구조**: 뷰포트 높이 기준 **세로 중앙 정렬**(`LayoutBuilder` + `Center` + `SingleChildScrollView` + `minHeight`) — `ConstrainedBox(maxWidth: 1100)` 안에 `Row(flex 4:5)` — 좌측 **「임시저장/ 사용 공고」**, 우측 **「새로 만들기」**.
+- **좌측**: 임시저장 목록(`watchMyDrafts`) + 게시된 공고 목록(`jobs` 컬렉션) — 초안은 **버튼형**, 게시 목록은 **행 단위 하단 라인**(`BorderSide`) 구분.
+- **우측 탭(4종)**: 「홍보이미지 업로드」 · 「캡처 이미지 업로드」 · 「텍스트 붙여넣기」 · 「기존 공고 복사」 — 선택 탭 아래 **`accent` 굵은 라인(3px)**, 비선택은 **얇은 `divider` 라인(1px)** 으로 구분.
+- **CTA 분기**: 홍보이미지(`sourceType: promotional`) → **"다음 단계"** (AI 스킵, `editorStep: step3`). 캡처/텍스트 → **"AI 초안 생성하기"**. 복사 → 목록에서 바로 이동.
+- **CTA 아래**: **「처음부터 직접 작성하기」** `TextButton` — `sourceType: manual`, 빈 폼 `step3`로 이동.
+
+### 홍보이미지 (`promotionalImageUrls`)
+
+- **정의**: AI 추출 없이 공고에 **직접 노출**되는 이미지(치과 소개·시설·분위기 등).
+- **모델**: `JobDraft.promotionalImageUrls`, `JobPostData.promotionalImageUrls` — `List<String>`.
+- **프리뷰 배치**: `JobPostPreview`에서 **담당업무 ↔ 병원정보 사이**에 `_sectionPromotionalImages()`로 삽입. 각 이미지는 **모바일 폭 전체(`width: double.infinity`, `fitWidth`)**를 차지하고, 여러 장이면 **세로로 쌓여** 배치된다.
+- **업로드 흐름**: `job_input_page` → `JobImageUploader.uploadImages` → `promotionalImageUrls`로 저장, `aiParseStatus: done`, `currentStep: ai_generated` 세팅 → 에디터 `step3`로 이동.
+
+### 미리보기 2열 그리드 (짧은 설명)
+
+- **지금 구조**: `JobPostPreview`의 정보 행은 **짝을 이루면 가로로 두 칸**(한 줄에 두 항목). **마지막에 항목이 하나만 남으면** 그 줄은 **한 칸만 쓰고 나머지는 비움**(자동으로 아래 줄까지 길게 늘리지는 않음).
+- **“긴 글만 한 줄 전체”**를 쓰고 싶다면, 일반적인 방법은 **그 행을 2열 묶음에 넣지 않고** `Row` 밖에서 **폭 전체(`width: double.infinity` 또는 `Column` 안의 단일 `JobDetailInfoRow`)** 로 두는 식으로 **레이아웃만 따로** 잡는 것이다. (지금 위젯은 모든 행을 같은 2열 규칙으로 묶고 있음.)
+
 ---
 
 ## 컬러 (코드 단일 소스)
@@ -39,6 +67,8 @@
 | 본문·제목 | `textPrimary` / `textSecondary` | |
 | 구분선 | `divider` | |
 | 에러·반려·정지 안내 | `error` + 배너 패턴 | 왼쪽 보더 3px + 연한 배경 |
+
+- **베이지·크림 톤 금지 (공고 파트 웹)**: 배경·채움·플레이스홀더에 **`surfaceMuted`**, **`creamWhite`** 등 크림/베이지 계열을 쓰지 않는다. 뉴트럴은 **`webPublisherPageBg`**, **`white`**, **`divider`** 조합으로 맞춘다. (의미 색은 **`accent` / `cardEmphasis` / `text*`**.)
 
 `publisher_shared.dart` 의 `kPub*` 상수는 레거시 호환용이며, 새 코드는 **`AppColors`** 를 직접 쓰는 것을 권장합니다.
 
@@ -85,6 +115,8 @@
 | 게시자 공통 위젯·`PubScaffold` | `lib/features/publisher/pages/publisher_shared.dart` |
 | 인증 진행 UI | `lib/features/publisher/pages/publisher_onboarding_*.dart` |
 | 웹 공고 등록 폼(밑줄·섹션 간격·드롭다운 테마) | `lib/features/jobs/ui/job_post_form.dart` |
+| 웹 공고 **자료 입력**(좌우 2열 · 4탭 · 홍보이미지) | `lib/features/jobs/web/job_input_page.dart` |
+| 공고 **초안 미리보기**(홍보이미지 갤러리 포함) | `lib/features/jobs/ui/job_post_preview.dart` |
 
 ---
 

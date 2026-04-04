@@ -23,7 +23,6 @@ class _PublisherSignupPageState extends State<PublisherSignupPage> {
   bool _obscureConfirm = true;
   bool _agreeTerms = false;
   bool _agreePrivacy = false;
-  bool _agreeMarketing = false;
   bool _isLoading = false;
   String? _errorMsg;
 
@@ -323,15 +322,6 @@ class _PublisherSignupPageState extends State<PublisherSignupPage> {
                           required: true,
                           onChanged:
                               (v) => setState(() => _agreePrivacy = v ?? false),
-                        ),
-                        const SizedBox(height: 10),
-                        _policyCheckRow(
-                          value: _agreeMarketing,
-                          label: '마케팅 수신 동의',
-                          required: false,
-                          onChanged:
-                              (v) =>
-                                  setState(() => _agreeMarketing = v ?? false),
                         ),
 
                         // ── 에러 ─────────────────────
