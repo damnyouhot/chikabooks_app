@@ -9,14 +9,33 @@ import 'package:flutter_naver_login/interface/types/naver_login_status.dart';
 
 /// 네이버 로그인 서비스 (서버 기반 인증)
 /// Access Token을 서버로 전송하여 검증 및 Custom Token 발급
+///
+/// ■ Scope / 이메일
+/// - `flutter_naver_login` 은 Dart 에서 OAuth scope 문자열을 넘기지 않습니다.
+///   Android/iOS 는 NaverIdLoginSDK.authenticate() + 동일 토큰으로 `nid/me` 호출입니다.
+/// - 이메일 노출 여부는 **네이버 개발자 센터**의 애플리케이션·동의 항목·API 설정과
+///   발급된 액세스 토큰 권한에 따릅니다. (앱 코드에 별도 scope 파라미터 없음)
+/// - 점검: 개발자 센터 → 제공 정보에 이메일 필수 여부, 서비스 환경(패키지/번들) 일치,
+///   문제 계정은 네이버 **연결 해제 후 재로그인**. 디버그 시 로그의 `nid/me` 키 목록 확인.
 class NaverAuthService {
   static final _functions = FirebaseFunctions.instanceFor(region: 'us-central1');
   static final _auth = FirebaseAuth.instance;
 
+  static String _debugBodyPrefix(String body, [int max = 420]) {
+    if (body.isEmpty) return '(empty)';
+    final t = body.replaceAll(RegExp(r'\s+'), ' ').trim();
+    return t.length <= max ? t : '${t.substring(0, max)}…';
+  }
+
   /// 네이버 로그인 실행
   ///
-  /// 성공 시 `(User, nid/SDK에서 확보한 이메일)` — Auth에 이메일이 없어도 SDK에서 온 주소는 두 번째 값으로 전달( SignInTracker용 ).
-  static Future<(User user, String? profileEmail)?> signInWithNaver() async {
+  /// 성공 시 [user]가 non-null. 실패 시 [user]는 null이며 [errorMessage]에 Callable 메시지가 올 수 있음(이메일 중복 등).
+  static Future<
+      ({
+        User? user,
+        String? profileEmail,
+        String? errorMessage,
+      })> signInWithNaver() async {
     try {
       debugPrint('🔑 네이버 로그인 시작');
       
@@ -28,14 +47,14 @@ class NaverAuthService {
       // ✅ status 확인
       if (result.status != NaverLoginStatus.loggedIn) {
         debugPrint('❌ 네이버 로그인 실패: ${result.status}');
-        return null;
+        return (user: null, profileEmail: null, errorMessage: null);
       }
       
       // ✅ account 확인
       final account = result.account;
       if (account == null) {
         debugPrint('❌ 네이버 계정 정보가 없습니다');
-        return null;
+        return (user: null, profileEmail: null, errorMessage: null);
       }
       
     // 2. Access Token 가져오기 (getCurrentAccessToken 사용)
@@ -51,7 +70,7 @@ class NaverAuthService {
         
         // 토큰이 없으면 로그아웃 후 재시도 권장
         await FlutterNaverLogin.logOut();
-        return null;
+        return (user: null, profileEmail: null, errorMessage: null);
       }
       
       debugPrint('✅ 네이버 Access Token 획득: ${tokenResult.accessToken.substring(0, 20)}...');
@@ -72,6 +91,7 @@ class NaverAuthService {
 
       // 2c. 토큰으로 직접 nid/me 호출 (SDK→Dart 맵에 email 이 비는 경우 대비)
       if (profileEmail == null || profileEmail.isEmpty) {
+        debugPrint('🧩 [nid/me] SDK 이메일 없음 → openapi.naver.com/v1/nid/me 직접 호출');
         try {
           final res = await http.get(
             Uri.parse('https://openapi.naver.com/v1/nid/me'),
@@ -79,17 +99,65 @@ class NaverAuthService {
               'Authorization': 'Bearer ${tokenResult.accessToken}',
             },
           );
-          if (res.statusCode == 200) {
-            final map = jsonDecode(res.body) as Map<String, dynamic>?;
-            final resp = map?['response'] as Map<String, dynamic>?;
-            final em = resp?['email'] as String?;
-            if (em != null && em.trim().isNotEmpty) {
-              profileEmail = em.trim();
-              debugPrint('🧩 직접 nid/me email: $profileEmail');
+          debugPrint(
+            '🧩 [nid/me] HTTP ${res.statusCode} bytes=${res.body.length}',
+          );
+          if (res.statusCode != 200) {
+            if (kDebugMode) {
+              debugPrint(
+                '🧩 [nid/me] 실패 본문(앞 420자): ${_debugBodyPrefix(res.body)}',
+              );
+            }
+          } else {
+            Map<String, dynamic>? map;
+            try {
+              map = jsonDecode(res.body) as Map<String, dynamic>?;
+            } catch (e) {
+              debugPrint('⚠️ [nid/me] JSON 파싱 실패: $e');
+              if (kDebugMode) {
+                debugPrint(
+                  '🧩 [nid/me] raw(앞 420자): ${_debugBodyPrefix(res.body)}',
+                );
+              }
+            }
+            if (map != null) {
+              final resultCode = map['resultcode'];
+              final msg = map['message'] as String?;
+              final resp = map['response'] as Map<String, dynamic>?;
+              final ok =
+                  resultCode == '00' ||
+                  resultCode == 0 ||
+                  resultCode == '0' ||
+                  '$resultCode' == '00';
+              if (!ok) {
+                debugPrint(
+                  '🧩 [nid/me] API 오류 resultcode=$resultCode message=$msg',
+                );
+              }
+              final responseKeys =
+                  resp == null ? <String>[] : (resp.keys.toList()..sort());
+              final hasEmailKey =
+                  resp != null &&
+                  resp.containsKey('email') &&
+                  (resp['email'] as String?)?.trim().isNotEmpty == true;
+              debugPrint(
+                '🧩 [nid/me] resultcode=$resultCode ok=$ok '
+                'response.keys=$responseKeys emailFieldPresent=$hasEmailKey',
+              );
+              final em = resp?['email'] as String?;
+              if (em != null && em.trim().isNotEmpty) {
+                profileEmail = em.trim();
+                debugPrint('🧩 [nid/me] email 확보: $profileEmail');
+              } else if (ok && resp != null && kDebugMode) {
+                debugPrint(
+                  '🧩 [nid/me] 성공 응답이나 email 비어 있음 (검수·동의·토큰 scope 의심)',
+                );
+              }
             }
           }
-        } catch (e) {
-          debugPrint('⚠️ 직접 nid/me 조회 실패(무시): $e');
+        } catch (e, st) {
+          debugPrint('⚠️ [nid/me] 직접 호출 예외: $e');
+          debugPrint('⚠️ [nid/me] $st');
         }
       }
 
@@ -119,19 +187,35 @@ class NaverAuthService {
       final currentUser = _auth.currentUser;
       if (currentUser == null) {
         debugPrint('❌ Firebase Auth currentUser가 null (비정상)');
-        return null;
+        return (
+          user: null,
+          profileEmail: null,
+          errorMessage: null,
+        );
       }
       
       debugPrint('✅✅✅ 네이버 로그인 완전 성공!');
       debugPrint('✅ UID: ${currentUser.uid}');
       debugPrint('✅ Auth.email: ${currentUser.email} / SDK profileEmail: $profileEmail');
       
-      return (currentUser, profileEmail);
+      return (
+        user: currentUser,
+        profileEmail: profileEmail,
+        errorMessage: null,
+      );
+    } on FirebaseFunctionsException catch (e, stackTrace) {
+      debugPrint('❌ 네이버 로그인 (Functions): ${e.code} ${e.message}');
+      debugPrint('❌ StackTrace: $stackTrace');
+      return (
+        user: null,
+        profileEmail: null,
+        errorMessage: e.message,
+      );
     } catch (e, stackTrace) {
       debugPrint('❌ 네이버 로그인 예외 발생');
       debugPrint('❌ Error: $e');
       debugPrint('❌ StackTrace: $stackTrace');
-      return null;
+      return (user: null, profileEmail: null, errorMessage: null);
     }
   }
 

@@ -24,6 +24,18 @@ enum SocialLoginError {
   APP_CHECK_REQUIRED = "APP_CHECK_REQUIRED",
   INVALID_INPUT = "INVALID_INPUT",
   INTERNAL_ERROR = "INTERNAL_ERROR",
+  EMAIL_ALREADY_IN_USE = "EMAIL_ALREADY_IN_USE",
+}
+
+/** Firebase Admin SDK 등에서 던진 오류의 `auth/...` 코드 추출 */
+function getFirebaseAuthErrorCode(error: unknown): string | null {
+  if (!error || typeof error !== "object") return null;
+  const e = error as {code?: unknown; errorInfo?: {code?: string}};
+  if (typeof e.code === "string") return e.code;
+  if (e.errorInfo && typeof e.errorInfo.code === "string") {
+    return e.errorInfo.code;
+  }
+  return null;
 }
 
 /**
@@ -1063,16 +1075,35 @@ export const verifyNaverToken = functions.https.onCall(
         updateData.email = email;
       }
 
-      await admin.auth().updateUser(uid, updateData).catch(async () => {
-        const createData: admin.auth.CreateRequest = {uid};
-        if (displayName) {
-          createData.displayName = displayName;
+      // 빈 updateUser({}) 는 INVALID_ARGUMENT → 재로그인 시 createUser(uid) 가 uid 중복으로 실패할 수 있음
+      // (이메일·이름 미제공 네이버 계정에서 특히 자주 발생)
+      const hasAuthFields = Object.keys(updateData).length > 0;
+      if (hasAuthFields) {
+        await admin.auth().updateUser(uid, updateData).catch(async () => {
+          const createData: admin.auth.CreateRequest = {uid};
+          if (displayName) {
+            createData.displayName = displayName;
+          }
+          if (email && email.trim().length > 0) {
+            createData.email = email;
+          }
+          await admin.auth().createUser(createData);
+        });
+      } else {
+        try {
+          await admin.auth().getUser(uid);
+        } catch (e: unknown) {
+          const code =
+            e && typeof e === "object" && "code" in e
+              ? String((e as {code?: string}).code)
+              : "";
+          if (code === "auth/user-not-found") {
+            await admin.auth().createUser({uid});
+          } else {
+            throw e;
+          }
         }
-        if (email && email.trim().length > 0) {
-          createData.email = email;
-        }
-        await admin.auth().createUser(createData);
-      });
+      }
 
       // ========== 8. Firestore users 컬렉션에 저장 ==========
       const naverNewUserRef = db.collection("users").doc(uid);
@@ -1110,13 +1141,37 @@ export const verifyNaverToken = functions.https.onCall(
         uid,
       };
     } catch (error: any) {
-      console.error("⚠️ verifyNaverToken error:", error.message);
+      const authCode = getFirebaseAuthErrorCode(error);
+      console.error(
+        "⚠️ verifyNaverToken error:",
+        authCode || error?.code || "(no code)",
+        error?.message ?? error
+      );
 
       if (error instanceof functions.https.HttpsError) {
         throw error;
       }
 
-      // ========== 10. 에러 분류 및 전달 ==========
+      // ========== 10. Firebase Auth (Admin) 오류 — internal 로만 묻히지 않도록 ==========
+      if (
+        authCode === "auth/email-already-exists" ||
+        authCode === "auth/email-already-in-use"
+      ) {
+        throw new functions.https.HttpsError(
+          "already-exists",
+          "이 이메일은 다른 로그인 방식으로 이미 가입되어 있습니다. 기존 방식으로 로그인하거나 계정 통합이 필요합니다.",
+          {errorCode: SocialLoginError.EMAIL_ALREADY_IN_USE, authCode}
+        );
+      }
+      if (authCode === "auth/uid-already-exists") {
+        throw new functions.https.HttpsError(
+          "aborted",
+          "계정 생성이 충돌했습니다. 잠시 후 다시 시도해 주세요.",
+          {errorCode: SocialLoginError.INTERNAL_ERROR, authCode}
+        );
+      }
+
+      // ========== 11. 에러 분류 및 전달 (네이버 API 등) ==========
       if (axios.isAxiosError(error)) {
         if (error.response) {
           const status = error.response.status;

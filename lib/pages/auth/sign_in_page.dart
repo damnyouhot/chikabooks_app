@@ -218,16 +218,21 @@ class _SignInPageState extends State<SignInPage> {
       debugPrint('🔑 네이버 로그인 시작');
       final naverRes = await NaverAuthService.signInWithNaver();
 
-      if (naverRes == null) {
+      if (naverRes.user == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('네이버 로그인 실패. 다시 시도해주세요.')),
+            SnackBar(
+              content: Text(
+                naverRes.errorMessage ?? '네이버 로그인 실패. 다시 시도해주세요.',
+              ),
+            ),
           );
         }
         return;
       }
 
-      final (user, naverProfileEmail) = naverRes;
+      final user = naverRes.user!;
+      final naverProfileEmail = naverRes.profileEmail;
       debugPrint(
         '✅ 네이버 로그인 성공: ${user.uid} (Auth.email=${user.email}, sdk=$naverProfileEmail)',
       );
