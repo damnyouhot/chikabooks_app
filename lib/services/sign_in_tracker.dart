@@ -20,6 +20,9 @@ class SignInTracker {
   // ── Firestore + 로컬 저장 ─────────────────────────────────
   /// 로그인 성공 직후 호출.
   /// [email] 을 명시하면 Firestore에 저장. 생략 시 Firebase Auth currentUser.email 자동 사용.
+  ///
+  /// 치과(공고자) 계정(`clinics_accounts/{uid}`)이면 `users/{uid}`에 쓰지 않는다.
+  /// 공고자 기록은 `ClinicAuthService.recordLogin()`에서 별도 처리.
   static Future<void> record(String provider, {String? email}) async {
     // 1) 로컬 저장 (배지용)
     try {
@@ -30,6 +33,20 @@ class SignInTracker {
     // 2) Firestore 저장
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
+
+    // 치과(공고자) 계정이면 users 컬렉션에 쓰지 않는다
+    try {
+      final clinicDoc =
+          await _db.collection('clinics_accounts').doc(uid).get();
+      if (clinicDoc.exists) {
+        debugPrint(
+          '⏭️ SignInTracker: clinics_accounts/$uid 존재 → users 기록 skip',
+        );
+        return;
+      }
+    } catch (e) {
+      debugPrint('⚠️ SignInTracker: clinics_accounts 확인 실패 (계속 진행): $e');
+    }
 
     // 이메일: 파라미터 우선 → Firebase Auth currentUser.email 폴백
     final resolvedEmail =

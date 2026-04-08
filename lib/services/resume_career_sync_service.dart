@@ -76,11 +76,17 @@ class ResumeCareerSyncService {
         'clinicName': exp.clinicName.trim(),
         'startDate': Timestamp.fromDate(startDate),
         'endDate': endDate != null ? Timestamp.fromDate(endDate) : null,
-        'tags': exp.tasks.take(5).toList(), // 경력 업무를 태그로
-        'acquiredSkills': exp.tools.take(5).toList(),
-        'syncedFromResume': true, // 자동 동기화 표시
+        'syncedFromResume': true,
         'updatedAt': FieldValue.serverTimestamp(),
       };
+
+      // tasks/tools가 있을 때만 동기화 (빈 배열로 기존 값 덮어쓰기 방지)
+      if (exp.tasks.isNotEmpty) {
+        entryData['tags'] = exp.tasks.take(5).toList();
+      }
+      if (exp.tools.isNotEmpty) {
+        entryData['acquiredSkills'] = exp.tools.take(5).toList();
+      }
 
       if (match != null) {
         // 업데이트

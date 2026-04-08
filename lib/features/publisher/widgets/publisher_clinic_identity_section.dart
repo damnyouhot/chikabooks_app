@@ -10,10 +10,14 @@ class PublisherClinicIdentitySection extends StatefulWidget {
   final ClinicProfile profile;
   final VoidCallback onSaved;
 
+  /// 웹 공고 에디터 3단계(치과 인증) — [JobPostForm] step3와 동일: 라벨 열 + 입력 한 줄
+  final bool inlineFieldLabels;
+
   const PublisherClinicIdentitySection({
     super.key,
     required this.profile,
     required this.onSaved,
+    this.inlineFieldLabels = false,
   });
 
   @override
@@ -153,6 +157,67 @@ class _PublisherClinicIdentitySectionState
     );
   }
 
+  /// 인라인 행용 — 라벨은 [Row] 왼쪽 열에 두고 필드에는 힌트만
+  InputDecoration _decValueOnly(String hint) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: GoogleFonts.notoSansKr(
+        fontSize: 13,
+        fontWeight: FontWeight.w400,
+        color: AppColors.textDisabled,
+      ),
+      contentPadding: const EdgeInsets.symmetric(vertical: 10),
+      isDense: true,
+      border: const UnderlineInputBorder(
+        borderSide: BorderSide(color: AppColors.divider),
+      ),
+      enabledBorder: const UnderlineInputBorder(
+        borderSide: BorderSide(color: AppColors.divider),
+      ),
+      focusedBorder: const UnderlineInputBorder(
+        borderSide: BorderSide(color: AppColors.accent, width: 2),
+      ),
+    );
+  }
+
+  TextStyle get _fieldLabelStyle => GoogleFonts.notoSansKr(
+    fontSize: 13,
+    fontWeight: FontWeight.w600,
+    color: AppColors.textSecondary,
+  );
+
+  Widget _inlineLabeledField({
+    required String label,
+    required String hint,
+    required TextEditingController controller,
+    int maxLines = 1,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: AppPublisher.formInlineLabelWidth,
+          child: Padding(
+            padding: EdgeInsets.only(top: maxLines > 1 ? 10 : 10),
+            child: Text(label, style: _fieldLabelStyle),
+          ),
+        ),
+        Expanded(
+          child: TextFormField(
+            controller: controller,
+            maxLines: maxLines,
+            style: GoogleFonts.notoSansKr(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+            decoration: _decValueOnly(hint),
+          ),
+        ),
+      ],
+    );
+  }
+
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
@@ -172,9 +237,10 @@ class _PublisherClinicIdentitySectionState
   @override
   Widget build(BuildContext context) {
     final bv = widget.profile.businessVerification;
-    final bizNo = bv.bizNo.isNotEmpty
-        ? bv.bizNo
-        : (bv.ocrResult?['bizNo'] as String? ?? '');
+    final bizNo =
+        bv.bizNo.isNotEmpty
+            ? bv.bizNo
+            : (bv.ocrResult?['bizNo'] as String? ?? '');
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -199,67 +265,120 @@ class _PublisherClinicIdentitySectionState
             ),
           ),
           const SizedBox(height: 16),
-          TextFormField(
-            controller: _clinicNameCtrl,
-            style: GoogleFonts.notoSansKr(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
+          if (widget.inlineFieldLabels) ...[
+            _inlineLabeledField(
+              label: '상호(등록증 기준)',
+              hint: '예) 서울○○치과의원',
+              controller: _clinicNameCtrl,
             ),
-            decoration: _dec('상호(등록증 기준)', '예) 서울○○치과의원'),
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: _displayNameCtrl,
-            style: GoogleFonts.notoSansKr(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
+            const SizedBox(height: 12),
+            _inlineLabeledField(
+              label: '구직자에게 보이는 치과명',
+              hint: '비우면 상호와 동일하게 표시됩니다',
+              controller: _displayNameCtrl,
             ),
-            decoration: _dec(
-              '구직자에게 보이는 치과명',
-              '비우면 상호와 동일하게 표시됩니다',
+            const SizedBox(height: 12),
+            _inlineLabeledField(
+              label: '대표자명',
+              hint: '',
+              controller: _ownerNameCtrl,
             ),
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: _ownerNameCtrl,
-            style: GoogleFonts.notoSansKr(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
+            const SizedBox(height: 12),
+            _inlineLabeledField(
+              label: '사업장 주소',
+              hint: '',
+              controller: _addressCtrl,
+              maxLines: 2,
             ),
-            decoration: _dec('대표자명', ''),
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: _addressCtrl,
-            maxLines: 2,
-            style: GoogleFonts.notoSansKr(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: AppPublisher.formInlineLabelWidth,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text('사업자등록번호', style: _fieldLabelStyle),
+                  ),
+                ),
+                Expanded(
+                  child: Text(
+                    bizNo.isEmpty ? '(등록증 업로드 후 표시됩니다)' : bizNo,
+                    style: GoogleFonts.notoSansKr(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color:
+                          bizNo.isEmpty
+                              ? AppColors.textDisabled
+                              : AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            decoration: _dec('사업장 주소', ''),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            '사업자등록번호',
-            style: GoogleFonts.notoSansKr(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textSecondary,
+          ] else ...[
+            TextFormField(
+              controller: _clinicNameCtrl,
+              style: GoogleFonts.notoSansKr(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+              decoration: _dec('상호(등록증 기준)', '예) 서울○○치과의원'),
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            bizNo.isEmpty ? '(등록증 업로드 후 표시됩니다)' : bizNo,
-            style: GoogleFonts.notoSansKr(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: bizNo.isEmpty ? AppColors.textDisabled : AppColors.textPrimary,
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _displayNameCtrl,
+              style: GoogleFonts.notoSansKr(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+              decoration: _dec('구직자에게 보이는 치과명', '비우면 상호와 동일하게 표시됩니다'),
             ),
-          ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _ownerNameCtrl,
+              style: GoogleFonts.notoSansKr(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+              decoration: _dec('대표자명', ''),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _addressCtrl,
+              maxLines: 2,
+              style: GoogleFonts.notoSansKr(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+              decoration: _dec('사업장 주소', ''),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '사업자등록번호',
+              style: GoogleFonts.notoSansKr(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              bizNo.isEmpty ? '(등록증 업로드 후 표시됩니다)' : bizNo,
+              style: GoogleFonts.notoSansKr(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color:
+                    bizNo.isEmpty
+                        ? AppColors.textDisabled
+                        : AppColors.textPrimary,
+              ),
+            ),
+          ],
           const SizedBox(height: 20),
           SizedBox(
             height: AppPublisher.ctaHeight,
@@ -271,25 +390,28 @@ class _PublisherClinicIdentitySectionState
                 foregroundColor: AppColors.white,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppPublisher.buttonRadius),
+                  borderRadius: BorderRadius.circular(
+                    AppPublisher.buttonRadius,
+                  ),
                 ),
               ),
-              child: _saving
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: AppColors.white,
+              child:
+                  _saving
+                      ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.white,
+                        ),
+                      )
+                      : Text(
+                        '이 단계 저장',
+                        style: GoogleFonts.notoSansKr(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                    )
-                  : Text(
-                      '이 단계 저장',
-                      style: GoogleFonts.notoSansKr(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
             ),
           ),
         ],

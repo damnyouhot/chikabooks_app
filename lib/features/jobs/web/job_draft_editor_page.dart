@@ -6,20 +6,28 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_tokens.dart';
-import '../../../models/clinic_profile.dart' show BizVerificationStatus, ClinicProfile;
+import '../../../models/clinic_profile.dart'
+    show BizVerificationStatus, ClinicProfile;
 import '../../../models/job_draft.dart';
 import '../../../services/job_draft_service.dart';
+import '../../../utils/tag_generator.dart';
 import '../../publisher/services/clinic_profile_service.dart';
 import '../../publisher/widgets/biz_license_upload_section.dart';
 import '../../publisher/widgets/publisher_clinic_identity_section.dart';
 import '../ui/job_post_form.dart';
 import '../ui/job_post_preview.dart';
+import '../ui/job_preview_scroll_anchor.dart';
 import '../utils/job_ai_extract_normalize.dart';
+import '../utils/job_draft_sync_debug.dart';
+import '../utils/job_post_field_sync.dart';
 
 /// AI 초안 편집 페이지 (/post-job/edit/:draftId)
 ///
 /// AI가 추출한 초안을 JobPostForm에 채운 상태로 보여주고,
 /// 사용자가 수정 후 게시 단계로 넘어간다.
+///
+/// 에디터 단계(`editorStep`): **1** 치과 사진 · **2** 공고 상세 · **3** 치과 인증
+/// (레거시 저장값은 [_migrateEditorStep]으로 매핑)
 class JobDraftEditorPage extends StatefulWidget {
   final String draftId;
   const JobDraftEditorPage({super.key, required this.draftId});
@@ -29,19 +37,31 @@ class JobDraftEditorPage extends StatefulWidget {
 }
 
 class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
+  /// Step2(공고 상세) [JobPostForm] — AI 병합 후 [applyDraftFromParent]로 SSOT 동기화.
+  final GlobalKey<JobPostFormState> _detailFormKey =
+      GlobalKey<JobPostFormState>();
+
   JobPostData _data = JobPostData();
+
   /// Firestore 반영 후에만 폼 마운트 — 빈 initialData로 TextEditingController 고정 방지
   bool _draftReady = false;
   String? _loadError;
+
   /// [JobPostData.toMap]에 없는 드래프트 메타 — 폼 임시저장 시 항상 병합
   Map<String, dynamic> _extraDraftFields = {};
   DateTime? _draftUpdatedAt;
   ClinicProfile? _selectedProfile;
   bool _isLoadingAi = false;
+
   /// [ClinicProfileService.ensureDefaultProfileForDraft] 완료 후 true
   bool _profileReady = false;
   String _editorStep = 'step1';
   String? _aiError;
+
+  /// 좌측 미리보기 단일 스크롤 — [JobPostPreview]와 동일 인스턴스 유지.
+  final ScrollController _previewScrollController = ScrollController();
+  final Map<JobPreviewScrollAnchor, GlobalKey> _previewSectionKeys =
+      createJobPreviewSectionKeys();
 
   Map<String, dynamic> _persistExtraFromDraft(JobDraft d) {
     final m = <String, dynamic>{};
@@ -90,7 +110,8 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
     if (promoUrls.isEmpty) {
       final extra = _extraDraftFields['promotionalImageUrls'];
       if (extra is List && extra.isNotEmpty) {
-        promoUrls = extra.map((e) => e.toString()).where((s) => _isHttpUrl(s)).toList();
+        promoUrls =
+            extra.map((e) => e.toString()).where((s) => _isHttpUrl(s)).toList();
       }
     }
 
@@ -111,11 +132,12 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
     }
     return _data.copyWith(
       promotionalImageUrls: promoUrls,
-      images: urls.map((u) {
-        final seg = Uri.tryParse(u)?.pathSegments.last;
-        final name = (seg != null && seg.isNotEmpty) ? seg : 'image.jpg';
-        return XFile(u, name: name);
-      }).toList(),
+      images:
+          urls.map((u) {
+            final seg = Uri.tryParse(u)?.pathSegments.last;
+            final name = (seg != null && seg.isNotEmpty) ? seg : 'image.jpg';
+            return XFile(u, name: name);
+          }).toList(),
     );
   }
 
@@ -124,10 +146,45 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
     return t.startsWith('http://') || t.startsWith('https://');
   }
 
+  /// 예전 순서(1:자료 2:치과정보 3:공고상세)로 저장된 [editorStep]을
+  /// 현재 순서(1:사진 2:공고상세 3:인증)로 맞춘다.
+  static String _migrateEditorStep(String? saved) {
+    switch (saved) {
+      case 'step2':
+        return 'step3';
+      case 'step3':
+        return 'step2';
+      default:
+        return saved ?? 'step1';
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _loadDraftAndParse();
+  }
+
+  @override
+  void dispose() {
+    _previewScrollController.dispose();
+    super.dispose();
+  }
+
+  /// Step3 폼 포커스 진입 시 좌측 프리뷰를 해당 섹션으로 스크롤.
+  void _scrollPreviewTo(JobPreviewScrollAnchor anchor) {
+    final key = _previewSectionKeys[anchor]!;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final ctx = key.currentContext;
+      if (ctx == null) return;
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
+        alignment: 0.08,
+      );
+    });
   }
 
   Future<void> _loadDraftAndParse() async {
@@ -176,8 +233,8 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
       final extra = GoRouterState.of(context).extra as Map<String, dynamic>?;
       await _callAiParsing(
         draft: draft,
-        sourceType: extra?['sourceType'] as String? ??
-            draft.sourceType ?? 'text',
+        sourceType:
+            extra?['sourceType'] as String? ?? draft.sourceType ?? 'text',
         rawText: draft.rawInputText ?? '',
       );
     }
@@ -200,10 +257,7 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
     setState(() {
       _selectedProfile = p;
       _profileReady = true;
-      _extraDraftFields = {
-        ..._extraDraftFields,
-        'clinicProfileId': p.id,
-      };
+      _extraDraftFields = {..._extraDraftFields, 'clinicProfileId': p.id};
     });
   }
 
@@ -212,7 +266,7 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
       _draftReady = true;
       _draftUpdatedAt = draft.updatedAt;
       _extraDraftFields = _persistExtraFromDraft(draft);
-      _editorStep = draft.editorStep ?? 'step1';
+      _editorStep = _migrateEditorStep(draft.editorStep);
       _data = JobPostData(
         clinicName: draft.clinicName,
         title: draft.title,
@@ -243,6 +297,7 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
         weekendWork: draft.weekendWork,
         nightShift: draft.nightShift,
         applyMethod: List.from(draft.applyMethod),
+        requiredDocuments: List.from(draft.requiredDocuments),
         isAlwaysHiring: draft.isAlwaysHiring,
         closingDate: draft.closingDate,
         subwayStationName: draft.subwayStationName,
@@ -254,12 +309,14 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
         lat: draft.lat,
         lng: draft.lng,
         tags: List.from(draft.tags),
+        tagsUserEdited: draft.tagsUserEdited,
         mainDutiesRaw: draft.mainDutiesRaw,
         mainDutiesList: List.from(draft.mainDutiesList),
         recruitmentStart: draft.recruitmentStart,
-        fieldStatus: draft.fieldStatus != null
-            ? Map<String, String>.from(draft.fieldStatus!)
-            : null,
+        fieldStatus:
+            draft.fieldStatus != null
+                ? Map<String, String>.from(draft.fieldStatus!)
+                : null,
         fieldSources: draft.fieldSources,
       );
     });
@@ -279,9 +336,7 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
   }) async {
     final callable = FirebaseFunctions.instance.httpsCallable(
       'parseJobImagesToForm',
-      options: HttpsCallableOptions(
-        timeout: const Duration(seconds: 180),
-      ),
+      options: HttpsCallableOptions(timeout: const Duration(seconds: 180)),
     );
     final result = await callable.call({
       'imageUrls': imageUrls,
@@ -306,32 +361,36 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
     );
     final cc = res['chairCount'];
     final sc = res['staffCount'];
-    final chairN = cc is int
-        ? cc
-        : (cc is num
-            ? cc.round()
-            : int.tryParse('$cc'.replaceAll(RegExp(r'[^\d]'), '')));
-    final staffN = sc is int
-        ? sc
-        : (sc is num
-            ? sc.round()
-            : int.tryParse('$sc'.replaceAll(RegExp(r'[^\d]'), '')));
+    final chairN =
+        cc is int
+            ? cc
+            : (cc is num
+                ? cc.round()
+                : int.tryParse('$cc'.replaceAll(RegExp(r'[^\d]'), '')));
+    final staffN =
+        sc is int
+            ? sc
+            : (sc is num
+                ? sc.round()
+                : int.tryParse('$sc'.replaceAll(RegExp(r'[^\d]'), '')));
 
     final mainDutiesListRaw = res['mainDutiesList'];
-    final mainDutiesList = mainDutiesListRaw is List
-        ? mainDutiesListRaw
-            .map((e) => e.toString())
-            .where((s) => s.isNotEmpty)
-            .toList()
-        : <String>[];
+    final mainDutiesList =
+        mainDutiesListRaw is List
+            ? mainDutiesListRaw
+                .map((e) => e.toString())
+                .where((s) => s.isNotEmpty)
+                .toList()
+            : <String>[];
 
     final specialtiesRaw = res['specialties'];
-    final specialties = specialtiesRaw is List
-        ? specialtiesRaw
-            .map((e) => e.toString())
-            .where((s) => s.isNotEmpty)
-            .toList()
-        : <String>[];
+    final specialties =
+        specialtiesRaw is List
+            ? specialtiesRaw
+                .map((e) => e.toString())
+                .where((s) => s.isNotEmpty)
+                .toList()
+            : <String>[];
 
     final hasOralScanner =
         res['hasOralScanner'] is bool ? res['hasOralScanner'] as bool : null;
@@ -363,14 +422,16 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
         recruitmentStartParsed = DateTime.parse(recruitRaw);
       } catch (_) {}
     }
-    final DateTime? recruitmentStart = mergeEmptyOnly
-        ? (_data.recruitmentStart ?? recruitmentStartParsed)
-        : (recruitmentStartParsed ?? _data.recruitmentStart);
+    final DateTime? recruitmentStart =
+        mergeEmptyOnly
+            ? (_data.recruitmentStart ?? recruitmentStartParsed)
+            : (recruitmentStartParsed ?? _data.recruitmentStart);
 
     final fsRaw = res['fieldStatus'];
-    final Map<String, String>? fieldStatusParsed = fsRaw is Map
-        ? fsRaw.map((k, v) => MapEntry(k.toString(), v.toString()))
-        : null;
+    final Map<String, String>? fieldStatusParsed =
+        fsRaw is Map
+            ? fsRaw.map((k, v) => MapEntry(k.toString(), v.toString()))
+            : null;
 
     final Map<String, String>? mergedFieldStatus;
     if (mergeEmptyOnly) {
@@ -388,122 +449,336 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
       mergedFieldStatus = fieldStatusParsed ?? _data.fieldStatus;
     }
 
-    final newBenefits = (res['benefits'] as List?)
+    final newBenefits = JobPostFieldSync.normalizeBenefits(
+      (res['benefits'] as List?)
+              ?.map((e) => e.toString())
+              .where((s) => s.isNotEmpty)
+              .toList() ??
+          <String>[],
+    );
+    final newSubwayLines =
+        (res['subwayLines'] as List?)
             ?.map((e) => e.toString())
             .where((s) => s.isNotEmpty)
             .toList() ??
         <String>[];
-    final newSubwayLines = (res['subwayLines'] as List?)
-            ?.map((e) => e.toString())
-            .where((s) => s.isNotEmpty)
-            .toList() ??
-        <String>[];
+    final newRequiredDocuments = JobPostFieldSync.normalizeDocuments(
+      (res['requiredDocuments'] as List?)
+              ?.map((e) => e.toString())
+              .where((s) => s.isNotEmpty)
+              .toList() ??
+          <String>[],
+    );
 
-    setState(() {
-      final d = _data;
-      _data = d.copyWith(
-        clinicName: mergeEmptyOnly
-            ? _mergeStrPreferExisting(d.clinicName, res['clinicName'])
-            : _firstNonEmpty(res['clinicName'], d.clinicName),
-        title: mergeEmptyOnly
-            ? _mergeStrPreferExisting(d.title, res['title'])
-            : _firstNonEmpty(res['title'], d.title),
-        role: mergeEmptyOnly
-            ? _mergeStrPreferExisting(d.role, res['role'])
-            : _firstNonEmpty(res['role'], d.role),
-        career: mergeEmptyOnly
+    final d = _data;
+    final parsedHireFromAi = JobPostFieldSync.hireRolesFromExtract(res);
+
+    final careerMergedRaw =
+        mergeEmptyOnly
             ? _mergeStrPreferExisting(d.career, res['career'])
-            : _firstNonEmpty(res['career'], d.career),
-        employmentType: mergeEmptyOnly
+            : _firstNonEmpty(res['career'], d.career);
+    final careerOut = JobPostFieldSync.pickCareerForStorage(
+      careerMergedRaw,
+      d.career,
+    );
+
+    final empMergedRaw =
+        mergeEmptyOnly
             ? _mergeStrPreferExisting(d.employmentType, res['employmentType'])
-            : _firstNonEmpty(res['employmentType'], d.employmentType),
-        workHours: mergeEmptyOnly
+            : _firstNonEmpty(res['employmentType'], d.employmentType);
+    final employmentOut = JobPostFieldSync.pickEmploymentType(
+      empMergedRaw,
+      d.employmentType,
+    );
+
+    final List<String> mergedHireRoles;
+    if (mergeEmptyOnly) {
+      if (d.hireRoles.isNotEmpty) {
+        mergedHireRoles = List<String>.from(d.hireRoles);
+      } else if (parsedHireFromAi.isNotEmpty) {
+        mergedHireRoles = parsedHireFromAi;
+      } else {
+        mergedHireRoles = List<String>.from(d.hireRoles);
+      }
+    } else {
+      mergedHireRoles =
+          parsedHireFromAi.isNotEmpty
+              ? parsedHireFromAi
+              : List<String>.from(d.hireRoles);
+    }
+    final mergedRoleLine = JobPostData.joinHireRoles(mergedHireRoles);
+
+    final eduMergedRaw =
+        mergeEmptyOnly
+            ? _mergeStrPreferExisting(d.education, res['education'])
+            : _firstNonEmpty(res['education'], d.education);
+    final educationOut = JobPostFieldSync.pickEducationForStorage(
+      eduMergedRaw,
+      d.education,
+    );
+
+    final salaryMerged = _mergeSalaryAi(d, res, mergeEmptyOnly);
+
+    final titleOut =
+        mergeEmptyOnly
+            ? _mergeStrPreferExisting(d.title, res['title'])
+            : _firstNonEmpty(res['title'], d.title);
+    final clinicNameOut =
+        mergeEmptyOnly
+            ? _mergeStrPreferExisting(d.clinicName, res['clinicName'])
+            : _firstNonEmpty(res['clinicName'], d.clinicName);
+    final workHoursOut =
+        mergeEmptyOnly
             ? _mergeStrPreferExisting(d.workHours, res['workHours'])
-            : _firstNonEmpty(res['workHours'], d.workHours),
-        salary: mergeEmptyOnly
-            ? _mergeStrPreferExisting(d.salary, res['salary'])
-            : _firstNonEmpty(res['salary'], d.salary),
-        benefits: mergeEmptyOnly
+            : _firstNonEmpty(res['workHours'], d.workHours);
+    final benefitsOut =
+        mergeEmptyOnly
             ? (d.benefits.isNotEmpty
                 ? d.benefits
                 : (newBenefits.isNotEmpty ? newBenefits : d.benefits))
-            : (newBenefits.isNotEmpty ? newBenefits : d.benefits),
-        description: mergeEmptyOnly
+            : (newBenefits.isNotEmpty ? newBenefits : d.benefits);
+    final requiredDocumentsOut =
+        mergeEmptyOnly
+            ? (d.requiredDocuments.isNotEmpty
+                ? d.requiredDocuments
+                : (newRequiredDocuments.isNotEmpty
+                    ? newRequiredDocuments
+                    : d.requiredDocuments))
+            : (newRequiredDocuments.isNotEmpty
+                ? newRequiredDocuments
+                : d.requiredDocuments);
+    final descriptionOut =
+        mergeEmptyOnly
             ? _mergeStrPreferExisting(d.description, res['description'])
-            : _firstNonEmpty(res['description'], d.description),
-        address: mergeEmptyOnly
+            : _firstNonEmpty(res['description'], d.description);
+    final addressOut =
+        mergeEmptyOnly
             ? _mergeStrPreferExisting(d.address, res['address'])
-            : _firstNonEmpty(res['address'], d.address),
-        contact: mergeEmptyOnly
+            : _firstNonEmpty(res['address'], d.address);
+    final contactOut =
+        mergeEmptyOnly
             ? _mergeStrPreferExisting(d.contact, res['contact'])
-            : _firstNonEmpty(res['contact'], d.contact),
-        hospitalType: mergeEmptyOnly
+            : _firstNonEmpty(res['contact'], d.contact);
+
+    // applyMethod AI 동기화 + email 자동 감지
+    final newApplyMethodRaw =
+        (res['applyMethod'] as List?)
+            ?.map((e) => e.toString())
+            .where((s) => s.isNotEmpty && s != 'phone')
+            .toList() ??
+        <String>[];
+    final applyMethodOut = List<String>.from(d.applyMethod)..remove('phone');
+    for (final m in newApplyMethodRaw) {
+      if (!applyMethodOut.contains(m)) applyMethodOut.add(m);
+    }
+    if (!applyMethodOut.contains('online')) applyMethodOut.insert(0, 'online');
+    if (contactOut.contains('@') && !applyMethodOut.contains('email')) {
+      applyMethodOut.add('email');
+    }
+
+    final hospitalTypeOut =
+        mergeEmptyOnly
             ? ((d.hospitalType != null && d.hospitalType!.trim().isNotEmpty)
                 ? d.hospitalType
                 : (htKey ?? d.hospitalType))
-            : (htKey ?? d.hospitalType),
-        workDays: mergeEmptyOnly
+            : (htKey ?? d.hospitalType);
+    final workDaysOut =
+        mergeEmptyOnly
             ? (d.workDays.isNotEmpty
                 ? d.workDays
                 : (wd.isNotEmpty ? wd : d.workDays))
-            : (wd.isNotEmpty ? wd : d.workDays),
-        weekendWork: mergeEmptyOnly
-            ? d.weekendWork
-            : (_parseBool(res['weekendWork']) ?? d.weekendWork),
-        nightShift:
-            mergeEmptyOnly ? d.nightShift : (_parseBool(res['nightShift']) ?? d.nightShift),
-        chairCount: mergeEmptyOnly
-            ? (d.chairCount ?? chairN)
-            : (chairN ?? d.chairCount),
-        staffCount: mergeEmptyOnly
-            ? (d.staffCount ?? staffN)
-            : (staffN ?? d.staffCount),
-        subwayStationName: mergeEmptyOnly
+            : (wd.isNotEmpty ? wd : d.workDays);
+    final chairCountOut =
+        mergeEmptyOnly ? (d.chairCount ?? chairN) : (chairN ?? d.chairCount);
+    final staffCountOut =
+        mergeEmptyOnly ? (d.staffCount ?? staffN) : (staffN ?? d.staffCount);
+    final subwayStationNameOut =
+        mergeEmptyOnly
             ? _mergeStrNullablePreferExisting(
-                d.subwayStationName, res['subwayStationName'] as String?)
+              d.subwayStationName,
+              res['subwayStationName'] as String?,
+            )
             : _firstNonEmptyNullable(
-                res['subwayStationName'] as String?, d.subwayStationName),
-        subwayLines: mergeEmptyOnly
-            ? (d.subwayLines.isNotEmpty
-                ? d.subwayLines
-                : (newSubwayLines.isNotEmpty ? newSubwayLines : d.subwayLines))
-            : (newSubwayLines.isNotEmpty ? newSubwayLines : d.subwayLines),
-        mainDutiesList: mergeEmptyOnly
+              res['subwayStationName'] as String?,
+              d.subwayStationName,
+            );
+    final mainDutiesListOut =
+        mergeEmptyOnly
             ? (d.mainDutiesList.isNotEmpty
                 ? d.mainDutiesList
-                : (mainDutiesList.isNotEmpty ? mainDutiesList : d.mainDutiesList))
-            : (mainDutiesList.isNotEmpty ? mainDutiesList : d.mainDutiesList),
-        mainDutiesRaw: mergeEmptyOnly
-            ? (d.mainDutiesList.isNotEmpty
-                ? d.mainDutiesRaw
                 : (mainDutiesList.isNotEmpty
-                    ? res['mainDutiesRaw'] as String?
-                    : d.mainDutiesRaw))
-            : (mainDutiesList.isNotEmpty
-                ? res['mainDutiesRaw'] as String?
-                : d.mainDutiesRaw),
-        specialties: mergeEmptyOnly
+                    ? mainDutiesList
+                    : d.mainDutiesList))
+            : (mainDutiesList.isNotEmpty ? mainDutiesList : d.mainDutiesList);
+    final specialtiesOut =
+        mergeEmptyOnly
             ? (d.specialties.isNotEmpty
                 ? d.specialties
                 : (specialties.isNotEmpty ? specialties : d.specialties))
-            : (specialties.isNotEmpty ? specialties : d.specialties),
-        hasOralScanner: mergeEmptyOnly
+            : (specialties.isNotEmpty ? specialties : d.specialties);
+    final hasOralScannerOut =
+        mergeEmptyOnly
             ? (d.hasOralScanner ?? hasOralScanner)
-            : (hasOralScanner ?? d.hasOralScanner),
-        hasCT: mergeEmptyOnly ? (d.hasCT ?? hasCT) : (hasCT ?? d.hasCT),
-        has3DPrinter: mergeEmptyOnly
+            : (hasOralScanner ?? d.hasOralScanner);
+    final hasCTOut = mergeEmptyOnly ? (d.hasCT ?? hasCT) : (hasCT ?? d.hasCT);
+    final has3DPrinterOut =
+        mergeEmptyOnly
             ? (d.has3DPrinter ?? has3DPrinter)
-            : (has3DPrinter ?? d.has3DPrinter),
-        digitalEquipmentRaw: mergeEmptyOnly
+            : (has3DPrinter ?? d.has3DPrinter);
+    final digitalEquipmentRawOut =
+        mergeEmptyOnly
             ? (d.digitalEquipmentRaw?.trim().isNotEmpty == true
                 ? d.digitalEquipmentRaw
                 : (digitalEquipmentRaw ?? d.digitalEquipmentRaw))
-            : (digitalEquipmentRaw ?? d.digitalEquipmentRaw),
+            : (digitalEquipmentRaw ?? d.digitalEquipmentRaw);
+
+    final fieldStatusMerged = JobPostFieldSync.patchFieldStatusForFilledValues(
+      mergedFieldStatus,
+      {
+        'title': titleOut.trim().isNotEmpty,
+        'clinicName': clinicNameOut.trim().isNotEmpty,
+        'career': careerOut.trim().isNotEmpty,
+        'education': educationOut.trim().isNotEmpty,
+        'employmentType': employmentOut.trim().isNotEmpty,
+        'role': mergedRoleLine.trim().isNotEmpty,
+        'mainDuties': mainDutiesListOut.isNotEmpty,
+        'salary': salaryMerged.salaryLine.trim().isNotEmpty,
+        'workHours': workHoursOut.trim().isNotEmpty,
+        'workDays': workDaysOut.isNotEmpty,
+        'benefits': benefitsOut.isNotEmpty,
+        'description': descriptionOut.trim().isNotEmpty,
+        'address': addressOut.trim().isNotEmpty,
+        'contact': contactOut.trim().isNotEmpty,
+        'subwayStationName': (subwayStationNameOut ?? '').trim().isNotEmpty,
+        'applyMethod': applyMethodOut.isNotEmpty,
+        'hospitalType': (hospitalTypeOut ?? '').trim().isNotEmpty,
+        'chairCount': chairCountOut != null,
+        'staffCount': staffCountOut != null,
+        'specialties': specialtiesOut.isNotEmpty,
+        'hasOralScanner': hasOralScannerOut != null,
+        'hasCT': hasCTOut != null,
+        'has3DPrinter': has3DPrinterOut != null,
+        'digitalEquipmentRaw': (digitalEquipmentRawOut ?? '').trim().isNotEmpty,
+        'requiredDocuments': requiredDocumentsOut.isNotEmpty,
+        'closingDate': d.isAlwaysHiring || closingDate != null,
+      },
+    );
+
+    setState(() {
+      _data = d.copyWith(
+        tagsUserEdited: d.tagsUserEdited,
+        clinicName: clinicNameOut,
+        title: titleOut,
+        hireRoles: mergedHireRoles,
+        role: mergedRoleLine,
+        career: careerOut,
+        education: educationOut,
+        employmentType: employmentOut,
+        workHours: workHoursOut,
+        salary: salaryMerged.salaryLine,
+        salaryPayType: salaryMerged.payType,
+        salaryAmount: salaryMerged.amount,
+        benefits: benefitsOut,
+        description: descriptionOut,
+        address: addressOut,
+        contact: contactOut,
+        hospitalType: hospitalTypeOut,
+        workDays: workDaysOut,
+        weekendWork:
+            mergeEmptyOnly
+                ? d.weekendWork
+                : (_parseBool(res['weekendWork']) ?? d.weekendWork),
+        nightShift:
+            mergeEmptyOnly
+                ? d.nightShift
+                : (_parseBool(res['nightShift']) ?? d.nightShift),
+        chairCount: chairCountOut,
+        staffCount: staffCountOut,
+        subwayStationName: subwayStationNameOut,
+        subwayLines:
+            mergeEmptyOnly
+                ? (d.subwayLines.isNotEmpty
+                    ? d.subwayLines
+                    : (newSubwayLines.isNotEmpty
+                        ? newSubwayLines
+                        : d.subwayLines))
+                : (newSubwayLines.isNotEmpty ? newSubwayLines : d.subwayLines),
+        mainDutiesList: mainDutiesListOut,
+        mainDutiesRaw:
+            mergeEmptyOnly
+                ? (mainDutiesListOut.isNotEmpty
+                    ? d.mainDutiesRaw
+                    : (mainDutiesList.isNotEmpty
+                        ? res['mainDutiesRaw'] as String?
+                        : d.mainDutiesRaw))
+                : (mainDutiesListOut.isNotEmpty
+                    ? res['mainDutiesRaw'] as String?
+                    : d.mainDutiesRaw),
+        specialties: specialtiesOut,
+        hasOralScanner: hasOralScannerOut,
+        hasCT: hasCTOut,
+        has3DPrinter: has3DPrinterOut,
+        digitalEquipmentRaw: digitalEquipmentRawOut,
+        requiredDocuments: requiredDocumentsOut,
+        applyMethod: applyMethodOut,
         closingDate: closingDate,
         recruitmentStart: recruitmentStart,
-        fieldStatus: mergedFieldStatus,
+        fieldStatus: fieldStatusMerged,
       );
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      JobDraftSyncDebug.logPipeline('parent_after_ai_merge', _data);
+      if (_editorStep == 'step2') {
+        _detailFormKey.currentState?.applyDraftFromParent(_data);
+      }
+    });
+  }
+
+  /// 급여 한 줄 + `salaryPayType` / `salaryAmount` (폼·저장과 동일 규칙).
+  ({String salaryLine, String payType, String amount}) _mergeSalaryAi(
+    JobPostData d,
+    Map<String, dynamic> res,
+    bool mergeEmptyOnly,
+  ) {
+    const validPay = {'협의', '시', '월', '연'};
+    final mergedOne =
+        mergeEmptyOnly
+            ? _mergeStrPreferExisting(d.salary, res['salary'])
+            : _firstNonEmpty(res['salary'], d.salary);
+    final rpt = (res['salaryPayType'] as String?)?.trim() ?? '';
+    final ram =
+        (res['salaryAmount'] as String?)?.trim().replaceAll(',', '') ?? '';
+
+    if (mergeEmptyOnly && d.salary.trim().isNotEmpty) {
+      return (
+        salaryLine: d.salary,
+        payType: d.salaryPayType,
+        amount: d.salaryAmount,
+      );
+    }
+
+    if (validPay.contains(rpt)) {
+      var line = JobPostData.composeSalaryLine(rpt, ram);
+      if (line.isEmpty && mergedOne.trim().isNotEmpty) {
+        final inf = JobPostData.inferSalaryPartsFromLegacy(mergedOne);
+        line = JobPostData.composeSalaryLine(inf.$1, inf.$2);
+        if (line.isEmpty) line = mergedOne.trim();
+        return (salaryLine: line, payType: inf.$1, amount: inf.$2);
+      }
+      return (
+        salaryLine: line.isNotEmpty ? line : mergedOne.trim(),
+        payType: rpt,
+        amount: ram,
+      );
+    }
+
+    final inf = JobPostData.inferSalaryPartsFromLegacy(mergedOne);
+    var line = JobPostData.composeSalaryLine(inf.$1, inf.$2);
+    if (line.isEmpty && mergedOne.trim().isNotEmpty) {
+      line = mergedOne.trim();
+    }
+    return (salaryLine: line, payType: inf.$1, amount: inf.$2);
   }
 
   String _mergeStrPreferExisting(String current, dynamic resVal) {
@@ -535,9 +810,8 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
       final promo = draft.promotionalImageUrls;
 
       /// 우선순위: 캡처(raw) → 치과 자료(clinic) → 홍보(promo)
-      final List<String> pass1ImageUrls = raw.isNotEmpty
-          ? raw
-          : (clinic.isNotEmpty ? clinic : promo);
+      final List<String> pass1ImageUrls =
+          raw.isNotEmpty ? raw : (clinic.isNotEmpty ? clinic : promo);
 
       final bool runPromoSecondPass =
           promo.isNotEmpty && !_urlListsSameSet(pass1ImageUrls, promo);
@@ -564,6 +838,23 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
         }
       }
 
+      if (mounted && !_data.tagsUserEdited) {
+        setState(() {
+          _data = _data.copyWith(
+            tags: TagGenerator.generate(
+              benefits: _data.benefits,
+              workDays: _data.workDays,
+              weekendWork: _data.weekendWork,
+              nightShift: _data.nightShift,
+              career: _data.career,
+              applyMethod: _data.applyMethod,
+              subwayStationName: _data.subwayStationName,
+              walkingMinutes: _data.walkingMinutes,
+            ),
+          );
+        });
+      }
+
       await JobDraftService.saveDraft(
         draftId: widget.draftId,
         formData: {
@@ -585,17 +876,11 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
     } catch (e) {
       await JobDraftService.saveDraft(
         draftId: widget.draftId,
-        formData: {
-          ..._extraDraftFields,
-          'aiParseStatus': 'failed',
-        },
+        formData: {..._extraDraftFields, 'aiParseStatus': 'failed'},
       );
       if (mounted) {
         setState(() {
-          _extraDraftFields = {
-            ..._extraDraftFields,
-            'aiParseStatus': 'failed',
-          };
+          _extraDraftFields = {..._extraDraftFields, 'aiParseStatus': 'failed'};
         });
       }
       if (mounted) {
@@ -605,7 +890,8 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
           msg = 'AI 분석 시간이 초과했어요. 텍스트가 너무 길면 줄여서 다시 시도해 주세요.';
         } else if (errStr.contains('not-found') || errStr.contains('image')) {
           msg = '이미지를 불러올 수 없어요. 다른 이미지로 다시 시도해 주세요.';
-        } else if (errStr.contains('network') || errStr.contains('unavailable')) {
+        } else if (errStr.contains('network') ||
+            errStr.contains('unavailable')) {
           msg = '네트워크 오류가 발생했어요. 인터넷 연결을 확인해 주세요.';
         }
         setState(() => _aiError = msg);
@@ -629,8 +915,16 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
     if (v is bool) return v;
     if (v is String) {
       final lower = v.toLowerCase().trim();
-      if (lower.contains('있') || lower.contains('예') || lower == 'true' || lower == 'yes') return true;
-      if (lower.contains('없') || lower.contains('아니') || lower == 'false' || lower == 'no') return false;
+      if (lower.contains('있') ||
+          lower.contains('예') ||
+          lower == 'true' ||
+          lower == 'yes')
+        return true;
+      if (lower.contains('없') ||
+          lower.contains('아니') ||
+          lower == 'false' ||
+          lower == 'no')
+        return false;
     }
     return null;
   }
@@ -638,43 +932,36 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
   void _onDataChanged(JobPostData d) {
     setState(() {
       _data = d;
-      final httpUrls = d.images
-          .map((x) => x.path.trim())
-          .where((p) => p.startsWith('http://') || p.startsWith('https://'))
-          .toList();
+      final httpUrls =
+          d.images
+              .map((x) => x.path.trim())
+              .where((p) => p.startsWith('http://') || p.startsWith('https://'))
+              .toList();
       // 자료 첨부(치과) 갤러리 → imageUrls만. rawImageUrls(캡처 AI)와 혼동하지 않음.
       _extraDraftFields = {
         ..._extraDraftFields,
         'imageUrls': httpUrls,
+        'promotionalImageUrls': d.promotionalImageUrls,
       };
     });
+    JobDraftSyncDebug.logPipeline('onDataChanged', d);
   }
 
   Future<void> _setEditorStep(String step) async {
     setState(() => _editorStep = step);
     await JobDraftService.saveDraft(
       draftId: widget.draftId,
-      formData: {
-        ..._extraDraftFields,
-        'editorStep': step,
-      },
+      formData: {..._extraDraftFields, 'editorStep': step},
     );
     if (mounted) {
       setState(() {
-        _extraDraftFields = {
-          ..._extraDraftFields,
-          'editorStep': step,
-        };
+        _extraDraftFields = {..._extraDraftFields, 'editorStep': step};
       });
     }
   }
 
   Future<void> _goNextStep() async {
     if (_editorStep == 'step1') {
-      await _setEditorStep('step2');
-      return;
-    }
-    if (_editorStep == 'step2') {
       final pid = _selectedProfile?.id;
       if (pid != null) {
         final p = await ClinicProfileService.getProfile(pid);
@@ -682,15 +969,17 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
           setState(() {
             _selectedProfile = p;
             _data = _data.copyWith(
-              clinicName: _data.clinicName.isEmpty
-                  ? p.effectiveName
-                  : _data.clinicName,
-              address:
-                  _data.address.isEmpty ? p.address : _data.address,
+              clinicName:
+                  _data.clinicName.isEmpty ? p.effectiveName : _data.clinicName,
+              address: _data.address.isEmpty ? p.address : _data.address,
             );
           });
         }
       }
+      await _setEditorStep('step2');
+      return;
+    }
+    if (_editorStep == 'step2') {
       await _setEditorStep('step3');
     }
   }
@@ -729,7 +1018,8 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
         ..._extraDraftFields,
         if (latest != null && latest.rawImageUrls.isNotEmpty)
           'rawImageUrls': latest.rawImageUrls,
-        if (latest != null && latest.imageUrls.isNotEmpty) 'imageUrls': latest.imageUrls,
+        if (latest != null && latest.imageUrls.isNotEmpty)
+          'imageUrls': latest.imageUrls,
         'currentStep': 'review',
       },
     );
@@ -741,10 +1031,7 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
     return Scaffold(
       backgroundColor: AppColors.webPublisherPageBg,
       body: Column(
-        children: [
-          _buildTopBar(),
-          Expanded(child: _buildBodyAfterLoad()),
-        ],
+        children: [_buildTopBar(), Expanded(child: _buildBodyAfterLoad())],
       ),
     );
   }
@@ -758,7 +1045,10 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
             const SizedBox(
               width: 40,
               height: 40,
-              child: CircularProgressIndicator(strokeWidth: 3, color: AppColors.accent),
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                color: AppColors.accent,
+              ),
             ),
             const SizedBox(height: 16),
             Text(
@@ -780,7 +1070,11 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.error_outline, size: 48, color: AppColors.error.withValues(alpha: 0.85)),
+              Icon(
+                Icons.error_outline,
+                size: 48,
+                color: AppColors.error.withValues(alpha: 0.85),
+              ),
               const SizedBox(height: 16),
               Text(
                 _loadError!,
@@ -794,8 +1088,11 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
               ),
               const SizedBox(height: 20),
               TextButton(
-                onPressed: () =>
-                    context.canPop() ? context.pop() : context.go('/post-job/input'),
+                onPressed:
+                    () =>
+                        context.canPop()
+                            ? context.pop()
+                            : context.go('/post-job/input'),
                 child: Text(
                   '돌아가기',
                   style: GoogleFonts.notoSansKr(
@@ -818,7 +1115,10 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
             const SizedBox(
               width: 40,
               height: 40,
-              child: CircularProgressIndicator(strokeWidth: 3, color: AppColors.accent),
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                color: AppColors.accent,
+              ),
             ),
             const SizedBox(height: 16),
             Text(
@@ -850,8 +1150,11 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
       child: Row(
         children: [
           IconButton(
-            onPressed: () =>
-                context.canPop() ? context.pop() : context.go('/post-job/input'),
+            onPressed:
+                () =>
+                    context.canPop()
+                        ? context.pop()
+                        : context.go('/post-job/input'),
             icon: const Icon(Icons.arrow_back, size: 20),
             tooltip: '뒤로',
             style: IconButton.styleFrom(
@@ -878,7 +1181,9 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
               decoration: BoxDecoration(
                 color: AppColors.accent.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(AppPublisher.softRadius),
-                border: Border.all(color: AppColors.accent.withValues(alpha: 0.2)),
+                border: Border.all(
+                  color: AppColors.accent.withValues(alpha: 0.2),
+                ),
               ),
               child: Text(
                 _selectedProfile!.effectiveName,
@@ -900,12 +1205,17 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
                 foregroundColor: AppColors.white,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppPublisher.buttonRadius),
+                  borderRadius: BorderRadius.circular(
+                    AppPublisher.buttonRadius,
+                  ),
                 ),
               ),
               child: Text(
                 '게시 단계로',
-                style: GoogleFonts.notoSansKr(fontSize: 14, fontWeight: FontWeight.w700),
+                style: GoogleFonts.notoSansKr(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ),
@@ -915,26 +1225,43 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
   }
 
   Widget _buildWideLayout() {
-    return Row(
-      children: [
-        Expanded(
-          flex: 4,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 390),
-                child: JobPostPreview(data: _dataForPreview()),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxPreviewH = (constraints.maxHeight - 48).clamp(280.0, 844.0);
+        return Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1320),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 46,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(0, 24, 16, 24),
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 390),
+                          child: JobPostPreview(
+                            data: _dataForPreview(),
+                            maxHeight: maxPreviewH,
+                            scrollController: _previewScrollController,
+                            sectionKeys: _previewSectionKeys,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Container(width: 1, color: AppColors.divider),
+                  Expanded(flex: 54, child: _buildFormSection()),
+                ],
               ),
             ),
           ),
-        ),
-        Container(width: 1, color: AppColors.divider),
-        Expanded(
-          flex: 6,
-          child: _buildFormSection(),
-        ),
-      ],
+        );
+      },
     );
   }
 
@@ -976,8 +1303,11 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.warning_amber_rounded,
-                              size: 18, color: AppColors.error),
+                          const Icon(
+                            Icons.warning_amber_rounded,
+                            size: 18,
+                            color: AppColors.error,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
@@ -997,21 +1327,10 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
                   const SizedBox(height: 12),
                   _buildStepIndicator(),
                   const SizedBox(height: 20),
-                  if (_editorStep == 'step1') _buildStep1Body(profile),
+                  if (_editorStep == 'step1') _buildStep1Body(),
                   if (_editorStep == 'step2')
-                    PublisherClinicIdentitySection(
-                      profile: profile,
-                      onSaved: () async {
-                        final u =
-                            await ClinicProfileService.getProfile(profile.id);
-                        if (u != null && mounted) {
-                          setState(() => _selectedProfile = u);
-                        }
-                      },
-                    ),
-                  if (_editorStep == 'step3')
                     JobPostForm(
-                      key: ValueKey('editor_s3_${widget.draftId}'),
+                      key: _detailFormKey,
                       initialData: _data,
                       draftId: widget.draftId,
                       publisherWebStyle: true,
@@ -1021,7 +1340,9 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
                       onDataChanged: _onDataChanged,
                       onDraftIdChanged: (_) {},
                       onSubmit: (_) async => _goToPublish(),
+                      onWebEditorPreviewScrollTo: _scrollPreviewTo,
                     ),
+                  if (_editorStep == 'step3') _buildStep3Body(profile),
                   const SizedBox(height: 28),
                   _buildStepNav(),
                 ],
@@ -1053,9 +1374,7 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: AppColors.accent.withValues(alpha: 0.06),
-        border: Border(
-          left: BorderSide(color: AppColors.accent, width: 3),
-        ),
+        border: Border(left: BorderSide(color: AppColors.accent, width: 3)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1079,10 +1398,11 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
   }
 
   Widget _buildStepIndicator() {
-    const labels = ['자료 첨부', '치과 정보', '공고 상세'];
-    final idx = _editorStep == 'step1'
-        ? 0
-        : _editorStep == 'step2'
+    const labels = ['치과 사진 첨부', '공고 상세', '치과 인증'];
+    final idx =
+        _editorStep == 'step1'
+            ? 0
+            : _editorStep == 'step2'
             ? 1
             : 2;
     return Wrap(
@@ -1091,16 +1411,22 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
       runSpacing: 8,
       children: List.generate(3, (i) {
         final active = i == idx;
-        final stepId = i == 0 ? 'step1' : i == 1 ? 'step2' : 'step3';
+        final stepId =
+            i == 0
+                ? 'step1'
+                : i == 1
+                ? 'step2'
+                : 'step3';
         return InkWell(
           onTap: () => _setEditorStep(stepId),
           borderRadius: BorderRadius.circular(20),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
-              color: active
-                  ? AppColors.accent.withValues(alpha: 0.12)
-                  : AppColors.white,
+              color:
+                  active
+                      ? AppColors.accent.withValues(alpha: 0.12)
+                      : AppColors.white,
               border: Border.all(
                 color: active ? AppColors.accent : AppColors.divider,
               ),
@@ -1120,9 +1446,8 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
     );
   }
 
-  Widget _buildStep1Body(ClinicProfile profile) {
-    final wide = MediaQuery.sizeOf(context).width >= 800;
-    final form = JobPostForm(
+  Widget _buildStep1Body() {
+    return JobPostForm(
       key: ValueKey('editor_s1_${widget.draftId}'),
       initialData: _data,
       draftId: widget.draftId,
@@ -1134,23 +1459,25 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
       onDraftIdChanged: (_) {},
       onSubmit: (_) async => _goToPublish(),
     );
-    final license = _buildLicenseSide(profile);
-    if (wide) {
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(child: form),
-          const SizedBox(width: 20),
-          Expanded(child: license),
-        ],
-      );
-    }
+  }
+
+  /// 3단계: 사업자 인증 카드 + 치과 프로필(OCR) 확인
+  Widget _buildStep3Body(ClinicProfile profile) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        form,
-        const SizedBox(height: 20),
-        license,
+        _buildLicenseSide(profile),
+        SizedBox(height: AppPublisher.formSectionSpacing),
+        PublisherClinicIdentitySection(
+          profile: profile,
+          inlineFieldLabels: true,
+          onSaved: () async {
+            final u = await ClinicProfileService.getProfile(profile.id);
+            if (u != null && mounted) {
+              setState(() => _selectedProfile = u);
+            }
+          },
+        ),
       ],
     );
   }
@@ -1161,16 +1488,18 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: AppColors.accent.withValues(alpha: 0.05),
-          border: Border(
-            left: BorderSide(color: AppColors.accent, width: 3),
-          ),
+          border: Border(left: BorderSide(color: AppColors.accent, width: 3)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(Icons.verified_outlined, color: AppColors.accent, size: 20),
+                Icon(
+                  Icons.verified_outlined,
+                  color: AppColors.accent,
+                  size: 20,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   '사업자 인증 완료',
@@ -1197,6 +1526,7 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
     }
     return BizLicenseUploadSection(
       profileId: profile.id,
+      publisherStyleOcrLabelWidth: true,
       onCompleted: () async {
         final updated = await ClinicProfileService.getProfile(profile.id);
         if (updated != null && mounted) {
@@ -1238,7 +1568,9 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
                 foregroundColor: AppColors.white,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppPublisher.buttonRadius),
+                  borderRadius: BorderRadius.circular(
+                    AppPublisher.buttonRadius,
+                  ),
                 ),
               ),
               child: Text(
@@ -1266,19 +1598,47 @@ class _AiLoadingView extends StatefulWidget {
 
 class _AiLoadingViewState extends State<_AiLoadingView> {
   static const _stages = [
-    (sec: 0,  icon: Icons.cloud_upload_outlined,         msg: '이미지를 업로드하는 중이에요...'),
-    (sec: 6,  icon: Icons.image_search_outlined,          msg: 'AI가 공고 이미지를 분석하고 있어요...'),
-    (sec: 18, icon: Icons.manage_search_outlined,         msg: '치과 정보와 근무 조건을 추출하는 중이에요...'),
-    (sec: 45, icon: Icons.playlist_add_check_outlined,    msg: '담당 업무와 복리후생을 정리하는 중이에요...'),
-    (sec: 95, icon: Icons.check_circle_outline_rounded,   msg: '거의 다 됐어요! 조금만 기다려주세요...'),
+    (sec: 0, icon: Icons.cloud_upload_outlined, msg: '이미지를 업로드하는\n중이에요...'),
+    (
+      sec: 6,
+      icon: Icons.image_search_outlined,
+      msg: 'AI가 공고 이미지를\n분석하고 있어요...',
+    ),
+    (
+      sec: 18,
+      icon: Icons.manage_search_outlined,
+      msg: '치과 정보와 근무 조건을\n추출하는 중이에요...',
+    ),
+    (
+      sec: 45,
+      icon: Icons.playlist_add_check_outlined,
+      msg: '담당 업무와 복리후생을\n정리하는 중이에요...',
+    ),
+    (
+      sec: 95,
+      icon: Icons.check_circle_outline_rounded,
+      msg: '거의 다 됐어요!\n조금만 기다려주세요...',
+    ),
   ];
+
+  /// 게이지 아래 로테이션 (사업자 인증·다음 단계 등)
+  static const _tipLines = <String>[
+    '이미지가 많을수록\n시간이 걸릴 수 있어요',
+    '게시 전 사업자등록증을 첨부하고\n사업자 인증을 완료해야 해요.',
+    '추출이 끝나면 병원명·연락처를\n꼭 한 번 더 확인해 주세요.',
+  ];
+
+  /// 단계 제목 아래 안내 — 기본 12pt 대비 1.5배·볼드
+  static const _tipFontSize = 12.0 * 1.5;
 
   /// 진행 바 최대 예상 시간 (초) — Callable/함수 상한(180초)에 맞춤, 실제 완료 전 95%까지만 채움
   static const _maxSec = 170.0;
 
   late final DateTime _startTime;
   Timer? _ticker;
+  Timer? _tipTicker;
   int _elapsed = 0;
+  int _tipIndex = 0;
 
   @override
   void initState() {
@@ -1290,11 +1650,18 @@ class _AiLoadingViewState extends State<_AiLoadingView> {
         _elapsed = DateTime.now().difference(_startTime).inSeconds;
       });
     });
+    _tipTicker = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (!mounted) return;
+      setState(() {
+        _tipIndex = (_tipIndex + 1) % _tipLines.length;
+      });
+    });
   }
 
   @override
   void dispose() {
     _ticker?.cancel();
+    _tipTicker?.cancel();
     super.dispose();
   }
 
@@ -1318,67 +1685,97 @@ class _AiLoadingViewState extends State<_AiLoadingView> {
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 60),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 400),
-              child: Icon(
-                stage.icon,
-                key: ValueKey(_stageIndex),
-                size: 48,
-                color: AppColors.accent,
-              ),
-            ),
-            const SizedBox(height: 24),
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              child: Text(
-                stage.msg,
-                key: ValueKey(_stageIndex),
-                textAlign: TextAlign.center,
-                style: GoogleFonts.notoSansKr(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                  height: 1.45,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final maxW = constraints.maxWidth;
+            final barW = maxW * 2 / 3;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 400),
+                  child: Icon(
+                    stage.icon,
+                    key: ValueKey(_stageIndex),
+                    size: 48,
+                    color: AppColors.accent,
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '이미지가 많을수록 시간이 걸릴 수 있어요',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.notoSansKr(
-                fontSize: 12,
-                color: AppColors.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 28),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: TweenAnimationBuilder<double>(
-                tween: Tween(begin: 0, end: _progress),
-                duration: const Duration(milliseconds: 800),
-                curve: Curves.easeOut,
-                builder: (_, value, __) => LinearProgressIndicator(
-                  value: value,
-                  minHeight: 6,
-                  backgroundColor: AppColors.divider,
-                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.accent),
+                const SizedBox(height: 24),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  child: Text(
+                    stage.msg,
+                    key: ValueKey(_stageIndex),
+                    textAlign: TextAlign.center,
+                    maxLines: 3,
+                    style: GoogleFonts.notoSansKr(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                      height: 1.45,
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              '${(_progress * 100).toInt()}%',
-              style: GoogleFonts.notoSansKr(
-                fontSize: 11,
-                color: AppColors.textDisabled,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
+                const SizedBox(height: 28),
+                SizedBox(
+                  width: barW,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(
+                      AppPublisher.softRadius,
+                    ),
+                    child: TweenAnimationBuilder<double>(
+                      tween: Tween(begin: 0, end: _progress),
+                      duration: const Duration(milliseconds: 800),
+                      curve: Curves.easeOut,
+                      builder:
+                          (_, value, __) => LinearProgressIndicator(
+                            value: value,
+                            minHeight: 6,
+                            backgroundColor: AppColors.divider,
+                            valueColor: const AlwaysStoppedAnimation<Color>(
+                              AppColors.accent,
+                            ),
+                          ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: barW,
+                  child: Text(
+                    '${(_progress * 100).toInt()}%',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.notoSansKr(
+                      fontSize: 11,
+                      color: AppColors.textDisabled,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: maxW,
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 350),
+                    child: Text(
+                      _tipLines[_tipIndex],
+                      key: ValueKey<int>(_tipIndex),
+                      textAlign: TextAlign.center,
+                      maxLines: 4,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.notoSansKr(
+                        fontSize: _tipFontSize,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textSecondary,
+                        height: 1.45,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

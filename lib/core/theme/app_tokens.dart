@@ -9,15 +9,20 @@ class AppRadius {
   AppRadius._();
 
   /// 아주 작은 radius (선택지 뱃지 등)
-  static const double xs   = 6.0;
+  static const double xs = 6.0;
+
   /// 작은 radius (버튼 내부 요소, 소형 뱃지)
-  static const double sm   = 8.0;
+  static const double sm = 8.0;
+
   /// 기본 radius (버튼, 선택지 옵션, 탭바 인디케이터)
-  static const double md   = 10.0;
+  static const double md = 10.0;
+
   /// 카드 radius (대부분의 리스트 타일 카드)
-  static const double lg   = 14.0;
+  static const double lg = 14.0;
+
   /// 큰 카드 radius (퀴즈 카드, 성적 카드 등 섹션 카드)
-  static const double xl   = 16.0;
+  static const double xl = 16.0;
+
   /// 원형 (뱃지, pill 버튼)
   static const double full = 999.0;
 }
@@ -33,15 +38,20 @@ class AppSpacing {
   AppSpacing._();
 
   /// 4px — 아이콘-텍스트 간격, 최소 여백
-  static const double xs  = 4.0;
+  static const double xs = 4.0;
+
   /// 8px — 카드 내 항목 간격
-  static const double sm  = 8.0;
+  static const double sm = 8.0;
+
   /// 12px — 카드 내 섹션 간격, 리스트 아이템 간격
-  static const double md  = 12.0;
+  static const double md = 12.0;
+
   /// 16px — 카드 기본 패딩, 리스트 패딩
-  static const double lg  = 16.0;
+  static const double lg = 16.0;
+
   /// 20px — 페이지 좌우 패딩
-  static const double xl  = 20.0;
+  static const double xl = 20.0;
+
   /// 24px — 섹션 간격
   static const double xxl = 24.0;
 }
@@ -78,10 +88,12 @@ class AppPublisher {
   /// 병원 정보 등 나란히 두 필드 사이
   static const double formFieldRowGap = 20.0;
 
+  /// 웹 편집기 step3: 라벨 열 고정 폭 (한 줄 라벨 + 입력)
+  static const double formInlineLabelWidth = 108.0;
+
   /// 이미지 행·보조 버튼 줄 사이 가로 간격
   static const double formButtonRowGap = 14.0;
 
   /// 웹 공고 자료 입력(`/post-job/input`) 흰 패널·임시저장 카드 모서리 — [AppRadius.md]와 동일 스케일
   static const double inputPanelRadius = 10.0;
 }
-

@@ -56,9 +56,7 @@ class _WebLoginPageState extends State<WebLoginPage> {
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return _buildSessionGateScaffold(
-            message: '세션 확인 중…',
-          );
+          return _buildSessionGateScaffold(message: '세션 확인 중…');
         }
 
         final user = snapshot.data;
@@ -70,102 +68,121 @@ class _WebLoginPageState extends State<WebLoginPage> {
               context.go(_postAuthDestination());
             });
           }
-          return _buildSessionGateScaffold(
-            message: '이미 로그인되어 있습니다. 이동 중…',
-          );
+          return _buildSessionGateScaffold(message: '이미 로그인되어 있습니다. 이동 중…');
         }
 
         return Scaffold(
           backgroundColor: AppColors.white,
+          // shrinkWrap + Center: 세로 중앙. SizedBox(width: ∞) 로 Column 이 maxWidth 까지
+          // 채워지게 해 Row 의 Expanded 가 동일 폭을 갖도록 함(안 하면 intrinsic 폭으로 줄어듦).
           body: Center(
-            child: SingleChildScrollView(
+            child: Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.xxl,
                 vertical: AppSpacing.xxl,
               ),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 960),
-                child: Column(
+                child: ListView(
+                  shrinkWrap: true,
+                  physics: const AlwaysScrollableScrollPhysics(),
                   children: [
-                    _buildLogo(),
-                    const SizedBox(height: AppSpacing.xxl),
+                    SizedBox(
+                      width: double.infinity,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Center(child: _buildLogo()),
+                          const SizedBox(height: AppSpacing.xxl),
 
-                    // ── 좌(지원자) / 우(치과) ────────────────
-                    LayoutBuilder(
-                      builder: (context, constraints) {
-                        if (constraints.maxWidth < 620) {
-                          return Column(
-                            children: [
-                              _ApplicantLoginCard(nextRoute: widget.nextRoute),
-                              Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 20),
-                                child: Center(
-                                  child: Container(
-                                    width: 96,
-                                    height: 1,
-                                    decoration: BoxDecoration(
-                                      color: AppColors.divider,
-                                      borderRadius:
-                                          BorderRadius.circular(0.5),
+                          // ── 좌(지원자) / 우(치과) ────────────────
+                          LayoutBuilder(
+                            builder: (context, constraints) {
+                              if (constraints.maxWidth < 620) {
+                                return Column(
+                                  children: [
+                                    _ApplicantLoginCard(
+                                      nextRoute: widget.nextRoute,
+                                    ),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 20,
+                                      ),
+                                      child: Center(
+                                        child: Container(
+                                          width: 96,
+                                          height: 1,
+                                          decoration: BoxDecoration(
+                                            color: AppColors.divider,
+                                            borderRadius: BorderRadius.circular(
+                                              0.5,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    _ClinicLoginCard(
+                                      nextRoute: widget.nextRoute,
+                                    ),
+                                  ],
+                                );
+                              }
+                              return Row(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Expanded(
+                                    child: _ApplicantLoginCard(
+                                      nextRoute: widget.nextRoute,
                                     ),
                                   ),
-                                ),
-                              ),
-                              _ClinicLoginCard(nextRoute: widget.nextRoute),
-                            ],
-                          );
-                        }
-                        return Row(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Expanded(
-                              child: _ApplicantLoginCard(
-                                nextRoute: widget.nextRoute,
-                              ),
-                            ),
-                            SizedBox(
-                              width: 48,
-                              child: Center(
-                                child: Container(
-                                  width: 1,
-                                  height: 108,
-                                  decoration: BoxDecoration(
-                                    color: AppColors.divider,
-                                    borderRadius: BorderRadius.circular(0.5),
+                                  SizedBox(
+                                    width: 48,
+                                    child: Center(
+                                      child: Container(
+                                        width: 1,
+                                        height: 108,
+                                        decoration: BoxDecoration(
+                                          color: AppColors.divider,
+                                          borderRadius: BorderRadius.circular(
+                                            0.5,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: _ClinicLoginCard(
+                                      nextRoute: widget.nextRoute,
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+
+                          const SizedBox(height: AppSpacing.xxl),
+
+                          // ── 하단 링크 ────────────────────────────
+                          Padding(
+                            padding: const EdgeInsets.only(top: AppSpacing.md),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  '© 하이진랩',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.textDisabled,
                                   ),
                                 ),
-                              ),
-                            ),
-                            Expanded(
-                              child: _ClinicLoginCard(
-                                nextRoute: widget.nextRoute,
-                              ),
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-
-                    const SizedBox(height: AppSpacing.xxl),
-
-                    // ── 하단 링크 ────────────────────────────
-                    Padding(
-                      padding: const EdgeInsets.only(top: AppSpacing.md),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            '© 하이진랩',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textDisabled,
+                                const SizedBox(width: 16),
+                                _link('개인정보처리방침', '/privacy'),
+                                _dot(),
+                                _link('이용약관', '/terms'),
+                              ],
                             ),
                           ),
-                          const SizedBox(width: 16),
-                          _link('개인정보처리방침', '/privacy'),
-                          _dot(),
-                          _link('이용약관', '/terms'),
                         ],
                       ),
                     ),
@@ -332,17 +349,15 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
     if (FirebaseAuth.instance.currentUser?.uid == null) return;
 
     try {
-      final blocked = await ClinicAuthService.blockClinicAccountFromApplicantLogin();
+      final blocked =
+          await ClinicAuthService.blockClinicAccountFromApplicantLogin();
       if (blocked != null) {
         if (!mounted) return;
         _showError(blocked);
         return;
       }
 
-      await SignInTracker.record(
-        provider,
-        email: emailHint,
-      );
+      await SignInTracker.record(provider, email: emailHint);
       // 앱 [SignInPage]와 동일: 로그인 성공 후 uid가 있을 때만 기록 (①~③)
       AdminActivityService.log(
         ActivityEventType.viewSignInPage,
@@ -368,19 +383,14 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
         await FirebaseAuth.instance.signOut();
       } catch (_) {}
       if (mounted) {
-        _showError(
-          '로그인 확인 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.',
-        );
+        _showError('로그인 확인 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.');
       }
     }
   }
 
   // ── 카카오 ─────────────────────────────────────────────────
   Future<void> _loginKakao() async {
-    AdminActivityService.log(
-      ActivityEventType.tapLoginKakao,
-      page: 'sign_in',
-    );
+    AdminActivityService.log(ActivityEventType.tapLoginKakao, page: 'sign_in');
     _setLoading('kakao');
     try {
       final user = await KakaoAuthService.signInWithKakao();
@@ -398,10 +408,7 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
 
   // ── 구글 ───────────────────────────────────────────────────
   Future<void> _loginGoogle() async {
-    AdminActivityService.log(
-      ActivityEventType.tapLoginGoogle,
-      page: 'sign_in',
-    );
+    AdminActivityService.log(ActivityEventType.tapLoginGoogle, page: 'sign_in');
     _setLoading('google');
     try {
       // 웹에서는 signInWithPopup 방식 사용 (idToken null 문제 해결)
@@ -427,10 +434,7 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
 
   // ── 애플 ───────────────────────────────────────────────────
   Future<void> _loginApple() async {
-    AdminActivityService.log(
-      ActivityEventType.tapLoginApple,
-      page: 'sign_in',
-    );
+    AdminActivityService.log(ActivityEventType.tapLoginApple, page: 'sign_in');
     _setLoading('apple');
     try {
       final appleRes = await AppleAuthService.signInWithApple();
@@ -439,10 +443,7 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
         return;
       }
       final (user, appleIdEmail) = appleRes;
-      await _handlePostLogin(
-        'apple',
-        emailHint: appleIdEmail ?? user.email,
-      );
+      await _handlePostLogin('apple', emailHint: appleIdEmail ?? user.email);
     } catch (e) {
       _showError('Apple 로그인 오류: $e');
     } finally {
@@ -477,9 +478,10 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
       if (mounted) {
         setState(() {
           _naverResetLoading = false;
-          _errorMsg = e.code == 'user-not-found'
-              ? '등록된 이메일이 아니에요. 가입한 네이버 이메일을 다시 확인해주세요.'
-              : '발송 중 오류가 발생했어요. 다시 시도해주세요.';
+          _errorMsg =
+              e.code == 'user-not-found'
+                  ? '등록된 이메일이 아니에요. 가입한 네이버 이메일을 다시 확인해주세요.'
+                  : '발송 중 오류가 발생했어요. 다시 시도해주세요.';
         });
       }
     } catch (_) {
@@ -500,10 +502,7 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
       _showError('이메일과 비밀번호를 입력해주세요.');
       return;
     }
-    AdminActivityService.log(
-      ActivityEventType.tapLoginEmail,
-      page: 'sign_in',
-    );
+    AdminActivityService.log(ActivityEventType.tapLoginEmail, page: 'sign_in');
     _setLoading('email');
     try {
       User? user;
@@ -513,8 +512,9 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
           return;
         }
         // 회원가입 전: 공고자 계정 중복 체크 (normalizedEmail 기준)
-        final dupMsg =
-            await ClinicAuthService.checkDuplicateForApplicantSignup(email);
+        final dupMsg = await ClinicAuthService.checkDuplicateForApplicantSignup(
+          email,
+        );
         if (dupMsg != null) {
           _showError(dupMsg);
           return;
@@ -581,6 +581,7 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
   @override
   Widget build(BuildContext context) {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.xl),
       decoration: BoxDecoration(
         color: AppColors.white,
@@ -680,19 +681,21 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
             _naverPwSetEmail != null
                 ? null
                 : () {
-                    setState(() {
-                      _showNaverResetForm = !_showNaverResetForm;
-                      _naverResetSent = false;
-                      _naverEmailCtrl.clear();
-                      _errorMsg = null;
-                    });
-                  },
-            trailingLabel: _naverPwSetEmail != null
-                ? '이메일+비밀번호로 로그인하세요'
-                : '웹에서는 비밀번호 설정이 필요해요',
-            trailingBadgeBg: _naverPwSetEmail != null
-                ? AppColors.textDisabled.withOpacity(0.25)
-                : AppColors.naverLoginGreen.withOpacity(0.3),
+                  setState(() {
+                    _showNaverResetForm = !_showNaverResetForm;
+                    _naverResetSent = false;
+                    _naverEmailCtrl.clear();
+                    _errorMsg = null;
+                  });
+                },
+            trailingLabel:
+                _naverPwSetEmail != null
+                    ? '이메일+비밀번호로 로그인하세요'
+                    : '웹에서는 비밀번호 설정이 필요해요',
+            trailingBadgeBg:
+                _naverPwSetEmail != null
+                    ? AppColors.textDisabled.withOpacity(0.25)
+                    : AppColors.naverLoginGreen.withOpacity(0.3),
           ),
 
           // 네이버 비밀번호 설정 완료 시 이메일 폼 안내
@@ -764,96 +767,103 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
                   color: AppColors.naverLoginGreen.withOpacity(0.25),
                 ),
               ),
-              child: _naverResetSent
-                  ? Column(
-                      children: [
-                        const Icon(
-                          Icons.mark_email_read_outlined,
-                          color: AppColors.naverLoginGreen,
-                          size: 28,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '비밀번호 설정 링크를 보냈어요!\n메일함을 확인해주세요.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: AppColors.textPrimary,
-                            height: 1.5,
+              child:
+                  _naverResetSent
+                      ? Column(
+                        children: [
+                          const Icon(
+                            Icons.mark_email_read_outlined,
+                            color: AppColors.naverLoginGreen,
+                            size: 28,
                           ),
-                        ),
-                        const SizedBox(height: 10),
-                        TextButton(
-                          onPressed: () => setState(() {
-                            _naverResetSent = false;
-                            _naverEmailCtrl.clear();
-                          }),
-                          style: TextButton.styleFrom(padding: EdgeInsets.zero),
-                          child: const Text(
-                            '다시 입력하기',
+                          const SizedBox(height: 8),
+                          Text(
+                            '비밀번호 설정 링크를 보냈어요!\n메일함을 확인해주세요.',
+                            textAlign: TextAlign.center,
                             style: TextStyle(
-                              fontSize: 12,
-                              color: AppColors.naverLoginGreen,
+                              fontSize: 13,
+                              color: AppColors.textPrimary,
+                              height: 1.5,
                             ),
                           ),
-                        ),
-                      ],
-                    )
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text(
-                          '네이버로 가입한 이메일 주소를 입력하면\n비밀번호 설정 링크를 보내드려요.',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
-                            height: 1.5,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        PubTextField(
-                          controller: _naverEmailCtrl,
-                          label: '가입한 네이버 이메일',
-                          hint: 'example@naver.com',
-                          keyboardType: TextInputType.emailAddress,
-                        ),
-                        const SizedBox(height: 10),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: _naverResetLoading
-                                ? null
-                                : _sendNaverPasswordReset,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.naverLoginGreen,
-                              foregroundColor: AppColors.white,
-                              elevation: 0,
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 13),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
+                          const SizedBox(height: 10),
+                          TextButton(
+                            onPressed:
+                                () => setState(() {
+                                  _naverResetSent = false;
+                                  _naverEmailCtrl.clear();
+                                }),
+                            style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                            ),
+                            child: const Text(
+                              '다시 입력하기',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.naverLoginGreen,
                               ),
                             ),
-                            child: _naverResetLoading
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: AppColors.white,
-                                    ),
-                                  )
-                                : const Text(
-                                    '메일로 비밀번호 설정 링크 보내기',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
                           ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      )
+                      : Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            '네이버로 가입한 이메일 주소를 입력하면\n비밀번호 설정 링크를 보내드려요.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                              height: 1.5,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          PubTextField(
+                            controller: _naverEmailCtrl,
+                            label: '가입한 네이버 이메일',
+                            hint: 'example@naver.com',
+                            keyboardType: TextInputType.emailAddress,
+                          ),
+                          const SizedBox(height: 10),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed:
+                                  _naverResetLoading
+                                      ? null
+                                      : _sendNaverPasswordReset,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.naverLoginGreen,
+                                foregroundColor: AppColors.white,
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 13,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              child:
+                                  _naverResetLoading
+                                      ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: AppColors.white,
+                                        ),
+                                      )
+                                      : const Text(
+                                        '메일로 비밀번호 설정 링크 보내기',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                            ),
+                          ),
+                        ],
+                      ),
             ),
           ],
 
@@ -1092,9 +1102,10 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
                       trailingLabel,
                       style: TextStyle(
                         fontSize: 11,
-                        color: trailingBadgeBg != null
-                            ? fgColor.withOpacity(0.85)
-                            : AppColors.textSecondary,
+                        color:
+                            trailingBadgeBg != null
+                                ? fgColor.withOpacity(0.85)
+                                : AppColors.textSecondary,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -1282,7 +1293,6 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
         await ClinicAuthService.initClinicAccount();
       }
 
-      await SignInTracker.record('email');
       await ClinicAuthService.recordLogin();
 
       if (!mounted) return;
@@ -1312,6 +1322,7 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
   @override
   Widget build(BuildContext context) {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.xl),
       decoration: BoxDecoration(
         color: AppColors.white,
@@ -1419,10 +1430,7 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
                   color: AppColors.cardEmphasis.withOpacity(0.08),
                   borderRadius: BorderRadius.circular(AppRadius.sm),
                   border: Border(
-                    left: BorderSide(
-                      color: AppColors.cardEmphasis,
-                      width: 3,
-                    ),
+                    left: BorderSide(color: AppColors.cardEmphasis, width: 3),
                   ),
                 ),
                 child: Row(
@@ -1462,8 +1470,9 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   shape: RoundedRectangleBorder(
-                    borderRadius:
-                        BorderRadius.circular(AppPublisher.buttonRadius),
+                    borderRadius: BorderRadius.circular(
+                      AppPublisher.buttonRadius,
+                    ),
                   ),
                 ),
                 child:
@@ -1540,8 +1549,9 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     shape: RoundedRectangleBorder(
-                      borderRadius:
-                          BorderRadius.circular(AppPublisher.buttonRadius),
+                      borderRadius: BorderRadius.circular(
+                        AppPublisher.buttonRadius,
+                      ),
                     ),
                   ),
                   child: Text(

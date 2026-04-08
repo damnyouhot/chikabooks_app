@@ -74,8 +74,12 @@
 	<string>백그라운드에서 주변 구인 알림을 받기 위해 위치 권한이 필요합니다.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>주변 치과 구인 정보를 제공하기 위해 위치 권한이 필요합니다.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>이력서를 촬영하여 AI가 자동으로 정보를 추출하거나, 프로필 사진을 등록하는 데 사용됩니다. 촬영된 이미지는 분석 후 삭제 옵션을 선택할 수 있습니다.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>프로필 이미지 및 이력서 첨부 등 사용자가 선택한 사진 파일을 업로드하기 위해 사진 보관함 접근 권한이 필요합니다.</string>
+	<string>갤러리에서 이력서 사진이나 프로필 사진을 선택하는 데 사용됩니다. 선택한 이미지는 AI 자동입력 분석 또는 프로필 등록에만 활용됩니다.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>촬영한 사진을 사진 보관함에 저장하기 위해 접근이 필요합니다.</string>
 	<key>NidAppName</key>
 	<string>하이진랩</string>
 	<key>NidClientID</key>

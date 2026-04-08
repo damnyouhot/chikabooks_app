@@ -142,6 +142,7 @@ class _TrainingCardState extends State<_TrainingCard> {
   @override
   Widget build(BuildContext context) {
     return Card(
+      color: AppColors.white,
       margin: const EdgeInsets.only(bottom: 14),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(

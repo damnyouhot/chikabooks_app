@@ -1,4 +1,5 @@
 import '../../../models/job.dart';
+import 'job_post_tracked_fields.dart';
 
 /// [parseJobImagesToForm] 응답을 폼·미리보기에 맞게 정리한다.
 ///
@@ -20,13 +21,6 @@ class JobAiExtractNormalizer {
     '목요일': 'thu', '금요일': 'fri', '토요일': 'sat', '일요일': 'sun',
   };
   static const _validDayCodes = {'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'};
-
-  // 필드 상태 추적 대상 필드
-  static const _trackedFields = [
-    'clinicName', 'title', 'role', 'salary', 'workHours', 'workDays',
-    'mainDuties', 'benefits', 'address', 'closingDate', 'hospitalType',
-    'specialties',
-  ];
 
   /// Cloud Function 원본 맵을 보정한 복사본 반환.
   static Map<String, dynamic> normalize(Map<String, dynamic> raw) {
@@ -258,15 +252,13 @@ class JobAiExtractNormalizer {
       (m['fieldStatus'] as Map?)?.map((k, v) => MapEntry(k.toString(), v.toString())) ?? {},
     );
 
-    for (final field in _trackedFields) {
+    for (final field in JobPostTrackedFields.aiStatusOrderedKeys) {
       if (status.containsKey(field)) continue;
 
-      // 값이 없으면 missing, 있으면 confirmed로 보완
-      final val = m[field];
-      if (val == null || val == '' || (val is List && val.isEmpty)) {
-        status[field] = 'missing';
-      } else {
+      if (JobPostTrackedFields.valuePresentInExtract(m, field)) {
         status[field] = 'confirmed';
+      } else {
+        status[field] = 'missing';
       }
     }
 

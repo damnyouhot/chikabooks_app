@@ -76,6 +76,6 @@ Map<String, dynamic> publishedJobCopyDraftFormData(Job job) {
     'copiedFromJobId': job.id,
     'currentStep': 'ai_generated',
     'aiParseStatus': 'done',
-    'editorStep': 'step3',
+    'editorStep': 'step2',
   };
 }

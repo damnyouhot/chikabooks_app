@@ -158,7 +158,7 @@ class JobDraftService {
           'copiedFromDraftId': d.id,
           'currentStep': 'ai_generated',
           'aiParseStatus': 'done',
-          'editorStep': 'step3',
+          'editorStep': 'step2',
         },
       );
     } catch (e) {

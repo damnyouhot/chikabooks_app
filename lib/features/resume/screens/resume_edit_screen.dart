@@ -9,12 +9,9 @@ import '../../../services/resume_service.dart';
 import '../../../services/resume_draft_service.dart';
 import '../../../services/resume_prefill_service.dart';
 import '../widgets/section_profile.dart';
-import '../widgets/section_licenses.dart';
 import '../widgets/section_experiences.dart';
 import '../widgets/section_skills.dart';
 import '../widgets/section_education.dart';
-import '../widgets/section_trainings.dart';
-import '../widgets/section_attachments.dart';
 import '../widgets/section_summary.dart';
 import 'resume_preview_screen.dart';
 
@@ -46,12 +43,9 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
   static const _sections = [
     _SectionDef(icon: Icons.person_outline, label: '기본정보'),
     _SectionDef(icon: Icons.edit_note, label: '요약'),
-    _SectionDef(icon: Icons.verified_outlined, label: '면허/자격'),
     _SectionDef(icon: Icons.work_outline, label: '경력'),
     _SectionDef(icon: Icons.auto_awesome_outlined, label: '스킬'),
     _SectionDef(icon: Icons.school_outlined, label: '학력'),
-    _SectionDef(icon: Icons.menu_book_outlined, label: '보수교육'),
-    _SectionDef(icon: Icons.attach_file, label: '첨부파일'),
   ];
 
   @override
@@ -372,34 +366,19 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
           },
         );
       case 2:
-        return SectionLicenses(
-          licenses: r.licenses,
-          onChanged: (l) => _updateResume(_copyWith(licenses: l)),
-        );
-      case 3:
         return SectionExperiences(
           experiences: r.experiences,
           onChanged: (e) => _updateResume(_copyWith(experiences: e)),
         );
-      case 4:
+      case 3:
         return SectionSkills(
           skills: r.skills,
           onChanged: (s) => _updateResume(_copyWith(skills: s)),
         );
-      case 5:
+      case 4:
         return SectionEducation(
           education: r.education,
           onChanged: (e) => _updateResume(_copyWith(education: e)),
-        );
-      case 6:
-        return SectionTrainings(
-          trainings: r.trainings,
-          onChanged: (t) => _updateResume(_copyWith(trainings: t)),
-        );
-      case 7:
-        return SectionAttachments(
-          attachments: r.attachments,
-          onChanged: (a) => _updateResume(_copyWith(attachments: a)),
         );
       default:
         return const SizedBox.shrink();
@@ -408,12 +387,9 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
 
   Resume _copyWith({
     ResumeProfile? profile,
-    List<ResumeLicense>? licenses,
     List<ResumeExperience>? experiences,
     List<ResumeSkill>? skills,
     List<ResumeEducation>? education,
-    List<ResumeTraining>? trainings,
-    List<ResumeAttachment>? attachments,
   }) {
     final r = _resume!;
     return Resume(
@@ -424,12 +400,9 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
       updatedAt: r.updatedAt,
       visibility: r.visibility,
       profile: profile ?? r.profile,
-      licenses: licenses ?? r.licenses,
       experiences: experiences ?? r.experiences,
       skills: skills ?? r.skills,
       education: education ?? r.education,
-      trainings: trainings ?? r.trainings,
-      attachments: attachments ?? r.attachments,
     );
   }
 

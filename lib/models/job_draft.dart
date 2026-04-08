@@ -39,6 +39,7 @@ class JobDraft {
   final bool weekendWork;
   final bool nightShift;
   final List<String> applyMethod;
+  final List<String> requiredDocuments;
   final bool isAlwaysHiring;
   final DateTime? closingDate;
   final String? subwayStationName;
@@ -50,6 +51,8 @@ class JobDraft {
   final double? lat;
   final double? lng;
   final List<String> tags;
+  /// 자동 생성 태그를 사용자가 편집했으면 true — AI 재추출 시 태그 덮어쓰기 방지
+  final bool tagsUserEdited;
 
   // AI 파이프라인 필드
   final String? currentStep;
@@ -68,7 +71,7 @@ class JobDraft {
   final Map<String, String>? fieldStatus;
   final Map<String, dynamic>? fieldSources;
 
-  /// 웹 공고 Stepper 상태 (`step1` | `step2` | `step3`) — 클라이언트 전용, 미설정 시 기본 흐름
+  /// 웹 공고 Stepper: `step1` 사진 · `step2` 공고 상세 · `step3` 치과 인증 — 클라이언트 전용
   final String? editorStep;
 
   const JobDraft({
@@ -104,6 +107,7 @@ class JobDraft {
     this.weekendWork = false,
     this.nightShift = false,
     this.applyMethod = const [],
+    this.requiredDocuments = const [],
     this.isAlwaysHiring = false,
     this.closingDate,
     this.subwayStationName,
@@ -115,6 +119,7 @@ class JobDraft {
     this.lat,
     this.lng,
     this.tags = const [],
+    this.tagsUserEdited = false,
     this.currentStep,
     this.aiParseStatus,
     this.sourceType,
@@ -172,6 +177,7 @@ class JobDraft {
       weekendWork: (data['weekendWork'] as bool?) ?? false,
       nightShift: (data['nightShift'] as bool?) ?? false,
       applyMethod: List<String>.from(data['applyMethod'] ?? []),
+      requiredDocuments: List<String>.from(data['requiredDocuments'] ?? []),
       isAlwaysHiring: (data['isAlwaysHiring'] as bool?) ?? false,
       closingDate: closing,
       subwayStationName: trans?['subwayStationName'] as String?,
@@ -183,6 +189,7 @@ class JobDraft {
       lat: (data['lat'] as num?)?.toDouble(),
       lng: (data['lng'] as num?)?.toDouble(),
       tags: List<String>.from(data['tags'] ?? []),
+      tagsUserEdited: (data['tagsUserEdited'] as bool?) ?? false,
       currentStep: data['currentStep'] as String?,
       aiParseStatus: data['aiParseStatus'] as String?,
       sourceType: data['sourceType'] as String?,
@@ -235,6 +242,7 @@ class JobDraft {
         'weekendWork': weekendWork,
         'nightShift': nightShift,
         if (applyMethod.isNotEmpty) 'applyMethod': applyMethod,
+        if (requiredDocuments.isNotEmpty) 'requiredDocuments': requiredDocuments,
         'isAlwaysHiring': isAlwaysHiring,
         if (closingDate != null) 'closingDate': closingDate!.toIso8601String(),
         if (subwayStationName != null || subwayLines.isNotEmpty || walkingMinutes != null)
@@ -249,6 +257,7 @@ class JobDraft {
         if (lat != null) 'lat': lat,
         if (lng != null) 'lng': lng,
         if (tags.isNotEmpty) 'tags': tags,
+        if (tagsUserEdited) 'tagsUserEdited': true,
         if (currentStep != null) 'currentStep': currentStep,
         if (aiParseStatus != null) 'aiParseStatus': aiParseStatus,
         if (sourceType != null) 'sourceType': sourceType,

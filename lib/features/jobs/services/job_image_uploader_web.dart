@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
@@ -29,13 +31,14 @@ class JobImageUploaderImpl {
         SettableMetadata(contentType: 'image/$ext'),
       );
 
-      task.snapshotEvents.listen((snap) {
+      final sub = task.snapshotEvents.listen((snap) {
         if (snap.totalBytes > 0) {
           onProgress?.call(i, snap.bytesTransferred / snap.totalBytes);
         }
       });
 
       await task;
+      await sub.cancel();
       urls.add(await ref.getDownloadURL());
     }
 

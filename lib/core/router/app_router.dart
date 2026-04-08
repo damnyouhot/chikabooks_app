@@ -84,15 +84,24 @@ final appRouter = GoRouter(
     // 레거시 온보딩 경로는 이제 모두 /post-job/input으로 redirect되므로
     // 별도 가드 불필요 (post-job 가드에서 처리)
 
-    // 새 공고 플로우: 로그인만 되어 있으면 진입 가능
-    // (인증·결제는 게시 직전 단계에서 검증)
+    // 회원가입 완료 후 authStateChanges로 GoRouter가 refresh되어
+    // 위젯이 rebuild된 경우, clinics_accounts가 이미 있으면 바로 진입시킴
+    if (path == '/publisher/signup' && user != null) {
+      final status = await ClinicAuthService.getStatus();
+      if (status.exists) return '/post-job/input';
+    }
+
+    // 새 공고 플로우: 치과(`clinics_accounts`) 마스터가 있을 때만 진입.
+    // (구글 등 비밀번호 없는 세션으로 /post-job 만 들어왔을 때 자동 생성하면
+    // 이메일·비밀번호 치과 로그인과 불일치하는 계정이 생김 → 가입/로그인으로 유도)
     if (path.startsWith('/post-job') && user != null) {
       final status = await ClinicAuthService.getStatus();
       if (!status.exists) {
-        // clinics_accounts 문서가 없으면 → 마스터 문서 자동 생성
-        await ClinicAuthService.initClinicAccount();
+        final returnTo =
+            state.uri.path +
+            (state.uri.hasQuery ? '?${state.uri.query}' : '');
+        return '/publisher/signup?next=${Uri.encodeComponent(returnTo)}';
       }
-      // Lazy Migration: 기존 사용자 프로필 자동 생성
       await ClinicProfileService.migrateIfNeeded();
     }
 

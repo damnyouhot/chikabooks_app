@@ -22,6 +22,8 @@
 - **드롭다운**: Material 기본 메뉴·호버가 보라/라벤더 톤으로 나가지 않도록, **`Theme` + `dropdownColor: white` + `accent` 계열 `ColorScheme.surfaceContainer*`** 로 `JobPostForm._pubDropdownMenuTheme` 에서 통일. **외곽 `borderRadius`는 `buttonRadius`**.
 - **라운드**: 칩·썸네일·작은 타일은 **`AppPublisher.softRadius`(3px)**. 주요 **Outlined/Elevated** CTA는 **`AppPublisher.buttonRadius`(8px)**.
 - **입력**: 공고자 로그인·`JobPostForm(publisherWebStyle: true)` 동일 — **밑줄(`UnderlineInputBorder`) 필드** — 포커스 시 `AppColors.accent` 2px, 에러 시 **`AppColors.cardEmphasis`** (`web_login_page` 와 동일).
+- **웹 편집기 step2(공고 상세) — 라벨·입력 한 줄**: `JobPostForm`에 `publisherWebStyle: true` + `publisherWebEditorStep: 'step3'` 일 때 **라벨 고정 열(`AppPublisher.formInlineLabelWidth` = 108px) + 오른쪽 입력** (`Row`). 텍스트·드롭다운·칩 블록·교통편 등 동일 규칙. **담당 업무**는 우측 `±`/`＋`가 **`_wrapStep3Clear` 한 번만** 나오도록 — 블록 안에 같은 동작의 `IconButton`을 두지 않음(중복 방지).
+- **웹 편집기 step3(치과 인증)**: `PublisherClinicIdentitySection(inlineFieldLabels: true)` 로 상호·치과명·대표자·주소·사업자번호 행을 **공고 상세 step과 같은 라벨 열 폭**에 맞춤. `BizLicenseUploadSection(publisherStyleOcrLabelWidth: true)` 로 OCR 확인 행 라벨 열도 동일 폭 (`job_draft_editor_page` 3단계).
 - **강조 색**: **네이비(`accent` = `blue`)**와 **레드(`cardEmphasis` = `lime`)** 위주. 구형 주황 `warning`에 의존한 CTA는 피하고, 의미 있는 강조는 토큰으로 통일.
 - **배경**: 웹 공고자 전용 페이지 배경은 크림 앱 배경과 구분 — **`AppColors.webPublisherPageBg` (`#F0F0F0`)**. `PubScaffold`의 `webPublisherShell: true`일 때 셸은 **흰색 + AppBar 하단 1px 라인**.
 
@@ -35,9 +37,9 @@
 
 ### `/post-job/input` 좌우 2-column 레이아웃
 
-- **구조**: 뷰포트 높이 기준 **세로 중앙 정렬**(`LayoutBuilder` + `Center` + `SingleChildScrollView` + `minHeight`) — `ConstrainedBox(maxWidth: 1100)` 안에 `Row(flex 4:5)` — 좌측 **「임시저장/ 사용 공고」**, 우측 **「새로 만들기」**.
-- **좌측**: 임시저장 목록(`watchMyDrafts`) + 게시된 공고 목록(`jobs` 컬렉션) — 초안은 **버튼형**, 게시 목록은 **행 단위 하단 라인**(`BorderSide`) 구분.
-- **우측 탭(4종)**: 「홍보이미지 업로드」 · 「캡처 이미지 업로드」 · 「텍스트 붙여넣기」 · 「기존 공고 복사」 — 선택 탭 아래 **`accent` 굵은 라인(3px)**, 비선택은 **얇은 `divider` 라인(1px)** 으로 구분.
+- **구조**: `ConstrainedBox(maxWidth: 1100)` → 내부 `LayoutBuilder`로 **Row 가로 폭만** 확정한 뒤, **`Expanded(flex: 1)` × 2** 로 양열 **동일 폭**. 화면 **왼쪽** = 「1분 만에 공고 만들기」, **오른쪽** = 「임시 / 게시된 공고」(코드: `_buildRightColumn` / `_buildLeftColumn`). 세로는 **`Center` + `ListView(shrinkWrap: true)`** 로 블록을 뷰포트 안에서 가운데에 두고, 내용이 길면 세로 스크롤. **바깥 `SizedBox(width: double.infinity)` 만으로 Row 폭을 잡지 않음**(무한 폭 끌어당김·열 비대칭 방지).
+- **왼쪽 열 · 새로 만들기**: 탭 「치과 이미지 업로드」·「홍보 이미지 업로드」 / 「캡처 이미지 AI」·「텍스트 AI」 등 — 선택 탭 아래 **`accent` 굵은 라인(3px)**, 비선택은 **얇은 `divider` 라인(1px)**.
+- **오른쪽 열 · 임시/게시**: 임시저장 목록(`watchMyDrafts`) + 게시된 공고(`jobs`) — 초안은 **버튼형**, 게시 목록은 **행 단위** 구분.
 - **CTA 분기**: 홍보이미지(`sourceType: promotional`) → **"다음 단계"** (AI 스킵, `editorStep: step3`). 캡처/텍스트 → **"AI 초안 생성하기"**. 복사 → 목록에서 바로 이동.
 - **CTA 아래**: **「처음부터 직접 작성하기」** `TextButton` — `sourceType: manual`, 빈 폼 `step3`로 이동.
 
@@ -117,6 +119,74 @@
 | 웹 공고 등록 폼(밑줄·섹션 간격·드롭다운 테마) | `lib/features/jobs/ui/job_post_form.dart` |
 | 웹 공고 **자료 입력**(좌우 2열 · 4탭 · 홍보이미지) | `lib/features/jobs/web/job_input_page.dart` |
 | 공고 **초안 미리보기**(홍보이미지 갤러리 포함) | `lib/features/jobs/ui/job_post_preview.dart` |
+| AI 추출 ↔ 폼 **필드 동기화** | `lib/features/jobs/utils/job_post_field_sync.dart` |
+| AI **추적 필드 키·순서** | `lib/features/jobs/utils/job_post_tracked_fields.dart` |
+| 드래프트 **AI 병합**(에디터) | `lib/features/jobs/web/job_draft_editor_page.dart` (`_applyNormalizedResult`) |
+| Draft 동기화 **디버그 로그** (`kDebugMode`) | `lib/features/jobs/utils/job_draft_sync_debug.dart` |
+| 폼 **명시적 상태 동기화** | `JobPostFormState.applyDraftFromParent` (`job_post_form.dart`) |
+| Callable **`parseJobImagesToForm`** | `functions/src/index.ts` |
+
+---
+
+## 에디터 Step3 — 필드 동기화 규칙 (요약)
+
+- **채용직:** 진실 원천은 `hireRoles`. `role`은 `JobPostData.joinHireRoles(hireRoles)`로만 맞춘다. AI 맵에서는 `hireRoles` 배열을 우선하고, 없으면 `role` 한 줄을 콤마로 분리한다 (`JobPostFieldSync.hireRolesFromExtract`).
+- **경력·학력·고용:** 허용 목록은 `careerDropdownOptions` / `educationDropdownOptions` / `employmentTypeOptions`. 저장 전 `pickCareerForStorage` / `pickEducationForStorage` / `pickEmploymentType`으로 정규화한다.
+- **급여:** `salary` 한 줄과 `salaryPayType`·`salaryAmount`는 함께 맞춘다. AI가 `salaryPayType`·`salaryAmount`를 주면 우선 반영하고, 없으면 `inferSalaryPartsFromLegacy`로 복원한다 (`_mergeSalaryAi` / `JobPostForm._runAiAutofill`).
+- **드래프트 AI 병합:** `mergeEmptyOnly == false`일 때 채용직은 AI 결과가 있으면 `hireRoles`를 교체하고, `true`(홍보 2차)일 때는 기존 `hireRoles`가 비어 있을 때만 채운다. 급여는 2차 패스에서 이미 채워진 `salary`가 있으면 유지한다.
+- **태그:** AI 파싱 완료 후 `TagGenerator.generate`로 `_data.tags`를 갱신한다 (드래프트 저장과 일치).
+- **fieldStatus:** 키 목록·순서는 `JobPostTrackedFields.aiStatusOrderedKeys`가 단일 소스. 클라이언트 `JobAiExtractNormalizer`가 누락 키를 `missing`/`confirmed`로 보완한다. 값이 채워진 필드는 `JobPostFieldSync.patchFieldStatusForFilledValues(…, Map<String,bool>)`로 `confirmed` 보정한다. **필드 뱃지:** `missing`만 빨간 「미입력」 — `inferred`/`conflict`는 뱃지 없음. Step3 값이 비어 있을 때는 별도 「미입력」(`_emptyAttentionRedBadge`).
+- **병원 유형:** 저장은 `Job.hospitalTypeLabels`의 **영문 키**(`clinic` 등). 드롭다운 `value`는 **한글 라벨**과 맞추기 위해 `_hospitalTypeDropdownDisplay`로 변환한다. `_sanitizeFormData`에서 한글만 들어온 경우 키로 정규화한다.
+
+### AI 병합 경로 패리티
+
+- **`JobPostForm._runAiAutofill`**(이미지 업로드 플로우)와 **`JobDraftEditorPage._applyNormalizedResult`**(초안 편집기)는 동일한 정규화 유틸을 쓴다. 서버 `parseJobImagesToForm` 응답에 `education`, `salaryPayType`, `salaryAmount`가 포함되면 양쪽 모두 반영한다.
+
+### 드래프트 편집기 와이드 레이아웃 (`/post-job/edit/:id`)
+
+- 좌측 프리뷰 : 우측 폼 = **`Expanded(flex: 29)` : `Expanded(flex: 21)`** — 우측 폭을 기존 6:4 대비 약 **70% 수준**으로 축소한 비율.
+- 좌측은 **바깥 `SingleChildScrollView` 없음**. `JobPostPreview`에 **`maxHeight`**(뷰포트 기준)를 넘겨 폰 프레임 높이를 제한하고, **내부 `ListView`만** 세로 스크롤(이중 스크롤 완화).
+
+---
+
+## Draft 에디터 — 데이터 단일성·추출 근본 개선 (계획·아키텍처)
+
+외부 검토 의견을 반영하되, **이 코드베이스에는 이미 AI 병합·소스 타입별 우선순위**(`mergeEmptyOnly`, 홍보 2차 패스, 캡처→치과→홍보 URL 우선순위 등)가 구현되어 있다. 아래는 그 위에 **단일 상태(SSOT)**와 **동기화 vs 추출 누락**을 분리해 적는다.
+
+### 1. 문제의 두 갈래 (반드시 분리)
+
+| 유형 | 의미 | 대응 축 |
+|------|------|--------|
+| **동기화** | 이미 받은 값이 있는데 프리뷰·입력란·저장본이 서로 다름 | 부모 `JobPostData`, 컨트롤러, `_dataForPreview()` 간 일관성 |
+| **추출 누락** | 구조 필드에 애초 값이 안 들어옴 | **`parseJobImagesToForm`** 프롬프트·후처리 |
+
+### 2. 단일 진실 원천 (SSOT)
+
+- 편집 중 **원본**은 부모의 **`JobPostData`** (및 저장 시 같은 맵 직렬화).
+- **프리뷰**는 `_dataForPreview()`로 이미지 URL 등 **최소 보정**만 한 뒤 동일 모델을 표시.
+- **`JobPostFormState.applyDraftFromParent`** — AI 병합·드래프트 반영 직후 부모 상태 → 텍스트 컨트롤러·`_aiFieldStatus` 동기화(명시적 1회).
+- 진단: **`JobDraftSyncDebug.logPipeline`** (`kDebugMode`) — `parent_after_ai_merge`, `onDataChanged` 등.
+
+### 3. 컨트롤러 동기화 방향
+
+- 장기 목표: **`applyDraftToControllers` / `applyControllersToDraft`** 류로 양방향 책임 명시. 현재는 **`applyDraftFromParent`** 가 AI 병합 직후 SSOT 정합용.
+
+### 4. 본 저장소의 추출·병합 우선순위 (외부 문서가 빠뜨리기 쉬움)
+
+- **`mergeEmptyOnly`**, **`_callAiParsing`의 URL 우선순위**, **`hireRoles` vs `role`**, **`job_post_field_sync` / `JobAiExtractNormalizer`** — 위 「에디터 Step3」절과 코드가 단일 규칙.
+
+### 5. 추출 누락과 서버
+
+- 구조화 값은 **`parseJobImagesToForm`** 이 주 공급원. 클라이언트 동기화만으로 빈 필드가 채워지지는 않는다.
+- OCR 원문 보존 → 구조 매핑 → 누락 검출 등 **서버 단계화**는 장기 과제.
+
+### 6. 권장 작업 순서 (근본 우선)
+
+1. `JobDraftSyncDebug` 등으로 **흐름 로그** (동기화 vs 추출 구분)
+2. SSOT·`applyDraftFromParent`·프리뷰 보정 최소화
+3. 서버 프롬프트·후처리
+4. 프리뷰 점프 UX (동기화 안정 후)
+5. 레이아웃 미세 조정
 
 ---
 

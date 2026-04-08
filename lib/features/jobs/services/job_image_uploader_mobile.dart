@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
@@ -47,13 +48,14 @@ class JobImageUploaderImpl {
         );
       }
 
-      task.snapshotEvents.listen((snap) {
+      final sub = task.snapshotEvents.listen((snap) {
         if (snap.totalBytes > 0) {
           onProgress?.call(i, snap.bytesTransferred / snap.totalBytes);
         }
       });
 
       await task;
+      await sub.cancel();
       final url = await ref.getDownloadURL();
       urls.add(url);
     }

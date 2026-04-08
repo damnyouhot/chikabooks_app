@@ -223,7 +223,11 @@ class ClinicAuthService {
   /// 마스터 문서만 생성. 치과 정보는 clinic_profiles에서 별도 관리.
   static Future<void> initClinicAccount() async {
     final uid = _uid;
-    if (uid == null) return;
+    if (uid == null) {
+      throw StateError(
+        'ClinicAuthService.initClinicAccount: 로그인된 사용자가 없습니다.',
+      );
+    }
 
     final email = _auth.currentUser?.email ?? '';
     final normalizedEmail = email.trim().toLowerCase();

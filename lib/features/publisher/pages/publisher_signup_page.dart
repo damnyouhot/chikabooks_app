@@ -6,6 +6,18 @@ import '../../../core/theme/app_colors.dart';
 import 'publisher_shared.dart';
 import '../services/clinic_auth_service.dart';
 
+/// `?next=` 는 앱 내부 경로만 허용 (오픈 리다이렉트 방지)
+String _safePostSignupDestination(BuildContext context) {
+  final next = GoRouterState.of(context).uri.queryParameters['next'];
+  if (next != null &&
+      next.isNotEmpty &&
+      next.startsWith('/') &&
+      !next.startsWith('//')) {
+    return next;
+  }
+  return '/post-job/input';
+}
+
 class PublisherSignupPage extends StatefulWidget {
   const PublisherSignupPage({super.key});
 
@@ -49,6 +61,12 @@ class _PublisherSignupPageState extends State<PublisherSignupPage> {
       _isLoading = true;
       _errorMsg = null;
     });
+
+    // authStateChanges 로 GoRouter가 refresh되면 위젯이 rebuild되어
+    // mounted=false 가 됨 → async 작업 전에 router/destination 미리 캡처
+    final router = GoRouter.of(context);
+    final destination = _safePostSignupDestination(context);
+
     try {
       final email = _emailCtrl.text.trim();
       final normalizedEmail = email.toLowerCase();
@@ -60,11 +78,13 @@ class _PublisherSignupPageState extends State<PublisherSignupPage> {
           .limit(1)
           .get();
       if (existingApplicant.docs.isNotEmpty) {
-        setState(() {
-          _errorMsg = '이 이메일은 이미 위생사 계정으로 가입되어 있어\n'
-              '공고자 계정으로 사용할 수 없습니다.\n'
-              '공고자 가입은 별도의 이메일로 진행해 주세요.';
-        });
+        if (mounted) {
+          setState(() {
+            _errorMsg = '이 이메일은 이미 위생사 계정으로 가입되어 있어\n'
+                '공고자 계정으로 사용할 수 없습니다.\n'
+                '공고자 가입은 별도의 이메일로 진행해 주세요.';
+          });
+        }
         return;
       }
 
@@ -76,27 +96,23 @@ class _PublisherSignupPageState extends State<PublisherSignupPage> {
         );
       } on FirebaseAuthException catch (e) {
         if (e.code == 'email-already-in-use') {
-          // Auth 계정은 있는데 Firestore 문서가 없을 수 있음 → 복구 시도
-          await _handleAlreadyInUse(email, _pwCtrl.text);
+          await _handleAlreadyInUse(email, _pwCtrl.text, router, destination);
           return;
         }
-        setState(() => _errorMsg = _mapError(e.code));
+        if (mounted) setState(() => _errorMsg = _mapError(e.code));
         return;
       }
 
       // Auth 계정 생성 후: uid 기준 중복 체크 + clinics_accounts 문서 생성
       final dupMsg = await ClinicAuthService.checkDuplicateForClinicSignup(email);
       if (dupMsg != null) {
-        // 위생사 계정이 이미 같은 uid로 존재 → Auth 계정 삭제 후 안내
         await FirebaseAuth.instance.currentUser?.delete();
-        if (!mounted) return;
-        setState(() => _errorMsg = dupMsg);
+        if (mounted) setState(() => _errorMsg = dupMsg);
         return;
       }
 
       await ClinicAuthService.initClinicAccount();
-      if (!mounted) return;
-      context.go('/post-job/input');
+      router.go(destination);
     } catch (_) {
       if (mounted) setState(() => _errorMsg = '회원가입 중 오류가 발생했어요. 다시 시도해주세요.');
     } finally {
@@ -111,7 +127,12 @@ class _PublisherSignupPageState extends State<PublisherSignupPage> {
   /// - 같은 비번으로 로그인 성공 + clinics_accounts 있음 → 이미 정상 계정, 로그인 유도
   /// - 같은 비번으로 로그인 성공 + users 문서 있음       → 위생사 계정, 차단
   /// - 비번 틀림                                        → 비밀번호 찾기 안내
-  Future<void> _handleAlreadyInUse(String email, String password) async {
+  Future<void> _handleAlreadyInUse(
+    String email,
+    String password,
+    GoRouter router,
+    String destination,
+  ) async {
     try {
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: email,
@@ -141,13 +162,8 @@ class _PublisherSignupPageState extends State<PublisherSignupPage> {
           });
         }
       } else if (status.exists) {
-        // clinics_accounts가 이미 있음 → 정상 계정, 로그인으로 안내
-        await FirebaseAuth.instance.signOut();
-        if (mounted) {
-          setState(() {
-            _errorMsg = '이미 가입된 계정이에요.\n로그인 화면에서 로그인해주세요.';
-          });
-        }
+        // clinics_accounts가 이미 있음 → 이미 정상 계정이므로 바로 진입
+        router.go(destination);
       } else {
         // Auth만 있고 Firestore 문서 없음 → clinics_accounts만 재생성해서 복구
         final dupMsg =
@@ -158,7 +174,7 @@ class _PublisherSignupPageState extends State<PublisherSignupPage> {
           return;
         }
         await ClinicAuthService.initClinicAccount();
-        if (mounted) context.go('/post-job/input');
+        router.go(destination);
       }
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
@@ -454,7 +470,10 @@ class _PublisherSignupPageState extends State<PublisherSignupPage> {
                         ),
                       ),
                       TextButton(
-                        onPressed: () => context.pop(),
+                        onPressed:
+                            () => context.go(
+                              '/login?next=${Uri.encodeComponent('/post-job/input')}',
+                            ),
                         style: TextButton.styleFrom(padding: EdgeInsets.zero),
                         child: const Text(
                           '로그인',

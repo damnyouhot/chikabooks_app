@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:desktop_drop/desktop_drop.dart';
@@ -22,9 +23,10 @@ import 'web_file_drop_zone.dart';
 
 /// 공고 자료 입력 페이지 (/post-job/input)
 ///
-/// 좌우 2-column 레이아웃:
-///   - 좌측: 1분 만에 공고 만들기 (2단 슬라이드: 치과·홍보 → 캡처·텍스트 AI)
-///   - 우측: 임시·게시 공고 목록 (초안 + 게시)
+/// 좌우 2-column (문서 DESIGN_PUBLISHER_JOBS.md, 최대 가로 1100px):
+///   - 화면 **왼쪽** 열: 1분 만에 공고 만들기 (`_buildRightColumn`)
+///   - 화면 **오른쪽** 열: 임시·게시 목록 (`_buildLeftColumn`)
+///   - 양열은 동일 `Expanded(flex: 1)`; Row 가로는 `LayoutBuilder`로만 확정(무한 폭 끌어당김 방지)
 class JobInputPage extends StatefulWidget {
   const JobInputPage({super.key});
 
@@ -35,8 +37,10 @@ class JobInputPage extends StatefulWidget {
 class _JobInputPageState extends State<JobInputPage> with RouteAware {
   /// 0: 치과 이미지, 1: 홍보 이미지 (1번째 슬라이드)
   int _tabSlide0 = 0;
+
   /// 0: 캡처 AI, 1: 텍스트 AI (2번째 슬라이드)
   int _tabSlide1 = 0;
+
   /// 0: 치과·홍보 슬라이드, 1: 캡처·텍스트 슬라이드
   int _wizardPage = 0;
   late final PageController _wizardPageController;
@@ -49,8 +53,15 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
       BorderRadius.circular(AppPublisher.softRadius);
 
   static const double _wizardPanelHeight = 440;
+
   /// 마법사 열(`_buildRightColumn`) 높이 기준 세로 가운데에 두는 구분선 길이
   static const double _wizardDividerLineHeight = 148;
+
+  /// 본문 2열 래퍼 최대 가로 (`docs/DESIGN_PUBLISHER_JOBS.md` /post-job/input)
+  static const double _kInputPageMaxWidth = 1100;
+
+  /// 양 열 사이 세로 구분선 좌우 패딩 합의값(한쪽)
+  static const double _kColumnDividerPaddingH = 24;
 
   // ── 치과 이미지 (편집기 자료 첨부 · imageUrls) ───────────
   final List<XFile> _clinicImages = [];
@@ -73,16 +84,31 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
   /// 제출 진행 다이얼로그 ([_showSubmitProgressDialog]와 짝)
   StateSetter? _submitDialogSetState;
   String _submitStatusMessage = '';
-  double? _submitUploadProgress;
+
+  /// 분류별 업로드 진행(치과·홍보·캡처 …). null이면 단일 인디케이터·문구만 표시.
+  List<double>? _submitPhaseProgress;
+  List<String>? _submitPhaseLabels;
+  Timer? _submitTipTimer;
+  int _submitTipIndex = 0;
   bool _submitDialogPopped = false;
+
+  /// 하단 로테이션 안내 — 기본 12pt 대비 1.5배·볼드
+  static const double _submitTipFontSize = 12.0 * 1.5;
+
+  /// 업로드·저장 대기 중 하단 안내 로테이션 (`_AiLoadingView` 톤과 맞춤)
+  static const _submitMarketingTips = <String>[
+    '사진만 올리면 급여·근무 조건까지\n초안으로 정리돼요.',
+    '게시 전 사업자등록증 첨부와\n사업자 인증이 필수예요.',
+    '추출이 끝나면 병원명·연락처를\n꼭 한 번 더 확인해 주세요.',
+  ];
 
   /// 복사 중인 임시저장 ID (해당 행에 로딩 표시)
   String? _busyCopyDraftId;
+
   /// 복사 중인 게시 공고 ID
   String? _busyCopyJobId;
 
-  bool get _copyInFlight =>
-      _busyCopyDraftId != null || _busyCopyJobId != null;
+  bool get _copyInFlight => _busyCopyDraftId != null || _busyCopyJobId != null;
 
   /// 2번째 슬라이드에서 AI 초안 가능 여부
   /// 캡처·텍스트 외에 1번 슬라이드에 올린 홍보 이미지만 있어도 추출 가능
@@ -137,6 +163,7 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
 
   @override
   void dispose() {
+    _submitTipTimer?.cancel();
     appRouteObserver.unsubscribe(this);
     _wizardPageController.dispose();
     _textCtrl.dispose();
@@ -248,8 +275,35 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
   void _resetSubmitProgressUi() {
     _submitDialogPopped = false;
     _submitDialogSetState = null;
-    _submitUploadProgress = null;
+    _submitPhaseProgress = null;
+    _submitPhaseLabels = null;
     _submitStatusMessage = '';
+    _submitTipIndex = 0;
+  }
+
+  /// 이번 제출에서 업로드되는 분류 순서(비어 있지 않은 배치만, 실제 업로드 순서와 동일)
+  List<String> _buildUploadPhaseLabels() {
+    final labels = <String>[];
+    if (_clinicImages.isNotEmpty) labels.add('치과 내외부 사진');
+    if (_promoImages.isNotEmpty) labels.add('홍보 이미지');
+    if (_hasAiReadyOnSlide2 && _tabSlide1 == 0 && _captureImages.isNotEmpty) {
+      labels.add('캡처 이미지');
+    }
+    return labels;
+  }
+
+  void _startSubmitTipRotation() {
+    _submitTipTimer?.cancel();
+    _submitTipTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (!mounted) return;
+      _submitTipIndex = (_submitTipIndex + 1) % _submitMarketingTips.length;
+      _syncSubmitDialog();
+    });
+  }
+
+  void _stopSubmitTipRotation() {
+    _submitTipTimer?.cancel();
+    _submitTipTimer = null;
   }
 
   void _syncSubmitDialog() {
@@ -279,46 +333,16 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
               child: AlertDialog(
                 backgroundColor: AppColors.white,
                 shape: RoundedRectangleBorder(
-                  borderRadius:
-                      BorderRadius.circular(AppPublisher.softRadius),
+                  borderRadius: BorderRadius.circular(
+                    AppPublisher.inputPanelRadius,
+                  ),
                 ),
                 content: ConstrainedBox(
-                  constraints:
-                      const BoxConstraints(minWidth: 280, maxWidth: 340),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      SizedBox(
-                        width: double.infinity,
-                        height: 4,
-                        child: _submitUploadProgress != null
-                            ? LinearProgressIndicator(
-                                value: _submitUploadProgress!
-                                    .clamp(0.0, 1.0),
-                                backgroundColor: AppColors.divider,
-                                color: AppColors.accent,
-                              )
-                            : LinearProgressIndicator(
-                                backgroundColor: AppColors.divider,
-                                color: AppColors.accent,
-                              ),
-                      ),
-                      const SizedBox(height: 20),
-                      Text(
-                        _submitStatusMessage.isEmpty
-                            ? '처리 중이에요…'
-                            : _submitStatusMessage,
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.notoSansKr(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
-                          height: 1.45,
-                        ),
-                      ),
-                    ],
+                  constraints: const BoxConstraints(
+                    minWidth: 300,
+                    maxWidth: 400,
                   ),
+                  child: _buildSubmitProgressDialogBody(),
                 ),
               ),
             );
@@ -328,23 +352,134 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
     );
   }
 
+  Widget _buildSubmitProgressDialogBody() {
+    final tips = _submitMarketingTips;
+    final tip = tips[_submitTipIndex % tips.length];
+    final tipStyle = GoogleFonts.notoSansKr(
+      fontSize: _submitTipFontSize,
+      fontWeight: FontWeight.w800,
+      color: AppColors.textSecondary,
+      height: 1.45,
+    );
+
+    final labels = _submitPhaseLabels;
+    final prog = _submitPhaseProgress;
+    if (labels != null &&
+        prog != null &&
+        labels.length == prog.length &&
+        labels.isNotEmpty) {
+      final n = labels.length;
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 280),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: List.generate(n, (k) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          labels[k],
+                          style: GoogleFonts.notoSansKr(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                            height: 1.3,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(
+                            AppPublisher.softRadius,
+                          ),
+                          child: LinearProgressIndicator(
+                            value: prog[k].clamp(0.0, 1.0),
+                            minHeight: 5,
+                            backgroundColor: AppColors.divider,
+                            color: AppColors.accent,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(tip, textAlign: TextAlign.center, style: tipStyle),
+        ],
+      );
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(AppPublisher.softRadius),
+          child: const LinearProgressIndicator(
+            backgroundColor: AppColors.divider,
+            color: AppColors.accent,
+            minHeight: 4,
+          ),
+        ),
+        const SizedBox(height: 20),
+        Text(
+          _submitStatusMessage.isEmpty ? '처리 중이에요…' : _submitStatusMessage,
+          textAlign: TextAlign.center,
+          style: GoogleFonts.notoSansKr(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+            height: 1.45,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(tip, textAlign: TextAlign.center, style: tipStyle),
+      ],
+    );
+  }
+
   Future<List<String>> _uploadBatchWithProgress({
     required String jobId,
     required List<XFile> images,
-    required String statusPrefix,
+    required int phaseIndex,
+    required int totalPhases,
   }) async {
     if (images.isEmpty) return [];
     final n = images.length;
-    return JobImageUploader.uploadImages(
+    _submitStatusMessage = '';
+    _syncSubmitDialog();
+
+    final urls = await JobImageUploader.uploadImages(
       jobId: jobId,
       images: images,
       onProgress: (i, p) {
         if (!mounted) return;
-        _submitUploadProgress = ((i + p) / n).clamp(0.0, 1.0);
-        _submitStatusMessage = '$statusPrefix (${i + 1}/$n)…';
+        final agg = ((i + p) / n).clamp(0.0, 1.0);
+        _submitPhaseProgress = List<double>.generate(totalPhases, (j) {
+          if (j < phaseIndex) return 1.0;
+          if (j == phaseIndex) return agg;
+          return 0.0;
+        });
         _syncSubmitDialog();
       },
     );
+    if (mounted) {
+      _submitPhaseProgress = List<double>.generate(totalPhases, (j) {
+        if (j <= phaseIndex) return 1.0;
+        return 0.0;
+      });
+      _syncSubmitDialog();
+    }
+    return urls;
   }
 
   Future<void> _proceed() async {
@@ -360,107 +495,136 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
     setState(() => _isLoading = true);
     _resetSubmitProgressUi();
     _submitStatusMessage = '준비하는 중이에요…';
-    _submitUploadProgress = null;
     _showSubmitProgressDialog();
     await Future<void>.delayed(Duration.zero);
     _syncSubmitDialog();
+    _startSubmitTipRotation();
 
     try {
-      final tempJobId = 'tmp_${const Uuid().v4()}';
-      final clinicUrls = await _uploadBatchWithProgress(
-        jobId: tempJobId,
-        images: _clinicImages,
-        statusPrefix: '치과 이미지 업로드 중',
-      );
-
-      _submitUploadProgress = null;
-      _submitStatusMessage = _promoImages.isEmpty
-          ? '다음 단계로 넘어가는 중…'
-          : '홍보 이미지 업로드 준비 중…';
+      final phaseLabels = _buildUploadPhaseLabels();
+      final totalPhases = phaseLabels.length;
+      if (totalPhases > 0) {
+        _submitPhaseLabels = phaseLabels;
+        _submitPhaseProgress = List<double>.filled(totalPhases, 0.0);
+        _submitStatusMessage = '';
+      } else {
+        _submitPhaseLabels = null;
+        _submitPhaseProgress = null;
+        _submitStatusMessage = '준비하는 중이에요…';
+      }
       _syncSubmitDialog();
 
-      final promoUrls = await _uploadBatchWithProgress(
-        jobId: tempJobId,
-        images: _promoImages,
-        statusPrefix: '홍보 이미지 업로드 중',
-      );
+      final tempJobId = 'tmp_${const Uuid().v4()}';
+      var phaseIndex = 0;
+
+      final clinicUrls =
+          _clinicImages.isNotEmpty
+              ? await _uploadBatchWithProgress(
+                jobId: tempJobId,
+                images: _clinicImages,
+                phaseIndex: phaseIndex++,
+                totalPhases: totalPhases,
+              )
+              : <String>[];
+
+      final promoUrls =
+          _promoImages.isNotEmpty
+              ? await _uploadBatchWithProgress(
+                jobId: tempJobId,
+                images: _promoImages,
+                phaseIndex: phaseIndex++,
+                totalPhases: totalPhases,
+              )
+              : <String>[];
 
       if (_hasAiReadyOnSlide2) {
         if (_tabSlide1 == 0) {
-          _submitUploadProgress = null;
-          _submitStatusMessage = _captureImages.isEmpty
-              ? (_promoImages.isNotEmpty
-                  ? '홍보 이미지로 추출 준비 중…'
-                  : '이미지를 확인하는 중…')
-              : '캡처 이미지 업로드 준비 중…';
+          final captureUrls =
+              _captureImages.isNotEmpty
+                  ? await _uploadBatchWithProgress(
+                    jobId: tempJobId,
+                    images: _captureImages,
+                    phaseIndex: phaseIndex++,
+                    totalPhases: totalPhases,
+                  )
+                  : <String>[];
+
+          _submitPhaseLabels = null;
+          _submitPhaseProgress = null;
+          _submitStatusMessage = '초안을 저장하는 중이에요…';
           _syncSubmitDialog();
 
-          final captureUrls = await _uploadBatchWithProgress(
-            jobId: tempJobId,
-            images: _captureImages,
-            statusPrefix: '캡처 이미지 업로드 중',
+          final draftId = await JobDraftService.saveDraft(
+            formData: {
+              if (clinicUrls.isNotEmpty) 'imageUrls': clinicUrls,
+              if (promoUrls.isNotEmpty) 'promotionalImageUrls': promoUrls,
+              'rawImageUrls': captureUrls,
+              'sourceType': 'image',
+              'currentStep': 'input',
+              'aiParseStatus': 'idle',
+            },
           );
-
-          _submitUploadProgress = null;
-          _submitStatusMessage = '초안을 저장하는 중이에요…';
-          _syncSubmitDialog();
-
-          final draftId = await JobDraftService.saveDraft(formData: {
-            if (clinicUrls.isNotEmpty) 'imageUrls': clinicUrls,
-            if (promoUrls.isNotEmpty) 'promotionalImageUrls': promoUrls,
-            'rawImageUrls': captureUrls,
-            'sourceType': 'image',
-            'currentStep': 'input',
-            'aiParseStatus': 'idle',
-          });
           if (!mounted || draftId == null) return;
           _dismissSubmitDialog();
-          context.push('/post-job/edit/$draftId',
-              extra: {'sourceType': 'image'});
+          context.push(
+            '/post-job/edit/$draftId',
+            extra: {'sourceType': 'image'},
+          );
         } else {
-          _submitUploadProgress = null;
+          _submitPhaseLabels = null;
+          _submitPhaseProgress = null;
           _submitStatusMessage = '초안을 저장하는 중이에요…';
           _syncSubmitDialog();
 
-          final draftId = await JobDraftService.saveDraft(formData: {
-            if (clinicUrls.isNotEmpty) 'imageUrls': clinicUrls,
-            if (promoUrls.isNotEmpty) 'promotionalImageUrls': promoUrls,
-            'rawInputText': _textCtrl.text.trim(),
-            'sourceType': 'text',
-            'currentStep': 'input',
-            'aiParseStatus': 'idle',
-          });
+          final draftId = await JobDraftService.saveDraft(
+            formData: {
+              if (clinicUrls.isNotEmpty) 'imageUrls': clinicUrls,
+              if (promoUrls.isNotEmpty) 'promotionalImageUrls': promoUrls,
+              'rawInputText': _textCtrl.text.trim(),
+              'sourceType': 'text',
+              'currentStep': 'input',
+              'aiParseStatus': 'idle',
+            },
+          );
           if (!mounted || draftId == null) return;
           _dismissSubmitDialog();
-          context.push('/post-job/edit/$draftId',
-              extra: {'sourceType': 'text'});
+          context.push(
+            '/post-job/edit/$draftId',
+            extra: {'sourceType': 'text'},
+          );
         }
       } else {
-        _submitUploadProgress = null;
+        _submitPhaseLabels = null;
+        _submitPhaseProgress = null;
         _submitStatusMessage = '초안을 저장하는 중이에요…';
         _syncSubmitDialog();
 
         final onlyPromo = clinicUrls.isEmpty && promoUrls.isNotEmpty;
-        final draftId = await JobDraftService.saveDraft(formData: {
-          if (clinicUrls.isNotEmpty) 'imageUrls': clinicUrls,
-          if (promoUrls.isNotEmpty) 'promotionalImageUrls': promoUrls,
-          'sourceType': 'promotional',
-          'currentStep': 'ai_generated',
-          'aiParseStatus': 'done',
-          'editorStep': onlyPromo ? 'step3' : 'step1',
-        });
+        final draftId = await JobDraftService.saveDraft(
+          formData: {
+            if (clinicUrls.isNotEmpty) 'imageUrls': clinicUrls,
+            if (promoUrls.isNotEmpty) 'promotionalImageUrls': promoUrls,
+            'sourceType': 'promotional',
+            'currentStep': 'ai_generated',
+            'aiParseStatus': 'done',
+            'editorStep': onlyPromo ? 'step2' : 'step1',
+          },
+        );
         if (!mounted || draftId == null) return;
         _dismissSubmitDialog();
-        context.push('/post-job/edit/$draftId',
-            extra: {'sourceType': 'promotional'});
+        context.push(
+          '/post-job/edit/$draftId',
+          extra: {'sourceType': 'promotional'},
+        );
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('저장 중 오류가 발생했어요.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('저장 중 오류가 발생했어요.')));
       }
     } finally {
+      _stopSubmitTipRotation();
       _dismissSubmitDialog();
       if (mounted) setState(() => _isLoading = false);
     }
@@ -470,29 +634,31 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
     setState(() => _isLoading = true);
     _resetSubmitProgressUi();
     _submitStatusMessage = '빈 초안을 만드는 중이에요…';
-    _submitUploadProgress = null;
     _showSubmitProgressDialog();
     await Future<void>.delayed(Duration.zero);
     _syncSubmitDialog();
+    _startSubmitTipRotation();
 
     try {
-      final draftId = await JobDraftService.saveDraft(formData: {
-        'sourceType': 'manual',
-        'currentStep': 'ai_generated',
-        'aiParseStatus': 'done',
-        'editorStep': 'step3',
-      });
+      final draftId = await JobDraftService.saveDraft(
+        formData: {
+          'sourceType': 'manual',
+          'currentStep': 'ai_generated',
+          'aiParseStatus': 'done',
+          'editorStep': 'step2',
+        },
+      );
       if (!mounted || draftId == null) return;
       _dismissSubmitDialog();
-      context.push('/post-job/edit/$draftId',
-          extra: {'sourceType': 'manual'});
+      context.push('/post-job/edit/$draftId', extra: {'sourceType': 'manual'});
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('생성 중 오류가 발생했어요.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('생성 중 오류가 발생했어요.')));
       }
     } finally {
+      _stopSubmitTipRotation();
       _dismissSubmitDialog();
       if (mounted) setState(() => _isLoading = false);
     }
@@ -505,28 +671,33 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
   Future<void> _confirmDeleteDraft(JobDraft d) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(
-          '임시저장 삭제',
-          style: GoogleFonts.notoSansKr(fontWeight: FontWeight.w700),
-        ),
-        content: Text(
-          '"${d.displayTitle}" 초안을 삭제할까요?\n삭제 후에는 복구할 수 없어요.',
-          style: GoogleFonts.notoSansKr(fontSize: 14, height: 1.45),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text('취소',
-                style: GoogleFonts.notoSansKr(color: AppColors.textSecondary)),
+      builder:
+          (ctx) => AlertDialog(
+            title: Text(
+              '임시저장 삭제',
+              style: GoogleFonts.notoSansKr(fontWeight: FontWeight.w700),
+            ),
+            content: Text(
+              '"${d.displayTitle}" 초안을 삭제할까요?\n삭제 후에는 복구할 수 없어요.',
+              style: GoogleFonts.notoSansKr(fontSize: 14, height: 1.45),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: Text(
+                  '취소',
+                  style: GoogleFonts.notoSansKr(color: AppColors.textSecondary),
+                ),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.destructive,
+                ),
+                child: const Text('삭제'),
+              ),
+            ],
           ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(backgroundColor: AppColors.destructive),
-            child: const Text('삭제'),
-          ),
-        ],
-      ),
     );
     if (ok != true || !mounted) return;
     final deleted = await JobDraftService.deleteDraft(d.id);
@@ -631,56 +802,65 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
 
   @override
   Widget build(BuildContext context) {
+    const outerPad = EdgeInsets.symmetric(horizontal: 40, vertical: 40);
     return Scaffold(
       backgroundColor: AppColors.webPublisherPageBg,
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          return Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 40),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 1100),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: IntrinsicHeight(
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Expanded(child: _buildRightColumn()),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 78,
-                                  ),
-                                  child: Center(
-                                    child: Container(
-                                      width: 1,
-                                      height: _wizardDividerLineHeight,
-                                      decoration: BoxDecoration(
-                                        color: AppColors.divider,
-                                        borderRadius:
-                                            BorderRadius.circular(0.5),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
+      body: Center(
+        child: Padding(
+          padding: outerPad,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: _kInputPageMaxWidth),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final rowW = constraints.maxWidth;
+                return ListView(
+                  shrinkWrap: true,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  children: [
+                    SizedBox(
+                      width: rowW,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            flex: 1,
+                            child: SizedBox(
+                              width: double.infinity,
+                              child: _buildRightColumn(),
                             ),
                           ),
-                        ),
-                        Expanded(child: _buildLeftColumn()),
-                      ],
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: _kColumnDividerPaddingH,
+                            ),
+                            child: Align(
+                              alignment: Alignment.topCenter,
+                              child: Container(
+                                width: 1,
+                                height: _wizardDividerLineHeight,
+                                decoration: BoxDecoration(
+                                  color: AppColors.divider,
+                                  borderRadius: BorderRadius.circular(0.5),
+                                ),
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            flex: 1,
+                            child: SizedBox(
+                              width: double.infinity,
+                              child: _buildLeftColumn(),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ),
-              ),
+                  ],
+                );
+              },
             ),
-          );
-        },
+          ),
+        ),
       ),
     );
   }
@@ -693,14 +873,14 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
   static const double _leftSideIconWidth = 40;
 
   TextStyle get _leftSectionSubtitleStyle => GoogleFonts.notoSansKr(
-        fontSize: 14,
-        fontWeight: FontWeight.w700,
-        color: AppColors.textPrimary,
-      );
+    fontSize: 14,
+    fontWeight: FontWeight.w700,
+    color: AppColors.textPrimary,
+  );
 
   Widget _buildLeftColumn() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
           '임시 / 게시된 공고로 만들기',
@@ -737,31 +917,32 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
       height: _leftListCardHeight,
       child: Tooltip(
         message: tooltip,
-        child: busy
-            ? Center(
-                child: SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: AppColors.blue,
+        child:
+            busy
+                ? Center(
+                  child: SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.blue,
+                    ),
+                  ),
+                )
+                : IconButton(
+                  onPressed: onTap,
+                  icon: Icon(icon, size: 22),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: _leftSideIconWidth,
+                    minHeight: 40,
+                  ),
+                  style: IconButton.styleFrom(
+                    foregroundColor: iconColor,
+                    disabledForegroundColor: iconColor.withValues(alpha: 0.35),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                 ),
-              )
-            : IconButton(
-                onPressed: onTap,
-                icon: Icon(icon, size: 22),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(
-                  minWidth: _leftSideIconWidth,
-                  minHeight: 40,
-                ),
-                style: IconButton.styleFrom(
-                  foregroundColor: iconColor,
-                  disabledForegroundColor: iconColor.withValues(alpha: 0.35),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-              ),
       ),
     );
   }
@@ -798,12 +979,18 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
         ),
       );
     }
+    final created = d.createdAt;
+    final updated = d.updatedAt;
+    final showCreatedLine =
+        created != null &&
+        updated != null &&
+        updated.difference(created).inMinutes > 2;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          _relativeTimeLabel(t, isNewest: isNewest),
+          '마지막 저장 · ${_relativeTimeLabel(t, isNewest: isNewest)}',
           textAlign: TextAlign.right,
           style: GoogleFonts.notoSansKr(
             fontSize: 11,
@@ -820,6 +1007,16 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
             color: AppColors.white.withValues(alpha: 0.78),
           ),
         ),
+        if (showCreatedLine)
+          Text(
+            '처음 저장 ${_exactDateTimeLabel(created)}',
+            textAlign: TextAlign.right,
+            style: GoogleFonts.notoSansKr(
+              fontSize: 9,
+              height: 1.15,
+              color: AppColors.white.withValues(alpha: 0.62),
+            ),
+          ),
       ],
     );
   }
@@ -842,8 +1039,10 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
                   foregroundColor: AppColors.white,
                   backgroundColor: AppColors.blue,
                   side: line,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
                   minimumSize: const Size.fromHeight(_leftListCardHeight),
                   shape: RoundedRectangleBorder(borderRadius: r),
                 ),
@@ -880,9 +1079,8 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
               tooltip: d.hasContent ? '복사해서 새로 편집' : '복사할 내용이 없어요',
               busy: copyBusy,
               iconColor: AppColors.blue,
-              onTap: (d.hasContent && !_copyInFlight)
-                  ? () => _copyDraft(d)
-                  : null,
+              onTap:
+                  (d.hasContent && !_copyInFlight) ? () => _copyDraft(d) : null,
             ),
             _buildLeftSideIconAction(
               icon: Icons.delete_outline,
@@ -901,12 +1099,13 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
     if (uid == null) return const SizedBox.shrink();
 
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('jobs')
-          .where('createdBy', isEqualTo: uid)
-          .orderBy('createdAt', descending: true)
-          .limit(10)
-          .snapshots(),
+      stream:
+          FirebaseFirestore.instance
+              .collection('jobs')
+              .where('createdBy', isEqualTo: uid)
+              .orderBy('createdAt', descending: true)
+              .limit(10)
+              .snapshots(),
       builder: (context, snap) {
         final docs = snap.data?.docs ?? [];
         if (docs.isEmpty) {
@@ -960,8 +1159,10 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
     );
   }
 
-  Widget _buildPublishedCard(QueryDocumentSnapshot doc,
-      {required bool isNewest}) {
+  Widget _buildPublishedCard(
+    QueryDocumentSnapshot doc, {
+    required bool isNewest,
+  }) {
     final data = doc.data() as Map<String, dynamic>;
     final title = data['title'] as String? ?? '(제목 없음)';
     final clinicName = data['clinicName'] as String? ?? '';
@@ -990,8 +1191,10 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
                     border: Border.fromBorderSide(line),
                   ),
                   child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       mainAxisSize: MainAxisSize.min,
@@ -1014,8 +1217,10 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            _buildPublishedTimeTexts(createdDate,
-                                isNewest: isNewest),
+                            _buildPublishedTimeTexts(
+                              createdDate,
+                              isNewest: isNewest,
+                            ),
                             const SizedBox(width: 6),
                             Icon(
                               Icons.chevron_right,
@@ -1133,7 +1338,7 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
         ),
         const SizedBox(height: 6),
         Text(
-          '그것도 타이핑 없이',
+          '게시 전 사업자등록증 첨부와 사업자 인증이 필수예요.',
           style: GoogleFonts.notoSansKr(
             fontSize: 13,
             color: AppColors.textSecondary,
@@ -1230,11 +1435,8 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
                     textAlign: TextAlign.center,
                     style: GoogleFonts.notoSansKr(
                       fontSize: 12,
-                      fontWeight:
-                          isSel ? FontWeight.w700 : FontWeight.w500,
-                      color: isSel
-                          ? AppColors.accent
-                          : AppColors.textSecondary,
+                      fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
+                      color: isSel ? AppColors.accent : AppColors.textSecondary,
                       letterSpacing: -0.12,
                     ),
                   ),
@@ -1266,64 +1468,65 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
   Widget _buildSlide0Body() {
     return switch (_tabSlide0) {
       0 => _buildImageUploadSection(
-            images: _clinicImages,
-            cache: _clinicCache,
-            dropActive: _clinicDropActive,
-            dropKey: _clinicDropKey,
-            onPick: () => _pickAndAppend(_clinicImages, _clinicCache, max: 10),
-            onRemove: (i) => setState(() {
+        images: _clinicImages,
+        cache: _clinicCache,
+        dropActive: _clinicDropActive,
+        dropKey: _clinicDropKey,
+        onPick: () => _pickAndAppend(_clinicImages, _clinicCache, max: 10),
+        onRemove:
+            (i) => setState(() {
               final r = _clinicImages.removeAt(i);
               _clinicCache.remove(r.name);
             }),
-            onDropDone: (d) async {
-              setState(() => _clinicDropActive = false);
-              await _appendImages(
-                flattenDropItems(d.files),
-                _clinicImages,
-                _clinicCache,
-                max: 10,
-              );
-            },
-            onWebDrop: (files) async {
-              setState(() => _clinicDropActive = false);
-              await _appendImages(files, _clinicImages, _clinicCache, max: 10);
-            },
-            onDragEnter: () => setState(() => _clinicDropActive = true),
-            onDragExit: () => setState(() => _clinicDropActive = false),
-            hint:
-                '다음 화면 「자료 첨부」의 치과 이미지에 그대로 반영됩니다.\n(최대 10장)',
-            title: '치과 내부·시설 사진을 올려주세요',
-            maxImages: 10,
-          ),
+        onDropDone: (d) async {
+          setState(() => _clinicDropActive = false);
+          await _appendImages(
+            flattenDropItems(d.files),
+            _clinicImages,
+            _clinicCache,
+            max: 10,
+          );
+        },
+        onWebDrop: (files) async {
+          setState(() => _clinicDropActive = false);
+          await _appendImages(files, _clinicImages, _clinicCache, max: 10);
+        },
+        onDragEnter: () => setState(() => _clinicDropActive = true),
+        onDragExit: () => setState(() => _clinicDropActive = false),
+        hint: '다음 화면 「자료 첨부」의 치과 이미지에 그대로 반영됩니다.\n(최대 10장)',
+        title: '치과 내부·시설 사진을 올려주세요',
+        maxImages: 10,
+      ),
       1 => _buildImageUploadSection(
-            images: _promoImages,
-            cache: _promoCache,
-            dropActive: _promoDropActive,
-            dropKey: _promoDropKey,
-            onPick: () => _pickAndAppend(_promoImages, _promoCache, max: 10),
-            onRemove: (i) => setState(() {
+        images: _promoImages,
+        cache: _promoCache,
+        dropActive: _promoDropActive,
+        dropKey: _promoDropKey,
+        onPick: () => _pickAndAppend(_promoImages, _promoCache, max: 10),
+        onRemove:
+            (i) => setState(() {
               final r = _promoImages.removeAt(i);
               _promoCache.remove(r.name);
             }),
-            onDropDone: (d) async {
-              setState(() => _promoDropActive = false);
-              await _appendImages(
-                flattenDropItems(d.files),
-                _promoImages,
-                _promoCache,
-                max: 10,
-              );
-            },
-            onWebDrop: (files) async {
-              setState(() => _promoDropActive = false);
-              await _appendImages(files, _promoImages, _promoCache, max: 10);
-            },
-            onDragEnter: () => setState(() => _promoDropActive = true),
-            onDragExit: () => setState(() => _promoDropActive = false),
-            hint: '치과 소개·시설·분위기 사진 등\nAI 추출 없이 공고에 바로 게시됩니다.',
-            title: '홍보용 이미지가 있으시다면 올려주세요',
-            maxImages: 10,
-          ),
+        onDropDone: (d) async {
+          setState(() => _promoDropActive = false);
+          await _appendImages(
+            flattenDropItems(d.files),
+            _promoImages,
+            _promoCache,
+            max: 10,
+          );
+        },
+        onWebDrop: (files) async {
+          setState(() => _promoDropActive = false);
+          await _appendImages(files, _promoImages, _promoCache, max: 10);
+        },
+        onDragEnter: () => setState(() => _promoDropActive = true),
+        onDragExit: () => setState(() => _promoDropActive = false),
+        hint: '치과 소개·시설·분위기 사진 등\nAI 추출 없이 공고에 바로 게시됩니다.',
+        title: '홍보용 이미지가 있으시다면 올려주세요',
+        maxImages: 10,
+      ),
       _ => const SizedBox.shrink(),
     };
   }
@@ -1331,34 +1534,35 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
   Widget _buildSlide1Body() {
     return switch (_tabSlide1) {
       0 => _buildImageUploadSection(
-            images: _captureImages,
-            cache: _captureCache,
-            dropActive: _captureDropActive,
-            dropKey: _captureDropKey,
-            onPick: () => _pickAndAppend(_captureImages, _captureCache, max: 8),
-            onRemove: (i) => setState(() {
+        images: _captureImages,
+        cache: _captureCache,
+        dropActive: _captureDropActive,
+        dropKey: _captureDropKey,
+        onPick: () => _pickAndAppend(_captureImages, _captureCache, max: 8),
+        onRemove:
+            (i) => setState(() {
               final r = _captureImages.removeAt(i);
               _captureCache.remove(r.name);
             }),
-            onDropDone: (d) async {
-              setState(() => _captureDropActive = false);
-              await _appendImages(
-                flattenDropItems(d.files),
-                _captureImages,
-                _captureCache,
-                max: 8,
-              );
-            },
-            onWebDrop: (files) async {
-              setState(() => _captureDropActive = false);
-              await _appendImages(files, _captureImages, _captureCache, max: 8);
-            },
-            onDragEnter: () => setState(() => _captureDropActive = true),
-            onDragExit: () => setState(() => _captureDropActive = false),
-            hint: 'AI가 내용을 읽어 초안을 만들어 드려요(최대 8장).',
-            title: '기존 게시물을 캡처해서 올려주세요',
-            maxImages: 8,
-          ),
+        onDropDone: (d) async {
+          setState(() => _captureDropActive = false);
+          await _appendImages(
+            flattenDropItems(d.files),
+            _captureImages,
+            _captureCache,
+            max: 8,
+          );
+        },
+        onWebDrop: (files) async {
+          setState(() => _captureDropActive = false);
+          await _appendImages(files, _captureImages, _captureCache, max: 8);
+        },
+        onDragEnter: () => setState(() => _captureDropActive = true),
+        onDragExit: () => setState(() => _captureDropActive = false),
+        hint: 'AI가 내용을 읽어 초안을 만들어 드려요(최대 8장).',
+        title: '기존 게시물을 캡처해서 올려주세요',
+        maxImages: 8,
+      ),
       1 => _buildTextSection(),
       _ => const SizedBox.shrink(),
     };
@@ -1411,17 +1615,20 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
                   height: 160,
                   width: double.infinity,
                   decoration: BoxDecoration(
-                    borderRadius:
-                        BorderRadius.circular(AppPublisher.softRadius),
+                    borderRadius: BorderRadius.circular(
+                      AppPublisher.softRadius,
+                    ),
                     color: AppColors.accent.withValues(alpha: 0.03),
                   ),
                   child: Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.add_photo_alternate_outlined,
-                            size: 36,
-                            color: AppColors.accent.withValues(alpha: 0.5)),
+                        Icon(
+                          Icons.add_photo_alternate_outlined,
+                          size: 36,
+                          color: AppColors.accent.withValues(alpha: 0.5),
+                        ),
                         const SizedBox(height: 8),
                         Text(
                           title,
@@ -1466,8 +1673,10 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
                         borderRadius: _thumbRadius,
                         border: Border.all(color: AppColors.divider),
                       ),
-                      child: const Icon(Icons.add,
-                          color: AppColors.textDisabled),
+                      child: const Icon(
+                        Icons.add,
+                        color: AppColors.textDisabled,
+                      ),
                     ),
                   ),
               ],
@@ -1479,15 +1688,15 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
     final dropChild = AnimatedContainer(
       key: kIsWeb ? dropKey : null,
       duration: const Duration(milliseconds: 150),
-      padding:
-          dropActive ? const EdgeInsets.only(left: 6) : EdgeInsets.zero,
-      decoration: dropActive
-          ? const BoxDecoration(
-              border: Border(
-                left: BorderSide(color: AppColors.accent, width: 3),
-              ),
-            )
-          : null,
+      padding: dropActive ? const EdgeInsets.only(left: 6) : EdgeInsets.zero,
+      decoration:
+          dropActive
+              ? const BoxDecoration(
+                border: Border(
+                  left: BorderSide(color: AppColors.accent, width: 3),
+                ),
+              )
+              : null,
       child: inner,
     );
 
@@ -1527,8 +1736,10 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
               else
                 const ColoredBox(
                   color: AppColors.webPublisherPageBg,
-                  child: Icon(Icons.image_outlined,
-                      color: AppColors.textDisabled),
+                  child: Icon(
+                    Icons.image_outlined,
+                    color: AppColors.textDisabled,
+                  ),
                 ),
               Positioned(
                 top: 2,
@@ -1542,8 +1753,11 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
                       shape: BoxShape.circle,
                       color: AppColors.black.withValues(alpha: 0.54),
                     ),
-                    child: const Icon(Icons.close,
-                        size: 11, color: AppColors.white),
+                    child: const Icon(
+                      Icons.close,
+                      size: 11,
+                      color: AppColors.white,
+                    ),
                   ),
                 ),
               ),
@@ -1577,8 +1791,7 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
             onChanged: (_) => setState(() {}),
             style: GoogleFonts.notoSansKr(fontSize: 14, height: 1.6),
             decoration: InputDecoration(
-              hintText:
-                  '기존 채용 사이트, 메신저, 문서 등에 있는\n공고 텍스트를 복사해서 붙여넣어주세요.',
+              hintText: '기존 채용 사이트, 메신저, 문서 등에 있는\n공고 텍스트를 복사해서 붙여넣어주세요.',
               hintStyle: GoogleFonts.notoSansKr(
                 fontSize: 13,
                 color: AppColors.textDisabled,
@@ -1591,8 +1804,7 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
                 borderSide: BorderSide(color: AppColors.divider),
               ),
               focusedBorder: const UnderlineInputBorder(
-                borderSide:
-                    BorderSide(color: AppColors.accent, width: 2),
+                borderSide: BorderSide(color: AppColors.accent, width: 2),
               ),
               contentPadding: const EdgeInsets.symmetric(vertical: 10),
               isDense: true,
@@ -1617,36 +1829,38 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
             width: _ctaBackSlotWidth,
             child: Align(
               alignment: Alignment.centerLeft,
-              child: _wizardPage == 1
-                  ? TextButton.icon(
-                      onPressed: _isLoading
-                          ? null
-                          : () {
-                              _wizardPageController.previousPage(
-                                duration: const Duration(milliseconds: 320),
-                                curve: Curves.easeOutCubic,
-                              );
-                            },
-                      icon: Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        size: 14,
-                        color: AppColors.textSecondary,
-                      ),
-                      label: Text(
-                        '이전 단계',
-                        style: GoogleFonts.notoSansKr(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
+              child:
+                  _wizardPage == 1
+                      ? TextButton.icon(
+                        onPressed:
+                            _isLoading
+                                ? null
+                                : () {
+                                  _wizardPageController.previousPage(
+                                    duration: const Duration(milliseconds: 320),
+                                    curve: Curves.easeOutCubic,
+                                  );
+                                },
+                        icon: Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          size: 14,
                           color: AppColors.textSecondary,
                         ),
-                      ),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                    )
-                  : const SizedBox.shrink(),
+                        label: Text(
+                          '이전 단계',
+                          style: GoogleFonts.notoSansKr(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      )
+                      : const SizedBox.shrink(),
             ),
           ),
           Expanded(child: _buildPrimaryCtaButton()),
@@ -1666,24 +1880,27 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
         elevation: 0,
         minimumSize: const Size.fromHeight(AppPublisher.ctaHeight),
         shape: RoundedRectangleBorder(
-          borderRadius:
-              BorderRadius.circular(AppPublisher.buttonRadius),
+          borderRadius: BorderRadius.circular(AppPublisher.buttonRadius),
         ),
       ),
-      child: _isLoading
-          ? const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                  strokeWidth: 2, color: AppColors.white))
-          : Text(
-              _ctaLabel,
-              style: GoogleFonts.notoSansKr(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.18,
+      child:
+          _isLoading
+              ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.white,
+                ),
+              )
+              : Text(
+                _ctaLabel,
+                style: GoogleFonts.notoSansKr(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.18,
+                ),
               ),
-            ),
     );
   }
 
@@ -1693,8 +1910,7 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
         onPressed: _isLoading ? null : _goFromScratch,
         style: TextButton.styleFrom(
           foregroundColor: AppColors.textSecondary,
-          padding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         ),
         child: Text(
           '직접 작성하기',

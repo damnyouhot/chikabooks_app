@@ -19,10 +19,14 @@ class BizLicenseUploadSection extends StatefulWidget {
   final String profileId;
   final VoidCallback? onCompleted;
 
+  /// 웹 공고 에디터 3단계 등 — OCR 확인 행 라벨 열을 [AppPublisher.formInlineLabelWidth]에 맞춤
+  final bool publisherStyleOcrLabelWidth;
+
   const BizLicenseUploadSection({
     super.key,
     required this.profileId,
     this.onCompleted,
+    this.publisherStyleOcrLabelWidth = false,
   });
 
   @override
@@ -65,9 +69,9 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
     }
     if (bytes == null || bytes.isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('파일을 읽을 수 없습니다.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('파일을 읽을 수 없습니다.')));
       }
       return;
     }
@@ -83,9 +87,12 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
     }
 
     final rawExt = (file.extension ?? '').toLowerCase();
-    final ext = rawExt.isNotEmpty
-        ? rawExt
-        : (file.name.contains('.') ? file.name.split('.').last.toLowerCase() : 'jpg');
+    final ext =
+        rawExt.isNotEmpty
+            ? rawExt
+            : (file.name.contains('.')
+                ? file.name.split('.').last.toLowerCase()
+                : 'jpg');
     if (!const {'pdf', 'jpg', 'jpeg', 'png'}.contains(ext)) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -148,9 +155,9 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('업로드 실패: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('업로드 실패: $e')));
       }
     } finally {
       if (mounted) setState(() => _isUploading = false);
@@ -183,9 +190,9 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
       widget.onCompleted?.call();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('반영 실패: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('반영 실패: $e')));
       }
     }
   }
@@ -198,13 +205,12 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.accent.withValues(alpha: 0.04),
-        border: Border(
-          left: BorderSide(color: AppColors.accent, width: 3),
-        ),
+        border: Border(left: BorderSide(color: AppColors.accent, width: 3)),
       ),
-      child: _ocrResult != null
-          ? _buildConfirmation()
-          : _isUploading
+      child:
+          _ocrResult != null
+              ? _buildConfirmation()
+              : _isUploading
               ? _buildProgress()
               : _buildPrompt(),
     );
@@ -270,14 +276,19 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
                 icon: const Icon(Icons.upload_file, size: 16),
                 label: Text(
                   '등록증 업로드',
-                  style: GoogleFonts.notoSansKr(fontSize: 12, fontWeight: FontWeight.w600),
+                  style: GoogleFonts.notoSansKr(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accent,
                   foregroundColor: AppColors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppPublisher.buttonRadius),
+                    borderRadius: BorderRadius.circular(
+                      AppPublisher.buttonRadius,
+                    ),
                   ),
                   padding: const EdgeInsets.symmetric(horizontal: 14),
                 ),
@@ -330,12 +341,16 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
         const SizedBox(height: 10),
         ..._ocrResult!.entries.map((e) {
           final label = _ocrLabels[e.key] ?? e.key;
+          final labelW =
+              widget.publisherStyleOcrLabelWidth
+                  ? AppPublisher.formInlineLabelWidth
+                  : 80.0;
           return Padding(
             padding: const EdgeInsets.only(bottom: 4),
             child: Row(
               children: [
                 SizedBox(
-                  width: 80,
+                  width: labelW,
                   child: Text(
                     label,
                     style: GoogleFonts.notoSansKr(
@@ -370,7 +385,9 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
                   foregroundColor: AppColors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppPublisher.buttonRadius),
+                    borderRadius: BorderRadius.circular(
+                      AppPublisher.buttonRadius,
+                    ),
                   ),
                   padding: const EdgeInsets.symmetric(horizontal: 14),
                 ),

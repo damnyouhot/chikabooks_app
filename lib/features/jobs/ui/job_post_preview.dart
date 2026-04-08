@@ -2,6 +2,9 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'job_post_form.dart';
+import 'job_preview_scroll_anchor.dart';
+import '../utils/job_post_field_sync.dart';
+import '../utils/job_draft_sync_debug.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../models/job.dart';
@@ -13,7 +16,22 @@ import '../../../widgets/job/job_detail_widgets.dart';
 class JobPostPreview extends StatefulWidget {
   final JobPostData data;
 
-  const JobPostPreview({super.key, required this.data});
+  /// 드래프트 에디터 좌측 등 — 뷰포트 높이 상한. 지정 시 **내부 [ListView]만** 스크롤(바깥 이중 스크롤 방지).
+  final double? maxHeight;
+
+  /// 부모가 소유 — [Scrollable.ensureVisible] 연동 시 전달.
+  final ScrollController? scrollController;
+
+  /// 섹션 앵커 — [JobDraftEditorPage] 등에서 생성해 전달.
+  final Map<JobPreviewScrollAnchor, GlobalKey>? sectionKeys;
+
+  const JobPostPreview({
+    super.key,
+    required this.data,
+    this.maxHeight,
+    this.scrollController,
+    this.sectionKeys,
+  });
 
   @override
   State<JobPostPreview> createState() => _JobPostPreviewState();
@@ -22,6 +40,7 @@ class JobPostPreview extends StatefulWidget {
 class _JobPostPreviewState extends State<JobPostPreview> {
   late final PageController _galleryCtrl;
   int _galleryIndex = 0;
+  String? _lastPreviewLogSig;
 
   JobPostData get data => widget.data;
 
@@ -40,9 +59,10 @@ class _JobPostPreviewState extends State<JobPostPreview> {
   bool _hasText(String? s) => (s?.trim().isNotEmpty ?? false);
 
   String _hireRolesLine() {
-    if (data.hireRoles.isNotEmpty) return data.hireRoles.join(', ');
-    final r = data.role.trim();
-    return r;
+    return JobPostFieldSync.hireRolesDisplayLine(
+      hireRoles: data.hireRoles,
+      role: data.role,
+    );
   }
 
   Widget _buildPreviewTitleHeader() {
@@ -97,7 +117,8 @@ class _JobPostPreviewState extends State<JobPostPreview> {
   }
 
   String _transportValue() {
-    if (data.subwayStationName == null || data.subwayStationName!.trim().isEmpty) {
+    if (data.subwayStationName == null ||
+        data.subwayStationName!.trim().isEmpty) {
       return '';
     }
     final parts = <String>[data.subwayStationName!.trim()];
@@ -114,11 +135,16 @@ class _JobPostPreviewState extends State<JobPostPreview> {
   String _dateFmt(DateTime d) =>
       '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
+  Widget _anchor(JobPreviewScrollAnchor anchor, Widget child) {
+    final k = widget.sectionKeys?[anchor];
+    if (k == null) return child;
+    return KeyedSubtree(key: k, child: child);
+  }
+
   List<Widget> _sectionBasicInfo() {
     final hireLine = _hireRolesLine();
-    final dutyLine = data.mainDutiesList.isNotEmpty
-        ? data.mainDutiesList.join(', ')
-        : '';
+    final dutyLine =
+        data.mainDutiesList.isNotEmpty ? data.mainDutiesList.join(', ') : '';
     final rows = <Widget>[
       if (_hasText(data.clinicName))
         JobDetailInfoRow(
@@ -176,24 +202,29 @@ class _JobPostPreviewState extends State<JobPostPreview> {
     final urls = data.promotionalImageUrls;
     if (urls.isEmpty) return [];
     return [
-      ...urls.map((url) => Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(AppPublisher.softRadius),
-              child: Image.network(
-                url,
-                width: double.infinity,
-                fit: BoxFit.fitWidth,
-                errorBuilder: (_, __, ___) => Container(
-                  width: double.infinity,
-                  height: 120,
-                  color: AppColors.surfaceMuted,
-                  child: const Icon(Icons.broken_image_outlined,
-                      color: AppColors.textDisabled),
-                ),
-              ),
+      ...urls.map(
+        (url) => Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(AppPublisher.softRadius),
+            child: Image.network(
+              url,
+              width: double.infinity,
+              fit: BoxFit.fitWidth,
+              errorBuilder:
+                  (_, __, ___) => Container(
+                    width: double.infinity,
+                    height: 120,
+                    color: AppColors.surfaceMuted,
+                    child: const Icon(
+                      Icons.broken_image_outlined,
+                      color: AppColors.textDisabled,
+                    ),
+                  ),
             ),
-          )),
+          ),
+        ),
+      ),
       const Divider(height: AppSpacing.xxl, color: AppColors.divider),
     ];
   }
@@ -204,7 +235,8 @@ class _JobPostPreviewState extends State<JobPostPreview> {
         JobDetailInfoRow(
           icon: Icons.business_outlined,
           label: '병원 유형',
-          value: Job.hospitalTypeLabels[data.hospitalType] ?? data.hospitalType!,
+          value:
+              Job.hospitalTypeLabels[data.hospitalType] ?? data.hospitalType!,
         ),
       if (data.chairCount != null)
         JobDetailInfoRow(
@@ -242,7 +274,8 @@ class _JobPostPreviewState extends State<JobPostPreview> {
           label: '3D 프린터',
           value: data.has3DPrinter! ? '보유' : '없음',
         ),
-      if (data.digitalEquipmentRaw != null && data.digitalEquipmentRaw!.trim().isNotEmpty)
+      if (data.digitalEquipmentRaw != null &&
+          data.digitalEquipmentRaw!.trim().isNotEmpty)
         JobDetailInfoRow(
           icon: Icons.more_horiz,
           label: '기타 장비',
@@ -299,7 +332,15 @@ class _JobPostPreviewState extends State<JobPostPreview> {
         JobDetailInfoRow(
           icon: Icons.send_outlined,
           label: '지원 방법',
-          value: data.applyMethod.map((m) => Job.applyMethodLabels[m] ?? m).join(', '),
+          value: data.applyMethod
+              .map((m) => Job.applyMethodLabels[m] ?? m)
+              .join(', '),
+        ),
+      if (data.requiredDocuments.isNotEmpty)
+        JobDetailInfoRow(
+          icon: Icons.description_outlined,
+          label: '제출서류',
+          value: data.requiredDocuments.join(', '),
         ),
       JobDetailInfoRow(
         icon: Icons.all_inclusive,
@@ -359,27 +400,28 @@ class _JobPostPreviewState extends State<JobPostPreview> {
     return [
       const JobDetailSectionTitle('주소 · 연락처 · 교통'),
       if (rows.isNotEmpty)
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: rows,
-        ),
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: rows),
       if (hasSubway)
         Padding(
-          padding: const EdgeInsets.only(left: 18 + AppSpacing.sm, bottom: AppSpacing.md),
+          padding: const EdgeInsets.only(
+            left: 18 + AppSpacing.sm,
+            bottom: AppSpacing.md,
+          ),
           child: Wrap(
             spacing: AppSpacing.xs,
             runSpacing: AppSpacing.xs,
-            children: data.subwayLines
-                .map(
-                  (l) => Text(
-                    l,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                )
-                .toList(),
+            children:
+                data.subwayLines
+                    .map(
+                      (l) => Text(
+                        l,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    )
+                    .toList(),
           ),
         ),
     ];
@@ -388,7 +430,16 @@ class _JobPostPreviewState extends State<JobPostPreview> {
   @override
   Widget build(BuildContext context) {
     const phoneW = 390.0;
-    const phoneH = 844.0;
+    final phoneH = (widget.maxHeight ?? 844.0).clamp(280.0, 844.0);
+
+    if (kDebugMode) {
+      final sig =
+          '${data.address}|${data.contact}|${data.description.length}|${data.workHours}|${data.tags.length}';
+      if (sig != _lastPreviewLogSig) {
+        _lastPreviewLogSig = sig;
+        JobDraftSyncDebug.logPipeline('preview', data);
+      }
+    }
 
     return Center(
       child: SizedBox(
@@ -414,9 +465,14 @@ class _JobPostPreviewState extends State<JobPostPreview> {
               scrolledUnderElevation: 0,
               surfaceTintColor: Colors.transparent,
               backgroundColor: AppColors.appBg,
-              leading: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+              leading: const Icon(
+                Icons.arrow_back,
+                color: AppColors.textPrimary,
+              ),
               title: Text(
-                data.clinicName.trim().isEmpty ? '(샘플) 치과명' : data.clinicName.trim(),
+                data.clinicName.trim().isEmpty
+                    ? '(샘플) 치과명'
+                    : data.clinicName.trim(),
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -453,6 +509,8 @@ class _JobPostPreviewState extends State<JobPostPreview> {
               ],
             ),
             body: ListView(
+              controller: widget.scrollController,
+              primary: widget.scrollController == null,
               padding: const EdgeInsets.fromLTRB(
                 AppSpacing.lg + 10,
                 AppSpacing.sm,
@@ -461,71 +519,117 @@ class _JobPostPreviewState extends State<JobPostPreview> {
               ),
               physics: const BouncingScrollPhysics(),
               children: [
-                _buildPreviewTitleHeader(),
-                if (data.images.isNotEmpty) ...[
-                  _buildImageGallery(),
-                  const SizedBox(height: AppSpacing.lg),
-                ],
-
-                // ── 기본 정보 → 근무 조건 → 홍보이미지 … ──
-                ..._sectionBasicInfo(),
-                ..._sectionWorkConditions(),
-
-                // ── 홍보이미지 (근무 조건 ↔ 병원정보 사이) ──
-                ..._sectionPromotionalImages(),
-
-                // ── 그룹 B: 병원 정보 → 복리후생 ──
-                ..._sectionHospital(),
-
-                // ── 복리후생 ──
-                const JobDetailSectionTitle('복리후생'),
-                if (data.benefits.isEmpty)
-                  Text(
-                    '복리후생 미확인 · 오른쪽에서 입력해 주세요',
-                    style: TextStyle(
-                      fontSize: 14,
-                      height: 1.5,
-                      color: AppColors.textDisabled,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  )
-                else
-                  _buildBenefitsWrap(),
-                const Divider(height: AppSpacing.xxl, color: AppColors.divider),
-
-                ..._sectionApply(),
-
-                // ── 상세 내용 ──
-                const JobDetailSectionTitle('상세 내용'),
-                Text(
-                  data.description.trim().isNotEmpty
-                      ? data.description.trim()
-                      : '병원 소개 미입력 · 오른쪽에서 입력해 주세요',
-                  style: TextStyle(
-                    fontSize: 14,
-                    height: 1.5,
-                    color: data.description.trim().isNotEmpty
-                        ? AppColors.textSecondary
-                        : AppColors.textDisabled,
-                    fontStyle: data.description.trim().isEmpty ? FontStyle.italic : FontStyle.normal,
+                _anchor(
+                  JobPreviewScrollAnchor.basicInfo,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildPreviewTitleHeader(),
+                      if (data.images.isNotEmpty) ...[
+                        _buildImageGallery(),
+                        const SizedBox(height: AppSpacing.lg),
+                      ],
+                      ..._sectionBasicInfo(),
+                    ],
                   ),
                 ),
-                const SizedBox(height: AppSpacing.lg),
-
-                ..._sectionAddress(),
-
-                const SizedBox(height: AppSpacing.xl),
-                Center(
-                  child: Text(
-                    'AI가 정리한 공고 초안 · 오른쪽에서 수정 후 등록하세요',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: AppColors.textDisabled,
-                    ),
-                    textAlign: TextAlign.center,
+                _anchor(
+                  JobPreviewScrollAnchor.workConditions,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: _sectionWorkConditions(),
                   ),
                 ),
-                const SizedBox(height: AppSpacing.md),
+                _anchor(
+                  JobPreviewScrollAnchor.hospital,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      ..._sectionPromotionalImages(),
+                      ..._sectionHospital(),
+                    ],
+                  ),
+                ),
+                _anchor(
+                  JobPreviewScrollAnchor.benefits,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const JobDetailSectionTitle('복리후생'),
+                      if (data.benefits.isEmpty)
+                        Text(
+                          '복리후생 미확인 · 오른쪽에서 입력해 주세요',
+                          style: TextStyle(
+                            fontSize: 14,
+                            height: 1.5,
+                            color: AppColors.textDisabled,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        )
+                      else
+                        _buildBenefitsWrap(),
+                      const Divider(
+                        height: AppSpacing.xxl,
+                        color: AppColors.divider,
+                      ),
+                    ],
+                  ),
+                ),
+                _anchor(
+                  JobPreviewScrollAnchor.apply,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: _sectionApply(),
+                  ),
+                ),
+                _anchor(
+                  JobPreviewScrollAnchor.description,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const JobDetailSectionTitle('상세 내용'),
+                      Text(
+                        data.description.trim().isNotEmpty
+                            ? data.description.trim()
+                            : '병원 소개 미입력 · 오른쪽에서 입력해 주세요',
+                        style: TextStyle(
+                          fontSize: 14,
+                          height: 1.5,
+                          color:
+                              data.description.trim().isNotEmpty
+                                  ? AppColors.textSecondary
+                                  : AppColors.textDisabled,
+                          fontStyle:
+                              data.description.trim().isEmpty
+                                  ? FontStyle.italic
+                                  : FontStyle.normal,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                    ],
+                  ),
+                ),
+                _anchor(
+                  JobPreviewScrollAnchor.addressContact,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      ..._sectionAddress(),
+                      const SizedBox(height: AppSpacing.xl),
+                      Center(
+                        child: Text(
+                          'AI가 정리한 공고 초안 · 오른쪽에서 수정 후 등록하세요',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: AppColors.textDisabled,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -577,14 +681,16 @@ class _JobPostPreviewState extends State<JobPostPreview> {
           borderRadius: BorderRadius.circular(AppRadius.md),
           child: SizedBox(
             height: 220,
-            child: count == 1
-                ? _coverForIndex(0)
-                : PageView.builder(
-                    controller: _galleryCtrl,
-                    itemCount: count,
-                    onPageChanged: (i) => setState(() => _galleryIndex = i),
-                    itemBuilder: (_, i) => SizedBox.expand(child: _coverForIndex(i)),
-                  ),
+            child:
+                count == 1
+                    ? _coverForIndex(0)
+                    : PageView.builder(
+                      controller: _galleryCtrl,
+                      itemCount: count,
+                      onPageChanged: (i) => setState(() => _galleryIndex = i),
+                      itemBuilder:
+                          (_, i) => SizedBox.expand(child: _coverForIndex(i)),
+                    ),
           ),
         ),
         if (count > 1) ...[
@@ -620,10 +726,15 @@ class _JobPostPreviewState extends State<JobPostPreview> {
       fit: BoxFit.cover,
       width: double.infinity,
       height: 220,
-      errorBuilder: (_, __, ___) => Container(
-        color: AppColors.disabledBg,
-        child: const Icon(Icons.business, size: 48, color: AppColors.textDisabled),
-      ),
+      errorBuilder:
+          (_, __, ___) => Container(
+            color: AppColors.disabledBg,
+            child: const Icon(
+              Icons.business,
+              size: 48,
+              color: AppColors.textDisabled,
+            ),
+          ),
     );
   }
 }

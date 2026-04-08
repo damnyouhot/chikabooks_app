@@ -1,7 +1,7 @@
 /**
  * report_quiz_all_users.js
  *
- * 모든 계정의 퀴즈 성적·순위·상위%를 앱과 동일한 규칙으로 출력합니다.
+ * 모든 계정의 퀴즈 성적·순위·상위%를 앱과 동일한 규칙(정답률)으로 출력합니다.
  *
  *   node tools/report_quiz_all_users.js
  */
@@ -38,33 +38,79 @@ function initAdmin() {
 initAdmin();
 const db = admin.firestore();
 
-function computeRank(totalCorrect, distribution) {
+function currentWeekKeyKst() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+    .formatToParts(new Date())
+    .reduce((acc, p) => {
+      if (p.type !== "literal") acc[p.type] = p.value;
+      return acc;
+    }, {});
+  const y = parseInt(parts.year, 10);
+  const m = parseInt(parts.month, 10);
+  const d = parseInt(parts.day, 10);
+  const jsSun0 = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  const wd = jsSun0 === 0 ? 7 : jsSun0;
+  const monday = new Date(Date.UTC(y, m - 1, d));
+  monday.setUTCDate(monday.getUTCDate() - (wd - 1));
+  const yy = monday.getUTCFullYear();
+  const mm = String(monday.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(monday.getUTCDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+}
+
+function accuracyPct(correct, wrong) {
+  const t = (correct | 0) + (wrong | 0);
+  if (t <= 0) return null;
+  return Math.round((correct / t) * 100);
+}
+
+function computeRankAccuracy(myPct, distribution) {
   let peopleAboveMe = 0;
   for (const [key, val] of Object.entries(distribution)) {
     const score = parseInt(key, 10);
     if (Number.isNaN(score)) continue;
-    if (score > totalCorrect) {
-      peopleAboveMe += typeof val === "number" ? val : (val | 0);
+    if (score > myPct) {
+      peopleAboveMe += typeof val === "number" ? val : val | 0;
     }
   }
   return peopleAboveMe + 1;
 }
 
 function formatTopPct(rank, totalUsers) {
-  if (totalUsers <= 0) return "0";
+  if (totalUsers <= 0) return "—";
   const raw = Math.min(100, Math.max(0, (rank / totalUsers) * 100));
   return raw >= 10 ? raw.toFixed(1) : raw.toFixed(2);
 }
 
 async function main() {
+  const weekKey = currentWeekKeyKst();
+
   const globalSnap = await db.collection("quiz_global").doc("stats").get();
-  let totalParticipants = 1;
-  let distribution = {};
+  let totalParticipantsAll = 0;
+  let distAll = {};
 
   if (globalSnap.exists) {
     const g = globalSnap.data() || {};
-    totalParticipants = Math.max(1, (g.totalParticipants ?? 1) | 0);
-    distribution = { ...(g.scoreDistribution || {}) };
+    totalParticipantsAll = (g.totalParticipantsAccuracy ?? 0) | 0;
+    distAll = { ...(g.accuracyDistribution || {}) };
+  }
+
+  const weeklySnap = await db
+    .collection("quiz_global")
+    .doc(`weekly_${weekKey}`)
+    .get();
+  let totalParticipantsWeek = 0;
+  let distWeek = {};
+
+  if (weeklySnap.exists) {
+    const w = weeklySnap.data() || {};
+    totalParticipantsWeek = (w.totalParticipantsWeekly ?? 0) | 0;
+    distWeek = { ...(w.accuracyDistribution || {}) };
   }
 
   const usersSnap = await db.collection("users").get();
@@ -93,8 +139,10 @@ async function main() {
         totalCorrect: null,
         totalWrong: null,
         countedInGlobal: null,
-        rank: null,
-        topPct: null,
+        rankAll: null,
+        topPctAll: null,
+        rankWeek: null,
+        topPctWeek: null,
       });
       continue;
     }
@@ -104,8 +152,20 @@ async function main() {
     const totalWrong = (s.totalWrong ?? 0) | 0;
     const countedInGlobal = s.countedInGlobal === true;
 
-    const rank = computeRank(totalCorrect, distribution);
-    const topPct = formatTopPct(rank, totalParticipants);
+    const pctAll = accuracyPct(totalCorrect, totalWrong);
+    const rankAll =
+      pctAll === null ? null : computeRankAccuracy(pctAll, distAll);
+    const topPctAll =
+      pctAll === null ? null : formatTopPct(rankAll, totalParticipantsAll);
+
+    const sameWeek = s.weekKey === weekKey;
+    const wc = sameWeek ? (s.weekCorrect ?? 0) | 0 : 0;
+    const ww = sameWeek ? (s.weekWrong ?? 0) | 0 : 0;
+    const pctWeek = accuracyPct(wc, ww);
+    const rankWeek =
+      pctWeek === null ? null : computeRankAccuracy(pctWeek, distWeek);
+    const topPctWeek =
+      pctWeek === null ? null : formatTopPct(rankWeek, totalParticipantsWeek);
 
     rows.push({
       uid,
@@ -114,16 +174,18 @@ async function main() {
       totalCorrect,
       totalWrong,
       countedInGlobal,
-      rank,
-      topPct,
+      rankAll,
+      topPctAll,
+      rankWeek,
+      topPctWeek,
     });
   }
 
   console.log("========================================");
-  console.log(" 퀴즈 성적 / 순위 / 상위% (앱과 동일 규칙)");
+  console.log(" 퀴즈 성적 / 순위 / 상위% (정답률 기준)");
   console.log("========================================");
   console.log(
-    ` quiz_global/stats: totalParticipants=${totalParticipants}, distribution=${JSON.stringify(distribution)}`
+    ` 주간 weekKey=${weekKey} | 통산 참가자=${totalParticipantsAll}, 주간 참가자=${totalParticipantsWeek}`
   );
   console.log("");
 
@@ -131,32 +193,38 @@ async function main() {
     if (!a.hasStats && !b.hasStats) return a.label.localeCompare(b.label);
     if (!a.hasStats) return 1;
     if (!b.hasStats) return -1;
-    return b.totalCorrect - a.totalCorrect || a.rank - b.rank;
+    const pa = accuracyPct(a.totalCorrect, a.totalWrong) ?? -1;
+    const pb = accuracyPct(b.totalCorrect, b.totalWrong) ?? -1;
+    return pb - pa || (a.rankAll ?? 0) - (b.rankAll ?? 0);
   });
 
   console.log(
     [
-      "이메일/표시".padEnd(28),
+      "이메일/표시".padEnd(26),
       "정답".padStart(4),
       "오답".padStart(4),
-      "글로벌집계".padStart(8),
-      "순위".padStart(6),
-      "상위%".padStart(8),
-      "uid(앞8자)",
+      "집계".padStart(4),
+      "통산순".padStart(6),
+      "통산%".padStart(7),
+      "주간순".padStart(6),
+      "주간%".padStart(7),
+      "uid(앞8)",
     ].join("  ")
   );
-  console.log("-".repeat(100));
+  console.log("-".repeat(110));
 
   for (const r of rows) {
     if (!r.hasStats) {
       console.log(
         [
-          r.label.slice(0, 26).padEnd(28),
+          r.label.slice(0, 24).padEnd(26),
           "-".padStart(4),
           "-".padStart(4),
-          "-".padStart(8),
+          "-".padStart(4),
           "-".padStart(6),
-          "-".padStart(8),
+          "-".padStart(7),
+          "-".padStart(6),
+          "-".padStart(7),
           r.uid.slice(0, 8),
         ].join("  ")
       );
@@ -164,20 +232,22 @@ async function main() {
     }
     console.log(
       [
-        r.label.slice(0, 26).padEnd(28),
+        r.label.slice(0, 24).padEnd(26),
         String(r.totalCorrect).padStart(4),
         String(r.totalWrong).padStart(4),
-        (r.countedInGlobal ? "Y" : "N").padStart(8),
-        String(r.rank).padStart(6),
-        (r.topPct + "%").padStart(8),
+        (r.countedInGlobal ? "Y" : "N").padStart(4),
+        String(r.rankAll ?? "—").padStart(6),
+        ((r.topPctAll != null ? r.topPctAll + "%" : "—")).padStart(7),
+        String(r.rankWeek ?? "—").padStart(6),
+        ((r.topPctWeek != null ? r.topPctWeek + "%" : "—")).padStart(7),
         r.uid.slice(0, 8),
       ].join("  ")
     );
   }
 
   console.log("");
-  console.log("※ 순위 = (나보다 누적 정답이 많은 사람 수) + 1");
-  console.log("※ 상위% = (순위 / 전체 참가자) × 100  (앱 카드와 동일)");
+  console.log("※ 통산·주간 순위 = (나보다 정답률이 높은 사람 수) + 1");
+  console.log("※ 상위% = (순위 / 해당 참가자 수) × 100");
   console.log("========================================");
 }
 

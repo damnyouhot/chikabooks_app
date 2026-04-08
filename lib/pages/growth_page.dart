@@ -11,19 +11,17 @@ import '../core/theme/app_colors.dart';
 import '../core/theme/app_tokens.dart';
 import '../core/widgets/app_muted_card.dart';
 import '../core/widgets/app_segmented_control.dart';
-import 'ebook/ebook_list_page.dart';
 import 'ebook/ebook_detail_page.dart';
 import 'quiz_today_page.dart';
 import 'hira_update_page.dart';
 import 'settings/settings_page.dart';
 
-/// 성장 탭 (3탭)
+/// 성장 탭
 ///
-/// 내부 소탭 4개:
+/// 상단 세그먼트 3개 (스토어 탭은 숨김 — `EbookListPage`는 `/books` 등에서 유지):
 /// 1. 오늘의 퀴즈 — 매일 2문제
-/// 2. 급여변경 — HIRA 수가/급여 변경 포인트
-/// 3. 성장하기 3번 탭(라벨: 치과책방) — e-Book 스토어
-/// 4. 내 서재 — 구매한 e-Book 목록
+/// 2. 보험정보 — HIRA 수가/급여 변경
+/// 3. 내 서재 — 연동 도서 목록
 class GrowthPage extends StatefulWidget {
   final ValueNotifier<int>? subTabNotifier;
   /// 보험정보(HiraUpdatePage) 내부 소탭: 0=수가 조회, 1=제도 변경
@@ -42,13 +40,13 @@ class _GrowthPageState extends State<GrowthPage>
   @override
   void initState() {
     super.initState();
-    _tabCtrl = TabController(length: 4, vsync: this);
+    _tabCtrl = TabController(length: 3, vsync: this);
     widget.subTabNotifier?.addListener(_onSubTabChanged);
   }
 
   void _onSubTabChanged() {
     final idx = widget.subTabNotifier?.value ?? -1;
-    if (idx >= 0 && idx < 4) {
+    if (idx >= 0 && idx < 3) {
       _tabCtrl.animateTo(idx);
     }
   }
@@ -71,7 +69,7 @@ class _GrowthPageState extends State<GrowthPage>
             // 세그먼트 탭바 → AppSegmentedControl
             AppSegmentedControl(
               controller: _tabCtrl,
-              labels: const ['오늘 퀴즈', '보험정보', '치과책방', '내 서재'],
+              labels: const ['오늘 퀴즈', '보험정보', '내 서재'],
             ),
             Expanded(
               child: TabBarView(
@@ -79,7 +77,6 @@ class _GrowthPageState extends State<GrowthPage>
                 children: [
                   const QuizTodayPage(),
                   HiraUpdatePage(tabRequestNotifier: widget.hiraTabRequestNotifier),
-                  const EbookListPage(),
                   const _MyLibraryView(),
                 ],
               ),
@@ -226,7 +223,7 @@ class _MyLibraryViewState extends State<_MyLibraryView>
         // 서브 탭바 → AppSegmentedControl
         AppSegmentedControl(
           controller: _tabCtrl,
-          labels: const ['전자책', '저장한 변경사항'],
+          labels: const ['치과책방', '저장한 변경사항'],
           margin: const EdgeInsets.symmetric(
             horizontal: AppSpacing.xl,
             vertical: AppSpacing.md,
@@ -476,7 +473,7 @@ class _MyBooksTabState extends State<_MyBooksTab> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '전자책 구매내역이 보이지 않나요?',
+                      '책이 보이지 않나요?',
                       style: TextStyle(
                         fontSize: 12,
                         color: AppColors.textSecondary,
@@ -520,18 +517,10 @@ class _MyBooksTabState extends State<_MyBooksTab> {
                         ),
                         const SizedBox(height: AppSpacing.md),
                         Text(
-                          '구매한 도서가 없습니다.',
+                          '등록된 책이 없습니다',
                           style: TextStyle(
                             color: AppColors.textSecondary,
                             fontSize: 14,
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.xs),
-                        Text(
-                          '치과책방 홈페이지에서 구매가 가능합니다',
-                          style: TextStyle(
-                            color: AppColors.textDisabled,
-                            fontSize: 12,
                           ),
                         ),
                       ],

@@ -12,6 +12,7 @@ import '../../services/naver_auth_service.dart';
 import '../../services/sign_in_tracker.dart';
 import '../../services/onboarding_service.dart';
 import '../../services/admin_activity_service.dart';
+import '../../features/publisher/services/clinic_auth_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/hygiene_lab_english_title.dart';
 /// 다중 소셜 로그인 페이지
@@ -91,6 +92,14 @@ class _SignInPageState extends State<SignInPage> {
 
       debugPrint('✅ Google 로그인 성공: ${currentUser.uid} (${currentUser.email})');
 
+      final blocked = await ClinicAuthService.blockClinicAccountFromApplicantLogin();
+      if (blocked != null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(blocked)));
+        }
+        return;
+      }
+
       await SignInTracker.record('google');
       AdminActivityService.log(ActivityEventType.viewSignInPage, page: 'sign_in');
       AdminActivityService.log(ActivityEventType.loginSuccess, page: 'sign_in', extra: {'provider': 'google'});
@@ -125,6 +134,15 @@ class _SignInPageState extends State<SignInPage> {
         ).showSnackBar(const SnackBar(content: Text('Apple 로그인 실패')));
       } else if (appleRes != null) {
         final (user, appleIdEmail) = appleRes;
+
+        final blocked = await ClinicAuthService.blockClinicAccountFromApplicantLogin();
+        if (blocked != null) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(blocked)));
+          }
+          return;
+        }
+
         await SignInTracker.record(
           'apple',
           email: appleIdEmail ?? user.email,
@@ -188,6 +206,14 @@ class _SignInPageState extends State<SignInPage> {
 
       debugPrint('✅ 카카오 로그인 성공: ${user.uid} (${user.email})');
 
+      final blocked = await ClinicAuthService.blockClinicAccountFromApplicantLogin();
+      if (blocked != null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(blocked)));
+        }
+        return;
+      }
+
       await SignInTracker.record('kakao');
       AdminActivityService.log(ActivityEventType.viewSignInPage, page: 'sign_in');
       AdminActivityService.log(ActivityEventType.loginSuccess, page: 'sign_in', extra: {'provider': 'kakao'});
@@ -236,6 +262,14 @@ class _SignInPageState extends State<SignInPage> {
       debugPrint(
         '✅ 네이버 로그인 성공: ${user.uid} (Auth.email=${user.email}, sdk=$naverProfileEmail)',
       );
+
+      final blocked = await ClinicAuthService.blockClinicAccountFromApplicantLogin();
+      if (blocked != null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(blocked)));
+        }
+        return;
+      }
 
       await SignInTracker.record(
         'naver',
@@ -407,6 +441,16 @@ class _SignInPageState extends State<SignInPage> {
                               ),
                             );
                           } else {
+                            final blocked = await ClinicAuthService.blockClinicAccountFromApplicantLogin();
+                            if (blocked != null) {
+                              if (context.mounted) {
+                                Navigator.pop(context);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text(blocked)),
+                                );
+                              }
+                              return;
+                            }
                             await SignInTracker.record('email');
                             AdminActivityService.log(ActivityEventType.viewSignInPage, page: 'sign_in');
                             AdminActivityService.log(ActivityEventType.loginSuccess, page: 'sign_in', extra: {'provider': 'email', 'isSignUp': isSignUp});

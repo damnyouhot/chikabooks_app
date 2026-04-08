@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import '../models/quiz_content_config.dart';
 import '../models/quiz_pool_item.dart';
 import '../models/quiz_schedule.dart';
+import 'quiz_accuracy_stats.dart';
 
 /// 퀴즈 풀 & 스케줄 관리 서비스
 ///
@@ -32,6 +33,13 @@ class QuizPoolService {
   static String get todayKey {
     final nowKst = DateTime.now().toUtc().add(const Duration(hours: 9));
     return _dateKey(nowKst);
+  }
+
+  /// KST 기준 이번 주 월요일 dateKey (`saveAnswer`·UI·집계와 동일).
+  static String get currentWeekKey {
+    final nowKst = DateTime.now().toUtc().add(const Duration(hours: 9));
+    final monday = nowKst.subtract(Duration(days: nowKst.weekday - 1));
+    return _dateKey(monday);
   }
 
   // ══════════════════════════════════════════════════════════════
@@ -179,12 +187,14 @@ class QuizPoolService {
       final weekKey = _dateKey(monday);
 
       final globalRef = _db.collection('quiz_global').doc('stats');
+      final weeklyRef = _db.collection('quiz_global').doc('weekly_$weekKey');
 
       await _db.runTransaction((tx) async {
         // ── 1. 기존 값 읽기 (트랜잭션 내 읽기는 쓰기 전에 모두 수행) ──
         final histSnap   = await tx.get(histRef);
         final statsSnap  = await tx.get(statsRef);
         final globalSnap = await tx.get(globalRef);
+        final weeklySnap = await tx.get(weeklyRef);
 
         final histData  = histSnap.data()  ?? <String, dynamic>{};
         final statsData = statsSnap.data() ?? <String, dynamic>{};
@@ -228,66 +238,110 @@ class QuizPoolService {
             ? (statsData['weekWrong']   as num?)?.toInt() ?? 0
             : 0;  // 새 주: 초기화
 
-        tx.set(statsRef, {
-          'totalCorrect':    prevTotalCorrect + (isCorrect ? 1 : 0),
-          'totalWrong':      prevTotalWrong   + (isCorrect ? 0 : 1),
-          'weekKey':         weekKey,
-          'weekCorrect':     prevWeekCorrect  + (isCorrect ? 1 : 0),
-          'weekWrong':       prevWeekWrong    + (isCorrect ? 0 : 1),
-          'countedInGlobal': true,
-          'lastAnsweredAt':  FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-
-        // ── 6. 글로벌 순위 집계 (quiz_global/stats) ──
-        final globalData = globalSnap.data() ?? <String, dynamic>{};
-        final distribution = Map<String, dynamic>.from(
-          globalData['scoreDistribution'] as Map<String, dynamic>? ?? {},
-        );
-        var totalParticipants =
-            (globalData['totalParticipants'] as num?)?.toInt() ?? 0;
-
-        // countedInGlobal 필드로 이 유저가 글로벌 집계에 포함됐는지 판단
-        // (기존 유저도 코드 배포 후 처음 풀면 정상 등록됨)
-        final isCountedInGlobal = statsData['countedInGlobal'] == true;
         final newTotalCorrect = prevTotalCorrect + (isCorrect ? 1 : 0);
+        final newTotalWrong   = prevTotalWrong   + (isCorrect ? 0 : 1);
+        final newWeekCorrect  = prevWeekCorrect  + (isCorrect ? 1 : 0);
+        final newWeekWrong    = prevWeekWrong    + (isCorrect ? 0 : 1);
 
-        // 분포 내 이전 구간 존재 여부 확인:
-        // isCountedInGlobal=true 이지만 scoreDistribution 에 없으면
-        // cleanup 등으로 글로벌 데이터가 초기화된 "팬텀 유저" 케이스
-        final prevBucketCount =
-            (distribution[prevTotalCorrect.toString()] as num?)?.toInt() ?? 0;
-        final isPhantomUser = isCountedInGlobal && prevBucketCount <= 0;
+        tx.set(statsRef, {
+          'totalCorrect': newTotalCorrect,
+          'totalWrong': newTotalWrong,
+          'weekKey': weekKey,
+          'weekCorrect': newWeekCorrect,
+          'weekWrong': newWeekWrong,
+          'countedInGlobal': true,
+          'countedInGlobalAccuracy': true,
+          'weeklyGlobalRegisteredWeekKey': weekKey,
+          'lastAnsweredAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
 
-        if (!isCountedInGlobal || isPhantomUser) {
-          // 신규 유저 OR 팬텀 유저: 글로벌 집계에 (재)등록
-          totalParticipants += 1;
-          final newKey = newTotalCorrect.toString();
-          distribution[newKey] =
-              ((distribution[newKey] as num?)?.toInt() ?? 0) + 1;
-        } else if (isCorrect) {
-          // 이미 집계된 유저 + 정답: 이전 구간 -1, 새 구간 +1
-          final prevKey = prevTotalCorrect.toString();
-          final newKey  = newTotalCorrect.toString();
-          final prevBucket = ((distribution[prevKey] as num?)?.toInt() ?? 0) - 1;
-          if (prevBucket > 0) {
-            distribution[prevKey] = prevBucket;
+        // ── 6. 글로벌·주간 정답률 분포 (quiz_global/stats, quiz_global/weekly_*) ──
+        final globalData = globalSnap.data() ?? <String, dynamic>{};
+        final accDist = Map<String, dynamic>.from(
+          globalData['accuracyDistribution'] as Map<String, dynamic>? ?? {},
+        );
+        var totalParticipantsAccuracy =
+            (globalData['totalParticipantsAccuracy'] as num?)?.toInt() ?? 0;
+
+        final countedAcc = statsData['countedInGlobalAccuracy'] == true;
+        final oldAllPct =
+            QuizAccuracyStats.accuracyPercent(prevTotalCorrect, prevTotalWrong);
+        final newAllPct =
+            QuizAccuracyStats.accuracyPercent(newTotalCorrect, newTotalWrong)!;
+
+        // 신규: countedInGlobalAccuracy 미설정 + countedInGlobal 미설정 → 최초 등록.
+        // 레거시(countedInGlobal만 true): 분포 이동(팬텀 시 재등록).
+        var firstAll = false;
+        if (!countedAcc) {
+          firstAll = statsData['countedInGlobal'] != true;
+        } else {
+          if (oldAllPct == null) {
+            firstAll = true;
           } else {
-            distribution.remove(prevKey);
+            final cnt =
+                (accDist[oldAllPct.toString()] as num?)?.toInt() ?? 0;
+            firstAll = cnt <= 0;
           }
-          distribution[newKey] =
-              ((distribution[newKey] as num?)?.toInt() ?? 0) + 1;
         }
-        // 이미 집계된 유저 + 오답: totalCorrect 변화 없음 → 분포 변경 불필요
 
-        debugPrint('📊 [Global] participants=$totalParticipants, '
-            'dist=$distribution, counted=$isCountedInGlobal, '
-            'newTotalCorrect=$newTotalCorrect');
+        QuizAccuracyStats.applyBucketMove(
+          dist: accDist,
+          oldPct: oldAllPct,
+          newPct: newAllPct,
+          firstReg: firstAll,
+          onParticipantDelta: (d) => totalParticipantsAccuracy += d,
+        );
+
+        final weeklyData = weeklySnap.data() ?? <String, dynamic>{};
+        final wDist = Map<String, dynamic>.from(
+          weeklyData['accuracyDistribution'] as Map<String, dynamic>? ?? {},
+        );
+        var totalParticipantsWeekly =
+            (weeklyData['totalParticipantsWeekly'] as num?)?.toInt() ?? 0;
+
+        final regWeek =
+            statsData['weeklyGlobalRegisteredWeekKey'] as String?;
+        final oldWPct =
+            QuizAccuracyStats.accuracyPercent(prevWeekCorrect, prevWeekWrong);
+        final newWPct =
+            QuizAccuracyStats.accuracyPercent(newWeekCorrect, newWeekWrong)!;
+
+        var firstWeek = false;
+        if (regWeek != weekKey) {
+          firstWeek = true;
+        } else if (oldWPct == null) {
+          firstWeek = true;
+        } else {
+          final cnt =
+              (wDist[oldWPct.toString()] as num?)?.toInt() ?? 0;
+          firstWeek = cnt <= 0;
+        }
+
+        QuizAccuracyStats.applyBucketMove(
+          dist: wDist,
+          oldPct: oldWPct,
+          newPct: newWPct,
+          firstReg: firstWeek,
+          onParticipantDelta: (d) => totalParticipantsWeekly += d,
+        );
+
+        debugPrint(
+          '📊 [Global accuracy] all=$accDist p=$totalParticipantsAccuracy '
+          'weekly=$wDist wp=$totalParticipantsWeekly',
+        );
 
         tx.set(globalRef, {
-          'totalParticipants': totalParticipants,
-          'scoreDistribution': distribution,
-          'lastUpdatedAt':     FieldValue.serverTimestamp(),
-        });
+          'totalParticipantsAccuracy': totalParticipantsAccuracy,
+          'accuracyDistribution': accDist,
+          'lastUpdatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
+        tx.set(weeklyRef, {
+          'weekKey': weekKey,
+          'totalParticipantsWeekly': totalParticipantsWeekly,
+          'accuracyDistribution': wDist,
+          'lastUpdatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
       });
     } catch (e) {
       debugPrint('⚠️ QuizPoolService.saveAnswer: $e');
