@@ -2,17 +2,13 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import '../../core/theme/app_colors.dart';
-import '../../services/admin_activity_service.dart';
-import '../../services/app_error_logger.dart';
-import '../../services/onboarding_service.dart';
 import '../../services/user_profile_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import '../../features/auth/services/web_account_actions_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../onboarding/onboarding_profile_screen.dart';
 
@@ -123,212 +119,30 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _confirmLogout() async {
-    // 모든 계정에 대해 동일하게 일반 로그아웃 처리
-    final result = await showDialog<bool>(
-      context: context,
-      builder:
-          (ctx) => AlertDialog(
-            title: const Text('로그아웃할까요?'),
-            content: const Text('로그아웃하면 다시 로그인해야 내 서재와 구매한 책을 볼 수 있어요.'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('취소'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('로그아웃'),
-              ),
-            ],
-          ),
+    await WebAccountActionsService.confirmLogout(
+      context,
+      afterLogout: (ctx) {
+        Navigator.of(ctx).pop();
+        ScaffoldMessenger.of(
+          ctx,
+        ).showSnackBar(const SnackBar(content: Text('로그아웃 되었어요.')));
+      },
     );
-
-    if (result == true) {
-      // 세션 캐시 초기화 (excludeFromStats 캐시가 다음 계정까지 잔류하는 문제 방지)
-      AdminActivityService.clearCache();
-      AppErrorLogger.clearCache();
-      UserProfileService.clearCache();
-
-      // Firebase Auth + Google Sign-In 로그아웃
-      await GoogleSignIn().signOut();
-      await _auth.signOut();
-
-      if (!mounted) return;
-
-      // 설정 페이지 닫기 (AuthGate로 돌아가서 자동으로 로그인 페이지로 이동)
-      Navigator.of(context).pop();
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('로그아웃 되었어요.')));
-    }
   }
 
-  /// 계정 삭제 확인 및 실행
   Future<void> _confirmAndDeleteAccount() async {
-    final user = _user;
-    if (user == null) return;
-
-    // 1단계: 경고 다이얼로그
-    final confirm1 = await showDialog<bool>(
-      context: context,
-      builder:
-          (ctx) => AlertDialog(
-            title: const Text('⚠️ 계정을 삭제할까요?'),
-            content: const Text(
-              '삭제하면 복구할 수 없어요.\n\n'
-              '• 개인 기록 및 목표\n'
-              '• 파트너 그룹 멤버십\n'
-              '• 작성한 게시물 (익명 처리)\n'
-              '• 프로필 정보\n\n'
-              '모든 데이터가 삭제됩니다.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('취소'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                style: FilledButton.styleFrom(
-                  backgroundColor: Theme.of(ctx).colorScheme.error,
-                ),
-                child: const Text('다음'),
-              ),
-            ],
+    await WebAccountActionsService.confirmDeleteAccount(
+      context,
+      onSuccess: (ctx) {
+        Navigator.of(ctx).pop();
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          const SnackBar(
+            content: Text('✅ 계정이 완전히 삭제되었습니다.'),
+            backgroundColor: AppColors.success,
           ),
+        );
+      },
     );
-
-    if (confirm1 != true) return;
-
-    // 2단계: "삭제" 입력 확인
-    String inputText = '';
-    final confirm2 = await showDialog<bool>(
-      context: context,
-      builder:
-          (ctx) => AlertDialog(
-            title: const Text('마지막 확인'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('정말로 삭제하려면 아래에 "삭제"라고 입력해주세요.'),
-                const SizedBox(height: 16),
-                TextField(
-                  onChanged: (v) => inputText = v.trim(),
-                  decoration: const InputDecoration(
-                    hintText: '삭제',
-                    border: OutlineInputBorder(),
-                  ),
-                  autofocus: true,
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('취소'),
-              ),
-              FilledButton(
-                onPressed: () {
-                  Navigator.pop(ctx, inputText == '삭제');
-                },
-                style: FilledButton.styleFrom(
-                  backgroundColor: Theme.of(ctx).colorScheme.error,
-                ),
-                child: const Text('계정 삭제'),
-              ),
-            ],
-          ),
-    );
-
-    if (confirm2 != true) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('입력값이 일치하지 않아 취소되었습니다.')));
-      }
-      return;
-    }
-
-    // 3단계: 로딩 표시
-    if (mounted) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder:
-            (ctx) => const Center(
-              child: Card(
-                child: Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      CircularProgressIndicator(),
-                      SizedBox(height: 16),
-                      Text('계정을 삭제하는 중입니다...'),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-      );
-    }
-
-    try {
-      // 4단계: Cloud Function 호출
-      final callable = FirebaseFunctions.instanceFor(
-        region: 'asia-northeast3',
-      ).httpsCallable('deleteMyAccount');
-
-      await callable.call();
-
-      // 5단계: 재가입 시 온보딩 플래그를 signOut 전에 설정
-      // (signOut 후에는 currentUser가 null이 되어 schedulePendingOnboarding이 실패함)
-      await OnboardingService.forceSchedule();
-
-      // 5.5단계: 세션 캐시 초기화 (excludeFromStats 캐시 잔류 방지)
-      AdminActivityService.clearCache();
-      AppErrorLogger.clearCache();
-      UserProfileService.clearCache();
-
-      // 6단계: 로컬 로그아웃 (Auth는 서버에서 이미 삭제됨)
-      try {
-        await GoogleSignIn().signOut();
-        await _auth.signOut();
-      } catch (_) {
-        // Auth 계정이 이미 삭제되어 실패할 수 있음 (무시)
-      }
-
-      if (!mounted) return;
-
-      // 로딩 다이얼로그 닫기
-      Navigator.of(context).pop();
-
-      // 설정 페이지 닫기 (AuthGate가 로그인 화면으로 이동)
-      Navigator.of(context).pop();
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('✅ 계정이 완전히 삭제되었습니다.'),
-          backgroundColor: AppColors.success,
-        ),
-      );
-    } catch (e) {
-      debugPrint('❌ 계정 삭제 실패: $e');
-
-      if (!mounted) return;
-
-      // 로딩 다이얼로그 닫기
-      Navigator.of(context).pop();
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('계정 삭제 실패: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
-    }
   }
 
   @override

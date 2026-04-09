@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../models/resume.dart';
 import '../../../core/theme/app_colors.dart';
 import 'resume_ocr_prompt.dart';
+import 'resume_inline_underline_field.dart';
 
 /// G. 보수교육/세미나 섹션
 class SectionTrainings extends StatefulWidget {
@@ -173,18 +174,41 @@ class _TrainingCardState extends State<_TrainingCard> {
             const SizedBox(height: 10),
             Divider(height: 1, color: AppColors.divider.withOpacity(0.6)),
             const SizedBox(height: 14),
-            _field('교육명', _titleCtrl, '예: 보수교육 8시간'),
-            _field('교육기관', _orgCtrl, '대한치과위생사협회'),
+            ResumeInlineUnderlineField(
+              label: '교육명',
+              hint: '예: 보수교육 8시간',
+              controller: _titleCtrl,
+              onChanged: (_) => _emit(),
+            ),
+            ResumeInlineUnderlineField(
+              label: '교육기관',
+              hint: '대한치과위생사협회',
+              controller: _orgCtrl,
+              onChanged: (_) => _emit(),
+            ),
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: _field('시간', _hoursCtrl, '8',
-                      keyboard: TextInputType.number),
+                  child: ResumeInlineUnderlineField(
+                    label: '시간',
+                    hint: '8',
+                    controller: _hoursCtrl,
+                    keyboardType: TextInputType.number,
+                    labelWidth: 52,
+                    onChanged: (_) => _emit(),
+                  ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: _field('연도', _yearCtrl, '2025',
-                      keyboard: TextInputType.number),
+                  child: ResumeInlineUnderlineField(
+                    label: '연도',
+                    hint: '2025',
+                    controller: _yearCtrl,
+                    keyboardType: TextInputType.number,
+                    labelWidth: 52,
+                    onChanged: (_) => _emit(),
+                  ),
                 ),
               ],
             ),
@@ -194,30 +218,5 @@ class _TrainingCardState extends State<_TrainingCard> {
     );
   }
 
-  Widget _field(
-    String label,
-    TextEditingController ctrl,
-    String hint, {
-    TextInputType keyboard = TextInputType.text,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: TextField(
-        controller: ctrl,
-        keyboardType: keyboard,
-        onChanged: (_) => _emit(),
-        decoration: InputDecoration(
-          labelText: label,
-          hintText: hint,
-            hintStyle: TextStyle(color: AppColors.textDisabled),
-          border: const OutlineInputBorder(),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          isDense: true,
-        ),
-        style: const TextStyle(fontSize: 13),
-      ),
-    );
-  }
 }
 

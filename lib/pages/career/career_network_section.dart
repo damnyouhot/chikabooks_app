@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
-import '../../services/career_profile_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
+import '../../services/career_profile_service.dart';
+import '../../models/resume.dart';
+import '../../services/resume_career_sync_service.dart';
+import '../../services/resume_service.dart';
 import 'career_shared.dart';
+import 'resume_pick_for_network_sheet.dart';
 
 // ── 치과 네트워크 카드 ─────────────────────────────────────────
 class CareerNetworkCard extends StatefulWidget {
@@ -55,9 +59,6 @@ class _CareerNetworkCardState extends State<CareerNetworkCard> {
         final entries = snap.data ?? [];
         final totalClinics = entries.length;
         final totalMonths = entries.fold(0, (sum, e) => sum + e.months);
-        final maxMonths = entries.isEmpty
-            ? 1
-            : entries.map((e) => e.months).reduce((a, b) => a > b ? a : b);
 
         return CareerCard(
           padding: const EdgeInsets.fromLTRB(
@@ -140,7 +141,6 @@ class _CareerNetworkCardState extends State<CareerNetworkCard> {
                   padding: const EdgeInsets.only(top: 12),
                   child: _NetworkTimelineItem(
                     entry: entries.first,
-                    maxMonths: maxMonths,
                     onEdit: () => DentalNetworkEditSheet.show(
                       context,
                       editing: entries.first,
@@ -176,7 +176,6 @@ class _CareerNetworkCardState extends State<CareerNetworkCard> {
                                           const EdgeInsets.only(bottom: 10),
                                       child: _NetworkTimelineItem(
                                         entry: e,
-                                        maxMonths: maxMonths,
                                         onEdit: () =>
                                             DentalNetworkEditSheet.show(
                                           context,
@@ -275,25 +274,19 @@ class _NetworkEmptyHint extends StatelessWidget {
 
 class _NetworkTimelineItem extends StatelessWidget {
   final DentalNetworkEntry entry;
-  final int maxMonths;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
   const _NetworkTimelineItem({
     required this.entry,
-    required this.maxMonths,
     required this.onEdit,
     required this.onDelete,
   });
 
+  static const double _barHeight = 40;
+
   @override
   Widget build(BuildContext context) {
-    final screenH = MediaQuery.of(context).size.height;
-    final kMaxBarH = (screenH * 0.13).clamp(80.0, 130.0);
-    final kMinBarH = (screenH * 0.035).clamp(22.0, 36.0);
-    final barHeight =
-        kMinBarH + (kMaxBarH - kMinBarH) * (entry.months / maxMonths);
-
     return Container(
       decoration: BoxDecoration(
         // border 제거 — 배경색으로 현재 재직 여부 표현
@@ -302,15 +295,15 @@ class _NetworkTimelineItem extends StatelessWidget {
             : AppColors.onCardPrimary.withOpacity(0.07), // 이전 kCCardBg
         borderRadius: BorderRadius.circular(AppRadius.lg),
       ),
-      padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
+      padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // 타임라인 바 — 이전 isCurrent ? kCAccent : kCAccent.withOpacity(0.45)
           Container(
-            width: 7,
-            height: barHeight,
-            margin: const EdgeInsets.only(top: 2, right: 12),
+            width: 6,
+            height: _barHeight,
+            margin: const EdgeInsets.only(right: 10),
             decoration: BoxDecoration(
               color: entry.isCurrent
                   ? AppColors.cardEmphasis                  // Neon (현재 재직)
@@ -397,22 +390,30 @@ class _NetworkTimelineItem extends StatelessWidget {
               ],
             ),
           ),
-          Column(
+          Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               IconButton(
                 onPressed: onEdit,
-                icon: const Icon(Icons.edit_outlined, size: 16),
+                icon: const Icon(Icons.edit_outlined, size: 18),
                 color: AppColors.onCardPrimary, // 이전 kCText.withOpacity(0.55)
-                constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
-                padding: EdgeInsets.zero,
+                style: IconButton.styleFrom(
+                  padding: const EdgeInsets.all(4),
+                  minimumSize: const Size(32, 32),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.compact,
+                ),
               ),
               IconButton(
                 onPressed: onDelete,
-                icon: const Icon(Icons.delete_outline, size: 16),
+                icon: const Icon(Icons.delete_outline, size: 18),
                 color: AppColors.error, // 이전 Colors.redAccent.withOpacity(0.7)
-                constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
-                padding: EdgeInsets.zero,
+                style: IconButton.styleFrom(
+                  padding: const EdgeInsets.all(4),
+                  minimumSize: const Size(32, 32),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.compact,
+                ),
               ),
             ],
           ),
@@ -442,11 +443,114 @@ class DentalNetworkEditSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (editing != null) return _DentalEntryFormSheet(editing: editing);
-    return _DentalNetworkListSheet();
+    return const _DentalNetworkListSheet();
   }
 }
 
-class _DentalNetworkListSheet extends StatelessWidget {
+class _DentalNetworkListSheet extends StatefulWidget {
+  const _DentalNetworkListSheet();
+
+  @override
+  State<_DentalNetworkListSheet> createState() =>
+      _DentalNetworkListSheetState();
+}
+
+class _DentalNetworkListSheetState extends State<_DentalNetworkListSheet> {
+  bool _extracting = false;
+  bool _deletingSynced = false;
+
+  Future<void> _onExtractFromResume() async {
+    if (_extracting) return;
+    setState(() => _extracting = true);
+
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      final resumes = await ResumeService.fetchMyResumes();
+      if (!mounted) return;
+
+      final preferredId = await ResumeService.getLastImportedResumeId();
+      if (!mounted) return;
+
+      var withCareer =
+          resumes
+              .where(
+                (r) => r.experiences.any((e) => e.clinicName.trim().isNotEmpty),
+              )
+              .toList();
+
+      withCareer.sort((a, b) {
+        final aPref =
+            preferredId != null && a.id == preferredId;
+        final bPref =
+            preferredId != null && b.id == preferredId;
+        if (aPref != bPref) return aPref ? -1 : 1;
+        final at = a.updatedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final bt = b.updatedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        return bt.compareTo(at);
+      });
+
+      if (withCareer.isEmpty) {
+        if (resumes.isEmpty) {
+          messenger.showSnackBar(
+            const SnackBar(
+              content: Text(
+                '작성된 이력서가 없어요. 이력서를 먼저 만든 뒤 다시 시도해 주세요.',
+              ),
+            ),
+          );
+        } else {
+          messenger.showSnackBar(
+            const SnackBar(
+              content: Text(
+                '이력서에 등록된 경력이 없어요. 경력을 입력한 뒤 다시 시도해 주세요.',
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
+      if (!mounted) return;
+
+      final Resume? picked = await showResumePickerForNetworkExport(
+        context,
+        withCareer,
+        preferredResumeId: preferredId,
+      );
+
+      if (!mounted) return;
+      if (picked == null) return;
+
+      await ResumeCareerSyncService.syncFromResume(
+        picked,
+        syncSkills: false,
+      );
+
+      if (!mounted) return;
+      final title = picked.title.trim();
+      final label =
+          title.isEmpty
+              ? Resume.kDefaultResumeTitle
+              : (title.length > 32 ? '${title.substring(0, 29)}…' : title);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('「$label」경력을 치과 네트워크에 반영했어요.'),
+        ),
+      );
+    } catch (e, st) {
+      debugPrint('⚠️ 치과 네트워크 이력서 추출: $e\n$st');
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('불러오지 못했어요. 잠시 후 다시 시도해 주세요.'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _extracting = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -483,19 +587,21 @@ class _DentalNetworkListSheet extends StatelessWidget {
                   ),
                 ),
                 ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    showModalBottomSheet<void>(
-                      context: context,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (_) => const _DentalEntryFormSheet(),
-                    );
-                  },
+                  onPressed: _extracting
+                      ? null
+                      : () {
+                          Navigator.of(context).pop();
+                          showModalBottomSheet<void>(
+                            context: context,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
+                            builder: (_) => const _DentalEntryFormSheet(),
+                          );
+                        },
                   icon: const Icon(Icons.add, size: 16),
                   label: const Text('추가'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.accent,   // 이전 kCText(Black)
+                    backgroundColor: AppColors.accent, // 이전 kCText(Black)
                     foregroundColor: AppColors.onAccent,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 14,
@@ -512,6 +618,60 @@ class _DentalNetworkListSheet extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+            child: Semantics(
+              button: true,
+              label: '이력서에서 치과 경력 추출',
+              child: SizedBox(
+                width: double.infinity,
+                height: AppPublisher.ctaHeight,
+                child: ElevatedButton(
+                  onPressed: _extracting ? null : _onExtractFromResume,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: AppColors.onAccent,
+                    disabledBackgroundColor: AppColors.accent.withValues(
+                      alpha: 0.45,
+                    ),
+                    disabledForegroundColor: AppColors.onAccent.withValues(
+                      alpha: 0.85,
+                    ),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(
+                        AppPublisher.buttonRadius,
+                      ),
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  child:
+                      _extracting
+                          ? SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.onAccent,
+                            ),
+                          )
+                          : const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.description_outlined, size: 20),
+                              SizedBox(width: 8),
+                              Text('이력서에서 추출하기'),
+                            ],
+                          ),
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -534,7 +694,8 @@ class _DentalNetworkListSheet extends StatelessWidget {
                           ),
                           SizedBox(height: 12),
                           Text(
-                            '아직 등록된 치과가 없어요.\n오른쪽 위 추가 버튼을 눌러보세요.',
+                            '아직 등록된 치과가 없어요.\n'
+                            '위에서 이력서 경력을 가져오거나, 오른쪽 위 추가로 직접 입력할 수 있어요.',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 14,
@@ -547,98 +708,244 @@ class _DentalNetworkListSheet extends StatelessWidget {
                     ),
                   );
                 }
-                return ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.lg, 0, AppSpacing.lg, AppSpacing.xxl,
-                  ),
-                  itemCount: entries.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
-                  itemBuilder: (context, i) {
-                    final e = entries[i];
-                    return Container(
-                      decoration: BoxDecoration(
-                        // border 제거 — 배경색으로 현재 재직 여부 표현
-                        color: e.isCurrent
-                            ? AppColors.accent.withOpacity(0.10)
-                            : AppColors.surfaceMuted, // 이전 kCCardBg
-                        borderRadius: BorderRadius.circular(AppRadius.lg),
-                      ),
-                      padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                final hasSynced =
+                    entries.any((e) => e.syncedFromResume);
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.lg,
+                          0,
+                          AppSpacing.lg,
+                          AppSpacing.sm,
+                        ),
+                        itemCount: entries.length,
+                        separatorBuilder: (_, __) =>
+                            const SizedBox(height: 8),
+                        itemBuilder: (context, i) {
+                          final e = entries[i];
+                          return Container(
+                            decoration: BoxDecoration(
+                              color: e.isCurrent
+                                  ? AppColors.accent.withOpacity(0.10)
+                                  : AppColors.surfaceMuted,
+                              borderRadius:
+                                  BorderRadius.circular(AppRadius.lg),
+                            ),
+                            padding: const EdgeInsets.fromLTRB(
+                              14,
+                              10,
+                              8,
+                              10,
+                            ),
+                            child: Row(
                               children: [
-                                Text(
-                                  e.clinicName,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppColors.textPrimary,
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        e.clinicName,
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w800,
+                                          color: AppColors.textPrimary,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        '${e.periodLabel}  ·  ${formatCareerMonths(e.months)}',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '${e.periodLabel}  ·  ${formatCareerMonths(e.months)}',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.textSecondary, // 이전 kCText.withOpacity(0.55)
+                                IconButton(
+                                  onPressed: () {
+                                    Navigator.of(context).pop();
+                                    showModalBottomSheet<void>(
+                                      context: context,
+                                      isScrollControlled: true,
+                                      backgroundColor: Colors.transparent,
+                                      builder:
+                                          (_) => _DentalEntryFormSheet(
+                                            editing: e,
+                                          ),
+                                    );
+                                  },
+                                  icon: const Icon(
+                                    Icons.edit_outlined,
+                                    size: 18,
                                   ),
+                                  color: AppColors.textSecondary,
+                                ),
+                                IconButton(
+                                  onPressed: () async {
+                                    final ok = await showDialog<bool>(
+                                      context: context,
+                                      builder:
+                                          (ctx) => AlertDialog(
+                                            title: const Text(
+                                              '삭제하시겠어요?',
+                                            ),
+                                            content: Text(
+                                              '"${e.clinicName}" 이력을 삭제합니다.',
+                                            ),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () =>
+                                                    Navigator.of(
+                                                      ctx,
+                                                    ).pop(false),
+                                                child: const Text('취소'),
+                                              ),
+                                              TextButton(
+                                                onPressed: () =>
+                                                    Navigator.of(
+                                                      ctx,
+                                                    ).pop(true),
+                                                child: const Text(
+                                                  '삭제',
+                                                  style: TextStyle(
+                                                    color: AppColors.error,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                    );
+                                    if (ok == true) {
+                                      await CareerProfileService
+                                          .deleteNetworkEntry(e.id);
+                                    }
+                                  },
+                                  icon: const Icon(
+                                    Icons.delete_outline,
+                                    size: 18,
+                                  ),
+                                  color: AppColors.error,
                                 ),
                               ],
                             ),
-                          ),
-                          IconButton(
-                            onPressed: () {
-                              Navigator.of(context).pop();
-                              showModalBottomSheet<void>(
-                                context: context,
-                                isScrollControlled: true,
-                                backgroundColor: Colors.transparent,
-                                builder: (_) => _DentalEntryFormSheet(editing: e),
-                              );
-                            },
-                            icon: const Icon(Icons.edit_outlined, size: 18),
-                            color: AppColors.textSecondary, // 이전 kCText.withOpacity(0.6)
-                          ),
-                          IconButton(
-                            onPressed: () async {
-                              final ok = await showDialog<bool>(
-                                context: context,
-                                builder: (ctx) => AlertDialog(
-                                  title: const Text('삭제하시겠어요?'),
-                                  content: Text(
-                                    '"${e.clinicName}" 이력을 삭제합니다.',
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () =>
-                                          Navigator.of(ctx).pop(false),
-                                      child: const Text('취소'),
-                                    ),
-                                    TextButton(
-                                      onPressed: () =>
-                                          Navigator.of(ctx).pop(true),
-                                      child: const Text(
-                                        '삭제',
-                                        style: TextStyle(color: AppColors.error),
+                          );
+                        },
+                      ),
+                    ),
+                    if (hasSynced)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.lg,
+                          0,
+                          AppSpacing.lg,
+                          AppSpacing.md,
+                        ),
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed:
+                                _deletingSynced
+                                    ? null
+                                    : () async {
+                                      final ok = await showDialog<bool>(
+                                        context: context,
+                                        builder:
+                                            (ctx) => AlertDialog(
+                                              title: const Text(
+                                                '이력서에서 가져온 경력만 삭제',
+                                              ),
+                                              content: const Text(
+                                                '이력서 동기화로 추가된 항목만 모두 삭제합니다. '
+                                                '직접 추가한 치과는 그대로 둡니다.',
+                                              ),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () =>
+                                                      Navigator.of(
+                                                        ctx,
+                                                      ).pop(false),
+                                                  child: const Text('취소'),
+                                                ),
+                                                TextButton(
+                                                  onPressed: () =>
+                                                      Navigator.of(
+                                                        ctx,
+                                                      ).pop(true),
+                                                  child: const Text(
+                                                    '전체 삭제',
+                                                    style: TextStyle(
+                                                      color:
+                                                          AppColors.error,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                      );
+                                      if (ok != true || !context.mounted) {
+                                        return;
+                                      }
+                                      setState(() => _deletingSynced = true);
+                                      try {
+                                        final n =
+                                            await CareerProfileService
+                                                .deleteAllSyncedFromResumeNetworkEntries();
+                                        if (!context.mounted) return;
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              n > 0
+                                                  ? '이력서에서 가져온 경력 $n건을 삭제했어요.'
+                                                  : '삭제할 항목이 없어요.',
+                                            ),
+                                          ),
+                                        );
+                                      } catch (e) {
+                                        if (!context.mounted) return;
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              '삭제하지 못했어요: $e',
+                                            ),
+                                          ),
+                                        );
+                                      } finally {
+                                        if (mounted) {
+                                          setState(
+                                            () => _deletingSynced = false,
+                                          );
+                                        }
+                                      }
+                                    },
+                            child:
+                                _deletingSynced
+                                    ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                    : const Text(
+                                      '전체 삭제',
+                                      style: TextStyle(
+                                        color: AppColors.error,
+                                        fontWeight: FontWeight.w700,
                                       ),
                                     ),
-                                  ],
-                                ),
-                              );
-                              if (ok == true) {
-                                await CareerProfileService.deleteNetworkEntry(e.id);
-                              }
-                            },
-                            icon: const Icon(Icons.delete_outline, size: 18),
-                            color: AppColors.error, // 이전 Colors.redAccent.withOpacity(0.65)
                           ),
-                        ],
+                        ),
                       ),
-                    );
-                  },
+                  ],
                 );
               },
             ),
@@ -736,6 +1043,8 @@ class _DentalEntryFormSheetState extends State<_DentalEntryFormSheet> {
         endDate: _isCurrent ? null : _endDate,
         tags: _tags,
         acquiredSkills: _acquiredSkills,
+        // 시트에서 저장 = 사용자 확정 → 이력서 자동동기화 대상에서 제외
+        syncedFromResume: false,
       );
       if (widget.editing == null) {
         await CareerProfileService.addNetworkEntry(entry);

@@ -1,10 +1,17 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
+import 'career_network_dedupe_helper.dart';
+
 class CareerProfileService {
   static final _db = FirebaseFirestore.instance;
   static final _auth = FirebaseAuth.instance;
+
+  /// [watchNetworkEntries] 구독 시 과도한 Firestore 호출 방지 (분 단위)
+  static final Map<String, DateTime> _lastNetworkMergeAt = {};
 
   static String? get _uid => _auth.currentUser?.uid;
 
@@ -193,6 +200,24 @@ class CareerProfileService {
   static Stream<List<DentalNetworkEntry>> watchNetworkEntries() {
     return _auth.authStateChanges().asyncExpand((user) {
       if (user == null) return const Stream.empty();
+      unawaited(
+        Future(() async {
+          try {
+            final now = DateTime.now();
+            final last = _lastNetworkMergeAt[user.uid];
+            if (last != null &&
+                now.difference(last) < const Duration(minutes: 3)) {
+              return;
+            }
+            _lastNetworkMergeAt[user.uid] = now;
+            await CareerNetworkDedupeHelper.mergeSimilarNetworkEntries(
+              _db.collection('users').doc(user.uid).collection('careerNetwork'),
+            );
+          } catch (e) {
+            debugPrint('⚠️ CareerProfileService network dedupe: $e');
+          }
+        }),
+      );
       return _db
           .collection('users')
           .doc(user.uid)
@@ -225,6 +250,26 @@ class CareerProfileService {
     final ref = _networkRef;
     if (ref == null) throw Exception('로그인이 필요합니다.');
     await ref.doc(entryId).delete();
+  }
+
+  /// `syncedFromResume == true`인 치과 네트워크 행만 일괄 삭제 (이력서 추출로 쌓인 줄만 비움)
+  static Future<int> deleteAllSyncedFromResumeNetworkEntries() async {
+    final ref = _networkRef;
+    if (ref == null) throw Exception('로그인이 필요합니다.');
+    final snap = await ref.where('syncedFromResume', isEqualTo: true).get();
+    final docs = snap.docs;
+    if (docs.isEmpty) return 0;
+
+    const chunk = 450;
+    for (var i = 0; i < docs.length; i += chunk) {
+      final batch = _db.batch();
+      final end = i + chunk > docs.length ? docs.length : i + chunk;
+      for (var j = i; j < end; j++) {
+        batch.delete(docs[j].reference);
+      }
+      await batch.commit();
+    }
+    return docs.length;
   }
 
   static Future<void> updateCareerIdentity({
@@ -270,6 +315,9 @@ class DentalNetworkEntry {
   final List<String> tags;
   final List<String> acquiredSkills;
 
+  /// 이력서 저장 시 자동 동기화로 생성·갱신된 항목
+  final bool syncedFromResume;
+
   DentalNetworkEntry({
     this.id = '',
     required this.clinicName,
@@ -277,6 +325,7 @@ class DentalNetworkEntry {
     this.endDate,
     this.tags = const [],
     this.acquiredSkills = const [],
+    this.syncedFromResume = false,
   });
 
   bool get isCurrent => endDate == null;
@@ -287,11 +336,14 @@ class DentalNetworkEntry {
     return m < 1 ? 1 : m;
   }
 
+  /// `YYYY.MM` 단위 — 연도만이 아니라 월까지 보여 검증·중복 확인에 유리
   String get periodLabel {
-    final sy = startDate.year;
-    if (endDate == null) return '$sy ~ 현재';
-    final ey = endDate!.year;
-    return sy == ey ? '$sy' : '$sy ~ $ey';
+    String ym(DateTime d) =>
+        '${d.year}.${d.month.toString().padLeft(2, '0')}';
+    final s = ym(startDate);
+    if (endDate == null) return '$s ~ 현재';
+    final e = ym(endDate!);
+    return '$s ~ $e';
   }
 
   DentalNetworkEntry copyWith({
@@ -301,6 +353,7 @@ class DentalNetworkEntry {
     Object? endDate = _sentinel,
     List<String>? tags,
     List<String>? acquiredSkills,
+    bool? syncedFromResume,
   }) {
     return DentalNetworkEntry(
       id: id ?? this.id,
@@ -309,6 +362,7 @@ class DentalNetworkEntry {
       endDate: endDate == _sentinel ? this.endDate : endDate as DateTime?,
       tags: tags ?? this.tags,
       acquiredSkills: acquiredSkills ?? this.acquiredSkills,
+      syncedFromResume: syncedFromResume ?? this.syncedFromResume,
     );
   }
 
@@ -323,6 +377,7 @@ class DentalNetworkEntry {
       endDate: (d['endDate'] as Timestamp?)?.toDate(),
       tags: List<String>.from(d['tags'] as List? ?? []),
       acquiredSkills: List<String>.from(d['acquiredSkills'] as List? ?? []),
+      syncedFromResume: d['syncedFromResume'] as bool? ?? false,
     );
   }
 
@@ -332,6 +387,7 @@ class DentalNetworkEntry {
     'endDate': endDate != null ? Timestamp.fromDate(endDate!) : null,
     'tags': tags,
     'acquiredSkills': acquiredSkills,
+    'syncedFromResume': syncedFromResume,
   };
 }
 

@@ -1,8 +1,11 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_muted_card.dart';
 import '../../../models/resume.dart';
+import '../widgets/resume_skill_presets.dart';
+import '../../auth/web/web_account_menu_button.dart';
 
 /// 이력서 미리보기 화면
 ///
@@ -49,6 +52,7 @@ class _ResumePreviewScreenState extends State<ResumePreviewScreen>
         ),
         centerTitle: false,
         iconTheme: const IconThemeData(color: AppColors.textPrimary),
+        actions: [if (kIsWeb) const WebAccountMenuButton()],
         bottom: TabBar(
           controller: _tabCtrl,
           labelColor: AppColors.accent,
@@ -104,53 +108,110 @@ class _ResumePreviewScreenState extends State<ResumePreviewScreen>
             ),
           ),
 
-        // ── 프로필 사진 + 이름/한줄소개 ──
+        // ── 프로필 사진 + 인적사항(기본정보) ──
         _buildProfileHeader(profile, anonymous: anonymous),
 
-        // ── A. 기본정보 ──
-        _PreviewSection(
-          title: '기본정보',
-          icon: Icons.person_outline,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _infoRow(
-                '이름',
-                anonymous ? _mask(profile?.name ?? '') : (profile?.name ?? '-'),
-              ),
-              _infoRow(
-                '연락처',
-                anonymous ? '***-****-****' : (profile?.phone ?? '-'),
-              ),
-              _infoRow(
-                '이메일',
-                anonymous ? '****@****.com' : (profile?.email ?? '-'),
-              ),
-              _infoRow('지역', profile?.region ?? '-'),
-              if (profile?.workTypes.isNotEmpty == true)
-                _infoRow('희망 근무형태', profile!.workTypes.join(', ')),
-              if (profile?.headline.isNotEmpty == true)
-                _infoRow('한줄소개', profile!.headline),
-            ],
+        // ── A. 학력 ──
+        if (r.education.isNotEmpty)
+          _PreviewSection(
+            title: '학력',
+            icon: Icons.school_outlined,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (var i = 0; i < r.education.length; i++) ...[
+                  if (i > 0)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: AppColors.divider.withValues(alpha: 0.55),
+                      ),
+                    ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        r.education[i].school,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                          height: 1.35,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${r.education[i].major}'
+                        '${r.education[i].gradYear != null ? ' · ${r.education[i].gradYear}년 졸업' : ''}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textDisabled,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
           ),
-        ),
 
-        // ── B. 요약 ──
+        // ── B. 경력 (한 카드 · 항목마다 구분선) ──
+        if (r.experiences.isNotEmpty)
+          _PreviewSection(
+            title: '경력',
+            icon: Icons.work_outline,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (var i = 0; i < r.experiences.length; i++) ...[
+                  if (i > 0)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: AppColors.divider.withValues(alpha: 0.55),
+                      ),
+                    ),
+                  _ExperiencePreviewBlock(
+                    experience: r.experiences[i],
+                    anonymous: anonymous,
+                    mask: _mask,
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+        // ── C. 스킬 (임상 / 소프트·기타 / 코멘트) ──
+        if (r.skills.isNotEmpty ||
+            (profile?.clinicalSkillsComment.isNotEmpty == true) ||
+            (profile?.softSkillsComment.isNotEmpty == true))
+          _PreviewSection(
+            title: '스킬',
+            icon: Icons.auto_awesome_outlined,
+            child: _buildSkillsPreviewBlock(r, profile),
+          ),
+
+        // ── E. 자기소개 ──
         if (profile?.summary.isNotEmpty == true)
           _PreviewSection(
-            title: '요약',
+            title: '자기소개',
             icon: Icons.edit_note,
             child: Text(
               profile!.summary,
               style: const TextStyle(
                 fontSize: 13,
                 color: AppColors.textSecondary,
-                height: 1.6,
+                height: 1.65,
               ),
             ),
           ),
 
-        // ── C. 면허/자격 ──
+        // ── F. 면허/자격 ──
         if (r.licenses.isNotEmpty)
           _PreviewSection(
             title: '면허 / 자격',
@@ -180,124 +241,6 @@ class _ResumePreviewScreenState extends State<ResumePreviewScreen>
                               ),
                             ),
                           ],
-                        ),
-                      ))
-                  .toList(),
-            ),
-          ),
-
-        // ── D. 경력 ──
-        if (r.experiences.isNotEmpty)
-          _PreviewSection(
-            title: '경력',
-            icon: Icons.work_outline,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: r.experiences.map((e) {
-                return AppMutedCard(
-                  margin: const EdgeInsets.only(bottom: AppSpacing.md),
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  radius: AppRadius.md,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        anonymous
-                            ? '${_mask(e.clinicName)} (${e.region})'
-                            : '${e.clinicName} (${e.region})',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      Text(
-                        '${e.start} ~ ${e.end}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textDisabled,
-                        ),
-                      ),
-                      if (e.tasks.isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        Wrap(
-                          spacing: 4,
-                          runSpacing: 4,
-                          children: e.tasks
-                              .map((t) => Chip(
-                                    label: Text(t,
-                                        style: const TextStyle(fontSize: 10)),
-                                    materialTapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
-                                    visualDensity: VisualDensity.compact,
-                                    padding: EdgeInsets.zero,
-                                    labelPadding: const EdgeInsets.symmetric(
-                                        horizontal: 6),
-                                  ))
-                              .toList(),
-                        ),
-                      ],
-                      if (e.achievementsText?.isNotEmpty == true) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          '성과: ${e.achievementsText}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-
-        // ── E. 스킬 ──
-        if (r.skills.isNotEmpty)
-          _PreviewSection(
-            title: '스킬',
-            icon: Icons.auto_awesome_outlined,
-            child: Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: r.skills.map((s) {
-                return Chip(
-                  avatar: CircleAvatar(
-                    backgroundColor: AppColors.accent.withOpacity(0.15),
-                    radius: 10,
-                    child: Text(
-                      '${s.level}',
-                      style: const TextStyle(
-                        fontSize: 9,
-                        color: AppColors.accent,
-                      ),
-                    ),
-                  ),
-                  label: Text(s.name, style: const TextStyle(fontSize: 12)),
-                );
-              }).toList(),
-            ),
-          ),
-
-        // ── F. 학력 ──
-        if (r.education.isNotEmpty)
-          _PreviewSection(
-            title: '학력',
-            icon: Icons.school_outlined,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: r.education
-                  .map((e) => Padding(
-                        padding: const EdgeInsets.only(bottom: 6),
-                        child: Text(
-                          '${e.school} — ${e.major}'
-                          '${e.gradYear != null ? ' (${e.gradYear}년 졸업)' : ''}',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: AppColors.textSecondary,
-                          ),
                         ),
                       ))
                   .toList(),
@@ -365,14 +308,168 @@ class _ResumePreviewScreenState extends State<ResumePreviewScreen>
     );
   }
 
-  Widget _infoRow(String label, String value) {
+  /// 스킬 미리보기: 작성 화면과 동일하게 임상 / 소프트·기타 구분
+  Widget _buildSkillsPreviewBlock(Resume r, ResumeProfile? profile) {
+    final clinical = <ResumeSkill>[];
+    final soft = <ResumeSkill>[];
+    final other = <ResumeSkill>[];
+    for (final s in r.skills) {
+      if (ResumeSkillPresets.isClinicalSkillId(s.id, s.name)) {
+        clinical.add(s);
+      } else if (ResumeSkillPresets.isSoftSkillId(s.id, s.name)) {
+        soft.add(s);
+      } else {
+        other.add(s);
+      }
+    }
+    final cc = profile?.clinicalSkillsComment ?? '';
+    final sc = profile?.softSkillsComment ?? '';
+
+    final hasClinicalBlock = clinical.isNotEmpty || cc.isNotEmpty;
+    final hasSoftBlock =
+        soft.isNotEmpty || other.isNotEmpty || sc.isNotEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (hasClinicalBlock) ...[
+          _skillPreviewSubheading('임상 스킬'),
+          if (clinical.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              alignment: WrapAlignment.start,
+              children: clinical.map((s) => _previewSkillChip(s)).toList(),
+            ),
+          ],
+          if (cc.isNotEmpty) ...[
+            SizedBox(height: clinical.isNotEmpty ? 12 : 0),
+            _skillCommentCard('코멘트', cc),
+          ],
+        ],
+        if (hasClinicalBlock && hasSoftBlock) ...[
+          const SizedBox(height: 14),
+          Divider(
+            height: 1,
+            thickness: 1,
+            color: AppColors.divider.withValues(alpha: 0.55),
+          ),
+          const SizedBox(height: 14),
+        ],
+        if (hasSoftBlock) ...[
+          _skillPreviewSubheading('소프트 스킬'),
+          if (soft.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              alignment: WrapAlignment.start,
+              children: soft.map((s) => _previewSkillChip(s)).toList(),
+            ),
+          ],
+          if (other.isNotEmpty) ...[
+            SizedBox(height: soft.isNotEmpty ? 10 : 8),
+            Text(
+              '직접 추가',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textDisabled,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              alignment: WrapAlignment.start,
+              children: other.map((s) => _previewSkillChip(s)).toList(),
+            ),
+          ],
+          if (sc.isNotEmpty) ...[
+            SizedBox(height: (soft.isNotEmpty || other.isNotEmpty) ? 12 : 0),
+            _skillCommentCard('코멘트', sc),
+          ],
+        ],
+      ],
+    );
+  }
+
+  Widget _previewSkillChip(ResumeSkill s) {
+    return Chip(
+      avatar: CircleAvatar(
+        backgroundColor: AppColors.accent.withValues(alpha: 0.15),
+        radius: 10,
+        child: Text(
+          '${s.level}',
+          style: const TextStyle(
+            fontSize: 9,
+            color: AppColors.accent,
+          ),
+        ),
+      ),
+      label: Text(s.name, style: const TextStyle(fontSize: 12)),
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      visualDensity: VisualDensity.compact,
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+    );
+  }
+
+  Widget _skillPreviewSubheading(String title) {
+    return Text(
+      title,
+      style: const TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w700,
+        color: AppColors.textPrimary,
+      ),
+    );
+  }
+
+  Widget _skillCommentCard(String label, String body) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceMuted.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        border: Border.all(
+          color: AppColors.divider.withValues(alpha: 0.65),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            body,
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textPrimary,
+              height: 1.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _infoRow(String label, String value, {double labelWidth = 58}) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.only(bottom: 5),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 80,
+            width: labelWidth,
             child: Text(
               label,
               style: const TextStyle(
@@ -388,6 +485,7 @@ class _ResumePreviewScreenState extends State<ResumePreviewScreen>
               style: const TextStyle(
                 fontSize: 13,
                 color: AppColors.textPrimary,
+                height: 1.35,
               ),
             ),
           ),
@@ -398,21 +496,18 @@ class _ResumePreviewScreenState extends State<ResumePreviewScreen>
 
   Widget _buildProfileHeader(ResumeProfile? profile, {required bool anonymous}) {
     final photoUrl = anonymous ? null : profile?.selectedPhotoUrl;
-    final name = anonymous
-        ? _mask(profile?.name ?? '')
-        : (profile?.name ?? '');
-    final headline = profile?.headline ?? '';
 
     return AppMutedCard(
       margin: const EdgeInsets.only(bottom: AppSpacing.md),
       padding: const EdgeInsets.all(AppSpacing.md),
       radius: AppRadius.md,
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 대표 사진 (3:4 직사각형)
+          // 대표 사진 (3:4) — 인적사항 가독성을 위해 충분히 크게
           Container(
-            width: 72,
-            height: 96,
+            width: 132,
+            height: 176,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(10),
               color: AppColors.divider,
@@ -428,33 +523,32 @@ class _ResumePreviewScreenState extends State<ResumePreviewScreen>
                   )
                 : _defaultAvatar(),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (name.isNotEmpty)
-                  Text(
-                    name,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                if (headline.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    headline,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: AppColors.textSecondary,
-                      height: 1.4,
-                    ),
-                  ),
-                ],
+                _infoRow(
+                  '이름',
+                  anonymous ? _mask(profile?.name ?? '') : (profile?.name ?? '-'),
+                ),
+                _infoRow(
+                  '연락처',
+                  anonymous ? '***-****-****' : (profile?.phone ?? '-'),
+                ),
+                _infoRow(
+                  '이메일',
+                  anonymous ? '****@****.com' : (profile?.email ?? '-'),
+                ),
+                _infoRow('지역', profile?.region ?? '-'),
+                _infoRow(
+                  '근무형태',
+                  profile?.workTypes.isNotEmpty == true
+                      ? profile!.workTypes.join(', ')
+                      : '-',
+                ),
+                if (profile?.headline.isNotEmpty == true)
+                  _infoRow('한줄소개', profile!.headline),
               ],
             ),
           ),
@@ -467,7 +561,7 @@ class _ResumePreviewScreenState extends State<ResumePreviewScreen>
     return Center(
       child: Icon(
         Icons.person,
-        size: 36,
+        size: 48,
         color: AppColors.textDisabled.withOpacity(0.5),
       ),
     );
@@ -478,6 +572,91 @@ class _ResumePreviewScreenState extends State<ResumePreviewScreen>
     if (text.isEmpty) return '-';
     if (text.length <= 1) return '*';
     return '${text[0]}${'*' * (text.length - 1)}';
+  }
+}
+
+/// 경력 한 건 — 병원명(지역)은 지역 비어 있으면 괄호 생략
+class _ExperiencePreviewBlock extends StatelessWidget {
+  const _ExperiencePreviewBlock({
+    required this.experience,
+    required this.anonymous,
+    required this.mask,
+  });
+
+  final ResumeExperience experience;
+  final bool anonymous;
+  final String Function(String) mask;
+
+  @override
+  Widget build(BuildContext context) {
+    final e = experience;
+    final clinic = anonymous ? mask(e.clinicName) : e.clinicName;
+    final region = e.region.trim();
+    final titleLine =
+        region.isEmpty ? clinic : '$clinic ($region)';
+
+    final period = '${e.start} ~ ${e.end}';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Text(
+                titleLine,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                  height: 1.35,
+                ),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              period,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.textDisabled,
+              ),
+            ),
+          ],
+        ),
+        if (e.tasks.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 4,
+            runSpacing: 4,
+            children: e.tasks
+                .map(
+                  (t) => Chip(
+                    label: Text(t, style: const TextStyle(fontSize: 10)),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    labelPadding: const EdgeInsets.symmetric(horizontal: 6),
+                  ),
+                )
+                .toList(),
+          ),
+        ],
+        if (e.achievementsText?.isNotEmpty == true) ...[
+          const SizedBox(height: 6),
+          Text(
+            '성과: ${e.achievementsText}',
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ],
+    );
   }
 }
 

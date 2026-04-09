@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -11,6 +12,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_tokens.dart' show AppPublisher, AppRadius;
 import '../../../models/job_draft.dart';
 import '../../../services/job_draft_service.dart';
+import '../../auth/web/web_account_menu_button.dart';
 
 /// 구인등록 웹 페이지 셸 (/post-job)
 ///
@@ -214,6 +216,10 @@ class _JobPostWebPageState extends State<JobPostWebPage>
                     textStyle: const TextStyle(fontSize: 13),
                   ),
                 ),
+                if (kIsWeb) ...[
+                  const SizedBox(width: 4),
+                  const WebAccountMenuButton(),
+                ],
               ],
             ),
           ),

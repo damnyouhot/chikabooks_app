@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_tokens.dart';
+import '../../auth/web/web_account_menu_button.dart';
 import '../../../models/clinic_profile.dart'
     show BizVerificationStatus, ClinicProfile;
 import '../../../models/job_draft.dart';
@@ -57,6 +58,11 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
   bool _profileReady = false;
   String _editorStep = 'step1';
   String? _aiError;
+
+  /// 사업자 인증 완료 상태에서만 true — 새 등록증 교체 UI 진입
+  bool _licenseReplaceMode = false;
+
+  bool _retryingBusinessCheck = false;
 
   /// 좌측 미리보기 단일 스크롤 — [JobPostPreview]와 동일 인스턴스 유지.
   final ScrollController _previewScrollController = ScrollController();
@@ -1196,6 +1202,8 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
             ),
           ],
           const Spacer(),
+          const WebAccountMenuButton(),
+          const SizedBox(width: 12),
           SizedBox(
             height: AppPublisher.ctaHeight,
             child: ElevatedButton(
@@ -1354,6 +1362,85 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
     );
   }
 
+  Future<void> _retryBusinessCheck(ClinicProfile profile) async {
+    if (_retryingBusinessCheck) return;
+    setState(() => _retryingBusinessCheck = true);
+    try {
+      final fn = FirebaseFunctions.instance.httpsCallable(
+        'checkBusinessStatus',
+      );
+      await fn.call({'profileId': profile.id});
+      final u = await ClinicProfileService.getProfile(profile.id);
+      if (u != null && mounted) {
+        setState(() {
+          _selectedProfile = u;
+          if (u.isBusinessVerified) {
+            _licenseReplaceMode = false;
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('다시 확인에 실패했습니다: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _retryingBusinessCheck = false);
+    }
+  }
+
+  Future<void> _onTapReplaceBusinessLicense() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: Text(
+            '등록증을 바꿀까요?',
+            style: GoogleFonts.notoSansKr(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          content: Text(
+            '새 파일을 올리면 사업자 정보를 다시 확인합니다. 이전 등록증은 내부 인증 목적으로만 보관되며 외부에 공개되지 않습니다.',
+            style: GoogleFonts.notoSansKr(
+              fontSize: 13,
+              height: 1.5,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(
+                '취소',
+                style: GoogleFonts.notoSansKr(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(
+                '계속',
+                style: GoogleFonts.notoSansKr(
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.accent,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+    if (ok == true && mounted) {
+      setState(() => _licenseReplaceMode = true);
+    }
+  }
+
   Widget _buildVerificationStickyBanner(ClinicProfile profile) {
     if (profile.isBusinessVerified) return const SizedBox.shrink();
     final bv = profile.businessVerification;
@@ -1392,6 +1479,33 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
               ),
             ),
           ),
+          if (fr == 'nts_api_error') ...[
+            const SizedBox(width: 8),
+            TextButton(
+              onPressed:
+                  _retryingBusinessCheck
+                      ? null
+                      : () => _retryBusinessCheck(profile),
+              child:
+                  _retryingBusinessCheck
+                      ? SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.accent,
+                        ),
+                      )
+                      : Text(
+                        '다시 확인',
+                        style: GoogleFonts.notoSansKr(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.accent,
+                        ),
+                      ),
+            ),
+          ],
         ],
       ),
     );
@@ -1483,54 +1597,27 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
   }
 
   Widget _buildLicenseSide(ClinicProfile profile) {
-    if (profile.isBusinessVerified) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.accent.withValues(alpha: 0.05),
-          border: Border(left: BorderSide(color: AppColors.accent, width: 3)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.verified_outlined,
-                  color: AppColors.accent,
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '사업자 인증 완료',
-                  style: GoogleFonts.notoSansKr(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '등록증은 내부 검증용이며 외부에 공개되지 않습니다.',
-              style: GoogleFonts.notoSansKr(
-                fontSize: 12,
-                height: 1.45,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
     return BizLicenseUploadSection(
       profileId: profile.id,
       publisherStyleOcrLabelWidth: true,
+      replacementMode: _licenseReplaceMode,
+      persistedProfile: profile,
+      onReplaceLicenseWithDialog: _onTapReplaceBusinessLicense,
+      onReplacementCancel:
+          _licenseReplaceMode
+              ? () {
+                if (mounted) setState(() => _licenseReplaceMode = false);
+              }
+              : null,
       onCompleted: () async {
         final updated = await ClinicProfileService.getProfile(profile.id);
         if (updated != null && mounted) {
-          setState(() => _selectedProfile = updated);
+          setState(() {
+            _selectedProfile = updated;
+            if (updated.isBusinessVerified) {
+              _licenseReplaceMode = false;
+            }
+          });
         }
       },
     );

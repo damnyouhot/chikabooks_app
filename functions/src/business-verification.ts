@@ -5,6 +5,8 @@
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions/v1";
 import axios from "axios";
+import type {HiraMatchLevel} from "./hira-match-tier";
+import {matchHiraClinicName} from "./hira-hospital-match";
 
 /** Firestore businessVerification.status 와 동일한 문자열 */
 export type RunCheckStatus =
@@ -19,6 +21,11 @@ export interface RunCheckResult {
   method: "nts" | "mock";
   /** 이미 verified였거나 검증을 건너뜀 */
   skipped?: boolean;
+  /** 심평원 병원목록 대조 (보조) */
+  hiraMatched?: boolean | null;
+  hiraNote?: string;
+  /** strict | partial | none */
+  hiraMatchLevel?: HiraMatchLevel;
 }
 
 /**
@@ -73,6 +80,24 @@ async function callNtsStatusApi(
   return {valid: true, closed};
 }
 
+async function runHiraSupplement(
+  clinicName: string,
+  address: string,
+  /** defineSecret().value() 등으로 전달(문자열 시크릿은 런타임에 env 미주입되는 경우가 있어 우선 사용) */
+  hiraKeyOverride?: string
+): Promise<{matched: boolean | null; note: string; level: HiraMatchLevel}> {
+  const hiraKey = String(
+    hiraKeyOverride ?? process.env.HIRA_SERVICE_KEY ?? ""
+  ).trim();
+  if (!hiraKey) {
+    return {matched: null, note: "HIRA(공공데이터) 키 미설정", level: "none"};
+  }
+  if (!clinicName.trim()) {
+    return {matched: null, note: "상호 없음", level: "none"};
+  }
+  return matchHiraClinicName(clinicName, address, hiraKey);
+}
+
 /**
  * Mock: 사업자번호 끝 2자리로 결과 시뮬레이션 (키 없을 때)
  * - 00: 폐업으로 간주 → rejected
@@ -100,12 +125,14 @@ function mockDecision(
  * @param {FirebaseFirestore.Firestore} db Firestore
  * @param {string} uid 소유자 uid
  * @param {string} profileId 프로필 문서 id
+ * @param {string} [hiraServiceKey] 심평원 API용 공공데이터 키(선호: defineSecret value)
  * @return {Promise<RunCheckResult>} 검증 결과
  */
 export async function runCheckBusinessStatus(
   db: admin.firestore.Firestore,
   uid: string,
-  profileId: string
+  profileId: string,
+  hiraServiceKey?: string
 ): Promise<RunCheckResult> {
   const profileRef = db
     .collection("clinics_accounts")
@@ -126,9 +153,23 @@ export async function runCheckBusinessStatus(
   const ocr = bv.ocrResult || {};
   const bizNoRaw = String(bv.bizNo ?? ocr.bizNo ?? "").trim();
   const bizNoDigits = normalizeBizNoDigits(bizNoRaw);
+  const clinicName = String(data.clinicName ?? ocr.clinicName ?? "").trim();
+  const addressStr = String(data.address ?? ocr.address ?? "").trim();
 
   if (bv.status === "verified") {
-    return {status: "verified", method: "mock", skipped: true};
+    const lv = bv.hiraMatchLevel;
+    const hiraMatchLevel =
+      lv === "strict" || lv === "partial" || lv === "none" ? lv : undefined;
+    return {
+      status: "verified",
+      method: "mock",
+      skipped: true,
+      hiraMatched:
+        typeof bv.hiraMatched === "boolean" ? bv.hiraMatched : null,
+      hiraNote:
+        typeof bv.hiraNote === "string" ? bv.hiraNote : "기존 인증 유지",
+      hiraMatchLevel,
+    };
   }
 
   if (!bizNoDigits || bizNoDigits.length < 10) {
@@ -187,6 +228,11 @@ export async function runCheckBusinessStatus(
       };
     }
 
+    const hiraMock = await runHiraSupplement(
+      clinicName,
+      addressStr,
+      hiraServiceKey
+    );
     await profileRef.update({
       "businessVerification.status": "verified",
       "businessVerification.bizNo": bizNoRaw,
@@ -196,9 +242,18 @@ export async function runCheckBusinessStatus(
       "businessVerification.checkMethod": "mock",
       "businessVerification.verifiedAt":
         admin.firestore.FieldValue.serverTimestamp(),
+      "businessVerification.hiraMatched": hiraMock.matched,
+      "businessVerification.hiraNote": hiraMock.note,
+      "businessVerification.hiraMatchLevel": hiraMock.level,
       "updatedAt": admin.firestore.FieldValue.serverTimestamp(),
     });
-    return {status: "verified", method: "mock"};
+    return {
+      status: "verified",
+      method: "mock",
+      hiraMatched: hiraMock.matched,
+      hiraNote: hiraMock.note,
+      hiraMatchLevel: hiraMock.level,
+    };
   }
 
   try {
@@ -238,7 +293,11 @@ export async function runCheckBusinessStatus(
       };
     }
 
-    // TODO: HIRA 요양기관 대조 — Phase 2에서 실연동 시 manual_review 분기
+    const hiraNts = await runHiraSupplement(
+      clinicName,
+      addressStr,
+      hiraServiceKey
+    );
     await profileRef.update({
       "businessVerification.status": "verified",
       "businessVerification.bizNo": bizNoRaw,
@@ -248,9 +307,18 @@ export async function runCheckBusinessStatus(
       "businessVerification.checkMethod": "nts",
       "businessVerification.verifiedAt":
         admin.firestore.FieldValue.serverTimestamp(),
+      "businessVerification.hiraMatched": hiraNts.matched,
+      "businessVerification.hiraNote": hiraNts.note,
+      "businessVerification.hiraMatchLevel": hiraNts.level,
       "updatedAt": admin.firestore.FieldValue.serverTimestamp(),
     });
-    return {status: "verified", method: "nts"};
+    return {
+      status: "verified",
+      method: "nts",
+      hiraMatched: hiraNts.matched,
+      hiraNote: hiraNts.note,
+      hiraMatchLevel: hiraNts.level,
+    };
   } catch (e: unknown) {
     functions.logger.error("NTS API 호출 실패", {
       uid,

@@ -264,6 +264,20 @@ class _PublisherClinicIdentitySectionState
               height: 1.45,
             ),
           ),
+          if (widget.profile.bizRegImageUrl != null ||
+              widget.profile.businessVerification.docUrl != null ||
+              (widget.profile.businessVerification.ocrResult != null &&
+                  widget.profile.businessVerification.ocrResult!.isNotEmpty)) ...[
+            const SizedBox(height: 8),
+            Text(
+              '등록증을 바꾸려면 위 단계에서 새 파일을 올려 주세요.',
+              style: GoogleFonts.notoSansKr(
+                fontSize: 11,
+                color: AppColors.textDisabled,
+                height: 1.45,
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           if (widget.inlineFieldLabels) ...[
             _inlineLabeledField(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../models/resume.dart';
 import '../../../core/theme/app_colors.dart';
 import 'resume_ocr_prompt.dart';
+import 'resume_inline_underline_field.dart';
 
 /// D. 경력 섹션 (근무지별)
 class SectionExperiences extends StatefulWidget {
@@ -182,50 +183,52 @@ class _ExperienceCardState extends State<_ExperienceCard> {
           const SizedBox(height: 10),
           const Divider(height: 1, color: AppColors.divider),
           const SizedBox(height: 14),
-          _field('병원명 *', _clinicCtrl, '예: 서울밝은치과'),
-          _field('지역', _regionCtrl, '서울시 강남구'),
+          ResumeInlineUnderlineField(
+            label: '병원명 *',
+            hint: '예: 서울밝은치과',
+            controller: _clinicCtrl,
+            onChanged: (_) => _emit(),
+          ),
+          ResumeInlineUnderlineField(
+            label: '지역',
+            hint: '서울시 강남구',
+            controller: _regionCtrl,
+            onChanged: (_) => _emit(),
+          ),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(child: _field('시작 (YYYY-MM)', _startCtrl, '2023-03')),
+              Expanded(
+                child: ResumeInlineUnderlineField(
+                  label: '시작',
+                  hint: '2023-03',
+                  controller: _startCtrl,
+                  labelWidth: 52,
+                  onChanged: (_) => _emit(),
+                ),
+              ),
               const SizedBox(width: 10),
-              Expanded(child: _field('종료 (YYYY-MM)', _endCtrl, '재직중')),
+              Expanded(
+                child: ResumeInlineUnderlineField(
+                  label: '종료',
+                  hint: '재직중',
+                  controller: _endCtrl,
+                  labelWidth: 52,
+                  onChanged: (_) => _emit(),
+                ),
+              ),
             ],
           ),
-          _field(
-            '소속, 담당, 성과',
-            _achieveCtrl,
-            '치주과 소속 / 스케일링 담당 / 하루 평균 환자 30명',
+          ResumeInlineUnderlineField(
+            label: '소속, 담당, 성과',
+            hint: '치주과 소속 / 스케일링 담당 / 하루 평균 환자 30명',
+            controller: _achieveCtrl,
             maxLines: 3,
+            onChanged: (_) => _emit(),
           ),
         ],
       ),
     );
   }
 
-  Widget _field(
-    String label,
-    TextEditingController ctrl,
-    String hint, {
-    int maxLines = 1,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: TextField(
-        controller: ctrl,
-        onChanged: (_) => _emit(),
-        maxLines: maxLines,
-        decoration: InputDecoration(
-          labelText: label,
-          hintText: hint,
-          hintStyle: const TextStyle(color: AppColors.textDisabled),
-          border: const OutlineInputBorder(
-            borderRadius: BorderRadius.all(Radius.circular(8)),
-          ),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        ),
-        style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
-      ),
-    );
-  }
 }

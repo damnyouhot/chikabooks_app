@@ -14,6 +14,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/router/app_route_observer.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_tokens.dart';
+import '../../auth/web/web_account_menu_button.dart';
 import '../../../services/job_draft_service.dart';
 import '../../../models/job.dart';
 import '../../../models/job_draft.dart';
@@ -817,6 +818,16 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
                   shrinkWrap: true,
                   physics: const AlwaysScrollableScrollPhysics(),
                   children: [
+                    if (kIsWeb)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: Row(
+                          children: const [
+                            Spacer(),
+                            WebAccountMenuButton(),
+                          ],
+                        ),
+                      ),
                     SizedBox(
                       width: rowW,
                       child: Row(

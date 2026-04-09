@@ -65,6 +65,13 @@ class BusinessVerification {
   /// `nts` | `mock` | `mock_hira` | `nts_error` | `server_skip` …
   final String? checkMethod;
 
+  /// 심평원 병원정보 보조 대조
+  final bool? hiraMatched;
+  final String? hiraNote;
+
+  /// `strict` | `partial` | `none` — 서버 B안 단계형
+  final String? hiraMatchLevel;
+
   const BusinessVerification({
     this.status = BizVerificationStatus.none,
     this.bizNo = '',
@@ -75,6 +82,9 @@ class BusinessVerification {
     this.failReason,
     this.lastCheckAt,
     this.checkMethod,
+    this.hiraMatched,
+    this.hiraNote,
+    this.hiraMatchLevel,
   });
 
   factory BusinessVerification.fromMap(Map<String, dynamic>? data) {
@@ -89,6 +99,9 @@ class BusinessVerification {
       failReason: data['failReason'] as String?,
       lastCheckAt: (data['lastCheckAt'] as Timestamp?)?.toDate(),
       checkMethod: data['checkMethod'] as String?,
+      hiraMatched: data['hiraMatched'] as bool?,
+      hiraNote: data['hiraNote'] as String?,
+      hiraMatchLevel: data['hiraMatchLevel'] as String?,
     );
   }
 
@@ -104,6 +117,9 @@ class BusinessVerification {
         if (lastCheckAt != null)
           'lastCheckAt': Timestamp.fromDate(lastCheckAt!),
         if (checkMethod != null) 'checkMethod': checkMethod,
+        if (hiraMatched != null) 'hiraMatched': hiraMatched,
+        if (hiraNote != null) 'hiraNote': hiraNote,
+        if (hiraMatchLevel != null) 'hiraMatchLevel': hiraMatchLevel,
       };
 }
 

@@ -1,5 +1,4 @@
 import 'dart:io' show File;
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -15,6 +14,7 @@ import '../../../services/resume_draft_service.dart';
 import '../../../services/resume_file_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_tokens.dart';
+import '../../auth/web/web_account_menu_button.dart';
 import 'resume_edit_screen.dart';
 import 'ocr_review_screen.dart';
 /// 이력서 홈 화면 (탭: 새로 만들기·수정하기 / 기존 파일 그대로 쓰기)
@@ -59,20 +59,7 @@ class _ResumeHomeScreenState extends State<ResumeHomeScreen>
         ),
         centerTitle: false,
         iconTheme: const IconThemeData(color: AppColors.textPrimary),
-        actions: [
-          if (kIsWeb)
-            TextButton.icon(
-              icon: Icon(Icons.logout, size: 16, color: AppColors.textSecondary),
-              label: Text(
-                '로그아웃',
-                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-              ),
-              onPressed: () async {
-                await FirebaseAuth.instance.signOut();
-                if (context.mounted) context.go('/login');
-              },
-            ),
-        ],
+        actions: const [WebAccountMenuButton()],
         bottom: TabBar(
           controller: _tabController,
           labelColor: AppColors.accent,

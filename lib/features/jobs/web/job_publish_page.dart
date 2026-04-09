@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -10,6 +11,7 @@ import '../../../services/order_service.dart';
 import '../../../services/voucher_service.dart';
 import '../../publisher/services/clinic_auth_service.dart';
 import '../../publisher/services/clinic_profile_service.dart';
+import '../../auth/web/web_account_menu_button.dart';
 
 /// 게시 전 최종 단계 페이지 (/post-job/publish/:draftId)
 ///
@@ -107,32 +109,53 @@ class _JobPublishPageState extends State<JobPublishPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.webPublisherPageBg,
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 520),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _buildHeader(),
-                      const SizedBox(height: 24),
-                      _buildChecklist(),
-                      const SizedBox(height: 24),
-                      if (_vouchers.isNotEmpty) ...[
-                        _buildVoucherSection(),
-                        const SizedBox(height: 24),
-                      ],
-                      _buildPublishButton(),
-                      const SizedBox(height: 16),
-                      _buildBackButton(),
-                    ],
-                  ),
-                ),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (kIsWeb)
+            Container(
+              color: AppColors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+              child: const Row(
+                children: [
+                  Spacer(),
+                  WebAccountMenuButton(),
+                ],
               ),
             ),
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : Center(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 40,
+                      ),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 520),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _buildHeader(),
+                            const SizedBox(height: 24),
+                            _buildChecklist(),
+                            const SizedBox(height: 24),
+                            if (_vouchers.isNotEmpty) ...[
+                              _buildVoucherSection(),
+                              const SizedBox(height: 24),
+                            ],
+                            _buildPublishButton(),
+                            const SizedBox(height: 16),
+                            _buildBackButton(),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+          ),
+        ],
+      ),
     );
   }
 

@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../auth/web/web_account_menu_button.dart';
 import '../services/job_image_uploader.dart';
 
 /// 치과 사업자 인증 페이지 (/clinic-verify)
@@ -171,6 +172,7 @@ class _ClinicVerifyPageState extends State<ClinicVerifyPage> {
           icon: const Icon(Icons.arrow_back_ios, color: AppColors.textPrimary, size: 18),
           onPressed: () => context.canPop() ? context.pop() : null,
         ),
+        actions: const [WebAccountMenuButton()],
       ),
       body: ListView(
         padding: const EdgeInsets.all(20),
@@ -526,21 +528,39 @@ class _ClinicVerifyPageState extends State<ClinicVerifyPage> {
   Widget _buildSuccessScreen() {
     return Scaffold(
       backgroundColor: AppColors.appBg,
-      body: Center(
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 400),
-          margin: const EdgeInsets.all(32),
-          padding: const EdgeInsets.all(36),
-          decoration: BoxDecoration(
-            color: AppColors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(color: AppColors.black.withOpacity(0.07), blurRadius: 20),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (kIsWeb)
+            Container(
+              color: AppColors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+              child: const Row(
+                children: [
+                  Spacer(),
+                  WebAccountMenuButton(),
+                ],
+              ),
+            ),
+          Expanded(
+            child: Center(
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 400),
+                margin: const EdgeInsets.all(32),
+                padding: const EdgeInsets.all(36),
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.black.withOpacity(0.07),
+                      blurRadius: 20,
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
               Container(
                 width: 64,
                 height: 64,
@@ -591,9 +611,12 @@ class _ClinicVerifyPageState extends State<ClinicVerifyPage> {
                   child: const Text('구인공고 작성하러 가기'),
                 ),
               ),
-            ],
+                  ],
+                ),
+              ),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

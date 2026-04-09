@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_tokens.dart';
@@ -13,6 +14,8 @@ import '../widgets/section_experiences.dart';
 import '../widgets/section_skills.dart';
 import '../widgets/section_education.dart';
 import '../widgets/section_summary.dart';
+import '../widgets/resume_inline_underline_field.dart';
+import '../../auth/web/web_account_menu_button.dart';
 import 'resume_preview_screen.dart';
 
 /// 이력서 편집 화면
@@ -39,13 +42,13 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
   final _titleCtrl = TextEditingController();
   final _scrollCtrl = ScrollController();
 
-  // 섹션 정의
+  // 섹션 정의: 기본정보 → 학력 → 경력 → 스킬 → 자기소개
   static const _sections = [
     _SectionDef(icon: Icons.person_outline, label: '기본정보'),
-    _SectionDef(icon: Icons.edit_note, label: '요약'),
+    _SectionDef(icon: Icons.school_outlined, label: '학력'),
     _SectionDef(icon: Icons.work_outline, label: '경력'),
     _SectionDef(icon: Icons.auto_awesome_outlined, label: '스킬'),
-    _SectionDef(icon: Icons.school_outlined, label: '학력'),
+    _SectionDef(icon: Icons.edit_note, label: '자기소개'),
   ];
 
   @override
@@ -91,9 +94,7 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
           if (!context.mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text(
-                '가입·커리어 카드에 적어 둔 내용을 이력서에 자동으로 넣었어요. 저장하면 반영돼요.',
-              ),
+              content: Text('가입·커리어 카드에 적어 둔 내용을 이력서에 자동으로 넣었어요. 저장하면 반영돼요.'),
               duration: Duration(seconds: 3),
             ),
           );
@@ -101,8 +102,9 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
       }
     }
     // 기존 드래프트가 있는지 확인
-    final existing =
-        await ResumeDraftService.findDraftForResume(widget.resumeId);
+    final existing = await ResumeDraftService.findDraftForResume(
+      widget.resumeId,
+    );
     if (existing != null && mounted) {
       setState(() => _draftId = existing.id);
     }
@@ -212,9 +214,8 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final targetWidth = constraints.maxWidth > 680
-                    ? 680.0
-                    : constraints.maxWidth;
+                final targetWidth =
+                    constraints.maxWidth > 680 ? 680.0 : constraints.maxWidth;
                 return Align(
                   alignment: Alignment.topCenter,
                   child: SizedBox(
@@ -260,23 +261,25 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
       centerTitle: false,
       iconTheme: const IconThemeData(color: AppColors.textPrimary),
       actions: [
+        if (kIsWeb) const WebAccountMenuButton(),
         // 저장 버튼 (모든 섹션에서 항상 표시)
         TextButton(
           onPressed: _saving ? null : _save,
-          child: _saving
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text(
-                  '저장',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.accent,
+          child:
+              _saving
+                  ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                  : const Text(
+                    '저장',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.accent,
+                    ),
                   ),
-                ),
         ),
         TextButton(
           onPressed: () {
@@ -321,7 +324,8 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                    color: selected ? AppColors.onAccent : AppColors.textSecondary,
+                    color:
+                        selected ? AppColors.onAccent : AppColors.textSecondary,
                   ),
                 ),
                 selected: selected,
@@ -348,22 +352,9 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
           onChanged: (p) => _updateResume(_copyWith(profile: p)),
         );
       case 1:
-        return SectionSummary(
-          summary: r.profile?.summary ?? '',
-          onChanged: (s) {
-            final p = r.profile ?? const ResumeProfile();
-            _updateResume(_copyWith(
-              profile: ResumeProfile(
-                name: p.name,
-                phone: p.phone,
-                email: p.email,
-                region: p.region,
-                workTypes: p.workTypes,
-                headline: p.headline,
-                summary: s,
-              ),
-            ));
-          },
+        return SectionEducation(
+          education: r.education,
+          onChanged: (e) => _updateResume(_copyWith(education: e)),
         );
       case 2:
         return SectionExperiences(
@@ -373,12 +364,28 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
       case 3:
         return SectionSkills(
           skills: r.skills,
-          onChanged: (s) => _updateResume(_copyWith(skills: s)),
+          clinicalSkillsComment: r.profile?.clinicalSkillsComment ?? '',
+          softSkillsComment: r.profile?.softSkillsComment ?? '',
+          onSkillsChanged: (s) => _updateResume(_copyWith(skills: s)),
+          onCommentsChanged: (clinical, soft) {
+            final p = r.profile ?? const ResumeProfile();
+            _updateResume(
+              _copyWith(
+                profile: p.copyWith(
+                  clinicalSkillsComment: clinical,
+                  softSkillsComment: soft,
+                ),
+              ),
+            );
+          },
         );
       case 4:
-        return SectionEducation(
-          education: r.education,
-          onChanged: (e) => _updateResume(_copyWith(education: e)),
+        return SectionSummary(
+          resume: r,
+          onSummaryChanged: (s) {
+            final p = r.profile ?? const ResumeProfile();
+            _updateResume(_copyWith(profile: p.copyWith(summary: s)));
+          },
         );
       default:
         return const SizedBox.shrink();
@@ -400,9 +407,12 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
       updatedAt: r.updatedAt,
       visibility: r.visibility,
       profile: profile ?? r.profile,
+      licenses: r.licenses,
       experiences: experiences ?? r.experiences,
       skills: skills ?? r.skills,
       education: education ?? r.education,
+      trainings: r.trainings,
+      attachments: r.attachments,
     );
   }
 
@@ -424,8 +434,8 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
           if (_currentSection > 0)
             Expanded(
               child: AppMutedButton(
-                onTap: () =>
-                    setState(() => _currentSection = _currentSection - 1),
+                onTap:
+                    () => setState(() => _currentSection = _currentSection - 1),
                 label: '이전',
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
@@ -436,9 +446,10 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
           Expanded(
             flex: 2,
             child: AppPrimaryButton(
-              onPressed: _saving
-                  ? null
-                  : _currentSection < _sections.length - 1
+              onPressed:
+                  _saving
+                      ? null
+                      : _currentSection < _sections.length - 1
                       ? () => setState(() => _currentSection++)
                       : _save,
               label: _currentSection < _sections.length - 1 ? '다음' : '저장하기',
@@ -455,35 +466,35 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
     _titleCtrl.text = _resume!.title;
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('이력서 제목'),
-        content: TextField(
-          controller: _titleCtrl,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: '예: 하이진랩에서 작성한 이력서, 교정 지원용',
-            border: OutlineInputBorder(),
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('이력서 제목'),
+            content: ResumeInlineUnderlineField(
+              label: '제목',
+              hint: '예: 하이진랩에서 작성한 이력서, 교정 지원용',
+              controller: _titleCtrl,
+              autofocus: true,
+              bottomPadding: 0,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('취소'),
+              ),
+              TextButton(
+                onPressed: () {
+                  final t = _titleCtrl.text.trim();
+                  if (t.isNotEmpty) {
+                    _onTitleChanged(t);
+                    ResumeService.updateTitle(widget.resumeId, t);
+                    setState(() {});
+                  }
+                  Navigator.pop(ctx);
+                },
+                child: const Text('확인'),
+              ),
+            ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('취소'),
-          ),
-          TextButton(
-            onPressed: () {
-              final t = _titleCtrl.text.trim();
-              if (t.isNotEmpty) {
-                _onTitleChanged(t);
-                ResumeService.updateTitle(widget.resumeId, t);
-                setState(() {});
-              }
-              Navigator.pop(ctx);
-            },
-            child: const Text('확인'),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -493,4 +504,3 @@ class _SectionDef {
   final String label;
   const _SectionDef({required this.icon, required this.label});
 }
-

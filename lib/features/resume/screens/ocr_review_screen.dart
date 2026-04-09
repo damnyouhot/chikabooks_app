@@ -6,7 +6,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -18,6 +18,7 @@ import '../../../core/theme/app_tokens.dart';
 import '../../../models/resume.dart';
 import '../../../models/resume_import_draft.dart';
 import '../../../services/resume_service.dart';
+import '../../auth/web/web_account_menu_button.dart';
 import 'resume_edit_screen.dart';
 
 /// OCR 진입 소스 — 홈 화면에서 어떤 버튼으로 들어왔는지
@@ -97,6 +98,7 @@ class _OcrReviewScreenState extends State<OcrReviewScreen> {
         ),
         centerTitle: false,
         iconTheme: const IconThemeData(color: AppColors.textPrimary),
+        actions: [if (kIsWeb) const WebAccountMenuButton()],
       ),
       body: _buildBody(),
     );
@@ -1183,6 +1185,7 @@ class _OcrReviewScreenState extends State<OcrReviewScreen> {
         education: education,
       );
       await ResumeService.updateResume(resume);
+      await ResumeService.markLastImportedResume(resumeId);
 
       // ── 7. 드래프트 상태 confirmed 처리
       await FirebaseFirestore.instance

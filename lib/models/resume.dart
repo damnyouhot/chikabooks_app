@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'resume_intro_enums.dart';
+
 /// 이력서 엔티티
 /// Firestore 경로: `resumes/{resumeId}`
 class Resume {
@@ -51,30 +53,37 @@ class Resume {
       visibility: ResumeVisibility.fromMap(
         data['visibility'] as Map<String, dynamic>? ?? {},
       ),
-      profile: sections['profile'] != null
-          ? ResumeProfile.fromMap(sections['profile'])
-          : null,
-      licenses: (sections['licenses'] as List?)
+      profile:
+          sections['profile'] != null
+              ? ResumeProfile.fromMap(sections['profile'])
+              : null,
+      licenses:
+          (sections['licenses'] as List?)
               ?.map((e) => ResumeLicense.fromMap(e))
               .toList() ??
           [],
-      experiences: (sections['experiences'] as List?)
+      experiences:
+          (sections['experiences'] as List?)
               ?.map((e) => ResumeExperience.fromMap(e))
               .toList() ??
           [],
-      skills: (sections['skills'] as List?)
+      skills:
+          (sections['skills'] as List?)
               ?.map((e) => ResumeSkill.fromMap(e))
               .toList() ??
           [],
-      education: (sections['education'] as List?)
+      education:
+          (sections['education'] as List?)
               ?.map((e) => ResumeEducation.fromMap(e))
               .toList() ??
           [],
-      trainings: (sections['trainings'] as List?)
+      trainings:
+          (sections['trainings'] as List?)
               ?.map((e) => ResumeTraining.fromMap(e))
               .toList() ??
           [],
-      attachments: (sections['attachments'] as List?)
+      attachments:
+          (sections['attachments'] as List?)
               ?.map((e) => ResumeAttachment.fromMap(e))
               .toList() ??
           [],
@@ -86,23 +95,24 @@ class Resume {
   }
 
   Map<String, dynamic> toMap() => {
-        'ownerUid': ownerUid,
-        'title': title,
-        'createdAt': createdAt != null
+    'ownerUid': ownerUid,
+    'title': title,
+    'createdAt':
+        createdAt != null
             ? Timestamp.fromDate(createdAt!)
             : FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-        'visibility': visibility.toMap(),
-        'sections': {
-          if (profile != null) 'profile': profile!.toMap(),
-          'licenses': licenses.map((e) => e.toMap()).toList(),
-          'experiences': experiences.map((e) => e.toMap()).toList(),
-          'skills': skills.map((e) => e.toMap()).toList(),
-          'education': education.map((e) => e.toMap()).toList(),
-          'trainings': trainings.map((e) => e.toMap()).toList(),
-          'attachments': attachments.map((e) => e.toMap()).toList(),
-        },
-      };
+    'updatedAt': FieldValue.serverTimestamp(),
+    'visibility': visibility.toMap(),
+    'sections': {
+      if (profile != null) 'profile': profile!.toMap(),
+      'licenses': licenses.map((e) => e.toMap()).toList(),
+      'experiences': experiences.map((e) => e.toMap()).toList(),
+      'skills': skills.map((e) => e.toMap()).toList(),
+      'education': education.map((e) => e.toMap()).toList(),
+      'trainings': trainings.map((e) => e.toMap()).toList(),
+      'attachments': attachments.map((e) => e.toMap()).toList(),
+    },
+  };
 }
 
 // ── 공개 설정 ────────────────────────────────────────────
@@ -128,9 +138,9 @@ class ResumeVisibility {
   }
 
   Map<String, dynamic> toMap() => {
-        'defaultAnonymous': defaultAnonymous,
-        'fieldsMask': fieldsMask,
-      };
+    'defaultAnonymous': defaultAnonymous,
+    'fieldsMask': fieldsMask,
+  };
 }
 
 // ── 기본정보 ────────────────────────────────────────────
@@ -143,11 +153,21 @@ class ResumeProfile {
   final String headline;
   final String summary;
 
+  /// 스킬 탭 — 임상 스킬 / 소프트 스킬 각각 설명 (선택)
+  final String clinicalSkillsComment;
+  final String softSkillsComment;
+
   /// 프로필 사진 URL 목록 (최대 3장)
   final List<String> photoUrls;
 
   /// 대표 사진 인덱스 (photoUrls 내)
   final int selectedPhotoIndex;
+
+  /// 경력 단계 — 자기소개 템플릿 추천에 사용 (미선택 시 [ExperienceLevel.any])
+  final ExperienceLevel experienceLevel;
+
+  /// 구직 목표 — 템플릿 추천·톤 매칭
+  final JobGoal jobGoal;
 
   const ResumeProfile({
     this.name = '',
@@ -157,8 +177,12 @@ class ResumeProfile {
     this.workTypes = const [],
     this.headline = '',
     this.summary = '',
+    this.clinicalSkillsComment = '',
+    this.softSkillsComment = '',
     this.photoUrls = const [],
     this.selectedPhotoIndex = 0,
+    this.experienceLevel = ExperienceLevel.any,
+    this.jobGoal = JobGoal.general,
   });
 
   /// 대표 사진 URL (없으면 null)
@@ -177,22 +201,32 @@ class ResumeProfile {
       workTypes: List<String>.from(data['workTypes'] ?? []),
       headline: data['headline'] as String? ?? '',
       summary: data['summary'] as String? ?? '',
+      clinicalSkillsComment: data['clinicalSkillsComment'] as String? ?? '',
+      softSkillsComment: data['softSkillsComment'] as String? ?? '',
       photoUrls: List<String>.from(data['photoUrls'] ?? []),
       selectedPhotoIndex: (data['selectedPhotoIndex'] as int?) ?? 0,
+      experienceLevel: ExperienceLevel.fromStorage(
+        data['experienceLevel'] as String?,
+      ),
+      jobGoal: JobGoal.fromStorage(data['jobGoal'] as String?),
     );
   }
 
   Map<String, dynamic> toMap() => {
-        'name': name,
-        'phone': phone,
-        'email': email,
-        'region': region,
-        'workTypes': workTypes,
-        'headline': headline,
-        'summary': summary,
-        'photoUrls': photoUrls,
-        'selectedPhotoIndex': selectedPhotoIndex,
-      };
+    'name': name,
+    'phone': phone,
+    'email': email,
+    'region': region,
+    'workTypes': workTypes,
+    'headline': headline,
+    'summary': summary,
+    'clinicalSkillsComment': clinicalSkillsComment,
+    'softSkillsComment': softSkillsComment,
+    'photoUrls': photoUrls,
+    'selectedPhotoIndex': selectedPhotoIndex,
+    'experienceLevel': experienceLevel.toStorage(),
+    'jobGoal': jobGoal.toStorage(),
+  };
 
   ResumeProfile copyWith({
     String? name,
@@ -202,8 +236,12 @@ class ResumeProfile {
     List<String>? workTypes,
     String? headline,
     String? summary,
+    String? clinicalSkillsComment,
+    String? softSkillsComment,
     List<String>? photoUrls,
     int? selectedPhotoIndex,
+    ExperienceLevel? experienceLevel,
+    JobGoal? jobGoal,
   }) {
     return ResumeProfile(
       name: name ?? this.name,
@@ -213,8 +251,13 @@ class ResumeProfile {
       workTypes: workTypes ?? this.workTypes,
       headline: headline ?? this.headline,
       summary: summary ?? this.summary,
+      clinicalSkillsComment:
+          clinicalSkillsComment ?? this.clinicalSkillsComment,
+      softSkillsComment: softSkillsComment ?? this.softSkillsComment,
       photoUrls: photoUrls ?? this.photoUrls,
       selectedPhotoIndex: selectedPhotoIndex ?? this.selectedPhotoIndex,
+      experienceLevel: experienceLevel ?? this.experienceLevel,
+      jobGoal: jobGoal ?? this.jobGoal,
     );
   }
 }
@@ -243,11 +286,11 @@ class ResumeLicense {
   }
 
   Map<String, dynamic> toMap() => {
-        'type': type,
-        'has': has,
-        if (numberMasked != null) 'numberMasked': numberMasked,
-        if (issuedYear != null) 'issuedYear': issuedYear,
-      };
+    'type': type,
+    'has': has,
+    if (numberMasked != null) 'numberMasked': numberMasked,
+    if (issuedYear != null) 'issuedYear': issuedYear,
+  };
 }
 
 // ── 경력 ────────────────────────────────────────────────
@@ -283,14 +326,14 @@ class ResumeExperience {
   }
 
   Map<String, dynamic> toMap() => {
-        'clinicName': clinicName,
-        'region': region,
-        'start': start,
-        'end': end,
-        'tasks': tasks,
-        'tools': tools,
-        if (achievementsText != null) 'achievementsText': achievementsText,
-      };
+    'clinicName': clinicName,
+    'region': region,
+    'start': start,
+    'end': end,
+    'tasks': tasks,
+    'tools': tools,
+    if (achievementsText != null) 'achievementsText': achievementsText,
+  };
 }
 
 // ── 스킬 ────────────────────────────────────────────────
@@ -329,10 +372,10 @@ class ResumeEducation {
   }
 
   Map<String, dynamic> toMap() => {
-        'school': school,
-        'major': major,
-        if (gradYear != null) 'gradYear': gradYear,
-      };
+    'school': school,
+    'major': major,
+    if (gradYear != null) 'gradYear': gradYear,
+  };
 }
 
 // ── 보수교육/세미나 ─────────────────────────────────────
@@ -362,12 +405,12 @@ class ResumeTraining {
   }
 
   Map<String, dynamic> toMap() => {
-        'title': title,
-        'org': org,
-        if (hours != null) 'hours': hours,
-        if (year != null) 'year': year,
-        if (proofFileRef != null) 'proofFileRef': proofFileRef,
-      };
+    'title': title,
+    'org': org,
+    if (hours != null) 'hours': hours,
+    if (year != null) 'year': year,
+    if (proofFileRef != null) 'proofFileRef': proofFileRef,
+  };
 }
 
 // ── 첨부파일 ────────────────────────────────────────────
@@ -376,11 +419,7 @@ class ResumeAttachment {
   final String type; // 자격증, 수료증, 경력증명 등
   final String title;
 
-  const ResumeAttachment({
-    this.fileRef = '',
-    this.type = '',
-    this.title = '',
-  });
+  const ResumeAttachment({this.fileRef = '', this.type = '', this.title = ''});
 
   factory ResumeAttachment.fromMap(Map<String, dynamic> data) {
     return ResumeAttachment(
@@ -391,9 +430,8 @@ class ResumeAttachment {
   }
 
   Map<String, dynamic> toMap() => {
-        'fileRef': fileRef,
-        'type': type,
-        'title': title,
-      };
+    'fileRef': fileRef,
+    'type': type,
+    'title': title,
+  };
 }
-

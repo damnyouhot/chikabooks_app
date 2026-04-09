@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../models/resume.dart';
 import 'resume_career_sync_service.dart';
+import 'resume_experience_merge_service.dart';
 
 /// 이력서 Firestore CRUD 서비스
 ///
@@ -16,6 +17,42 @@ class ResumeService {
 
   static CollectionReference<Map<String, dynamic>> get _col =>
       _db.collection('resumes');
+
+  static DocumentReference<Map<String, dynamic>>? get _userDocRef {
+    final uid = _uid;
+    if (uid == null) return null;
+    return _db.collection('users').doc(uid);
+  }
+
+  /// AI/OCR로 이력서가 확정되면 호출 — 치과 네트워크 추출 시 기본 소스로 사용
+  static Future<void> markLastImportedResume(String resumeId) async {
+    final ref = _userDocRef;
+    if (ref == null || resumeId.isEmpty) return;
+    try {
+      await ref.set(
+        {
+          'lastImportedResumeId': resumeId,
+          'lastImportedResumeAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
+    } catch (e) {
+      debugPrint('⚠️ markLastImportedResume: $e');
+    }
+  }
+
+  /// [markLastImportedResume]으로 저장한 ID (없으면 null)
+  static Future<String?> getLastImportedResumeId() async {
+    final ref = _userDocRef;
+    if (ref == null) return null;
+    try {
+      final snap = await ref.get();
+      return snap.data()?['lastImportedResumeId'] as String?;
+    } catch (e) {
+      debugPrint('⚠️ getLastImportedResumeId: $e');
+      return null;
+    }
+  }
 
   // ── 조회 ────────────────────────────────────────────────
 
@@ -118,6 +155,39 @@ class ResumeService {
     }
   }
 
+  /// 후처리로 경력이 바뀌지 않았을 때 [Resume] 인스턴스 재사용
+  static bool _identicalExperienceLists(
+    List<ResumeExperience> a,
+    List<ResumeExperience> b,
+  ) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      final x = a[i];
+      final y = b[i];
+      if (x.clinicName != y.clinicName ||
+          x.region != y.region ||
+          x.start != y.start ||
+          x.end != y.end ||
+          x.achievementsText != y.achievementsText) {
+        return false;
+      }
+      if (!_sameStringList(x.tasks, y.tasks) ||
+          !_sameStringList(x.tools, y.tools)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  static bool _sameStringList(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
   /// 이력서가 비어있는지 판별 (제목/기본값만 있는 상태)
   static bool _isEmpty(Resume r) {
     return (r.profile == null || r.profile!.name.isEmpty) &&
@@ -166,14 +236,39 @@ class ResumeService {
   /// 이력서 전체 업데이트 + 커리어 카드 동기화
   static Future<bool> updateResume(Resume resume) async {
     try {
+      final mergedExperiences =
+          ResumeExperienceMergeService.mergeSimilar(resume.experiences);
+      final toSave =
+          mergedExperiences.length == resume.experiences.length &&
+                  _identicalExperienceLists(
+                    resume.experiences,
+                    mergedExperiences,
+                  )
+              ? resume
+              : Resume(
+                  id: resume.id,
+                  ownerUid: resume.ownerUid,
+                  title: resume.title,
+                  createdAt: resume.createdAt,
+                  updatedAt: resume.updatedAt,
+                  visibility: resume.visibility,
+                  profile: resume.profile,
+                  licenses: resume.licenses,
+                  experiences: mergedExperiences,
+                  skills: resume.skills,
+                  education: resume.education,
+                  trainings: resume.trainings,
+                  attachments: resume.attachments,
+                );
+
       await _col.doc(resume.id).update({
-        ...resume.toMap(),
+        ...toSave.toMap(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
       debugPrint('✅ 이력서 업데이트: ${resume.id}');
 
       // 커리어 카드에 자동 동기화
-      ResumeCareerSyncService.syncFromResume(resume);
+      ResumeCareerSyncService.syncFromResume(toSave);
 
       return true;
     } catch (e) {

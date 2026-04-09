@@ -10,23 +10,34 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_tokens.dart';
+import '../../../models/clinic_profile.dart';
+import 'biz_license_verification_three_tier_panel.dart';
+import 'biz_license_verify_snapshot.dart';
 
-/// 사업자등록증 업로드 인라인 섹션
-///
-/// UX 포지셔닝: "인증"이 아니라 "치과 정보 자동입력 편의 기능"
-/// OCR 결과를 사용자에게 확인받은 후 프로필에 반영
+/// 사업자등록증 업로드 — OCR · 국세청 · HIRA(안내) 3단 스냅샷
 class BizLicenseUploadSection extends StatefulWidget {
   final String profileId;
   final VoidCallback? onCompleted;
 
-  /// 웹 공고 에디터 3단계 등 — OCR 확인 행 라벨 열을 [AppPublisher.formInlineLabelWidth]에 맞춤
   final bool publisherStyleOcrLabelWidth;
+  final bool replacementMode;
+  final VoidCallback? onReplacementCancel;
+
+  /// 인증 완료 후에도 Firestore 기준 3단 스냅샷을 복원할 때 전달
+  final ClinicProfile? persistedProfile;
+
+  /// 부모(예: 공고 에디터)에서 확인 다이얼로그 후 `replacementMode` 로 전환
+  final Future<void> Function()? onReplaceLicenseWithDialog;
 
   const BizLicenseUploadSection({
     super.key,
     required this.profileId,
     this.onCompleted,
     this.publisherStyleOcrLabelWidth = false,
+    this.replacementMode = false,
+    this.onReplacementCancel,
+    this.persistedProfile,
+    this.onReplaceLicenseWithDialog,
   });
 
   @override
@@ -38,7 +49,17 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
   bool _dismissed = false;
   bool _isUploading = false;
   double _uploadProgress = 0;
+
   Map<String, String>? _ocrResult;
+  BizLicenseVerifySnapshot? _verifySnapshot;
+  bool _ocrReadFailed = false;
+  bool _ocrEmpty = false;
+
+  /// `프로필에 반영하기` 성공 후 — 스냅샷은 유지하고 버튼만 완료 상태로
+  bool _profileApplied = false;
+
+  /// Firestore에서만 채운 스냅샷(업로드 세션 없음) — 「반영 안 함」 숨김용
+  bool _hydratedFromProfile = false;
 
   static String _contentTypeForExt(String ext) {
     switch (ext) {
@@ -52,6 +73,108 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
       default:
         return 'application/octet-stream';
     }
+  }
+
+  bool get _canApplyToProfile {
+    if (_profileApplied) return false;
+    final snap = _verifySnapshot;
+    if (snap == null) return false;
+    if (_ocrReadFailed || _ocrEmpty) return false;
+    if (_ocrResult == null || _ocrResult!.isEmpty) return false;
+    return snap.canApplyToProfileAfterNts;
+  }
+
+  Map<String, String>? _buildOcrMapFromProfile(ClinicProfile p) {
+    final o = p.businessVerification.ocrResult ?? {};
+    String pick(String key) {
+      final ov = o[key];
+      if (ov != null && ov.toString().trim().isNotEmpty) {
+        return ov.toString().trim();
+      }
+      switch (key) {
+        case 'clinicName':
+          return p.clinicName.trim();
+        case 'ownerName':
+          return p.ownerName.trim();
+        case 'address':
+          return p.address.trim();
+        case 'bizNo':
+          return p.businessVerification.bizNo.trim();
+        default:
+          return '';
+      }
+    }
+
+    final m = <String, String>{};
+    for (final k in ['clinicName', 'ownerName', 'bizNo', 'address']) {
+      final v = pick(k);
+      if (v.isNotEmpty) m[k] = v;
+    }
+    return m.isEmpty ? null : m;
+  }
+
+  void _maybeSeedFromPersistedProfile() {
+    final p = widget.persistedProfile;
+    if (p == null || !p.isBusinessVerified || widget.replacementMode) return;
+    if (_verifySnapshot != null || _isUploading) return;
+    setState(() {
+      _verifySnapshot = BizLicenseVerifySnapshot.fromPersistedClinicProfile(p);
+      _ocrResult = _buildOcrMapFromProfile(p);
+      _ocrReadFailed = false;
+      _ocrEmpty = _ocrResult == null || _ocrResult!.isEmpty;
+      _profileApplied = true;
+      _hydratedFromProfile = true;
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _maybeSeedFromPersistedProfile();
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant BizLicenseUploadSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!oldWidget.replacementMode && widget.replacementMode) {
+      setState(() {
+        _verifySnapshot = null;
+        _ocrResult = null;
+        _ocrReadFailed = false;
+        _ocrEmpty = false;
+        _profileApplied = false;
+        _hydratedFromProfile = false;
+      });
+    } else if (oldWidget.replacementMode && !widget.replacementMode) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _maybeSeedFromPersistedProfile();
+      });
+    }
+    _syncHydratedSnapshotIfNeeded();
+  }
+
+  void _syncHydratedSnapshotIfNeeded() {
+    if (!_hydratedFromProfile || widget.replacementMode || _isUploading) return;
+    final p = widget.persistedProfile;
+    if (p == null || !p.isBusinessVerified) return;
+    final next = BizLicenseVerifySnapshot.fromPersistedClinicProfile(p);
+    final ocr = _buildOcrMapFromProfile(p);
+    final cur = _verifySnapshot;
+    if (cur == null) return;
+    if (cur.hiraNote == next.hiraNote &&
+        cur.checkMethod == next.checkMethod &&
+        cur.hiraMatched == next.hiraMatched &&
+        cur.hiraMatchLevel == next.hiraMatchLevel) {
+      return;
+    }
+    setState(() {
+      _verifySnapshot = next;
+      _ocrResult = ocr;
+      _ocrReadFailed = false;
+      _ocrEmpty = ocr == null || ocr.isEmpty;
+    });
   }
 
   Future<void> _pickAndUpload() async {
@@ -109,6 +232,11 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
       _isUploading = true;
       _uploadProgress = 0;
       _ocrResult = null;
+      _verifySnapshot = null;
+      _ocrReadFailed = false;
+      _ocrEmpty = false;
+      _profileApplied = false;
+      _hydratedFromProfile = false;
     });
 
     try {
@@ -137,6 +265,7 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
       });
 
       final data = Map<String, dynamic>.from(result.data as Map);
+      final snapshot = BizLicenseVerifySnapshot.fromCallable(data);
       final extracted = <String, String>{
         if ((data['clinicName'] ?? '').toString().isNotEmpty)
           'clinicName': data['clinicName'].toString(),
@@ -148,10 +277,16 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
           'bizNo': data['bizNo'].toString(),
       };
 
-      if (extracted.isEmpty) {
-        widget.onCompleted?.call();
-      } else {
-        setState(() => _ocrResult = extracted);
+      final empty = extracted.isEmpty;
+      final readFailed = empty && snapshot.failReason == 'ocr_failed';
+
+      if (mounted) {
+        setState(() {
+          _verifySnapshot = snapshot;
+          _ocrReadFailed = readFailed;
+          _ocrEmpty = empty;
+          _ocrResult = empty ? null : extracted;
+        });
       }
     } catch (e) {
       if (mounted) {
@@ -164,7 +299,23 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
     }
   }
 
+  void _clearResultAndNotifyParent() {
+    setState(() {
+      _ocrResult = null;
+      _verifySnapshot = null;
+      _ocrReadFailed = false;
+      _ocrEmpty = false;
+      _profileApplied = false;
+      _hydratedFromProfile = false;
+    });
+    widget.onCompleted?.call();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _maybeSeedFromPersistedProfile();
+    });
+  }
+
   Future<void> _applyOcrToProfile() async {
+    if (!_canApplyToProfile) return;
     if (_ocrResult == null) return;
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
@@ -186,8 +337,13 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      setState(() => _ocrResult = null);
-      widget.onCompleted?.call();
+      if (mounted) {
+        setState(() => _profileApplied = true);
+        widget.onCompleted?.call();
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('프로필에 반영했어요.')));
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
@@ -208,8 +364,8 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
         border: Border(left: BorderSide(color: AppColors.accent, width: 3)),
       ),
       child:
-          _ocrResult != null
-              ? _buildConfirmation()
+          _verifySnapshot != null && !_isUploading
+              ? _buildResultPanel()
               : _isUploading
               ? _buildProgress()
               : _buildPrompt(),
@@ -226,7 +382,9 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                '등록증을 올리면 치과 정보를 자동으로 채워드려요',
+                widget.replacementMode
+                    ? '새 등록증을 올려 주세요'
+                    : '등록증을 올리면 치과 정보를 자동으로 채워드려요',
                 style: GoogleFonts.notoSansKr(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
@@ -235,9 +393,16 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
               ),
             ),
             IconButton(
-              onPressed: () => setState(() => _dismissed = true),
+              onPressed: () {
+                if (widget.replacementMode &&
+                    widget.onReplacementCancel != null) {
+                  widget.onReplacementCancel!();
+                } else {
+                  setState(() => _dismissed = true);
+                }
+              },
               icon: const Icon(Icons.close, size: 18),
-              tooltip: '닫기',
+              tooltip: widget.replacementMode ? '취소' : '닫기',
               style: IconButton.styleFrom(
                 foregroundColor: AppColors.textDisabled,
                 padding: const EdgeInsets.all(4),
@@ -250,7 +415,9 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
         ),
         const SizedBox(height: 6),
         Text(
-          '상호명, 대표자명, 주소, 사업자번호를 자동으로 입력해요 (PDF·JPG·PNG)',
+          widget.replacementMode
+              ? '새 파일을 올리면 사업자 정보를 다시 확인합니다. 이전 등록증은 내부 인증 기록으로만 남으며 외부에 공개되지 않습니다. (PDF·JPG·PNG)'
+              : '상호명, 대표자명, 주소, 사업자번호를 자동으로 입력해요 (PDF·JPG·PNG)',
           style: GoogleFonts.notoSansKr(
             fontSize: 12,
             color: AppColors.textSecondary,
@@ -275,7 +442,7 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
                 onPressed: _pickAndUpload,
                 icon: const Icon(Icons.upload_file, size: 16),
                 label: Text(
-                  '등록증 업로드',
+                  widget.replacementMode ? '파일 선택' : '등록증 업로드',
                   style: GoogleFonts.notoSansKr(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -295,95 +462,128 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
               ),
             ),
             const SizedBox(width: 8),
-            TextButton(
-              onPressed: () => setState(() => _dismissed = true),
-              child: Text(
-                '나중에 할게요',
-                style: GoogleFonts.notoSansKr(
-                  fontSize: 12,
-                  color: AppColors.textDisabled,
+            if (widget.replacementMode && widget.onReplacementCancel != null)
+              TextButton(
+                onPressed: widget.onReplacementCancel,
+                child: Text(
+                  '취소',
+                  style: GoogleFonts.notoSansKr(
+                    fontSize: 12,
+                    color: AppColors.textDisabled,
+                  ),
+                ),
+              )
+            else
+              TextButton(
+                onPressed: () => setState(() => _dismissed = true),
+                child: Text(
+                  '나중에 할게요',
+                  style: GoogleFonts.notoSansKr(
+                    fontSize: 12,
+                    color: AppColors.textDisabled,
+                  ),
                 ),
               ),
-            ),
           ],
         ),
       ],
     );
   }
 
-  static const _ocrLabels = {
-    'clinicName': '상호명',
-    'ownerName': '대표자명',
-    'address': '주소',
-    'bizNo': '사업자번호',
-  };
-
-  Widget _buildConfirmation() {
+  Widget _buildResultPanel() {
+    final snap = _verifySnapshot!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Icon(Icons.check_circle_outline, size: 18, color: AppColors.accent),
-            const SizedBox(width: 8),
-            Expanded(
+        Text(
+          '인증 결과 요약',
+          style: GoogleFonts.notoSansKr(
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 10),
+        BizLicenseVerificationThreeTierPanel(
+          snapshot: snap,
+          ocrReadFailed: _ocrReadFailed,
+          ocrEmpty: _ocrEmpty,
+          ocrResult: _ocrResult,
+          publisherStyleOcrLabelWidth: widget.publisherStyleOcrLabelWidth,
+        ),
+        if (_profileApplied) ...[
+          const SizedBox(height: 8),
+          Text(
+            '프로필에 반영했습니다. 아래 국세청·HIRA 안내는 그대로 유지됩니다.',
+            style: GoogleFonts.notoSansKr(
+              fontSize: 11,
+              color: AppColors.accent,
+              fontWeight: FontWeight.w600,
+              height: 1.4,
+            ),
+          ),
+        ] else if (!_canApplyToProfile) ...[
+          const SizedBox(height: 8),
+          Text(
+            _ocrReadFailed || _ocrEmpty
+                ? '등록증에서 정보를 읽고, 국세청 사업자 인증이 완료되어야 프로필에 반영할 수 있어요.'
+                : '국세청 사업자 인증이 완료된 뒤 프로필에 반영할 수 있어요.',
+            style: GoogleFonts.notoSansKr(
+              fontSize: 11,
+              color: AppColors.textDisabled,
+              height: 1.4,
+            ),
+          ),
+        ],
+        const SizedBox(height: 14),
+        if (widget.onReplaceLicenseWithDialog != null &&
+            widget.persistedProfile?.isBusinessVerified == true &&
+            !widget.replacementMode) ...[
+          SizedBox(
+            height: AppPublisher.ctaHeight,
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: () async {
+                await widget.onReplaceLicenseWithDialog!.call();
+              },
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.accent,
+                side: const BorderSide(color: AppColors.accent),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(
+                    AppPublisher.buttonRadius,
+                  ),
+                ),
+              ),
               child: Text(
-                '등록증에서 아래 정보를 읽었어요',
+                '등록증 다시 올리기',
                 style: GoogleFonts.notoSansKr(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
                 ),
               ),
             ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        ..._ocrResult!.entries.map((e) {
-          final label = _ocrLabels[e.key] ?? e.key;
-          final labelW =
-              widget.publisherStyleOcrLabelWidth
-                  ? AppPublisher.formInlineLabelWidth
-                  : 80.0;
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: labelW,
-                  child: Text(
-                    label,
-                    style: GoogleFonts.notoSansKr(
-                      fontSize: 12,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Text(
-                    e.value,
-                    style: GoogleFonts.notoSansKr(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        }),
-        const SizedBox(height: 12),
-        Row(
+          ),
+          const SizedBox(height: 12),
+        ],
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             SizedBox(
               height: AppPublisher.ctaHeight,
               child: ElevatedButton(
-                onPressed: _applyOcrToProfile,
+                onPressed:
+                    _profileApplied
+                        ? null
+                        : (_canApplyToProfile ? _applyOcrToProfile : null),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accent,
                   foregroundColor: AppColors.white,
                   elevation: 0,
+                  disabledBackgroundColor: AppColors.divider,
+                  disabledForegroundColor: AppColors.textDisabled,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(
                       AppPublisher.buttonRadius,
@@ -392,7 +592,7 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
                   padding: const EdgeInsets.symmetric(horizontal: 14),
                 ),
                 child: Text(
-                  '프로필에 반영하기',
+                  _profileApplied ? '프로필에 반영됨' : '프로필에 반영하기',
                   style: GoogleFonts.notoSansKr(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -400,20 +600,28 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
                 ),
               ),
             ),
-            const SizedBox(width: 8),
             TextButton(
-              onPressed: () {
-                setState(() => _ocrResult = null);
-                widget.onCompleted?.call();
-              },
+              onPressed: _pickAndUpload,
               child: Text(
-                '반영 안 함',
+                '다른 파일로 올리기',
                 style: GoogleFonts.notoSansKr(
                   fontSize: 12,
-                  color: AppColors.textDisabled,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.accent,
                 ),
               ),
             ),
+            if (!_hydratedFromProfile)
+              TextButton(
+                onPressed: _clearResultAndNotifyParent,
+                child: Text(
+                  '반영 안 함',
+                  style: GoogleFonts.notoSansKr(
+                    fontSize: 12,
+                    color: AppColors.textDisabled,
+                  ),
+                ),
+              ),
           ],
         ),
       ],

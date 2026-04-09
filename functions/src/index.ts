@@ -11,6 +11,8 @@ import { haversineMeters, linesForStationDisplayName } from "./metro_station_lin
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
 const GOOGLE_MAPS_API_KEY = defineSecret("GOOGLE_MAPS_API_KEY");
+/** 심평원 병원정보 API — `defineSecret`로 바인딩해야 런타임에 값이 주입됨 */
+const HIRA_SERVICE_KEY = defineSecret("HIRA_SERVICE_KEY");
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -4513,7 +4515,11 @@ export const searchFeeSchedule = functions
  * Output: { bizNo, clinicName, ownerName, address, openedAt, status, failReason?, checkMethod?, skipped? }
  */
 export const verifyBusinessLicense = functions
-  .runWith({ timeoutSeconds: 120, memory: "512MB", secrets: ["GEMINI_API_KEY"] })
+  .runWith({
+    timeoutSeconds: 120,
+    memory: "512MB",
+    secrets: ["GEMINI_API_KEY", "NTS_SERVICE_KEY", HIRA_SERVICE_KEY],
+  })
   .https.onCall(async (data, context) => {
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
@@ -4622,7 +4628,12 @@ export const verifyBusinessLicense = functions
       "updatedAt": admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    const check = await runCheckBusinessStatus(db, uid, profileId);
+    const check = await runCheckBusinessStatus(
+      db,
+      uid,
+      profileId,
+      HIRA_SERVICE_KEY.value()
+    );
 
     return {
       ...extracted,
@@ -4630,6 +4641,9 @@ export const verifyBusinessLicense = functions
       failReason: check.failReason,
       checkMethod: check.method,
       skipped: check.skipped,
+      hiraMatched: check.hiraMatched,
+      hiraNote: check.hiraNote,
+      hiraMatchLevel: check.hiraMatchLevel,
     };
   });
 
@@ -4640,7 +4654,11 @@ export const verifyBusinessLicense = functions
  * Input: { profileId }
  */
 export const checkBusinessStatus = functions
-  .runWith({ timeoutSeconds: 60, memory: "256MB" })
+  .runWith({
+    timeoutSeconds: 60,
+    memory: "256MB",
+    secrets: ["NTS_SERVICE_KEY", HIRA_SERVICE_KEY],
+  })
   .https.onCall(async (data, context) => {
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
@@ -4650,7 +4668,12 @@ export const checkBusinessStatus = functions
     if (!profileId) {
       throw new functions.https.HttpsError("invalid-argument", "profileId가 필요합니다.");
     }
-    const result = await runCheckBusinessStatus(db, uid, profileId);
+    const result = await runCheckBusinessStatus(
+      db,
+      uid,
+      profileId,
+      HIRA_SERVICE_KEY.value()
+    );
     return result;
   });
 

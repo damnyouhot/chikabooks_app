@@ -772,9 +772,6 @@ class _NetworkSectionState extends State<_NetworkSection> {
     final entries = widget.entries;
     final totalClinics = entries.length;
     final totalMonths = entries.fold(0, (sum, e) => sum + e.months);
-    final maxMonths = entries.isEmpty
-        ? 1
-        : entries.map((e) => e.months).reduce((a, b) => a > b ? a : b);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -861,7 +858,6 @@ class _NetworkSectionState extends State<_NetworkSection> {
                             padding: const EdgeInsets.only(bottom: 10),
                             child: _NetworkTimelineItem(
                               entry: e,
-                              maxMonths: maxMonths,
                               onEdit: () => DentalNetworkEditSheet.show(
                                 context,
                                 editing: e,
@@ -953,25 +949,20 @@ class _NetworkEmptyHint extends StatelessWidget {
 
 class _NetworkTimelineItem extends StatelessWidget {
   final DentalNetworkEntry entry;
-  final int maxMonths;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
   const _NetworkTimelineItem({
     required this.entry,
-    required this.maxMonths,
     required this.onEdit,
     required this.onDelete,
   });
 
+  /// 세로 막대 고정 높이 (텍스트 블록·한 줄 아이콘과 균형)
+  static const double _barHeight = 40;
+
   @override
   Widget build(BuildContext context) {
-    final screenH = MediaQuery.of(context).size.height;
-    final kMaxBarH = (screenH * 0.13).clamp(80.0, 130.0);
-    final kMinBarH = (screenH * 0.035).clamp(22.0, 36.0);
-    final barHeight =
-        kMinBarH + (kMaxBarH - kMinBarH) * (entry.months / maxMonths);
-
     return Container(
       decoration: BoxDecoration(
         color: entry.isCurrent
@@ -985,14 +976,14 @@ class _NetworkTimelineItem extends StatelessWidget {
           width: 0.8,
         ),
       ),
-      padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
+      padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Container(
-            width: 7,
-            height: barHeight,
-            margin: const EdgeInsets.only(top: 2, right: 12),
+            width: 6,
+            height: _barHeight,
+            margin: const EdgeInsets.only(right: 10),
             decoration: BoxDecoration(
               color: entry.isCurrent
                   ? AppColors.accent
@@ -1061,22 +1052,30 @@ class _NetworkTimelineItem extends StatelessWidget {
               ],
             ),
           ),
-          Column(
+          Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               IconButton(
                 onPressed: onEdit,
-                icon: const Icon(Icons.edit_outlined, size: 16),
+                icon: const Icon(Icons.edit_outlined, size: 18),
                 color: AppColors.textSecondary,
-                constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
-                padding: EdgeInsets.zero,
+                style: IconButton.styleFrom(
+                  padding: const EdgeInsets.all(4),
+                  minimumSize: const Size(32, 32),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.compact,
+                ),
               ),
               IconButton(
                 onPressed: onDelete,
-                icon: const Icon(Icons.delete_outline, size: 16),
+                icon: const Icon(Icons.delete_outline, size: 18),
                 color: AppColors.error,
-                constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
-                padding: EdgeInsets.zero,
+                style: IconButton.styleFrom(
+                  padding: const EdgeInsets.all(4),
+                  minimumSize: const Size(32, 32),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.compact,
+                ),
               ),
             ],
           ),
