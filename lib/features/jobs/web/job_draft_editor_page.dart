@@ -217,6 +217,10 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
     _applyDraftToData(draft);
     await _ensureProfile(draft);
     if (!mounted) return;
+    final prof = _selectedProfile;
+    if (prof != null) {
+      _mergeClinicProfileDefaultsIntoData(prof);
+    }
 
     if (needsAi) {
       await JobDraftService.saveDraft(
@@ -264,6 +268,33 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
       _selectedProfile = p;
       _profileReady = true;
       _extraDraftFields = {..._extraDraftFields, 'clinicProfileId': p.id};
+    });
+  }
+
+  /// 드래프트에 비어 있을 때 [ClinicProfile]로 치과명·주소·연락처 보강.
+  /// `editorStep: step2`로 바로 진입(추출 없이 새 공고) 시에도 step1→2와 동일하게 채움.
+  void _mergeClinicProfileDefaultsIntoData(ClinicProfile p) {
+    final name = _data.clinicName.trim();
+    final addr = _data.address.trim();
+    final ct = _data.contact.trim();
+    if (name.isNotEmpty && addr.isNotEmpty && ct.isNotEmpty) return;
+
+    final eff = p.effectiveName.trim();
+    final pAddr = p.address.trim();
+    final pPhone = p.phone.trim();
+
+    setState(() {
+      _data = _data.copyWith(
+        clinicName: name.isEmpty && eff.isNotEmpty ? eff : _data.clinicName,
+        address: addr.isEmpty && pAddr.isNotEmpty ? p.address : _data.address,
+        contact: ct.isEmpty && pPhone.isNotEmpty ? p.phone : _data.contact,
+      );
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_editorStep == 'step2') {
+        _detailFormKey.currentState?.applyDraftFromParent(_data);
+      }
     });
   }
 
@@ -978,6 +1009,7 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
               clinicName:
                   _data.clinicName.isEmpty ? p.effectiveName : _data.clinicName,
               address: _data.address.isEmpty ? p.address : _data.address,
+              contact: _data.contact.isEmpty ? p.phone : _data.contact,
             );
           });
         }
@@ -1247,7 +1279,7 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
                   Expanded(
                     flex: 46,
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(0, 24, 16, 24),
+                      padding: const EdgeInsets.fromLTRB(0, 28, 16, 28),
                       child: Align(
                         alignment: Alignment.topCenter,
                         child: ConstrainedBox(
@@ -1293,7 +1325,7 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
       builder: (context, snap) {
         final profile = snap.data ?? _selectedProfile!;
         return SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(24),
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 720),

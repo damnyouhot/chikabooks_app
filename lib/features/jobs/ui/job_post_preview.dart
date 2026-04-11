@@ -193,7 +193,10 @@ class _JobPostPreviewState extends State<JobPostPreview> {
     return [
       const JobDetailSectionTitle('기본 정보'),
       _previewInfoGrid(rows),
-      const Divider(height: AppSpacing.xxl, color: AppColors.divider),
+      Divider(
+        height: AppPublisher.previewSectionDividerHeight,
+        color: AppColors.divider,
+      ),
     ];
   }
 
@@ -225,7 +228,10 @@ class _JobPostPreviewState extends State<JobPostPreview> {
           ),
         ),
       ),
-      const Divider(height: AppSpacing.xxl, color: AppColors.divider),
+      Divider(
+        height: AppPublisher.previewSectionDividerHeight,
+        color: AppColors.divider,
+      ),
     ];
   }
 
@@ -286,7 +292,10 @@ class _JobPostPreviewState extends State<JobPostPreview> {
     return [
       const JobDetailSectionTitle('병원 정보'),
       _previewInfoGrid(rows),
-      const Divider(height: AppSpacing.xxl, color: AppColors.divider),
+      Divider(
+        height: AppPublisher.previewSectionDividerHeight,
+        color: AppColors.divider,
+      ),
     ];
   }
 
@@ -322,7 +331,10 @@ class _JobPostPreviewState extends State<JobPostPreview> {
     return [
       const JobDetailSectionTitle('근무 조건'),
       _previewInfoGrid(rows),
-      const Divider(height: AppSpacing.xxl, color: AppColors.divider),
+      Divider(
+        height: AppPublisher.previewSectionDividerHeight,
+        color: AppColors.divider,
+      ),
     ];
   }
 
@@ -363,7 +375,10 @@ class _JobPostPreviewState extends State<JobPostPreview> {
     return [
       const JobDetailSectionTitle('지원 방법 · 마감'),
       _previewInfoGrid(rows),
-      const Divider(height: AppSpacing.xxl, color: AppColors.divider),
+      Divider(
+        height: AppPublisher.previewSectionDividerHeight,
+        color: AppColors.divider,
+      ),
     ];
   }
 
@@ -513,9 +528,9 @@ class _JobPostPreviewState extends State<JobPostPreview> {
               primary: widget.scrollController == null,
               padding: const EdgeInsets.fromLTRB(
                 AppSpacing.lg + 10,
-                AppSpacing.sm,
+                AppSpacing.md,
                 AppSpacing.lg,
-                80,
+                88,
               ),
               physics: const BouncingScrollPhysics(),
               children: [
@@ -568,8 +583,8 @@ class _JobPostPreviewState extends State<JobPostPreview> {
                         )
                       else
                         _buildBenefitsWrap(),
-                      const Divider(
-                        height: AppSpacing.xxl,
+                      Divider(
+                        height: AppPublisher.previewSectionDividerHeight,
                         color: AppColors.divider,
                       ),
                     ],

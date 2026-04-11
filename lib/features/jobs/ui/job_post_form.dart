@@ -699,7 +699,10 @@ class JobPostFormState extends State<JobPostForm> {
     final wasBlank =
         oldD.title.trim().isEmpty && oldD.clinicName.trim().isEmpty;
     final hasNow =
-        newD.title.trim().isNotEmpty || newD.clinicName.trim().isNotEmpty;
+        newD.title.trim().isNotEmpty ||
+        newD.clinicName.trim().isNotEmpty ||
+        newD.address.trim().isNotEmpty ||
+        newD.contact.trim().isNotEmpty;
     final aiFilledMore = _shouldRehydrateFromParentAi(oldD, newD);
     if ((wasBlank && hasNow) || aiFilledMore) {
       _hydrateControllersFromData(newD);
@@ -718,6 +721,7 @@ class JobPostFormState extends State<JobPostForm> {
     if (gained(oldD.workHours, newD.workHours)) return true;
     if (gained(oldD.description, newD.description)) return true;
     if (gained(oldD.address, newD.address)) return true;
+    if (gained(oldD.contact, newD.contact)) return true;
     if (gained(oldD.education, newD.education)) return true;
     if (oldD.specialties.isEmpty && newD.specialties.isNotEmpty) return true;
     if ((oldD.hospitalType == null || oldD.hospitalType!.trim().isEmpty) &&

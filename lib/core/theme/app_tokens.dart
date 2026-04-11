@@ -70,16 +70,16 @@ class AppPublisher {
   static const double buttonRadius = 8.0;
 
   /// `JobPostForm(publisherWebStyle)` 파트 ↔ 파트 세로 간격 (구분선 없이 여백만)
-  static const double formSectionSpacing = 40.0;
+  static const double formSectionSpacing = 46.0;
 
   /// 섹션 제목(기본 정보·병원 정보…) — 본문 14pt 대비 1.5배
   static const double formSectionTitleSize = 21.0;
 
   /// 섹션 제목 아래 → 필드 블록
-  static const double formSectionTitleGap = 22.0;
+  static const double formSectionTitleGap = 26.0;
 
   /// 필드 블록 → 다음 파트 전 내부 하단 여백 (Divider 없음)
-  static const double formSectionBottomGap = 32.0;
+  static const double formSectionBottomGap = 38.0;
 
   /// 복리·근무요일·지원방법 등 Wrap 칩 가로/세로 간격
   static const double formChipSpacing = 12.0;
@@ -96,4 +96,7 @@ class AppPublisher {
 
   /// 웹 공고 자료 입력(`/post-job/input`) 흰 패널·임시저장 카드 모서리 — [AppRadius.md]와 동일 스케일
   static const double inputPanelRadius = 10.0;
+
+  /// 웹 공고 미리보기 [JobPostPreview] 블록 사이 [Divider] 높이(세로 여백)
+  static const double previewSectionDividerHeight = 28.0;
 }
