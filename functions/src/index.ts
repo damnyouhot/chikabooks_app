@@ -4861,6 +4861,64 @@ export const confirmPayment = functions.https.onCall(
     const salaryStr = String(draftData.salary ?? "").trim();
     const sr = parseJobSalaryRange(salaryStr);
 
+    // district 자동 생성
+    const addrForDistrict = String(profileData.address || draftData.address || "");
+    let district = "";
+    if (addrForDistrict.length > 0) {
+      const parts = addrForDistrict.split(/\s+/);
+      const guIdx = parts.findIndex((p: string) => p.endsWith("구") || p.endsWith("군"));
+      const dongIdx = parts.findIndex(
+        (p: string) => p.endsWith("동") || p.endsWith("읍") || p.endsWith("면") || p.endsWith("로") || p.endsWith("길")
+      );
+      const gu = guIdx >= 0 ? parts[guIdx] : "";
+      const dong = dongIdx >= 0 && dongIdx > guIdx ? parts[dongIdx] : "";
+      if (dong && gu) district = `${dong} · ${gu}`;
+      else if (gu) district = gu;
+      else if (parts.length >= 2) district = parts.slice(0, 2).join(" ");
+    }
+
+    // 교통편 (draft의 transportation 객체 or flat 필드 통합)
+    const draftTrans = draftData.transportation as Record<string, unknown> | undefined;
+    const transObj: Record<string, unknown> | null = draftTrans
+      ? {
+          subwayLines: Array.isArray(draftTrans.subwayLines) ? draftTrans.subwayLines : [],
+          ...(typeof draftTrans.subwayStationName === "string" && (draftTrans.subwayStationName as string).trim()
+            ? { subwayStationName: (draftTrans.subwayStationName as string).trim() } : {}),
+          ...(typeof draftTrans.walkingDistanceMeters === "number" ? { walkingDistanceMeters: Math.floor(draftTrans.walkingDistanceMeters as number) } : {}),
+          ...(typeof draftTrans.walkingMinutes === "number" ? { walkingMinutes: Math.floor(draftTrans.walkingMinutes as number) } : {}),
+          ...(typeof draftTrans.exitNumber === "string" && (draftTrans.exitNumber as string).trim()
+            ? { exitNumber: (draftTrans.exitNumber as string).trim() } : {}),
+          parking: draftTrans.parking === true,
+        }
+      : null;
+    const jobSubwayLines: string[] = transObj
+      ? (transObj.subwayLines as string[])
+      : (Array.isArray(draftData.subwayLines) ? (draftData.subwayLines as string[]) : []);
+    const jobHasParking: boolean = transObj
+      ? transObj.parking === true
+      : (draftData.parking === true || (draftTrans?.parking === true));
+    const jobStationName = transObj ? (transObj.subwayStationName as string | undefined) : undefined;
+    const jobWalkMin = transObj ? (transObj.walkingMinutes as number | undefined) : undefined;
+    const isNearStation = !!jobStationName && typeof jobWalkMin === "number" && jobWalkMin <= 10;
+
+    // 마감일 (ISO 문자열 → Timestamp)
+    let closingDateTs: admin.firestore.Timestamp | null = null;
+    const closingRaw = draftData.closingDate;
+    if (closingRaw) {
+      if (closingRaw instanceof admin.firestore.Timestamp) {
+        closingDateTs = closingRaw;
+      } else if (typeof closingRaw === "string" && closingRaw.trim()) {
+        try {
+          const d = new Date(closingRaw.trim());
+          if (!isNaN(d.getTime())) closingDateTs = admin.firestore.Timestamp.fromDate(d);
+        } catch (_) { /* ignore */ }
+      }
+    }
+
+    // 좌표
+    const jobLat = typeof draftData.lat === "number" && isFinite(draftData.lat as number) ? draftData.lat as number : null;
+    const jobLng = typeof draftData.lng === "number" && isFinite(draftData.lng as number) ? draftData.lng as number : null;
+
     // jobs 문서 생성
     const jobData: Record<string, unknown> = {
       createdBy: uid,
@@ -4871,20 +4929,54 @@ export const confirmPayment = functions.https.onCall(
       role: draftData.role || "",
       type: draftData.role || "",
       career: draftData.career || "미정",
-      employmentType: draftData.employmentType || "",
-      workHours: draftData.workHours || "",
+      employmentType: String(draftData.employmentType ?? "").trim(),
+      workHours: String(draftData.workHours ?? "").trim(),
       salary: salaryStr,
       salaryText: salaryStr,
       salaryMin: sr.min,
       salaryMax: sr.max,
       salaryRange: [sr.min, sr.max],
-      benefits: draftData.benefits || [],
+      benefits: Array.isArray(draftData.benefits) ? draftData.benefits : [],
       description: draftData.description || "",
       details: draftData.description || "",
       address: profileData.address || draftData.address || "",
-      contact: draftData.contact || "",
-      images: draftData.imageUrls || [],
-      tags: draftData.tags || [],
+      district,
+      contact: String(draftData.contact ?? "").trim(),
+      images: Array.isArray(draftData.imageUrls) ? draftData.imageUrls : [],
+      tags: Array.isArray(draftData.tags) ? draftData.tags : [],
+      // ── 기본 정보 추가 ───────────────────────────────────────
+      education: String(draftData.education ?? "").trim(),
+      hireRoles: Array.isArray(draftData.hireRoles) ? draftData.hireRoles : [],
+      // ── 병원 정보 ─────────────────────────────────────────
+      ...(draftData.hospitalType ? { hospitalType: draftData.hospitalType } : {}),
+      ...(typeof draftData.chairCount === "number" ? { chairCount: Math.floor(draftData.chairCount as number) } : {}),
+      ...(typeof draftData.staffCount === "number" ? { staffCount: Math.floor(draftData.staffCount as number) } : {}),
+      specialties: Array.isArray(draftData.specialties) ? draftData.specialties : [],
+      ...(draftData.hasOralScanner != null ? { hasOralScanner: draftData.hasOralScanner } : {}),
+      ...(draftData.hasCT != null ? { hasCT: draftData.hasCT } : {}),
+      ...(draftData.has3DPrinter != null ? { has3DPrinter: draftData.has3DPrinter } : {}),
+      ...(draftData.digitalEquipmentRaw ? { digitalEquipmentRaw: String(draftData.digitalEquipmentRaw).trim() } : {}),
+      // ── 근무 조건 ────────────────────────────────────────
+      workDays: Array.isArray(draftData.workDays) ? draftData.workDays : [],
+      weekendWork: draftData.weekendWork === true,
+      nightShift: draftData.nightShift === true,
+      // ── 지원 관련 ────────────────────────────────────────
+      applyMethod: Array.isArray(draftData.applyMethod) ? draftData.applyMethod : [],
+      isAlwaysHiring: draftData.isAlwaysHiring === true,
+      ...(closingDateTs ? { closingDate: closingDateTs } : {}),
+      requiredDocuments: Array.isArray(draftData.requiredDocuments) ? draftData.requiredDocuments : [],
+      // ── 담당 업무 ────────────────────────────────────────
+      mainDutiesList: Array.isArray(draftData.mainDutiesList) ? draftData.mainDutiesList : [],
+      // ── 교통편 ──────────────────────────────────────────
+      ...(transObj ? { transportation: transObj } : {}),
+      ...(jobSubwayLines.length > 0 ? { subwayLines: jobSubwayLines } : {}),
+      hasParking: jobHasParking,
+      isNearStation,
+      // ── 좌표 ────────────────────────────────────────────
+      ...(jobLat != null && jobLng != null ? { lat: jobLat, lng: jobLng } : {}),
+      // ── 홍보이미지 ───────────────────────────────────────
+      promotionalImageUrls: Array.isArray(draftData.promotionalImageUrls) ? draftData.promotionalImageUrls : [],
+      // ── 메타 ─────────────────────────────────────────────
       status: "active",
       paymentStatus: "paid",
       publishedAt: admin.firestore.FieldValue.serverTimestamp(),

@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'job_post_form.dart';
 import 'job_preview_scroll_anchor.dart';
 import '../utils/job_post_field_sync.dart';
@@ -359,12 +361,6 @@ class _JobPostPreviewState extends State<JobPostPreview> {
         label: '상시채용',
         value: data.isAlwaysHiring ? '예' : '아니오',
       ),
-      if (data.recruitmentStart != null)
-        JobDetailInfoRow(
-          icon: Icons.event_outlined,
-          label: '모집 시작일',
-          value: _dateFmt(data.recruitmentStart!),
-        ),
       if (data.closingDate != null)
         JobDetailInfoRow(
           icon: Icons.event_busy_outlined,
@@ -411,9 +407,11 @@ class _JobPostPreviewState extends State<JobPostPreview> {
         ),
     ];
     final hasSubway = data.subwayLines.isNotEmpty;
-    if (rows.isEmpty && !hasSubway) return [];
+    final hasLatLng = data.lat != null && data.lng != null;
+    if (rows.isEmpty && !hasSubway && !hasLatLng) return [];
     return [
       const JobDetailSectionTitle('주소 · 연락처 · 교통'),
+      if (hasLatLng) _buildMapWidget(data.lat!, data.lng!),
       if (rows.isNotEmpty)
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: rows),
       if (hasSubway)
@@ -440,6 +438,69 @@ class _JobPostPreviewState extends State<JobPostPreview> {
           ),
         ),
     ];
+  }
+
+  /// 주소 섹션 최상단 지도 위젯.
+  /// 웹에서는 HtmlElementView 가 Clip 컨테이너를 벗어나는 렌더링 문제가 있어
+  /// PointerSignalResolver 로 스크롤 이벤트를 흡수해 지도 위에서 리스트가 스크롤되도록 처리.
+  Widget _buildMapWidget(double lat, double lng) {
+    final latLng = LatLng(lat, lng);
+    final mapChild = ClipRRect(
+      borderRadius: BorderRadius.circular(AppPublisher.softRadius),
+      child: SizedBox(
+        height: 160,
+        child: GoogleMap(
+          initialCameraPosition: CameraPosition(target: latLng, zoom: 15),
+          markers: {
+            Marker(markerId: const MarkerId('clinic'), position: latLng),
+          },
+          zoomControlsEnabled: false,
+          scrollGesturesEnabled: false,
+          rotateGesturesEnabled: false,
+          tiltGesturesEnabled: false,
+          zoomGesturesEnabled: false,
+          myLocationButtonEnabled: false,
+          liteModeEnabled: !kIsWeb,
+        ),
+      ),
+    );
+
+    // 웹: 지도 위에서 발생하는 스크롤 이벤트를 부모 ListView 로 전달
+    if (kIsWeb) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: AppSpacing.md),
+        child: Listener(
+          onPointerSignal: (event) {
+            if (event is PointerScrollEvent) {
+              // 이벤트를 소비해 지도가 가로채지 않도록 처리
+              GestureBinding.instance.pointerSignalResolver.register(
+                event,
+                (e) {
+                  if (e is! PointerScrollEvent) return;
+                  final ctx = context;
+                  if (!ctx.mounted) return;
+                  final scrollable = Scrollable.maybeOf(ctx);
+                  if (scrollable == null) return;
+                  final pos = scrollable.position;
+                  final newOffset =
+                      (pos.pixels + e.scrollDelta.dy).clamp(
+                        pos.minScrollExtent,
+                        pos.maxScrollExtent,
+                      );
+                  pos.jumpTo(newOffset);
+                },
+              );
+            }
+          },
+          child: mapChild,
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+      child: mapChild,
+    );
   }
 
   @override

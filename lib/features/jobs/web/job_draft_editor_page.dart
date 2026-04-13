@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
@@ -68,6 +69,12 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
   final ScrollController _previewScrollController = ScrollController();
   final Map<JobPreviewScrollAnchor, GlobalKey> _previewSectionKeys =
       createJobPreviewSectionKeys();
+
+  /// 우측 폼 스크롤 컨트롤러 — 마우스 위치 기반 라우팅에 사용.
+  final ScrollController _formScrollController = ScrollController();
+
+  /// true: 마우스가 좌측(프리뷰) 영역에 있음 / false: 우측(에디터) 영역
+  bool _mouseOnLeft = true;
 
   Map<String, dynamic> _persistExtraFromDraft(JobDraft d) {
     final m = <String, dynamic>{};
@@ -174,6 +181,7 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
   @override
   void dispose() {
     _previewScrollController.dispose();
+    _formScrollController.dispose();
     super.dispose();
   }
 
@@ -1268,35 +1276,64 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final maxPreviewH = (constraints.maxHeight - 48).clamp(280.0, 844.0);
-        return Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1320),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    flex: 46,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(0, 28, 16, 28),
-                      child: Align(
-                        alignment: Alignment.topCenter,
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 390),
-                          child: JobPostPreview(
-                            data: _dataForPreview(),
-                            maxHeight: maxPreviewH,
-                            scrollController: _previewScrollController,
-                            sectionKeys: _previewSectionKeys,
+        return Listener(
+          behavior: HitTestBehavior.translucent,
+          onPointerSignal: (event) {
+            if (event is! PointerScrollEvent) return;
+            // 이 핸들러가 이벤트를 독점해 자식 Scrollable의 이중 스크롤을 방지
+            GestureBinding.instance.pointerSignalResolver.register(event, (e) {
+              if (e is! PointerScrollEvent) return;
+              final ctrl =
+                  _mouseOnLeft ? _previewScrollController : _formScrollController;
+              if (!ctrl.hasClients) return;
+              final pos = ctrl.position;
+              final newOffset =
+                  (pos.pixels + e.scrollDelta.dy).clamp(
+                    pos.minScrollExtent,
+                    pos.maxScrollExtent,
+                  );
+              pos.jumpTo(newOffset);
+            });
+          },
+          child: MouseRegion(
+            onHover: (event) {
+              // LayoutBuilder constraints 기준 좌우 판별
+              final isLeft = event.localPosition.dx < constraints.maxWidth / 2;
+              if (isLeft != _mouseOnLeft) {
+                setState(() => _mouseOnLeft = isLeft);
+              }
+            },
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1320),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        flex: 46,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(0, 28, 16, 28),
+                          child: Align(
+                            alignment: Alignment.topCenter,
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 390),
+                              child: JobPostPreview(
+                                data: _dataForPreview(),
+                                maxHeight: maxPreviewH,
+                                scrollController: _previewScrollController,
+                                sectionKeys: _previewSectionKeys,
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                    ),
+                      Container(width: 1, color: AppColors.divider),
+                      Expanded(flex: 54, child: _buildFormSection()),
+                    ],
                   ),
-                  Container(width: 1, color: AppColors.divider),
-                  Expanded(flex: 54, child: _buildFormSection()),
-                ],
+                ),
               ),
             ),
           ),
@@ -1325,6 +1362,7 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
       builder: (context, snap) {
         final profile = snap.data ?? _selectedProfile!;
         return SingleChildScrollView(
+          controller: _formScrollController,
           padding: const EdgeInsets.all(24),
           child: Center(
             child: ConstrainedBox(

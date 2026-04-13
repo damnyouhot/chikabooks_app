@@ -299,11 +299,6 @@ class _JobListingsScreenState extends State<JobListingsScreen> {
               child: _CareerSummarySection(careerSummary: _careerSummary),
             ),
 
-            // ── 채용 서비스 오픈 예정 안내 ───────────────────────
-            const SliverToBoxAdapter(
-              child: _ServiceOpenBanner(),
-            ),
-
             // ── 프리미엄: 2열 그리드 (진입 시 고정 캐러셀 없음) ──
             SliverToBoxAdapter(
               child: _PremiumGridSection(jobs: mockLevel1Jobs),
@@ -679,37 +674,6 @@ class _CareerSummarySection extends StatelessWidget {
 }
 
 
-// ── 채용 서비스 오픈 예정 배너 ─────────────────────────────────────
-class _ServiceOpenBanner extends StatelessWidget {
-  const _ServiceOpenBanner();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.lg,
-        AppSpacing.md,
-        AppSpacing.lg,
-        0,
-      ),
-      child: Center(
-        child: Text(
-          '채용 서비스 곧 정식 오픈 예정입니다',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: AppColors.accent.withValues(alpha: 0.75),
-            letterSpacing: -0.2,
-            height: 1.4,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-
 // ── 하단 검색 바 (Positioned) ────────────────────────────────────
 class _BottomSearchBar extends StatefulWidget {
   final String searchQuery;
@@ -1023,7 +987,7 @@ class _PremiumGridSection extends StatelessWidget {
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
                 crossAxisSpacing: 10,
-                mainAxisSpacing: 10,
+                mainAxisSpacing: 5,
                 mainAxisExtent: 262,
               ),
               itemCount: jobs.length,
@@ -1257,25 +1221,17 @@ class _Level2CardState extends State<_Level2Card> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 제목 행: 타이틀 + 찜하기
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          job.displayTitle,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
-                            letterSpacing: -0.3,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
-                        ),
-                      ),
-                      _BookmarkIcon(jobId: job.id),
-                    ],
+                  // 제목
+                  Text(
+                    job.displayTitle,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                      letterSpacing: -0.3,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -1530,8 +1486,6 @@ class _Level3Row extends StatelessWidget {
                       fit: BoxFit.cover,
                     ),
                   ),
-                const SizedBox(height: 4),
-                _BookmarkIcon(jobId: job.id),
               ],
             ),
           ],
@@ -1673,8 +1627,6 @@ class _JobRowAsCWithThumb extends StatelessWidget {
                     textColor: AppColors.accent,
                   ),
                 ],
-                const SizedBox(height: 4),
-                _BookmarkIcon(jobId: job.id),
               ],
             ),
           ],
@@ -1793,21 +1745,16 @@ class _Level4Row extends StatelessWidget {
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
-            // 우: 즉시지원 배지 + 찜하기
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (job.canApplyNow)
-                  AppBadge(
-                    label: '즉시지원',
-                    bgColor: AppColors.accent.withValues(alpha: 0.12),
-                    textColor: AppColors.accent,
-                  ),
-                if (job.canApplyNow) const SizedBox(height: 4),
-                _BookmarkIcon(jobId: job.id),
-              ],
-            ),
+            // 우: 즉시지원 배지
+            if (job.canApplyNow)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: AppBadge(
+                  label: '즉시지원',
+                  bgColor: AppColors.accent.withValues(alpha: 0.12),
+                  textColor: AppColors.accent,
+                ),
+              ),
           ],
         ),
       ),
@@ -1978,10 +1925,10 @@ class _BookmarkIcon extends StatelessWidget {
             padding: const EdgeInsets.all(2),
             child: Icon(
               isBookmarked
-                  ? Icons.favorite_rounded
-                  : Icons.favorite_border_rounded,
+                  ? Icons.bookmark
+                  : Icons.bookmark_border,
               size: 18,
-              color: isBookmarked ? AppColors.error : AppColors.textDisabled,
+              color: isBookmarked ? AppColors.accent : AppColors.textDisabled,
             ),
           ),
         );

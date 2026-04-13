@@ -48,11 +48,24 @@ class Job {
   final DateTime? closingDate;
   final bool canApplyNow;
 
+  // ── 기본 정보 추가 ──────────────────────────────
+  /// 학력 조건 (예: "대졸 이상", "무관")
+  final String education;
+  /// 모집 직종 목록 (복수 직종 모집 시 사용)
+  final List<String> hireRoles;
+
   // ── 병원 정보 (3.1) ─────────────────────────────
   /// clinic | network | hospital | general (null = 미입력)
   final String? hospitalType;
   final int? chairCount;
   final int? staffCount;
+  /// 진료과목 태그 (임플란트, 교정 등)
+  final List<String> specialties;
+  final bool? hasOralScanner;
+  final bool? hasCT;
+  final bool? has3DPrinter;
+  /// 기타 디지털 장비 자유 입력 텍스트
+  final String? digitalEquipmentRaw;
 
   // ── 근무 조건 (3.2) ─────────────────────────────
   /// 영문 코드 리스트: mon, tue, wed, thu, fri, sat, sun
@@ -64,6 +77,11 @@ class Job {
   /// online | phone | email (복수 선택)
   final List<String> applyMethod;
   final bool isAlwaysHiring;
+  /// 제출 서류 목록
+  final List<String> requiredDocuments;
+
+  // ── 담당 업무 (3.3-2) ───────────────────────────
+  final List<String> mainDutiesList;
 
   // ── 교통편 (3.4) ────────────────────────────────
   final TransportationInfo? transportation;
@@ -74,7 +92,10 @@ class Job {
   // ── 태그 (3.5) ──────────────────────────────────
   final List<String> tags;
 
-  // ── 광고·노출 구조 (3.6) ────────────────────────
+  // ── 홍보 이미지 (3.6) ───────────────────────────
+  final List<String> promotionalImageUrls;
+
+  // ── 광고·노출 구조 (3.7) ────────────────────────
   final DateTime? adStartAt;
   final DateTime? adEndAt;
   final int priorityScore;
@@ -104,19 +125,37 @@ class Job {
     this.isNearStation = false,
     this.closingDate,
     this.canApplyNow = false,
-    // 신규 optional 필드
+    // 기본 정보 추가
+    this.education = '',
+    this.hireRoles = const [],
+    // 병원 정보
     this.hospitalType,
     this.chairCount,
     this.staffCount,
+    this.specialties = const [],
+    this.hasOralScanner,
+    this.hasCT,
+    this.has3DPrinter,
+    this.digitalEquipmentRaw,
+    // 근무 조건
     this.workDays = const [],
     this.weekendWork = false,
     this.nightShift = false,
+    // 지원 관련
     this.applyMethod = const [],
     this.isAlwaysHiring = false,
+    this.requiredDocuments = const [],
+    // 담당 업무
+    this.mainDutiesList = const [],
+    // 교통편
     this.transportation,
     this.subwayLines = const [],
     this.hasParking = false,
+    // 태그
     this.tags = const [],
+    // 홍보 이미지
+    this.promotionalImageUrls = const [],
+    // 광고
     this.adStartAt,
     this.adEndAt,
     this.priorityScore = 0,
@@ -280,10 +319,18 @@ class Job {
       isNearStation: nearStation,
       closingDate: closing,
       canApplyNow: (json['canApplyNow'] as bool?) ?? false,
+      // 기본 정보 추가
+      education: (json['education'] as String?)?.trim() ?? '',
+      hireRoles: List<String>.from(json['hireRoles'] ?? []),
       // 병원 정보
       hospitalType: json['hospitalType'] as String?,
       chairCount: (json['chairCount'] as num?)?.toInt(),
       staffCount: (json['staffCount'] as num?)?.toInt(),
+      specialties: List<String>.from(json['specialties'] ?? []),
+      hasOralScanner: json['hasOralScanner'] as bool?,
+      hasCT: json['hasCT'] as bool?,
+      has3DPrinter: json['has3DPrinter'] as bool?,
+      digitalEquipmentRaw: (json['digitalEquipmentRaw'] as String?)?.trim(),
       // 근무 조건
       workDays: List<String>.from(json['workDays'] ?? []),
       weekendWork: (json['weekendWork'] as bool?) ?? false,
@@ -291,12 +338,17 @@ class Job {
       // 지원 관련
       applyMethod: List<String>.from(json['applyMethod'] ?? []),
       isAlwaysHiring: (json['isAlwaysHiring'] as bool?) ?? false,
+      requiredDocuments: List<String>.from(json['requiredDocuments'] ?? []),
+      // 담당 업무
+      mainDutiesList: List<String>.from(json['mainDutiesList'] ?? []),
       // 교통편
       transportation: trans,
       subwayLines: List<String>.from(json['subwayLines'] ?? []),
       hasParking: (json['hasParking'] as bool?) ?? false,
       // 태그
       tags: List<String>.from(json['tags'] ?? []),
+      // 홍보 이미지
+      promotionalImageUrls: List<String>.from(json['promotionalImageUrls'] ?? []),
       // 광고
       adStartAt: parseTs(json['adStartAt']),
       adEndAt: parseTs(json['adEndAt']),
@@ -414,10 +466,19 @@ class Job {
         if (closingDate != null)
           'closingDate': Timestamp.fromDate(closingDate!),
         'canApplyNow': canApplyNow,
+        // 기본 정보 추가
+        if (education.isNotEmpty) 'education': education,
+        if (hireRoles.isNotEmpty) 'hireRoles': hireRoles,
         // 병원 정보
         if (hospitalType != null) 'hospitalType': hospitalType,
         if (chairCount != null) 'chairCount': chairCount,
         if (staffCount != null) 'staffCount': staffCount,
+        if (specialties.isNotEmpty) 'specialties': specialties,
+        if (hasOralScanner != null) 'hasOralScanner': hasOralScanner,
+        if (hasCT != null) 'hasCT': hasCT,
+        if (has3DPrinter != null) 'has3DPrinter': has3DPrinter,
+        if (digitalEquipmentRaw != null && digitalEquipmentRaw!.isNotEmpty)
+          'digitalEquipmentRaw': digitalEquipmentRaw,
         // 근무 조건
         if (workDays.isNotEmpty) 'workDays': workDays,
         'weekendWork': weekendWork,
@@ -425,12 +486,17 @@ class Job {
         // 지원 관련
         if (applyMethod.isNotEmpty) 'applyMethod': applyMethod,
         'isAlwaysHiring': isAlwaysHiring,
+        if (requiredDocuments.isNotEmpty) 'requiredDocuments': requiredDocuments,
+        // 담당 업무
+        if (mainDutiesList.isNotEmpty) 'mainDutiesList': mainDutiesList,
         // 교통편
         if (transportation != null) 'transportation': transportation!.toJson(),
         if (subwayLines.isNotEmpty) 'subwayLines': subwayLines,
         'hasParking': hasParking,
         // 태그
         if (tags.isNotEmpty) 'tags': tags,
+        // 홍보 이미지
+        if (promotionalImageUrls.isNotEmpty) 'promotionalImageUrls': promotionalImageUrls,
         // 광고
         if (adStartAt != null) 'adStartAt': Timestamp.fromDate(adStartAt!),
         if (adEndAt != null) 'adEndAt': Timestamp.fromDate(adEndAt!),

@@ -43,21 +43,35 @@ final List<Job> mockLevel1Jobs = [
         '진료 안내와 대기 순서 관리, 간단한 서류 발급 등 프런트 전반을 맡게 됩니다. '
         '치과 데스크 또는 의료기관 유사 업무 경험이 있으면 우대합니다. '
         '정확하고 친절한 커뮤니케이션이 가능한 분을 환영합니다.',
-    benefits: ['4대보험', '퇴직금', '명절상여'],
+    benefits: ['4대보험', '퇴직금', '명절상여', '주5일', '식비지원'],
     images: [kClinicPictureSampleAssets[3]],
     jobLevel: 1,
     matchScore: 52,
     isNearStation: true,
     closingDate: DateTime.now().add(const Duration(days: 10)),
     canApplyNow: true,
+    // 기본 정보 추가
+    education: '대졸 이상 (무관)',
+    hireRoles: ['데스크', '코디네이터'],
+    // 병원 정보
     hospitalType: 'clinic',
     chairCount: 3,
     staffCount: 5,
+    specialties: ['임플란트', '보철', '일반진료'],
+    hasOralScanner: true,
+    hasCT: true,
+    has3DPrinter: false,
+    // 근무 조건
     workDays: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'],
     weekendWork: true,
     nightShift: false,
+    // 지원 관련
     applyMethod: ['online', 'phone', 'email'],
     isAlwaysHiring: false,
+    requiredDocuments: ['이력서', '자기소개서'],
+    // 담당 업무
+    mainDutiesList: ['예약·취소 접수 처리', '내원 환자 응대', '수납 및 보험 청구', '진료실 안내', '서류 발급'],
+    // 교통편
     transportation: const TransportationInfo(
       subwayLines: ['2호선'],
       subwayStationName: '신촌역',
