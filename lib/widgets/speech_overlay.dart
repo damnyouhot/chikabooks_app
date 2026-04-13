@@ -30,6 +30,19 @@ class SpeechOverlay extends StatefulWidget {
     this.contentScale = 1.0,
   });
 
+  /// [SpeechOverlay] 본문과 동일한 한 줄 높이 — 레이아웃 오프셋(줄 단위 간격)에 사용.
+  static double lineHeightFor({
+    required bool isOnboarding,
+    double contentScale = 1.0,
+  }) {
+    const baseOnboarding = 17.0;
+    const baseNormal = 16.0;
+    const inner = 0.85;
+    final fontSize =
+        (isOnboarding ? baseOnboarding : baseNormal) * inner * contentScale;
+    return fontSize * 1.5;
+  }
+
   @override
   State<SpeechOverlay> createState() => _SpeechOverlayState();
 }

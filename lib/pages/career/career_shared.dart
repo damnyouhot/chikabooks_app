@@ -4,6 +4,10 @@ import '../../core/theme/app_tokens.dart';
 import '../../core/widgets/app_primary_card.dart';
 
 // ── 헬퍼 함수 ──────────────────────────────────────────────────
+/// 치과 히스토리가 비었을 때 — 요약·펼침 힌트 문구 공통 (두 줄)
+const String kDentalHistoryEmptyHint =
+    '아직 이력이 없어요\n직접 추가 또는 이력서 업로드 시 자동 입력돼요';
+
 String formatCareerMonths(int months) {
   if (months <= 0) return '1개월 미만';
   final years = months ~/ 12;
@@ -25,6 +29,7 @@ IconData iconFromSkillName(String name) {
     case 'sanitizer':         return Icons.sanitizer_outlined;
     case 'phone':             return Icons.phone_outlined;
     case 'radio':             return Icons.radio_outlined;
+    case 'denture_imp':       return Icons.precision_manufacturing_outlined;
     default:                  return Icons.star_outline;
   }
 }

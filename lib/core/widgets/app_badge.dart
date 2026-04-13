@@ -136,7 +136,7 @@ class AppStatusBadge extends StatelessWidget {
 
 /// '준비중' — 어두운 녹색([AppColors.prepBadgeGreen]) 배경 + 크림 화이트 텍스트 ([AppColors.appBg])
 ///
-/// 사용: 나 탭 Jobs 카드, 커리어 소탭(채용) 등
+/// 사용: 나 탭 Jobs 카드, 커리어 소탭(채용 · 지원) 등
 class PrepInProgressBadge extends StatelessWidget {
   const PrepInProgressBadge({super.key});
 

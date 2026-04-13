@@ -66,10 +66,16 @@ class _GrowthPageState extends State<GrowthPage>
         child: Column(
           children: [
             _buildHeader(),
-            // 세그먼트 탭바 → AppSegmentedControl
+            // 세그먼트 탭바 → AppSegmentedControl (상단 마진 0 — 헤더 아이콘과 겹치지 않게 본문만 위로)
             AppSegmentedControl(
               controller: _tabCtrl,
               labels: const ['오늘 퀴즈', '보험정보', '내 서재'],
+              margin: const EdgeInsets.fromLTRB(
+                AppSpacing.xl,
+                0,
+                AppSpacing.xl,
+                AppSpacing.sm,
+              ),
             ),
             Expanded(
               child: TabBarView(
@@ -88,56 +94,36 @@ class _GrowthPageState extends State<GrowthPage>
   }
 
   Widget _buildHeader() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // ── 타이틀 + 아이콘 (한 행으로 통합) ──
-        Padding(
-          padding: const EdgeInsets.only(left: AppSpacing.xl, right: 4),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const Text(
-                '성장하기',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const Spacer(),
-              IconButton(
-                icon: Icon(
-                  Icons.info_outline,
-                  color: AppColors.textDisabled,
-                  size: 18,
-                ),
-                onPressed: () => _showConceptDialog(context),
-              ),
-              IconButton(
-                icon: Icon(
-                  Icons.settings_outlined,
-                  color: AppColors.textDisabled,
-                  size: 20,
-                ),
-                onPressed:
-                    () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const SettingsPage()),
-                    ),
-              ),
-            ],
+    return Padding(
+      padding: const EdgeInsets.only(
+        left: AppSpacing.xl,
+        right: 4,
+        bottom: AppSpacing.xs,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const Spacer(),
+          IconButton(
+            icon: Icon(
+              Icons.info_outline,
+              color: AppColors.textDisabled,
+              size: 18,
+            ),
+            onPressed: () => _showConceptDialog(context),
           ),
-        ),
-        // ── 서브타이틀 ──
-        Padding(
-          padding: const EdgeInsets.only(left: AppSpacing.xl),
-          child: Text(
-            '오늘도 하나씩, 꾸준히 성장해요.',
-            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          IconButton(
+            icon: Icon(
+              Icons.settings_outlined,
+              color: AppColors.textDisabled,
+              size: 20,
+            ),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const SettingsPage()),
+            ),
           ),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-      ],
+        ],
+      ),
     );
   }
 
@@ -451,7 +437,7 @@ class _MyBooksTabState extends State<_MyBooksTab> {
         Padding(
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.xl,
-            AppSpacing.md,
+            AppSpacing.sm,
             AppSpacing.xl,
             0,
           ),

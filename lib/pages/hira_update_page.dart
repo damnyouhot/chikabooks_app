@@ -71,9 +71,11 @@ class _HiraUpdatePageState extends State<HiraUpdatePage>
           AppSegmentedControl(
             controller: _tabCtrl,
             labels: const ['수가 조회', '제도 변경'],
-            margin: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.xl,
-              vertical: AppSpacing.md,
+            margin: const EdgeInsets.fromLTRB(
+              AppSpacing.xl,
+              AppSpacing.xs,
+              AppSpacing.xl,
+              AppSpacing.sm,
             ),
           ),
           Expanded(

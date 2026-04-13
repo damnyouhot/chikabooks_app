@@ -7,18 +7,21 @@ import '../../models/job.dart';
 import '../../screen/jobs/job_detail_screen.dart';
 import 'job_cover_image.dart';
 
-/// Level 1 프리미엄 캐러셀 (수평 PageView)
+/// Level 1 프리미엄 캐러셀 (수평 PageView — 무한루프, 항상 정방향)
 ///
-/// - 4초마다 자동으로 다음 공고로 슬라이드
+/// - 4초마다 자동으로 다음 공고로 슬라이드 (항상 좌→우 방향)
+/// - 마지막 공고 다음에 첫 번째로 자연스럽게 연결됨 (역주행 없음)
 /// - 유저가 직접 좌우 스와이프로도 이동 가능
-/// - 스와이프 시 자동 타이머 리셋
 ///
-/// [stickyHeight]: SliverPersistentHeader 에서 사용하는 고정 높이
+/// [stickyHeight]: Stack 오버레이로 사용할 고정 높이
 class JobLevel1Carousel extends StatefulWidget {
   final List<Job> jobs;
 
   /// 섹션헤더(40) + PageView카드(116) + 하단여백(8) = 164px
   static const double stickyHeight = 164.0;
+
+  /// 무한루프의 가상 시작 인덱스 — 충분히 큰 배수로 잡아 앞뒤로 자유롭게 스와이프 가능
+  static const int _loopOffset = 10000;
 
   const JobLevel1Carousel({
     super.key,
@@ -31,14 +34,19 @@ class JobLevel1Carousel extends StatefulWidget {
 
 /// 외부에서 [GlobalKey<JobLevel1CarouselState>]로 접근 가능한 공개 State
 class JobLevel1CarouselState extends State<JobLevel1Carousel> {
-  late final PageController _pageCtrl;
+  late PageController _pageCtrl;
   Timer? _timer;
-  int _currentPage = 0;
+  int _virtualPage = JobLevel1Carousel._loopOffset; // 현재 가상 인덱스
+
+  int get _realIndex {
+    if (widget.jobs.isEmpty) return 0;
+    return _virtualPage % widget.jobs.length;
+  }
 
   @override
   void initState() {
     super.initState();
-    _pageCtrl = PageController();
+    _pageCtrl = PageController(initialPage: _virtualPage);
     if (widget.jobs.length > 1) _startTimer();
   }
 
@@ -50,30 +58,33 @@ class JobLevel1CarouselState extends State<JobLevel1Carousel> {
   }
 
   void _startTimer() {
+    _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 4), (_) => _advance());
   }
 
-  // 타이머 리셋 (스와이프 후 호출)
   void _resetTimer() {
-    _timer?.cancel();
     if (widget.jobs.length > 1) _startTimer();
   }
 
+  /// 항상 +1 방향으로 이동 → 역주행 없음
   void _advance() {
-    if (!mounted || widget.jobs.isEmpty) return;
-    final next = (_currentPage + 1) % widget.jobs.length;
+    if (!mounted || widget.jobs.isEmpty || !_pageCtrl.hasClients) return;
     _pageCtrl.animateToPage(
-      next,
+      _virtualPage + 1,
       duration: const Duration(milliseconds: 500),
       curve: Curves.easeInOut,
     );
   }
 
-  /// 외부(지도 화면 등)에서 GlobalKey로 특정 페이지로 이동
-  void scrollToPage(int index) {
-    if (!mounted || !_pageCtrl.hasClients) return;
+  /// 외부(지도 화면 등)에서 GlobalKey로 특정 실제 인덱스로 이동
+  void scrollToPage(int realIndex) {
+    if (!mounted || !_pageCtrl.hasClients || widget.jobs.isEmpty) return;
+    // 현재 가상 페이지 기준으로 가장 가까운 방향으로 이동
+    final currentReal = _virtualPage % widget.jobs.length;
+    int diff = realIndex - currentReal;
+    if (diff < 0) diff += widget.jobs.length;
     _pageCtrl.animateToPage(
-      index,
+      _virtualPage + diff,
       duration: const Duration(milliseconds: 350),
       curve: Curves.easeOut,
     );
@@ -111,10 +122,10 @@ class JobLevel1CarouselState extends State<JobLevel1Carousel> {
                 ),
               ),
               const Spacer(),
-              // 페이지 인디케이터 (현재/전체)
+              // 페이지 인디케이터 (실제 번호)
               if (widget.jobs.length > 1)
                 Text(
-                  '${_currentPage + 1} / ${widget.jobs.length}',
+                  '${_realIndex + 1} / ${widget.jobs.length}',
                   style: const TextStyle(
                     fontSize: 11,
                     color: AppColors.textDisabled,
@@ -125,17 +136,20 @@ class JobLevel1CarouselState extends State<JobLevel1Carousel> {
           ),
         ),
 
-        // ── 수평 PageView (스와이프 + 자동 슬라이드) ─────────────
+        // ── 수평 PageView (무한 itemCount → 역주행 없음) ─────────────
         SizedBox(
           height: 116,
           child: PageView.builder(
             controller: _pageCtrl,
             onPageChanged: (i) {
-              setState(() => _currentPage = i);
-              _resetTimer(); // 스와이프 시 타이머 리셋
+              setState(() => _virtualPage = i);
+              _resetTimer();
             },
-            itemCount: widget.jobs.length,
-            itemBuilder: (_, i) => _Level1Card(job: widget.jobs[i]),
+            itemBuilder: (_, i) {
+              final job = widget.jobs[i % widget.jobs.length];
+              return _Level1Card(job: job);
+            },
+            // itemCount 미지정 → 무한 스크롤
           ),
         ),
 
@@ -231,7 +245,6 @@ class _Level1Card extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 6),
-                        // 매칭 점수 (우측 정렬)
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -267,7 +280,7 @@ class _Level1Card extends StatelessWidget {
                     ),
                     const SizedBox(height: 5),
 
-                    // 3줄: 태그 (tags 우선, 없으면 benefits fallback) + 교통편
+                    // 3줄: 태그 + 교통편
                     Wrap(
                       spacing: 4,
                       runSpacing: 2,
@@ -317,14 +330,15 @@ class _BenefitChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: AppColors.surfaceMuted,
+        color: AppColors.accent.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(AppRadius.xs),
       ),
       child: Text(
         label,
         style: const TextStyle(
           fontSize: 10,
-          color: AppColors.textSecondary,
+          fontWeight: FontWeight.w600,
+          color: AppColors.accent,
           letterSpacing: -0.2,
         ),
       ),

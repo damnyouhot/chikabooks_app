@@ -242,15 +242,20 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
         ),
 
         // ── 하단 말풍선 (탭바 바로 위) — spotlight와 동일한 위치, 0.5초 페이드인 ──
+        // 말풍선 영역에서도 확실히 터치 진행되도록 전용 GestureDetector (Stack 히트 순서 보조)
         Positioned(
           bottom: bottomNavHeight + 16,
           left: 16,
           right: 16,
           child: FadeTransition(
             opacity: _fadeCtrl,
-            child: _DialogueBubble(
-              text: dialogue.replaceAll('{name}', _nickname ?? ''),
-              isAlert: true, // 주황 배경 + 크림 화이트 텍스트
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _onTap,
+              child: _DialogueBubble(
+                text: dialogue.replaceAll('{name}', _nickname ?? ''),
+                isAlert: true, // 주황 배경 + 크림 화이트 텍스트
+              ),
             ),
           ),
         ),

@@ -24,7 +24,6 @@ class BondPageState extends State<BondPage> {
         child: CustomScrollView(
           slivers: [
             SliverToBoxAdapter(child: _buildHeader()),
-            const SliverToBoxAdapter(child: SizedBox(height: 8)),
             SliverToBoxAdapter(child: BondPollSection(key: _pollKey)),
             const SliverToBoxAdapter(child: SizedBox(height: 40)),
           ],
@@ -34,53 +33,32 @@ class BondPageState extends State<BondPage> {
   }
 
   Widget _buildHeader() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 20, right: 4),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const Text(
-                '공감투표',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const Spacer(),
-              IconButton(
-                icon: const Icon(
-                  Icons.info_outline,
-                  color: AppColors.textDisabled,
-                  size: 18,
-                ),
-                onPressed: () => _showConceptDialog(context),
-              ),
-              IconButton(
-                icon: const Icon(
-                  Icons.settings_outlined,
-                  color: AppColors.textDisabled,
-                  size: 20,
-                ),
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const SettingsPage()),
-                ),
-              ),
-            ],
+    return Padding(
+      padding: const EdgeInsets.only(left: 20, right: 4, bottom: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const Spacer(),
+          IconButton(
+            icon: const Icon(
+              Icons.info_outline,
+              color: AppColors.textDisabled,
+              size: 18,
+            ),
+            onPressed: () => _showConceptDialog(context),
           ),
-        ),
-        Padding(
-          padding: const EdgeInsets.only(left: 20),
-          child: Text(
-            '오늘의 주제에 공감을 표현해보세요.',
-            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          IconButton(
+            icon: const Icon(
+              Icons.settings_outlined,
+              color: AppColors.textDisabled,
+              size: 20,
+            ),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const SettingsPage()),
+            ),
           ),
-        ),
-        const SizedBox(height: 10),
-      ],
+        ],
+      ),
     );
   }
 

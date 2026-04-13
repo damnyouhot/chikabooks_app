@@ -3,6 +3,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import '../core/theme/app_colors.dart';
+import '../core/theme/app_tokens.dart';
 import '../notifiers/job_filter_notifier.dart';
 import '../services/job_service.dart';
 import '../screen/jobs/job_listings_screen.dart';
@@ -62,7 +63,7 @@ class _CareerSkillAutoHintScopeState extends State<_CareerSkillAutoHintScope> {
 
 /// 커리어(도전하기) 탭 - 탭4
 ///
-/// - 소탭 0: 채용 (JobListingsScreen ↔ JobMapScreen)
+/// - 소탭 0: 채용 · 지원 (JobListingsScreen ↔ JobMapScreen)
 /// - 소탭 1: 커리어 카드 (CareerTab)
 ///
 /// [isOnboardingActive] 온보딩 진행 중이면 커리어 카드(소탭1)로 바로 열림
@@ -155,9 +156,9 @@ class _JobPageState extends State<JobPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // ── 공통 타이틀 + 인포/설정 (두 소탭 모두 항상 표시) ──
+                // ── 상단 인포/설정 (두 소탭 모두 항상 표시) ──
                 const _JobPageTitleBar(),
-                // ── 공통 소탭바 (채용 / 커리어 카드) ──
+                // ── 공통 소탭바 (채용 · 지원 / 커리어 카드) ──
                 const CareerTabHeader(),
                 // 소탭 본문
                 Expanded(
@@ -202,64 +203,42 @@ class _JobPageState extends State<JobPage> {
   }
 }
 
-// ── 커리어 탭 공통 타이틀 바 (두 소탭 모두 상단에 항상 표시) ──────────
+// ── 커리어 탭 상단 바: 인포/설정 (두 소탭 모두 항상 표시) ──────────
 class _JobPageTitleBar extends StatelessWidget {
   const _JobPageTitleBar();
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // ── 타이틀 + 아이콘 행 ──
-        Padding(
-          padding: const EdgeInsets.only(left: 20, right: 4),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const Text(
-                '커리어',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const Spacer(),
-              IconButton(
-                icon: const Icon(
-                  Icons.info_outline,
-                  color: AppColors.textSecondary,
-                  size: 18,
-                ),
-                onPressed: () => _showInfoDialog(context),
-              ),
-              IconButton(
-                icon: const Icon(
-                  Icons.settings_outlined,
-                  color: AppColors.textDisabled,
-                  size: 20,
-                ),
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const SettingsPage()),
-                ),
-              ),
-            ],
-          ),
-        ),
-        // ── 서브타이틀 ──
-        const Padding(
-          padding: EdgeInsets.only(left: 20),
-          child: Text(
-            '내 커리어를 관리하고 맞춤 공고를 받아보세요.',
-            style: TextStyle(
-              fontSize: 12,
+    return Padding(
+      padding: const EdgeInsets.only(
+        left: AppSpacing.xl,
+        right: 4,
+        bottom: AppSpacing.xs,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const Spacer(),
+          IconButton(
+            icon: const Icon(
+              Icons.info_outline,
               color: AppColors.textSecondary,
+              size: 18,
+            ),
+            onPressed: () => _showInfoDialog(context),
+          ),
+          IconButton(
+            icon: const Icon(
+              Icons.settings_outlined,
+              color: AppColors.textDisabled,
+              size: 20,
+            ),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const SettingsPage()),
             ),
           ),
-        ),
-        const SizedBox(height: 4),
-      ],
+        ],
+      ),
     );
   }
 

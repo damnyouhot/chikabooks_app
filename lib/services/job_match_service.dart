@@ -149,45 +149,21 @@ class JobMatchService {
   }
 
   // ────────────────────────────────────────────────────────────────
-  // 총 경력 개월수 계산 (careerProfile Map에서)
+  // 총 경력 개월수 (커리어 탭 상단 카드와 동일 규칙)
   // ────────────────────────────────────────────────────────────────
 
-  /// profile의 identity 필드에서 총 경력 개월수를 계산
-  ///
-  /// 우선순위: useTotalCareerMonthsOverride → currentStartDate 기반 계산
-  static int extractTotalCareerMonths(Map<String, dynamic>? profile) {
-    if (profile == null) return 0;
+  /// [CareerTab] 상단 카드와 동일: override면 그 값, 아니면 치과 히스토리 합 [networkSumMonths].
+  static int totalCareerMonthsForCard({
+    required Map<String, dynamic>? profile,
+    required int networkSumMonths,
+  }) {
+    if (profile == null) return networkSumMonths;
     final identity =
         (profile['identity'] as Map?)?.cast<String, dynamic>() ?? {};
-
-    // 수동 입력 우선
     if (identity['useTotalCareerMonthsOverride'] == true) {
       return (identity['totalCareerMonthsOverride'] as int?) ?? 0;
     }
-
-    // 현재 재직 시작일로 계산
-    final rawStart = identity['currentStartDate'];
-    if (rawStart != null) {
-      DateTime? startDate;
-      // Firestore Timestamp 또는 String 모두 처리
-      try {
-        if (rawStart is DateTime) {
-          startDate = rawStart;
-        } else {
-          // toDate() 메서드가 있으면 Timestamp로 취급
-          startDate = (rawStart as dynamic).toDate() as DateTime?;
-        }
-      } catch (_) {}
-
-      if (startDate != null) {
-        final now = DateTime.now();
-        final months =
-            (now.year - startDate.year) * 12 + (now.month - startDate.month);
-        return months.clamp(0, 999);
-      }
-    }
-
-    return 0;
+    return networkSumMonths;
   }
 
   // ────────────────────────────────────────────────────────────────

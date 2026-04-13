@@ -108,6 +108,9 @@ class _CaringPageState extends State<CaringPage>
   static const double _kSpeechOverlayExtraTop =
       0.75 * (16.0 * 0.85 * 1.5);
 
+  /// 온보딩 말풍선: 아이들과 동일 기준에서 [SpeechOverlay] 온보딩 한 줄 높이만큼 추가 상향
+  static const int _kOnboardingSpeechLiftLines = 3;
+
   File? _riveFile;
   RiveWidgetController? _dogController;
   TriggerInput? _tapTrigger;
@@ -681,7 +684,7 @@ class _CaringPageState extends State<CaringPage>
                       ),
                       child: Container(
                         color: AppColors.appBg,
-                        padding: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.only(bottom: 8),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -736,7 +739,7 @@ class _CaringPageState extends State<CaringPage>
                     // ClipRect 여유 공간이 생겨 캐릭터 상단 잘림이 최소화됨
                     child: ClipRect(
                       child: Padding(
-                        padding: const EdgeInsets.only(top: 18),
+                        padding: const EdgeInsets.only(top: 10),
                         child: _buildCharacterStack(
                             isOnboarding,
                             MediaQuery.of(context).size.height),
@@ -786,7 +789,7 @@ class _CaringPageState extends State<CaringPage>
   // 기기가 달라져도 캐릭터가 항상 화면 높이 대비 동일 비율로 보임.
   // (Pixel 7 Pro 892dp 기준 kScreenRatio = 0.38 → 캐릭터 ≈ 339dp)
   Widget _buildCharacterStack(bool isOnboarding, double screenH) {
-    // 탭0(나) 온보딩 전체(step2·4 팝업 포함) — 대사 유무와 무관하게 캐릭터 크기 유지
+    // 탭0 온보딩: 말풍선 글자만 확대 — 캐릭터 스케일은 아이들과 동일
     final tab0LayoutBoost =
         isOnboarding && widget.onboardingTab0LayoutBoost;
 
@@ -806,11 +809,7 @@ class _CaringPageState extends State<CaringPage>
                     const kScreenRatio = 0.38;
                     final scale =
                         (screenH * kScreenRatio / availableH).clamp(0.85, 2.5);
-                    var finalScale = isOnboarding ? scale * 0.90 : scale;
-                    if (tab0LayoutBoost) {
-                      // 온보딩 캐릭터 파트: 1.8 × 85% × 90%
-                      finalScale *= 1.8 * 0.85 * 0.9;
-                    }
+                    final finalScale = scale;
 
                     // 캐릭터만 60dp 아래로 이동
                     // Transform.translate는 레이아웃·텍스트 위치에 영향 없음
@@ -881,10 +880,8 @@ class _CaringPageState extends State<CaringPage>
         Positioned.fill(
           child: IgnorePointer(
             child: LayoutBuilder(builder: (ctx, constraints) {
-              final h = constraints.maxHeight;
               // 기본·리액션: 같은 위치, 리액션 우선 (`_reactionMsgText ?? _baseMsgText`)
-              final baseMsgTop =
-                  (isOnboarding ? h * 0.028 : 0.0) + _kSpeechOverlayExtraTop;
+              final baseMsgTop = _kSpeechOverlayExtraTop;
               final displayText = isOnboarding
                   ? widget.onboardingDialogue
                   : (_reactionMsgText ?? _baseMsgText);
@@ -893,19 +890,28 @@ class _CaringPageState extends State<CaringPage>
                   : (_reactionMsgText != null
                       ? _isReactionMsgDismissing
                       : _isBaseMsgDismissing);
+              final speechContentScale =
+                  tab0LayoutBoost ? 1.5 * 0.85 * 0.9 : 1.0;
+              final speechLiftDy = isOnboarding
+                  ? -12.0 -
+                      _kOnboardingSpeechLiftLines *
+                          SpeechOverlay.lineHeightFor(
+                            isOnboarding: true,
+                            contentScale: speechContentScale,
+                          )
+                  : -12.0;
               return Stack(children: [
                 Positioned(top: baseMsgTop, left: 0, right: 0,
                   child: Center(
                     child: Transform.translate(
-                      offset: isOnboarding ? Offset.zero : const Offset(0, -12),
+                      offset: Offset(0, speechLiftDy),
                       child: SpeechOverlay(
                         text: displayText,
                         isDismissing: isDismissing,
                         isOnboarding: isOnboarding,
                         onboardingBoldWord:
                             isOnboarding ? widget.onboardingBoldWord : null,
-                        contentScale:
-                            tab0LayoutBoost ? 1.5 * 0.85 * 0.9 : 1.0,
+                        contentScale: speechContentScale,
                       ),
                     ),
                   )),
@@ -919,23 +925,23 @@ class _CaringPageState extends State<CaringPage>
 
   Widget _buildTopBar({bool titleVisible = true}) {
     if (!titleVisible) return const SizedBox.shrink();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 20, right: 4),
-          child: Row(children: [
-            Text('나', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-            const Spacer(),
-            IconButton(icon: Icon(Icons.info_outline, color: AppColors.textSecondary, size: 18), onPressed: () => _showConceptDialog(context)),
-            IconButton(icon: Icon(Icons.settings_outlined, color: AppColors.textDisabled, size: 20),
-                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsPage()))),
-          ]),
-        ),
-        Padding(padding: const EdgeInsets.only(left: 20),
-          child: Text('오늘 하루도 잘 버텼어요.', style: TextStyle(fontSize: 12, color: AppColors.textSecondary))),
-        const SizedBox(height: 10),
-      ],
+    return Padding(
+      padding: const EdgeInsets.only(left: 20, right: 4, bottom: 4),
+      child: Row(
+        children: [
+          const Spacer(),
+          IconButton(
+            icon: Icon(Icons.info_outline, color: AppColors.textSecondary, size: 18),
+            onPressed: () => _showConceptDialog(context),
+          ),
+          IconButton(
+            icon: Icon(Icons.settings_outlined, color: AppColors.textDisabled, size: 20),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const SettingsPage()),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

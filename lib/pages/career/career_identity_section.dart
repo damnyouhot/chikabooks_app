@@ -301,7 +301,8 @@ class _CareerIdentitySheetState extends State<CareerIdentitySheet> {
   final Set<String> _tags = {};
   DateTime? _currentStartDate;
   bool _useOverride = false;
-  final _overrideCtrl = TextEditingController();
+  final _yearCtrl = TextEditingController();
+  final _monthCtrl = TextEditingController();
   bool _saving = false;
   bool _loading = true;
 
@@ -341,7 +342,10 @@ class _CareerIdentitySheetState extends State<CareerIdentitySheet> {
             }
           } catch (_) {}
           _useOverride = identity['useTotalCareerMonthsOverride'] == true;
-          _overrideCtrl.text = overrideM > 0 ? '$overrideM' : '';
+          final y = overrideM ~/ 12;
+          final mo = overrideM % 12;
+          _yearCtrl.text = '$y';
+          _monthCtrl.text = '$mo';
         });
       }
     } catch (_) {
@@ -354,8 +358,36 @@ class _CareerIdentitySheetState extends State<CareerIdentitySheet> {
   @override
   void dispose() {
     _clinicCtrl.dispose();
-    _overrideCtrl.dispose();
+    _yearCtrl.dispose();
+    _monthCtrl.dispose();
     super.dispose();
+  }
+
+  /// 년·월(0~11) → 총 개월 (미리보기·저장 공통)
+  int _computedOverrideMonths() {
+    final y = int.tryParse(_yearCtrl.text.trim()) ?? 0;
+    final mo = int.tryParse(_monthCtrl.text.trim()) ?? 0;
+    final moClamped = mo.clamp(0, 11);
+    return (y * 12 + moClamped).clamp(0, 999999);
+  }
+
+  bool _validateOverrideMonthRange() {
+    final raw = _monthCtrl.text.trim();
+    if (raw.isEmpty) return true;
+    final mo = int.tryParse(raw);
+    if (mo == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('개월은 숫자로 입력해 주세요')),
+      );
+      return false;
+    }
+    if (mo < 0 || mo > 11) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('개월은 0~11 사이로 입력해 주세요 (나머지는 년에 반영)')),
+      );
+      return false;
+    }
+    return true;
   }
 
   Future<void> _pickStartDate() async {
@@ -372,9 +404,9 @@ class _CareerIdentitySheetState extends State<CareerIdentitySheet> {
 
   Future<void> _save() async {
     if (_saving) return;
+    if (_useOverride && !_validateOverrideMonthRange()) return;
     setState(() => _saving = true);
-    final overrideM =
-        _useOverride ? (int.tryParse(_overrideCtrl.text) ?? 0) : 0;
+    final overrideM = _useOverride ? _computedOverrideMonths() : 0;
     try {
       await CareerProfileService.updateCareerIdentity(
         status: _status,
@@ -383,6 +415,7 @@ class _CareerIdentitySheetState extends State<CareerIdentitySheet> {
         currentStartDate: _currentStartDate,
         useTotalCareerMonthsOverride: _useOverride,
         totalCareerMonthsOverride: _useOverride ? overrideM : null,
+        careerOverrideLocked: _useOverride,
       );
       if (_tags.isNotEmpty) {
         unawaited(FunnelOnboardingService.tryLogFirstCareerSpecialty());
@@ -539,7 +572,7 @@ class _CareerIdentitySheetState extends State<CareerIdentitySheet> {
                             ),
                             const SizedBox(height: 2),
                             const Text(
-                              '치과 네트워크 자동 합산 대신 직접 입력',
+                              '치과 히스토리 자동 합산 대신 직접 입력',
                               style: TextStyle(
                                 fontSize: 11,
                                 color: AppColors.textSecondary, // 이전 kCText.withOpacity(0.5)
@@ -558,13 +591,56 @@ class _CareerIdentitySheetState extends State<CareerIdentitySheet> {
                   if (_useOverride) ...[
                     const SizedBox(height: 10),
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
                           child: TextField(
-                            controller: _overrideCtrl,
+                            controller: _yearCtrl,
                             keyboardType: TextInputType.number,
                             decoration: InputDecoration(
-                              hintText: '개월 수 입력 (예: 36)',
+                              hintText: '0',
+                              filled: true,
+                              fillColor: AppColors.white,
+                              border: OutlineInputBorder(
+                                borderRadius:
+                                    BorderRadius.circular(AppRadius.md),
+                                borderSide: BorderSide(
+                                  color: AppColors.divider,
+                                  width: 0.8,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius:
+                                    BorderRadius.circular(AppRadius.md),
+                                borderSide: BorderSide(
+                                  color: AppColors.divider,
+                                  width: 0.8,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius:
+                                    BorderRadius.circular(AppRadius.md),
+                                borderSide: const BorderSide(
+                                  color: AppColors.accent,
+                                  width: 1.4,
+                                ),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.md,
+                                vertical: AppSpacing.sm + 2,
+                              ),
+                              suffixText: '년',
+                            ),
+                            onChanged: (_) => setState(() {}),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: _monthCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              hintText: '0~11',
                               filled: true,
                               fillColor: AppColors.white,
                               border: OutlineInputBorder(
@@ -600,20 +676,16 @@ class _CareerIdentitySheetState extends State<CareerIdentitySheet> {
                             onChanged: (_) => setState(() {}),
                           ),
                         ),
-                        const SizedBox(width: 10),
-                        Text(
-                          _overrideCtrl.text.isEmpty
-                              ? ''
-                              : formatCareerMonths(
-                                  int.tryParse(_overrideCtrl.text) ?? 0,
-                                ),
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textSecondary, // 이전 kCText.withOpacity(0.65)
-                          ),
-                        ),
                       ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '→ ${formatCareerMonths(_computedOverrideMonths())}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ],
                 ],

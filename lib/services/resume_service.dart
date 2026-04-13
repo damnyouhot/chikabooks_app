@@ -24,7 +24,7 @@ class ResumeService {
     return _db.collection('users').doc(uid);
   }
 
-  /// AI/OCR로 이력서가 확정되면 호출 — 치과 네트워크 추출 시 기본 소스로 사용
+  /// AI/OCR로 이력서가 확정되면 호출 — 치과 히스토리(careerNetwork) 추출 시 기본 소스로 사용
   static Future<void> markLastImportedResume(String resumeId) async {
     final ref = _userDocRef;
     if (ref == null || resumeId.isEmpty) return;

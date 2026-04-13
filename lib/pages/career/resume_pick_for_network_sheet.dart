@@ -106,7 +106,7 @@ class _ResumePickerSheet extends StatelessWidget {
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                '치과 네트워크에 반영할 이력서를 고르세요. '
+                '치과 히스토리에 반영할 이력서를 고르세요. '
                 '최근 AI로 불러온 이력서가 있으면 맨 위에 표시됩니다.',
                 style: TextStyle(
                   fontSize: 13,

@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
 import '../../services/user_profile_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -161,8 +162,8 @@ class _SettingsPageState extends State<SettingsPage> {
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 12),
         children: [
-          // 1) 계정
-          const _SectionTitle(title: '계정'),
+          // 1) 내 계정
+          const _SectionTitle(title: '[내 계정]'),
           if (user == null)
             const _InfoTile(
               icon: Icons.person_outline,
@@ -175,12 +176,12 @@ class _SettingsPageState extends State<SettingsPage> {
               future: _loadUserProfile(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16),
-                    child: Card(
-                      child: Padding(
-                        padding: EdgeInsets.all(16),
-                        child: Center(child: CircularProgressIndicator()),
+                  return const _AccountSectionCard(
+                    child: Center(
+                      child: SizedBox(
+                        height: 28,
+                        width: 28,
+                        child: CircularProgressIndicator(strokeWidth: 2),
                       ),
                     ),
                   );
@@ -195,15 +196,14 @@ class _SettingsPageState extends State<SettingsPage> {
                         ? _providerLabelFromAuth(user)
                         : provider;
 
-                return _AccountCard(
+                return _AccountSummary(
                   email: user.email ?? data?['email'] as String? ?? '이메일 정보 없음',
                   displayName:
-                      data?['nickname'] as String? ?? // ✅ nickname 필드 우선
+                      data?['nickname'] as String? ??
                       user.displayName ??
                       data?['displayName'] as String? ??
                       '닉네임 없음',
                   provider: displayProvider,
-                  uid: user.uid,
                 );
               },
             ),
@@ -386,62 +386,61 @@ class _InfoTile extends StatelessWidget {
   }
 }
 
-class _AccountCard extends StatelessWidget {
-  final String displayName;
-  final String email;
-  final String provider;
-  final String uid;
+/// 설정 상단 계정 블록 — 리스트 카드와 동일한 톤의 서피스 박스
+class _AccountSectionCard extends StatelessWidget {
+  final Widget child;
 
-  const _AccountCard({
-    required this.displayName,
-    required this.email,
-    required this.provider,
-    required this.uid,
-  });
+  const _AccountSectionCard({required this.child});
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       child: Card(
         elevation: 0,
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              const CircleAvatar(radius: 22, child: Icon(Icons.person)),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      displayName,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(email, style: Theme.of(context).textTheme.bodyMedium),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
-                      children: [
-                        _Chip(text: '로그인: $provider'),
-                        _Chip(
-                          text:
-                              'UID: ${uid.substring(0, uid.length >= 8 ? 8 : uid.length)}…',
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
         ),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+class _AccountSummary extends StatelessWidget {
+  final String displayName;
+  final String email;
+  final String provider;
+
+  const _AccountSummary({
+    required this.displayName,
+    required this.email,
+    required this.provider,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return _AccountSectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            displayName,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          SizedBox(height: AppSpacing.sm),
+          Text('이메일: $email', style: theme.textTheme.bodyMedium),
+          SizedBox(height: AppSpacing.xs),
+          Text('로그인 방식: $provider', style: theme.textTheme.bodyMedium),
+        ],
       ),
     );
   }
@@ -489,24 +488,6 @@ class _AdminSectionState extends State<_AdminSection> {
         ),
         const SizedBox(height: 12),
       ],
-    );
-  }
-}
-
-class _Chip extends StatelessWidget {
-  final String text;
-  const _Chip({required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(999),
-        color: Theme.of(context).colorScheme.surface,
-        border: Border.all(color: Theme.of(context).dividerColor),
-      ),
-      child: Text(text, style: Theme.of(context).textTheme.labelMedium),
     );
   }
 }

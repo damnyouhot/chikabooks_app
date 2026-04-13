@@ -16,7 +16,7 @@
 ///
 /// ── 수면 ──
 ///   재우기       → sleepStart
-///   깨우기       → sleepWake
+///   깨우기       → sleepWake / sleepWakeLongMent(12h+ 고정 1문장)
 class CaringMents {
   // ════════════════════════════════════════════
   // 1) 밥주기 (Feed)
@@ -170,6 +170,10 @@ class CaringMents {
     "좋은 컨디션이야.",
     "눈이 초롱초롱하네.",
   ];
+
+  /// 12시간 이상 수면 후 깨우기 (고정 멘트 1문장)
+  static const sleepWakeLongMent =
+      '잠을 열두 시간 이상 자면 기분이 좋지 않아요...';
 
   /// 짧은 수면 깨우기 (30분 이하 — 패널티)
   static const sleepShort = [

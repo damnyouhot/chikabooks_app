@@ -20,7 +20,6 @@ import '../../widgets/job/quick_apply_sheet.dart';
 import '../../widgets/job/radius_chip_row.dart';
 import '../../widgets/job/job_cover_image.dart';
 import 'job_detail_screen.dart';
-
 // 앱 세션 내 공고 목록 캐시 (반경/필터 조합 → 결과)
 final Map<String, List<Job>> _jobCache = {};
 
@@ -193,9 +192,25 @@ class _JobMapScreenState extends State<JobMapScreen> {
         jobs = await _jobService.fetchJobs();
       }
 
-      // Firestore 비어있으면 Mock 폴백
+      // Firestore 비어있으면 Mock 폴백 (반경 필터도 동일하게 적용)
       if (jobs.isEmpty) {
-        jobs = [...mockLevel2Jobs, ...generateMockLevel3Jobs(count: 10)];
+        final mockAll = [...mockLevel2Jobs, ...generateMockLevel3Jobs(count: 10)];
+        if (widget.userLocation != null) {
+          final userLoc = widget.userLocation!;
+          final radiusKm = _jobFilter.radiusKm;
+          jobs = mockAll.where((job) {
+            if (job.lat == 0 && job.lng == 0) return false;
+            return _jobService.calculateDistance(
+                  userLoc,
+                  LatLng(job.lat, job.lng),
+                ) <=
+                radiusKm;
+          }).toList();
+          // 반경 내에 아무것도 없으면 전체 Mock 표시 (빈 지도 방지)
+          if (jobs.isEmpty) jobs = mockAll;
+        } else {
+          jobs = mockAll;
+        }
       }
 
       jobs = _applyClientFilters(jobs);

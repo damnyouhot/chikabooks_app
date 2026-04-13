@@ -214,6 +214,8 @@ class _HomeShellState extends State<HomeShell> {
         _onboardingCtrl.advance();
         return;
       }
+      // 스포트라이트가 아닐 때: 현재 step이 속한 탭만 허용 (캐릭터/타탭 대사 구간에서 임의 이동 방지)
+      if (idx != _onboardingCtrl.currentTabIndex) return;
       _setTab(idx);
       return;
     }

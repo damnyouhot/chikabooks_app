@@ -29,7 +29,8 @@ import '../services/funnel_onboarding_service.dart';
 ///   energy<30 → mood 보상 절반(내림), mood<30 → bond 절반(내림)
 /// 재우기:
 ///   ≤30분 깨우기: energy+0, mood-5
-///   >30분: energy+h*12.5, mood+5
+///   >30분 & <12시간: energy+h*12.5(최대 8h), mood+5
+///   ≥12시간: energy 회복 동일, mood-2·bond-1, mood+5 없음, 일일 bond+1 없음(감쇠 시)
 /// ──────────────────────────────────────────────
 class CaringActionService {
   static final _db = FirebaseFirestore.instance;
@@ -115,7 +116,7 @@ class CaringActionService {
           final remaining = _feedCooldownMin - elapsed.inMinutes;
           return FeedResult(
             success: false,
-            rejectMent: '${_pickRandom(CaringMents.feedCooldown)} (${remaining}분 후)',
+            rejectMent: '${_pickRandom(CaringMents.feedCooldown)} ($remaining분 후)',
           );
         } else if (feedCount == 1 && elapsed.inMinutes >= _feedConsecutiveWindowMin) {
           feedCount = 0;
@@ -296,6 +297,7 @@ class CaringActionService {
   /// 깨우기 — 30분 이하 패널티 / 초과 회복 + 상황별 멘트
   ///
   /// [fromLocal]: [startSleep]과 동일. 있으면 서버 읽기 없이 판단·벌점 일관성 확보.
+  /// 멘트 분기와 [CaringStateService.wake]는 동일 [DateTime]으로 맞춤.
   static Future<WakeResult> wakeUp({CaringState? fromLocal}) async {
     final state =
         fromLocal ?? await CaringStateService.loadState();
@@ -303,17 +305,24 @@ class CaringActionService {
       return WakeResult(state: state, ment: '이미 깨어 있어요.');
     }
 
-    final isShort = state.sleepStartedAt != null &&
-        DateTime.now().difference(state.sleepStartedAt!).inMinutes <=
-            CaringStateService.shortSleepThresholdMin;
+    final clock = DateTime.now();
+    final sleepElapsed = state.sleepStartedAt != null
+        ? clock.difference(state.sleepStartedAt!)
+        : Duration.zero;
+    final isShort = sleepElapsed.inMinutes <=
+        CaringStateService.shortSleepThresholdMin;
+    final isLongSleep = sleepElapsed >= CaringStateService.longSleepThreshold;
 
     final woken = await CaringStateService.wake(
       state,
       persist: fromLocal == null,
+      now: clock,
     );
     final ment = isShort
         ? _pickRandom(CaringMents.sleepShort)
-        : _pickRandom(CaringMents.sleepWake);
+        : isLongSleep
+            ? CaringMents.sleepWakeLongMent
+            : _pickRandom(CaringMents.sleepWake);
 
     return WakeResult(state: woken, ment: ment, isShortSleep: isShort);
   }

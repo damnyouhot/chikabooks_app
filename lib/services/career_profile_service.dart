@@ -55,6 +55,7 @@ class CareerProfileService {
     {'id': 'fluoride',       'title': '불소도포',           'icon': 'water_drop'},
     {'id': 'xray',           'title': '방사선 촬영',        'icon': 'radio'},
     {'id': 'prostho',        'title': '인상 채득',          'icon': 'handyman'},
+    {'id': 'denture_imp',    'title': '덴처임프',           'icon': 'denture_imp'},
     {'id': 'temp_crown',     'title': '임시치아 제작',      'icon': 'build_circle'},
     {'id': 'ortho',          'title': '교정 와이어 교체',   'icon': 'architecture'},
     {'id': 'implant',        'title': '임플란트 보조',      'icon': 'build'},
@@ -190,7 +191,7 @@ class CareerProfileService {
     }
   }
 
-  // ── 치과 네트워크 ────────────────────────────────────────
+  // ── 치과 히스토리 (careerNetwork 컬렉션) ───────────────────
   static CollectionReference<Map<String, dynamic>>? get _networkRef {
     final uid = _uid;
     if (uid == null) return null;
@@ -252,7 +253,7 @@ class CareerProfileService {
     await ref.doc(entryId).delete();
   }
 
-  /// `syncedFromResume == true`인 치과 네트워크 행만 일괄 삭제 (이력서 추출로 쌓인 줄만 비움)
+  /// `syncedFromResume == true`인 치과 히스토리 행만 일괄 삭제 (이력서 추출로 쌓인 줄만 비움)
   static Future<int> deleteAllSyncedFromResumeNetworkEntries() async {
     final ref = _networkRef;
     if (ref == null) throw Exception('로그인이 필요합니다.');
@@ -279,26 +280,31 @@ class CareerProfileService {
     List<String> specialtyTags = const [],
     bool useTotalCareerMonthsOverride = false,
     int? totalCareerMonthsOverride,
+    /// true: 총 경력 직접 입력 사용 중 — 프로필 연차 저장 시 덮어쓰지 않음(연차 변경 시만 동기화).
+    bool? careerOverrideLocked,
   }) async {
     try {
       final ref = _userRef;
       if (ref == null) throw Exception('로그인이 필요합니다.');
 
+      final identityPayload = <String, dynamic>{
+        'status': status,
+        'clinicName': clinicName.trim(),
+        'currentStartDate':
+            currentStartDate != null
+                ? Timestamp.fromDate(currentStartDate)
+                : null,
+        'specialtyTags': specialtyTags,
+        'useTotalCareerMonthsOverride': useTotalCareerMonthsOverride,
+        'totalCareerMonthsOverride': totalCareerMonthsOverride,
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+      if (careerOverrideLocked != null) {
+        identityPayload['careerOverrideLocked'] = careerOverrideLocked;
+      }
+
       await ref.set({
-        'careerProfile': {
-          'identity': {
-            'status': status,
-            'clinicName': clinicName.trim(),
-            'currentStartDate':
-                currentStartDate != null
-                    ? Timestamp.fromDate(currentStartDate)
-                    : null,
-            'specialtyTags': specialtyTags,
-            'useTotalCareerMonthsOverride': useTotalCareerMonthsOverride,
-            'totalCareerMonthsOverride': totalCareerMonthsOverride,
-            'updatedAt': FieldValue.serverTimestamp(),
-          },
-        },
+        'careerProfile': {'identity': identityPayload},
       }, SetOptions(merge: true));
     } catch (e) {
       debugPrint('⚠️ CareerProfileService.updateCareerIdentity error: $e');

@@ -292,9 +292,11 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
   Widget build(BuildContext context) {
     if (!kQuizGlassMode) {
       return ListView(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.xl,
-          vertical: AppSpacing.lg,
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.xl,
+          AppSpacing.sm,
+          AppSpacing.xl,
+          AppSpacing.lg,
         ),
         children: _buildChildren(),
       );
@@ -344,9 +346,11 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
           ),
         ),
         ListView(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.xl,
-            vertical: AppSpacing.lg,
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.xl,
+            AppSpacing.sm,
+            AppSpacing.xl,
+            AppSpacing.lg,
           ),
           children: _buildChildren(),
         ),

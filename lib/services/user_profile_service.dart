@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/user_public_profile.dart';
+import 'career_profile_onboarding_sync.dart';
 
 
 /// 교감 프로필 서비스 (캐시 포함)
@@ -85,6 +86,10 @@ class UserProfileService {
     final uid = _auth.currentUser?.uid;
     if (uid == null) throw Exception('로그인이 필요합니다.');
 
+    final prevSnap = await _db.collection('users').doc(uid).get();
+    final previousCareerGroup =
+        prevSnap.data()?['careerGroup'] as String?;
+
     final data = <String, dynamic>{
       'nickname': nickname.trim(),
       'region': region,
@@ -96,6 +101,17 @@ class UserProfileService {
     await _ensurePublicProfile(uid, UserPublicProfile(nickname: nickname));
     // 캐시 갱신
     _cache = await getMyProfile(forceRefresh: true);
+
+    if (careerGroup != null) {
+      try {
+        await CareerProfileOnboardingSync.applyAfterOnboarding(
+          careerGroup,
+          previousCareerGroupFromUserDoc: previousCareerGroup,
+        );
+      } catch (e) {
+        debugPrint('⚠️ [updateBasicProfile] career identity 동기화 실패: $e');
+      }
+    }
   }
 
   /// Step B 저장: 주 고민 / 근무 유형
@@ -142,6 +158,10 @@ class UserProfileService {
     debugPrint('🔍 [completeOnboarding] careerGroup: $careerGroup');
     debugPrint('🔍 [completeOnboarding] concernTags: $concernTags');
 
+    final prevSnap = await _db.collection('users').doc(uid).get();
+    final previousCareerGroup =
+        prevSnap.data()?['careerGroup'] as String?;
+
     // ✅ careerGroup → careerBucket 변환
     String careerBucket;
     if (careerGroup == '학생' || careerGroup == '1년차' || careerGroup == '2년차') {
@@ -167,6 +187,18 @@ class UserProfileService {
     debugPrint('🔍 [completeOnboarding] Firestore 업데이트 시작...');
     await _db.collection('users').doc(uid).set(data, SetOptions(merge: true));
     debugPrint('✅ [completeOnboarding] Firestore 업데이트 완료');
+
+    // 커리어 탭 총 경력 ← 연차 (수동 잠금 시 같은 연차만 저장하면 스킵)
+    try {
+      await CareerProfileOnboardingSync.applyAfterOnboarding(
+        careerGroup,
+        previousCareerGroupFromUserDoc: previousCareerGroup,
+      );
+      debugPrint('✅ [completeOnboarding] careerProfile identity override 반영');
+    } catch (e) {
+      debugPrint('⚠️ [completeOnboarding] career identity 동기화 실패: $e');
+      rethrow;
+    }
 
     // 캐시 갱신
     debugPrint('🔍 [completeOnboarding] 캐시 갱신 중...');

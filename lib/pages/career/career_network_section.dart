@@ -8,7 +8,7 @@ import '../../services/resume_service.dart';
 import 'career_shared.dart';
 import 'resume_pick_for_network_sheet.dart';
 
-// ── 치과 네트워크 카드 ─────────────────────────────────────────
+// ── 나의 치과 히스토리 카드 (구 career 네트워크) ─────────────────
 class CareerNetworkCard extends StatefulWidget {
   const CareerNetworkCard({super.key});
 
@@ -33,7 +33,7 @@ class _CareerNetworkCardState extends State<CareerNetworkCard> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '나의 치과 네트워크',
+                  '나의 치과 히스토리',
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w900,
@@ -53,7 +53,7 @@ class _CareerNetworkCardState extends State<CareerNetworkCard> {
           );
         }
         if (snap.hasError) {
-          return const CareerErrorCard(message: '치과 네트워크를 불러오지 못했어요.');
+          return const CareerErrorCard(message: '치과 히스토리를 불러오지 못했어요.');
         }
 
         final entries = snap.data ?? [];
@@ -76,7 +76,7 @@ class _CareerNetworkCardState extends State<CareerNetworkCard> {
                     children: [
                       const Expanded(
                         child: Text(
-                          '나의 치과 네트워크',
+                          '나의 치과 히스토리',
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w900,
@@ -123,7 +123,7 @@ class _CareerNetworkCardState extends State<CareerNetworkCard> {
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Text(
                     totalClinics == 0
-                        ? '아직 이력이 없어요  ·  탭해서 추가하기'
+                        ? kDentalHistoryEmptyHint
                         : '총 $totalClinics곳 · 총 ${formatCareerMonths(totalMonths)}',
                     style: TextStyle(
                       fontSize: 12,
@@ -252,13 +252,13 @@ class _NetworkEmptyHint extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          const Expanded(
+          Expanded(
             child: Text(
-              '아직 이력이 없어요.\n첫 근무지를 추가하면 타임라인이 만들어져요.',
+              kDentalHistoryEmptyHint,
               style: TextStyle(
                 fontSize: 12,
                 height: 1.35,
-                color: AppColors.onCardPrimary, // 이전 kCText.withOpacity(0.75)
+                color: AppColors.onCardPrimary.withOpacity(0.92),
               ),
             ),
           ),
@@ -423,7 +423,7 @@ class _NetworkTimelineItem extends StatelessWidget {
   }
 }
 
-// ── 치과 네트워크 편집 시트 ────────────────────────────────────
+// ── 치과 히스토리 편집 시트 ────────────────────────────────────
 class DentalNetworkEditSheet extends StatelessWidget {
   final DentalNetworkEntry? editing;
   const DentalNetworkEditSheet._({this.editing});
@@ -535,11 +535,11 @@ class _DentalNetworkListSheetState extends State<_DentalNetworkListSheet> {
               : (title.length > 32 ? '${title.substring(0, 29)}…' : title);
       messenger.showSnackBar(
         SnackBar(
-          content: Text('「$label」경력을 치과 네트워크에 반영했어요.'),
+          content: Text('「$label」경력을 치과 히스토리에 반영했어요.'),
         ),
       );
     } catch (e, st) {
-      debugPrint('⚠️ 치과 네트워크 이력서 추출: $e\n$st');
+      debugPrint('⚠️ 치과 히스토리 이력서 추출: $e\n$st');
       if (!mounted) return;
       messenger.showSnackBar(
         const SnackBar(
@@ -578,7 +578,7 @@ class _DentalNetworkListSheetState extends State<_DentalNetworkListSheet> {
               children: [
                 const Expanded(
                   child: Text(
-                    '치과 네트워크',
+                    '나의 치과 히스토리',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w900,

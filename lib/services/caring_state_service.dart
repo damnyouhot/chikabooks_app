@@ -10,6 +10,9 @@ import '../config/reward_constants.dart';
 /// hunger / mood / energy / bond 4개 상태 + 시간 경과 시스템.
 /// users/{uid} 문서의 caringState 필드를 사용.
 ///
+/// **수면·깨우기 ([wake]):** 짧은 수면(≤30분)은 기분 벌점만. 그 외는 에너지 회복(최대 8h분).
+/// 12시간 이상은 기분·유대 추가 패널티·고정 멘트(액션 서비스). 수면 중 시간 감쇠는 배고픔만.
+///
 /// **저장:** [saveState] / [saveStateSequential]는 동일 FIFO 큐로 처리되어
 /// `caringState` 전체 덮어쓰기가 동시에 끝나며 순서가 뒤바뀌지 않도록 한다.
 class CaringStateService {
@@ -38,6 +41,12 @@ class CaringStateService {
   static const double sleepEnergyPerHour = 12.5;
   static const double sleepMaxHours = 8.0;
   static const double sleepMoodBonus = 5.0;
+
+  /// 이 시간 이상 수면 후 깨우면: 기분 +5 없음, 기분·유대 패널티 적용.
+  /// [_applyTimeDecay] 중 수면이면서 이 이상이면 일일 bond +1도 생략.
+  static const Duration longSleepThreshold = Duration(hours: 12);
+  static const double longSleepMoodPenalty = 2.0;
+  static const double longSleepBondPenalty = 1.0;
 
   /// bond 미접속 패널티
   static const double bondAbsencePenaltyPerDay = 3.0;
@@ -90,7 +99,8 @@ class CaringStateService {
 
   /// 오프라인 시간 반영 (순수 함수)
   ///
-  /// 수면 중이면 감소/회복 없음 (회복은 wake()에서만 처리)
+  /// 수면 중: 배고픔은 깨어 있을 때와 동일 비율로 감소. 기분·에너지 시간감소 없음.
+  /// 에너지·기분 회복은 wake()에서만 처리.
   static CaringState _applyTimeDecay(CaringState state, DateTime now) {
     final lastActive = state.lastActiveAt ?? now;
     final elapsed = now.difference(lastActive);
@@ -106,7 +116,7 @@ class CaringStateService {
     double bond = state.bond;
 
     if (state.isSleeping) {
-      // 수면 중: 감소·회복 모두 없음 (wake()에서 일괄 처리)
+      hunger = max(hungerFloor, hunger - hours * hungerDecayPerHour);
     } else {
       // hunger < 30 → mood 시간감소 +1/h 가속
       final effectiveMoodDecay = hunger < 30
@@ -126,13 +136,16 @@ class CaringStateService {
         bondAbsenceMaxPenalty,
       );
       bond = max(0, bond - penalty);
-      debugPrint('🔻 bond 미접속 패널티: -$penalty (${absentDays}일)');
+      debugPrint('🔻 bond 미접속 패널티: -$penalty ($absentDays일)');
     }
 
     // ── 일일 첫 접속 bond +1 ──
     final todayKey = _dateKey(now);
     final lastDateKey = state.lastActiveAt != null ? _dateKey(state.lastActiveAt!) : null;
-    if (lastDateKey != todayKey) {
+    final skipDailyBondForLongSleep = state.isSleeping &&
+        state.sleepStartedAt != null &&
+        now.difference(state.sleepStartedAt!) >= longSleepThreshold;
+    if (lastDateKey != todayKey && !skipDailyBondForLongSleep) {
       bond = min(100, bond + 1);
       debugPrint('✅ 일일 첫 접속 bond +1');
     }
@@ -229,18 +242,33 @@ class CaringStateService {
   static const int shortSleepThresholdMin = 30;
   static const double shortSleepMoodPenalty = 5.0;
 
-  /// 깨우기 — 30분 초과면 회복, 이하면 패널티
+  /// 깨우기
   ///
+  /// - [sleepStartedAt] 없음: 잠만 해제.
+  /// - **≤30분:** 기분 [shortSleepMoodPenalty], 에너지 변화 없음.
+  /// - **30분 초과 ~ 12시간 미만:** 에너지 회복(최대 [sleepMaxHours]만큼), 기분 +[sleepMoodBonus].
+  /// - **≥12시간:** 에너지 회복은 동일, 기분 [longSleepMoodPenalty]·유대 [longSleepBondPenalty].
+  ///
+  /// [now]를 넘기면 [CaringActionService.wakeUp]과 동일 시각으로 경과·멘트 분기를 맞출 수 있음.
   /// [persist]: false면 계산만 하고 저장은 호출자([saveStateSequential] 등)에 맡김.
-  static Future<CaringState> wake(CaringState current, {bool persist = true}) async {
-    final now = DateTime.now();
+  static Future<CaringState> wake(
+    CaringState current, {
+    bool persist = true,
+    DateTime? now,
+  }) async {
+    final clock = now ?? DateTime.now();
     if (current.sleepStartedAt == null) {
-      final woken = current.copyWith(isSleeping: false, lastActiveAt: now);
+      final woken = current.copyWith(isSleeping: false, lastActiveAt: clock);
       if (persist) await saveState(woken);
       return woken;
     }
 
-    final sleepElapsed = now.difference(current.sleepStartedAt!);
+    var sleepElapsed = clock.difference(current.sleepStartedAt!);
+    if (sleepElapsed.isNegative) {
+      debugPrint('⚠️ wake: sleepElapsed < 0 (시계 역행 등) → 0으로 처리');
+      sleepElapsed = Duration.zero;
+    }
+
     final sleepMinutes = sleepElapsed.inMinutes;
 
     CaringState woken;
@@ -248,19 +276,32 @@ class CaringStateService {
       woken = current.copyWith(
         isSleeping: false,
         mood: current.mood - shortSleepMoodPenalty,
-        lastActiveAt: now,
+        lastActiveAt: clock,
       );
-      debugPrint('😴 짧은 수면 패널티: mood -$shortSleepMoodPenalty (${sleepMinutes}분)');
+      debugPrint('😴 짧은 수면 패널티: mood -$shortSleepMoodPenalty ($sleepMinutes분)');
     } else {
-      final sleepHours = min(sleepElapsed.inMinutes / 60.0, sleepMaxHours);
+      final sleepHoursTotal = sleepElapsed.inMinutes / 60.0;
+      final sleepHours = min(sleepHoursTotal, sleepMaxHours);
       final recoveredEnergy = min(100.0, current.energy + sleepHours * sleepEnergyPerHour);
-      final recoveredMood = min(100.0, current.mood + sleepMoodBonus);
+      final isLongSleep = sleepElapsed >= longSleepThreshold;
+      final recoveredMood = isLongSleep
+          ? max(moodFloor, current.mood - longSleepMoodPenalty)
+          : min(100.0, current.mood + sleepMoodBonus);
+      final newBond = isLongSleep
+          ? max(0.0, current.bond - longSleepBondPenalty)
+          : current.bond;
       woken = current.copyWith(
         isSleeping: false,
         energy: recoveredEnergy,
         mood: recoveredMood,
-        lastActiveAt: now,
+        bond: newBond,
+        lastActiveAt: clock,
       );
+      if (isLongSleep) {
+        debugPrint(
+          '😴 장시간 수면: mood -$longSleepMoodPenalty, bond -$longSleepBondPenalty ($sleepHoursTotal h)',
+        );
+      }
     }
 
     if (persist) await saveState(woken);
