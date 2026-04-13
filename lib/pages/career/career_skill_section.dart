@@ -109,9 +109,13 @@ class CareerSkillCard extends StatelessWidget {
           Expanded(
             child: Text(
               info.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                fontSize: 14,
+                fontSize: 11,
                 fontWeight: FontWeight.w700,
+                height: 1.15,
+                letterSpacing: -0.2,
                 color: AppColors.textPrimary,
               ),
             ),

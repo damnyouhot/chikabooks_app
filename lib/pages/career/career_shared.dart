@@ -6,7 +6,7 @@ import '../../core/widgets/app_primary_card.dart';
 // ── 헬퍼 함수 ──────────────────────────────────────────────────
 /// 치과 히스토리가 비었을 때 — 요약·펼침 힌트 문구 공통 (두 줄)
 const String kDentalHistoryEmptyHint =
-    '아직 이력이 없어요\n직접 추가 또는 이력서 업로드 시 자동 입력돼요';
+    '아직 이력이 없어요\n직접 추가, 이력서 업로드 시 자동 입력돼요';
 
 String formatCareerMonths(int months) {
   if (months <= 0) return '1개월 미만';
