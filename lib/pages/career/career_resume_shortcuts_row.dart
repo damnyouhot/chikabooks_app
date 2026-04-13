@@ -4,8 +4,8 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../core/widgets/app_badge.dart';
 import '../../core/widgets/app_muted_card.dart';
-import '../../features/resume/screens/my_applications_screen.dart';
 import '../../features/resume/screens/resume_home_screen.dart';
+import '../../pages/my_activity_page.dart';
 
 /// 채용 탭 스크롤 상단 등 — 내 이력서 / 지원 내역 바로가기 (가로 반반)
 class CareerResumeShortcutsRow extends StatelessWidget {
@@ -33,12 +33,12 @@ class CareerResumeShortcutsRow extends StatelessWidget {
           Expanded(
             child: _CareerShortcutCard(
               icon: Icons.work_outline,
-              label: '지원 내역',
-              description: '지원 공고 현황 확인',
+              label: '지원 · 저장 공고',
+              description: '지원 및 저장 공고 확인',
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => const MyApplicationsScreen(),
+                  builder: (_) => const MyActivityPage(),
                 ),
               ),
             ),

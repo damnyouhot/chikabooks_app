@@ -211,34 +211,18 @@ class _Level1Card extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // 1줄: 병원명 + 위치 + 매칭 점수 (우측)
+                    // 1줄: 공고 제목 + 매칭 점수 (우측 정렬)
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        Flexible(
-                          child: Text.rich(
-                            TextSpan(
-                              children: [
-                                TextSpan(
-                                  text: job.displayClinicName,
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.textPrimary,
-                                    letterSpacing: -0.3,
-                                  ),
-                                ),
-                                if (job.district.isNotEmpty)
-                                  TextSpan(
-                                    text: '  ${job.district}',
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w400,
-                                      color: AppColors.textDisabled,
-                                      letterSpacing: -0.2,
-                                    ),
-                                  ),
-                              ],
+                        Expanded(
+                          child: Text(
+                            job.displayTitle,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                              letterSpacing: -0.3,
                             ),
                             overflow: TextOverflow.ellipsis,
                             maxLines: 1,
@@ -267,30 +251,46 @@ class _Level1Card extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 3),
 
-                    // 2줄: 직무 · 고용 · 경력
+                    // 2줄: 치과이름, 위치 (검은색)
+                    Text(
+                      job.district.isNotEmpty
+                          ? '${job.displayClinicName}  ${job.district}'
+                          : job.displayClinicName,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                        letterSpacing: -0.2,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                    const SizedBox(height: 2),
+
+                    // 3줄: 직무 · 고용형태 · 경력 (검은색)
                     Text(
                       job.listRoleLine.isEmpty ? '—' : job.listRoleLine,
                       style: const TextStyle(
                         fontSize: 11,
-                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textPrimary,
                         letterSpacing: -0.2,
                       ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
                     ),
-                    const SizedBox(height: 5),
+                    const SizedBox(height: 4),
 
-                    // 3줄: 태그 + 교통편
+                    // 4줄: 해시태그 (accent 배경 칩)
                     Wrap(
                       spacing: 4,
                       runSpacing: 2,
-                      children: [
-                        if (job.transportation?.summaryLine != null)
-                          _BenefitChip(label: '🚇 ${job.transportation!.summaryLine!}'),
-                        ...(job.tags.isNotEmpty ? job.tags : job.benefits)
-                            .take(3)
-                            .map((b) => _BenefitChip(label: b)),
-                      ],
+                      children: (job.tags.isNotEmpty ? job.tags : job.benefits)
+                          .take(3)
+                          .map((b) => _BenefitChip(label: b))
+                          .toList(),
                     ),
                   ],
                 ),

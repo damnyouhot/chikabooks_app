@@ -42,7 +42,7 @@ class _MyActivityPageState extends State<MyActivityPage>
         backgroundColor: AppColors.white,
         elevation: 0,
         title: const Text(
-          '내 활동',
+          '지원 · 저장 공고',
           style: TextStyle(
             color: AppColors.textPrimary,
             fontSize: 18,
@@ -53,10 +53,10 @@ class _MyActivityPageState extends State<MyActivityPage>
         bottom: TabBar(
           controller: _tabController,
           labelColor: AppColors.textPrimary,
-          unselectedLabelColor: AppColors.textSecondary, // 이전 _kText.withOpacity(0.5)
+          unselectedLabelColor: AppColors.textSecondary,
           indicatorColor: AppColors.accent,
           indicatorWeight: 3,
-          tabs: const [Tab(text: '지원 내역'), Tab(text: '관심 공고')],
+          tabs: const [Tab(text: '지원 공고'), Tab(text: '저장 공고')],
         ),
       ),
       body: TabBarView(

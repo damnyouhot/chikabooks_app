@@ -32,7 +32,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
         backgroundColor: AppColors.white,
         elevation: 0,
         title: const Text(
-          '내 지원 내역',
+          '내 지원 공고',
           style: TextStyle(
             fontSize: 17,
             fontWeight: FontWeight.w700,
@@ -83,8 +83,6 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
       (label: '전체', value: null),
       (label: '지원 완료', value: ApplicationStatus.submitted),
       (label: '열람됨', value: ApplicationStatus.reviewed),
-      (label: '연락처 요청', value: ApplicationStatus.contactRequested),
-      (label: '연락처 공개', value: ApplicationStatus.contactShared),
       (label: '철회', value: ApplicationStatus.withdrawn),
     ];
 

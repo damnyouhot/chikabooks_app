@@ -21,6 +21,55 @@ import '../jobs/job_detail_screen.dart';
 import '../../widgets/job/job_cover_image.dart';
 import '../../pages/career/career_resume_shortcuts_row.dart';
 
+/// C목록에 끼워 넣는 A·B 행용 썸네일 (기존 96의 60%)
+const double _kAbThumbInCListSide = 58;
+
+String _jobEducationHint(String career) {
+  final c = career.trim();
+  if (c.contains('전문대졸')) return '전문대졸';
+  if (c.contains('대졸')) return '대졸';
+  if (c.contains('전문') && c.contains('학')) return '전문학사';
+  return '학력 면접 협의';
+}
+
+String _jobCareerShort(String career) {
+  final c = career.trim();
+  if (c.isEmpty || c == '미정') return '—';
+  if (c.contains('경력 무관') || c.contains('경력무관')) return '경력 무관';
+  if (c.contains('신입/경력')) return '경력 무관';
+  if (c.contains('1년 이상')) return '1년 이상';
+  if (c.contains('2년 이상')) return '2년 이상';
+  if (c.contains('신입 가능') || c.contains('신입')) return '신입';
+  if (c.length > 18) return '${c.substring(0, 15)}…';
+  return c;
+}
+
+String _jobDistrictStationLine(Job job) {
+  final dong = job.district.split(' · ').first.trim();
+  final t = job.transportation;
+  final st = t?.subwayStationName;
+  final wm = t?.walkingMinutes;
+  if (dong.isEmpty) {
+    final parts = job.address.split(' ');
+    return parts.length >= 2 ? parts.take(2).join(' ') : job.address;
+  }
+  if (st != null && st.isNotEmpty && wm != null) {
+    return '$dong, $st $wm분';
+  }
+  return dong;
+}
+
+String _jobInsuranceLine(Job job) {
+  for (final b in job.benefits) {
+    if (b.contains('4대')) return b;
+  }
+  for (final t in job.tags) {
+    if (t.contains('4대')) return t;
+  }
+  if (job.benefits.isNotEmpty) return job.benefits.first;
+  return '복리 면접 협의';
+}
+
 /// 채용 소탭 - 목록 모드
 ///
 /// ## Sliver 구조
@@ -184,7 +233,7 @@ class _JobListingsScreenState extends State<JobListingsScreen> {
 
       if (result.jobs.isEmpty && _level3Jobs.isEmpty) {
         setState(() {
-          _level3Jobs = generateMockLevel3Jobs(count: 30);
+          _level3Jobs = generateMockLevel3Jobs(count: 38);
           _level3HasMore = false;
           _useMockData = true;
           _level3Loading = false;
@@ -201,7 +250,7 @@ class _JobListingsScreenState extends State<JobListingsScreen> {
       if (!mounted) return;
       if (_level3Jobs.isEmpty) {
         setState(() {
-          _level3Jobs = generateMockLevel3Jobs(count: 30);
+          _level3Jobs = generateMockLevel3Jobs(count: 38);
           _level3HasMore = false;
           _useMockData = true;
           _level3Loading = false;
@@ -344,31 +393,7 @@ class _JobListingsScreenState extends State<JobListingsScreen> {
     }
 
     // 클라이언트 필터 적용
-    List<Job> jobs = List.of(_level3Jobs);
-
-    if (_searchQuery.isNotEmpty) {
-      final q = _searchQuery.toLowerCase();
-      jobs = jobs.where((j) {
-        return j.clinicName.toLowerCase().contains(q) ||
-            j.address.toLowerCase().contains(q) ||
-            j.district.toLowerCase().contains(q);
-      }).toList();
-    }
-
-    if (jobFilter.positionFilter != '전체') {
-      jobs = jobs.where((j) => j.type == jobFilter.positionFilter).toList();
-    }
-
-    if (jobFilter.employmentType != '전체') {
-      final want = jobFilter.employmentType;
-      jobs = jobs.where((j) {
-        final et = j.employmentType.trim();
-        if (et.isNotEmpty) {
-          return et.contains(want) || want.contains(et);
-        }
-        return j.type.contains(want);
-      }).toList();
-    }
+    List<Job> jobs = _applyNonSortFilters(List.of(_level3Jobs), jobFilter);
 
     switch (jobFilter.sortBy) {
       case '매칭높은순':
@@ -423,19 +448,20 @@ class _JobListingsScreenState extends State<JobListingsScreen> {
       return const SliverToBoxAdapter(child: _Level3EmptyState());
     }
 
-    // A·B클래스 공고는 필터 미적용 상태로 상단 고정
+    // A·B클래스 공고 — 동일 필터 적용 (정렬은 A→B 원래 순서 유지)
     final level1Ids = mockLevel1Jobs.map((j) => j.id).toSet();
-    final fixedTop = <Job>[
+    final rawFixed = <Job>[
       ...mockLevel1Jobs,
       ...mockLevel2Jobs.where((j) => !level1Ids.contains(j.id)),
     ];
+    final fixedTop = _applyNonSortFilters(rawFixed, jobFilter);
 
     return SliverToBoxAdapter(
       child: Column(
         children: [
-          // ── A·B클래스 고정 공고 (필터 영향 없음) ──
+          // ── A·B클래스 고정 공고 (C행과 동일 정보량·소형 썸네일 60%) ──
           for (int i = 0; i < fixedTop.length; i++) ...[
-            _Level3Row(
+            _JobRowAsCWithThumb(
               job: fixedTop[i],
               onTap: () => _navigateToDetail(fixedTop[i]),
             ),
@@ -461,18 +487,145 @@ class _JobListingsScreenState extends State<JobListingsScreen> {
                 endIndent: 16,
                 color: AppColors.divider,
               ),
-            // 12개마다 A클래스 공고 2개 미니 섹션 삽입 (슬롯 순환)
-            if ((i + 1) % 12 == 0 && i < jobs.length - 1) ...[
-              _PremiumMiniSlot(
-                slotIndex: (i + 1) ~/ 12 - 1,
-                premiumJobs: mockLevel1Jobs,
-                onTap: _navigateToDetail,
-              ),
-            ],
           ],
         ],
       ),
     );
+  }
+
+  // ── 클라이언트 필터 헬퍼 (정렬 제외) ─────────────────────────────
+  List<Job> _applyNonSortFilters(
+    List<Job> source,
+    JobFilterNotifier jobFilter,
+  ) {
+    List<Job> jobs = List.of(source);
+
+    if (_searchQuery.isNotEmpty) {
+      final q = _searchQuery.toLowerCase();
+      jobs = jobs.where((j) {
+        return j.clinicName.toLowerCase().contains(q) ||
+            j.address.toLowerCase().contains(q) ||
+            j.district.toLowerCase().contains(q);
+      }).toList();
+    }
+
+    if (jobFilter.positionFilter != '전체') {
+      jobs = jobs.where((j) => j.type == jobFilter.positionFilter).toList();
+    }
+
+    if (jobFilter.employmentType != '전체') {
+      final want = jobFilter.employmentType;
+      jobs = jobs.where((j) {
+        final et = j.employmentType.trim();
+        if (et.isNotEmpty) return et.contains(want) || want.contains(et);
+        return j.type.contains(want);
+      }).toList();
+    }
+
+    if (jobFilter.regionFilter != '전체') {
+      final r = jobFilter.regionFilter;
+      jobs = jobs
+          .where((j) => j.address.contains(r) || j.district.contains(r))
+          .toList();
+    }
+
+    if (jobFilter.careerFilter != '전체') {
+      jobs = jobs.where((j) {
+        final c = j.career.toLowerCase();
+        switch (jobFilter.careerFilter) {
+          case '신입':
+            return c.contains('신입') ||
+                c.contains('무관') ||
+                c.contains('경력없');
+          case '1년 이상':
+            return c.contains('1년') ||
+                c.contains('2년') ||
+                (c.contains('경력') &&
+                    !c.contains('신입') &&
+                    !c.contains('무관'));
+          case '3년 이상':
+            return c.contains('3년') ||
+                c.contains('4년') ||
+                c.contains('5년');
+          case '5년 이상':
+            return c.contains('5년') ||
+                c.contains('6년') ||
+                c.contains('7년') ||
+                c.contains('10년');
+          default:
+            return true;
+        }
+      }).toList();
+    }
+
+    if (jobFilter.salaryRange.start > 0 ||
+        jobFilter.salaryRange.end < 10000) {
+      final minF = jobFilter.salaryRange.start;
+      final maxF = jobFilter.salaryRange.end;
+      jobs = jobs.where((j) {
+        if (j.salaryRange.isEmpty) return true;
+        final jobMin = j.salaryRange.first.toDouble();
+        final jobMax = j.salaryRange.last.toDouble();
+        return jobMax >= minF && jobMin <= maxF;
+      }).toList();
+    }
+
+    if (jobFilter.hospitalType != '전체') {
+      jobs = jobs
+          .where((j) => j.hospitalType == jobFilter.hospitalType)
+          .toList();
+    }
+
+    if (jobFilter.selectedWorkDays.isNotEmpty) {
+      jobs = jobs.where((j) {
+        return jobFilter.selectedWorkDays
+            .every((day) => j.workDays.contains(day));
+      }).toList();
+    }
+
+    if (jobFilter.selectedSubwayLines.isNotEmpty) {
+      jobs = jobs.where((j) {
+        return j.subwayLines
+            .any((line) => jobFilter.selectedSubwayLines.contains(line));
+      }).toList();
+    }
+
+    if (jobFilter.conditions.isNotEmpty) {
+      jobs = jobs.where((j) {
+        return jobFilter.conditions.every((cond) {
+          switch (cond) {
+            case '신입가능':
+              return j.career.contains('신입') || j.career.contains('무관');
+            case '야간없음':
+              return !j.nightShift;
+            case '주4일':
+              return j.workDays.length <= 4;
+            case '파트타임 가능':
+              return j.employmentType.contains('파트');
+            case '역세권':
+              return j.isNearStation;
+            case '즉시지원':
+              return j.canApplyNow;
+            case '4대보험':
+              return j.benefits.any((b) => b.contains('4대')) ||
+                  j.tags.any((t) => t.contains('4대'));
+            case '퇴직금':
+              return j.benefits.any((b) => b.contains('퇴직')) ||
+                  j.tags.any((t) => t.contains('퇴직'));
+            case '연차':
+              return j.benefits.any((b) => b.contains('연차')) ||
+                  j.tags.any((t) => t.contains('연차'));
+            case '식비지원':
+              return j.benefits.any((b) => b.contains('식비')) ||
+                  j.tags.any((t) => t.contains('식비'));
+            default:
+              return true;
+          }
+        });
+      }).toList();
+    }
+
+    return jobs;
   }
 
   void _navigateToDetail(Job job) {
@@ -871,7 +1024,7 @@ class _PremiumGridSection extends StatelessWidget {
                 crossAxisCount: 2,
                 crossAxisSpacing: 10,
                 mainAxisSpacing: 10,
-                mainAxisExtent: 300,
+                mainAxisExtent: 262,
               ),
               itemCount: jobs.length,
               itemBuilder: (_, i) => _Level2Card(job: jobs[i]),
@@ -982,16 +1135,6 @@ class _Level2CardState extends State<_Level2Card> {
     super.dispose();
   }
 
-  String get _dDayText {
-    final job = widget.job;
-    if (job.isAlwaysHiring) return '상시채용';
-    if (job.closingDate == null) return '상시';
-    final diff = job.closingDate!.difference(DateTime.now()).inDays;
-    if (diff < 0) return '마감';
-    if (diff == 0) return 'D-day';
-    return 'D-$diff';
-  }
-
   @override
   Widget build(BuildContext context) {
     final job = widget.job;
@@ -1005,23 +1148,25 @@ class _Level2CardState extends State<_Level2Card> {
       ),
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.white,
+          color: AppColors.appBg,
           borderRadius: BorderRadius.circular(AppRadius.md),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── 이미지 (스와이프 가능) + 점 인디케이터 ──
+            // ── 이미지 (스와이프 가능) + 점 인디케이터 + 매칭률 ──
             ClipRRect(
               borderRadius: BorderRadius.vertical(
                 top: Radius.circular(AppRadius.md),
               ),
               child: SizedBox(
-                height: 130,
-                child: images.isNotEmpty
-                    ? Stack(
-                        children: [
-                          PageView.builder(
+                height: 100,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // 이미지 or 플레이스홀더
+                    images.isNotEmpty
+                        ? PageView.builder(
                             controller: _imgCtrl,
                             itemCount: images.length,
                             onPageChanged: (i) =>
@@ -1031,64 +1176,96 @@ class _Level2CardState extends State<_Level2Card> {
                               fit: BoxFit.cover,
                               width: double.infinity,
                             ),
-                          ),
-                          if (hasMultiple)
-                            Positioned(
-                              bottom: 6,
-                              left: 0,
-                              right: 0,
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: List.generate(images.length, (i) {
-                                  final sel = i == _imgPage;
-                                  return AnimatedContainer(
-                                    duration:
-                                        const Duration(milliseconds: 200),
-                                    margin: const EdgeInsets.symmetric(
-                                        horizontal: 2),
-                                    width: sel ? 12 : 5,
-                                    height: 5,
-                                    decoration: BoxDecoration(
-                                      color: sel
-                                          ? AppColors.white
-                                          : AppColors.white
-                                              .withValues(alpha: 0.55),
-                                      borderRadius: BorderRadius.circular(3),
-                                    ),
-                                  );
-                                }),
+                          )
+                        : Container(
+                            color: AppColors.surfaceMuted,
+                            child: const Center(
+                              child: Icon(
+                                Icons.business_outlined,
+                                size: 22,
+                                color: AppColors.textDisabled,
                               ),
                             ),
-                        ],
-                      )
-                    : Container(
-                        color: AppColors.surfaceMuted,
-                        width: double.infinity,
-                        child: const Center(
-                          child: Icon(
-                            Icons.business_outlined,
-                            size: 22,
-                            color: AppColors.textDisabled,
                           ),
+                    // 이미지 페이지 인디케이터 (복수 이미지일 때)
+                    if (hasMultiple)
+                      Positioned(
+                        bottom: 6,
+                        left: 0,
+                        right: 0,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: List.generate(images.length, (i) {
+                            final sel = i == _imgPage;
+                            return AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              margin:
+                                  const EdgeInsets.symmetric(horizontal: 2),
+                              width: sel ? 12 : 5,
+                              height: 5,
+                              decoration: BoxDecoration(
+                                color: sel
+                                    ? AppColors.white
+                                    : AppColors.white
+                                        .withValues(alpha: 0.55),
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                            );
+                          }),
                         ),
                       ),
+                    // 매칭률 배지 (우상단)
+                    Positioned(
+                      top: 6,
+                      right: 6,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.50),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.verified_rounded,
+                              size: 9,
+                              color: AppColors.prepBadgeGreen,
+                            ),
+                            const SizedBox(width: 2),
+                            Text(
+                              '매칭 ${job.matchScore}%',
+                              style: const TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.white,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            // ── 텍스트 정보 (B클래스 수준) ──────────────────────
+            // ── 제목 / 치과명 / 직무·학력 / 고용·경력 / 동·역 / 태그 ──
             Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+              padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 병원명 + D-day 우측
+                  // 제목 행: 타이틀 + 찜하기
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
                         child: Text(
-                          job.displayClinicName,
+                          job.displayTitle,
                           style: const TextStyle(
-                            fontSize: 12,
+                            fontSize: 13,
                             fontWeight: FontWeight.w700,
                             color: AppColors.textPrimary,
                             letterSpacing: -0.3,
@@ -1097,68 +1274,78 @@ class _Level2CardState extends State<_Level2Card> {
                           maxLines: 1,
                         ),
                       ),
-                      const SizedBox(width: 4),
-                      Text(
-                        _dDayText,
-                        style: const TextStyle(
-                          fontSize: 10,
-                          color: AppColors.textDisabled,
-                          letterSpacing: -0.2,
-                        ),
-                      ),
+                      _BookmarkIcon(jobId: job.id),
                     ],
                   ),
                   const SizedBox(height: 2),
-                  // 직무·고용·경력
                   Text(
-                    job.listRoleLine.isEmpty ? '—' : job.listRoleLine,
+                    job.displayClinicName,
                     style: const TextStyle(
-                      fontSize: 10,
-                      color: AppColors.textDisabled,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
                       letterSpacing: -0.2,
                     ),
                     overflow: TextOverflow.ellipsis,
                     maxLines: 1,
                   ),
-                  const SizedBox(height: 3),
-                  // 위치 + 역세권
+                  const SizedBox(height: 2),
+                  Text(
+                    '${job.type.trim()}, ${_jobEducationHint(job.career)}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textPrimary,
+                      letterSpacing: -0.2,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    '${job.employmentType.trim()}, ${_jobCareerShort(job.career)}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textPrimary,
+                      letterSpacing: -0.2,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                  const SizedBox(height: 1),
                   Row(
                     children: [
                       const Icon(
                         Icons.location_on_outlined,
                         size: 10,
-                        color: AppColors.textDisabled,
+                        color: AppColors.textPrimary,
                       ),
                       const SizedBox(width: 2),
                       Expanded(
                         child: Text(
-                          job.district.isNotEmpty
-                              ? job.district.split(' · ').first
-                              : job.address.split(' ').take(2).join(' '),
+                          _jobDistrictStationLine(job),
                           style: const TextStyle(
                             fontSize: 10,
-                            color: AppColors.textDisabled,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.textPrimary,
                             letterSpacing: -0.2,
                           ),
                           overflow: TextOverflow.ellipsis,
                           maxLines: 1,
                         ),
                       ),
-                      if (job.isNearStation) ...[
-                        const SizedBox(width: 4),
-                        const _StationChip(),
-                      ],
                     ],
                   ),
-                  const SizedBox(height: 5),
-                  // 태그 최대 2개
+                  const SizedBox(height: 4),
                   Wrap(
                     spacing: 3,
                     runSpacing: 2,
-                    children: (job.tags.isNotEmpty ? job.tags : job.benefits)
-                        .take(2)
-                        .map((b) => _SmallChip(label: b))
-                        .toList(),
+                    children:
+                        (job.tags.isNotEmpty ? job.tags : job.benefits)
+                            .take(2)
+                            .map((b) => _SmallChip(label: b))
+                            .toList(),
                   ),
                 ],
               ),
@@ -1177,7 +1364,7 @@ class _Level3Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(top: AppSpacing.xxl + 4),
+      margin: EdgeInsets.only(top: (AppSpacing.xxl + 4) * 2),
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.lg,
         AppSpacing.md,
@@ -1227,20 +1414,6 @@ class _Level3Row extends StatelessWidget {
 
   const _Level3Row({required this.job, required this.onTap});
 
-  String get _dDayText {
-    if (job.isAlwaysHiring) return '상시채용';
-    if (job.closingDate == null) return '상시';
-    final diff = job.closingDate!.difference(DateTime.now()).inDays;
-    if (diff < 0) return '마감';
-    if (diff == 0) return 'D-day';
-    return 'D-$diff';
-  }
-
-  bool get _isUrgent {
-    final t = _dDayText;
-    return t == 'D-day' || t == 'D-1' || t == 'D-2';
-  }
-
   @override
   Widget build(BuildContext context) {
     return InkWell(
@@ -1289,8 +1462,8 @@ class _Level3Row extends StatelessWidget {
                     job.displayClinicName,
                     style: const TextStyle(
                       fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
                       letterSpacing: -0.2,
                     ),
                   ),
@@ -1299,7 +1472,8 @@ class _Level3Row extends StatelessWidget {
                     job.listRoleLine,
                     style: const TextStyle(
                       fontSize: 11,
-                      color: AppColors.textDisabled,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textPrimary,
                       letterSpacing: -0.2,
                     ),
                   ),
@@ -1309,7 +1483,7 @@ class _Level3Row extends StatelessWidget {
                       const Icon(
                         Icons.location_on_outlined,
                         size: 11,
-                        color: AppColors.textDisabled,
+                        color: AppColors.textPrimary,
                       ),
                       const SizedBox(width: 2),
                       Text(
@@ -1318,14 +1492,11 @@ class _Level3Row extends StatelessWidget {
                             : job.address,
                         style: const TextStyle(
                           fontSize: 10,
-                          color: AppColors.textDisabled,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.textPrimary,
                           letterSpacing: -0.2,
                         ),
                       ),
-                      if (job.isNearStation) ...[
-                        const SizedBox(width: 5),
-                        const _StationChip(),
-                      ],
                     ],
                   ),
                   if (job.tags.isNotEmpty) ...[
@@ -1344,34 +1515,23 @@ class _Level3Row extends StatelessWidget {
             ),
             const SizedBox(width: AppSpacing.sm),
 
-            // 우: 썸네일 (이미지 있을 때) + D-day + 즉시지원
+            // 우: 썸네일 + 찜하기
             Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 if (job.images.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(AppRadius.sm),
-                      child: JobCoverImage(
-                        source: job.images.first,
-                        width: 96,
-                        height: 96,
-                        fit: BoxFit.cover,
-                      ),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                    child: JobCoverImage(
+                      source: job.images.first,
+                      width: 96,
+                      height: 96,
+                      fit: BoxFit.cover,
                     ),
                   ),
-                Text(
-                  _dDayText,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: _isUrgent
-                        ? AppColors.error
-                        : AppColors.textDisabled,
-                    letterSpacing: -0.2,
-                  ),
-                ),
+                const SizedBox(height: 4),
+                _BookmarkIcon(jobId: job.id),
               ],
             ),
           ],
@@ -1381,26 +1541,12 @@ class _Level3Row extends StatelessWidget {
   }
 }
 
-// ── 전체 공고 행 (텍스트 위주: 썸네일·해시태그 없음) ───────────────
-class _Level4Row extends StatelessWidget {
+// ── A·B를 C목록 상단에 넣을 때: C행과 동일 텍스트 + 60% 썸네일 (해시태그·마감 없음) ─
+class _JobRowAsCWithThumb extends StatelessWidget {
   final Job job;
   final VoidCallback onTap;
 
-  const _Level4Row({required this.job, required this.onTap});
-
-  String get _dDayText {
-    if (job.isAlwaysHiring) return '상시채용';
-    if (job.closingDate == null) return '상시';
-    final diff = job.closingDate!.difference(DateTime.now()).inDays;
-    if (diff < 0) return '마감';
-    if (diff == 0) return 'D-day';
-    return 'D-$diff';
-  }
-
-  bool get _isUrgent {
-    final t = _dDayText;
-    return t == 'D-day' || t == 'D-1' || t == 'D-2';
-  }
+  const _JobRowAsCWithThumb({required this.job, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -1464,8 +1610,8 @@ class _Level4Row extends StatelessWidget {
                             text: '  $role',
                             style: const TextStyle(
                               fontSize: 11,
-                              fontWeight: FontWeight.w400,
-                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.textPrimary,
                               letterSpacing: -0.2,
                             ),
                           ),
@@ -1480,7 +1626,7 @@ class _Level4Row extends StatelessWidget {
                       const Icon(
                         Icons.location_on_outlined,
                         size: 11,
-                        color: AppColors.textDisabled,
+                        color: AppColors.textPrimary,
                       ),
                       const SizedBox(width: 2),
                       Expanded(
@@ -1490,45 +1636,176 @@ class _Level4Row extends StatelessWidget {
                               : job.address,
                           style: const TextStyle(
                             fontSize: 10,
-                            color: AppColors.textDisabled,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.textPrimary,
                             letterSpacing: -0.2,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      if (job.isNearStation) ...[
-                        const SizedBox(width: 5),
-                        const _StationChip(),
-                      ],
                     ],
                   ),
                 ],
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
+            // 우: 썸네일 최우측 정렬 + 즉시지원 배지 아래 우측 정렬
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  _dDayText,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: _isUrgent
-                        ? AppColors.error
-                        : AppColors.textDisabled,
-                    letterSpacing: -0.2,
+                if (job.images.isNotEmpty)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                    child: JobCoverImage(
+                      source: job.images.first,
+                      width: _kAbThumbInCListSide,
+                      height: _kAbThumbInCListSide,
+                      fit: BoxFit.cover,
+                    ),
                   ),
-                ),
                 if (job.canApplyNow) ...[
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 5),
                   AppBadge(
                     label: '즉시지원',
                     bgColor: AppColors.accent.withValues(alpha: 0.12),
                     textColor: AppColors.accent,
                   ),
                 ],
+                const SizedBox(height: 4),
+                _BookmarkIcon(jobId: job.id),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── 전체 공고 행 (텍스트 위주: 썸네일·해시태그 없음) ───────────────
+class _Level4Row extends StatelessWidget {
+  final Job job;
+  final VoidCallback onTap;
+
+  const _Level4Row({required this.job, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final role = job.listRoleLine;
+
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        color: AppColors.appBg,
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          AppSpacing.md,
+          AppSpacing.lg,
+          AppSpacing.md,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (job.jobLevel == 1 || job.jobLevel == 2) ...[
+                    Text(
+                      job.jobLevel == 1 ? '프리미엄' : '추천',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.accent,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                  ],
+                  Text(
+                    job.displayTitle,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                      letterSpacing: -0.3,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 5),
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: job.displayClinicName,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                        if (role.isNotEmpty)
+                          TextSpan(
+                            text: '  $role',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.textPrimary,
+                              letterSpacing: -0.2,
+                            ),
+                          ),
+                      ],
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 5),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.location_on_outlined,
+                        size: 11,
+                        color: AppColors.textPrimary,
+                      ),
+                      const SizedBox(width: 2),
+                      Expanded(
+                        child: Text(
+                          job.district.isNotEmpty
+                              ? job.district
+                              : job.address,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.textPrimary,
+                            letterSpacing: -0.2,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            // 우: 즉시지원 배지 + 찜하기
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (job.canApplyNow)
+                  AppBadge(
+                    label: '즉시지원',
+                    bgColor: AppColors.accent.withValues(alpha: 0.12),
+                    textColor: AppColors.accent,
+                  ),
+                if (job.canApplyNow) const SizedBox(height: 4),
+                _BookmarkIcon(jobId: job.id),
               ],
             ),
           ],
@@ -1651,7 +1928,8 @@ class _PremiumMiniSlot extends StatelessWidget {
                                   job.listRoleLine,
                                   style: const TextStyle(
                                     fontSize: 10,
-                                    color: AppColors.textDisabled,
+                                    fontWeight: FontWeight.w500,
+                                    color: AppColors.textPrimary,
                                     letterSpacing: -0.2,
                                   ),
                                   maxLines: 1,
@@ -1674,31 +1952,45 @@ class _PremiumMiniSlot extends StatelessWidget {
   }
 }
 
-// ── 공통 소형 위젯 ────────────────────────────────────────────────
-class _StationChip extends StatelessWidget {
-  const _StationChip();
+// ── 찜하기 아이콘 버튼 ────────────────────────────────────────────
+class _BookmarkIcon extends StatelessWidget {
+  final String jobId;
+
+  const _BookmarkIcon({required this.jobId});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE8F5E9),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: const Text(
-        '역세권',
-        style: TextStyle(
-          fontSize: 9,
-          fontWeight: FontWeight.w600,
-          color: Color(0xFF43A047),
-          letterSpacing: -0.1,
-        ),
-      ),
+    final jobService = context.read<JobService>();
+    return StreamBuilder<List<String>>(
+      stream: jobService.watchBookmarkedJobIds(),
+      builder: (context, snap) {
+        final isBookmarked = (snap.data ?? []).contains(jobId);
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () {
+            if (isBookmarked) {
+              jobService.unbookmarkJob(jobId);
+            } else {
+              jobService.bookmarkJob(jobId);
+            }
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(2),
+            child: Icon(
+              isBookmarked
+                  ? Icons.favorite_rounded
+                  : Icons.favorite_border_rounded,
+              size: 18,
+              color: isBookmarked ? AppColors.error : AppColors.textDisabled,
+            ),
+          ),
+        );
+      },
     );
   }
 }
 
+// ── 공통 소형 위젯 ────────────────────────────────────────────────
 class _SmallChip extends StatelessWidget {
   final String label;
 
