@@ -13,12 +13,14 @@ import '../../pages/admin/admin_dashboard_page.dart';
 import '../../features/jobs/web/job_post_web_page.dart';
 import '../../features/jobs/web/job_input_page.dart';
 import '../../features/jobs/web/job_draft_editor_page.dart';
-import '../../features/jobs/web/job_publish_page.dart';
+import '../../features/jobs/web/job_product_select_page.dart';
 import '../../features/jobs/web/job_publish_success_page.dart';
 import '../../features/jobs/web/legal_page.dart';
+import '../../features/jobs/web/refund_legal_page.dart';
 import '../../features/jobs/ui/clinic_verify_page.dart';
 import '../../features/auth/web/web_login_page.dart';
 import '../../features/auth/web/set_password_page.dart';
+import '../../features/payment/payment_result_page.dart';
 import '../../features/feedback/feedback_list_page.dart';
 import '../../features/feedback/feedback_write_page.dart';
 import '../../features/feedback/feedback_detail_page.dart';
@@ -127,14 +129,38 @@ final appRouter = GoRouter(
           JobDraftEditorPage(draftId: state.pathParameters['draftId']!),
     ),
     GoRoute(
-      path: '/post-job/publish/:draftId',
+      path: '/post-job/product/:draftId',
       builder: (_, state) =>
-          JobPublishPage(draftId: state.pathParameters['draftId']!),
+          JobProductSelectPage(draftId: state.pathParameters['draftId']!),
+    ),
+    GoRoute(
+      path: '/post-job/publish/:draftId',
+      // 레거시 경로 → 새 상품 선택 페이지로 리다이렉트
+      redirect: (_, state) =>
+          '/post-job/product/${state.pathParameters['draftId']}',
     ),
     GoRoute(
       path: '/post-job/success/:jobId',
       builder: (_, state) =>
           JobPublishSuccessPage(jobId: state.pathParameters['jobId']!),
+    ),
+
+    // ── 토스페이먼츠 결제 결과 ────────────────────────────
+    GoRoute(
+      path: '/post-job/payment/success',
+      builder: (_, state) => PaymentSuccessPage(
+        paymentKey: state.uri.queryParameters['paymentKey'] ?? '',
+        orderId: state.uri.queryParameters['orderId'] ?? '',
+        amount: state.uri.queryParameters['amount'] ?? '',
+      ),
+    ),
+    GoRoute(
+      path: '/post-job/payment/fail',
+      builder: (_, state) => PaymentFailPage(
+        code: state.uri.queryParameters['code'] ?? '',
+        message: state.uri.queryParameters['message'] ?? '',
+        orderId: state.uri.queryParameters['orderId'] ?? '',
+      ),
     ),
 
     GoRoute(
@@ -177,6 +203,7 @@ final appRouter = GoRouter(
     // ── 로그인 불필요 — 법적 문서 페이지 ──────────────────
     GoRoute(path: '/privacy', builder: (_, __) => buildPrivacyPage()),
     GoRoute(path: '/terms', builder: (_, __) => buildTermsPage()),
+    GoRoute(path: '/refund', builder: (_, __) => buildRefundPage()),
     GoRoute(path: '/support', builder: (_, __) => const SupportPage()),
 
     // ── Firebase 이메일 액션 링크 (비밀번호 재설정) ──────────

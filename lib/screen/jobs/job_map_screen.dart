@@ -7,7 +7,6 @@ import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
-import '../../core/widgets/app_badge.dart';
 import '../../core/widgets/app_muted_card.dart';
 import '../../data/mock_jobs.dart';
 import '../../models/job.dart';
@@ -15,10 +14,10 @@ import '../../notifiers/job_filter_notifier.dart';
 import '../../services/job_service.dart';
 import '../../widgets/job/filter_bottom_sheet.dart';
 import '../../widgets/job/floating_search_bar.dart';
+import '../../widgets/job/job_level1_carousel.dart';
 import '../../widgets/job/map_empty_state_card.dart';
 import '../../widgets/job/quick_apply_sheet.dart';
 import '../../widgets/job/radius_chip_row.dart';
-import '../../widgets/job/job_cover_image.dart';
 import 'job_detail_screen.dart';
 // 앱 세션 내 공고 목록 캐시 (반경/필터 조합 → 결과)
 final Map<String, List<Job>> _jobCache = {};
@@ -29,7 +28,7 @@ final Map<String, List<Job>> _jobCache = {};
 /// 지도 뷰 (4단계 개편)
 ///
 /// ## 레이아웃
-/// - 상단: 프리미엄 공고 가로 슬라이더 (Level 1 광고 카드, 자동+수동 슬라이드)
+/// - 상단: [JobLevel1Carousel] — 목록 탭 고정 캐러셀과 동일(무한 PageView·4초 자동)
 /// - 하단: Google Maps + Edge Indicator + 검색/반경 오버레이
 ///
 /// ## 마커 스타일
@@ -57,10 +56,9 @@ class _JobMapScreenState extends State<JobMapScreen> {
   bool _isLoading = true;
   List<Job> _allJobs = [];
 
-  // 프리미엄 카드 슬라이더 + 자동 슬라이드
-  final _carouselCtrl = PageController(viewportFraction: 0.88);
-  int _carouselPage = 0;
-  Timer? _adTimer;
+  /// 목록 [JobLevel1Carousel]과 동일 캐러셀 — 핀/엣지에서 [scrollToPage] 연동
+  final GlobalKey<JobLevel1CarouselState> _level1CarouselKey =
+      GlobalKey<JobLevel1CarouselState>();
 
   // Level 2/3 핀 선택 시 하단 미리보기 카드
   Job? _selectedJob;
@@ -86,30 +84,6 @@ class _JobMapScreenState extends State<JobMapScreen> {
       target: LatLng(37.5665, 126.9780),
       zoom: 11,
     );
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _startAdAutoScroll();
-  }
-
-  void _startAdAutoScroll() {
-    _adTimer?.cancel();
-    _adTimer = Timer.periodic(const Duration(seconds: 4), (_) {
-      if (!mounted || !_carouselCtrl.hasClients || _premiumJobs.isEmpty) return;
-      final next = (_carouselPage + 1) % _premiumJobs.length;
-      _carouselCtrl.animateToPage(
-        next,
-        duration: const Duration(milliseconds: 450),
-        curve: Curves.easeInOut,
-      );
-    });
-  }
-
-  void _restartAdAutoScroll() {
-    _adTimer?.cancel();
-    _startAdAutoScroll();
   }
 
   @override
@@ -161,9 +135,7 @@ class _JobMapScreenState extends State<JobMapScreen> {
 
   @override
   void dispose() {
-    _carouselCtrl.dispose();
     _boundsTimer?.cancel();
-    _adTimer?.cancel();
     super.dispose();
   }
 
@@ -293,15 +265,8 @@ class _JobMapScreenState extends State<JobMapScreen> {
   void _onPremiumPinTap(Job job) {
     final idx = _premiumJobs.indexWhere((j) => j.id == job.id);
     if (idx >= 0) {
-      _carouselCtrl.animateToPage(
-        idx,
-        duration: const Duration(milliseconds: 350),
-        curve: Curves.easeOut,
-      );
-      setState(() {
-        _carouselPage = idx;
-        _selectedJob = null;
-      });
+      _level1CarouselKey.currentState?.scrollToPage(idx);
+      setState(() => _selectedJob = null);
     }
   }
 
@@ -310,31 +275,6 @@ class _JobMapScreenState extends State<JobMapScreen> {
     setState(() => _selectedJob = job);
     _mapController?.animateCamera(
       CameraUpdate.newLatLng(LatLng(job.lat, job.lng)),
-    );
-  }
-
-  // ── 카드 탭 → 지도 이동 ─────────────────────────────────────────
-  void _onCardTap(Job job) {
-    if (job.lat != 0 && job.lng != 0) {
-      _mapController?.animateCamera(
-        CameraUpdate.newCameraPosition(
-          CameraPosition(target: LatLng(job.lat, job.lng), zoom: 15),
-        ),
-      );
-    }
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => JobDetailScreen(jobId: job.id)),
-    );
-  }
-
-  /// 카드의 지도 핀 아이콘 탭 → 지도만 이동 (상세 없이)
-  void _onCardPinTap(Job job) {
-    if (job.lat == 0 && job.lng == 0) return;
-    _mapController?.animateCamera(
-      CameraUpdate.newCameraPosition(
-        CameraPosition(target: LatLng(job.lat, job.lng), zoom: 15),
-      ),
     );
   }
 
@@ -436,12 +376,7 @@ class _JobMapScreenState extends State<JobMapScreen> {
             );
             final idx = _premiumJobs.indexWhere((j) => j.id == job.id);
             if (idx >= 0) {
-              _carouselCtrl.animateToPage(
-                idx,
-                duration: const Duration(milliseconds: 350),
-                curve: Curves.easeOut,
-              );
-              setState(() => _carouselPage = idx);
+              _level1CarouselKey.currentState?.scrollToPage(idx);
             }
           },
         ),
@@ -555,291 +490,26 @@ class _JobMapScreenState extends State<JobMapScreen> {
     );
   }
 
-  // ── 프리미엄 광고 카드 슬라이더 ─────────────────────────────────
+  /// 목록 탭 고정 캐러셀과 동일 위젯 — viewportFraction·AnimatedContainer 제거로 깜박임 방지
   Widget _buildAdCarousel() {
-    return Container(
-      color: AppColors.white,
-      child: Column(
-        // mainAxisSize.min → 자식 컨텐츠 높이에 맞게 자동 결정 (오버플로우 없음)
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 섹션 헤더
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              AppSpacing.sm + 2,
-              AppSpacing.lg,
-              6,
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 3,
-                  height: 13,
-                  decoration: BoxDecoration(
-                    color: AppColors.accent,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(width: 7),
-                const Text(
-                  '프리미엄 공고',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                    letterSpacing: -0.3,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  '핀 탭으로 이동 · 카드 탭으로 상세',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: AppColors.textDisabled,
-                    letterSpacing: -0.2,
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  '${_carouselPage + 1} / ${_premiumJobs.length}',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: AppColors.textDisabled,
-                    letterSpacing: -0.2,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // 가로 스크롤 카드 — 고정 높이 박스로 감싸서 PageView 높이 확정
-          // 실측 내용 높이 ~102px + 여유 12px = 114px → 어떤 폰에서도 안전
-          SizedBox(
-            height: 114,
-            child: PageView.builder(
-              controller: _carouselCtrl,
-              onPageChanged: (i) {
-                setState(() => _carouselPage = i);
-                _restartAdAutoScroll(); // 수동 스와이프 후 타이머 재시작
-              },
-              itemCount: _premiumJobs.length,
-              itemBuilder: (_, i) => _PremiumAdCard(
-                job: _premiumJobs[i],
-                isSelected: i == _carouselPage,
-                onTap: () => _onCardTap(_premiumJobs[i]),
-                onPinTap: () => _onCardPinTap(_premiumJobs[i]),
+    return Material(
+      color: AppColors.appBg,
+      child: JobLevel1Carousel(
+        key: _level1CarouselKey,
+        jobs: _premiumJobs,
+        onJobTap: (context, job) {
+          if (job.lat != 0 && job.lng != 0) {
+            _mapController?.animateCamera(
+              CameraUpdate.newCameraPosition(
+                CameraPosition(target: LatLng(job.lat, job.lng), zoom: 15),
               ),
-            ),
-          ),
-          const SizedBox(height: 6),
-        ],
-      ),
-    );
-  }
-}
-
-// ────────────────────────────────────────────────────────────────────
-// 프리미엄 광고 카드 (가로 슬라이더 아이템)
-// ────────────────────────────────────────────────────────────────────
-class _PremiumAdCard extends StatelessWidget {
-  final Job job;
-  final bool isSelected;
-  final VoidCallback onTap;
-  final VoidCallback onPinTap;
-
-  const _PremiumAdCard({
-    required this.job,
-    required this.isSelected,
-    required this.onTap,
-    required this.onPinTap,
-  });
-
-  String get _dDayText {
-    if (job.closingDate == null) return '상시';
-    final diff = job.closingDate!.difference(DateTime.now()).inDays;
-    if (diff < 0) return '마감';
-    if (diff == 0) return 'D-day';
-    return 'D-$diff';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 220),
-      margin: EdgeInsets.fromLTRB(
-        isSelected ? 4 : 2,
-        isSelected ? 0 : 2,
-        isSelected ? 4 : 2,
-        5,
-      ),
-      decoration: BoxDecoration(
-        color: isSelected
-            ? AppColors.accent.withValues(alpha: 0.06)
-            : AppColors.surfaceMuted,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-          child: Row(
-            children: [
-              // 좌: 이미지 / 병원 아이콘
-              _CardThumbnail(job: job),
-              const SizedBox(width: 14),
-
-              // 우: 텍스트 정보
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // 매칭 점수 + D-day
-                    Row(
-                      children: [
-                        if (job.matchScore > 0) ...[
-                          AppBadge(
-                            label: '매칭 ${job.matchScore}%',
-                            bgColor: AppColors.accent.withValues(alpha: 0.12),
-                            textColor: AppColors.accent,
-                          ),
-                          const SizedBox(width: 6),
-                        ],
-                        Text(
-                          _dDayText,
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: _dDayText == 'D-day' || _dDayText == 'D-1'
-                                ? AppColors.error
-                                : AppColors.textDisabled,
-                            letterSpacing: -0.2,
-                          ),
-                        ),
-                        const Spacer(),
-                        // 지도 핀 아이콘 (탭 → 지도 이동)
-                        GestureDetector(
-                          onTap: onPinTap,
-                          behavior: HitTestBehavior.opaque,
-                          child: Padding(
-                            padding: const EdgeInsets.only(left: AppSpacing.sm),
-                            child: Icon(
-                              Icons.location_on_rounded,
-                              size: 18,
-                              color: AppColors.accent.withValues(alpha: 0.7),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 5),
-
-                    // 병원명
-                    Text(
-                      job.displayClinicName,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                        letterSpacing: -0.3,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 3),
-
-                    // 공고 제목
-                    Text(
-                      job.displayTitle,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textSecondary,
-                        letterSpacing: -0.2,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 6),
-
-                    // 직무 · 경력 · 역세권
-                    Row(
-                      children: [
-                        _MiniTag(
-                          label: job.type,
-                          color: const Color(0xFFE3F2FD),
-                          textColor: const Color(0xFF1976D2),
-                        ),
-                        const SizedBox(width: 4),
-                        _MiniTag(
-                          label: job.career,
-                          color: const Color(0xFFF3E5F5),
-                          textColor: const Color(0xFF7B1FA2),
-                        ),
-                        if (job.isNearStation) ...[
-                          const SizedBox(width: 4),
-                          _MiniTag(
-                            label: '역세권',
-                            color: const Color(0xFFE8F5E9),
-                            textColor: const Color(0xFF43A047),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── 카드 썸네일 ──────────────────────────────────────────────────
-class _CardThumbnail extends StatelessWidget {
-  final Job job;
-
-  const _CardThumbnail({required this.job});
-
-  @override
-  Widget build(BuildContext context) {
-    const size = 44.0;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(AppRadius.sm + 2),
-      child: SizedBox(
-        width: size,
-        height: size,
-        child: job.images.isNotEmpty
-            ? JobCoverImage(source: job.images.first, fit: BoxFit.cover)
-            : Container(
-                color: AppColors.surfaceMuted,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.local_hospital_outlined,
-                      size: 22,
-                      color: AppColors.textDisabled,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      job.clinicName.length > 3
-                          ? job.clinicName.substring(0, 3)
-                          : job.clinicName,
-                      style: const TextStyle(
-                        fontSize: 8,
-                        color: AppColors.textDisabled,
-                        letterSpacing: -0.2,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              ),
+            );
+          }
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => JobDetailScreen(jobId: job.id)),
+          );
+        },
       ),
     );
   }

@@ -13,6 +13,8 @@ const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 const GOOGLE_MAPS_API_KEY = defineSecret("GOOGLE_MAPS_API_KEY");
 /** 심평원 병원정보 API — `defineSecret`로 바인딩해야 런타임에 값이 주입됨 */
 const HIRA_SERVICE_KEY = defineSecret("HIRA_SERVICE_KEY");
+/** 토스페이먼츠 시크릿 키 */
+const TOSS_SECRET_KEY = defineSecret("TOSS_SECRET_KEY");
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -4800,7 +4802,9 @@ export const createOrder = functions.https.onCall(
  * Input: { orderId, paymentKey? }
  * Output: { jobId, success }
  */
-export const confirmPayment = functions.https.onCall(
+export const confirmPayment = functions
+  .runWith({ secrets: ["TOSS_SECRET_KEY"] })
+  .https.onCall(
   async (data, context) => {
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
@@ -4830,13 +4834,35 @@ export const confirmPayment = functions.https.onCall(
 
     const amount = orderData.amount ?? 0;
 
-    // 유료 결제: 토스페이먼츠 검증 (Phase 8에서 실제 연동)
+    // 유료 결제: 토스페이먼츠 서버 검증
     if (amount > 0) {
       if (!paymentKey) {
         throw new functions.https.HttpsError("invalid-argument", "paymentKey가 필요합니다.");
       }
-      // TODO: 토스페이먼츠 서버 검증 API 호출
-      functions.logger.info("confirmPayment: toss verification placeholder", { orderId, paymentKey });
+      try {
+        const secretKey = TOSS_SECRET_KEY.value();
+        const encoded = Buffer.from(`${secretKey}:`).toString("base64");
+        const tossRes = await axios.post(
+          "https://api.tosspayments.com/v1/payments/confirm",
+          { paymentKey, orderId, amount },
+          {
+            headers: {
+              Authorization: `Basic ${encoded}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+        functions.logger.info("confirmPayment: toss verified", {
+          orderId,
+          paymentKey,
+          status: tossRes.data?.status,
+        });
+      } catch (err: unknown) {
+        const axiosErr = err as { response?: { data?: { message?: string; code?: string } } };
+        const msg = axiosErr.response?.data?.message ?? "토스페이먼츠 검증 실패";
+        functions.logger.error("confirmPayment: toss verification failed", { orderId, msg });
+        throw new functions.https.HttpsError("internal", `결제 검증 실패: ${msg}`);
+      }
     }
 
     // Draft 데이터 로드

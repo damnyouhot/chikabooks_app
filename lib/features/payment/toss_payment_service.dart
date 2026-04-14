@@ -12,9 +12,9 @@ import 'package:web/web.dart' as web;
 /// 3. [_clientKey]를 실제 클라이언트 키로 교체
 /// 4. [_successUrl] / [_failUrl]을 실제 도메인으로 교체
 class TossPaymentService {
-  static const _clientKey = 'test_ck_PLACEHOLDER';
-  static const _successUrl = 'https://yourdomain.com/post-job/payment/success';
-  static const _failUrl = 'https://yourdomain.com/post-job/payment/fail';
+  static const _clientKey = 'test_ck_GjLJoQ1aVZXLDYY7DlyP8w6KYe2R';
+  static const _successUrl = 'https://hygienelab.kr/post-job/payment/success';
+  static const _failUrl = 'https://hygienelab.kr/post-job/payment/fail';
 
   /// 결제 위젯을 호출하여 카드 결제를 시작합니다.
   ///

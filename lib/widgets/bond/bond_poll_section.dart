@@ -12,7 +12,9 @@ import '../../models/poll_comment.dart';
 import '../../models/poll_option.dart';
 import '../../services/admin_activity_service.dart';
 import '../../services/empathy_poll_service.dart';
+import '../../services/caring_treat_service.dart';
 import '../../services/funnel_onboarding_service.dart';
+import '../caring/floating_treat_burst.dart';
 
 /// 공감투표 섹션 — 오늘의 투표 + 지난 투표 피드
 class BondPollSection extends StatefulWidget {
@@ -35,6 +37,7 @@ class BondPollSectionState extends State<BondPollSection> {
   // ── 인라인 보기 추가 ──
   final _addOptionController = TextEditingController();
   bool _addingOption = false;
+  bool _hideAuthorNicknameWhenAdding = false;
 
   // ── 지난 투표 (lazy + pagination) ──
   final List<Poll> _closedPolls = [];
@@ -232,6 +235,11 @@ class BondPollSectionState extends State<BondPollSection> {
       // 첫 공감 선택일 때만 온보딩 퍼널 ③ (이미 투표한 유저 재선택은 isChange)
       if (!result.isChange) {
         unawaited(FunnelOnboardingService.tryLogFirstPoll());
+        unawaited(() async {
+          final ok = await CaringTreatService.tryGrantEmpathyFirstVote(_activePoll!.id);
+          if (!mounted || !ok) return;
+          FloatingTreatBurst.show(context, iconCount: 2);
+        }());
       }
     } else if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -245,10 +253,20 @@ class BondPollSectionState extends State<BondPollSection> {
     final text = _addOptionController.text.trim();
     if (text.isEmpty) return;
 
+    final hideNickname = _hideAuthorNicknameWhenAdding;
     setState(() => _addingOption = true);
-    final result = await EmpathyPollService.addOption(_activePoll!.id, text);
+    final result = await EmpathyPollService.addOption(
+      _activePoll!.id,
+      text,
+      hideAuthorNickname: hideNickname,
+    );
     if (!mounted) return;
-    setState(() => _addingOption = false);
+    setState(() {
+      _addingOption = false;
+      if (result.success) {
+        _hideAuthorNicknameWhenAdding = false;
+      }
+    });
 
     if (result.success) {
       _addOptionController.clear();
@@ -547,15 +565,31 @@ class BondPollSectionState extends State<BondPollSection> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Checkbox(
-                  value: false,
-                  onChanged: null,
+                  value: _hideAuthorNicknameWhenAdding,
+                  onChanged: _addingOption
+                      ? null
+                      : (v) {
+                          setState(() => _hideAuthorNicknameWhenAdding = v ?? false);
+                        },
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   visualDensity: VisualDensity.compact,
+                  activeColor: AppColors.accent,
                   side: BorderSide(color: AppColors.textDisabled.withValues(alpha: 0.5)),
                 ),
-                Text(
-                  '닉네임 비공개',
-                  style: TextStyle(fontSize: 11, color: AppColors.textDisabled),
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _addingOption
+                      ? null
+                      : () {
+                          setState(() => _hideAuthorNicknameWhenAdding = !_hideAuthorNicknameWhenAdding);
+                        },
+                  child: Text(
+                    '닉네임 비공개',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: _addingOption ? AppColors.textDisabled : AppColors.textSecondary,
+                    ),
+                  ),
                 ),
               ],
             ),

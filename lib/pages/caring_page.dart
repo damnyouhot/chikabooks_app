@@ -12,6 +12,7 @@ import '../services/ebook_service.dart';
 import '../services/hira_update_service.dart';
 import '../services/quiz_content_config_service.dart';
 import '../services/quiz_pool_service.dart';
+import '../services/caring_treat_service.dart';
 import '../data/base_message_data.dart';
 import '../models/hira_update.dart';
 import '../models/ebook.dart';
@@ -588,6 +589,7 @@ class _CaringPageState extends State<CaringPage>
             page: 'home',
           );
           unawaited(FunnelOnboardingService.tryLogFirstFeed());
+          unawaited(CaringTreatService.consumeOneTreatAfterSuccessfulFeed());
         }
       } else {
         final msg = result.rejectMent ?? '나중에 다시 시도하세요';
@@ -930,6 +932,38 @@ class _CaringPageState extends State<CaringPage>
       child: Row(
         children: [
           const Spacer(),
+          StreamBuilder<int>(
+            stream: CaringTreatService.watchTreatCount(),
+            builder: (context, snap) {
+              final n = snap.data ?? 0;
+              return Tooltip(
+                message: '받은 먹이 (공감·퀴즈로 모을 수 있어요)',
+                child: Padding(
+                  padding: const EdgeInsetsDirectional.only(end: 4),
+                  child: SizedBox(
+                    height: 48,
+                    child: Center(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('🍖', style: TextStyle(fontSize: 16)),
+                          const SizedBox(width: 2),
+                          Text(
+                            '$n',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: Icon(Icons.info_outline, color: AppColors.textSecondary, size: 18),
             onPressed: () => _showConceptDialog(context),
@@ -987,14 +1021,19 @@ class _CaringPageState extends State<CaringPage>
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text("'나' 탭에 대해서", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-        content: const SingleChildScrollView(
+        content: SingleChildScrollView(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-            Text(
+            const Text(
               '캐릭터의 배고픔·기분·에너지를 살피고 돌보며, 유대와 감정을 쌓는 공간이에요.',
               style: TextStyle(fontSize: 13, height: 1.5),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(
+              '공감 투표·퀴즈에서 받은 먹이는 캐릭터 점수에 잠깐 반영돼요.',
+              style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 8),
+            const Text(
               '위쪽 게이지로 상태를 볼 수 있어요. 시간이 지나면서도 변하고, 밥·쓰다듬기·잠에 따라 달라져요.',
               style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary),
             ),

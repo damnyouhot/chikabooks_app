@@ -806,72 +806,103 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
     const outerPad = EdgeInsets.symmetric(horizontal: 40, vertical: 40);
     return Scaffold(
       backgroundColor: AppColors.webPublisherPageBg,
-      body: Center(
-        child: Padding(
-          padding: outerPad,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: _kInputPageMaxWidth),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final rowW = constraints.maxWidth;
-                return ListView(
-                  shrinkWrap: true,
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  children: [
-                    if (kIsWeb)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: Row(
-                          children: const [
-                            Spacer(),
-                            WebAccountMenuButton(),
-                          ],
-                        ),
-                      ),
-                    SizedBox(
-                      width: rowW,
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+      body: Column(
+        children: [
+          // ── 상단 흰 띠: 1. 자료 사진 첨부 ────────────────────
+          if (kIsWeb)
+            Container(
+              color: AppColors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: () =>
+                        context.canPop() ? context.pop() : context.go('/'),
+                    icon: const Icon(Icons.arrow_back, size: 20),
+                    tooltip: '뒤로',
+                    style: IconButton.styleFrom(
+                      foregroundColor: AppColors.textPrimary,
+                      padding: const EdgeInsets.all(8),
+                      minimumSize: const Size(40, 40),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '1. 자료 사진 첨부',
+                    style: GoogleFonts.notoSansKr(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const Spacer(),
+                  const WebAccountMenuButton(),
+                ],
+              ),
+            ),
+          // ── 본문 ────────────────────────────────────────────
+          Expanded(
+            child: Center(
+              child: Padding(
+                padding: outerPad,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: _kInputPageMaxWidth),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final rowW = constraints.maxWidth;
+                      return ListView(
+                        shrinkWrap: true,
+                        physics: const AlwaysScrollableScrollPhysics(),
                         children: [
-                          Expanded(
-                            flex: 1,
-                            child: SizedBox(
-                              width: double.infinity,
-                              child: _buildRightColumn(),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: _kColumnDividerPaddingH,
-                            ),
-                            child: Align(
-                              alignment: Alignment.topCenter,
-                              child: Container(
-                                width: 1,
-                                height: _wizardDividerLineHeight,
-                                decoration: BoxDecoration(
-                                  color: AppColors.divider,
-                                  borderRadius: BorderRadius.circular(0.5),
+                          SizedBox(
+                            width: rowW,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  flex: 1,
+                                  child: SizedBox(
+                                    width: double.infinity,
+                                    child: _buildRightColumn(),
+                                  ),
                                 ),
-                              ),
-                            ),
-                          ),
-                          Expanded(
-                            flex: 1,
-                            child: SizedBox(
-                              width: double.infinity,
-                              child: _buildLeftColumn(),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: _kColumnDividerPaddingH,
+                                  ),
+                                  child: Align(
+                                    alignment: Alignment.topCenter,
+                                    child: Container(
+                                      width: 1,
+                                      height: _wizardDividerLineHeight,
+                                      decoration: BoxDecoration(
+                                        color: AppColors.divider,
+                                        borderRadius: BorderRadius.circular(0.5),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  flex: 1,
+                                  child: SizedBox(
+                                    width: double.infinity,
+                                    child: _buildLeftColumn(),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
-                      ),
-                    ),
-                  ],
-                );
-              },
+                      );
+                    },
+                  ),
+                ),
+              ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }

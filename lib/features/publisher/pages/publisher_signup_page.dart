@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
@@ -35,6 +36,7 @@ class _PublisherSignupPageState extends State<PublisherSignupPage> {
   bool _obscureConfirm = true;
   bool _agreeTerms = false;
   bool _agreePrivacy = false;
+  bool _agreeRefund = false;
   bool _isLoading = false;
   String? _errorMsg;
 
@@ -53,7 +55,7 @@ class _PublisherSignupPageState extends State<PublisherSignupPage> {
 
   Future<void> _signup() async {
     if (!_formKey.currentState!.validate()) return;
-    if (!_agreeTerms || !_agreePrivacy) {
+    if (!_agreeTerms || !_agreePrivacy || !_agreeRefund) {
       setState(() => _errorMsg = '필수 약관에 동의해주세요.');
       return;
     }
@@ -71,21 +73,24 @@ class _PublisherSignupPageState extends State<PublisherSignupPage> {
       final email = _emailCtrl.text.trim();
       final normalizedEmail = email.toLowerCase();
 
-      // Auth 계정 생성 전: 이메일 기준으로 위생사 계정 중복 체크
-      final existingApplicant = await FirebaseFirestore.instance
-          .collection('users')
-          .where('normalizedEmail', isEqualTo: normalizedEmail)
-          .limit(1)
-          .get();
-      if (existingApplicant.docs.isNotEmpty) {
-        if (mounted) {
-          setState(() {
-            _errorMsg = '이 이메일은 이미 위생사 계정으로 가입되어 있어\n'
-                '공고자 계정으로 사용할 수 없습니다.\n'
-                '공고자 가입은 별도의 이메일로 진행해 주세요.';
-          });
+      // Auth 계정 생성 전: 이메일 기준으로 위생사 계정 중복 체크 (관리자 계정 제외)
+      final isAdmin = ClinicAuthService.isAdminEmailWhitelisted(normalizedEmail);
+      if (!isAdmin) {
+        final existingApplicant = await FirebaseFirestore.instance
+            .collection('users')
+            .where('normalizedEmail', isEqualTo: normalizedEmail)
+            .limit(1)
+            .get();
+        if (existingApplicant.docs.isNotEmpty) {
+          if (mounted) {
+            setState(() {
+              _errorMsg = '이 이메일은 이미 위생사 계정으로 가입되어 있어\n'
+                  '공고자 계정으로 사용할 수 없습니다.\n'
+                  '공고자 가입은 별도의 이메일로 진행해 주세요.';
+            });
+          }
+          return;
         }
-        return;
       }
 
       // Firebase Auth 계정 생성
@@ -151,7 +156,8 @@ class _PublisherSignupPageState extends State<PublisherSignupPage> {
                   .get()
               : null;
 
-      if (usersDoc != null && usersDoc.exists) {
+      final isAdmin = ClinicAuthService.isAdminEmailWhitelisted(email);
+      if (!isAdmin && usersDoc != null && usersDoc.exists) {
         await FirebaseAuth.instance.signOut();
         if (mounted) {
           setState(() {
@@ -404,14 +410,25 @@ class _PublisherSignupPageState extends State<PublisherSignupPage> {
                           required: true,
                           onChanged:
                               (v) => setState(() => _agreeTerms = v ?? false),
+                          onDetail: () => context.push('/terms'),
                         ),
                         const SizedBox(height: 10),
                         _policyCheckRow(
                           value: _agreePrivacy,
-                          label: '개인정보 처리방침 동의',
+                          label: '개인정보처리방침 동의',
                           required: true,
                           onChanged:
                               (v) => setState(() => _agreePrivacy = v ?? false),
+                          onDetail: () => context.push('/privacy'),
+                        ),
+                        const SizedBox(height: 10),
+                        _policyCheckRow(
+                          value: _agreeRefund,
+                          label: '환불 및 청약철회 정책 확인',
+                          required: true,
+                          onChanged:
+                              (v) => setState(() => _agreeRefund = v ?? false),
+                          onDetail: () => context.push('/refund'),
                         ),
 
                         // ── 에러 ─────────────────────

@@ -93,6 +93,19 @@ class ClinicAuthService {
 
   static const _collection = 'clinics_accounts';
 
+  /// 치과/위생사 중복 역할 차단에서 제외되는 관리자 계정 목록.
+  /// 이 이메일들은 두 역할을 동시에 사용할 수 있다.
+  static const _adminWhitelist = {
+    'chikabooks.app@gmail.com',
+    'damnyouhot@gmail.com',
+  };
+
+  static bool _isAdminEmail(String email) =>
+      _adminWhitelist.contains(email.trim().toLowerCase());
+
+  /// 외부에서 화이트리스트 여부를 확인할 때 사용 (예: 가입 UI 중복 체크 스킵)
+  static bool isAdminEmailWhitelisted(String email) => _isAdminEmail(email);
+
   /// 위생사(지원자) 로그인 경로에서 치과(공고자) 계정을 막을 때 사용하는 안내 문구
   static const String applicantLoginBlockedMessage =
       '이 계정은 치과(공고자) 전용으로 등록되어 있어\n'
@@ -109,6 +122,9 @@ class ClinicAuthService {
   static Future<String?> blockClinicAccountFromApplicantLogin() async {
     final uid = _uid;
     if (uid == null) return null;
+    // 관리자 화이트리스트: 두 역할 동시 사용 허용
+    final email = _auth.currentUser?.email ?? '';
+    if (_isAdminEmail(email)) return null;
     try {
       final doc = await _db.collection(_collection).doc(uid).get();
       if (!doc.exists) return null;
@@ -164,6 +180,9 @@ class ClinicAuthService {
   /// 위생사 계정으로 가입된 것이므로 공고자 가입 불가.
   /// 반환: null이면 통과, 문자열이면 에러 메시지
   static Future<String?> checkDuplicateForClinicSignup(String email) async {
+    // 관리자 화이트리스트: 두 역할 동시 사용 허용
+    if (_isAdminEmail(email)) return null;
+
     final uid = _uid;
     if (uid == null) return '로그인 세션이 만료됐어요. 다시 로그인해주세요.';
 
@@ -194,6 +213,9 @@ class ClinicAuthService {
   /// 공고자 계정으로 가입된 것이므로 위생사 가입 불가.
   /// 반환: null이면 통과, 문자열이면 에러 메시지
   static Future<String?> checkDuplicateForApplicantSignup(String email) async {
+    // 관리자 화이트리스트: 두 역할 동시 사용 허용
+    if (_isAdminEmail(email)) return null;
+
     final uid = _uid;
     final normalizedEmail = email.trim().toLowerCase();
 

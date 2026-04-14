@@ -1039,22 +1039,10 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
   }
 
   Future<void> _goToPublish() async {
-    final pid = _selectedProfile?.id;
-    if (pid == null) return;
-    final fresh = await ClinicProfileService.getProfile(pid);
-    if (!mounted) return;
-    if (fresh == null || !fresh.isBusinessVerified) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '사업자 인증이 완료된 후 게시 단계로 이동할 수 있어요.',
-            style: GoogleFonts.notoSansKr(fontSize: 14),
-          ),
-        ),
-      );
-      return;
+    if (_selectedProfile?.id != null) {
+      final fresh = await ClinicProfileService.getProfile(_selectedProfile!.id);
+      if (fresh != null && mounted) setState(() => _selectedProfile = fresh);
     }
-    setState(() => _selectedProfile = fresh);
     // 최종 저장: 폼의 toMap에는 이미지 URL이 없으므로 Firestore 최신본과 병합
     final latest = await JobDraftService.fetchDraft(widget.draftId);
     await JobDraftService.saveDraft(
@@ -1069,7 +1057,7 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
         'currentStep': 'review',
       },
     );
-    if (mounted) context.push('/post-job/publish/${widget.draftId}');
+    if (mounted) context.push('/post-job/product/${widget.draftId}');
   }
 
   @override
@@ -1195,12 +1183,12 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       child: Row(
         children: [
+          // ── 좌측: 뒤로가기 + 치과 칩 ─────────────────────────
           IconButton(
-            onPressed:
-                () =>
-                    context.canPop()
-                        ? context.pop()
-                        : context.go('/post-job/input'),
+            onPressed: () =>
+                context.canPop()
+                    ? context.pop()
+                    : context.go('/post-job/input'),
             icon: const Icon(Icons.arrow_back, size: 20),
             tooltip: '뒤로',
             style: IconButton.styleFrom(
@@ -1211,17 +1199,8 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
               visualDensity: VisualDensity.compact,
             ),
           ),
-          const SizedBox(width: 8),
-          Text(
-            '공고 편집',
-            style: GoogleFonts.notoSansKr(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
-            ),
-          ),
           if (_selectedProfile != null) ...[
-            const SizedBox(width: 12),
+            const SizedBox(width: 6),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
@@ -1241,6 +1220,17 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
               ),
             ),
           ],
+          // ── 중앙: 페이지 타이틀 ────────────────────────────────
+          const Spacer(),
+          Text(
+            '2. 공고 상세',
+            style: GoogleFonts.notoSansKr(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          // ── 우측: 계정 메뉴 + 다음 단계 버튼 ─────────────────
           const Spacer(),
           const WebAccountMenuButton(),
           const SizedBox(width: 12),

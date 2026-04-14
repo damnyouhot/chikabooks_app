@@ -17,6 +17,10 @@ import 'job_cover_image.dart';
 class JobLevel1Carousel extends StatefulWidget {
   final List<Job> jobs;
 
+  /// 지도 화면 등: 카드 탭 시 [JobDetailScreen]만 열지 않고 카메라 이동 등을 함께 처리할 때 사용.
+  /// null이면 기본 동작(상세 화면 푸시만).
+  final void Function(BuildContext context, Job job)? onJobTap;
+
   /// 섹션헤더(40) + PageView카드(116) + 하단여백(8) = 164px
   static const double stickyHeight = 164.0;
 
@@ -26,6 +30,7 @@ class JobLevel1Carousel extends StatefulWidget {
   const JobLevel1Carousel({
     super.key,
     required this.jobs,
+    this.onJobTap,
   });
 
   @override
@@ -147,7 +152,10 @@ class JobLevel1CarouselState extends State<JobLevel1Carousel> {
             },
             itemBuilder: (_, i) {
               final job = widget.jobs[i % widget.jobs.length];
-              return _Level1Card(job: job);
+              return _Level1Card(
+                job: job,
+                onJobTap: widget.onJobTap,
+              );
             },
             // itemCount 미지정 → 무한 스크롤
           ),
@@ -162,8 +170,26 @@ class JobLevel1CarouselState extends State<JobLevel1Carousel> {
 // ── Level 1 카드 ─────────────────────────────────────────────────
 class _Level1Card extends StatelessWidget {
   final Job job;
+  final void Function(BuildContext context, Job job)? onJobTap;
 
-  const _Level1Card({required this.job});
+  const _Level1Card({
+    required this.job,
+    this.onJobTap,
+  });
+
+  void _handleTap(BuildContext context) {
+    final custom = onJobTap;
+    if (custom != null) {
+      custom(context, job);
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => JobDetailScreen(jobId: job.id),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -174,12 +200,7 @@ class _Level1Card extends StatelessWidget {
       child: AppMutedCard(
         padding: EdgeInsets.zero,
         radius: AppRadius.lg,
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => JobDetailScreen(jobId: job.id),
-          ),
-        ),
+        onTap: () => _handleTap(context),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

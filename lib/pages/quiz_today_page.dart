@@ -15,7 +15,9 @@ import '../services/admin_activity_service.dart';
 import '../services/funnel_onboarding_service.dart';
 import '../services/quiz_content_config_service.dart';
 import '../services/quiz_accuracy_stats.dart';
+import '../services/caring_treat_service.dart';
 import '../services/quiz_pool_service.dart';
+import '../widgets/caring/floating_treat_burst.dart';
 import '../widgets/quiz/quiz_share_capture.dart';
 
 /// 퀴즈 탭 글래스 모드 플래그
@@ -72,6 +74,9 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
 
   // ── 지난 퀴즈 펼치기 여부 ──
   bool _recentExpanded = false;
+
+  /// 오늘 스케줄 로드 후 1회만 퀴즈 오픈 먹이 시도
+  bool _quizOpenTreatAttempted = false;
 
   @override
   void initState() {
@@ -218,10 +223,25 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
           _todayHistory = results[1] as UserQuizHistory?;
           _scheduleLoaded = true;
         });
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          unawaited(_tryGrantQuizOpenTreat());
+        });
       }
     } catch (e) {
       debugPrint('⚠️ 오늘 퀴즈 로드 실패: $e');
       if (mounted) setState(() => _scheduleLoaded = true);
+    }
+  }
+
+  Future<void> _tryGrantQuizOpenTreat() async {
+    if (_quizOpenTreatAttempted) return;
+    final s = _todaySchedule;
+    if (s == null) return;
+    _quizOpenTreatAttempted = true;
+    final ok = await CaringTreatService.tryGrantQuizDayOpened(s.dateKey);
+    if (ok && mounted) {
+      FloatingTreatBurst.show(context, iconCount: 2);
     }
   }
 
@@ -278,6 +298,15 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
 
     AdminActivityService.log(ActivityEventType.quizCompleted, page: 'growth');
     unawaited(FunnelOnboardingService.tryLogFirstQuiz());
+
+    if (isCorrect) {
+      unawaited(() async {
+        final ok = await CaringTreatService.tryGrantQuizCorrect(dateKey, quizId);
+        if (ok && mounted) {
+          FloatingTreatBurst.show(context, iconCount: 3);
+        }
+      }());
+    }
 
     QuizPoolService.saveAnswer(
       dateKey: dateKey,

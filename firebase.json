@@ -82,6 +82,10 @@
         "destination": "/privacy.html"
       },
       {
+        "source": "/refund",
+        "destination": "/refund.html"
+      },
+      {
         "source": "/support",
         "destination": "/support.html"
       },

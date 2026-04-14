@@ -285,7 +285,13 @@ class EmpathyPollService {
   static const int maxAuthorNicknameLength = 30;
 
   /// 사용자 보기 추가
-  static Future<AddOptionResult> addOption(String pollId, String content) async {
+  ///
+  /// [hideAuthorNickname]이 true이면 닉네임을 저장하지 않아 목록에는 `익명`으로만 표시됩니다.
+  static Future<AddOptionResult> addOption(
+    String pollId,
+    String content, {
+    bool hideAuthorNickname = false,
+  }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return AddOptionResult.fail('로그인이 필요합니다.');
 
@@ -315,10 +321,13 @@ class EmpathyPollService {
         );
       }
 
-      final profile = await UserProfileService.getMyProfile();
-      var nickname = profile?.nickname.trim() ?? '';
-      if (nickname.length > maxAuthorNicknameLength) {
-        nickname = nickname.substring(0, maxAuthorNicknameLength);
+      var nickname = '';
+      if (!hideAuthorNickname) {
+        final profile = await UserProfileService.getMyProfile();
+        nickname = profile?.nickname.trim() ?? '';
+        if (nickname.length > maxAuthorNicknameLength) {
+          nickname = nickname.substring(0, maxAuthorNicknameLength);
+        }
       }
 
       final docRef = await _optionsRef(pollId).add({

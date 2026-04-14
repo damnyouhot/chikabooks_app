@@ -25,7 +25,7 @@ class WebAccountActionsService {
     await FirebaseAuth.instance.signOut();
   }
 
-  /// 로그아웃 확인 후 세션 정리.
+  /// 세션 캐시 정리 후 Firebase·Google 로그아웃(확인 다이얼로그 없음).
   ///
   /// [afterLogout]이 null이면 `/login`으로 이동하고 스낵바를 띄웁니다(웹 플로우 기본).
   /// 설정 화면 등에서는 `Navigator.pop` 등을 [afterLogout]에 넘깁니다.
@@ -33,27 +33,6 @@ class WebAccountActionsService {
     BuildContext context, {
     void Function(BuildContext ctx)? afterLogout,
   }) async {
-    final result = await showDialog<bool>(
-      context: context,
-      builder:
-          (ctx) => AlertDialog(
-            title: const Text('로그아웃할까요?'),
-            content: const Text('로그아웃하면 다시 로그인해야 내 서재와 구매한 책을 볼 수 있어요.'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('취소'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('로그아웃'),
-              ),
-            ],
-          ),
-    );
-
-    if (result != true) return;
-
     await _clearSessionCaches();
     await _signOutGoogleAndFirebase();
 
