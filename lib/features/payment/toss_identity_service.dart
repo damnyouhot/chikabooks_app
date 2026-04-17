@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
-import 'package:web/web.dart' as web;
 
 /// 토스 본인확인(Toss Identity) 웹 SDK 연동 서비스
 ///

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -64,6 +65,8 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
   bool _licenseReplaceMode = false;
 
   bool _retryingBusinessCheck = false;
+  bool _isSaving = false;
+  DateTime? _lastSavedAt;
 
   /// 좌측 미리보기 단일 스크롤 — [JobPostPreview]와 동일 인스턴스 유지.
   final ScrollController _previewScrollController = ScrollController();
@@ -310,6 +313,7 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
     setState(() {
       _draftReady = true;
       _draftUpdatedAt = draft.updatedAt;
+      _lastSavedAt = draft.updatedAt;
       _extraDraftFields = _persistExtraFromDraft(draft);
       _editorStep = _migrateEditorStep(draft.editorStep);
       _data = JobPostData(
@@ -1038,6 +1042,51 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
     }
   }
 
+  Future<void> _manualSaveDraft() async {
+    if (_isSaving) return;
+    setState(() => _isSaving = true);
+    try {
+      await JobDraftService.saveDraft(
+        draftId: widget.draftId,
+        formData: {..._data.toMap(), ..._extraDraftFields},
+      );
+      if (mounted) {
+        setState(() => _lastSavedAt = DateTime.now());
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '임시저장 완료',
+              style: GoogleFonts.notoSansKr(fontSize: 13),
+            ),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '저장 실패: $e',
+              style: GoogleFonts.notoSansKr(fontSize: 13),
+            ),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
   Future<void> _goToPublish() async {
     if (_selectedProfile?.id != null) {
       final fresh = await ClinicProfileService.getProfile(_selectedProfile!.id);
@@ -1351,22 +1400,146 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
       initialData: _selectedProfile,
       builder: (context, snap) {
         final profile = snap.data ?? _selectedProfile!;
+
+        return Stack(
+          children: [
+            // ── 스크롤 콘텐츠 (전체 영역, 헤더·nav 뒤로 통과 → BackdropFilter 블러 대상) ──
+            Positioned.fill(
+              child: _buildStepContent(profile),
+            ),
+
+            // ── 상단 스티키 헤더 ──
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: _buildStepHeader(profile),
+            ),
+
+            // ── 하단 nav 오버레이 ──
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: _buildStepNav(),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildStepContent(ClinicProfile profile) {
+    // step별 스크롤 전략:
+    //   step1 — 컴팩트 이미지 섹션, 외부 스크롤 최소화
+    //   step2 — 공고 상세 폼, 세로 스크롤 허용
+    //   step3 — 가로 2열, 각 열 개별 스크롤, 외부 스크롤 없음
+    switch (_editorStep) {
+      case 'step3':
+        return SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 100, 24, 96),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 720),
+              child: _buildStep3Body(profile),
+            ),
+          ),
+        );
+
+      case 'step2':
         return SingleChildScrollView(
           controller: _formScrollController,
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.fromLTRB(24, 100, 24, 96),
+          child: LayoutBuilder(
+            builder: (ctx, bc) {
+              final w = bc.maxWidth > 720 ? 720.0 : bc.maxWidth;
+              return Align(
+                alignment: Alignment.topCenter,
+                child: SizedBox(
+                  width: w,
+                  child: JobPostForm(
+                    key: _detailFormKey,
+                    initialData: _data,
+                    draftId: widget.draftId,
+                    publisherWebStyle: true,
+                    publisherWebEditorStep: 'step3',
+                    extraDraftFields: _extraDraftFields,
+                    initialDraftUpdatedAt: _draftUpdatedAt,
+                    onDataChanged: _onDataChanged,
+                    onDraftIdChanged: (_) {},
+                    onDraftSaved: (dt) {
+                      if (mounted) setState(() => _lastSavedAt = dt);
+                    },
+                    onSubmit: (_) async => _goToPublish(),
+                    onWebEditorPreviewScrollTo: _scrollPreviewTo,
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+
+      default: // step1 — 스크롤 없이 컴팩트하게
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 100, 24, 96),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 720),
+              child: _buildStep1Body(),
+            ),
+          ),
+        );
+    }
+  }
+
+  Widget _buildStepHeader(ClinicProfile profile) {
+    final hasBanner =
+        !profile.isBusinessVerified || _aiError != null;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppPublisher.buttonRadius),
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.40),
+              borderRadius: BorderRadius.circular(AppPublisher.buttonRadius),
+              border: Border.all(
+                color: AppColors.divider.withValues(alpha: 0.5),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.06),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            padding: EdgeInsets.fromLTRB(
+              20,
+              12,
+              20,
+              hasBanner ? 10 : 12,
+            ),
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 720),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  _buildVerificationStickyBanner(profile),
                   if (_aiError != null) ...[
+                    const SizedBox(height: 8),
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: AppColors.error.withValues(alpha: 0.08),
                         border: const Border(
-                          left: BorderSide(color: AppColors.error, width: 3),
+                          left: BorderSide(
+                            color: AppColors.error,
+                            width: 3,
+                          ),
                         ),
                       ),
                       child: Row(
@@ -1389,37 +1562,17 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 16),
                   ],
-                  _buildVerificationStickyBanner(profile),
                   const SizedBox(height: 12),
                   _buildStepIndicator(),
-                  const SizedBox(height: 20),
-                  if (_editorStep == 'step1') _buildStep1Body(),
-                  if (_editorStep == 'step2')
-                    JobPostForm(
-                      key: _detailFormKey,
-                      initialData: _data,
-                      draftId: widget.draftId,
-                      publisherWebStyle: true,
-                      publisherWebEditorStep: 'step3',
-                      extraDraftFields: _extraDraftFields,
-                      initialDraftUpdatedAt: _draftUpdatedAt,
-                      onDataChanged: _onDataChanged,
-                      onDraftIdChanged: (_) {},
-                      onSubmit: (_) async => _goToPublish(),
-                      onWebEditorPreviewScrollTo: _scrollPreviewTo,
-                    ),
-                  if (_editorStep == 'step3') _buildStep3Body(profile),
-                  const SizedBox(height: 28),
-                  _buildStepNav(),
                 ],
               ),
             ),
           ),
-        );
-      },
-    );
+        ),
+      ),
+    ),
+  );
   }
 
   Future<void> _retryBusinessCheck(ClinicProfile profile) async {
@@ -1579,44 +1732,57 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
             : _editorStep == 'step2'
             ? 1
             : 2;
-    return Wrap(
-      alignment: WrapAlignment.center,
-      spacing: 8,
-      runSpacing: 8,
-      children: List.generate(3, (i) {
-        final active = i == idx;
-        final stepId =
-            i == 0
-                ? 'step1'
-                : i == 1
-                ? 'step2'
-                : 'step3';
-        return InkWell(
-          onTap: () => _setEditorStep(stepId),
-          borderRadius: BorderRadius.circular(20),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color:
-                  active
-                      ? AppColors.accent.withValues(alpha: 0.12)
-                      : AppColors.white,
-              border: Border.all(
-                color: active ? AppColors.accent : AppColors.divider,
+    return Row(
+      children: [
+        for (int i = 0; i < 3; i++) ...[
+          if (i > 0) const SizedBox(width: 8),
+          Expanded(
+            child: GestureDetector(
+              onTap: () => _setEditorStep(
+                i == 0 ? 'step1' : i == 1 ? 'step2' : 'step3',
               ),
-              borderRadius: BorderRadius.circular(AppPublisher.softRadius),
-            ),
-            child: Text(
-              '${i + 1}. ${labels[i]}',
-              style: GoogleFonts.notoSansKr(
-                fontSize: 12,
-                fontWeight: active ? FontWeight.w800 : FontWeight.w600,
-                color: active ? AppColors.accent : AppColors.textSecondary,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                height: AppPublisher.ctaHeight,
+                decoration: BoxDecoration(
+                  color: i == idx ? AppColors.accent : AppColors.white,
+                  border: Border.all(
+                    color: i == idx ? AppColors.accent : AppColors.divider,
+                    width: i == idx ? 0 : 1,
+                  ),
+                  borderRadius:
+                      BorderRadius.circular(AppPublisher.buttonRadius),
+                  boxShadow:
+                      i == idx
+                          ? [
+                            BoxShadow(
+                              color: AppColors.accent.withValues(alpha: 0.28),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ]
+                          : null,
+                ),
+                child: Center(
+                  child: Text(
+                    '${i + 1}) ${labels[i]}',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.notoSansKr(
+                      fontSize: 14,
+                      fontWeight:
+                          i == idx ? FontWeight.w700 : FontWeight.w600,
+                      color:
+                          i == idx
+                              ? AppColors.white
+                              : AppColors.textPrimary,
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
-        );
-      }),
+        ],
+      ],
     );
   }
 
@@ -1631,20 +1797,22 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
       initialDraftUpdatedAt: _draftUpdatedAt,
       onDataChanged: _onDataChanged,
       onDraftIdChanged: (_) {},
+      onDraftSaved: (dt) { if (mounted) setState(() => _lastSavedAt = dt); },
       onSubmit: (_) async => _goToPublish(),
     );
   }
 
-  /// 3단계: 사업자 인증 카드 + 치과 프로필(OCR) 확인
+  /// 3단계: 사업자 인증 → 치과 정보 (세로 배치)
   Widget _buildStep3Body(ClinicProfile profile) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _buildLicenseSide(profile),
-        SizedBox(height: AppPublisher.formSectionSpacing),
+        const SizedBox(height: 24),
         PublisherClinicIdentitySection(
           profile: profile,
           inlineFieldLabels: true,
+          hideSaveButton: true,
           onSaved: () async {
             final u = await ClinicProfileService.getProfile(profile.id);
             if (u != null && mounted) {
@@ -1684,52 +1852,139 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
   }
 
   Widget _buildStepNav() {
-    return Row(
-      children: [
-        if (_editorStep != 'step1')
-          OutlinedButton(
-            onPressed: _goPrevStep,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.accent,
-              side: const BorderSide(color: AppColors.accent),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppPublisher.buttonRadius),
-              ),
+    final canGoBack = _editorStep != 'step1';
+    final showNext = _editorStep != 'step3';
+    final saved = _lastSavedAt;
+    final savedLabel =
+        saved != null
+            ? '마지막 저장: ${saved.hour.toString().padLeft(2, '0')}:${saved.minute.toString().padLeft(2, '0')}'
+            : null;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppPublisher.buttonRadius),
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.40),
+              borderRadius: BorderRadius.circular(AppPublisher.buttonRadius),
+              border: Border.all(color: AppColors.divider, width: 1),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.07),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-            child: Text(
-              '이전',
-              style: GoogleFonts.notoSansKr(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 720),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      height: AppPublisher.ctaHeight,
+                      child: OutlinedButton(
+                        onPressed: canGoBack ? _goPrevStep : null,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.accent,
+                          disabledForegroundColor: AppColors.textSecondary,
+                          side: BorderSide(
+                            color:
+                                canGoBack
+                                    ? AppColors.accent
+                                    : AppColors.divider,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(
+                              AppPublisher.buttonRadius,
+                            ),
+                          ),
+                        ),
+                        child: Text(
+                          '이전',
+                          style: GoogleFonts.notoSansKr(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    if (savedLabel != null) ...[
+                      Text(
+                        savedLabel,
+                        style: GoogleFonts.notoSansKr(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.textDisabled,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                    ],
+                    SizedBox(
+                      height: AppPublisher.ctaHeight,
+                      child: OutlinedButton(
+                        onPressed: _isSaving ? null : _manualSaveDraft,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.textPrimary,
+                          side: const BorderSide(color: AppColors.divider),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(
+                              AppPublisher.buttonRadius,
+                            ),
+                          ),
+                        ),
+                        child: _isSaving
+                            ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                            : Text(
+                              '임시 저장',
+                              style: GoogleFonts.notoSansKr(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                      ),
+                    ),
+                    if (showNext) ...[
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        height: AppPublisher.ctaHeight,
+                        child: ElevatedButton(
+                          onPressed: _goNextStep,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.accent,
+                            foregroundColor: AppColors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(
+                                AppPublisher.buttonRadius,
+                              ),
+                            ),
+                          ),
+                          child: Text(
+                            '다음',
+                            style: GoogleFonts.notoSansKr(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ),
           ),
-        const Spacer(),
-        if (_editorStep != 'step3')
-          SizedBox(
-            height: AppPublisher.ctaHeight,
-            child: ElevatedButton(
-              onPressed: _goNextStep,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.accent,
-                foregroundColor: AppColors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(
-                    AppPublisher.buttonRadius,
-                  ),
-                ),
-              ),
-              child: Text(
-                '다음',
-                style: GoogleFonts.notoSansKr(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ),
-      ],
+        ),
+      ),
     );
   }
 }

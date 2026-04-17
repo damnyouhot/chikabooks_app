@@ -64,6 +64,9 @@ class JobDraft {
   final List<String> promotionalImageUrls;
   final String? clinicProfileId;
 
+  /// 로고파일 URL — 단일 이미지
+  final String? logoUrl;
+
   // ── AI 추출 품질 필드 ────────────────────────────
   final String? mainDutiesRaw;
   final List<String> mainDutiesList;
@@ -127,6 +130,7 @@ class JobDraft {
     this.rawImageUrls = const [],
     this.promotionalImageUrls = const [],
     this.clinicProfileId,
+    this.logoUrl,
     this.mainDutiesRaw,
     this.mainDutiesList = const [],
     this.recruitmentStart,
@@ -197,6 +201,7 @@ class JobDraft {
       rawImageUrls: List<String>.from(data['rawImageUrls'] ?? []),
       promotionalImageUrls: List<String>.from(data['promotionalImageUrls'] ?? []),
       clinicProfileId: data['clinicProfileId'] as String?,
+      logoUrl: data['logoUrl'] as String?,
       editorStep: data['editorStep'] as String?,
       mainDutiesRaw: data['mainDutiesRaw'] as String?,
       mainDutiesList: List<String>.from(data['mainDutiesList'] ?? []),
@@ -265,6 +270,7 @@ class JobDraft {
         if (rawImageUrls.isNotEmpty) 'rawImageUrls': rawImageUrls,
         if (promotionalImageUrls.isNotEmpty) 'promotionalImageUrls': promotionalImageUrls,
         if (clinicProfileId != null) 'clinicProfileId': clinicProfileId,
+        if (logoUrl != null && logoUrl!.isNotEmpty) 'logoUrl': logoUrl,
         if (editorStep != null) 'editorStep': editorStep,
         if (mainDutiesRaw != null) 'mainDutiesRaw': mainDutiesRaw,
         if (mainDutiesList.isNotEmpty) 'mainDutiesList': mainDutiesList,

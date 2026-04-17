@@ -1041,47 +1041,39 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
         _buildClassCard(
           cls: _ProductClass.a,
           medal: '🥇',
-          subtitle: '전국 전체 유저에게 가장 먼저 알려지는 공고',
+          subtitle: '전국 유저에서 알림, 탭상단 고정 노출되는 가장 강력한 공고',
+          baseClassLabel: 'B클래스 항목 전체 포함',
           features: const [
-            ('🔔', '전국 모든 유저에게 채용 개시 알림 발송'),
-            ('📍', '앱 내 광고 영역 최상단 우선 배치'),
-            ('🔁', '스크롤 중에도 반복 노출 (상단 고정 노출 구조)'),
-            ('🗺', '지도에서도 가장 눈에 띄는 강조 노출'),
-            ('📈', '매칭 추천에서 가장 높은 우선순위 반영'),
-            ('🖼', "필터 적용 후 '전체 공고'에서도 사진 포함 노출"),
-            ('⏱', '노출 기간: 10일'),
-            ('👥', '지원자 수 제한 없음'),
-            ('✏️', '공고 수정 자유'),
+            ('🔔', '전국 모든 유저 알림 발송'),
+            ('📍', '광고 영역 최상단 고정 배치'),
+            ('🔁', '스크롤 중에도 상단 고정'),
+            ('🗺', '지도 내 포인트 노출'),
+            ('📈', '매칭 추천 최우선순위'),
           ],
-          cta: '가장 빠르게 채용하고 싶다면 선택해야 하는 최상위 상품',
         ),
         const SizedBox(height: 12),
         _buildClassCard(
           cls: _ProductClass.b,
           medal: '🥈',
-          subtitle: '지역 기반으로 강하게 노출되는 공고',
+          subtitle: '지역 기반으로 사진과 함께 노출되는 공고',
+          baseClassLabel: 'C클래스 항목 전체 포함',
           features: const [
-            ('🔔', '해당 시/도 유저에게 채용 개시 알림 발송'),
+            ('🔔', '해당 시/도 유저 알림 발송'),
             ('📍', '광고 및 추천 영역 우선 노출'),
             ('📈', '매칭 추천에서 우대 노출'),
             ('🖼', "필터 적용 후 '전체 공고'에서도 사진 포함 노출"),
-            ('⏱', '노출 기간: 10일'),
-            ('👥', '지원자 수 제한 없음'),
           ],
-          cta: '적정 비용으로 노출을 확실히 높이고 싶을 때',
         ),
         const SizedBox(height: 12),
         _buildClassCard(
           cls: _ProductClass.c,
           medal: '🥉',
-          subtitle: '기본 공고 등록',
+          subtitle: '부담 없이 채용을 시작하고 싶을 때',
           features: const [
-            ('📄', '전체 공고 목록에 기본 노출'),
-            ('🗺', '지도 기본 노출'),
+            ('📄', '전체 공고 목록에 노출'),
+            ('🗺', '지도 노출'),
             ('⏱', '노출 기간: 10일'),
-            ('👥', '지원자 수 제한 없음'),
           ],
-          cta: '부담 없이 채용을 시작하고 싶을 때',
         ),
         const SizedBox(height: 20),
         _buildComparisonTable(),
@@ -1182,7 +1174,7 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
     required String medal,
     required String subtitle,
     required List<(String, String)> features,
-    required String cta,
+    String? baseClassLabel,
   }) {
     final isSelected = _selected == cls;
     return GestureDetector(
@@ -1232,43 +1224,56 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
                         : null,
                   ),
                   Expanded(
-                    child: Column(
+                    child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Text(
-                              '$medal ${cls.label}',
-                              style: GoogleFonts.notoSansKr(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                                color: isSelected
-                                    ? AppColors.blue
-                                    : AppColors.textPrimary,
-                                letterSpacing: -0.3,
-                              ),
+                        Expanded(
+                          child: Text.rich(
+                            TextSpan(
+                              children: [
+                                TextSpan(
+                                  text: '$medal ${cls.label}',
+                                  style: GoogleFonts.notoSansKr(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                    color: isSelected
+                                        ? AppColors.blue
+                                        : AppColors.textPrimary,
+                                    letterSpacing: -0.3,
+                                  ),
+                                ),
+                                TextSpan(
+                                  text: ' · ',
+                                  style: GoogleFonts.notoSansKr(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.textPrimary,
+                                    height: 1.35,
+                                  ),
+                                ),
+                                TextSpan(
+                                  text: subtitle,
+                                  style: GoogleFonts.notoSansKr(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.textPrimary,
+                                    height: 1.35,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const Spacer(),
-                            Text(
-                              cls.priceLabel,
-                              style: GoogleFonts.notoSansKr(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                                color: isSelected
-                                    ? AppColors.blue
-                                    : AppColors.textPrimary,
-                                letterSpacing: -0.3,
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(width: 8),
                         Text(
-                          subtitle,
+                          cls.priceLabel,
                           style: GoogleFonts.notoSansKr(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
-                            height: 1.4,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: isSelected
+                                ? AppColors.blue
+                                : AppColors.textPrimary,
+                            letterSpacing: -0.3,
                           ),
                         ),
                       ],
@@ -1277,65 +1282,135 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
                 ],
               ),
             ),
-            // ── 기능 목록 ──────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: features
-                    .map(
-                      (f) => Padding(
-                        padding: const EdgeInsets.only(bottom: 5),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(f.$1,
-                                style: const TextStyle(fontSize: 13)),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                f.$2,
-                                style: GoogleFonts.notoSansKr(
-                                  fontSize: 12,
-                                  color: AppColors.textSecondary,
-                                  height: 1.45,
-                                ),
-                              ),
-                            ),
-                          ],
+            // ── 기본 클래스 포함 뱃지 ─────────────────────────
+            if (baseClassLabel != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? AppColors.blue.withValues(alpha: 0.10)
+                        : AppColors.surfaceMuted,
+                    borderRadius:
+                        BorderRadius.circular(AppPublisher.softRadius),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.check_circle_rounded,
+                        size: 13,
+                        color: isSelected
+                            ? AppColors.blue
+                            : AppColors.textSecondary,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        baseClassLabel,
+                        style: GoogleFonts.notoSansKr(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: isSelected
+                              ? AppColors.blue
+                              : AppColors.textSecondary,
                         ),
                       ),
-                    )
-                    .toList(),
-              ),
-            ),
-            // ── CTA 힌트 ──────────────────────────────────────
-            Container(
-              margin: const EdgeInsets.fromLTRB(18, 10, 18, 16),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? AppColors.blue.withValues(alpha: 0.08)
-                    : AppColors.surfaceMuted,
-                borderRadius:
-                    BorderRadius.circular(AppPublisher.softRadius),
-              ),
-              child: Text(
-                '👉 $cta',
-                style: GoogleFonts.notoSansKr(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: isSelected
-                      ? AppColors.blue
-                      : AppColors.textSecondary,
-                  height: 1.4,
+                    ],
+                  ),
                 ),
               ),
+            // ── 추가 항목 레이블 (baseClassLabel 있을 때) ──────
+            if (baseClassLabel != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        height: 0.5,
+                        color: AppColors.divider,
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Text(
+                        '+ 추가 혜택',
+                        style: GoogleFonts.notoSansKr(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textDisabled,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Container(
+                        height: 0.5,
+                        color: AppColors.divider,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            // ── 기능 목록 (2열) ────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 10, 18, 16),
+              child: _buildFeatureTwoColumn(features),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  /// 클래스 카드 혜택 목록 — 2열 그리드, 본문 색상은 검정 계열([AppColors.textPrimary])
+  Widget _buildFeatureTwoColumn(List<(String, String)> features) {
+    const color = AppColors.textPrimary;
+    final rows = <Widget>[];
+    for (var i = 0; i < features.length; i += 2) {
+      rows.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: _featureItem(features[i], color)),
+              const SizedBox(width: 10),
+              if (i + 1 < features.length)
+                Expanded(child: _featureItem(features[i + 1], color))
+              else
+                const Expanded(child: SizedBox()),
+            ],
+          ),
+        ),
+      );
+    }
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: rows);
+  }
+
+  Widget _featureItem((String, String) f, Color color) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          f.$1,
+          style: TextStyle(fontSize: 13, color: color),
+        ),
+        const SizedBox(width: 4),
+        Expanded(
+          child: Text(
+            f.$2,
+            style: GoogleFonts.notoSansKr(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: color,
+              height: 1.45,
+            ),
+          ),
+        ),
+      ],
     );
   }
 

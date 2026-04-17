@@ -16,7 +16,6 @@ import '../../features/jobs/web/job_draft_editor_page.dart';
 import '../../features/jobs/web/job_product_select_page.dart';
 import '../../features/jobs/web/job_publish_success_page.dart';
 import '../../features/jobs/web/legal_page.dart';
-import '../../features/jobs/web/refund_legal_page.dart';
 import '../../features/jobs/ui/clinic_verify_page.dart';
 import '../../features/auth/web/web_login_page.dart';
 import '../../features/auth/web/set_password_page.dart';

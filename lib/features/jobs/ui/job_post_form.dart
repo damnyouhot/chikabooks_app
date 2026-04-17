@@ -67,6 +67,9 @@ class JobPostData {
   /// 홍보이미지 URL — AI 추출 없이 공고에 직접 노출
   List<String> promotionalImageUrls;
 
+  /// 로고파일 URL — 단일 이미지
+  String? logoUrl;
+
   // ── 신규 필드 ───────────────────────────────────────
   String? hospitalType; // clinic | network | hospital | general
   int? chairCount;
@@ -144,6 +147,7 @@ class JobPostData {
     this.contact = '',
     List<XFile>? images,
     List<String>? promotionalImageUrls,
+    this.logoUrl,
     this.hospitalType,
     this.chairCount,
     this.staffCount,
@@ -204,6 +208,7 @@ class JobPostData {
     String? contact,
     List<XFile>? images,
     List<String>? promotionalImageUrls,
+    String? logoUrl,
     String? hospitalType,
     int? chairCount,
     int? staffCount,
@@ -254,6 +259,7 @@ class JobPostData {
       images: images ?? List.from(this.images),
       promotionalImageUrls:
           promotionalImageUrls ?? List.from(this.promotionalImageUrls),
+      logoUrl: logoUrl ?? this.logoUrl,
       hospitalType: hospitalType ?? this.hospitalType,
       chairCount: chairCount ?? this.chairCount,
       staffCount: staffCount ?? this.staffCount,
@@ -310,6 +316,7 @@ class JobPostData {
     'contact': contact,
     if (promotionalImageUrls.isNotEmpty)
       'promotionalImageUrls': promotionalImageUrls,
+    if (logoUrl != null && logoUrl!.isNotEmpty) 'logoUrl': logoUrl,
     if (hospitalType != null) 'hospitalType': hospitalType,
     if (chairCount != null) 'chairCount': chairCount,
     if (staffCount != null) 'staffCount': staffCount,
@@ -494,6 +501,7 @@ class JobPostData {
         (k, v) => MapEntry(k.toString(), v.toString()),
       ),
       fieldSources: data['fieldSources'] as Map<String, dynamic>?,
+      logoUrl: data['logoUrl'] as String?,
     );
   }
 }
@@ -509,6 +517,7 @@ class JobPostData {
 /// [initialDraftUpdatedAt] : Firestore `updatedAt` — 재접속 후에도 「마지막 저장」 시각 표시용
 /// [publisherWebEditorStep] : 웹 편집기 — `step1`(로고·내외부 사진)·`step3`(공고 상세 본문). null 이면 기존 전체 폼.
 /// [onWebEditorPreviewScrollTo] : 웹 드래프트 에디터 step3 — 필드 포커스 시 좌측 미리보기 스크롤.
+/// [onDraftSaved] : 자동·수동 임시저장 완료 시 호출 (저장 시각 전달).
 class JobPostForm extends StatefulWidget {
   final JobPostData? initialData;
   final ValueChanged<JobPostData>? onDataChanged;
@@ -522,6 +531,7 @@ class JobPostForm extends StatefulWidget {
   /// `step1` | `step3` — [publisherWebStyle] true 일 때만 사용
   final String? publisherWebEditorStep;
   final ValueChanged<JobPreviewScrollAnchor>? onWebEditorPreviewScrollTo;
+  final void Function(DateTime savedAt)? onDraftSaved;
 
   const JobPostForm({
     super.key,
@@ -535,6 +545,7 @@ class JobPostForm extends StatefulWidget {
     this.initialDraftUpdatedAt,
     this.publisherWebEditorStep,
     this.onWebEditorPreviewScrollTo,
+    this.onDraftSaved,
   });
 
   @override
@@ -627,6 +638,9 @@ class JobPostFormState extends State<JobPostForm> {
   final GlobalKey _promoDropBoundaryKey = GlobalKey();
   final Map<int, double> _promoUploadProgress = {};
   static const int _kMaxPromoImages = 10;
+  bool _logoDropActive = false;
+  final GlobalKey _logoDropBoundaryKey = GlobalKey();
+  bool _logoUploadInProgress = false;
   static const _autoSaveDebounce = Duration(milliseconds: 1800);
 
   /// 웹 편집기 3단계(공고 상세) — 항목별 「항목 빼기」 표시
@@ -1113,6 +1127,8 @@ class JobPostFormState extends State<JobPostForm> {
         'rawImageUrls': <String>[],
         'imageUrls': <String>[],
         'promotionalImageUrls': _data.promotionalImageUrls,
+        if (_data.logoUrl != null && _data.logoUrl!.isNotEmpty)
+          'logoUrl': _data.logoUrl,
       };
     }
 
@@ -1130,6 +1146,8 @@ class JobPostFormState extends State<JobPostForm> {
         'rawImageUrls': urls,
         'imageUrls': urls,
         'promotionalImageUrls': _data.promotionalImageUrls,
+        if (_data.logoUrl != null && _data.logoUrl!.isNotEmpty)
+          'logoUrl': _data.logoUrl,
       };
     }
 
@@ -1205,6 +1223,8 @@ class JobPostFormState extends State<JobPostForm> {
       'rawImageUrls': rawOut,
       'imageUrls': imgOut,
       'promotionalImageUrls': _data.promotionalImageUrls,
+      if (_data.logoUrl != null && _data.logoUrl!.isNotEmpty)
+        'logoUrl': _data.logoUrl,
     };
   }
 
@@ -1237,6 +1257,7 @@ class JobPostFormState extends State<JobPostForm> {
         final isNew = _draftId == null;
         _draftId = id;
         _lastSavedAt = DateTime.now();
+        widget.onDraftSaved?.call(_lastSavedAt!);
         if (isNew) widget.onDraftIdChanged?.call(id);
         setState(() {});
       }
@@ -1867,6 +1888,49 @@ class JobPostFormState extends State<JobPostForm> {
     await _appendPromotionalFromXFiles(files);
   }
 
+  Future<void> _pickLogo() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: ImageSource.gallery);
+    if (picked == null) return;
+    await _appendLogoFromXFile(picked);
+  }
+
+  Future<void> _appendLogoFromXFile(XFile f) async {
+    if (!isAllowedJobImageFileName(f.name)) {
+      if (mounted) _showSnack('지원 이미지(jpg, png, gif, webp 등)만 추가할 수 있어요.');
+      return;
+    }
+    var draftKey = _draftId ?? widget.draftId;
+    if (draftKey == null || draftKey.isEmpty) {
+      draftKey = await JobDraftService.saveDraft(
+        draftId: null,
+        formData: _mergedFormData(),
+      );
+      if (draftKey != null) {
+        _draftId = draftKey;
+        widget.onDraftIdChanged?.call(draftKey);
+      }
+    }
+    if (draftKey == null || draftKey.isEmpty) return;
+
+    setState(() => _logoUploadInProgress = true);
+    try {
+      final uploaded = await JobImageUploader.uploadImages(
+        jobId: draftKey,
+        images: [f],
+        onProgress: (_, __) {},
+      );
+      if (!mounted) return;
+      if (uploaded.isNotEmpty) {
+        setState(() => _data = _data.copyWith(logoUrl: uploaded.first));
+        _notify();
+        _scheduleAutoSave();
+      }
+    } finally {
+      if (mounted) setState(() => _logoUploadInProgress = false);
+    }
+  }
+
   // ── 복리후생 토글 ──────────────────────────────────────
   // ── 제출 ───────────────────────────────────────────────
   Future<void> _submit() async {
@@ -1998,32 +2062,11 @@ class JobPostFormState extends State<JobPostForm> {
     void gap() =>
         out.add(const SizedBox(height: AppPublisher.formSectionSpacing));
 
-    // ── AI 상태 배너 (파싱 완료 후 표시) ──
-    if (full || step3) {
-      out.add(_buildAiStatusBanner());
-    }
+    // ── AI 상태 배너는 표시하지 않음 ──
 
     if (full || step1) {
       if (step1) {
-        out.add(
-          _sectionCard(
-            title: _sectionTitle(publisher: '로고 첨부', legacy: '📷 로고 첨부'),
-            child: _buildPromotionalImageSection(),
-          ),
-        );
-        gap();
-        out.add(
-          _sectionCard(
-            title: _sectionTitle(
-              publisher: '내외부 사진 첨부',
-              legacy: '📷 치과 이미지 (공고에 노출)',
-            ),
-            child: _buildInteriorImageSection(
-              secondaryHint:
-                  '치과 내부·외부 사진은 공고에 노출됩니다. (최대 10장, jpg/png, 장당 5MB 이하)',
-            ),
-          ),
-        );
+        out.add(_buildStep1CompactSections());
       } else {
         out.add(
           _sectionCard(
@@ -2153,6 +2196,163 @@ class JobPostFormState extends State<JobPostForm> {
   }
 
   // ── 섹션 카드 래퍼 ─────────────────────────────────────
+  /// step1 웹 에디터: [항목명+설명+추가버튼(좌) | 썸네일(우)] 세 항목 수직 배치
+  Widget _buildStep1CompactSections() {
+    const labelWidth = 160.0;
+
+    Widget addBtn(String label, bool enabled, VoidCallback? onTap) {
+      return SizedBox(
+        height: 32,
+        child: OutlinedButton.icon(
+          onPressed: enabled ? onTap : null,
+          icon: const Icon(Icons.add_photo_alternate_outlined, size: 14),
+          label: Text(label),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppColors.accent,
+            disabledForegroundColor: AppColors.textDisabled,
+            side: BorderSide(
+              color: enabled ? AppColors.accent : AppColors.divider,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius:
+                  BorderRadius.circular(AppPublisher.buttonRadius),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            minimumSize: Size.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            textStyle: _ft(size: 11, weight: FontWeight.w600),
+          ),
+        ),
+      );
+    }
+
+    Widget compactRow({
+      required String title,
+      required String desc,
+      required Widget button,
+      required Widget thumbsArea,
+      required bool hasItems,
+    }) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(20, 28, 20, 28),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: labelWidth,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: _ft(
+                      size: AppPublisher.formSectionTitleSize,
+                      weight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    desc,
+                    style: _ft(
+                      size: 11,
+                      weight: FontWeight.w500,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  button,
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: hasItems
+                  ? thumbsArea
+                  : Container(
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: AppColors.accent.withValues(alpha: 0.03),
+                        border: Border.all(
+                          color: AppColors.divider,
+                          width: 1,
+                        ),
+                        borderRadius: BorderRadius.circular(
+                          AppPublisher.softRadius,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.cloud_upload_outlined,
+                            size: 18,
+                            color: AppColors.textDisabled,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '클릭하거나 사진 끌어다 놓거나',
+                            style: _ft(
+                              size: 11,
+                              weight: FontWeight.w500,
+                              color: AppColors.textDisabled,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        compactRow(
+          title: '내외부 사진 첨부',
+          desc: '공고에 노출됩니다.\n(최대 10장, jpg/png, 5MB 이하)',
+          button: addBtn(
+            '사진 추가 (${_data.images.length}/10)',
+            _data.images.length < 10,
+            _pickImages,
+          ),
+          hasItems: _data.images.isNotEmpty,
+          thumbsArea: _buildInteriorImageSection(
+            primaryHint: '',
+            secondaryHint: '',
+            hideHintsAndButton: true,
+          ),
+        ),
+        const Divider(height: 24, thickness: 1, color: AppColors.divider),
+        compactRow(
+          title: '홍보이미지',
+          desc: '공고 홍보 영역에\n그대로 노출됩니다.',
+          button: addBtn(
+            '이미지 추가 (${_data.promotionalImageUrls.length}/$_kMaxPromoImages)',
+            _data.promotionalImageUrls.length < _kMaxPromoImages,
+            _pickPromotionalImages,
+          ),
+          hasItems: _data.promotionalImageUrls.isNotEmpty,
+          thumbsArea: _buildPromotionalImageSection(hideHintsAndButton: true),
+        ),
+        const Divider(height: 24, thickness: 1, color: AppColors.divider),
+        compactRow(
+          title: '로고파일',
+          desc: '공고에 노출됩니다.\n(1장)',
+          button: addBtn(
+            '로고 추가 (${_data.logoUrl != null && _data.logoUrl!.isNotEmpty ? 1 : 0}/1)',
+            _data.logoUrl == null || _data.logoUrl!.isEmpty,
+            _pickLogo,
+          ),
+          hasItems: _data.logoUrl != null && _data.logoUrl!.isNotEmpty,
+          thumbsArea: _buildLogoSection(hideHintsAndButton: true),
+        ),
+      ],
+    );
+  }
+
   Widget _sectionCard({required String title, required Widget child}) {
     if (widget.publisherWebStyle) {
       return Padding(
@@ -2210,7 +2410,7 @@ class JobPostFormState extends State<JobPostForm> {
   Widget _buildImageSection() => _buildInteriorImageSection();
 
   /// 홍보·로고 URL — AI 추출 없이 미리보기 상단에 노출 (`promotionalImageUrls`)
-  Widget _buildPromotionalImageSection() {
+  Widget _buildPromotionalImageSection({bool hideHintsAndButton = false}) {
     final dropChild = AnimatedContainer(
       key: kIsWeb ? _promoDropBoundaryKey : null,
       duration: const Duration(milliseconds: 150),
@@ -2236,31 +2436,35 @@ class JobPostFormState extends State<JobPostForm> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '아래 영역을 눌러 로고·심벌 이미지를 고르거나, 파일을 끌어다 놓을 수 있어요.',
-            style: _ft(
-              size: 12,
-              weight: FontWeight.w600,
-              color: AppColors.textPrimary,
+          if (!hideHintsAndButton) ...[
+            Text(
+              '아래 영역을 눌러 홍보 이미지를 고르거나, 파일을 끌어다 놓을 수 있어요.',
+              style: _ft(
+                size: 12,
+                weight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'AI 추출 없이 공고 홍보 영역에 그대로 노출됩니다. (최대 $_kMaxPromoImages장, jpg/png, 장당 5MB 이하)',
-            style: _ft(
-              size: 12,
-              weight: FontWeight.w500,
-              color: AppColors.textSecondary,
+            const SizedBox(height: 4),
+            Text(
+              'AI 추출 없이 공고 홍보 영역에 그대로 노출됩니다. (최대 $_kMaxPromoImages장, jpg/png, 장당 5MB 이하)',
+              style: _ft(
+                size: 12,
+                weight: FontWeight.w500,
+                color: AppColors.textSecondary,
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
+            const SizedBox(height: 12),
+          ],
           if (_data.promotionalImageUrls.isNotEmpty) ...[
             SizedBox(
-              height: 100,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: _data.promotionalImageUrls.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
+              height: 88,
+              child: Scrollbar(
+                thumbVisibility: true,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _data.promotionalImageUrls.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
                 itemBuilder: (_, i) {
                   final url = _data.promotionalImageUrls[i];
                   final progress = _promoUploadProgress[i];
@@ -2270,13 +2474,13 @@ class JobPostFormState extends State<JobPostForm> {
                         borderRadius: _rBox,
                         child: Image.network(
                           url,
-                          width: 100,
-                          height: 100,
+                          width: 72,
+                          height: 72,
                           fit: BoxFit.cover,
                           errorBuilder:
                               (_, __, ___) => Container(
-                                width: 100,
-                                height: 100,
+                                width: 72,
+                                height: 72,
                                 color: AppColors.surfaceMuted,
                                 child: const Icon(
                                   Icons.broken_image_outlined,
@@ -2341,28 +2545,30 @@ class JobPostFormState extends State<JobPostForm> {
                   );
                 },
               ),
+              ),
             ),
             const SizedBox(height: 12),
           ],
-          SizedBox(
-            height: _pubWeb ? AppPublisher.ctaHeight : null,
-            child: OutlinedButton.icon(
-              onPressed:
-                  _data.promotionalImageUrls.length < _kMaxPromoImages
-                      ? _pickPromotionalImages
-                      : null,
-              icon: const Icon(Icons.add_photo_alternate_outlined, size: 18),
-              label: Text(
-                '이미지 추가 (${_data.promotionalImageUrls.length}/$_kMaxPromoImages)',
-              ),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.textPrimary,
-                side: BorderSide(color: AppColors.divider),
-                shape: RoundedRectangleBorder(borderRadius: _rBtn),
-                padding: const EdgeInsets.symmetric(horizontal: 14),
+          if (!hideHintsAndButton)
+            SizedBox(
+              height: _pubWeb ? AppPublisher.ctaHeight : null,
+              child: OutlinedButton.icon(
+                onPressed:
+                    _data.promotionalImageUrls.length < _kMaxPromoImages
+                        ? _pickPromotionalImages
+                        : null,
+                icon: const Icon(Icons.add_photo_alternate_outlined, size: 18),
+                label: Text(
+                  '이미지 추가 (${_data.promotionalImageUrls.length}/$_kMaxPromoImages)',
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.textPrimary,
+                  side: BorderSide(color: AppColors.divider),
+                  shape: RoundedRectangleBorder(borderRadius: _rBtn),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -2384,11 +2590,165 @@ class JobPostFormState extends State<JobPostForm> {
     );
   }
 
+  // ── 로고파일 (1장) ──────────────────────────────────────────
+  Widget _buildLogoSection({bool hideHintsAndButton = false}) {
+    final logoUrl = _data.logoUrl;
+    final dropChild = AnimatedContainer(
+      key: kIsWeb ? _logoDropBoundaryKey : null,
+      duration: const Duration(milliseconds: 150),
+      padding: _logoDropActive ? const EdgeInsets.all(10) : EdgeInsets.zero,
+      decoration: _pubWeb
+          ? (_logoDropActive
+              ? const BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(color: AppColors.accent, width: 2),
+                  ),
+                )
+              : null)
+          : BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: _logoDropActive ? AppColors.accent : AppColors.divider,
+                  width: _logoDropActive ? 2 : 1,
+                ),
+              ),
+            ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (!hideHintsAndButton) ...[
+            Text(
+              '원한다면 로고 파일을 추가할 수 있어요.',
+              style: _ft(
+                size: 12,
+                weight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'AI 추출 없이 공고에 노출됩니다. (1장, jpg/png, 장당 5MB 이하)',
+              style: _ft(
+                size: 12,
+                weight: FontWeight.w500,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+          if (logoUrl != null && logoUrl.isNotEmpty) ...[
+            Row(
+              children: [
+                Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: _rBox,
+                      child: Image.network(
+                        logoUrl,
+                        width: 72,
+                        height: 72,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => Container(
+                          width: 72,
+                          height: 72,
+                          color: AppColors.surfaceMuted,
+                          child: const Icon(
+                            Icons.broken_image_outlined,
+                            color: AppColors.textDisabled,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: 2,
+                      right: 2,
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() => _data = _data.copyWith(logoUrl: ''));
+                          _notify();
+                          _scheduleAutoSave();
+                        },
+                        child: Container(
+                          width: 20,
+                          height: 20,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: AppColors.black.withOpacity(0.54),
+                          ),
+                          child: const Icon(
+                            Icons.close,
+                            size: 12,
+                            color: AppColors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+          ],
+          if (_logoUploadInProgress)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: SizedBox(
+                height: 3,
+                child: LinearProgressIndicator(
+                  backgroundColor: AppColors.divider,
+                  color: AppColors.accent,
+                ),
+              ),
+            )
+          else if ((logoUrl == null || logoUrl.isEmpty) && !hideHintsAndButton)
+            SizedBox(
+              height: _pubWeb ? AppPublisher.ctaHeight : null,
+              child: OutlinedButton.icon(
+                onPressed: _pickLogo,
+                icon: const Icon(Icons.add_photo_alternate_outlined, size: 18),
+                label: const Text('로고 추가 (0/1)'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.textPrimary,
+                  side: BorderSide(color: AppColors.divider),
+                  shape: RoundedRectangleBorder(borderRadius: _rBtn),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+
+    if (kIsWeb) {
+      return WebFileDropZone(
+        boundaryKey: _logoDropBoundaryKey,
+        onDrop: (files) async {
+          setState(() => _logoDropActive = false);
+          if (files.isNotEmpty) await _appendLogoFromXFile(files.first);
+        },
+        onDragEntered: () => setState(() => _logoDropActive = true),
+        onDragExited: () => setState(() => _logoDropActive = false),
+        child: dropChild,
+      );
+    }
+    return DropTarget(
+      onDragEntered: (_) => setState(() => _logoDropActive = true),
+      onDragExited: (_) => setState(() => _logoDropActive = false),
+      onDragDone: (details) async {
+        setState(() => _logoDropActive = false);
+        final flat = flattenDropItems(details.files);
+        if (flat.isNotEmpty) await _appendLogoFromXFile(flat.first);
+      },
+      child: dropChild,
+    );
+  }
+
   // ── 이미지 + AI 섹션 (내외부·공고 캡처용) ───────────────────────
   Widget _buildInteriorImageSection({
     String primaryHint = '아래 영역을 눌러 폴더에서 사진을 고르거나, 이미지 파일을 이곳으로 끌어다 놓을 수 있어요.',
     String secondaryHint =
         '공고 이미지를 올리면 AI가 폼을 채워줘요. (최대 10장, jpg/png, 장당 5MB 이하)',
+    bool hideHintsAndButton = false,
   }) {
     final dropChild = AnimatedContainer(
       key: kIsWeb ? _imageDropBoundaryKey : null,
@@ -2415,32 +2775,36 @@ class JobPostFormState extends State<JobPostForm> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            primaryHint,
-            style: _ft(
-              size: 12,
-              weight: FontWeight.w600,
-              color: AppColors.textPrimary,
+          if (!hideHintsAndButton) ...[
+            Text(
+              primaryHint,
+              style: _ft(
+                size: 12,
+                weight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            secondaryHint,
-            style: _ft(
-              size: 12,
-              weight: FontWeight.w500,
-              color: AppColors.textSecondary,
+            const SizedBox(height: 4),
+            Text(
+              secondaryHint,
+              style: _ft(
+                size: 12,
+                weight: FontWeight.w500,
+                color: AppColors.textSecondary,
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
+            const SizedBox(height: 12),
+          ],
           // 이미지 그리드
           if (_data.images.isNotEmpty) ...[
             SizedBox(
-              height: 100,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: _data.images.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
+              height: 88,
+              child: Scrollbar(
+                thumbVisibility: true,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _data.images.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
                 itemBuilder: (_, i) {
                   final progress = _uploadProgress[i];
                   return Stack(
@@ -2505,12 +2869,14 @@ class JobPostFormState extends State<JobPostForm> {
                   );
                 },
               ),
+              ),
             ),
             const SizedBox(height: 12),
           ],
-          Row(
-            children: [
-              // 이미지 추가 버튼
+          if (!hideHintsAndButton)
+            Row(
+              children: [
+                // 이미지 추가 버튼
               SizedBox(
                 height: _pubWeb ? AppPublisher.ctaHeight : null,
                 child: OutlinedButton.icon(
@@ -2586,13 +2952,13 @@ class JobPostFormState extends State<JobPostForm> {
       if (_isHttpImagePath(file.path)) {
         return Image.network(
           file.path,
-          width: 100,
-          height: 100,
+          width: 72,
+          height: 72,
           fit: BoxFit.cover,
           errorBuilder:
               (_, __, ___) => Container(
-                width: 100,
-                height: 100,
+                width: 72,
+                height: 72,
                 color: AppColors.surfaceMuted,
                 child: const Icon(
                   Icons.image_outlined,
@@ -2603,11 +2969,11 @@ class JobPostFormState extends State<JobPostForm> {
       }
       final bytes = _previewCache[file.name];
       if (bytes != null) {
-        return Image.memory(bytes, width: 100, height: 100, fit: BoxFit.cover);
+        return Image.memory(bytes, width: 72, height: 72, fit: BoxFit.cover);
       }
       return Container(
-        width: 100,
-        height: 100,
+        width: 72,
+        height: 72,
         color: AppColors.surfaceMuted,
         child: const Center(
           child: Icon(Icons.image_outlined, color: AppColors.textDisabled),
@@ -2616,8 +2982,8 @@ class JobPostFormState extends State<JobPostForm> {
     }
     return Image.file(
       File(file.path),
-      width: 100,
-      height: 100,
+      width: 72,
+      height: 72,
       fit: BoxFit.cover,
     );
   }
@@ -5370,7 +5736,8 @@ class JobPostFormState extends State<JobPostForm> {
   // ── 제출 섹션 ──────────────────────────────────────────
   Widget _buildSubmitSection() {
     if (_webEditorMode) {
-      return _buildWebEditorSubmitFooter();
+      // 스티키 바로 대체되므로 에디터 내부 저장 버튼은 표시하지 않음
+      return const SizedBox.shrink();
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

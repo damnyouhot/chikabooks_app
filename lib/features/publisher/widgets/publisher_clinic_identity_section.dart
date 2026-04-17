@@ -13,11 +13,15 @@ class PublisherClinicIdentitySection extends StatefulWidget {
   /// 웹 공고 에디터 3단계(치과 인증) — [JobPostForm] step3와 동일: 라벨 열 + 입력 한 줄
   final bool inlineFieldLabels;
 
+  /// 에디터 스티키 바를 쓸 때 하단 저장 버튼 숨김
+  final bool hideSaveButton;
+
   const PublisherClinicIdentitySection({
     super.key,
     required this.profile,
     required this.onSaved,
     this.inlineFieldLabels = false,
+    this.hideSaveButton = false,
   });
 
   @override
@@ -394,10 +398,11 @@ class _PublisherClinicIdentitySectionState
             ),
           ],
           const SizedBox(height: 20),
-          SizedBox(
-            height: AppPublisher.ctaHeight,
-            width: double.infinity,
-            child: ElevatedButton(
+          if (!widget.hideSaveButton)
+            SizedBox(
+              height: AppPublisher.ctaHeight,
+              width: double.infinity,
+              child: ElevatedButton(
               onPressed: _saving ? null : _save,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.accent,

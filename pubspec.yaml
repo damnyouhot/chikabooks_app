@@ -62,6 +62,8 @@ dependencies:
   image_cropper: ^12.1.1
   flutter_svg: ^2.2.4
   desktop_drop: ^0.7.0
+  # 웹 전용 Toss 결제(toss_payment_service_web) — 조건부 import로 모바일 빌드에 포함되지 않음
+  web: ^1.1.1
 
 dev_dependencies:
   flutter_test:

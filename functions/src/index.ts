@@ -10,6 +10,9 @@ import { haversineMeters, linesForStationDisplayName } from "./metro_station_lin
 
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
+/** 두 역할(치과/위생사) 동시 사용 및 결제 인증 체크 면제 관리자 계정 목록 */
+const ADMIN_WHITELIST = ["chikabooks.app@gmail.com", "damnyouhot@gmail.com"];
+
 const GOOGLE_MAPS_API_KEY = defineSecret("GOOGLE_MAPS_API_KEY");
 /** 심평원 병원정보 API — `defineSecret`로 바인딩해야 런타임에 값이 주입됨 */
 const HIRA_SERVICE_KEY = defineSecret("HIRA_SERVICE_KEY");
@@ -2801,13 +2804,29 @@ export const syncImwebPurchases = functions
 
         // linkedUid == null 인 것만 처리 (코드 레벨 필터)
         if (orderData.linkedUid !== null && orderData.linkedUid !== undefined) {
-          // 이미 다른 uid 와 연결된 주문은 스킵
+          // 이미 다른 uid 와 연결된 주문인 경우
           if (orderData.linkedUid !== uid) {
-            functions.logger.info("타 uid 연결 주문 스킵", {
+            // 연결된 uid 가 실제 존재하는 계정인지 확인
+            const linkedUserDoc = await db
+              .collection("users")
+              .doc(orderData.linkedUid as string)
+              .get();
+
+            if (linkedUserDoc.exists) {
+              // 진짜 다른 사람의 주문 → 스킵 (기존 동작 유지)
+              functions.logger.info("타 uid 연결 주문 스킵", {
+                docId: doc.id,
+                linkedUid: orderData.linkedUid,
+              });
+              continue;
+            }
+
+            // 탈퇴·삭제된 유령 uid → 현재 유저로 재연결 처리 (스킵하지 않음)
+            functions.logger.info("유령 linkedUid 감지, 현재 유저로 재연결", {
               docId: doc.id,
-              linkedUid: orderData.linkedUid,
+              ghostUid: orderData.linkedUid,
+              newUid: uid,
             });
-            continue;
           }
           // 이미 이 uid 와 연결됐으면 상품코드 처리는 하되 linkedUid 재설정 불필요
         }
@@ -4714,8 +4733,11 @@ export const createOrder = functions.https.onCall(
       throw new functions.https.HttpsError("permission-denied", "공고자 계정이 없습니다.");
     }
     const accountData = accountDoc.data() || {};
+    const accountEmail = (accountData.normalizedEmail || accountData.email || "").toLowerCase();
+    const isAdminAccount = ADMIN_WHITELIST.includes(accountEmail);
+
     const identityVerified = accountData.identityVerified === true || accountData.phoneVerified === true;
-    if (!identityVerified) {
+    if (!isAdminAccount && !identityVerified) {
       throw new functions.https.HttpsError("failed-precondition", "본인인증이 필요합니다.");
     }
 
@@ -4729,7 +4751,7 @@ export const createOrder = functions.https.onCall(
     }
     const profileData = profileDoc.data() || {};
     const bizStatus = profileData.businessVerification?.status;
-    if (bizStatus !== "verified") {
+    if (!isAdminAccount && bizStatus !== "verified") {
       throw new functions.https.HttpsError("failed-precondition", "사업자 인증이 필요합니다.");
     }
 
@@ -5502,4 +5524,203 @@ confidence 값은 0.0(전혀 확신 없음) ~ 1.0(명확히 확인됨) 사이로
       }).catch(() => {/* 오류 무시 */});
       throw new functions.https.HttpsError("internal", "AI 분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
     }
+  });
+
+// ================================================================
+// revokeRefundedPurchases (매일 새벽 3시 — 전날 환불/취소 자동 처리)
+// ================================================================
+// 아임웹 API에서 전날(KST) 환불·취소 완료된 주문을 조회하고,
+// 해당 유저의 users/{uid}/purchases/{ebookId} 문서를 삭제한다.
+//
+// 삭제 전 열람 여부(lastReadAt, progress 등)를 포함해
+// revoked_purchases 컬렉션에 기록 → 운영 감사 추적 가능.
+//
+// 실행 기준: Asia/Seoul 03:00 (전날 KST 00:00~23:59:59 범위)
+// ================================================================
+export const revokeRefundedPurchases = functions
+  .region("us-central1")
+  .runWith({ timeoutSeconds: 300, memory: "256MB" })
+  .pubsub.schedule("0 3 * * *")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    functions.logger.info("revokeRefundedPurchases: 시작");
+
+    // ── 아임웹 API 키 로드 ──────────────────────────────────
+    const keysSnap = await db.collection("api_keys").doc("imweb_keys").get();
+    if (!keysSnap.exists) {
+      functions.logger.warn("revokeRefundedPurchases: imweb_keys 없음, 종료");
+      return;
+    }
+    const keysData    = keysSnap.data()!;
+    const imwebKey    = keysData.key        as string;
+    const imwebSecret = keysData.secret_key as string;
+
+    // ── 아임웹 인증 ─────────────────────────────────────────
+    const authRes = await axios.get(
+      `https://api.imweb.me/v2/auth?key=${imwebKey}&secret=${imwebSecret}`
+    );
+    const accessToken: string = authRes.data?.access_token;
+    if (!accessToken) {
+      functions.logger.warn("revokeRefundedPurchases: access_token 발급 실패, 종료");
+      return;
+    }
+    const headers = { "access-token": accessToken };
+
+    // ── 전날(KST) 00:00 ~ 23:59:59 → Unix 타임스탬프 ────────
+    // 서버는 UTC 기준이므로 KST(UTC+9) 보정
+    const nowKst       = new Date(Date.now() + 9 * 60 * 60 * 1000);
+    const yKst         = new Date(nowKst);
+    yKst.setUTCDate(yKst.getUTCDate() - 1);
+
+    const dayStartUtc  = new Date(Date.UTC(
+      yKst.getUTCFullYear(), yKst.getUTCMonth(), yKst.getUTCDate(),
+      0, 0, 0
+    ) - 9 * 60 * 60 * 1000);                        // KST 00:00 → UTC
+
+    const dayEndUtc    = new Date(Date.UTC(
+      yKst.getUTCFullYear(), yKst.getUTCMonth(), yKst.getUTCDate(),
+      23, 59, 59
+    ) - 9 * 60 * 60 * 1000);                        // KST 23:59:59 → UTC
+
+    const fromSec = Math.floor(dayStartUtc.getTime() / 1000);
+    const toSec   = Math.floor(dayEndUtc.getTime()   / 1000);
+
+    functions.logger.info("revokeRefundedPurchases: 대상 기간", {
+      from: dayStartUtc.toISOString(),
+      to:   dayEndUtc.toISOString(),
+    });
+
+    // ── ebooks 맵 로드 (imwebProductCode → ebookId) ─────────
+    const ebooksSnap = await db.collection("ebooks").get();
+    const ebookMap   = new Map<string, string>();
+    for (const doc of ebooksSnap.docs) {
+      const code = doc.data().imwebProductCode as string | undefined;
+      if (code) ebookMap.set(code, doc.id);
+    }
+
+    // ── 아임웹 주문 페이지 순회 ─────────────────────────────
+    let revoked = 0;
+    let skipped = 0;
+    let page    = 1;
+
+    while (page <= 20) {
+      const url =
+        `https://api.imweb.me/v2/shop/orders` +
+        `?order_date_from=${fromSec}` +
+        `&order_date_to=${toSec}` +
+        `&order_version=v2` +
+        `&page=${page}` +
+        `&limit=100`;
+
+      if (page > 1) await imwebDelay(1500);
+
+      const res  = await axios.get(url, { headers });
+      const list = extractImwebList(res.data);
+      if (list.length === 0) break;
+
+      for (const order of list) {
+        const o = order as Record<string, unknown>;
+
+        // 취소·환불·반품 상태인 주문만 처리
+        if (!shouldExcludeImwebOrderSummary(o)) {
+          skipped++;
+          continue;
+        }
+
+        const orderer      = o["orderer"] as Record<string, unknown> | undefined;
+        const ordererEmail = (orderer?.["email"] as string | undefined)
+          ?.trim().toLowerCase();
+        if (!ordererEmail) continue;
+
+        // 이메일 기준 uid 조회 (email 직접 매칭 → emailAliases 매칭)
+        let uid: string | null = null;
+        const byEmail = await db.collection("users")
+          .where("email", "==", ordererEmail).limit(1).get();
+        if (!byEmail.empty) {
+          uid = byEmail.docs[0].id;
+        } else {
+          const byAlias = await db.collection("users")
+            .where("emailAliases", "array-contains", ordererEmail).limit(1).get();
+          if (!byAlias.empty) uid = byAlias.docs[0].id;
+        }
+        if (!uid) continue;
+
+        // prod-orders 조회 → 취소된 품목 파악
+        const orderNo = String(o["order_no"] ?? "");
+        if (!orderNo) continue;
+
+        await imwebDelay(1500);
+        const prodRes  = await axios.get(
+          `https://api.imweb.me/v2/shop/orders/${orderNo}/prod-orders`,
+          { headers }
+        );
+        const prodList = extractImwebList(prodRes.data);
+
+        for (const prodOrder of prodList) {
+          const items = prodOrder["items"];
+          if (!Array.isArray(items)) continue;
+
+          for (const item of items) {
+            const it     = item as Record<string, unknown>;
+            const prodNo = String(it["prod_no"] ?? "");
+            if (!prodNo) continue;
+
+            const ebookId = ebookMap.get(prodNo);
+            if (!ebookId) continue;
+
+            // 해당 유저의 purchases 문서 존재 여부 확인
+            const purchaseRef = db
+              .collection("users").doc(uid)
+              .collection("purchases").doc(ebookId);
+            const purchaseDoc = await purchaseRef.get();
+            if (!purchaseDoc.exists) continue;
+
+            const pd         = purchaseDoc.data() ?? {};
+            const lastReadAt = pd["lastReadAt"] ?? null;
+            const hadRead    = lastReadAt !== null;
+
+            // revoked_purchases 로그 기록 + purchases 삭제 (배치)
+            const logRef = db.collection("revoked_purchases").doc();
+            const batch  = db.batch();
+
+            batch.set(logRef, {
+              uid,
+              email:        ordererEmail,
+              ebookId,
+              imwebOrderNo: orderNo,
+              imwebProdNo:  prodNo,
+              revokedAt:    admin.firestore.FieldValue.serverTimestamp(),
+              hadRead,
+              lastReadAt:   lastReadAt ?? null,
+              lastPage:     pd["lastPage"]   ?? null,
+              progress:     pd["progress"]   ?? null,
+              purchasedAt:  pd["purchasedAt"] ?? null,
+              source:       pd["source"]      ?? null,
+              revokedBy:    "revokeRefundedPurchases_scheduler",
+            });
+
+            batch.delete(purchaseRef);
+            await batch.commit();
+
+            revoked++;
+            functions.logger.info("revokeRefundedPurchases: purchases 삭제", {
+              uid,
+              email: ordererEmail,
+              ebookId,
+              orderNo,
+              hadRead,
+            });
+          }
+        }
+      }
+
+      if (list.length < 100) break;
+      page++;
+    }
+
+    functions.logger.info("revokeRefundedPurchases: 완료", {
+      revoked,
+      skipped,
+      targetDate: dayStartUtc.toISOString().slice(0, 10),
+    });
   });

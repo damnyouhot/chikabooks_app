@@ -73,123 +73,142 @@ class _WebLoginPageState extends State<WebLoginPage> {
 
         return Scaffold(
           backgroundColor: AppColors.white,
-          // shrinkWrap + Center: 세로 중앙. SizedBox(width: ∞) 로 Column 이 maxWidth 까지
-          // 채워지게 해 Row 의 Expanded 가 동일 폭을 갖도록 함(안 하면 intrinsic 폭으로 줄어듦).
-          body: Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.xxl,
-                vertical: AppSpacing.xxl,
-              ),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 960),
-                child: ListView(
-                  shrinkWrap: true,
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  children: [
-                    SizedBox(
-                      width: double.infinity,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Center(child: _buildLogo()),
-                          const SizedBox(height: AppSpacing.xxl),
+          body: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: constraints.maxHeight,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.xxl,
+                      vertical: AppSpacing.xxl,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Center(
+                          child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 960),
+                          child: SizedBox(
+                            width: double.infinity,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Center(child: _buildLogo()),
+                                const SizedBox(height: AppSpacing.xxl),
 
-                          // ── 좌(지원자) / 우(치과) ────────────────
-                          LayoutBuilder(
-                            builder: (context, constraints) {
-                              if (constraints.maxWidth < 620) {
-                                return Column(
-                                  children: [
-                                    _ApplicantLoginCard(
-                                      nextRoute: widget.nextRoute,
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 20,
-                                      ),
-                                      child: Center(
-                                        child: Container(
-                                          width: 96,
-                                          height: 1,
-                                          decoration: BoxDecoration(
-                                            color: AppColors.divider,
-                                            borderRadius: BorderRadius.circular(
-                                              0.5,
+                                // ── 좌(지원자) / 우(치과) ────────────────
+                                LayoutBuilder(
+                                  builder: (context, innerConstraints) {
+                                    if (innerConstraints.maxWidth < 620) {
+                                      return Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          _ApplicantLoginCard(
+                                            nextRoute: widget.nextRoute,
+                                          ),
+                                          Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 20,
+                                            ),
+                                            child: Center(
+                                              child: Container(
+                                                width: 96,
+                                                height: 1,
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.divider,
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                        0.5,
+                                                      ),
+                                                ),
+                                              ),
                                             ),
                                           ),
-                                        ),
-                                      ),
-                                    ),
-                                    _ClinicLoginCard(
-                                      nextRoute: widget.nextRoute,
-                                    ),
-                                  ],
-                                );
-                              }
-                              return Row(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  Expanded(
-                                    child: _ApplicantLoginCard(
-                                      nextRoute: widget.nextRoute,
-                                    ),
-                                  ),
-                                  SizedBox(
-                                    width: 48,
-                                    child: Center(
-                                      child: Container(
-                                        width: 1,
-                                        height: 108,
-                                        decoration: BoxDecoration(
-                                          color: AppColors.divider,
-                                          borderRadius: BorderRadius.circular(
-                                            0.5,
+                                          _ClinicLoginCard(
+                                            nextRoute: widget.nextRoute,
                                           ),
+                                        ],
+                                      );
+                                    }
+                                    return IntrinsicHeight(
+                                      child: Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          Expanded(
+                                            child: _ApplicantLoginCard(
+                                              nextRoute: widget.nextRoute,
+                                            ),
+                                          ),
+                                          SizedBox(
+                                            width: 48,
+                                            child: Center(
+                                              child: Container(
+                                                width: 1,
+                                                height: 108,
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.divider,
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                        0.5,
+                                                      ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          Expanded(
+                                            child: _ClinicLoginCard(
+                                              nextRoute: widget.nextRoute,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+
+                                const SizedBox(height: AppSpacing.xxl),
+
+                                // ── 하단 링크 ────────────────────────────
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                    top: AppSpacing.md,
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        '© 하이진랩',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.textDisabled,
                                         ),
                                       ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: _ClinicLoginCard(
-                                      nextRoute: widget.nextRoute,
-                                    ),
-                                  ),
-                                ],
-                              );
-                            },
-                          ),
-
-                          const SizedBox(height: AppSpacing.xxl),
-
-                          // ── 하단 링크 ────────────────────────────
-                          Padding(
-                            padding: const EdgeInsets.only(top: AppSpacing.md),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  '© 하이진랩',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.textDisabled,
+                                      const SizedBox(width: 16),
+                                      _link('개인정보처리방침', '/privacy'),
+                                      _dot(),
+                                      _link('이용약관', '/terms'),
+                                    ],
                                   ),
                                 ),
-                                const SizedBox(width: 16),
-                                _link('개인정보처리방침', '/privacy'),
-                                _dot(),
-                                _link('이용약관', '/terms'),
                               ],
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
         );
       },
@@ -1017,7 +1036,6 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
               ),
             ),
           ],
-          const Spacer(),
         ],
       ),
     );
@@ -1566,7 +1584,6 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
                 ),
               ],
             ),
-            const Spacer(),
           ],
         ),
       ),
