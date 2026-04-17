@@ -1,6 +1,7 @@
 name: chikabooks_app
 description: A new Flutter project.
-publish_to: 'none' 
+publish_to: 'none'
+# 버전 변경 후 Xcode/Archive 전에 반드시: flutter build ios --config-only (로컬 Generated.xcconfig 갱신)
 version: 1.1.2+3
 
 environment:
