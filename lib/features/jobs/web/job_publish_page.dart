@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/web_site_footer.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../models/clinic_profile.dart';
 import '../../../models/voucher.dart';
@@ -154,6 +155,7 @@ class _JobPublishPageState extends State<JobPublishPage> {
                     ),
                   ),
           ),
+          if (kIsWeb) const WebSiteFooter(backgroundColor: AppColors.white),
         ],
       ),
     );

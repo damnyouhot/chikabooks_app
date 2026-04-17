@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/web_site_footer.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../data/mock_jobs.dart';
 import '../../../models/job.dart';
@@ -20,6 +21,7 @@ import '../../../widgets/job/job_listing_cards.dart';
 import '../../auth/web/web_account_menu_button.dart';
 import '../../publisher/services/clinic_profile_service.dart';
 import '../ui/job_post_form.dart';
+import 'job_post_top_bar.dart';
 
 // ── 상품 클래스 정의 ──────────────────────────────────────────
 enum _ProductClass { a, b, c }
@@ -351,45 +353,20 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
         children: [
           _buildTopBar(),
           Expanded(child: _buildBody()),
+          const WebSiteFooter(backgroundColor: AppColors.white),
         ],
       ),
     );
   }
 
   Widget _buildTopBar() {
-    return Container(
-      color: AppColors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-      child: Row(
-        children: [
-          IconButton(
-            onPressed: () =>
-                context.canPop()
-                    ? context.pop()
-                    : context.go('/post-job/edit/${widget.draftId}'),
-            icon: const Icon(Icons.arrow_back, size: 20),
-            tooltip: '뒤로',
-            style: IconButton.styleFrom(
-              foregroundColor: AppColors.textPrimary,
-              padding: const EdgeInsets.all(8),
-              minimumSize: const Size(40, 40),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              visualDensity: VisualDensity.compact,
-            ),
-          ),
-          const Spacer(),
-          Text(
-            '3. 공고상품 선택',
-            style: GoogleFonts.notoSansKr(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const Spacer(),
-          if (kIsWeb) const WebAccountMenuButton(),
-        ],
-      ),
+    return JobPostTopBar(
+      currentStep: JobPostStep.product,
+      prevStep: JobPostStep.edit,
+      onPrev: () => context.canPop()
+          ? context.pop()
+          : context.go('/post-job/edit/${widget.draftId}'),
+      trailing: kIsWeb ? const WebAccountMenuButton() : null,
     );
   }
 
@@ -1113,7 +1090,7 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
                     style: GoogleFonts.notoSansKr(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
-                      letterSpacing: -0.2,
+                      letterSpacing: -0.4,
                     ),
                   ),
           ),
@@ -1239,7 +1216,7 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
                                     color: isSelected
                                         ? AppColors.blue
                                         : AppColors.textPrimary,
-                                    letterSpacing: -0.3,
+                                    letterSpacing: -0.4,
                                   ),
                                 ),
                                 TextSpan(
@@ -1248,6 +1225,7 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
                                     color: AppColors.textPrimary,
+                                    letterSpacing: -0.4,
                                     height: 1.35,
                                   ),
                                 ),
@@ -1257,6 +1235,7 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
                                     color: AppColors.textPrimary,
+                                    letterSpacing: -0.4,
                                     height: 1.35,
                                   ),
                                 ),
@@ -1273,7 +1252,7 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
                             color: isSelected
                                 ? AppColors.blue
                                 : AppColors.textPrimary,
-                            letterSpacing: -0.3,
+                            letterSpacing: -0.4,
                           ),
                         ),
                       ],
@@ -1312,6 +1291,7 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
                         style: GoogleFonts.notoSansKr(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
+                          letterSpacing: -0.4,
                           color: isSelected
                               ? AppColors.blue
                               : AppColors.textSecondary,
@@ -1341,7 +1321,7 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
                           color: AppColors.textDisabled,
-                          letterSpacing: -0.2,
+                          letterSpacing: -0.4,
                         ),
                       ),
                     ),
@@ -1405,6 +1385,7 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
             style: GoogleFonts.notoSansKr(
               fontSize: 12,
               fontWeight: FontWeight.w500,
+              letterSpacing: -0.4,
               color: color,
               height: 1.45,
             ),
@@ -1437,14 +1418,17 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
                 const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             child: Row(
               children: [
-                const Expanded(
+                Expanded(
                   flex: 5,
-                  child: Text('📌 항목',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textSecondary,
-                      )),
+                  child: Text(
+                    '📌 항목',
+                    style: GoogleFonts.notoSansKr(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.4,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                 ),
                 _tableHead('A 프리미엄'),
                 _tableHead('B 추천'),
@@ -1469,9 +1453,10 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
       child: Text(
         text,
         textAlign: TextAlign.center,
-        style: const TextStyle(
+        style: GoogleFonts.notoSansKr(
           fontSize: 10,
           fontWeight: FontWeight.w700,
+          letterSpacing: -0.4,
           color: AppColors.textSecondary,
         ),
       ),
@@ -1500,9 +1485,10 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
             flex: 5,
             child: Text(
               label,
-              style: const TextStyle(
+              style: GoogleFonts.notoSansKr(
                 fontSize: 11,
                 fontWeight: FontWeight.w500,
+                letterSpacing: -0.4,
                 color: AppColors.textSecondary,
               ),
             ),
@@ -1522,9 +1508,10 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
       child: Text(
         text,
         textAlign: TextAlign.center,
-        style: TextStyle(
+        style: GoogleFonts.notoSansKr(
           fontSize: 11,
           fontWeight: highlight ? FontWeight.w700 : FontWeight.w500,
+          letterSpacing: -0.4,
           color: highlight
               ? AppColors.blue
               : dim

@@ -2,13 +2,13 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../ui/job_post_form.dart';
 import '../ui/job_post_preview.dart';
 import 'job_manage_section.dart';
 import 'job_analytics_section.dart';
 import 'web_typography.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/web_site_footer.dart';
 import '../../../core/theme/app_tokens.dart' show AppPublisher, AppRadius;
 import '../../../models/job_draft.dart';
 import '../../../services/job_draft_service.dart';
@@ -525,56 +525,10 @@ class _JobPostWebPageState extends State<JobPostWebPage>
     );
   }
 
-  // ── 하단 푸터 (개인정보 / 약관 링크) ──────────────────
+  // ── 하단 푸터 (사업자 정보 · 개인정보 / 약관 링크) ────
   Widget _buildFooter() {
-    return Container(
-      color: AppColors.white,
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 28),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Text(
-            '© 하이진랩',
-            style: TextStyle(fontSize: 12, color: AppColors.textDisabled),
-          ),
-          const SizedBox(width: 20),
-          _footerLink('개인정보처리방침', '/privacy'),
-          _footerDot(),
-          _footerLink('이용약관', '/terms'),
-        ],
-      ),
-    );
-  }
-
-  Widget _footerLink(String label, String path) {
-    return InkWell(
-      onTap: () {
-        // 같은 호스트의 정적 HTML을 새 탭에서 열기
-        launchUrl(
-          Uri.parse(path),
-          webOnlyWindowName: '_blank',
-        );
-      },
-      borderRadius: BorderRadius.circular(AppPublisher.softRadius),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-        child: Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: AppColors.textSecondary,
-            decoration: TextDecoration.underline,
-            decorationColor: AppColors.textDisabled,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _footerDot() {
-    return const Padding(
-      padding: EdgeInsets.symmetric(horizontal: 6),
-      child: Text('·', style: TextStyle(color: AppColors.textDisabled)),
+    return const WebSiteFooter(
+      padding: EdgeInsets.symmetric(vertical: 12, horizontal: 28),
     );
   }
 
@@ -582,6 +536,7 @@ class _JobPostWebPageState extends State<JobPostWebPage>
   Widget _buildSuccessScreen() {
     return Scaffold(
       backgroundColor: AppColors.appBg,
+      bottomNavigationBar: const WebSiteFooter(backgroundColor: AppColors.white),
       body: Center(
         child: Container(
           constraints: const BoxConstraints(maxWidth: 480),

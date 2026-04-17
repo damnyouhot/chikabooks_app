@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/web_site_footer.dart';
 import '../../services/order_service.dart';
 
 /// 토스페이먼츠 결제 성공 후 리다이렉트 되는 페이지
@@ -56,6 +57,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.appBg,
+      bottomNavigationBar: const WebSiteFooter(backgroundColor: AppColors.white),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
@@ -110,6 +112,7 @@ class PaymentFailPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.appBg,
+      bottomNavigationBar: const WebSiteFooter(backgroundColor: AppColors.white),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(32),

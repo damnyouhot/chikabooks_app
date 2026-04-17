@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/web_site_footer.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../models/feedback_post.dart';
 import '../../services/feedback_service.dart';
@@ -481,6 +483,8 @@ class _FeedbackDetailPageState extends State<FeedbackDetailPage> {
           );
         },
       ),
+      bottomNavigationBar:
+          kIsWeb ? const WebSiteFooter(backgroundColor: AppColors.white) : null,
     );
   }
 }

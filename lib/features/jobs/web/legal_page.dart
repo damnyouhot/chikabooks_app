@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/web_site_footer.dart';
 
 // _kPink는 법적 문서 구분선 색 — 의도적 유지
 const _kPink = Color(0xFFFF6B9D);
@@ -54,6 +55,8 @@ class LegalPage extends StatelessWidget {
 
                 // ── 푸터 ──
                 const SizedBox(height: 24),
+                const WebSiteFooter(showLegalLinks: false),
+                const SizedBox(height: 16),
                 Divider(color: AppColors.divider),
                 const SizedBox(height: 16),
                 Center(
@@ -401,7 +404,7 @@ LegalPage buildPrivacyPage() {
           LegalContent.bullets([
             '개인정보 보호책임자: 홍덕우',
             '문의 이메일: chikabooks.app@gmail.com',
-            '사업자 정보: 더글라스필름, 서울시 강남구 역삼로 215 남국빌딩 2층, 211-09-93780, 통신판매업 제 2026-서울강남-01300호',
+            '사업자 정보: 더글라스필름, 서울시 강남구 역삼로 215 남국빌딩 2층, 211-09-93780, 전화 070-8200-1030, 통신판매업 제 2026-서울강남-01300호',
           ]),
         ],
       ),
@@ -718,6 +721,7 @@ LegalPage buildRefundPage() {
             '사업자등록번호: 211-09-93780',
             '통신판매업 신고번호: 제 2026-서울강남-01300호',
             '주소: 서울시 강남구 역삼로 215 남국빌딩 2층',
+            '전화: 070-8200-1030',
             '고객센터 이메일: chikabooks.app@gmail.com',
             '결제대행사: 토스페이먼츠(주)',
           ]),

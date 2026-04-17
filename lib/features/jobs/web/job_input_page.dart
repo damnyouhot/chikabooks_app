@@ -13,6 +13,7 @@ import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/router/app_route_observer.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/web_site_footer.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../auth/web/web_account_menu_button.dart';
 import '../../../services/job_draft_service.dart';
@@ -20,6 +21,7 @@ import '../../../models/job.dart';
 import '../../../models/job_draft.dart';
 import '../services/job_image_uploader.dart';
 import '../utils/job_image_attach_helpers.dart';
+import 'job_post_top_bar.dart';
 import 'web_file_drop_zone.dart';
 
 /// 공고 자료 입력 페이지 (/post-job/input)
@@ -798,53 +800,13 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
       backgroundColor: AppColors.webPublisherPageBg,
       body: Column(
         children: [
-          // ── 상단 흰 띠: 1. 자료 사진 첨부 ────────────────────
+          // ── 상단 흰 띠: 공고 시작 ────────────────────
           if (kIsWeb)
-            Container(
-              color: AppColors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () =>
-                        context.canPop() ? context.pop() : context.go('/'),
-                    icon: const Icon(Icons.arrow_back, size: 20),
-                    tooltip: '뒤로',
-                    style: IconButton.styleFrom(
-                      foregroundColor: AppColors.textPrimary,
-                      padding: const EdgeInsets.all(8),
-                      minimumSize: const Size(40, 40),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 4,
-                      vertical: 8,
-                    ),
-                    child: Text(
-                      '홈',
-                      style: GoogleFonts.notoSansKr(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    '1. 공고 추출',
-                    style: GoogleFonts.notoSansKr(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const Spacer(),
-                  const WebAccountMenuButton(),
-                ],
-              ),
+            JobPostTopBar(
+              currentStep: JobPostStep.input,
+              prevStep: JobPostStep.home,
+              onPrev: () => context.go('/login'),
+              trailing: const WebAccountMenuButton(),
             ),
           // ── 본문 ────────────────────────────────────────────
           Expanded(
@@ -906,6 +868,7 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
               ),
             ),
           ),
+          if (kIsWeb) const WebSiteFooter(backgroundColor: AppColors.white),
         ],
       ),
     );

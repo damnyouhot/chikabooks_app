@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/web_site_footer.dart';
 import '../../../models/application.dart';
 import '../../../models/resume.dart';
 import '../../../services/resume_service.dart';
@@ -34,6 +35,7 @@ class _JobApplicantsPageState extends State<JobApplicantsPage> {
       data: WebTypo.themeData(Theme.of(context)),
       child: Scaffold(
         backgroundColor: AppColors.appBg,
+        bottomNavigationBar: const WebSiteFooter(backgroundColor: AppColors.white),
         appBar: AppBar(
           backgroundColor: AppColors.white,
           elevation: 0,

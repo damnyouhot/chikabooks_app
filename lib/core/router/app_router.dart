@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import 'go_router_refresh_stream.dart';
@@ -45,6 +46,58 @@ final _authRefreshListenable = GoRouterRefreshStream(
   FirebaseAuth.instance.authStateChanges(),
 );
 
+// ── 공고 등록 흐름 단계 인덱스 (슬라이드 방향 결정용) ───────────────
+//
+// /login(또는 / )도 같은 흐름의 -1 단계로 보아, 공고 시작 ↔ 홈(로그인)도
+// 동일한 좌우 슬라이드 트랜지션을 적용한다.
+int _jobPostStepIndex(String location) {
+  if (location.startsWith('/post-job/product')) return 2;
+  if (location.startsWith('/post-job/edit')) return 1;
+  if (location.startsWith('/post-job/input')) return 0;
+  if (location == '/login' || location == '/') return -1;
+  return -999; // 흐름 외 라우트
+}
+
+/// 직전 라우트의 단계 인덱스를 기억해 좌·우 슬라이드 방향을 결정한다.
+int _lastJobPostStepIndex = -999;
+
+/// 공고 흐름(+홈) 페이지 라우트에 좌우 슬라이드 트랜지션 적용
+/// - 다음 단계로 갈 때(인덱스 증가): 새 페이지가 오른쪽에서 들어옴
+/// - 이전 단계로 갈 때(인덱스 감소): 새 페이지가 왼쪽에서 들어옴
+/// - 같은 인덱스로 재빌드되는 경우: 직전 방향을 유지하여 흔들림을 막는다.
+CustomTransitionPage<void> _jobPostSlidePage({
+  required GoRouterState state,
+  required Widget child,
+}) {
+  final currentIdx = _jobPostStepIndex(state.uri.path);
+  final lastIdx = _lastJobPostStepIndex;
+  // 동일 인덱스로 재빌드되는 케이스(라우터 refresh 등)는 forward로 두어
+  // 의도치 않은 역방향 슬라이드를 방지한다.
+  final forward = lastIdx == -999 ? true : currentIdx > lastIdx;
+  if (currentIdx != lastIdx) {
+    _lastJobPostStepIndex = currentIdx;
+  }
+
+  final beginIn = forward ? const Offset(1, 0) : const Offset(-1, 0);
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 260),
+    reverseTransitionDuration: const Duration(milliseconds: 260),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      // 들어오는 페이지만 한쪽에서 미끄러져 들어옴.
+      // 나가는 페이지는 그 자리에 정지(secondaryAnimation 사용 안 함) →
+      // 위로 덮이는 페이지에 잔여 흔들림이 생기지 않는다.
+      return SlideTransition(
+        position: Tween<Offset>(begin: beginIn, end: Offset.zero)
+            .chain(CurveTween(curve: Curves.easeOutCubic))
+            .animate(animation),
+        child: child,
+      );
+    },
+  );
+}
+
 final appRouter = GoRouter(
   initialLocation: '/',
   refreshListenable: _authRefreshListenable,
@@ -64,7 +117,9 @@ final appRouter = GoRouter(
       return '/login';
     }
 
-    // /login 은 비로그인 전용: 이미 로그인됨 → next 우선, 없으면 공고 입력
+    // /login 은 비로그인 전용이지만, 로그인된 상태에서도 페이지 자체에서
+    // "현재 로그인됨" 카드를 보여주므로 자동 리다이렉트하지 않는다.
+    // (단, ?next= 가 명시적으로 전달된 경우에만 해당 경로로 이동시킨다.)
     if (path == '/login' && user != null) {
       final next = state.uri.queryParameters['next'];
       if (next != null && next.isNotEmpty) {
@@ -72,7 +127,7 @@ final appRouter = GoRouter(
           return next;
         }
       }
-      return kIsWeb ? '/post-job/input' : '/';
+      // next가 없으면 그대로 /login에 머무르며 페이지에서 안내한다.
     }
 
     // 인증 필요 경로 목록
@@ -88,22 +143,35 @@ final appRouter = GoRouter(
     // 회원가입 완료 후 authStateChanges로 GoRouter가 refresh되어
     // 위젯이 rebuild된 경우, clinics_accounts가 이미 있으면 바로 진입시킴
     if (path == '/publisher/signup' && user != null) {
-      final status = await ClinicAuthService.getStatus();
-      if (status.exists) return '/post-job/input';
+      try {
+        final status = await ClinicAuthService.getStatus();
+        if (status.exists) return '/post-job/input';
+      } catch (_) {
+        // 일시 오류 시에는 가입 페이지를 그대로 보여 줘 사용자 차단을 피함
+      }
     }
 
     // 새 공고 플로우: 치과(`clinics_accounts`) 마스터가 있을 때만 진입.
     // (구글 등 비밀번호 없는 세션으로 /post-job 만 들어왔을 때 자동 생성하면
     // 이메일·비밀번호 치과 로그인과 불일치하는 계정이 생김 → 가입/로그인으로 유도)
     if (path.startsWith('/post-job') && user != null) {
-      final status = await ClinicAuthService.getStatus();
-      if (!status.exists) {
+      try {
+        final status = await ClinicAuthService.getStatus();
+        if (!status.exists) {
+          final returnTo =
+              state.uri.path +
+              (state.uri.hasQuery ? '?${state.uri.query}' : '');
+          return '/publisher/signup?next=${Uri.encodeComponent(returnTo)}';
+        }
+        await ClinicProfileService.migrateIfNeeded();
+      } catch (e) {
+        // Firestore 일시 오류·권한 문제 등으로 redirect가 무한 대기되지 않도록
+        // 안전하게 가입 페이지로 보냄 (그곳에서 안내·재시도 가능)
         final returnTo =
             state.uri.path +
             (state.uri.hasQuery ? '?${state.uri.query}' : '');
         return '/publisher/signup?next=${Uri.encodeComponent(returnTo)}';
       }
-      await ClinicProfileService.migrateIfNeeded();
     }
 
     // 관리자 대시보드 접근 가드
@@ -121,16 +189,26 @@ final appRouter = GoRouter(
 
     // ── 새 공고 플로우 ──────────────────────────────────────
     GoRoute(path: '/post-job', builder: (_, __) => const JobPostWebPage()),
-    GoRoute(path: '/post-job/input', builder: (_, __) => const JobInputPage()),
+    GoRoute(
+      path: '/post-job/input',
+      pageBuilder: (context, state) => _jobPostSlidePage(
+        state: state,
+        child: const JobInputPage(),
+      ),
+    ),
     GoRoute(
       path: '/post-job/edit/:draftId',
-      builder: (_, state) =>
-          JobDraftEditorPage(draftId: state.pathParameters['draftId']!),
+      pageBuilder: (context, state) => _jobPostSlidePage(
+        state: state,
+        child: JobDraftEditorPage(draftId: state.pathParameters['draftId']!),
+      ),
     ),
     GoRoute(
       path: '/post-job/product/:draftId',
-      builder: (_, state) =>
-          JobProductSelectPage(draftId: state.pathParameters['draftId']!),
+      pageBuilder: (context, state) => _jobPostSlidePage(
+        state: state,
+        child: JobProductSelectPage(draftId: state.pathParameters['draftId']!),
+      ),
     ),
     GoRoute(
       path: '/post-job/publish/:draftId',
@@ -220,9 +298,12 @@ final appRouter = GoRouter(
     // ── 통합 로그인 페이지 ────────────────────────────────
     GoRoute(
       path: '/login',
-      builder: (_, state) {
+      pageBuilder: (context, state) {
         final next = state.uri.queryParameters['next'];
-        return WebLoginPage(nextRoute: next);
+        return _jobPostSlidePage(
+          state: state,
+          child: WebLoginPage(nextRoute: next),
+        );
       },
     ),
 

@@ -12,6 +12,7 @@ import '../../../services/sign_in_tracker.dart';
 import '../../publisher/services/clinic_auth_service.dart';
 import '../../publisher/pages/publisher_shared.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/web_site_footer.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/hygiene_lab_english_title.dart';
 
@@ -36,7 +37,36 @@ class WebLoginPage extends StatefulWidget {
 }
 
 class _WebLoginPageState extends State<WebLoginPage> {
-  bool _redirectScheduled = false;
+  /// 마지막으로 redirect 시도한 uid — uid가 바뀌면 다시 시도하도록 함
+  String? _lastRedirectedUid;
+  DateTime? _lastRedirectAt;
+
+  /// 현재 user가 치과 계정으로 로그인된 상태인지 (clinics_accounts 존재 여부).
+  /// 같은 uid에 대해 한 번만 조회하고 캐싱한다.
+  String? _domainCheckedUid;
+  bool _isClinicAccount = false;
+  bool _checkingDomain = false;
+
+  Future<void> _ensureDomainChecked(User user) async {
+    if (_domainCheckedUid == user.uid || _checkingDomain) return;
+    _checkingDomain = true;
+    try {
+      final status = await ClinicAuthService.getStatus();
+      if (!mounted) return;
+      setState(() {
+        _domainCheckedUid = user.uid;
+        _isClinicAccount = status.exists;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _domainCheckedUid = user.uid;
+        _isClinicAccount = false;
+      });
+    } finally {
+      _checkingDomain = false;
+    }
+  }
 
   /// 라우터 [redirect]와 동일 정책: `next`가 안전할 때만 사용, 아니면 홈
   String _postAuthDestination() {
@@ -50,6 +80,14 @@ class _WebLoginPageState extends State<WebLoginPage> {
     return '/';
   }
 
+  /// `/login`에 멈춰 있을 때 사용자가 직접 다시 시도할 수 있는 강제 새로고침
+  void _retryNavigation() {
+    setState(() {
+      _lastRedirectedUid = null;
+      _lastRedirectAt = null;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<User?>(
@@ -60,15 +98,30 @@ class _WebLoginPageState extends State<WebLoginPage> {
         }
 
         final user = snapshot.data;
-        if (user != null) {
-          if (!_redirectScheduled) {
-            _redirectScheduled = true;
+        // ?next= 가 명시적으로 지정된 경우에만 자동 이동(로그인 후 원래 가려던 곳)
+        final next = widget.nextRoute;
+        final hasExplicitNext = next != null &&
+            next.isNotEmpty &&
+            next.startsWith('/') &&
+            !next.startsWith('//');
+        if (user != null && hasExplicitNext) {
+          final now = DateTime.now();
+          final isCooldown = _lastRedirectedUid == user.uid &&
+              _lastRedirectAt != null &&
+              now.difference(_lastRedirectAt!).inSeconds < 3;
+          if (!isCooldown) {
+            _lastRedirectedUid = user.uid;
+            _lastRedirectAt = now;
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (!mounted) return;
               context.go(_postAuthDestination());
             });
           }
-          return _buildSessionGateScaffold(message: '이미 로그인되어 있습니다. 이동 중…');
+          return _buildSessionGateScaffold(
+            message: '이미 로그인되어 있습니다. 이동 중…',
+            showStuckHelp: true,
+            onRetry: _retryNavigation,
+          );
         }
 
         return Scaffold(
@@ -106,34 +159,80 @@ class _WebLoginPageState extends State<WebLoginPage> {
                                 // ── 좌(지원자) / 우(치과) ────────────────
                                 LayoutBuilder(
                                   builder: (context, innerConstraints) {
+                                    // 로그인된 도메인 판정.
+                                    // - user == null: 양쪽 모두 로그인 카드
+                                    // - user != null && 치과 계정: 우측만 "로그인됨"
+                                    // - user != null && 지원자 계정: 좌측만 "로그인됨"
+                                    if (user != null) {
+                                      // 비동기 도메인 판정 트리거 (이미 캐시된 uid면 no-op)
+                                      WidgetsBinding.instance
+                                          .addPostFrameCallback((_) {
+                                        _ensureDomainChecked(user);
+                                      });
+                                    }
+                                    final domainKnown =
+                                        user != null && _domainCheckedUid == user.uid;
+                                    final isClinicSignedIn =
+                                        domainKnown && _isClinicAccount;
+                                    final isApplicantSignedIn =
+                                        domainKnown && !_isClinicAccount;
+
+                                    final clinicSlot = isClinicSignedIn
+                                        ? _SignedInStatusCard(
+                                            user: user,
+                                            domain: _SignedInDomain.clinic,
+                                          )
+                                        : _ClinicLoginCard(
+                                            nextRoute: widget.nextRoute,
+                                          );
+                                    final applicantSlot = isApplicantSignedIn
+                                        ? _SignedInStatusCard(
+                                            user: user,
+                                            domain: _SignedInDomain.applicant,
+                                          )
+                                        : _ApplicantLoginCard(
+                                            nextRoute: widget.nextRoute,
+                                          );
+
+                                    Widget verticalDivider({double h = 108}) =>
+                                        SizedBox(
+                                          width: 48,
+                                          child: Center(
+                                            child: Container(
+                                              width: 1,
+                                              height: h,
+                                              decoration: BoxDecoration(
+                                                color: AppColors.divider,
+                                                borderRadius:
+                                                    BorderRadius.circular(0.5),
+                                              ),
+                                            ),
+                                          ),
+                                        );
+                                    Widget horizontalDivider() => Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 20,
+                                          ),
+                                          child: Center(
+                                            child: Container(
+                                              width: 96,
+                                              height: 1,
+                                              decoration: BoxDecoration(
+                                                color: AppColors.divider,
+                                                borderRadius:
+                                                    BorderRadius.circular(0.5),
+                                              ),
+                                            ),
+                                          ),
+                                        );
+
                                     if (innerConstraints.maxWidth < 620) {
                                       return Column(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          _ApplicantLoginCard(
-                                            nextRoute: widget.nextRoute,
-                                          ),
-                                          Padding(
-                                            padding: const EdgeInsets.symmetric(
-                                              vertical: 20,
-                                            ),
-                                            child: Center(
-                                              child: Container(
-                                                width: 96,
-                                                height: 1,
-                                                decoration: BoxDecoration(
-                                                  color: AppColors.divider,
-                                                  borderRadius:
-                                                      BorderRadius.circular(
-                                                        0.5,
-                                                      ),
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                          _ClinicLoginCard(
-                                            nextRoute: widget.nextRoute,
-                                          ),
+                                          applicantSlot,
+                                          horizontalDivider(),
+                                          clinicSlot,
                                         ],
                                       );
                                     }
@@ -142,32 +241,9 @@ class _WebLoginPageState extends State<WebLoginPage> {
                                         crossAxisAlignment:
                                             CrossAxisAlignment.stretch,
                                         children: [
-                                          Expanded(
-                                            child: _ApplicantLoginCard(
-                                              nextRoute: widget.nextRoute,
-                                            ),
-                                          ),
-                                          SizedBox(
-                                            width: 48,
-                                            child: Center(
-                                              child: Container(
-                                                width: 1,
-                                                height: 108,
-                                                decoration: BoxDecoration(
-                                                  color: AppColors.divider,
-                                                  borderRadius:
-                                                      BorderRadius.circular(
-                                                        0.5,
-                                                      ),
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                          Expanded(
-                                            child: _ClinicLoginCard(
-                                              nextRoute: widget.nextRoute,
-                                            ),
-                                          ),
+                                          Expanded(child: applicantSlot),
+                                          verticalDivider(),
+                                          Expanded(child: clinicSlot),
                                         ],
                                       ),
                                     );
@@ -176,26 +252,11 @@ class _WebLoginPageState extends State<WebLoginPage> {
 
                                 const SizedBox(height: AppSpacing.xxl),
 
-                                // ── 하단 링크 ────────────────────────────
-                                Padding(
-                                  padding: const EdgeInsets.only(
-                                    top: AppSpacing.md,
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        '© 하이진랩',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: AppColors.textDisabled,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 16),
-                                      _link('개인정보처리방침', '/privacy'),
-                                      _dot(),
-                                      _link('이용약관', '/terms'),
-                                    ],
+                                // ── 하단 사업자 정보 · 약관 ───────────────
+                                const Padding(
+                                  padding: EdgeInsets.only(top: AppSpacing.md),
+                                  child: WebSiteFooter(
+                                    padding: EdgeInsets.zero,
                                   ),
                                 ),
                               ],
@@ -215,9 +276,14 @@ class _WebLoginPageState extends State<WebLoginPage> {
     );
   }
 
-  Widget _buildSessionGateScaffold({required String message}) {
+  Widget _buildSessionGateScaffold({
+    required String message,
+    bool showStuckHelp = false,
+    VoidCallback? onRetry,
+  }) {
     return Scaffold(
       backgroundColor: AppColors.white,
+      bottomNavigationBar: const WebSiteFooter(),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -232,6 +298,40 @@ class _WebLoginPageState extends State<WebLoginPage> {
                 color: AppColors.textSecondary,
               ),
             ),
+            if (showStuckHelp) ...[
+              const SizedBox(height: 28),
+              Text(
+                '이동이 진행되지 않으면 아래 버튼을 눌러 주세요.',
+                style: GoogleFonts.notoSansKr(
+                  fontSize: 12,
+                  color: AppColors.textDisabled,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (onRetry != null)
+                    TextButton.icon(
+                      onPressed: onRetry,
+                      icon: const Icon(Icons.refresh, size: 16),
+                      label: const Text('다시 시도'),
+                    ),
+                  const SizedBox(width: 8),
+                  TextButton.icon(
+                    onPressed: () async {
+                      try {
+                        await FirebaseAuth.instance.signOut();
+                      } catch (_) {}
+                      if (!mounted) return;
+                      context.go('/login');
+                    },
+                    icon: const Icon(Icons.logout, size: 16),
+                    label: const Text('로그아웃 후 다시 로그인'),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
@@ -266,32 +366,6 @@ class _WebLoginPageState extends State<WebLoginPage> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _link(String label, String path) {
-    return InkWell(
-      onTap: () => context.push(path),
-      borderRadius: BorderRadius.circular(4),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: AppColors.textSecondary,
-            decoration: TextDecoration.underline,
-            decorationColor: AppColors.textDisabled,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _dot() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 6),
-      child: Text('·', style: TextStyle(color: AppColors.textDisabled)),
     );
   }
 }
@@ -1586,6 +1660,190 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 이미 로그인된 사용자에게 보여주는 안내 카드
+// ═══════════════════════════════════════════════════════════════
+enum _SignedInDomain { clinic, applicant }
+
+class _SignedInStatusCard extends StatelessWidget {
+  final User user;
+  final _SignedInDomain domain;
+  const _SignedInStatusCard({required this.user, required this.domain});
+
+  bool get _isClinic => domain == _SignedInDomain.clinic;
+
+  String get _title => _isClinic
+      ? '치과 계정으로 로그인되어 있어요'
+      : '지원자 계정으로 로그인되어 있어요';
+
+  String get _ctaLabel => _isClinic ? '공고 시작으로 이동' : '이력서로 이동';
+
+  String get _ctaRoute => _isClinic ? '/post-job/input' : '/applicant/resumes';
+
+  Color get _accentColor =>
+      _isClinic ? AppColors.accent : AppColors.success;
+
+  IconData get _badgeIcon => _isClinic
+      ? Icons.business_center_outlined
+      : Icons.person_outline_rounded;
+
+  String get _displayName {
+    final name = user.displayName?.trim();
+    if (name != null && name.isNotEmpty) return name;
+    final email = user.email;
+    if (email != null && email.isNotEmpty) return email;
+    return '로그인됨';
+  }
+
+  String? get _subtitle {
+    final email = user.email;
+    if (user.displayName?.trim().isNotEmpty == true && email != null) {
+      return email;
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        border: Border.all(color: AppColors.divider),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.divider.withOpacity(0.25),
+            blurRadius: 30,
+            offset: const Offset(0, 20),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: _accentColor.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  _badgeIcon,
+                  color: _accentColor,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _title,
+                      style: GoogleFonts.notoSansKr(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.4,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _displayName,
+                      style: GoogleFonts.notoSansKr(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: -0.3,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    if (_subtitle != null)
+                      Text(
+                        _subtitle!,
+                        style: GoogleFonts.notoSansKr(
+                          fontSize: 12,
+                          letterSpacing: -0.3,
+                          color: AppColors.textDisabled,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          SizedBox(
+            width: double.infinity,
+            height: AppPublisher.ctaHeight,
+            child: ElevatedButton.icon(
+              onPressed: () => context.go(_ctaRoute),
+              icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+              label: Text(
+                _ctaLabel,
+                style: GoogleFonts.notoSansKr(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.4,
+                  color: AppColors.white,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _accentColor,
+                foregroundColor: AppColors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(
+                    AppPublisher.buttonRadius,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          SizedBox(
+            width: double.infinity,
+            height: 40,
+            child: OutlinedButton.icon(
+              onPressed: () async {
+                try {
+                  await FirebaseAuth.instance.signOut();
+                } catch (_) {}
+              },
+              icon: const Icon(Icons.logout, size: 16),
+              label: Text(
+                '로그아웃',
+                style: GoogleFonts.notoSansKr(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.3,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.textSecondary,
+                side: BorderSide(color: AppColors.divider),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(
+                    AppPublisher.buttonRadius,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

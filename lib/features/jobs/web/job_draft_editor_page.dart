@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/web_site_footer.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../auth/web/web_account_menu_button.dart';
 import '../../../models/clinic_profile.dart'
@@ -17,6 +18,7 @@ import '../../../utils/tag_generator.dart';
 import '../../publisher/services/clinic_profile_service.dart';
 import '../../publisher/widgets/biz_license_upload_section.dart';
 import '../../publisher/widgets/publisher_clinic_identity_section.dart';
+import 'job_post_top_bar.dart';
 import '../ui/job_post_form.dart';
 import '../ui/job_post_preview.dart';
 import '../ui/job_preview_scroll_anchor.dart';
@@ -1114,7 +1116,11 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
     return Scaffold(
       backgroundColor: AppColors.webPublisherPageBg,
       body: Column(
-        children: [_buildTopBar(), Expanded(child: _buildBodyAfterLoad())],
+        children: [
+          _buildTopBar(),
+          Expanded(child: _buildBodyAfterLoad()),
+          const WebSiteFooter(backgroundColor: AppColors.white),
+        ],
       ),
     );
   }
@@ -1227,26 +1233,27 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
   }
 
   Widget _buildTopBar() {
-    return Container(
-      color: AppColors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-      child: Row(
+    return JobPostTopBar(
+      currentStep: JobPostStep.edit,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // ── 좌측: 뒤로가기 + 치과 칩 ─────────────────────────
-          IconButton(
-            onPressed: () =>
-                context.canPop()
-                    ? context.pop()
-                    : context.go('/post-job/input'),
-            icon: const Icon(Icons.arrow_back, size: 20),
-            tooltip: '뒤로',
-            style: IconButton.styleFrom(
-              foregroundColor: AppColors.textPrimary,
-              padding: const EdgeInsets.all(8),
-              minimumSize: const Size(40, 40),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              visualDensity: VisualDensity.compact,
-            ),
+          const WebAccountMenuButton(),
+          const SizedBox(width: 12),
+          JobStepNavButton.next(
+            step: JobPostStep.product,
+            onPressed: _goToPublish,
+          ),
+        ],
+      ),
+      leading: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          JobStepNavButton.prev(
+            step: JobPostStep.input,
+            onPressed: () => context.canPop()
+                ? context.pop()
+                : context.go('/post-job/input'),
           ),
           if (_selectedProfile != null) ...[
             const SizedBox(width: 6),
@@ -1269,43 +1276,6 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
               ),
             ),
           ],
-          // ── 중앙: 페이지 타이틀 ────────────────────────────────
-          const Spacer(),
-          Text(
-            '2. 공고 상세',
-            style: GoogleFonts.notoSansKr(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          // ── 우측: 계정 메뉴 + 다음 단계 버튼 ─────────────────
-          const Spacer(),
-          const WebAccountMenuButton(),
-          const SizedBox(width: 12),
-          SizedBox(
-            height: AppPublisher.ctaHeight,
-            child: ElevatedButton(
-              onPressed: _goToPublish,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.accent,
-                foregroundColor: AppColors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(
-                    AppPublisher.buttonRadius,
-                  ),
-                ),
-              ),
-              child: Text(
-                '게시 단계로',
-                style: GoogleFonts.notoSansKr(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ),
         ],
       ),
     );

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/web_site_footer.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../auth/web/web_account_menu_button.dart';
 
@@ -128,6 +129,7 @@ class JobPublishSuccessPage extends StatelessWidget {
               ),
             ),
           ),
+          if (kIsWeb) const WebSiteFooter(backgroundColor: AppColors.white),
         ],
       ),
     );

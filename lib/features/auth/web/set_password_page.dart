@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/web_site_footer.dart';
 import '../../../core/widgets/hygiene_lab_english_title.dart';
 import '../../publisher/pages/publisher_shared.dart';
 
@@ -103,6 +104,7 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: kPubBg,
+      bottomNavigationBar: const WebSiteFooter(backgroundColor: kPubBg),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),

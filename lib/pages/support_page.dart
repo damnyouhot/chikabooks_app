@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/theme/app_colors.dart';
+import '../core/widgets/web_site_footer.dart';
 
 /// 고객지원 (`/support`) — 웹 정적 `support.html`과 동일 내용 (브랜드: 하이진랩 / HygieneLab, `pubspec` 버전 예시 반영)
 class SupportPage extends StatelessWidget {
@@ -165,6 +166,7 @@ class SupportPage extends StatelessWidget {
           ],
         ),
       ),
+      bottomNavigationBar: const WebSiteFooter(backgroundColor: AppColors.appBg),
     );
   }
 
