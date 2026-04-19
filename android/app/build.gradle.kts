@@ -8,6 +8,12 @@ plugins {
 import java.util.Properties
 import java.io.FileInputStream
 
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+}
+
 android {
     // [핵심 1] 소스 코드의 실제 폴더 위치 (이걸 바꿔버리면 파일을 못 찾아서 에러가 납니다)
     namespace = "com.example.chikabooks_app"
@@ -51,9 +57,28 @@ android {
         manifestPlaceholders["naverClientSecret"] = naverClientSecret
     }
 
+    signingConfigs {
+        if (keystorePropertiesFile.exists()) {
+            create("release") {
+                keyAlias = keystoreProperties.getProperty("keyAlias")!!
+                keyPassword = keystoreProperties.getProperty("keyPassword")!!
+                storePassword = keystoreProperties.getProperty("storePassword")!!
+                storeFile = rootProject.file(keystoreProperties.getProperty("storeFile")!!)
+            }
+        }
+    }
+
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (keystorePropertiesFile.exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                println("WARNING: android/key.properties 없음 — release가 debug 키로 서명됩니다. 스토어 제출 전 key.properties를 설정하세요.")
+                signingConfigs.getByName("debug")
+            }
+            // Firebase/Kakao/Naver SDK 호환성을 위해 minify는 끔.
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 }

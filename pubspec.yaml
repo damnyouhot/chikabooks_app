@@ -39,9 +39,6 @@ dependencies:
   pdfx: ^2.6.0
   file_selector: ^1.0.3
 
-  in_app_purchase: ^3.2.1
-  in_app_purchase_android: ^0.4.0+1
-
   cupertino_icons: ^1.0.8
   provider: ^6.1.2
   uuid: ^4.5.1

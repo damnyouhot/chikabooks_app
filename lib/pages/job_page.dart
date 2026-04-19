@@ -125,6 +125,28 @@ class _JobPageState extends State<JobPage> {
 
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
+        if (!mounted) return;
+        final agreed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('위치 권한 안내'),
+            content: const Text(
+              '주변 치과 구인 정보를 거리 기준으로 보여드리기 위해 위치 권한이 필요해요.\n'
+              '앱이 화면에 보이는 동안에만 사용하며, 백그라운드에서는 위치를 수집하지 않습니다.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('나중에'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('허용하기'),
+              ),
+            ],
+          ),
+        );
+        if (agreed != true) return;
         permission = await Geolocator.requestPermission();
       }
       if (permission == LocationPermission.deniedForever ||

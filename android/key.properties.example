@@ -1,0 +1,7 @@
+# 이 파일을 복사해 key.properties 로 저장한 뒤 값을 채우세요.
+# key.properties 와 upload-keystore.jks 는 Git에 커밋하지 마세요.
+
+storePassword=YOUR_STORE_PASSWORD
+keyPassword=YOUR_KEY_PASSWORD
+keyAlias=upload
+storeFile=upload-keystore.jks

@@ -21,9 +21,10 @@
 
 ## 2. Android Release 빌드 KeyHash 등록
 
-- **현재 상태:** `build.gradle.kts` 설정에 따라 Debug와 Release 빌드가 동일한 `debug.keystore`를 사용하고 있습니다.
-- **KeyHash:** `62:A8:FC:42:7B:E2:EB:6B:3D:01:35:B6:FD:A6:52:8F:A7:DF:E3:AE` (Base64: `Yqj8Qnvi62s9ATW2/aZSj6ff464=`)
-- **조치:** 이 KeyHash는 카카오 개발자센터에 이미 등록되어 있어야 합니다. 만약 Google Play Store에 앱을 업로드할 경우, Google Play App Signing에 의해 새로운 서명키가 생성될 수 있으므로, **Google Play Console에서 제공하는 App Signing Key의 SHA1 Hash Key를 추가로 등록**해야 합니다.
+- **현재 상태:** `android/key.properties`가 있으면 Release는 `upload-keystore.jks`(별칭 `upload`)로 서명됩니다. 없으면 Gradle 경고와 함께 debug 키로 서명됩니다.
+- **Debug KeyHash (참고):** `62:A8:FC:42:7B:E2:EB:6B:3D:01:35:B6:FD:A6:52:8F:A7:DF:E3:AE` (Base64: `Yqj8Qnvi62s9ATW2/aZSj6ff464=`)
+- **릴리스 로컬 빌드:** `android`에서 `gradlew :app:signingReport`로 Release 항목의 인증서 지문을 확인하고, 카카오·네이버 등에 필요한 **Key Hash**는 `docs/KAKAO_KEYHASH_FIX.md` 절차로 Base64를 계산해 등록합니다.
+- **Play 스토어:** Google Play App Signing을 쓰면 스토어 배포 APK/AAB 서명 지문이 업로드 키와 다를 수 있으므로, **Play Console의 App Signing 인증서 SHA-1**도 각 개발자 콘솔에 추가 등록합니다.
 
 ## 3. iOS URL Scheme 등록
 

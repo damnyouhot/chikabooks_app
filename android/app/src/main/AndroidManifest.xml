@@ -1,24 +1,26 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- 인터넷 권한 추가 (url_launcher를 위해 필수) -->
+    <!-- 인터넷 -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
-    
-    <!-- 위치 권한 (geolocator 필수 - 주변 치과 구인 검색) -->
+
+    <!-- 위치 권한 (geolocator: 포그라운드 사용만) -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
-    
+
+    <!-- 알림 (Android 13+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
-        android:label="chikabooks_app"
+        android:label="@string/app_name"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
-        
+
         <!-- 카카오 네이티브 앱 키 -->
         <meta-data
             android:name="com.kakao.sdk.AppKey"
             android:value="683c7dcddbf93a77a45f0e1fe771c0ce"/>
-        
-        <!-- 네이버 로그인 SDK 설정 (flutter_naver_login 공식 방식) -->
+
+        <!-- 네이버 로그인 SDK -->
         <meta-data
             android:name="com.naver.sdk.clientId"
             android:value="@string/client_id" />
@@ -28,7 +30,7 @@
         <meta-data
             android:name="com.naver.sdk.clientName"
             android:value="@string/client_name" />
-        
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -37,21 +39,16 @@
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
-            <!-- Specifies an Android theme to apply to this Activity as soon as
-                 the Android process has started. This theme is visible to the user
-                 while the Flutter UI initializes. After that, this theme continues
-                 to determine the Window background behind the Flutter UI. -->
             <meta-data
-              android:name="io.flutter.embedding.android.NormalTheme"
-              android:resource="@style/NormalTheme"
-              />
+                android:name="io.flutter.embedding.android.NormalTheme"
+                android:resource="@style/NormalTheme"/>
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
-        
-        <!-- 카카오 리다이렉트 활동 -->
+
+        <!-- 카카오 리다이렉트 -->
         <activity
             android:name="com.kakao.sdk.flutter.AuthCodeCustomTabsActivity"
             android:exported="true">
@@ -59,45 +56,35 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                
-                <!-- Redirect URI: kakao{NATIVE_APP_KEY}://oauth -->
                 <data android:host="oauth"
                       android:scheme="kakao683c7dcddbf93a77a45f0e1fe771c0ce" />
             </intent-filter>
         </activity>
 
-        <!-- 네이버 로그인 리다이렉트 Activity (flutter_naver_login 2.x 필수) -->
+        <!-- 네이버 로그인 -->
         <activity
             android:name="com.nhn.android.naverlogin.ui.OAuthLoginActivity"
             android:exported="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
-
         <activity
             android:name="com.nhn.android.naverlogin.ui.OAuthLoginCustomTabActivity"
             android:exported="true" />
-        
-        <!-- Google Maps API Key (local.properties에서 주입됨) -->
+
+        <!-- Google Maps API Key -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="${mapsApiKey}" />
-        <!-- Don't delete the meta-data below.
-             This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
+
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
     </application>
-    <!-- Required to query activities that can process text, see:
-         https://developer.android.com/training/package-visibility and
-         https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.
 
-         In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
     <queries>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
-        
-        <!-- url_launcher를 위한 브라우저 intent -->
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <category android:name="android.intent.category.BROWSABLE" />
