@@ -3,10 +3,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart' as kakao;
 
 import '../../../core/theme/app_colors.dart';
 import '../../../services/admin_activity_service.dart';
 import '../../../services/app_error_logger.dart';
+import '../../../services/naver_auth_service.dart';
 import '../../../services/onboarding_service.dart';
 import '../../../services/user_profile_service.dart';
 
@@ -14,18 +16,46 @@ import '../../../services/user_profile_service.dart';
 class WebAccountActionsService {
   WebAccountActionsService._();
 
+  /// 계정 삭제 중복 호출 가드.
+  /// 더블 클릭/네트워크 재시도로 인해 같은 함수가 동시에 두 번 들어가는 것을 막는다.
+  static bool _deletionInFlight = false;
+
   static Future<void> _clearSessionCaches() async {
     AdminActivityService.clearCache();
     AppErrorLogger.clearCache();
     UserProfileService.clearCache();
   }
 
-  static Future<void> _signOutGoogleAndFirebase() async {
-    await GoogleSignIn().signOut();
-    await FirebaseAuth.instance.signOut();
+  /// 모든 소셜 로그인 SDK + Firebase 세션을 정리한다.
+  ///
+  /// 카카오/네이버 SDK 세션을 끊지 않으면 탈퇴/로그아웃 직후 자동 재로그인으로
+  /// 같은 UID가 즉시 재생성(=부활)되는 문제가 발생하므로, 모두 best-effort로 정리한다.
+  /// 각 SDK 호출은 미설치/미설정 플랫폼에서 예외를 던질 수 있으므로 개별 try/catch로 감싼다.
+  static Future<void> _clearAllSocialSessions() async {
+    try {
+      await GoogleSignIn().signOut();
+    } catch (e) {
+      debugPrint('⚠️ Google signOut 실패(무시): $e');
+    }
+    try {
+      await kakao.UserApi.instance.logout();
+    } catch (e) {
+      // 카카오 SDK 미초기화/세션 없음/웹 미지원 등 — 정상 케이스 다수
+      debugPrint('⚠️ Kakao logout 실패(무시): $e');
+    }
+    try {
+      await NaverAuthService.signOut();
+    } catch (e) {
+      debugPrint('⚠️ Naver signOut 실패(무시): $e');
+    }
+    try {
+      await FirebaseAuth.instance.signOut();
+    } catch (e) {
+      debugPrint('⚠️ FirebaseAuth signOut 실패(무시): $e');
+    }
   }
 
-  /// 세션 캐시 정리 후 Firebase·Google 로그아웃(확인 다이얼로그 없음).
+  /// 세션 캐시 정리 후 모든 소셜 SDK + Firebase 로그아웃(확인 다이얼로그 없음).
   ///
   /// [afterLogout]이 null이면 `/login`으로 이동하고 스낵바를 띄웁니다(웹 플로우 기본).
   /// 설정 화면 등에서는 `Navigator.pop` 등을 [afterLogout]에 넘깁니다.
@@ -34,7 +64,7 @@ class WebAccountActionsService {
     void Function(BuildContext ctx)? afterLogout,
   }) async {
     await _clearSessionCaches();
-    await _signOutGoogleAndFirebase();
+    await _clearAllSocialSessions();
 
     if (!context.mounted) return;
 
@@ -56,6 +86,11 @@ class WebAccountActionsService {
     BuildContext context, {
     void Function(BuildContext ctx)? onSuccess,
   }) async {
+    if (_deletionInFlight) {
+      debugPrint('⚠️ confirmDeleteAccount 중복 호출 차단 (이미 진행 중)');
+      return;
+    }
+
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
@@ -164,6 +199,7 @@ class WebAccountActionsService {
       );
     }
 
+    _deletionInFlight = true;
     try {
       final callable = FirebaseFunctions.instanceFor(
         region: 'asia-northeast3',
@@ -174,11 +210,7 @@ class WebAccountActionsService {
       await OnboardingService.forceSchedule();
 
       await _clearSessionCaches();
-
-      try {
-        await GoogleSignIn().signOut();
-        await FirebaseAuth.instance.signOut();
-      } catch (_) {}
+      await _clearAllSocialSessions();
 
       if (!context.mounted) return;
 
@@ -198,16 +230,44 @@ class WebAccountActionsService {
     } catch (e) {
       debugPrint('❌ 계정 삭제 실패: $e');
 
+      // 실패해도 로컬 세션은 끊어 사용자가 같은 SNS 토큰으로 즉시
+      // 부활하지 않도록 한다(서버에서 일부만 정리됐을 가능성에 대비).
+      try {
+        await _clearSessionCaches();
+        await _clearAllSocialSessions();
+      } catch (_) {}
+
       if (!context.mounted) return;
 
       Navigator.of(context).pop();
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('계정 삭제 실패: $e'),
+          content: Text(_describeDeletionError(e)),
           backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
+
+      // 안전 장치: 어떤 결과든 로그인 화면으로 이동시켜 비정상 잔여 세션을 방지.
+      if (onSuccess == null && context.mounted) {
+        context.go('/login');
+      }
+    } finally {
+      _deletionInFlight = false;
     }
+  }
+
+  /// 사용자에게 보여줄 에러 문구를 정리한다.
+  /// `[firebase_functions/internal] INTERNAL`처럼 본문이 비어 있는 경우엔
+  /// 추측성 메시지 대신 중립적인 안내를 사용한다.
+  static String _describeDeletionError(Object error) {
+    if (error is FirebaseFunctionsException) {
+      final msg = error.message?.trim();
+      if (msg == null || msg.isEmpty || msg.toUpperCase() == 'INTERNAL') {
+        return '계정 삭제 중 일시적인 오류가 발생했어요. 잠시 후 다시 시도해주세요.';
+      }
+      return '계정 삭제 실패: $msg';
+    }
+    return '계정 삭제 실패: $error';
   }
 }

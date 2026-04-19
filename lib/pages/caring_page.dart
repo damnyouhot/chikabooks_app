@@ -104,13 +104,11 @@ class _CaringPageState extends State<CaringPage>
   static const Duration _reactionDisplay = Duration(seconds: 2);
   static const Duration _randomBaseInterval = Duration(seconds: 5);
 
-  /// 캐릭터 위 말풍선 — 일반 모드 한 줄 높이(16×0.85×1.5)의 0.75배만큼 아래
+  /// 비온보딩 캐릭터 위 말풍선(밥/쓰다듬기 리액션 등) — 일반 모드 한 줄 높이(16×0.85×1.5)의 0.75배만큼 아래
   /// (직전에 1.5줄 분 내렸다가, 그중 절반만큼 다시 올린 위치)
   static const double _kSpeechOverlayExtraTop =
       0.75 * (16.0 * 0.85 * 1.5);
-
-  /// 온보딩 말풍선: 아이들과 동일 기준에서 [SpeechOverlay] 온보딩 한 줄 높이만큼 추가 상향
-  static const int _kOnboardingSpeechLiftLines = 3;
+  // 온보딩 탭0 말풍선은 ClipRect 바깥 외곽 Stack에 직접 배치한다 → `_buildOnboardingSpeechBubble`
 
   File? _riveFile;
   RiveWidgetController? _dogController;
@@ -761,8 +759,56 @@ class _CaringPageState extends State<CaringPage>
                 ],
               ),
             ),
-            // 기본·리액션 멘트는 캐릭터 위 SpeechOverlay (`_baseMsgText` / `_reactionMsgText`)
+            // 비온보딩 기본·리액션 멘트는 `_buildCharacterStack` 내부 SpeechOverlay (`_baseMsgText` / `_reactionMsgText`)
+            // 온보딩 탭0 대사는 ClipRect 영향에서 자유로운 외곽 Stack에 직접 배치한다.
+            if (isOnboarding && widget.onboardingDialogue != null)
+              _buildOnboardingSpeechBubble(
+                MediaQuery.of(context).size.height,
+              ),
           ],
+        ),
+      ),
+    );
+  }
+
+  // ── 온보딩 탭0 말풍선 ──────────────────────────────────────────
+  // ClipRect 안쪽(`_buildCharacterStack`)에 두면 위로 들어올린 글자가 잘리므로
+  // 외곽 SafeArea Stack 자식으로 배치한다.
+  //
+  // 위치 산식(safe area 하단 기준):
+  //   characterVisualHeight ≈ screenH × 0.38  (`_buildCharacterStack` `kScreenRatio`)
+  //   characterTranslateY    = 60.0           (`_buildCharacterStack` Transform.translate)
+  //   bottomSectionH         ≈ 120.0          (하단 액션 버튼 영역 추정)
+  //
+  //   캐릭터 시각 top의 safe area 하단 거리 ≈ (bottomSectionH - characterTranslateY) + characterVisualHeight
+  //   말풍선은 그 위로 `_kOnboardingBubbleClearance` 만큼 더 띄운 자리에 bottom 기준으로 고정
+  //
+  // 이 공식은 화면 높이 비율을 사용하므로 좁은 기기에서도 캐릭터와 글자가 자동으로
+  // 같이 위로 이동해 겹치지 않고, 큰 기기에서도 너무 위로 올라가 잘리지 않는다.
+  static const double _kCharacterScreenRatio = 0.38;
+  static const double _kCharacterTranslateY = 60.0;
+  static const double _kBottomSectionH = 120.0;
+  static const double _kOnboardingBubbleClearance = 24.0;
+  static const double _kOnboardingBubbleScale = 1.5 * 0.85 * 0.9;
+
+  Widget _buildOnboardingSpeechBubble(double screenH) {
+    final bubbleBottom = (_kBottomSectionH - _kCharacterTranslateY) +
+        screenH * _kCharacterScreenRatio +
+        _kOnboardingBubbleClearance;
+
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: bubbleBottom,
+      child: IgnorePointer(
+        child: Center(
+          child: SpeechOverlay(
+            text: widget.onboardingDialogue,
+            isDismissing: false,
+            isOnboarding: true,
+            onboardingBoldWord: widget.onboardingBoldWord,
+            contentScale: _kOnboardingBubbleScale,
+          ),
         ),
       ),
     );
@@ -791,10 +837,6 @@ class _CaringPageState extends State<CaringPage>
   // 기기가 달라져도 캐릭터가 항상 화면 높이 대비 동일 비율로 보임.
   // (Pixel 7 Pro 892dp 기준 kScreenRatio = 0.38 → 캐릭터 ≈ 339dp)
   Widget _buildCharacterStack(bool isOnboarding, double screenH) {
-    // 탭0 온보딩: 말풍선 글자만 확대 — 캐릭터 스케일은 아이들과 동일
-    final tab0LayoutBoost =
-        isOnboarding && widget.onboardingTab0LayoutBoost;
-
     return Stack(
       children: [
         Positioned.fill(
@@ -878,49 +920,34 @@ class _CaringPageState extends State<CaringPage>
                 color: AppColors.warning.withOpacity(0.8)),
           ),
 
-        // 텍스트 오버레이
-        Positioned.fill(
-          child: IgnorePointer(
-            child: LayoutBuilder(builder: (ctx, constraints) {
-              // 기본·리액션: 같은 위치, 리액션 우선 (`_reactionMsgText ?? _baseMsgText`)
-              final baseMsgTop = _kSpeechOverlayExtraTop;
-              final displayText = isOnboarding
-                  ? widget.onboardingDialogue
-                  : (_reactionMsgText ?? _baseMsgText);
-              final isDismissing = isOnboarding
-                  ? false
-                  : (_reactionMsgText != null
-                      ? _isReactionMsgDismissing
-                      : _isBaseMsgDismissing);
-              final speechContentScale =
-                  tab0LayoutBoost ? 1.5 * 0.85 * 0.9 : 1.0;
-              final speechLiftDy = isOnboarding
-                  ? -12.0 -
-                      _kOnboardingSpeechLiftLines *
-                          SpeechOverlay.lineHeightFor(
-                            isOnboarding: true,
-                            contentScale: speechContentScale,
-                          )
-                  : -12.0;
-              return Stack(children: [
-                Positioned(top: baseMsgTop, left: 0, right: 0,
-                  child: Center(
-                    child: Transform.translate(
-                      offset: Offset(0, speechLiftDy),
-                      child: SpeechOverlay(
-                        text: displayText,
-                        isDismissing: isDismissing,
-                        isOnboarding: isOnboarding,
-                        onboardingBoldWord:
-                            isOnboarding ? widget.onboardingBoldWord : null,
-                        contentScale: speechContentScale,
+        // 비온보딩 텍스트 오버레이(밥주기/쓰다듬기 리액션·기본 멘트).
+        // 온보딩 탭0 대사는 이 ClipRect 바깥의 외곽 Stack에 별도 배치된다(`_buildOnboardingSpeechBubble`).
+        if (!isOnboarding)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: LayoutBuilder(builder: (ctx, constraints) {
+                // 기본·리액션: 같은 위치, 리액션 우선 (`_reactionMsgText ?? _baseMsgText`)
+                final baseMsgTop = _kSpeechOverlayExtraTop;
+                final displayText = _reactionMsgText ?? _baseMsgText;
+                final isDismissing = _reactionMsgText != null
+                    ? _isReactionMsgDismissing
+                    : _isBaseMsgDismissing;
+                return Stack(children: [
+                  Positioned(top: baseMsgTop, left: 0, right: 0,
+                    child: Center(
+                      child: Transform.translate(
+                        offset: const Offset(0, -12),
+                        child: SpeechOverlay(
+                          text: displayText,
+                          isDismissing: isDismissing,
+                          isOnboarding: false,
+                        ),
                       ),
-                    ),
-                  )),
-              ]);
-            }),
+                    )),
+                ]);
+              }),
+            ),
           ),
-        ),
       ],
     );
   }

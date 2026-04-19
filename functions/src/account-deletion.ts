@@ -531,14 +531,26 @@ async function deleteUserData(uid: string) {
 
 /**
  * Firebase Auth 계정 삭제
+ *
+ * `auth/user-not-found`는 "이미 삭제됨"을 의미하므로 성공으로 간주한다.
+ * (Firestore는 삭제됐으나 Auth만 남아 재시도되는 경우, 또는 카카오 등
+ * 커스텀 토큰 흐름에서 Auth 계정이 외부 요인으로 사라진 경우에 발생)
  */
 async function deleteAuthAccount(uid: string) {
   try {
     await admin.auth().deleteUser(uid);
     console.log(`✅ Firebase Auth 계정 삭제 완료: ${uid}`);
-  } catch (error) {
+  } catch (error: any) {
+    const code: string | undefined =
+      error?.errorInfo?.code ?? error?.code;
+    if (code === "auth/user-not-found") {
+      console.warn(
+        `⚠️ Auth 계정 없음(이미 삭제된 것으로 간주): ${uid}`
+      );
+      return;
+    }
     console.error("❌ Auth 계정 삭제 실패:", error);
-    throw error; // 가장 중요한 작업이므로 에러 전파
+    throw error; // 그 외 에러는 전파
   }
 }
 
@@ -575,11 +587,13 @@ export async function performAccountDeletion(uid: string): Promise<void> {
   // ── 5단계: Firestore 사용자 문서 삭제 ───────────────
   await deleteUserData(uid);
 
-  // ── 5.5단계: 탈퇴 이력 저장 (재가입 온보딩 판단용) ──
-  await saveDeletedUserRecord(uid);
-
   // ── 6단계: Auth 계정 삭제 (최후) ────────────────────
   await deleteAuthAccount(uid);
+
+  // ── 7단계: 탈퇴 이력 저장 (재가입 온보딩 판단용) ──
+  // Auth 삭제까지 완료된 시점에만 카운터를 증가시킨다.
+  // (이전엔 5.5단계로 먼저 실행해 Auth 실패 시에도 signUpCount가 누적되는 문제가 있었음)
+  await saveDeletedUserRecord(uid);
 }
 
 /**
