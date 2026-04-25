@@ -4,7 +4,7 @@ import '../../core/theme/app_tokens.dart';
 import '../../core/widgets/app_badge.dart';
 import 'career_shared.dart';
 
-// ── 나의 커리어 레벨 규칙 모델 ──────────────────────────────────
+// ── 커리어 단계 규칙 모델 ──────────────────────────────────────
 class _StageRule {
   final String name;
   final int minMonths;
@@ -56,7 +56,7 @@ int _computeStageIndex({
   return idx;
 }
 
-// ── 나의 커리어 레벨 카드 (CareerStageCard) ────────────────────
+// ── 커리어 단계 카드 ───────────────────────────────────────────
 /// Gray(AppMutedCard) 배경 위에서 렌더되는 위젯.
 /// 이전에 사용하던 CareerCard(Blue) 래퍼는 제거되었으며,
 /// 텍스트/배지 색상이 textPrimary 계열로 변경됨.
@@ -176,7 +176,7 @@ class CareerStageCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '커리어 카드와 치과 히스토리를 채우면\n레벨이 자동으로 올라가요.',
+                    '커리어 카드와 치과 네트워크를 채우면\n단계가 자동으로 올라가요.',
                     style: const TextStyle(
                       fontSize: 12,
                       height: 1.5,
@@ -313,7 +313,7 @@ class _ChecklistItem extends StatelessWidget {
   }
 }
 
-// ── 나의 커리어 레벨 안내 시트 (외부에서 호출) ─────────────────
+// ── 커리어 단계 안내 시트 (외부에서 호출) ──────────────────────
 void showCareerStageGuideSheet(BuildContext context) {
   showModalBottomSheet<void>(
     context: context,
@@ -343,7 +343,7 @@ void showCareerStageGuideSheet(BuildContext context) {
             child: const Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                '나의 커리어 레벨 안내',
+                '커리어 단계 안내',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w900,
@@ -356,7 +356,7 @@ void showCareerStageGuideSheet(BuildContext context) {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
             child: const Text(
-              '총 경력과 치과 이력 수에 따라 레벨이 자동으로 결정됩니다.',
+              '총 경력, 치과 이력 수에 따라 단계가 자동으로 결정됩니다.',
               style: TextStyle(
                 fontSize: 12,
                 color: AppColors.textSecondary,

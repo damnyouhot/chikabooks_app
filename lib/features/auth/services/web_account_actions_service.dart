@@ -1,16 +1,21 @@
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart' as kakao;
 
 import '../../../core/theme/app_colors.dart';
+import '../../../features/me/providers/me_providers.dart';
+import '../../../features/me/services/me_session.dart';
 import '../../../services/admin_activity_service.dart';
 import '../../../services/app_error_logger.dart';
 import '../../../services/naver_auth_service.dart';
 import '../../../services/onboarding_service.dart';
 import '../../../services/user_profile_service.dart';
+import 'logout_reload.dart';
 
 /// 웹 이력서·공고 플로우 및 설정 등에서 공유하는 로그아웃·계정 삭제 로직.
 class WebAccountActionsService {
@@ -20,10 +25,33 @@ class WebAccountActionsService {
   /// 더블 클릭/네트워크 재시도로 인해 같은 함수가 동시에 두 번 들어가는 것을 막는다.
   static bool _deletionInFlight = false;
 
-  static Future<void> _clearSessionCaches() async {
+  static Future<void> _clearSessionCaches([BuildContext? context]) async {
     AdminActivityService.clearCache();
     AppErrorLogger.clearCache();
     UserProfileService.clearCache();
+
+    // /me 영역 세션 ValueNotifier 강제 리셋 (이전 사용자의 활성 지점 잔존 방지).
+    MeSession.activeBranchId.value = null;
+
+    // Riverpod 의 모든 사용자별 stream provider 를 명시적으로 폐기한다.
+    // currentUidProvider 가 authStateChanges 로 자동 갱신되긴 하지만,
+    // SDK 의 미세 타이밍에 따라 옛 stream 이 잠깐 새 사용자 화면에 보일 수
+    // 있어, 명시적으로 invalidate 해서 즉시 빈 상태로 재시작하도록 강제한다.
+    if (context != null) {
+      try {
+        final container = ProviderScope.containerOf(context, listen: false);
+        container.invalidate(clinicProfilesProvider);
+        container.invalidate(walletProvider);
+        container.invalidate(walletLedgerProvider);
+        container.invalidate(notificationPrefsProvider);
+        container.invalidate(applicantPoolProvider);
+        container.invalidate(meOverviewProvider);
+        container.invalidate(currentUidProvider);
+        container.invalidate(firebaseAuthStateProvider);
+      } catch (e) {
+        debugPrint('⚠️ Riverpod invalidate 실패(무시): $e');
+      }
+    }
   }
 
   /// 모든 소셜 로그인 SDK + Firebase 세션을 정리한다.
@@ -63,19 +91,28 @@ class WebAccountActionsService {
     BuildContext context, {
     void Function(BuildContext ctx)? afterLogout,
   }) async {
-    await _clearSessionCaches();
+    await _clearSessionCaches(context);
     await _clearAllSocialSessions();
 
     if (!context.mounted) return;
 
     if (afterLogout != null) {
       afterLogout(context);
-    } else {
-      context.go('/login');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('로그아웃 되었어요.')),
-      );
+      return;
     }
+
+    // 웹: 메모리에 남은 옛 사용자 상태(stream cache, 위젯 상태)를
+    // 가장 확실하게 끊는 방법은 페이지 reload. SPA 라이프사이클을 통째로
+    // 새로 시작하므로 계정 간 데이터 누수가 0% 가 된다.
+    if (kIsWeb) {
+      reloadToLogin();
+      return;
+    }
+
+    context.go('/login');
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('로그아웃 되었어요.')),
+    );
   }
 
   /// 계정 완전 삭제(Callable `deleteMyAccount`).
@@ -209,7 +246,7 @@ class WebAccountActionsService {
 
       await OnboardingService.forceSchedule();
 
-      await _clearSessionCaches();
+      await _clearSessionCaches(context);
       await _clearAllSocialSessions();
 
       if (!context.mounted) return;
@@ -218,6 +255,9 @@ class WebAccountActionsService {
 
       if (onSuccess != null) {
         onSuccess(context);
+      } else if (kIsWeb) {
+        reloadToLogin();
+        return;
       } else {
         context.go('/login');
         ScaffoldMessenger.of(context).showSnackBar(
@@ -233,7 +273,7 @@ class WebAccountActionsService {
       // 실패해도 로컬 세션은 끊어 사용자가 같은 SNS 토큰으로 즉시
       // 부활하지 않도록 한다(서버에서 일부만 정리됐을 가능성에 대비).
       try {
-        await _clearSessionCaches();
+        await _clearSessionCaches(context);
         await _clearAllSocialSessions();
       } catch (_) {}
 

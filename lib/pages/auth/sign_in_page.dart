@@ -12,9 +12,9 @@ import '../../services/naver_auth_service.dart';
 import '../../services/sign_in_tracker.dart';
 import '../../services/onboarding_service.dart';
 import '../../services/admin_activity_service.dart';
-import '../../features/publisher/services/clinic_auth_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/hygiene_lab_english_title.dart';
+
 /// 다중 소셜 로그인 페이지
 /// Google / Apple / Kakao / Naver / Email 지원
 class SignInPage extends StatefulWidget {
@@ -92,17 +92,16 @@ class _SignInPageState extends State<SignInPage> {
 
       debugPrint('✅ Google 로그인 성공: ${currentUser.uid} (${currentUser.email})');
 
-      final blocked = await ClinicAuthService.blockClinicAccountFromApplicantLogin();
-      if (blocked != null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(blocked)));
-        }
-        return;
-      }
-
       await SignInTracker.record('google');
-      AdminActivityService.log(ActivityEventType.viewSignInPage, page: 'sign_in');
-      AdminActivityService.log(ActivityEventType.loginSuccess, page: 'sign_in', extra: {'provider': 'google'});
+      AdminActivityService.log(
+        ActivityEventType.viewSignInPage,
+        page: 'sign_in',
+      );
+      AdminActivityService.log(
+        ActivityEventType.loginSuccess,
+        page: 'sign_in',
+        extra: {'provider': 'google'},
+      );
       AdminActivityService.logFunnel(
         FunnelEventType.signupComplete,
         extra: {'provider': 'google'},
@@ -135,20 +134,16 @@ class _SignInPageState extends State<SignInPage> {
       } else if (appleRes != null) {
         final (user, appleIdEmail) = appleRes;
 
-        final blocked = await ClinicAuthService.blockClinicAccountFromApplicantLogin();
-        if (blocked != null) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(blocked)));
-          }
-          return;
-        }
-
-        await SignInTracker.record(
-          'apple',
-          email: appleIdEmail ?? user.email,
+        await SignInTracker.record('apple', email: appleIdEmail ?? user.email);
+        AdminActivityService.log(
+          ActivityEventType.viewSignInPage,
+          page: 'sign_in',
         );
-        AdminActivityService.log(ActivityEventType.viewSignInPage, page: 'sign_in');
-        AdminActivityService.log(ActivityEventType.loginSuccess, page: 'sign_in', extra: {'provider': 'apple'});
+        AdminActivityService.log(
+          ActivityEventType.loginSuccess,
+          page: 'sign_in',
+          extra: {'provider': 'apple'},
+        );
         AdminActivityService.logFunnel(
           FunnelEventType.signupComplete,
           extra: {'provider': 'apple'},
@@ -206,17 +201,16 @@ class _SignInPageState extends State<SignInPage> {
 
       debugPrint('✅ 카카오 로그인 성공: ${user.uid} (${user.email})');
 
-      final blocked = await ClinicAuthService.blockClinicAccountFromApplicantLogin();
-      if (blocked != null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(blocked)));
-        }
-        return;
-      }
-
       await SignInTracker.record('kakao');
-      AdminActivityService.log(ActivityEventType.viewSignInPage, page: 'sign_in');
-      AdminActivityService.log(ActivityEventType.loginSuccess, page: 'sign_in', extra: {'provider': 'kakao'});
+      AdminActivityService.log(
+        ActivityEventType.viewSignInPage,
+        page: 'sign_in',
+      );
+      AdminActivityService.log(
+        ActivityEventType.loginSuccess,
+        page: 'sign_in',
+        extra: {'provider': 'kakao'},
+      );
       AdminActivityService.logFunnel(
         FunnelEventType.signupComplete,
         extra: {'provider': 'kakao'},
@@ -248,9 +242,7 @@ class _SignInPageState extends State<SignInPage> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(
-                naverRes.errorMessage ?? '네이버 로그인 실패. 다시 시도해주세요.',
-              ),
+              content: Text(naverRes.errorMessage ?? '네이버 로그인 실패. 다시 시도해주세요.'),
             ),
           );
         }
@@ -263,20 +255,19 @@ class _SignInPageState extends State<SignInPage> {
         '✅ 네이버 로그인 성공: ${user.uid} (Auth.email=${user.email}, sdk=$naverProfileEmail)',
       );
 
-      final blocked = await ClinicAuthService.blockClinicAccountFromApplicantLogin();
-      if (blocked != null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(blocked)));
-        }
-        return;
-      }
-
       await SignInTracker.record(
         'naver',
         email: naverProfileEmail ?? user.email,
       );
-      AdminActivityService.log(ActivityEventType.viewSignInPage, page: 'sign_in');
-      AdminActivityService.log(ActivityEventType.loginSuccess, page: 'sign_in', extra: {'provider': 'naver'});
+      AdminActivityService.log(
+        ActivityEventType.viewSignInPage,
+        page: 'sign_in',
+      );
+      AdminActivityService.log(
+        ActivityEventType.loginSuccess,
+        page: 'sign_in',
+        extra: {'provider': 'naver'},
+      );
       AdminActivityService.logFunnel(
         FunnelEventType.signupComplete,
         extra: {'provider': 'naver'},
@@ -417,19 +408,22 @@ class _SignInPageState extends State<SignInPage> {
                         User? user;
                         String? authError;
                         try {
-                        if (isSignUp) {
-                          user = await EmailAuthService.signUp(
-                            email: email,
-                            password: password,
-                          );
-                        } else {
-                          user = await EmailAuthService.signIn(
-                            email: email,
-                            password: password,
-                          );
+                          if (isSignUp) {
+                            user = await EmailAuthService.signUp(
+                              email: email,
+                              password: password,
+                            );
+                          } else {
+                            user = await EmailAuthService.signIn(
+                              email: email,
+                              password: password,
+                            );
                           }
                         } catch (e) {
-                          authError = e.toString().replaceFirst('Exception: ', '');
+                          authError = e.toString().replaceFirst(
+                            'Exception: ',
+                            '',
+                          );
                         }
 
                         if (context.mounted) {
@@ -437,23 +431,26 @@ class _SignInPageState extends State<SignInPage> {
                             Navigator.pop(context);
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text(authError ?? (isSignUp ? '회원가입 실패' : '로그인 실패')),
+                                content: Text(
+                                  authError ??
+                                      (isSignUp ? '회원가입 실패' : '로그인 실패'),
+                                ),
                               ),
                             );
                           } else {
-                            final blocked = await ClinicAuthService.blockClinicAccountFromApplicantLogin();
-                            if (blocked != null) {
-                              if (context.mounted) {
-                                Navigator.pop(context);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text(blocked)),
-                                );
-                              }
-                              return;
-                            }
                             await SignInTracker.record('email');
-                            AdminActivityService.log(ActivityEventType.viewSignInPage, page: 'sign_in');
-                            AdminActivityService.log(ActivityEventType.loginSuccess, page: 'sign_in', extra: {'provider': 'email', 'isSignUp': isSignUp});
+                            AdminActivityService.log(
+                              ActivityEventType.viewSignInPage,
+                              page: 'sign_in',
+                            );
+                            AdminActivityService.log(
+                              ActivityEventType.loginSuccess,
+                              page: 'sign_in',
+                              extra: {
+                                'provider': 'email',
+                                'isSignUp': isSignUp,
+                              },
+                            );
                             if (isSignUp) {
                               AdminActivityService.logFunnel(
                                 FunnelEventType.signupComplete,
@@ -495,127 +492,141 @@ class _SignInPageState extends State<SignInPage> {
                       Text('비밀번호 설정 링크 보내기'),
                     ],
                   ),
-                  content: isSent
-                      ? Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.mark_email_read_rounded,
-                              size: 48,
-                              color: Colors.green,
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              '${emailCtrl.text.trim()}으로\n비밀번호 설정 링크를 보냈어요.',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(fontSize: 14, height: 1.5),
-                            ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              '메일함을 확인해주세요.\n스팸함에 있을 수도 있어요.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey,
-                                height: 1.5,
+                  content:
+                      isSent
+                          ? Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.mark_email_read_rounded,
+                                size: 48,
+                                color: Colors.green,
                               ),
-                            ),
-                          ],
-                        )
-                      : Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              '가입 시 사용한 이메일을 입력하면\n비밀번호 설정 링크를 보내드려요.',
-                              style: TextStyle(fontSize: 13, height: 1.5),
-                            ),
-                            const SizedBox(height: 16),
-                            TextField(
-                              controller: emailCtrl,
-                              keyboardType: TextInputType.emailAddress,
-                              decoration: InputDecoration(
-                                labelText: '이메일',
-                                hintText: 'email@example.com',
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10),
+                              const SizedBox(height: 12),
+                              Text(
+                                '${emailCtrl.text.trim()}으로\n비밀번호 설정 링크를 보냈어요.',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  height: 1.5,
                                 ),
-                                prefixIcon: const Icon(Icons.email_outlined),
                               ),
-                            ),
-                            if (errorMsg != null) ...[
-                              const SizedBox(height: 10),
-                              Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: Colors.red.withOpacity(0.07),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  errorMsg!,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.red,
-                                  ),
+                              const SizedBox(height: 8),
+                              const Text(
+                                '메일함을 확인해주세요.\n스팸함에 있을 수도 있어요.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                  height: 1.5,
                                 ),
                               ),
                             ],
-                          ],
-                        ),
-                  actions: isSent
-                      ? [
-                          ElevatedButton(
-                            onPressed: () => Navigator.pop(ctx),
-                            child: const Text('확인'),
-                          ),
-                        ]
-                      : [
-                          TextButton(
-                            onPressed: isSending ? null : () => Navigator.pop(ctx),
-                            child: const Text('취소'),
-                          ),
-                          ElevatedButton(
-                            onPressed: isSending
-                                ? null
-                                : () async {
-                                    final email = emailCtrl.text.trim();
-                                    if (email.isEmpty || !email.contains('@')) {
-                                      setDialogState(
-                                        () => errorMsg = '올바른 이메일 주소를 입력해주세요.',
-                                      );
-                                      return;
-                                    }
-                                    setDialogState(() {
-                                      isSending = true;
-                                      errorMsg = null;
-                                    });
-                                    try {
-                                      await FirebaseAuth.instance
-                                          .sendPasswordResetEmail(email: email);
-                                      if (ctx.mounted) {
-                                        setDialogState(() => isSent = true);
-                                      }
-                                    } on FirebaseAuthException catch (e) {
-                                      setDialogState(() {
-                                        isSending = false;
-                                        errorMsg = e.code == 'user-not-found'
-                                            ? '등록되지 않은 이메일이에요.'
-                                            : '발송 중 오류가 발생했어요. 다시 시도해주세요.';
-                                      });
-                                    }
-                                  },
-                            child: isSending
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
+                          )
+                          : Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                '가입 시 사용한 이메일을 입력하면\n비밀번호 설정 링크를 보내드려요.',
+                                style: TextStyle(fontSize: 13, height: 1.5),
+                              ),
+                              const SizedBox(height: 16),
+                              TextField(
+                                controller: emailCtrl,
+                                keyboardType: TextInputType.emailAddress,
+                                decoration: InputDecoration(
+                                  labelText: '이메일',
+                                  hintText: 'email@example.com',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  prefixIcon: const Icon(Icons.email_outlined),
+                                ),
+                              ),
+                              if (errorMsg != null) ...[
+                                const SizedBox(height: 10),
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red.withOpacity(0.07),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    errorMsg!,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.red,
                                     ),
-                                  )
-                                : const Text('링크 보내기'),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
-                        ],
+                  actions:
+                      isSent
+                          ? [
+                            ElevatedButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              child: const Text('확인'),
+                            ),
+                          ]
+                          : [
+                            TextButton(
+                              onPressed:
+                                  isSending ? null : () => Navigator.pop(ctx),
+                              child: const Text('취소'),
+                            ),
+                            ElevatedButton(
+                              onPressed:
+                                  isSending
+                                      ? null
+                                      : () async {
+                                        final email = emailCtrl.text.trim();
+                                        if (email.isEmpty ||
+                                            !email.contains('@')) {
+                                          setDialogState(
+                                            () =>
+                                                errorMsg =
+                                                    '올바른 이메일 주소를 입력해주세요.',
+                                          );
+                                          return;
+                                        }
+                                        setDialogState(() {
+                                          isSending = true;
+                                          errorMsg = null;
+                                        });
+                                        try {
+                                          await FirebaseAuth.instance
+                                              .sendPasswordResetEmail(
+                                                email: email,
+                                              );
+                                          if (ctx.mounted) {
+                                            setDialogState(() => isSent = true);
+                                          }
+                                        } on FirebaseAuthException catch (e) {
+                                          setDialogState(() {
+                                            isSending = false;
+                                            errorMsg =
+                                                e.code == 'user-not-found'
+                                                    ? '등록되지 않은 이메일이에요.'
+                                                    : '발송 중 오류가 발생했어요. 다시 시도해주세요.';
+                                          });
+                                        }
+                                      },
+                              child:
+                                  isSending
+                                      ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                      : const Text('링크 보내기'),
+                            ),
+                          ],
                 ),
           ),
     );
@@ -672,7 +683,9 @@ class _SignInPageState extends State<SignInPage> {
                       ? const Padding(
                         padding: EdgeInsets.symmetric(vertical: 24),
                         child: Center(
-                          child: CircularProgressIndicator(color: AppColors.blue),
+                          child: CircularProgressIndicator(
+                            color: AppColors.blue,
+                          ),
                         ),
                       )
                       : Column(
@@ -891,4 +904,3 @@ class _BtnDef {
     this.onPressed,
   );
 }
-

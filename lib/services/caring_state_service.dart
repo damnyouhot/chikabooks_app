@@ -7,11 +7,12 @@ import '../config/reward_constants.dart';
 
 /// 돌보기(1탭) 상태 서비스
 ///
-/// hunger / mood / energy / bond 4개 상태 + 시간 경과 시스템.
+/// hunger / mood / energy / bond / cleanliness 5개 상태 + 시간 경과 시스템.
 /// users/{uid} 문서의 caringState 필드를 사용.
 ///
 /// **수면·깨우기 ([wake]):** 짧은 수면(≤30분)은 기분 벌점만. 그 외는 에너지 회복(최대 8h분).
-/// 12시간 이상은 기분·유대 추가 패널티·고정 멘트(액션 서비스). 수면 중 시간 감쇠는 배고픔만.
+/// 12시간 이상은 기분 패널티·고정 멘트(액션 서비스). 장시간 수면 bond는 [_applyTimeDecay]에서만 처리.
+/// 수면 중 시간 감쇠는 배고픔만.
 ///
 /// **저장:** [saveState] / [saveStateSequential]는 동일 FIFO 큐로 처리되어
 /// `caringState` 전체 덮어쓰기가 동시에 끝나며 순서가 뒤바뀌지 않도록 한다.
@@ -28,14 +29,17 @@ class CaringStateService {
   // ═══════════════════════ 상수 ═══════════════════════
 
   /// 시간당 감소량
-  static const double hungerDecayPerHour = 5.0;
+  static const double hungerDecayPerHour = 8.0;
   static const double moodDecayPerHour = 6.0;
   static const double energyDecayPerHour = 4.0;
+  static const double cleanlinessDecayPerHourAwake = 10.0;
+  static const double cleanlinessDecayPerHourSleeping = 8.0;
 
   /// 시간 감소 하한 캡 (이 아래로는 떨어지지 않음)
   static const double hungerFloor = 20.0;
   static const double moodFloor = 15.0;
   static const double energyFloor = 25.0;
+  static const double cleanlinessFloor = 0.0;
 
   /// 수면 — energy 시간당 회복량, 최대 반영 시간
   static const double sleepEnergyPerHour = 12.5;
@@ -46,14 +50,37 @@ class CaringStateService {
   /// [_applyTimeDecay] 중 수면이면서 이 이상이면 일일 bond +1도 생략.
   static const Duration longSleepThreshold = Duration(hours: 12);
   static const double longSleepMoodPenalty = 2.0;
-  static const double longSleepBondPenalty = 1.0;
 
   /// bond 미접속 패널티
   static const double bondAbsencePenaltyPerDay = 3.0;
   static const double bondAbsenceMaxPenalty = 9.0;
 
+  /// bond — 정산 구간 내 밥 없음: [bondUnfedHoursPerPenalty]시간마다 −1
+  static const double bondUnfedHoursPerPenalty = 8.0;
+  static const int bondUnfedPenaltyPerStep = 1;
+
+  /// bond — 연속 깨어 있음: [bondAwakeHoursPerPenalty]시간마다 −1 ([lastWakeAt] 기준)
+  static const double bondAwakeHoursPerPenalty = 20.0;
+  static const int bondAwakePenaltyPerStep = 1;
+
+  /// bond — 연속 수면: [bondSleepHoursPerPenalty]시간마다 −2
+  static const double bondSleepHoursPerPenalty = 12.0;
+  static const int bondSleepPenaltyPerStep = 2;
+
   /// 쓰다듬기 효과 구간 — 최근 이 시간 안의 터치만 집계
   static const Duration touchCountWindow = Duration(hours: 3);
+
+  /// 청결 유지 기반 유대 정산
+  static const double cleanBondHighThreshold = 85.0;
+  static const double cleanBondGoodThreshold = 70.0;
+  static const double cleanBondBadThreshold = 50.0;
+  static const double cleanBondVeryBadThreshold = 30.0;
+  static const int cleanBondHighRewardHours = 4;
+  static const int cleanBondGoodRewardHours = 6;
+  static const int cleanBondBadPenaltyHours = 4;
+  static const int cleanBondVeryBadPenaltyHours = 2;
+  static const int cleanBondDailyGainCap = 3;
+  static const int cleanBondDailyLossCap = 4;
 
   // ═══════════════════════ 읽기 ═══════════════════════
 
@@ -114,9 +141,28 @@ class CaringStateService {
     double mood = state.mood;
     double energy = state.energy;
     double bond = state.bond;
+    double cleanliness = state.cleanliness;
+    var cleanlinessGoodSince = state.cleanlinessGoodSince;
+    var cleanlinessBadSince = state.cleanlinessBadSince;
+    var lastCleanBondRewardAt = state.lastCleanBondRewardAt;
+    var lastCleanBondPenaltyAt = state.lastCleanBondPenaltyAt;
+    var cleanBondDateKey = state.cleanBondDateKey;
+    var dailyCleanBondGain = state.dailyCleanBondGain;
+    var dailyCleanBondLoss = state.dailyCleanBondLoss;
+
+    final todayKey = _dateKey(now);
+    if (cleanBondDateKey != todayKey) {
+      cleanBondDateKey = todayKey;
+      dailyCleanBondGain = 0;
+      dailyCleanBondLoss = 0;
+    }
 
     if (state.isSleeping) {
       hunger = max(hungerFloor, hunger - hours * hungerDecayPerHour);
+      cleanliness = max(
+        cleanlinessFloor,
+        cleanliness - hours * cleanlinessDecayPerHourSleeping,
+      );
     } else {
       // hunger < 30 → mood 시간감소 +1/h 가속
       final effectiveMoodDecay = hunger < 30
@@ -126,6 +172,10 @@ class CaringStateService {
       hunger = max(hungerFloor, hunger - hours * hungerDecayPerHour);
       mood = max(moodFloor, mood - hours * effectiveMoodDecay);
       energy = max(energyFloor, energy - hours * energyDecayPerHour);
+      cleanliness = max(
+        cleanlinessFloor,
+        cleanliness - hours * cleanlinessDecayPerHourAwake,
+      );
     }
 
     // ── bond 미접속 패널티 (24h 초과분만) ──
@@ -140,7 +190,6 @@ class CaringStateService {
     }
 
     // ── 일일 첫 접속 bond +1 ──
-    final todayKey = _dateKey(now);
     final lastDateKey = state.lastActiveAt != null ? _dateKey(state.lastActiveAt!) : null;
     final skipDailyBondForLongSleep = state.isSleeping &&
         state.sleepStartedAt != null &&
@@ -148,6 +197,111 @@ class CaringStateService {
     if (lastDateKey != todayKey && !skipDailyBondForLongSleep) {
       bond = min(100, bond + 1);
       debugPrint('✅ 일일 첫 접속 bond +1');
+    }
+
+    // ── bond: 밥 안 준 누적 시간 → 8h당 -1
+    // lastFeedAt 있으면 마지막 밥부터, 없으면 이번 정산 구간만(마지막 활동~now).
+    final t0 = state.lastActiveAt ?? now;
+    final lastFeed = state.lastFeedAt;
+    final double unfedHours = lastFeed != null
+        ? max(0.0, now.difference(lastFeed).inMinutes / 60.0)
+        : hours;
+    final starvePenalty =
+        (unfedHours / bondUnfedHoursPerPenalty).floor() * bondUnfedPenaltyPerStep;
+    if (starvePenalty > 0) {
+      bond = max(0.0, bond - starvePenalty);
+      debugPrint('🔻 bond 밥 없음: -$starvePenalty (${unfedHours.toStringAsFixed(1)}h)');
+    }
+
+    // ── bond: 연속 깨어 있음 → 20h당 -1 ([lastWakeAt] 없으면 이번 구간 시작 t0) ──
+    if (!state.isSleeping) {
+      final wakeRef = state.lastWakeAt ?? t0;
+      final awakeHours = now.difference(wakeRef).inMinutes / 60.0;
+      if (awakeHours > 0) {
+        final awakePenalty =
+            (awakeHours / bondAwakeHoursPerPenalty).floor() * bondAwakePenaltyPerStep;
+        if (awakePenalty > 0) {
+          bond = max(0.0, bond - awakePenalty);
+          debugPrint(
+            '🔻 bond 연속 깨어 있음: -$awakePenalty (${awakeHours.toStringAsFixed(1)}h)',
+          );
+        }
+      }
+    }
+
+    // ── bond: 연속 수면 → 12h당 -2 ──
+    if (state.isSleeping && state.sleepStartedAt != null) {
+      final sleepHours =
+          now.difference(state.sleepStartedAt!).inMinutes / 60.0;
+      if (sleepHours > 0) {
+        final sleepPenalty =
+            (sleepHours / bondSleepHoursPerPenalty).floor() * bondSleepPenaltyPerStep;
+        if (sleepPenalty > 0) {
+          bond = max(0.0, bond - sleepPenalty);
+          debugPrint(
+            '🔻 bond 연속 수면: -$sleepPenalty (${sleepHours.toStringAsFixed(1)}h)',
+          );
+        }
+      }
+    }
+
+    // ── cleanliness: 좋은/나쁜 청결 상태 유지 시간에 따른 bond 정산 ──
+    if (cleanliness >= cleanBondGoodThreshold) {
+      cleanlinessGoodSince ??= state.lastActiveAt ?? now;
+      cleanlinessBadSince = null;
+
+      final rewardHours = cleanliness >= cleanBondHighThreshold
+          ? cleanBondHighRewardHours
+          : cleanBondGoodRewardHours;
+      final rewardRef = _laterOf(
+        cleanlinessGoodSince,
+        lastCleanBondRewardAt ?? cleanlinessGoodSince,
+      );
+      final elapsedRewardHours = now.difference(rewardRef).inMinutes / 60.0;
+      final remainingGain = cleanBondDailyGainCap - dailyCleanBondGain;
+      final steps = min(
+        (elapsedRewardHours / rewardHours).floor(),
+        max(0, remainingGain),
+      );
+      if (steps > 0) {
+        bond = min(100.0, bond + steps);
+        dailyCleanBondGain += steps;
+        lastCleanBondRewardAt = rewardRef.add(
+          Duration(hours: rewardHours * steps),
+        );
+        debugPrint('✅ bond 청결 유지 보상: +$steps');
+      }
+    } else {
+      cleanlinessGoodSince = null;
+    }
+
+    if (cleanliness < cleanBondBadThreshold) {
+      cleanlinessBadSince ??= state.lastActiveAt ?? now;
+      cleanlinessGoodSince = null;
+
+      final penaltyHours = cleanliness < cleanBondVeryBadThreshold
+          ? cleanBondVeryBadPenaltyHours
+          : cleanBondBadPenaltyHours;
+      final penaltyRef = _laterOf(
+        cleanlinessBadSince,
+        lastCleanBondPenaltyAt ?? cleanlinessBadSince,
+      );
+      final elapsedPenaltyHours = now.difference(penaltyRef).inMinutes / 60.0;
+      final remainingLoss = cleanBondDailyLossCap - dailyCleanBondLoss;
+      final steps = min(
+        (elapsedPenaltyHours / penaltyHours).floor(),
+        max(0, remainingLoss),
+      );
+      if (steps > 0) {
+        bond = max(0.0, bond - steps);
+        dailyCleanBondLoss += steps;
+        lastCleanBondPenaltyAt = penaltyRef.add(
+          Duration(hours: penaltyHours * steps),
+        );
+        debugPrint('🔻 bond 청결 낮음 패널티: -$steps');
+      }
+    } else {
+      cleanlinessBadSince = null;
     }
 
     // ── 쓰다듬기: 3시간 밖 타임스탬프 제거 ──
@@ -162,8 +316,18 @@ class CaringStateService {
       mood: mood,
       energy: energy,
       bond: bond,
+      cleanliness: cleanliness,
       lastActiveAt: now,
       touchTimestamps: touchTimestamps,
+      cleanlinessGoodSince: cleanlinessGoodSince,
+      cleanlinessBadSince: cleanlinessBadSince,
+      lastCleanBondRewardAt: lastCleanBondRewardAt,
+      lastCleanBondPenaltyAt: lastCleanBondPenaltyAt,
+      cleanBondDateKey: cleanBondDateKey,
+      dailyCleanBondGain: dailyCleanBondGain,
+      dailyCleanBondLoss: dailyCleanBondLoss,
+      // 한 번도 깨우기 API를 안 탄 유저도 연속 깨어 있음 패널티가 누적되도록
+      lastWakeAt: state.lastWakeAt ?? (!state.isSleeping ? t0 : null),
     );
   }
 
@@ -247,7 +411,7 @@ class CaringStateService {
   /// - [sleepStartedAt] 없음: 잠만 해제.
   /// - **≤30분:** 기분 [shortSleepMoodPenalty], 에너지 변화 없음.
   /// - **30분 초과 ~ 12시간 미만:** 에너지 회복(최대 [sleepMaxHours]만큼), 기분 +[sleepMoodBonus].
-  /// - **≥12시간:** 에너지 회복은 동일, 기분 [longSleepMoodPenalty]·유대 [longSleepBondPenalty].
+  /// - **≥12시간:** 에너지 회복은 동일, 기분 [longSleepMoodPenalty] (bond는 [_applyTimeDecay] 수면 패널티만).
   ///
   /// [now]를 넘기면 [CaringActionService.wakeUp]과 동일 시각으로 경과·멘트 분기를 맞출 수 있음.
   /// [persist]: false면 계산만 하고 저장은 호출자([saveStateSequential] 등)에 맡김.
@@ -258,7 +422,11 @@ class CaringStateService {
   }) async {
     final clock = now ?? DateTime.now();
     if (current.sleepStartedAt == null) {
-      final woken = current.copyWith(isSleeping: false, lastActiveAt: clock);
+      final woken = current.copyWith(
+        isSleeping: false,
+        lastActiveAt: clock,
+        lastWakeAt: clock,
+      );
       if (persist) await saveState(woken);
       return woken;
     }
@@ -277,6 +445,7 @@ class CaringStateService {
         isSleeping: false,
         mood: current.mood - shortSleepMoodPenalty,
         lastActiveAt: clock,
+        lastWakeAt: clock,
       );
       debugPrint('😴 짧은 수면 패널티: mood -$shortSleepMoodPenalty ($sleepMinutes분)');
     } else {
@@ -287,19 +456,16 @@ class CaringStateService {
       final recoveredMood = isLongSleep
           ? max(moodFloor, current.mood - longSleepMoodPenalty)
           : min(100.0, current.mood + sleepMoodBonus);
-      final newBond = isLongSleep
-          ? max(0.0, current.bond - longSleepBondPenalty)
-          : current.bond;
       woken = current.copyWith(
         isSleeping: false,
         energy: recoveredEnergy,
         mood: recoveredMood,
-        bond: newBond,
         lastActiveAt: clock,
+        lastWakeAt: clock,
       );
       if (isLongSleep) {
         debugPrint(
-          '😴 장시간 수면: mood -$longSleepMoodPenalty, bond -$longSleepBondPenalty ($sleepHoursTotal h)',
+          '😴 장시간 수면: mood -$longSleepMoodPenalty ($sleepHoursTotal h)',
         );
       }
     }
@@ -312,6 +478,9 @@ class CaringStateService {
 
   static String _dateKey(DateTime dt) =>
       '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+
+  static DateTime _laterOf(DateTime a, DateTime b) =>
+      a.isAfter(b) ? a : b;
 
   static bool hasGreetedToday(CaringState state) {
     final todayKey = _dateKey(DateTime.now());
@@ -334,13 +503,14 @@ List<DateTime> _touchTimestampsFromMap(Map<String, dynamic> m) {
   return const [];
 }
 
-/// 캐릭터 상태 — hunger / mood / energy / bond (0~100)
+/// 캐릭터 상태 — hunger / mood / energy / bond / cleanliness (0~100)
 class CaringState {
-  // ── 핵심 4대 상태 ──
+  // ── 핵심 5대 상태 ──
   final double hunger;
   final double mood;
   final double energy;
   final double bond;
+  final double cleanliness;
 
   // ── 수면 ──
   final bool isSleeping;
@@ -351,6 +521,16 @@ class CaringState {
 
   // ── 쓰다듬기: 최근 3시간 안의 터치 시각 목록 (Firestore `touchTimestamps` 배열) ──
   final List<DateTime> touchTimestamps;
+
+  // ── 씻기기/청결 유지 ──
+  final DateTime? lastWashedAt;
+  final DateTime? cleanlinessGoodSince;
+  final DateTime? cleanlinessBadSince;
+  final DateTime? lastCleanBondRewardAt;
+  final DateTime? lastCleanBondPenaltyAt;
+  final String? cleanBondDateKey;
+  final int dailyCleanBondGain;
+  final int dailyCleanBondLoss;
 
   // ── 밥주기 연속 카운터 (시간 기반) ──
   final int consecutiveFeedCount;
@@ -365,16 +545,26 @@ class CaringState {
   static const double _initMood = 40;
   static const double _initEnergy = 20;
   static const double _initBond = 10;
+  static const double _initCleanliness = 30;
 
   const CaringState({
     this.hunger = _initHunger,
     this.mood = _initMood,
     this.energy = _initEnergy,
     this.bond = _initBond,
+    this.cleanliness = _initCleanliness,
     this.isSleeping = false,
     this.sleepStartedAt,
     this.lastActiveAt,
     this.touchTimestamps = const [],
+    this.lastWashedAt,
+    this.cleanlinessGoodSince,
+    this.cleanlinessBadSince,
+    this.lastCleanBondRewardAt,
+    this.lastCleanBondPenaltyAt,
+    this.cleanBondDateKey,
+    this.dailyCleanBondGain = 0,
+    this.dailyCleanBondLoss = 0,
     this.consecutiveFeedCount = 0,
     this.lastFeedAt,
     this.hasGreetedDate,
@@ -400,10 +590,23 @@ class CaringState {
       mood: (m['mood'] as num?)?.toDouble() ?? _initMood,
       energy: (m['energy'] as num?)?.toDouble() ?? _initEnergy,
       bond: (m['bond'] as num?)?.toDouble() ?? _initBond,
+      cleanliness: (m['cleanliness'] as num?)?.toDouble() ?? _initCleanliness,
       isSleeping: m['isSleeping'] ?? false,
       sleepStartedAt: (m['sleepStartedAt'] as Timestamp?)?.toDate(),
       lastActiveAt: (m['lastActiveAt'] as Timestamp?)?.toDate(),
       touchTimestamps: _touchTimestampsFromMap(m),
+      lastWashedAt: (m['lastWashedAt'] as Timestamp?)?.toDate(),
+      cleanlinessGoodSince:
+          (m['cleanlinessGoodSince'] as Timestamp?)?.toDate(),
+      cleanlinessBadSince:
+          (m['cleanlinessBadSince'] as Timestamp?)?.toDate(),
+      lastCleanBondRewardAt:
+          (m['lastCleanBondRewardAt'] as Timestamp?)?.toDate(),
+      lastCleanBondPenaltyAt:
+          (m['lastCleanBondPenaltyAt'] as Timestamp?)?.toDate(),
+      cleanBondDateKey: m['cleanBondDateKey'],
+      dailyCleanBondGain: m['dailyCleanBondGain'] ?? 0,
+      dailyCleanBondLoss: m['dailyCleanBondLoss'] ?? 0,
       consecutiveFeedCount: m['consecutiveFeedCount'] ?? 0,
       lastFeedAt: (m['lastFeedAt'] as Timestamp?)?.toDate(),
       hasGreetedDate: m['hasGreetedDate'],
@@ -418,12 +621,21 @@ class CaringState {
       'mood': mood,
       'energy': energy,
       'bond': bond,
+      'cleanliness': cleanliness,
       'isSleeping': isSleeping,
       'sleepStartedAt': sleepStartedAt != null ? Timestamp.fromDate(sleepStartedAt!) : null,
       'lastActiveAt': lastActiveAt != null ? Timestamp.fromDate(lastActiveAt!) : null,
       'touchTimestamps': touchTimestamps
           .map((t) => Timestamp.fromDate(t))
           .toList(growable: false),
+      'lastWashedAt': lastWashedAt != null ? Timestamp.fromDate(lastWashedAt!) : null,
+      'cleanlinessGoodSince': cleanlinessGoodSince != null ? Timestamp.fromDate(cleanlinessGoodSince!) : null,
+      'cleanlinessBadSince': cleanlinessBadSince != null ? Timestamp.fromDate(cleanlinessBadSince!) : null,
+      'lastCleanBondRewardAt': lastCleanBondRewardAt != null ? Timestamp.fromDate(lastCleanBondRewardAt!) : null,
+      'lastCleanBondPenaltyAt': lastCleanBondPenaltyAt != null ? Timestamp.fromDate(lastCleanBondPenaltyAt!) : null,
+      'cleanBondDateKey': cleanBondDateKey,
+      'dailyCleanBondGain': dailyCleanBondGain,
+      'dailyCleanBondLoss': dailyCleanBondLoss,
       'consecutiveFeedCount': consecutiveFeedCount,
       'lastFeedAt': lastFeedAt != null ? Timestamp.fromDate(lastFeedAt!) : null,
       'hasGreetedDate': hasGreetedDate,
@@ -436,24 +648,50 @@ class CaringState {
     double? mood,
     double? energy,
     double? bond,
+    double? cleanliness,
     bool? isSleeping,
     DateTime? sleepStartedAt,
     DateTime? lastActiveAt,
     List<DateTime>? touchTimestamps,
+    DateTime? lastWashedAt,
+    DateTime? cleanlinessGoodSince,
+    DateTime? cleanlinessBadSince,
+    DateTime? lastCleanBondRewardAt,
+    DateTime? lastCleanBondPenaltyAt,
+    String? cleanBondDateKey,
+    int? dailyCleanBondGain,
+    int? dailyCleanBondLoss,
     int? consecutiveFeedCount,
     DateTime? lastFeedAt,
     String? hasGreetedDate,
     DateTime? lastWakeAt,
+    bool clearCleanlinessGoodSince = false,
+    bool clearCleanlinessBadSince = false,
   }) {
     return CaringState(
       hunger: (hunger ?? this.hunger).clamp(0, 100),
       mood: (mood ?? this.mood).clamp(0, 100),
       energy: (energy ?? this.energy).clamp(0, 100),
       bond: (bond ?? this.bond).clamp(0, 100),
+      cleanliness: (cleanliness ?? this.cleanliness).clamp(0, 100),
       isSleeping: isSleeping ?? this.isSleeping,
       sleepStartedAt: sleepStartedAt ?? this.sleepStartedAt,
       lastActiveAt: lastActiveAt ?? this.lastActiveAt,
       touchTimestamps: touchTimestamps ?? this.touchTimestamps,
+      lastWashedAt: lastWashedAt ?? this.lastWashedAt,
+      cleanlinessGoodSince: clearCleanlinessGoodSince
+          ? null
+          : (cleanlinessGoodSince ?? this.cleanlinessGoodSince),
+      cleanlinessBadSince: clearCleanlinessBadSince
+          ? null
+          : (cleanlinessBadSince ?? this.cleanlinessBadSince),
+      lastCleanBondRewardAt:
+          lastCleanBondRewardAt ?? this.lastCleanBondRewardAt,
+      lastCleanBondPenaltyAt:
+          lastCleanBondPenaltyAt ?? this.lastCleanBondPenaltyAt,
+      cleanBondDateKey: cleanBondDateKey ?? this.cleanBondDateKey,
+      dailyCleanBondGain: dailyCleanBondGain ?? this.dailyCleanBondGain,
+      dailyCleanBondLoss: dailyCleanBondLoss ?? this.dailyCleanBondLoss,
       consecutiveFeedCount: consecutiveFeedCount ?? this.consecutiveFeedCount,
       lastFeedAt: lastFeedAt ?? this.lastFeedAt,
       hasGreetedDate: hasGreetedDate ?? this.hasGreetedDate,
@@ -466,4 +704,5 @@ class CaringState {
   int get moodInt => mood.round();
   int get energyInt => energy.round();
   int get bondInt => bond.round();
+  int get cleanlinessInt => cleanliness.round();
 }

@@ -11,6 +11,7 @@ import {matchHiraClinicName} from "./hira-hospital-match";
 /** Firestore businessVerification.status 와 동일한 문자열 */
 export type RunCheckStatus =
   | "verified"
+  | "provisional"
   | "rejected"
   | "manual_review"
   | "pending_auto";
@@ -27,6 +28,8 @@ export interface RunCheckResult {
   /** strict | partial | none */
   hiraMatchLevel?: HiraMatchLevel;
 }
+
+const NEW_CLINIC_GRACE_MONTHS = 1;
 
 /**
  * 하이픈 등 비숫자 제거
@@ -119,6 +122,110 @@ function mockDecision(
   return {closed: false, hiraMismatch: false};
 }
 
+function parseOpenedAt(value: unknown): Date | null {
+  if (!value) return null;
+  if (value instanceof admin.firestore.Timestamp) {
+    return value.toDate();
+  }
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value;
+  }
+
+  const raw = String(value).trim();
+  if (!raw) return null;
+
+  const ymd = raw.match(/^(\d{4})[-./년\s]?(\d{1,2})[-./월\s]?(\d{1,2})/);
+  if (!ymd) return null;
+
+  const year = Number(ymd[1]);
+  const month = Number(ymd[2]);
+  const day = Number(ymd[3]);
+  if (!year || month < 1 || month > 12 || day < 1 || day > 31) return null;
+
+  const d = new Date(Date.UTC(year, month - 1, day));
+  if (
+    d.getUTCFullYear() !== year ||
+    d.getUTCMonth() !== month - 1 ||
+    d.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  return d;
+}
+
+function isWithinNewClinicGrace(openedAt: Date, now = new Date()): boolean {
+  const graceUntil = new Date(openedAt.getTime());
+  graceUntil.setUTCMonth(graceUntil.getUTCMonth() + NEW_CLINIC_GRACE_MONTHS);
+  return now.getTime() <= graceUntil.getTime();
+}
+
+function daysSince(openedAt: Date, now = new Date()): number {
+  const ms = now.getTime() - openedAt.getTime();
+  return Math.max(0, Math.floor(ms / (1000 * 60 * 60 * 24)));
+}
+
+async function applyHiraDecision(args: {
+  profileRef: FirebaseFirestore.DocumentReference<FirebaseFirestore.DocumentData>;
+  method: "nts" | "mock";
+  bizNoRaw: string;
+  hira: {matched: boolean | null; note: string; level: HiraMatchLevel};
+  openedAtRaw: unknown;
+}): Promise<RunCheckResult> {
+  const openedAt = parseOpenedAt(args.openedAtRaw);
+
+  let status: RunCheckStatus = "provisional";
+  let failReason: string | undefined;
+  const extra: Record<string, unknown> = {};
+
+  if (args.hira.matched === false) {
+    if (!openedAt) {
+      status = "manual_review";
+      failReason = "hira_mismatch_opened_at_unknown";
+    } else if (isWithinNewClinicGrace(openedAt)) {
+      status = "provisional";
+      extra["businessVerification.policyReason"] = "new_clinic_hira_grace";
+      extra["businessVerification.newClinicGraceDaysSinceOpened"] =
+        daysSince(openedAt);
+    } else {
+      status = "manual_review";
+      failReason = "hira_mismatch_after_grace";
+    }
+  }
+
+  await args.profileRef.update({
+    "businessVerification.status": status,
+    "businessVerification.bizNo": args.bizNoRaw,
+    "businessVerification.failReason": failReason ??
+      admin.firestore.FieldValue.delete(),
+    "businessVerification.lastCheckAt":
+      admin.firestore.FieldValue.serverTimestamp(),
+    "businessVerification.checkMethod": args.method,
+    "businessVerification.verifiedAt": null,
+    "businessVerification.hiraMatched": args.hira.matched,
+    "businessVerification.hiraNote": args.hira.note,
+    "businessVerification.hiraMatchLevel": args.hira.level,
+    "businessVerification.openedAt": openedAt ?
+      admin.firestore.Timestamp.fromDate(openedAt) :
+      admin.firestore.FieldValue.delete(),
+    "businessVerification.policyReason": extra[
+      "businessVerification.policyReason"
+    ] ?? admin.firestore.FieldValue.delete(),
+    "businessVerification.newClinicGraceDaysSinceOpened": extra[
+      "businessVerification.newClinicGraceDaysSinceOpened"
+    ] ?? admin.firestore.FieldValue.delete(),
+    "updatedAt": admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  return {
+    status,
+    failReason,
+    method: args.method,
+    hiraMatched: args.hira.matched,
+    hiraNote: args.hira.note,
+    hiraMatchLevel: args.hira.level,
+  };
+}
+
 /**
  * clinics_accounts/{uid}/clinic_profiles/{profileId} 를 읽고
  * businessVerification 을 갱신한다.
@@ -155,13 +262,14 @@ export async function runCheckBusinessStatus(
   const bizNoDigits = normalizeBizNoDigits(bizNoRaw);
   const clinicName = String(data.clinicName ?? ocr.clinicName ?? "").trim();
   const addressStr = String(data.address ?? ocr.address ?? "").trim();
+  const openedAtRaw = bv.openedAt ?? ocr.openedAt ?? data.openedAt;
 
-  if (bv.status === "verified") {
+  if (bv.status === "verified" || bv.status === "provisional") {
     const lv = bv.hiraMatchLevel;
     const hiraMatchLevel =
       lv === "strict" || lv === "partial" || lv === "none" ? lv : undefined;
     return {
-      status: "verified",
+      status: bv.status as RunCheckStatus,
       method: "mock",
       skipped: true,
       hiraMatched:
@@ -211,49 +319,17 @@ export async function runCheckBusinessStatus(
         method: "mock",
       };
     }
-    if (m.hiraMismatch) {
-      await profileRef.update({
-        "businessVerification.status": "manual_review",
-        "businessVerification.bizNo": bizNoRaw,
-        "businessVerification.failReason": "hira_mismatch",
-        "businessVerification.lastCheckAt":
-          admin.firestore.FieldValue.serverTimestamp(),
-        "businessVerification.checkMethod": "mock_hira",
-        "updatedAt": admin.firestore.FieldValue.serverTimestamp(),
-      });
-      return {
-        status: "manual_review",
-        failReason: "hira_mismatch",
-        method: "mock",
-      };
-    }
+    const hiraMock = m.hiraMismatch ?
+      {matched: false, note: "Mock HIRA 불일치", level: "none" as const} :
+      await runHiraSupplement(clinicName, addressStr, hiraServiceKey);
 
-    const hiraMock = await runHiraSupplement(
-      clinicName,
-      addressStr,
-      hiraServiceKey
-    );
-    await profileRef.update({
-      "businessVerification.status": "verified",
-      "businessVerification.bizNo": bizNoRaw,
-      "businessVerification.failReason": admin.firestore.FieldValue.delete(),
-      "businessVerification.lastCheckAt":
-        admin.firestore.FieldValue.serverTimestamp(),
-      "businessVerification.checkMethod": "mock",
-      "businessVerification.verifiedAt":
-        admin.firestore.FieldValue.serverTimestamp(),
-      "businessVerification.hiraMatched": hiraMock.matched,
-      "businessVerification.hiraNote": hiraMock.note,
-      "businessVerification.hiraMatchLevel": hiraMock.level,
-      "updatedAt": admin.firestore.FieldValue.serverTimestamp(),
-    });
-    return {
-      status: "verified",
+    return applyHiraDecision({
+      profileRef,
       method: "mock",
-      hiraMatched: hiraMock.matched,
-      hiraNote: hiraMock.note,
-      hiraMatchLevel: hiraMock.level,
-    };
+      bizNoRaw,
+      hira: hiraMock,
+      openedAtRaw,
+    });
   }
 
   try {
@@ -298,27 +374,13 @@ export async function runCheckBusinessStatus(
       addressStr,
       hiraServiceKey
     );
-    await profileRef.update({
-      "businessVerification.status": "verified",
-      "businessVerification.bizNo": bizNoRaw,
-      "businessVerification.failReason": admin.firestore.FieldValue.delete(),
-      "businessVerification.lastCheckAt":
-        admin.firestore.FieldValue.serverTimestamp(),
-      "businessVerification.checkMethod": "nts",
-      "businessVerification.verifiedAt":
-        admin.firestore.FieldValue.serverTimestamp(),
-      "businessVerification.hiraMatched": hiraNts.matched,
-      "businessVerification.hiraNote": hiraNts.note,
-      "businessVerification.hiraMatchLevel": hiraNts.level,
-      "updatedAt": admin.firestore.FieldValue.serverTimestamp(),
-    });
-    return {
-      status: "verified",
+    return applyHiraDecision({
+      profileRef,
       method: "nts",
-      hiraMatched: hiraNts.matched,
-      hiraNote: hiraNts.note,
-      hiraMatchLevel: hiraNts.level,
-    };
+      bizNoRaw,
+      hira: hiraNts,
+      openedAtRaw,
+    });
   } catch (e: unknown) {
     functions.logger.error("NTS API 호출 실패", {
       uid,

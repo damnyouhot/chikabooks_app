@@ -19,6 +19,7 @@ import '../../auth/web/web_account_menu_button.dart';
 import '../../../services/job_draft_service.dart';
 import '../../../models/job.dart';
 import '../../../models/job_draft.dart';
+import '../../publisher/services/clinic_profile_service.dart';
 import '../services/job_image_uploader.dart';
 import '../utils/job_image_attach_helpers.dart';
 import 'job_post_top_bar.dart';
@@ -42,7 +43,6 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
   int _wizardPage = 0;
   late final PageController _wizardPageController;
 
-  final GlobalKey _clinicDropKey = GlobalKey();
   final GlobalKey _promoDropKey = GlobalKey();
   final GlobalKey _captureDropKey = GlobalKey();
 
@@ -63,7 +63,6 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
   // ── 치과 이미지 (편집기 자료 첨부 · imageUrls) ───────────
   final List<XFile> _clinicImages = [];
   final Map<String, Uint8List> _clinicCache = {};
-  bool _clinicDropActive = false;
 
   // ── 홍보이미지 상태 ─────────────────────────────────────
   final List<XFile> _promoImages = [];
@@ -107,6 +106,18 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
 
   bool get _copyInFlight => _busyCopyDraftId != null || _busyCopyJobId != null;
 
+  Future<Map<String, dynamic>> _preferredClinicDraftFields() async {
+    final profile = await ClinicProfileService.getPreferredProfileForJob();
+    if (profile == null) return const {};
+    return {
+      'clinicProfileId': profile.id,
+      if (profile.effectiveName.trim().isNotEmpty)
+        'clinicName': profile.effectiveName.trim(),
+      if (profile.address.trim().isNotEmpty) 'address': profile.address.trim(),
+      if (profile.phone.trim().isNotEmpty) 'contact': profile.phone.trim(),
+    };
+  }
+
   /// 4번째 단계(page 3)에서 AI 추출 가능 여부
   bool get _hasAiReadyOnSlide2 =>
       _captureImages.isNotEmpty ||
@@ -126,7 +137,6 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
       _captureCache.clear();
       _textCtrl.clear();
       _wizardPage = 0;
-      _clinicDropActive = false;
       _promoDropActive = false;
       _captureDropActive = false;
       _isLoading = false;
@@ -549,6 +559,7 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
 
           final draftId = await JobDraftService.saveDraft(
             formData: {
+              ...await _preferredClinicDraftFields(),
               if (clinicUrls.isNotEmpty) 'imageUrls': clinicUrls,
               if (promoUrls.isNotEmpty) 'promotionalImageUrls': promoUrls,
               'rawImageUrls': captureUrls,
@@ -571,6 +582,7 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
 
           final draftId = await JobDraftService.saveDraft(
             formData: {
+              ...await _preferredClinicDraftFields(),
               if (clinicUrls.isNotEmpty) 'imageUrls': clinicUrls,
               if (promoUrls.isNotEmpty) 'promotionalImageUrls': promoUrls,
               'rawInputText': _textCtrl.text.trim(),
@@ -592,15 +604,16 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
         _submitStatusMessage = '초안을 저장하는 중이에요…';
         _syncSubmitDialog();
 
-        final onlyPromo = clinicUrls.isEmpty && promoUrls.isNotEmpty;
         final draftId = await JobDraftService.saveDraft(
           formData: {
+            ...await _preferredClinicDraftFields(),
             if (clinicUrls.isNotEmpty) 'imageUrls': clinicUrls,
             if (promoUrls.isNotEmpty) 'promotionalImageUrls': promoUrls,
             'sourceType': 'promotional',
             'currentStep': 'ai_generated',
             'aiParseStatus': 'done',
-            'editorStep': onlyPromo ? 'step2' : 'step1',
+            // 진입 단계는 항상 공고 상세(step2)부터 시작
+            'editorStep': 'step2',
           },
         );
         if (!mounted || draftId == null) return;
@@ -635,6 +648,7 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
     try {
       final draftId = await JobDraftService.saveDraft(
         formData: {
+          ...await _preferredClinicDraftFields(),
           'sourceType': 'manual',
           'currentStep': 'ai_generated',
           'aiParseStatus': 'done',
@@ -737,6 +751,12 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
         );
         return;
       }
+      if (d.clinicProfileId == null || d.clinicProfileId!.isEmpty) {
+        final fields = await _preferredClinicDraftFields();
+        if (fields.isNotEmpty) {
+          await JobDraftService.saveDraft(draftId: newId, formData: fields);
+        }
+      }
       context.push('/post-job/edit/$newId', extra: {'sourceType': 'copy'});
     } catch (_) {
       if (mounted) {
@@ -771,6 +791,10 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
           ),
         );
         return;
+      }
+      final fields = await _preferredClinicDraftFields();
+      if (fields.isNotEmpty) {
+        await JobDraftService.saveDraft(draftId: newId, formData: fields);
       }
       context.push('/post-job/edit/$newId', extra: {'sourceType': 'copy'});
     } catch (_) {
@@ -814,7 +838,9 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
               child: Padding(
                 padding: outerPad,
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: _kInputPageMaxWidth),
+                  constraints: const BoxConstraints(
+                    maxWidth: _kInputPageMaxWidth,
+                  ),
                   child: LayoutBuilder(
                     builder: (context, constraints) {
                       final rowW = constraints.maxWidth;
@@ -838,14 +864,16 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: _kColumnDividerPaddingH,
                                   ),
-                  child: Align(
-                    alignment: Alignment.center,
-                    child: Container(
-                      width: 1,
-                      height: _wizardDividerLineHeight,
+                                  child: Align(
+                                    alignment: Alignment.center,
+                                    child: Container(
+                                      width: 1,
+                                      height: _wizardDividerLineHeight,
                                       decoration: BoxDecoration(
                                         color: AppColors.divider,
-                                        borderRadius: BorderRadius.circular(0.5),
+                                        borderRadius: BorderRadius.circular(
+                                          0.5,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -878,7 +906,7 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
   // 우측 패널: 임시 / 게시 목록
   // ══════════════════════════════════════════════════════════
 
-  static const double _leftListCardHeight = 68;
+  static const double _leftListCardHeight = 76;
   static const double _leftSideIconWidth = 40;
 
   TextStyle get _leftSectionSubtitleStyle => GoogleFonts.notoSansKr(
@@ -1030,6 +1058,17 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
     );
   }
 
+  Future<String> _draftClinicName(JobDraft d) async {
+    final pid = d.clinicProfileId;
+    if (pid != null && pid.isNotEmpty) {
+      final p = await ClinicProfileService.getProfile(pid);
+      final name = p?.effectiveName.trim();
+      if (name != null && name.isNotEmpty) return name;
+    }
+    final fallback = d.clinicName.trim();
+    return fallback.isNotEmpty ? fallback : '치과 미선택';
+  }
+
   Widget _buildDraftCard(JobDraft d, {required bool isNewest}) {
     final r = BorderRadius.circular(AppPublisher.buttonRadius);
     final line = BorderSide(color: AppColors.white.withValues(alpha: 0.35));
@@ -1059,15 +1098,39 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Expanded(
-                      child: Text(
-                        d.displayTitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.notoSansKr(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.white,
-                        ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            d.displayTitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.notoSansKr(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          FutureBuilder<String>(
+                            future: _draftClinicName(d),
+                            builder: (context, snap) {
+                              return Text(
+                                snap.data ?? '치과 확인 중',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.notoSansKr(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.white.withValues(
+                                    alpha: 0.68,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -1383,12 +1446,14 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
                     cache: _promoCache,
                     dropActive: _promoDropActive,
                     dropKey: _promoDropKey,
-                    onPick: () =>
-                        _pickAndAppend(_promoImages, _promoCache, max: 10),
-                    onRemove: (i) => setState(() {
-                      final r = _promoImages.removeAt(i);
-                      _promoCache.remove(r.name);
-                    }),
+                    onPick:
+                        () =>
+                            _pickAndAppend(_promoImages, _promoCache, max: 10),
+                    onRemove:
+                        (i) => setState(() {
+                          final r = _promoImages.removeAt(i);
+                          _promoCache.remove(r.name);
+                        }),
                     onDropDone: (d) async {
                       setState(() => _promoDropActive = false);
                       await _appendImages(
@@ -1401,7 +1466,11 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
                     onWebDrop: (files) async {
                       setState(() => _promoDropActive = false);
                       await _appendImages(
-                          files, _promoImages, _promoCache, max: 10);
+                        files,
+                        _promoImages,
+                        _promoCache,
+                        max: 10,
+                      );
                     },
                     onDragEnter: () => setState(() => _promoDropActive = true),
                     onDragExit: () => setState(() => _promoDropActive = false),
@@ -1417,12 +1486,17 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
                     cache: _captureCache,
                     dropActive: _captureDropActive,
                     dropKey: _captureDropKey,
-                    onPick: () =>
-                        _pickAndAppend(_captureImages, _captureCache, max: 8),
-                    onRemove: (i) => setState(() {
-                      final r = _captureImages.removeAt(i);
-                      _captureCache.remove(r.name);
-                    }),
+                    onPick:
+                        () => _pickAndAppend(
+                          _captureImages,
+                          _captureCache,
+                          max: 8,
+                        ),
+                    onRemove:
+                        (i) => setState(() {
+                          final r = _captureImages.removeAt(i);
+                          _captureCache.remove(r.name);
+                        }),
                     onDropDone: (d) async {
                       setState(() => _captureDropActive = false);
                       await _appendImages(
@@ -1435,12 +1509,16 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
                     onWebDrop: (files) async {
                       setState(() => _captureDropActive = false);
                       await _appendImages(
-                          files, _captureImages, _captureCache, max: 8);
+                        files,
+                        _captureImages,
+                        _captureCache,
+                        max: 8,
+                      );
                     },
-                    onDragEnter: () =>
-                        setState(() => _captureDropActive = true),
-                    onDragExit: () =>
-                        setState(() => _captureDropActive = false),
+                    onDragEnter:
+                        () => setState(() => _captureDropActive = true),
+                    onDragExit:
+                        () => setState(() => _captureDropActive = false),
                     hint: 'AI가 내용을 읽어 초안을 만들어 드려요(최대 8장).',
                     title: '기존 게시물을 캡처해서 올려주세요',
                     maxImages: 8,
@@ -1468,11 +1546,12 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
         final isCurrent = _wizardPage == i;
         return Expanded(
           child: GestureDetector(
-            onTap: () => _wizardPageController.animateToPage(
-              i,
-              duration: const Duration(milliseconds: 320),
-              curve: Curves.easeOutCubic,
-            ),
+            onTap:
+                () => _wizardPageController.animateToPage(
+                  i,
+                  duration: const Duration(milliseconds: 320),
+                  curve: Curves.easeOutCubic,
+                ),
             behavior: HitTestBehavior.opaque,
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -1485,7 +1564,10 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
                     style: GoogleFonts.notoSansKr(
                       fontSize: 12,
                       fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
-                      color: isCurrent ? AppColors.accent : AppColors.textSecondary,
+                      color:
+                          isCurrent
+                              ? AppColors.accent
+                              : AppColors.textSecondary,
                       letterSpacing: -0.12,
                     ),
                   ),
@@ -1775,12 +1857,13 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
           SizedBox(
             width: _ctaBackSlotWidth,
             child: ElevatedButton.icon(
-              onPressed: canGoBack
-                  ? () => _wizardPageController.previousPage(
+              onPressed:
+                  canGoBack
+                      ? () => _wizardPageController.previousPage(
                         duration: const Duration(milliseconds: 320),
                         curve: Curves.easeOutCubic,
                       )
-                  : null,
+                      : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.white,
                 foregroundColor: AppColors.textPrimary,
@@ -1792,7 +1875,9 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
                 ),
                 minimumSize: const Size.fromHeight(AppPublisher.ctaHeight),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppPublisher.buttonRadius),
+                  borderRadius: BorderRadius.circular(
+                    AppPublisher.buttonRadius,
+                  ),
                 ),
               ),
               icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 13),

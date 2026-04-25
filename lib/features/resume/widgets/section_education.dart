@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../../../models/resume.dart';
 import '../../../core/theme/app_colors.dart';
 import 'resume_ocr_prompt.dart';
-import 'resume_inline_underline_field.dart';
 
 /// F. 학력/실습 섹션
 class SectionEducation extends StatefulWidget {
@@ -139,11 +138,10 @@ class _EducationCardState extends State<_EducationCard> {
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: AppColors.white,
       margin: const EdgeInsets.only(bottom: 14),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -168,32 +166,40 @@ class _EducationCardState extends State<_EducationCard> {
               ],
             ),
             const SizedBox(height: 10),
-            Divider(height: 1, color: AppColors.divider.withOpacity(0.6)),
-            const SizedBox(height: 14),
-            ResumeInlineUnderlineField(
-              label: '학교명',
-              hint: '예: OO대학교',
-              controller: _schoolCtrl,
-              onChanged: (_) => _emit(),
-            ),
-            ResumeInlineUnderlineField(
-              label: '전공',
-              hint: '치위생학과',
-              controller: _majorCtrl,
-              onChanged: (_) => _emit(),
-            ),
-            ResumeInlineUnderlineField(
-              label: '졸업년도',
-              hint: '2021',
-              controller: _yearCtrl,
-              keyboardType: TextInputType.number,
-              onChanged: (_) => _emit(),
-            ),
+            _field('학교명', _schoolCtrl, '예: OO대학교'),
+            _field('전공', _majorCtrl, '치위생학과'),
+            _field('졸업년도', _yearCtrl, '2021',
+                keyboard: TextInputType.number),
           ],
         ),
       ),
     );
   }
 
+  Widget _field(
+    String label,
+    TextEditingController ctrl,
+    String hint, {
+    TextInputType keyboard = TextInputType.text,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: TextField(
+        controller: ctrl,
+        keyboardType: keyboard,
+        onChanged: (_) => _emit(),
+        decoration: InputDecoration(
+          labelText: label,
+          hintText: hint,
+            hintStyle: TextStyle(color: AppColors.textDisabled),
+          border: const OutlineInputBorder(),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          isDense: true,
+        ),
+        style: const TextStyle(fontSize: 13),
+      ),
+    );
+  }
 }
 

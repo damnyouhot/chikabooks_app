@@ -85,6 +85,7 @@ class OrderService {
     required String draftId,
     required String clinicProfileId,
     String? voucherId,
+    Map<String, dynamic>? consents,
   }) async {
     try {
       final callable = FirebaseFunctions.instance.httpsCallable('createOrder');
@@ -92,6 +93,7 @@ class OrderService {
         'draftId': draftId,
         'clinicProfileId': clinicProfileId,
         if (voucherId != null) 'voucherId': voucherId,
+        if (consents != null) 'consents': consents,
       });
       final data = Map<String, dynamic>.from(result.data as Map);
       return CreateOrderResult(

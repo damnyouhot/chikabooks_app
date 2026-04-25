@@ -1,0 +1,22 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appIDs": [
+          "NAW5958Y22.com.chikabooks.chikabooksApp"
+        ],
+        "components": [
+          {
+            "/": "/bond",
+            "comment": "Open shared empathy polls in the app."
+          },
+          {
+            "/": "/quiz",
+            "comment": "Open shared quizzes in the app."
+          }
+        ]
+      }
+    ]
+  }
+}

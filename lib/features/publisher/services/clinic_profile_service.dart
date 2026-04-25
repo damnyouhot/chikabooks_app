@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -24,9 +26,7 @@ class ClinicProfileService {
     final uid = _uid;
     if (uid == null) return [];
     try {
-      final snap = await _col(uid)
-          .orderBy('createdAt', descending: true)
-          .get();
+      final snap = await _col(uid).orderBy('createdAt', descending: true).get();
       return snap.docs
           .map((d) => ClinicProfile.fromDoc(d, ownerUid: uid))
           .toList();
@@ -37,15 +37,36 @@ class ClinicProfileService {
   }
 
   /// 프로필 목록 실시간 스트림
-  static Stream<List<ClinicProfile>> watchProfiles() {
-    final uid = _uid;
-    if (uid == null) return Stream.value([]);
+  ///
+  /// [uid] 가 주어지면 그 사용자에 대한 stream 을 만든다 (계정 격리).
+  /// 주어지지 않으면 호출 시점의 currentUser 를 사용한다(레거시 호환).
+  static Stream<List<ClinicProfile>> watchProfiles({String? uid}) {
+    final effectiveUid = uid ?? _uid;
+    if (effectiveUid == null) return Stream.value([]);
+    return _watchProfilesFor(effectiveUid);
+  }
+
+  static Stream<List<ClinicProfile>> _watchProfilesFor(String uid) {
     return _col(uid)
         .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snap) => snap.docs
-            .map((d) => ClinicProfile.fromDoc(d, ownerUid: uid))
-            .toList());
+        .map((snap) {
+          return snap.docs
+              .map((d) => ClinicProfile.fromDoc(d, ownerUid: uid))
+              .toList();
+        })
+        .transform(
+          StreamTransformer.fromHandlers(
+            handleError: (
+              Object e,
+              StackTrace st,
+              EventSink<List<ClinicProfile>> sink,
+            ) {
+              debugPrint('⚠️ ClinicProfileService.watchProfiles: $e');
+              sink.addError(e, st);
+            },
+          ),
+        );
   }
 
   /// 단일 프로필 실시간 스트림 (사업자 인증 상태 반영용)
@@ -79,6 +100,30 @@ class ClinicProfileService {
     return null;
   }
 
+  /// 공고에 자동 연결할 기본 지점.
+  ///
+  /// 우선순위:
+  /// 1. 공고 게시 가능한(verified/provisional) 지점
+  /// 2. 이름/주소 등 식별 정보가 있는 지점
+  /// 3. 빈 지점
+  static Future<ClinicProfile?> getPreferredProfileForJob() async {
+    final profiles = await getProfiles();
+    if (profiles.isEmpty) return null;
+    final publishable = profiles.where((p) => p.canPublishJobs).toList();
+    if (publishable.isNotEmpty) return publishable.first;
+    final identified =
+        profiles
+            .where(
+              (p) =>
+                  p.effectiveName.trim().isNotEmpty ||
+                  p.address.trim().isNotEmpty ||
+                  p.ownerName.trim().isNotEmpty,
+            )
+            .toList();
+    if (identified.isNotEmpty) return identified.first;
+    return profiles.first;
+  }
+
   /// 프로필 개수
   static Future<int> getProfileCount() async {
     final uid = _uid;
@@ -108,8 +153,8 @@ class ClinicProfileService {
         final existing = await getProfile(existingClinicProfileId);
         if (existing != null) return existing;
       }
-      var list = await getProfiles();
-      if (list.isEmpty) {
+      final selected = await getPreferredProfileForJob();
+      if (selected == null) {
         final newId = await createProfile();
         if (newId == null) return null;
         await JobDraftService.saveDraft(
@@ -118,12 +163,11 @@ class ClinicProfileService {
         );
         return getProfile(newId);
       }
-      final first = list.first;
       await JobDraftService.saveDraft(
         draftId: draftId,
-        formData: {'clinicProfileId': first.id},
+        formData: {'clinicProfileId': selected.id},
       );
-      return first;
+      return selected;
     } catch (e) {
       debugPrint('⚠️ ClinicProfileService.ensureDefaultProfileForDraft: $e');
       return null;
@@ -157,6 +201,18 @@ class ClinicProfileService {
     } catch (e) {
       debugPrint('⚠️ ClinicProfileService.createProfile: $e');
       return null;
+    }
+  }
+
+  static Future<bool> deleteProfile(String profileId) async {
+    final uid = _uid;
+    if (uid == null || profileId.isEmpty) return false;
+    try {
+      await _col(uid).doc(profileId).delete();
+      return true;
+    } catch (e) {
+      debugPrint('⚠️ ClinicProfileService.deleteProfile: $e');
+      return false;
     }
   }
 
@@ -201,8 +257,7 @@ class ClinicProfileService {
     if (uid == null) return false;
 
     try {
-      final masterDoc =
-          await _db.collection('clinics_accounts').doc(uid).get();
+      final masterDoc = await _db.collection('clinics_accounts').doc(uid).get();
       if (!masterDoc.exists) return false;
       final data = masterDoc.data()!;
 

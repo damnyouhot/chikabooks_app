@@ -25,6 +25,11 @@ class _AdminFeatureTabState extends State<AdminFeatureTab>
   List<AppErrorItem> _errors = [];
   List<MapEntry<String, int>> _topErrorPages = [];
 
+  // 각 섹션의 표본 한계 메타 — limit 에 닿으면 배너 노출
+  SampleMeta _featuresSample = SampleMeta.empty;
+  SampleMeta _errorsSample = SampleMeta.empty;
+  SampleMeta _errorPagesSample = SampleMeta.empty;
+
   @override
   void initState() {
     super.initState();
@@ -46,15 +51,30 @@ class _AdminFeatureTabState extends State<AdminFeatureTab>
     try {
       final results = await Future.wait([
         // 탭별 섹션에 나눠 담기 위해 타입 수를 넉넉히 (전역 TOP N)
-        AdminDashboardService.getTopFeatures(limit: 36, since: widget.since),
-        AdminDashboardService.getRecentErrors(limit: 10, since: widget.since),
-        AdminDashboardService.getTopErrorPages(limit: 5, since: widget.since),
+        AdminDashboardService.getTopFeaturesWithMeta(
+          limit: 36,
+          since: widget.since,
+        ),
+        AdminDashboardService.getRecentErrorsWithMeta(
+          limit: 10,
+          since: widget.since,
+        ),
+        AdminDashboardService.getTopErrorPagesWithMeta(
+          limit: 5,
+          since: widget.since,
+        ),
       ]);
       if (!mounted) return;
+      final featRes = results[0] as FeatureReactionResult;
+      final errRes = results[1] as RecentErrorsResult;
+      final pageRes = results[2] as TopErrorPagesResult;
       setState(() {
-        _features = results[0] as List<FeatureReactionItem>;
-        _errors = results[1] as List<AppErrorItem>;
-        _topErrorPages = results[2] as List<MapEntry<String, int>>;
+        _features = featRes.items;
+        _featuresSample = featRes.sample;
+        _errors = errRes.items;
+        _errorsSample = errRes.sample;
+        _topErrorPages = pageRes.entries;
+        _errorPagesSample = pageRes.sample;
         _loading = false;
       });
     } catch (e) {
@@ -91,6 +111,10 @@ class _AdminFeatureTabState extends State<AdminFeatureTab>
               ),
             ),
           ),
+          AdminSampleNotice(
+            sampleSize: _featuresSample.sampleSize,
+            limit: _featuresSample.limit,
+          ),
           if (_features.isEmpty)
             const AdminEmptyState(message: '아직 기록된 기능 반응이 없어요')
           else
@@ -100,6 +124,10 @@ class _AdminFeatureTabState extends State<AdminFeatureTab>
 
           // ── 오류 발생 페이지 TOP ──────────────────────────────
           const AdminSectionTitle('오류 발생 페이지 TOP'),
+          AdminSampleNotice(
+            sampleSize: _errorPagesSample.sampleSize,
+            limit: _errorPagesSample.limit,
+          ),
           if (_topErrorPages.isEmpty)
             const AdminEmptyState(message: '오류 데이터가 없어요 👍')
           else
@@ -109,6 +137,10 @@ class _AdminFeatureTabState extends State<AdminFeatureTab>
 
           // ── 최근 오류 리스트 ──────────────────────────────────
           const AdminSectionTitle('최근 오류 리스트'),
+          AdminSampleNotice(
+            sampleSize: _errorsSample.sampleSize,
+            limit: _errorsSample.limit,
+          ),
           if (_errors.isEmpty)
             const AdminEmptyState(message: '최근 오류가 없어요 👍')
           else

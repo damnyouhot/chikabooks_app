@@ -1,28 +1,14 @@
 import 'package:flutter/material.dart';
 import '../../../models/resume.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_tokens.dart';
 import 'resume_ocr_prompt.dart';
-import 'resume_inline_underline_field.dart';
-import 'resume_skill_comment_field.dart';
-import 'resume_skill_presets.dart';
 
 /// E. 임상 스킬 / 소프트 스킬 섹션
 class SectionSkills extends StatefulWidget {
   final List<ResumeSkill> skills;
-  final String clinicalSkillsComment;
-  final String softSkillsComment;
-  final ValueChanged<List<ResumeSkill>> onSkillsChanged;
-  final void Function(String clinical, String soft) onCommentsChanged;
+  final ValueChanged<List<ResumeSkill>> onChanged;
 
-  const SectionSkills({
-    super.key,
-    required this.skills,
-    this.clinicalSkillsComment = '',
-    this.softSkillsComment = '',
-    required this.onSkillsChanged,
-    required this.onCommentsChanged,
-  });
+  const SectionSkills({super.key, required this.skills, required this.onChanged});
 
   @override
   State<SectionSkills> createState() => _SectionSkillsState();
@@ -32,41 +18,46 @@ class _SectionSkillsState extends State<SectionSkills> {
   late List<ResumeSkill> _items;
   bool _showCustomInput = false;
   final _customCtrl = TextEditingController();
-  late final TextEditingController _clinicalCommentCtrl;
-  late final TextEditingController _softCommentCtrl;
 
-  /// 치과 채용 담당자가 바로 이해할 수 있는 예시 문장 (플레이스홀더)
-  static const _clinicalCommentHint =
-      '치과에서 위에 선택한 임상 스킬을 바탕으로 지원자를 더 잘 파악할 수 있게 적어주세요. '
-      '예) 비슷한 경력의 동료 대비 OO 분야에 더 강합니다. '
-      'OO 치과 근무 경험을 바탕으로 소아 진료 보조에 특히 강점이 있습니다.';
-  static const _softCommentHint =
-      '치과에서 위에 선택한 소프트 스킬로 협업·운영에서 어떤 역할을 해왔는지 적어주세요. '
-      '예) 비슷한 경력 대비 OO(상담·수납·교육 등)에서 강점이 있습니다. '
-      'OO 업무를 맡아 팀 내 OO(재고·감염·클레임 대응 등)에 기여했습니다.';
+  // 프리셋과 skillMaster를 통일 — career_profile_service.dart skillMaster와 동기화
+  static const _clinicalPresets = [
+    '스케일링',
+    '치주 관리',
+    '불소도포',
+    '방사선 촬영',
+    '인상 채득',
+    '임시치아 제작',
+    '교정 와이어 교체',
+    '임플란트 보조',
+    '근관치료 보조',
+    '소아 진료 보조',
+    '레진/실란트',
+    '치아미백',
+    '구강스캐너',
+    '구내,구외 포토',
+  ];
+
+  static const _softPresets = [
+    '환자 상담',
+    '보험청구',
+    '차트 관리',
+    '감염 관리',
+    '재고 관리',
+    '팀 리더십',
+    '신규 직원 교육',
+    '고객 CS',
+  ];
 
   @override
   void initState() {
     super.initState();
     _items = List.of(widget.skills);
-    _clinicalCommentCtrl =
-        TextEditingController(text: widget.clinicalSkillsComment);
-    _softCommentCtrl = TextEditingController(text: widget.softSkillsComment);
   }
 
   @override
   void dispose() {
     _customCtrl.dispose();
-    _clinicalCommentCtrl.dispose();
-    _softCommentCtrl.dispose();
     super.dispose();
-  }
-
-  void _emitComments() {
-    widget.onCommentsChanged(
-      _clinicalCommentCtrl.text,
-      _softCommentCtrl.text,
-    );
   }
 
   void _toggleSkill(String id, String name) {
@@ -78,7 +69,7 @@ class _SectionSkillsState extends State<SectionSkills> {
         _items.add(ResumeSkill(id: id, name: name, level: 3));
       }
     });
-    widget.onSkillsChanged(_items);
+    widget.onChanged(_items);
   }
 
   void _addCustomSkill() {
@@ -96,7 +87,7 @@ class _SectionSkillsState extends State<SectionSkills> {
       _customCtrl.clear();
       _showCustomInput = false;
     });
-    widget.onSkillsChanged(_items);
+    widget.onChanged(_items);
   }
 
   void _setLevel(int idx, int level) {
@@ -104,7 +95,7 @@ class _SectionSkillsState extends State<SectionSkills> {
       final old = _items[idx];
       _items[idx] = ResumeSkill(id: old.id, name: old.name, level: level);
     });
-    widget.onSkillsChanged(_items);
+    widget.onChanged(_items);
   }
 
   @override
@@ -124,50 +115,18 @@ class _SectionSkillsState extends State<SectionSkills> {
         const SizedBox(height: 12),
         const ResumeOcrPrompt(),
         Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          alignment: WrapAlignment.start,
-          children: ResumeSkillPresets.clinical.map((s) {
+          spacing: 6,
+          runSpacing: 6,
+          children: _clinicalPresets.map((s) {
             final selected = _items.any((sk) => sk.id == s);
             return FilterChip(
-              label: Text(
-                s,
-                style: const TextStyle(
-                  fontSize: 12,
-                  height: 1.25,
-                  fontWeight: FontWeight.w500,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
+              label: Text(s, style: const TextStyle(fontSize: 12)),
               selected: selected,
               selectedColor: AppColors.accent.withOpacity(0.12),
               checkmarkColor: AppColors.accent,
-              visualDensity: VisualDensity.compact,
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 6,
-                vertical: 2,
-              ),
-              side: BorderSide(
-                color: selected
-                    ? AppColors.accent.withOpacity(0.45)
-                    : AppColors.divider,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
               onSelected: (_) => _toggleSkill(s, s),
             );
           }).toList(),
-        ),
-        const SizedBox(height: 10),
-        ResumeSkillCommentField(
-          label: '코멘트',
-          hint: _clinicalCommentHint,
-          controller: _clinicalCommentCtrl,
-          onChanged: (_) => _emitComments(),
-          bottomPadding: 16,
         ),
 
         const SizedBox(height: 24),
@@ -177,50 +136,18 @@ class _SectionSkillsState extends State<SectionSkills> {
         ),
         const SizedBox(height: 12),
         Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          alignment: WrapAlignment.start,
-          children: ResumeSkillPresets.soft.map((s) {
+          spacing: 6,
+          runSpacing: 6,
+          children: _softPresets.map((s) {
             final selected = _items.any((sk) => sk.id == s);
             return FilterChip(
-              label: Text(
-                s,
-                style: const TextStyle(
-                  fontSize: 12,
-                  height: 1.25,
-                  fontWeight: FontWeight.w500,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
+              label: Text(s, style: const TextStyle(fontSize: 12)),
               selected: selected,
               selectedColor: AppColors.accent.withOpacity(0.12),
               checkmarkColor: AppColors.accent,
-              visualDensity: VisualDensity.compact,
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 6,
-                vertical: 2,
-              ),
-              side: BorderSide(
-                color: selected
-                    ? AppColors.accent.withOpacity(0.45)
-                    : AppColors.divider,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
               onSelected: (_) => _toggleSkill(s, s),
             );
           }).toList(),
-        ),
-        const SizedBox(height: 10),
-        ResumeSkillCommentField(
-          label: '코멘트',
-          hint: _softCommentHint,
-          controller: _softCommentCtrl,
-          onChanged: (_) => _emitComments(),
-          bottomPadding: 16,
         ),
 
         const SizedBox(height: 20),
@@ -291,7 +218,7 @@ class _SectionSkillsState extends State<SectionSkills> {
                     GestureDetector(
                       onTap: () {
                         setState(() => _items.removeAt(i));
-                        widget.onSkillsChanged(_items);
+                        widget.onChanged(_items);
                       },
                       child: const Padding(
                         padding: EdgeInsets.only(left: 4),
@@ -323,29 +250,44 @@ class _SectionSkillsState extends State<SectionSkills> {
             style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
           ),
           const SizedBox(height: 8),
-          ResumeInlineUnderlineField(
-            label: '스킬',
-            hint: '예: 틀니 보조, 치과CT 촬영 등',
-            controller: _customCtrl,
-            autofocus: true,
-            bottomPadding: 6,
-            onSubmitted: (_) => _addCustomSkill(),
-            inputSuffix: Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: ElevatedButton(
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _customCtrl,
+                  autofocus: true,
+                  style: const TextStyle(fontSize: 13),
+                  decoration: InputDecoration(
+                    hintText: '예: 틀니 보조, 치과CT 촬영 등',
+                    hintStyle: TextStyle(fontSize: 12, color: AppColors.textDisabled),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: AppColors.divider),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: AppColors.accent),
+                    ),
+                    filled: true,
+                    fillColor: AppColors.white,
+                  ),
+                  onSubmitted: (_) => _addCustomSkill(),
+                ),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton(
                 onPressed: _addCustomSkill,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accent,
                   foregroundColor: AppColors.onAccent,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppRadius.sm),
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   elevation: 0,
                 ),
                 child: const Text('추가', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
               ),
-            ),
+            ],
           ),
           const SizedBox(height: 6),
           TextButton(

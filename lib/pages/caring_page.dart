@@ -557,6 +557,39 @@ class _CaringPageState extends State<CaringPage>
     }
   }
 
+  void _onWash() async {
+    if (_caringState.isSleeping || !_caringReady || _caringPersistBusy) return;
+    _tapTrigger?.fire();
+    final prev = _caringState;
+    setState(() => _caringPersistBusy = true);
+    try {
+      final result =
+          await CaringActionService.tryWash(fromLocal: _caringState);
+      if (!mounted) return;
+      if (result.state != null) {
+        setState(() => _caringState = result.state!);
+        if (result.ment != null && result.ment!.isNotEmpty) {
+          _enqueueReaction(result.ment!);
+        }
+        final ok =
+            await CaringStateService.saveStateSequential(result.state!);
+        if (!mounted) return;
+        if (!ok) {
+          setState(() => _caringState = prev);
+          _enqueueReaction(
+            '저장에 실패했어요. 연결을 확인하고 다시 시도해 주세요.',
+          );
+        } else {
+          AdminActivityService.log(ActivityEventType.washCharacter, page: 'home');
+        }
+      } else if (result.ment != null && result.ment!.isNotEmpty) {
+        _enqueueReaction(result.ment!);
+      }
+    } finally {
+      if (mounted) setState(() => _caringPersistBusy = false);
+    }
+  }
+
   void _onFeed() async {
     if (_caringState.isSleeping || !_caringReady || _caringPersistBusy) return;
 
@@ -822,6 +855,7 @@ class _CaringPageState extends State<CaringPage>
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           _CircleGauge(emoji: '🍖', value: _caringState.hungerInt, color: AppColors.lime),
+          _CircleGauge(emoji: '🫧', value: _caringState.cleanlinessInt, color: const Color(0xFF4FC3F7)),
           _CircleGauge(emoji: '😊', value: _caringState.moodInt, color: const Color(0xFFFFD54F)),
           _CircleGauge(emoji: '⚡', value: _caringState.energyInt, color: const Color(0xFF81C784)),
           _CircleGauge(emoji: '💕', value: _caringState.bondInt, color: const Color(0xFFF48FB1)),
@@ -842,7 +876,7 @@ class _CaringPageState extends State<CaringPage>
         Positioned.fill(
           key: _characterAreaKey,
           child: GestureDetector(
-            onTap: isOnboarding || _caringState.isSleeping ? null : _onCircleTap,
+            onTap: isOnboarding || _caringState.isSleeping ? null : _onWash,
             behavior: isOnboarding ? HitTestBehavior.translucent : HitTestBehavior.opaque,
             child: _dogController != null
                 ? LayoutBuilder(builder: (ctx, constraints) {
@@ -912,12 +946,20 @@ class _CaringPageState extends State<CaringPage>
             ),
           ),
 
-        // 배고픔 아이콘
-        if (!_caringState.isSleeping && !isOnboarding && _caringState.hunger < 30)
+        // 배고픔 효과
+        if (!_caringState.isSleeping && !isOnboarding && _caringState.hunger < 50)
           Positioned(
-            top: 16, left: 32,
-            child: Icon(Icons.soup_kitchen_outlined, size: 28,
-                color: AppColors.warning.withOpacity(0.8)),
+            top: 42,
+            left: 0,
+            right: 0,
+            child: _HungerBoneEffect(hunger: _caringState.hunger),
+          ),
+
+        if (!_caringState.isSleeping && !isOnboarding && _caringState.cleanliness < 50)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: _DirtyEffect(cleanliness: _caringState.cleanliness),
+            ),
           ),
 
         // 비온보딩 텍스트 오버레이(밥주기/쓰다듬기 리액션·기본 멘트).
@@ -1051,7 +1093,7 @@ class _CaringPageState extends State<CaringPage>
         content: SingleChildScrollView(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
             const Text(
-              '캐릭터의 배고픔·기분·에너지를 살피고 돌보며, 유대와 감정을 쌓는 공간이에요.',
+              '캐릭터의 배고픔·기분·에너지·청결도를 살피고 돌보며, 유대와 감정을 쌓는 공간이에요.',
               style: TextStyle(fontSize: 13, height: 1.5),
             ),
             const SizedBox(height: 8),
@@ -1061,7 +1103,7 @@ class _CaringPageState extends State<CaringPage>
             ),
             const SizedBox(height: 8),
             const Text(
-              '위쪽 게이지로 상태를 볼 수 있어요. 시간이 지나면서도 변하고, 밥·쓰다듬기·잠에 따라 달라져요.',
+              '위쪽 게이지로 상태를 볼 수 있어요. 시간이 지나면서도 변하고, 밥·쓰다듬기·씻기기·잠에 따라 달라져요.',
               style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary),
             ),
             SizedBox(height: 16),
@@ -1076,6 +1118,13 @@ class _CaringPageState extends State<CaringPage>
             SizedBox(height: 8),
             Text(
               '쓰다듬기는 가까이 다가가는 느낌으로 기분이나 유대에 닿을 수 있어요. 한꺼번에 너무 잦으면 쉴 틈이 없어져서 오히려 컨디션이 나빠질 수 있어요. 최근 3시간 내 최대 6회까지만 긍정적으로 받아들여요.',
+              style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary),
+            ),
+            SizedBox(height: 16),
+            Text('🫧 씻기기', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            SizedBox(height: 8),
+            Text(
+              '캐릭터를 직접 터치하면 씻겨요. 청결도는 자주 조금씩 올릴 수 있고, 기분은 아주 조금 좋아지며 에너지는 아주 조금 줄어요. 청결한 상태를 오래 유지하면 유대가 오르고, 낮은 청결도가 오래 유지되면 유대가 줄어들 수 있어요.',
               style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary),
             ),
             SizedBox(height: 16),
@@ -1233,6 +1282,180 @@ class _ZzzAnimationState extends State<_ZzzAnimation>
   @override
   Widget build(BuildContext context) {
     return FadeTransition(opacity: _opacity, child: const Text('💤', style: TextStyle(fontSize: 28)));
+  }
+}
+
+class _HungerBoneEffect extends StatelessWidget {
+  const _HungerBoneEffect({required this.hunger});
+
+  final double hunger;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 70,
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.topCenter,
+        children: [
+          const _FloatingBone(
+            phase: 0,
+            top: 0,
+            horizontalOffset: 0,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FloatingBone extends StatefulWidget {
+  const _FloatingBone({
+    required this.phase,
+    required this.top,
+    required this.horizontalOffset,
+  });
+
+  final double phase;
+  final double top;
+  final double horizontalOffset;
+
+  @override
+  State<_FloatingBone> createState() => _FloatingBoneState();
+}
+
+class _FloatingBoneState extends State<_FloatingBone>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      top: widget.top,
+      child: AnimatedBuilder(
+        animation: _ctrl,
+        builder: (context, child) {
+          final t = (_ctrl.value + widget.phase) % 1.0;
+          final dx = widget.horizontalOffset + sin(t * 2 * pi) * 12;
+          return Transform.translate(
+            offset: Offset(dx, 0),
+            child: child,
+          );
+        },
+        child: const Text('🦴', style: TextStyle(fontSize: 22)),
+      ),
+    );
+  }
+}
+
+class _DirtyEffect extends StatelessWidget {
+  const _DirtyEffect({required this.cleanliness});
+
+  final double cleanliness;
+
+  @override
+  Widget build(BuildContext context) {
+    final flyCount = cleanliness < 20
+        ? 4
+        : cleanliness < 30
+            ? 3
+            : cleanliness < 40
+                ? 2
+                : 1;
+
+    return Stack(
+      children: [
+        if (cleanliness < 20)
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: const Color(0xFF6D5F43).withOpacity(0.08),
+              ),
+            ),
+          ),
+        for (var i = 0; i < flyCount; i++)
+          _FlyingFly(
+            phase: i * 0.24,
+            top: 42.0 + i * 24,
+            left: i.isEven ? 52.0 : null,
+            right: i.isEven ? null : 54.0,
+          ),
+      ],
+    );
+  }
+}
+
+class _FlyingFly extends StatefulWidget {
+  const _FlyingFly({
+    required this.phase,
+    required this.top,
+    this.left,
+    this.right,
+  });
+
+  final double phase;
+  final double top;
+  final double? left;
+  final double? right;
+
+  @override
+  State<_FlyingFly> createState() => _FlyingFlyState();
+}
+
+class _FlyingFlyState extends State<_FlyingFly>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      top: widget.top,
+      left: widget.left,
+      right: widget.right,
+      child: AnimatedBuilder(
+        animation: _ctrl,
+        builder: (context, child) {
+          final t = (_ctrl.value + widget.phase) % 1.0;
+          final dx = sin(t * 2 * pi) * 18;
+          final dy = cos(t * 4 * pi) * 10;
+          return Transform.translate(
+            offset: Offset(dx, dy),
+            child: child,
+          );
+        },
+        child: const Text('🪰', style: TextStyle(fontSize: 18)),
+      ),
+    );
   }
 }
 

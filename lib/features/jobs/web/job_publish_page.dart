@@ -38,7 +38,7 @@ class _JobPublishPageState extends State<JobPublishPage> {
 
   // 체크리스트 상태
   bool get _identityOk => _status.identityVerified;
-  bool get _bizOk => _profile?.isBusinessVerified ?? false;
+  bool get _bizOk => _profile?.canPublishJobs ?? false;
   bool get _allReady => _identityOk && _bizOk;
 
   @override

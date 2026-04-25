@@ -28,9 +28,11 @@ export const closeExpiredPolls = functions
   .onRun(async () => {
     const now = admin.firestore.Timestamp.now();
 
+    // status 가 'active' 뿐 아니라 'scheduled' 인 채로 endsAt 만 지나간 케이스도
+    // 함께 종료한다(과거에 scheduled 로만 등록되고 자동 활성화가 누락된 데이터 보정).
     const expiredSnap = await db
       .collection("polls")
-      .where("status", "==", "active")
+      .where("status", "in", ["active", "scheduled"])
       .where("endsAt", "<=", now)
       .get();
 

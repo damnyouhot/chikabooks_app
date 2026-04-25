@@ -167,7 +167,6 @@ class _AttachmentCardState extends State<_AttachmentCard> {
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: AppColors.white,
       margin: const EdgeInsets.only(bottom: 10),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       child: Padding(

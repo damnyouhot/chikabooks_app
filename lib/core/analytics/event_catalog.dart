@@ -212,6 +212,12 @@ const Map<String, EventMeta> kEventCatalog = {
     tab: EventTab.na,
     meaningfulBehavior: true,
   ),
+  'wash_character': EventMeta(
+    type: 'wash_character',
+    labelKo: '캐릭터 씻기기',
+    tab: EventTab.na,
+    meaningfulBehavior: true,
+  ),
   'caring_feed_success': EventMeta(
     type: 'caring_feed_success',
     labelKo: '캐릭터 밥주기 성공',
@@ -356,8 +362,13 @@ const Map<String, EventMeta> kEventCatalog = {
 };
 
 /// 온보딩 순차 퍼널: 집계 시 **교집합** 적용 순서 (type, 화면 라벨)
+///
+/// ① `view_sign_in_page` 는 **비로그인 사용자도 포함**하는 화면 진입 이벤트라
+/// 이후 단계(로그인 후만 기록)와 모집단이 다르다. 1→2 전환율이 구조적으로
+/// 낮게 보일 수 있으므로 라벨에 명시한다. 기존 데이터와의 호환을 위해
+/// 이벤트 타입 자체는 그대로 둔다.
 const List<(String type, String label)> kOnboardingFunnelOrderedSteps = [
-  ('view_sign_in_page', '① 로그인 화면 진입'),
+  ('view_sign_in_page', '① 로그인 화면 진입 (비로그인 포함)'),
   ('funnel_step_2_feed', '② 캐릭터 밥주기'),
   ('funnel_step_3_poll', '③ 공감투표 선택'),
   ('funnel_step_4_quiz', '④ 퀴즈 첫 풀이'),

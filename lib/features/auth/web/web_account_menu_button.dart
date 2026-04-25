@@ -30,6 +30,25 @@ class WebAccountMenuButton extends StatelessWidget {
       itemBuilder: (ctx) {
         return [
           PopupMenuItem<String>(
+            value: 'me',
+            child: Row(
+              children: [
+                Icon(Icons.account_box_outlined,
+                    size: 16, color: AppColors.accent),
+                const SizedBox(width: 8),
+                Text(
+                  '내 정보',
+                  style: GoogleFonts.notoSansKr(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const PopupMenuDivider(),
+          PopupMenuItem<String>(
             value: 'terms',
             child: Text(
               '이용약관',
@@ -86,7 +105,9 @@ class WebAccountMenuButton extends StatelessWidget {
       },
       onSelected: (value) async {
         if (!context.mounted) return;
-        if (value == 'terms') {
+        if (value == 'me') {
+          context.push('/me');
+        } else if (value == 'terms') {
           context.push('/terms');
         } else if (value == 'privacy') {
           context.push('/privacy');

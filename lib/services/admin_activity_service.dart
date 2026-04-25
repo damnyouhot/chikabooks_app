@@ -31,10 +31,19 @@ class AdminActivityService {
   /// 유저 스냅샷 캐시 (Firestore 읽기 최소화)
   static _UserSnapshot? _snapshotCache;
 
+  /// `users/{uid}.lastActiveAt` 마지막 갱신 시각 (세션 메모리)
+  ///
+  /// 모든 이벤트마다 쓰면 비용이 늘어나므로, [_lastActiveThrottle] 간격
+  /// 안에서는 한 번만 갱신한다. 앱이 종료/재시작되면 캐시가 비므로
+  /// 세션 시작 시 한 번은 무조건 갱신된다.
+  static DateTime? _lastActiveTouchedAt;
+  static const Duration _lastActiveThrottle = Duration(minutes: 5);
+
   /// 캐시 초기화 (로그아웃 / 계정 전환 시 반드시 호출)
   static void clearCache() {
     _excludedCache = null;
     _snapshotCache = null;
+    _lastActiveTouchedAt = null;
   }
 
   // ── 공개 메서드 ───────────────────────────────────────────────
@@ -73,6 +82,7 @@ class AdminActivityService {
         if (extra != null) data.addAll(extra);
 
         await _db.collection('activityLogs').add(data);
+        _touchLastActive(uid);
       } catch (e) {
         debugPrint('⚠️ AdminActivityService.log 실패: $e');
       }
@@ -104,8 +114,34 @@ class AdminActivityService {
         if (extra != null) data.addAll(extra);
 
         await _db.collection('activityLogs').add(data);
+        _touchLastActive(uid);
       } catch (e) {
         debugPrint('⚠️ AdminActivityService.logFunnel 실패: $e');
+      }
+    });
+  }
+
+  /// `users/{uid}.lastActiveAt` 갱신 — 5분 throttle (fire-and-forget)
+  ///
+  /// 이전에는 홈 진입(`_recordAppOpen`)·캐릭터 액션에서만 갱신되어
+  /// 공고만 보고 나가는 사용자가 "장기 미접속"으로 잘못 잡히는 문제가
+  /// 있었다. 모든 이벤트 기록 직후 호출해 활성/장기미접속 KPI 신뢰도를
+  /// 올린다.
+  static void _touchLastActive(String uid) {
+    final now = DateTime.now();
+    final last = _lastActiveTouchedAt;
+    if (last != null && now.difference(last) < _lastActiveThrottle) {
+      return;
+    }
+    _lastActiveTouchedAt = now;
+    Future.delayed(Duration.zero, () async {
+      try {
+        await _db
+            .collection('users')
+            .doc(uid)
+            .update({'lastActiveAt': FieldValue.serverTimestamp()});
+      } catch (_) {
+        // 문서 없거나 권한 없는 경우 무시 (퍼블리셔 등)
       }
     });
   }
@@ -259,6 +295,7 @@ enum ActivityEventType {
 
   // ── 버튼/기능 클릭 ─────────────────────────────────────────
   tapCharacter('tap_character', '캐릭터 클릭'),
+  washCharacter('wash_character', '캐릭터 씻기기'),
   caringFeedSuccess('caring_feed_success', '캐릭터 밥주기 성공'),
   tapEmotionStart('tap_emotion_start', '감정기록 시작'),
   tapEmotionSave('tap_emotion_save', '감정기록 저장 시도'),

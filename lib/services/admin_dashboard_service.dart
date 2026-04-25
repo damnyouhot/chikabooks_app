@@ -445,13 +445,25 @@ class AdminDashboardService {
     }
   }
 
-  /// 기능 반응 TOP N
+  /// [getTopFeaturesWithMeta] 의 호환 래퍼 — 표본 메타를 무시한다.
+  static Future<List<FeatureReactionItem>> getTopFeatures({
+    int limit = 12,
+    DateTime? since,
+  }) async {
+    final r = await getTopFeaturesWithMeta(limit: limit, since: since);
+    return r.items;
+  }
+
+  /// 기능 반응 TOP N + 표본 메타
   ///
-  /// Firestore group-by 미지원 → 최근 N건 읽어 클라이언트 집계
-  /// [since] 로 기간 제한 가능
+  /// Firestore group-by 미지원 → 최근 [_featureReadCap]건 읽어 클라이언트 집계.
+  /// 읽어들인 문서 수가 cap 에 닿으면 [SampleMeta.truncated] 가 true 가 되고,
+  /// UI 가 이를 토대로 "선택 기간이 다 반영되지 않았을 수 있음"을 표시한다.
   ///
   /// 공감투표 관련 타입은 [_mergeBondPollFeatureAggregates] 후 정렬합니다.
-  static Future<List<FeatureReactionItem>> getTopFeatures({
+  static const int _featureReadCap = 2000;
+
+  static Future<FeatureReactionResult> getTopFeaturesWithMeta({
     int limit = 12,
     DateTime? since,
   }) async {
@@ -461,13 +473,13 @@ class AdminDashboardService {
       Query<Map<String, dynamic>> q = _db
           .collection('activityLogs')
           .orderBy('timestamp', descending: true)
-          .limit(2000);
+          .limit(_featureReadCap);
       if (since != null) {
         q = _db
             .collection('activityLogs')
             .where('timestamp', isGreaterThan: Timestamp.fromDate(since))
             .orderBy('timestamp', descending: true)
-            .limit(2000);
+            .limit(_featureReadCap);
       }
       debugPrint('📊 getTopFeatures: since=$since');
       final snap = await q.get();
@@ -508,17 +520,32 @@ class AdminDashboardService {
           .toList()
         ..sort((a, b) => b.clickCount.compareTo(a.clickCount));
 
-      return items.take(limit).toList();
+      return FeatureReactionResult(
+        items: items.take(limit).toList(),
+        sample: SampleMeta(
+          sampleSize: snap.docs.length,
+          limit: _featureReadCap,
+        ),
+      );
     } catch (e) {
       debugPrint('⚠️ getTopFeatures: $e');
-      return [];
+      return FeatureReactionResult(items: const [], sample: SampleMeta.empty);
     }
   }
 
   // ─── Error Monitor ────────────────────────────────────────────
 
-  /// 최근 오류 리스트 ([since] 필터 포함)
+  /// [getRecentErrorsWithMeta] 호환 래퍼 — 표본 메타 무시.
   static Future<List<AppErrorItem>> getRecentErrors({
+    int limit = 50,
+    DateTime? since,
+  }) async {
+    final r = await getRecentErrorsWithMeta(limit: limit, since: since);
+    return r.items;
+  }
+
+  /// 최근 오류 리스트 + 표본 메타 ([since] 필터 포함)
+  static Future<RecentErrorsResult> getRecentErrorsWithMeta({
     int limit = 50,
     DateTime? since,
   }) async {
@@ -535,12 +562,16 @@ class AdminDashboardService {
             .limit(limit);
       }
       final snap = await q.get();
-      return snap.docs
+      final items = snap.docs
           .map((d) => AppErrorItem.fromMap(d.id, d.data()))
           .toList();
+      return RecentErrorsResult(
+        items: items,
+        sample: SampleMeta(sampleSize: snap.docs.length, limit: limit),
+      );
     } catch (e) {
       debugPrint('⚠️ getRecentErrors: $e');
-      return [];
+      return RecentErrorsResult(items: const [], sample: SampleMeta.empty);
     }
   }
 
@@ -687,19 +718,30 @@ class AdminDashboardService {
 
   // ─── Error Monitor ────────────────────────────────────────────
 
-  /// 페이지별 오류 빈도 TOP N ([since] 필터 포함)
+  static const int _errorPageReadCap = 500;
+
+  /// [getTopErrorPagesWithMeta] 호환 래퍼.
   static Future<List<MapEntry<String, int>>> getTopErrorPages({
+    int limit = 5,
+    DateTime? since,
+  }) async {
+    final r = await getTopErrorPagesWithMeta(limit: limit, since: since);
+    return r.entries;
+  }
+
+  /// 페이지별 오류 빈도 TOP N + 표본 메타 ([since] 필터 포함)
+  static Future<TopErrorPagesResult> getTopErrorPagesWithMeta({
     int limit = 5,
     DateTime? since,
   }) async {
     try {
       Query<Map<String, dynamic>> q =
-          _db.collection('appErrors').limit(500);
+          _db.collection('appErrors').limit(_errorPageReadCap);
       if (since != null) {
         q = _db
             .collection('appErrors')
             .where('timestamp', isGreaterThan: Timestamp.fromDate(since))
-            .limit(500);
+            .limit(_errorPageReadCap);
       }
       final snap = await q.get();
       final pageMap = <String, int>{};
@@ -709,10 +751,16 @@ class AdminDashboardService {
       }
       final sorted = pageMap.entries.toList()
         ..sort((a, b) => b.value.compareTo(a.value));
-      return sorted.take(limit).toList();
+      return TopErrorPagesResult(
+        entries: sorted.take(limit).toList(),
+        sample: SampleMeta(
+          sampleSize: snap.docs.length,
+          limit: _errorPageReadCap,
+        ),
+      );
     } catch (e) {
       debugPrint('⚠️ getTopErrorPages: $e');
-      return [];
+      return TopErrorPagesResult(entries: const [], sample: SampleMeta.empty);
     }
   }
 }

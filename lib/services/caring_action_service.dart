@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../data/caring_ments.dart';
 import '../services/admin_activity_service.dart';
 import '../services/caring_state_service.dart';
+import '../services/caring_treat_service.dart';
 import '../services/funnel_onboarding_service.dart';
 
 /// 돌보기(나 탭) 액션 처리 서비스
@@ -22,15 +23,20 @@ import '../services/funnel_onboarding_service.dart';
 ///   3회차: 1시간 쿨타임 차단
 ///   과식(hunger≥85, 우선): hunger+5, mood-2, energy-3
 ///   mood<30 → bond 절반(내림), energy<30 → 리액션 확률 50%
+///   보유 먹이(caringTreatCount) 0이면 밥주기 불가
 /// 터치 (최근 3시간 슬라이딩 윈도우 내 횟수):
 ///   1~3회: mood+5, bond+1
 ///   4~6회: mood+1, bond+0
 ///   7회+: mood-1
 ///   energy<30 → mood 보상 절반(내림), mood<30 → bond 절반(내림)
+/// 씻기기:
+///   캐릭터 직접 터치. cleanliness+2, mood+0.1, energy-0.2
+///   cleanliness≥85면 cleanliness+1, energy-0.1 / 100이면 cleanliness+0, energy-0.1
+///   bond는 즉시 상승하지 않고 청결 유지 시간으로 정산
 /// 재우기:
 ///   ≤30분 깨우기: energy+0, mood-5
 ///   >30분 & <12시간: energy+h*12.5(최대 8h), mood+5
-///   ≥12시간: energy 회복 동일, mood-2·bond-1, mood+5 없음, 일일 bond+1 없음(감쇠 시)
+///   ≥12시간: energy 회복 동일, mood-2, mood+5 없음, 일일 bond+1 없음(감쇠 시). 수면 중 bond는 감쇠에서만.
 /// ──────────────────────────────────────────────
 class CaringActionService {
   static final _db = FirebaseFirestore.instance;
@@ -100,6 +106,14 @@ class CaringActionService {
         return FeedResult(
           success: false,
           rejectMent: _pickRandom(CaringMents.feedWhileSleeping),
+        );
+      }
+
+      final treatCount = await CaringTreatService.getTreatCount();
+      if (treatCount <= 0) {
+        return FeedResult(
+          success: false,
+          rejectMent: '투표나 퀴즈를 풀면 먹이가 생겨요',
         );
       }
 
@@ -267,7 +281,94 @@ class CaringActionService {
     return _pickRandom(CaringMents.touchGeneral);
   }
 
+  // ═══════════════════════ 씻기기 (Wash) ═══════════════════════
+
+  static Future<WashResult> tryWash({CaringState? fromLocal}) async {
+    try {
+      final uid = await _ensureUidReady();
+      if (uid == null) {
+        return WashResult(ment: '로그인이 필요합니다.', state: null);
+      }
+
+      final state =
+          fromLocal ?? await CaringStateService.loadState();
+
+      if (state.isSleeping) {
+        return WashResult(
+          ment: _pickRandom(CaringMents.feedWhileSleeping),
+          state: null,
+        );
+      }
+
+      final now = DateTime.now();
+      final before = state.cleanliness;
+      final cleanDelta = before >= 100
+          ? 0.0
+          : before >= 85
+              ? 1.0
+              : 2.0;
+      final energyDelta = before >= 85 ? -0.1 : -0.2;
+      final after = (before + cleanDelta).clamp(0.0, 100.0);
+
+      final updated = state.copyWith(
+        cleanliness: after,
+        mood: state.mood + 0.1,
+        energy: state.energy + energyDelta,
+        lastWashedAt: now,
+        lastActiveAt: now,
+        cleanlinessGoodSince: after >=
+                CaringStateService.cleanBondGoodThreshold
+            ? state.cleanlinessGoodSince ?? now
+            : null,
+        cleanlinessBadSince: after <
+                CaringStateService.cleanBondBadThreshold
+            ? state.cleanlinessBadSince ?? now
+            : null,
+        clearCleanlinessGoodSince:
+            after < CaringStateService.cleanBondGoodThreshold,
+        clearCleanlinessBadSince:
+            after >= CaringStateService.cleanBondBadThreshold,
+      );
+
+      if (fromLocal == null) {
+        await CaringStateService.saveState(updated);
+      }
+
+      return WashResult(
+        ment: _pickWashMent(state, after),
+        state: updated,
+      );
+    } catch (e) {
+      debugPrint('⚠️ CaringActionService.tryWash error: $e');
+      return WashResult(ment: '오류가 발생했어요.', state: null);
+    }
+  }
+
+  static String? _pickWashMent(CaringState state, double after) {
+    final before = state.cleanliness;
+    if (state.lastWashedAt == null) {
+      return _pickRandom(CaringMents.washFirst);
+    }
+    if (before < 30 && after >= 30) {
+      return _pickRandom(CaringMents.washRecover30);
+    }
+    if (before < 70 && after >= 70) {
+      return _pickRandom(CaringMents.washRecover70);
+    }
+    if (before < 95 && after >= 95) {
+      return _pickRandom(CaringMents.washSparkle);
+    }
+    if (before < 20 && _random.nextInt(3) == 0) {
+      return _pickRandom(CaringMents.washDirty);
+    }
+    if (before >= 95 && _random.nextInt(5) == 0) {
+      return _pickRandom(CaringMents.washAlreadyClean);
+    }
+    return null;
+  }
+
   // ═══════════════════════ 재우기 / 깨우기 ═══════════════════════
+
 
   /// 재우기 시작
   ///
@@ -487,6 +588,13 @@ class TouchResult {
   final CaringState? state;
 
   TouchResult({required this.ment, this.isEffective = true, this.state});
+}
+
+class WashResult {
+  final String? ment;
+  final CaringState? state;
+
+  WashResult({required this.ment, this.state});
 }
 
 class WakeResult {

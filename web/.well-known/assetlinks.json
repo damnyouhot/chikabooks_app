@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.chikabooks.tenth",
+      "sha256_cert_fingerprints": [
+        "00:E9:BE:86:A1:C6:3A:0A:B1:41:88:B1:5D:6C:B3:1C:09:83:A0:1E:09:E8:07:DA:AD:C7:2F:D9:66:31:A0:58"
+      ]
+    }
+  }
+]

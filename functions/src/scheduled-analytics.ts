@@ -3,35 +3,46 @@ import * as admin from "firebase-admin";
 
 const db = admin.firestore();
 
-// ── 정의: AdminBehaviorService와 동일한 이벤트 분류 ──
+// ── 정의: lib/core/analytics/event_catalog.dart 와 1:1 일치 ──
+//
+// ⚠️ 변경 시 반드시 클라이언트 카탈로그(event_catalog.dart)와 동시에 수정할 것.
+// 두 정의가 어긋나면 Behavior 탭(클라 직접 계산)과 Trends 탭(서버 일별 집계)이
+// 같은 이름의 지표인데 서로 다른 숫자를 보여주게 된다.
 const MEANINGFUL_ACTIONS = new Set([
+  // 나 탭
   "tap_character",
+  "caring_feed_success",
   "tap_emotion_start",
   "tap_emotion_save",
   "emotion_save_success",
+  // 프로필·커리어·구직
   "tap_profile_save",
   "tap_job_save",
   "tap_job_apply",
   "tap_career_edit",
   "view_job_detail",
+  // 성장
   "quiz_completed",
+  // 같이(공감투표)
   "poll_empathize",
   "poll_change_empathy",
   "poll_add_option",
 ]);
 
+// EventCatalog.dailyFeatureUsageTypes 와 동일
 const FEATURE_KEYS = [
   "emotion_save_success",
   "tap_character",
+  "caring_feed_success",
   "view_job_detail",
   "quiz_completed",
-  "poll_empathize",
 ];
 
 const TAB_KEYS = ["view_home", "view_job", "view_growth", "view_bond"];
 
+// kTabConversionRows 와 동일 (view_home → caring_feed_success 로 통일)
 const CONVERSION_PAIRS: [string, string][] = [
-  ["view_home", "emotion_save_success"],
+  ["view_home", "caring_feed_success"],
   ["view_job", "view_job_detail"],
   ["view_growth", "quiz_completed"],
   ["view_bond", "poll_empathize"],
@@ -44,6 +55,13 @@ const CAREER_EVENTS = new Set([
   "tap_job_save",
   "tap_job_apply",
 ]);
+// kSegmentBondTypes 와 동일 — 기존엔 누락되어 segments.bond 가 항상 0이었음
+const BOND_EVENTS = new Set([
+  "view_bond",
+  "poll_empathize",
+  "poll_change_empathy",
+  "poll_add_option",
+]);
 
 /**
  * 매일 KST 01:00에 어제의 activityLogs를 집계하여
@@ -53,26 +71,31 @@ export const aggregateAnalyticsDaily = functions
   .pubsub.schedule("0 1 * * *")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
-    try {
-      const now = new Date();
-      const yesterday = new Date(now);
-      yesterday.setDate(yesterday.getDate() - 1);
-      const dateKey = formatDateKey(yesterday);
-
-      // 이미 존재하면 스킵
-      const existing = await db
-        .collection("analytics_daily")
-        .doc(dateKey)
-        .get();
-      if (existing.exists) {
-        console.log(`📊 [AnalyticsDaily] ${dateKey} 이미 존재 → 스킵`);
-        return;
+    // 어제 + 그 이전 6일(총 최근 7일) 중 누락분을 함께 채운다.
+    // 함수 배포가 일시 중단됐던 구간이 자동 복구되도록 안전 장치.
+    // 활동이 0건인 날도 generateForDate가 0으로 채워 문서를 만들어
+    // Trends 차트가 끊겨 보이지 않게 한다.
+    const now = new Date();
+    for (let offset = 1; offset <= 7; offset++) {
+      const target = new Date(now);
+      target.setDate(target.getDate() - offset);
+      const dateKey = formatDateKey(target);
+      try {
+        const existing = await db
+          .collection("analytics_daily")
+          .doc(dateKey)
+          .get();
+        if (existing.exists) {
+          if (offset === 1) {
+            console.log(`📊 [AnalyticsDaily] ${dateKey} 이미 존재 → 스킵`);
+          }
+          continue;
+        }
+        await generateForDate(target);
+        console.log(`✅ [AnalyticsDaily] ${dateKey} 집계 완료`);
+      } catch (error) {
+        console.error(`❌ [AnalyticsDaily] ${dateKey} 실패:`, error);
       }
-
-      await generateForDate(yesterday);
-      console.log(`✅ [AnalyticsDaily] ${dateKey} 집계 완료`);
-    } catch (error) {
-      console.error("❌ [AnalyticsDaily] 실패:", error);
     }
   });
 
@@ -179,16 +202,19 @@ async function generateForDate(date: Date): Promise<void> {
   let growth = 0;
   let emotion = 0;
   let career = 0;
+  let bond = 0;
   let ghost = 0;
   for (const [, events] of userEvents) {
     const typeSet = new Set(events);
     const isGrowth = [...typeSet].some((t) => GROWTH_EVENTS.has(t));
     const isEmotion = [...typeSet].some((t) => EMOTION_EVENTS.has(t));
     const isCareer = [...typeSet].some((t) => CAREER_EVENTS.has(t));
+    const isBond = [...typeSet].some((t) => BOND_EVENTS.has(t));
     if (isGrowth) growth++;
     if (isEmotion) emotion++;
     if (isCareer) career++;
-    if (!isGrowth && !isEmotion && !isCareer) {
+    if (isBond) bond++;
+    if (!isGrowth && !isEmotion && !isCareer && !isBond) {
       const hasMeaningful = [...typeSet].some((t) =>
         MEANINGFUL_ACTIONS.has(t)
       );
@@ -210,7 +236,7 @@ async function generateForDate(date: Date): Promise<void> {
       tabViews,
       tabConversions,
       depthBuckets: {loginOnly, oneAction, twoToFour, fivePlus},
-      segments: {growth, emotion, career, ghost},
+      segments: {growth, emotion, career, bond, ghost},
       retention: {d3: 0, d7: 0},
       eventCounts,
     });

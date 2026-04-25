@@ -3,6 +3,29 @@ library;
 
 import '../core/analytics/event_catalog.dart';
 
+// ─── 표본 한계 메타 ─────────────────────────────────────────
+/// activityLogs / appErrors 최근 N건만 읽어 클라이언트 집계할 때
+/// "표본이 limit에 닿았는지" 알리기 위한 메타 정보.
+///
+/// Firestore는 group-by · distinct count를 지원하지 않아 클라이언트가
+/// 최근 N건을 읽어 집계한다. 사용자/이벤트가 늘어나면 선택한 기간
+/// 전체가 아니라 **최근 일부만 반영된 숫자**가 표시될 수 있어, UI에
+/// 안내 배너로 명확히 표시한다.
+class SampleMeta {
+  /// 실제로 읽어들인 문서 수
+  final int sampleSize;
+
+  /// Firestore에 요청한 limit
+  final int limit;
+
+  /// sampleSize == limit 이면 true (= 더 오래된 데이터가 잘렸을 가능성)
+  bool get truncated => sampleSize >= limit;
+
+  const SampleMeta({required this.sampleSize, required this.limit});
+
+  static const empty = SampleMeta(sampleSize: 0, limit: 0);
+}
+
 // ─── KPI 카드 ───────────────────────────────────────────────
 class DashboardKpi {
   final String label;
@@ -70,6 +93,25 @@ class FeatureReactionItem {
     }
     return EventCatalog.labelForType(type);
   }
+}
+
+// ─── 표본 메타를 함께 반환하는 결과 래퍼들 ─────────────────
+class FeatureReactionResult {
+  final List<FeatureReactionItem> items;
+  final SampleMeta sample;
+  const FeatureReactionResult({required this.items, required this.sample});
+}
+
+class RecentErrorsResult {
+  final List<AppErrorItem> items;
+  final SampleMeta sample;
+  const RecentErrorsResult({required this.items, required this.sample});
+}
+
+class TopErrorPagesResult {
+  final List<MapEntry<String, int>> entries;
+  final SampleMeta sample;
+  const TopErrorPagesResult({required this.entries, required this.sample});
 }
 
 // ─── 오류 항목 ───────────────────────────────────────────────

@@ -2,27 +2,22 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/resume.dart';
-import 'career_network_dedupe_helper.dart';
 import 'career_profile_service.dart';
-import 'resume_experience_merge_service.dart';
 
 /// 이력서 → 커리어 카드 자동 동기화 서비스
 ///
 /// 설계서 §5 SSOT 규칙:
 /// - 이력서 확정/수정 시 → 커리어 카드(스킬/네트워크) 동기화
-/// - "나의 치과 히스토리"(careerNetwork)는 이력서 경력에서 자동 반영 (필수 자동화)
+/// - "나의 치과 네트워크"는 이력서 경력에서 자동 반영 (필수 자동화)
 /// - 커리어 카드에서 스킬은 자유 수정 가능 (이력서와 분리 편집 허용)
-///
-/// 네트워크 매칭:
-/// - 병원명 정규화 후 동일 + 시작 연·월 일치 → 업데이트
-/// - `syncedFromResume` + 시작 연도 동일 + `areProbablySameClinic` (월·표기 차이)
-/// - 그다음 `syncedFromResume` 이고 시작 연·월만 일치 → 업데이트 (폴백)
-/// - 동기화 후 월별 dedupe + 유사 기간·유사 병원명 merge로 최신 1건 유지
 class ResumeCareerSyncService {
   static final _db = FirebaseFirestore.instance;
   static final _auth = FirebaseAuth.instance;
 
   /// 이력서 저장 시 호출 — 커리어 카드에 동기화
+  ///
+  /// [resume] 저장된 이력서 데이터
+  /// [syncSkills] true이면 스킬도 동기화 (기본: true, 초회 동기화 시만)
   static Future<void> syncFromResume(
     Resume resume, {
     bool syncSkills = true,
@@ -31,10 +26,14 @@ class ResumeCareerSyncService {
     if (uid == null) return;
 
     try {
+      // 1. 경력 → 치과 네트워크 동기화
       await _syncNetwork(uid, resume.experiences);
+
+      // 2. 스킬 → 커리어 프로필 동기화 (선택)
       if (syncSkills) {
         await _syncSkills(uid, resume.skills);
       }
+
       debugPrint('✅ 이력서 → 커리어 카드 동기화 완료');
     } catch (e) {
       debugPrint('⚠️ ResumeCareerSyncService.syncFromResume error: $e');
@@ -42,158 +41,62 @@ class ResumeCareerSyncService {
   }
 
   /// 이력서 경력 → careerNetwork 서브컬렉션 동기화
+  ///
+  /// 전략: 기존 네트워크 엔트리를 clinicName+start 기준으로 매칭
+  /// - 매칭되면 업데이트
+  /// - 매칭 안 되면 새로 추가
+  /// - 이력서에 없는 엔트리는 건드리지 않음 (수동 추가된 것일 수 있음)
   static Future<void> _syncNetwork(
     String uid,
     List<ResumeExperience> experiences,
   ) async {
-    final merged = ResumeExperienceMergeService.mergeSimilar(experiences);
-    if (merged.isEmpty) return;
+    if (experiences.isEmpty) return;
 
     final networkRef =
         _db.collection('users').doc(uid).collection('careerNetwork');
 
-    // 기존 동기화 중복(같은 달 여러 행)을 먼저 정리해 매칭·폴백이 안정적으로 동작하도록 함
-    await _dedupeSyncedSameMonth(networkRef);
-    await CareerNetworkDedupeHelper.mergeSimilarNetworkEntries(networkRef);
-
+    // 기존 엔트리 로드
     final existingSnap = await networkRef.get();
-    final existing =
-        existingSnap.docs.map(DentalNetworkEntry.fromDoc).toList();
+    final existing = existingSnap.docs.map(DentalNetworkEntry.fromDoc).toList();
 
-    final consumedIds = <String>{};
-
-    for (final exp in merged) {
+    for (final exp in experiences) {
       if (exp.clinicName.trim().isEmpty) continue;
 
+      // YYYY-MM → DateTime 파싱
       final startDate = _parseYearMonth(exp.start);
       if (startDate == null) continue;
 
-      final endDate = exp.end == '재직중' ? null : _parseYearMonth(exp.end);
+      final endDate =
+          exp.end == '재직중' ? null : _parseYearMonth(exp.end);
 
-      DentalNetworkEntry? match = _findMatchByNormalizedName(
-        existing,
-        exp.clinicName,
-        startDate,
-        consumedIds,
-      );
-
-      match ??= _findMatchFuzzySyncedYear(
-        existing,
-        exp.clinicName,
-        startDate,
-        consumedIds,
-      );
-
-      match ??= _findSyncedFallback(
-        existing,
-        startDate,
-        consumedIds,
-      );
+      // 기존 엔트리에서 clinicName + 비슷한 시작일로 매칭
+      final match = _findMatch(existing, exp.clinicName, startDate);
 
       final entryData = <String, dynamic>{
         'clinicName': exp.clinicName.trim(),
         'startDate': Timestamp.fromDate(startDate),
         'endDate': endDate != null ? Timestamp.fromDate(endDate) : null,
-        'syncedFromResume': true,
+        'tags': exp.tasks.take(5).toList(), // 경력 업무를 태그로
+        'acquiredSkills': exp.tools.take(5).toList(),
+        'syncedFromResume': true, // 자동 동기화 표시
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
-      if (exp.tasks.isNotEmpty) {
-        entryData['tags'] = exp.tasks.take(5).toList();
-      }
-      if (exp.tools.isNotEmpty) {
-        entryData['acquiredSkills'] = exp.tools.take(5).toList();
-      }
-
-      final matched = match;
-      if (matched != null) {
-        final matchedId = matched.id;
-        await networkRef.doc(matchedId).update(entryData);
-        consumedIds.add(matchedId);
-        final ix = existing.indexWhere((e) => e.id == matchedId);
-        if (ix >= 0) {
-          existing[ix] = DentalNetworkEntry(
-            id: matchedId,
-            clinicName: exp.clinicName.trim(),
-            startDate: startDate,
-            endDate: endDate,
-            tags: exp.tasks.take(5).toList(),
-            acquiredSkills: exp.tools.take(5).toList(),
-            syncedFromResume: true,
-          );
-        }
+      if (match != null) {
+        // 업데이트
+        await networkRef.doc(match.id).update(entryData);
       } else {
+        // 새로 추가
         entryData['createdAt'] = FieldValue.serverTimestamp();
-        final newRef = await networkRef.add(entryData);
-        consumedIds.add(newRef.id);
-        existing.add(
-          DentalNetworkEntry(
-            id: newRef.id,
-            clinicName: exp.clinicName.trim(),
-            startDate: startDate,
-            endDate: endDate,
-            tags: exp.tasks.take(5).toList(),
-            acquiredSkills: exp.tools.take(5).toList(),
-            syncedFromResume: true,
-          ),
-        );
+        await networkRef.add(entryData);
       }
     }
-
-    await _dedupeSyncedSameMonth(networkRef);
-    await CareerNetworkDedupeHelper.mergeSimilarNetworkEntries(networkRef);
   }
 
-  /// 동일 연·월에 `syncedFromResume` 문서가 여러 개면 최신 1건만 남김 (OCR 중복 제거)
+  /// 이력서 스킬 → careerProfile.skills 동기화
   ///
-  /// 같은 달에 실제로 2곳을 다닌 경우는 드물며, 중복이면 보통 동일 근무의 표기 차이입니다.
-  static Future<void> _dedupeSyncedSameMonth(
-    CollectionReference<Map<String, dynamic>> networkRef,
-  ) async {
-    final snap = await networkRef.get();
-    final byMonth = <String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>{};
-
-    for (final doc in snap.docs) {
-      final d = doc.data();
-      if (d['syncedFromResume'] != true) continue;
-      final ts = d['startDate'] as Timestamp?;
-      if (ts == null) continue;
-      final dt = ts.toDate();
-      final key =
-          '${dt.year}-${dt.month.toString().padLeft(2, '0')}';
-      byMonth.putIfAbsent(key, () => []).add(doc);
-    }
-
-    for (final list in byMonth.values) {
-      if (list.length <= 1) continue;
-
-      int compareDocs(
-        QueryDocumentSnapshot<Map<String, dynamic>> a,
-        QueryDocumentSnapshot<Map<String, dynamic>> b,
-      ) {
-        final ua = a.data()['updatedAt'] as Timestamp?;
-        final ub = b.data()['updatedAt'] as Timestamp?;
-        final ca = a.data()['createdAt'] as Timestamp?;
-        final cb = b.data()['createdAt'] as Timestamp?;
-        final ta = ua ?? ca;
-        final tb = ub ?? cb;
-        if (ta == null && tb == null) return 0;
-        if (ta == null) return 1;
-        if (tb == null) return -1;
-        return tb.compareTo(ta);
-      }
-
-      list.sort(compareDocs);
-      for (var i = 1; i < list.length; i++) {
-        try {
-          await networkRef.doc(list[i].id).delete();
-        } catch (e) {
-          debugPrint('⚠️ dedupe delete ${list[i].id}: $e');
-        }
-      }
-    }
-  }
-
+  /// 전략: 이력서 스킬 중 skillMaster에 매칭되는 것만 반영
+  /// 기존에 사용자가 직접 수정한 스킬은 유지 (overwrite 안 함)
   static Future<void> _syncSkills(
     String uid,
     List<ResumeSkill> resumeSkills,
@@ -201,6 +104,8 @@ class ResumeCareerSyncService {
     if (resumeSkills.isEmpty) return;
 
     final userRef = _db.collection('users').doc(uid);
+
+    // 기존 스킬 로드
     final doc = await userRef.get();
     final careerProfile =
         doc.data()?['careerProfile'] as Map<String, dynamic>? ?? {};
@@ -210,9 +115,11 @@ class ResumeCareerSyncService {
             ) ??
             {};
 
+    // skillMaster ID 셋
     final masterIds =
         CareerProfileService.skillMaster.map((m) => m['id'] as String).toSet();
 
+    // 이력서 스킬명 → skillMaster ID 매핑
     final nameToId = <String, String>{};
     for (final m in CareerProfileService.skillMaster) {
       nameToId[m['title'] as String] = m['id'] as String;
@@ -221,6 +128,7 @@ class ResumeCareerSyncService {
     final updates = <String, dynamic>{};
 
     for (final skill in resumeSkills) {
+      // ID가 직접 매칭되거나, 이름으로 매칭
       String? masterId;
       if (masterIds.contains(skill.id)) {
         masterId = skill.id;
@@ -230,11 +138,12 @@ class ResumeCareerSyncService {
 
       if (masterId == null) continue;
 
+      // 기존에 사용자가 직접 수정한 스킬이면 건너뜀
       final existing = existingSkills[masterId];
       if (existing != null &&
           existing['enabled'] == true &&
           existing['syncedFromResume'] != true) {
-        continue;
+        continue; // 사용자가 직접 설정한 것 — 존중
       }
 
       updates['careerProfile.skills.$masterId'] = {
@@ -251,14 +160,7 @@ class ResumeCareerSyncService {
 
   // ── 유틸 ────────────────────────────────────────────
 
-  /// 비교용 병원명 (공백·흔한 구두점 제거 — OCR 표기 차이 완화)
-  static String _normalizeClinicName(String raw) {
-    var s = raw.trim();
-    s = s.replaceAll(RegExp(r'\s+'), '');
-    s = s.replaceAll(RegExp(r'[·•\-\(\)\[\]]'), '');
-    return s;
-  }
-
+  /// 'YYYY-MM' → DateTime
   static DateTime? _parseYearMonth(String s) {
     if (s.isEmpty) return null;
     final parts = s.split('-');
@@ -270,61 +172,20 @@ class ResumeCareerSyncService {
     }
   }
 
-  static DentalNetworkEntry? _findMatchByNormalizedName(
+  /// 기존 엔트리에서 clinicName + 시작일 비슷한 것 찾기
+  static DentalNetworkEntry? _findMatch(
     List<DentalNetworkEntry> entries,
     String clinicName,
     DateTime startDate,
-    Set<String> consumedIds,
   ) {
-    final target = _normalizeClinicName(clinicName);
-    if (target.isEmpty) return null;
-
     for (final e in entries) {
-      if (consumedIds.contains(e.id)) continue;
-      if (_normalizeClinicName(e.clinicName) == target &&
-          e.startDate.year == startDate.year &&
-          e.startDate.month == startDate.month) {
+      if (e.clinicName.trim() == clinicName.trim() &&
+          (e.startDate.year == startDate.year &&
+              e.startDate.month == startDate.month)) {
         return e;
       }
     }
-    return null;
-  }
-
-  /// 시작 연도 동일 + `syncedFromResume` + 병원명 유사(편집거리≤2 등) — 시작 월이 OCR마다 달라도 같은 행으로 갱신
-  static DentalNetworkEntry? _findMatchFuzzySyncedYear(
-    List<DentalNetworkEntry> entries,
-    String clinicName,
-    DateTime startDate,
-    Set<String> consumedIds,
-  ) {
-    for (final e in entries) {
-      if (consumedIds.contains(e.id)) continue;
-      if (!e.syncedFromResume) continue;
-      if (e.startDate.year != startDate.year) continue;
-      if (CareerNetworkDedupeHelper.areProbablySameClinic(
-            clinicName,
-            e.clinicName,
-          )) {
-        return e;
-      }
-    }
-    return null;
-  }
-
-  /// 이력서 동기화 행만 대상으로, 같은 시작 연·월 후보가 **정확히 1건**일 때만 갱신 대상으로 사용
-  /// (후보가 2건 이상이면 같은 달 실제 근무 2곳 가능성을 열어 둠)
-  static DentalNetworkEntry? _findSyncedFallback(
-    List<DentalNetworkEntry> entries,
-    DateTime startDate,
-    Set<String> consumedIds,
-  ) {
-    final candidates = entries.where((e) {
-      if (consumedIds.contains(e.id)) return false;
-      if (!e.syncedFromResume) return false;
-      return e.startDate.year == startDate.year &&
-          e.startDate.month == startDate.month;
-    }).toList();
-    if (candidates.length == 1) return candidates.first;
     return null;
   }
 }
+

@@ -5,6 +5,8 @@ import 'tabs/admin_userflow_tab.dart';
 import 'tabs/admin_feature_tab.dart';
 import 'tabs/admin_behavior_tab.dart';
 import 'tabs/admin_trends_tab.dart';
+import 'tabs/admin_billing_tab.dart';
+import 'tabs/admin_verify_tab.dart';
 
 /// 관리자 전용 운영 대시보드
 ///
@@ -39,7 +41,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 5,
+      length: 7,
       child: Scaffold(
         backgroundColor: AppColors.appBg,
         appBar: AppBar(
@@ -91,6 +93,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   Tab(text: 'Feature'),
                   Tab(text: 'Behavior'),
                   Tab(text: 'Trends'),
+                  Tab(text: 'Billing'),
+                  Tab(text: '인증 검토'),
                 ],
               ),
             ),
@@ -103,6 +107,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             AdminFeatureTab(since: _since),
             AdminBehaviorTab(since: _since),
             const AdminTrendsTab(),
+            const AdminBillingTab(),
+            const AdminVerifyTab(),
           ],
         ),
       ),

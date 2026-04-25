@@ -18,6 +18,14 @@ import '../../features/jobs/web/job_product_select_page.dart';
 import '../../features/jobs/web/job_publish_success_page.dart';
 import '../../features/jobs/web/legal_page.dart';
 import '../../features/jobs/ui/clinic_verify_page.dart';
+import '../../features/me/pages/me_overview_page.dart';
+import '../../features/me/pages/me_clinic_page.dart';
+import '../../features/me/pages/me_verification_page.dart';
+import '../../features/me/pages/me_account_page.dart';
+import '../../features/me/pages/me_billing_page.dart';
+import '../../features/me/pages/me_orders_page.dart';
+import '../../features/me/pages/me_applicants_pool_page.dart';
+import '../../features/me/pages/me_notifications_page.dart';
 import '../../features/auth/web/web_login_page.dart';
 import '../../features/auth/web/set_password_page.dart';
 import '../../features/payment/payment_result_page.dart';
@@ -89,9 +97,10 @@ CustomTransitionPage<void> _jobPostSlidePage({
       // 나가는 페이지는 그 자리에 정지(secondaryAnimation 사용 안 함) →
       // 위로 덮이는 페이지에 잔여 흔들림이 생기지 않는다.
       return SlideTransition(
-        position: Tween<Offset>(begin: beginIn, end: Offset.zero)
-            .chain(CurveTween(curve: Curves.easeOutCubic))
-            .animate(animation),
+        position: Tween<Offset>(
+          begin: beginIn,
+          end: Offset.zero,
+        ).chain(CurveTween(curve: Curves.easeOutCubic)).animate(animation),
         child: child,
       );
     },
@@ -111,9 +120,6 @@ final appRouter = GoRouter(
     // ── 웹 전용: 루트(/) 진입 시 항상 웹 플로우로 보냄 ──────────
     // 모바일 HomeShell·앱 온보딩이 웹에 노출되는 것을 차단한다.
     if (kIsWeb && path == '/') {
-      if (user != null) {
-        return '/post-job/input';
-      }
       return '/login';
     }
 
@@ -131,10 +137,35 @@ final appRouter = GoRouter(
     }
 
     // 인증 필요 경로 목록
-    const guardedPrefixes = ['/post-job', '/applicant', '/clinic-verify'];
+    const guardedPrefixes = [
+      '/post-job',
+      '/applicant',
+      '/clinic-verify',
+      '/me',
+    ];
     final needsAuth = guardedPrefixes.any((p) => path.startsWith(p));
     if (needsAuth && user == null) {
       return '/login?next=${Uri.encodeComponent(path)}';
+    }
+
+    // /me 진입 시에도 치과 마스터(`clinics_accounts`)가 있어야 함
+    if (path.startsWith('/me') && user != null) {
+      try {
+        final status = await ClinicAuthService.getStatus();
+        if (!status.exists) {
+          final returnTo =
+              state.uri.path +
+              (state.uri.hasQuery ? '?${state.uri.query}' : '');
+          return '/publisher/signup?next=${Uri.encodeComponent(returnTo)}';
+        }
+        await ClinicProfileService.migrateIfNeeded();
+      } catch (_) {
+        // /me 는 가입 안내가 우선이지만, Firestore 일시 오류로 무한 대기되지 않도록
+        // 가입 페이지로 보내 사용자에게 재시도 기회를 준다.
+        final returnTo =
+            state.uri.path + (state.uri.hasQuery ? '?${state.uri.query}' : '');
+        return '/publisher/signup?next=${Uri.encodeComponent(returnTo)}';
+      }
     }
 
     // 레거시 온보딩 경로는 이제 모두 /post-job/input으로 redirect되므로
@@ -168,8 +199,7 @@ final appRouter = GoRouter(
         // Firestore 일시 오류·권한 문제 등으로 redirect가 무한 대기되지 않도록
         // 안전하게 가입 페이지로 보냄 (그곳에서 안내·재시도 가능)
         final returnTo =
-            state.uri.path +
-            (state.uri.hasQuery ? '?${state.uri.query}' : '');
+            state.uri.path + (state.uri.hasQuery ? '?${state.uri.query}' : '');
         return '/publisher/signup?next=${Uri.encodeComponent(returnTo)}';
       }
     }
@@ -186,63 +216,82 @@ final appRouter = GoRouter(
 
   routes: [
     GoRoute(path: '/', builder: (_, __) => const AuthGate()),
+    GoRoute(
+      path: '/bond',
+      builder: (_, __) => const AuthGate(initialTabIndex: 1),
+    ),
+    GoRoute(
+      path: '/growth',
+      builder: (_, __) => const AuthGate(initialTabIndex: 2),
+    ),
 
     // ── 새 공고 플로우 ──────────────────────────────────────
     GoRoute(path: '/post-job', builder: (_, __) => const JobPostWebPage()),
     GoRoute(
       path: '/post-job/input',
-      pageBuilder: (context, state) => _jobPostSlidePage(
-        state: state,
-        child: const JobInputPage(),
-      ),
+      pageBuilder:
+          (context, state) =>
+              _jobPostSlidePage(state: state, child: const JobInputPage()),
     ),
     GoRoute(
       path: '/post-job/edit/:draftId',
-      pageBuilder: (context, state) => _jobPostSlidePage(
-        state: state,
-        child: JobDraftEditorPage(draftId: state.pathParameters['draftId']!),
-      ),
+      pageBuilder:
+          (context, state) => _jobPostSlidePage(
+            state: state,
+            child: JobDraftEditorPage(
+              draftId: state.pathParameters['draftId']!,
+            ),
+          ),
     ),
     GoRoute(
       path: '/post-job/product/:draftId',
-      pageBuilder: (context, state) => _jobPostSlidePage(
-        state: state,
-        child: JobProductSelectPage(draftId: state.pathParameters['draftId']!),
-      ),
+      pageBuilder:
+          (context, state) => _jobPostSlidePage(
+            state: state,
+            child: JobProductSelectPage(
+              draftId: state.pathParameters['draftId']!,
+            ),
+          ),
     ),
     GoRoute(
       path: '/post-job/publish/:draftId',
       // 레거시 경로 → 새 상품 선택 페이지로 리다이렉트
-      redirect: (_, state) =>
-          '/post-job/product/${state.pathParameters['draftId']}',
+      redirect:
+          (_, state) => '/post-job/product/${state.pathParameters['draftId']}',
     ),
     GoRoute(
       path: '/post-job/success/:jobId',
-      builder: (_, state) =>
-          JobPublishSuccessPage(jobId: state.pathParameters['jobId']!),
+      builder:
+          (_, state) =>
+              JobPublishSuccessPage(jobId: state.pathParameters['jobId']!),
     ),
 
     // ── 토스페이먼츠 결제 결과 ────────────────────────────
     GoRoute(
       path: '/post-job/payment/success',
-      builder: (_, state) => PaymentSuccessPage(
-        paymentKey: state.uri.queryParameters['paymentKey'] ?? '',
-        orderId: state.uri.queryParameters['orderId'] ?? '',
-        amount: state.uri.queryParameters['amount'] ?? '',
-      ),
+      builder:
+          (_, state) => PaymentSuccessPage(
+            paymentKey: state.uri.queryParameters['paymentKey'] ?? '',
+            orderId: state.uri.queryParameters['orderId'] ?? '',
+            amount: state.uri.queryParameters['amount'] ?? '',
+          ),
     ),
     GoRoute(
       path: '/post-job/payment/fail',
-      builder: (_, state) => PaymentFailPage(
-        code: state.uri.queryParameters['code'] ?? '',
-        message: state.uri.queryParameters['message'] ?? '',
-        orderId: state.uri.queryParameters['orderId'] ?? '',
-      ),
+      builder:
+          (_, state) => PaymentFailPage(
+            code: state.uri.queryParameters['code'] ?? '',
+            message: state.uri.queryParameters['message'] ?? '',
+            orderId: state.uri.queryParameters['orderId'] ?? '',
+          ),
     ),
 
     GoRoute(
       path: '/clinic-verify',
-      builder: (_, __) => const ClinicVerifyPage(),
+      builder:
+          (_, state) => ClinicVerifyPage(
+            profileId: state.uri.queryParameters['profileId'],
+          ),
     ),
     GoRoute(path: '/jobs', builder: (_, __) => const JobPage()),
     GoRoute(path: '/policy', builder: (_, __) => const HiraUpdatePage()),
@@ -250,31 +299,39 @@ final appRouter = GoRouter(
     GoRoute(path: '/quiz', builder: (_, __) => const QuizTodayPage()),
 
     // ── 관리자 대시보드 ──────────────────────────────────────
+    GoRoute(path: '/admin', builder: (_, __) => const AdminDashboardPage()),
+
+    // ── 내 정보(My Page) ─────────────────────────────────────
+    GoRoute(path: '/me', builder: (_, __) => const MeOverviewPage()),
+    GoRoute(path: '/me/clinic', builder: (_, __) => const MeClinicPage()),
+    GoRoute(path: '/me/verify', builder: (_, __) => const MeVerificationPage()),
+    GoRoute(path: '/me/billing', builder: (_, __) => const MeBillingPage()),
+    GoRoute(path: '/me/orders', builder: (_, __) => const MeOrdersPage()),
     GoRoute(
-      path: '/admin',
-      builder: (_, __) => const AdminDashboardPage(),
+      path: '/me/applicants',
+      builder: (_, __) => const MeApplicantsPoolPage(),
     ),
+    GoRoute(
+      path: '/me/notifications',
+      builder: (_, __) => const MeNotificationsPage(),
+    ),
+    GoRoute(path: '/me/account', builder: (_, __) => const MeAccountPage()),
 
     // ── 피드백 게시판 ────────────────────────────────────────
-    GoRoute(
-      path: '/feedback',
-      builder: (_, __) => const FeedbackListPage(),
-    ),
+    GoRoute(path: '/feedback', builder: (_, __) => const FeedbackListPage()),
     GoRoute(
       path: '/feedback/write',
       builder: (_, state) {
         final label = state.uri.queryParameters['label'] ?? '';
         final route = state.uri.queryParameters['route'] ?? '/feedback/write';
-        return FeedbackWritePage(
-          sourceScreenLabel: label,
-          sourceRoute: route,
-        );
+        return FeedbackWritePage(sourceScreenLabel: label, sourceRoute: route);
       },
     ),
     GoRoute(
       path: '/feedback/:id',
-      builder: (_, state) =>
-          FeedbackDetailPage(feedbackId: state.pathParameters['id']!),
+      builder:
+          (_, state) =>
+              FeedbackDetailPage(feedbackId: state.pathParameters['id']!),
     ),
 
     // ── 로그인 불필요 — 법적 문서 페이지 ──────────────────
@@ -308,10 +365,7 @@ final appRouter = GoRouter(
     ),
 
     // ── 레거시 /publisher/login → /login 리다이렉트 ───────
-    GoRoute(
-      path: '/publisher/login',
-      redirect: (_, __) => '/login',
-    ),
+    GoRoute(path: '/publisher/login', redirect: (_, __) => '/login'),
 
     // ── 지원자 (치과위생사) 전용 라우트 ──────────────────
     GoRoute(
@@ -320,9 +374,9 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/applicant/resumes/edit/:resumeId',
-      builder: (_, state) => ResumeEditScreen(
-        resumeId: state.pathParameters['resumeId']!,
-      ),
+      builder:
+          (_, state) =>
+              ResumeEditScreen(resumeId: state.pathParameters['resumeId']!),
     ),
     GoRoute(
       path: '/applicant/resumes/import',
@@ -347,21 +401,12 @@ final appRouter = GoRouter(
       path: '/publisher/verify-phone',
       redirect: (_, __) => '/post-job/input',
     ),
-    GoRoute(
-      path: '/publisher/profile',
-      redirect: (_, __) => '/post-job/input',
-    ),
+    GoRoute(path: '/publisher/profile', redirect: (_, __) => '/post-job/input'),
     GoRoute(
       path: '/publisher/verify-business',
       redirect: (_, __) => '/post-job/input',
     ),
-    GoRoute(
-      path: '/publisher/pending',
-      redirect: (_, __) => '/post-job/input',
-    ),
-    GoRoute(
-      path: '/publisher/done',
-      redirect: (_, __) => '/post-job/input',
-    ),
+    GoRoute(path: '/publisher/pending', redirect: (_, __) => '/post-job/input'),
+    GoRoute(path: '/publisher/done', redirect: (_, __) => '/post-job/input'),
   ],
 );

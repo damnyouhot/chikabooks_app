@@ -13,7 +13,9 @@ import '../../core/widgets/app_badge.dart';
 import '../../models/poll.dart';
 import '../../models/poll_option.dart';
 
-/// 공감 투표 카드를 이미지로 캡처해 SNS 공유 (텍스트 공유 없음)
+const String _kShareBaseUrl = 'https://chikabooks3rd.web.app';
+
+/// 공감 투표 카드를 이미지로 캡처해 SNS 공유
 class PollShareCapture {
   PollShareCapture._();
 
@@ -27,9 +29,14 @@ class PollShareCapture {
     required String badgeLabel,
     required bool isPastStyle,
     required int totalEmpathy,
-    String? selectedOptionId,
   }) async {
     final shareOrigin = sharePositionOriginForShare(context);
+    final shareUrl =
+        '$_kShareBaseUrl/bond?pollId=${Uri.encodeComponent(poll.id)}';
+    final shareText =
+        isPastStyle
+            ? '지난 공감 투표 결과를 확인해보세요.\n$shareUrl'
+            : '오늘의 공감 투표에 참여해보세요.\n$shareUrl';
 
     final overlay = Overlay.maybeOf(context, rootOverlay: true);
     if (overlay == null) {
@@ -40,34 +47,35 @@ class PollShareCapture {
     late OverlayEntry entry;
 
     entry = OverlayEntry(
-      builder: (ctx) => Positioned(
-        left: -8000,
-        top: 0,
-        child: Material(
-          color: AppColors.appBg,
-          child: RepaintBoundary(
-            key: key,
-            child: SizedBox(
-              width: _kCardWidth,
-              child: _PollShareCard(
-                poll: poll,
-                options: options,
-                badgeLabel: badgeLabel,
-                isPastStyle: isPastStyle,
-                totalEmpathy: totalEmpathy,
-                selectedOptionId: selectedOptionId,
+      builder:
+          (ctx) => Positioned(
+            left: -8000,
+            top: 0,
+            child: Material(
+              color: AppColors.appBg,
+              child: RepaintBoundary(
+                key: key,
+                child: SizedBox(
+                  width: _kCardWidth,
+                  child: _PollShareCard(
+                    poll: poll,
+                    options: options,
+                    badgeLabel: badgeLabel,
+                    isPastStyle: isPastStyle,
+                    totalEmpathy: totalEmpathy,
+                  ),
+                ),
               ),
             ),
           ),
-        ),
-      ),
     );
 
     overlay.insert(entry);
 
     try {
       await Future<void>.delayed(const Duration(milliseconds: 80));
-      final boundary = key.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      final boundary =
+          key.currentContext?.findRenderObject() as RenderRepaintBoundary?;
       if (boundary == null) {
         throw StateError('캡처 영역을 찾을 수 없어요.');
       }
@@ -86,6 +94,7 @@ class PollShareCapture {
 
       await Share.shareXFiles(
         [XFile(path, mimeType: 'image/png')],
+        text: shareText,
         sharePositionOrigin: shareOrigin,
       );
     } finally {
@@ -101,7 +110,6 @@ class _PollShareCard extends StatelessWidget {
     required this.badgeLabel,
     required this.isPastStyle,
     required this.totalEmpathy,
-    this.selectedOptionId,
   });
 
   final Poll poll;
@@ -109,7 +117,6 @@ class _PollShareCard extends StatelessWidget {
   final String badgeLabel;
   final bool isPastStyle;
   final int totalEmpathy;
-  final String? selectedOptionId;
 
   @override
   Widget build(BuildContext context) {
@@ -121,7 +128,11 @@ class _PollShareCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.how_to_vote_outlined, size: 18, color: AppColors.textDisabled),
+              Icon(
+                Icons.how_to_vote_outlined,
+                size: 18,
+                color: AppColors.textDisabled,
+              ),
               const SizedBox(width: 8),
               Text(
                 isPastStyle ? '지난 공감 투표' : '오늘의 공감 투표',
@@ -155,12 +166,14 @@ class _PollShareCard extends StatelessWidget {
                     children: [
                       AppBadge(
                         label: badgeLabel,
-                        bgColor: isPastStyle
-                            ? AppColors.cardPrimary
-                            : AppColors.pollBadgeBg,
-                        textColor: isPastStyle
-                            ? AppColors.onCardPrimary
-                            : AppColors.pollBadgeText,
+                        bgColor:
+                            isPastStyle
+                                ? AppColors.cardPrimary
+                                : AppColors.pollBadgeBg,
+                        textColor:
+                            isPastStyle
+                                ? AppColors.onCardPrimary
+                                : AppColors.pollBadgeText,
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -183,24 +196,18 @@ class _PollShareCard extends StatelessWidget {
                     children: [
                       if (isPastStyle)
                         ...options.asMap().entries.map(
-                              (e) => _pastOptionRow(
-                                rank: e.key,
-                                option: e.value,
-                                totalEmpathy: totalEmpathy,
-                              ),
-                            )
-                      else
-                        ...options.map(
-                          (o) => _todayOptionRow(
-                            option: o,
+                          (e) => _pastOptionRow(
+                            rank: e.key,
+                            option: e.value,
                             totalEmpathy: totalEmpathy,
-                            selected: selectedOptionId == o.id,
                           ),
-                        ),
+                        )
+                      else
+                        ...options.map((o) => _todayOptionRow(option: o)),
                     ],
                   ),
                 ),
-                if (totalEmpathy > 0)
+                if (isPastStyle && totalEmpathy > 0)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 14),
                     child: Center(
@@ -215,13 +222,20 @@ class _PollShareCard extends StatelessWidget {
                   ),
                 const Divider(height: 1),
                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: AppSpacing.xl),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 12,
+                    horizontal: AppSpacing.xl,
+                  ),
                   child: Row(
                     children: [
-                      Icon(Icons.favorite_outline, size: 14, color: AppColors.textDisabled),
+                      Icon(
+                        Icons.favorite_outline,
+                        size: 14,
+                        color: AppColors.textDisabled,
+                      ),
                       const SizedBox(width: 6),
                       Text(
-                        '치카 북스',
+                        isPastStyle ? '치카 북스' : '치카 북스에서 투표하기',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -245,9 +259,10 @@ class _PollShareCard extends StatelessWidget {
     required int totalEmpathy,
   }) {
     final rankLabel = '${rank + 1}위';
-    final pct = totalEmpathy > 0
-        ? (option.empathyCount / totalEmpathy * 100).toStringAsFixed(1)
-        : '0.0';
+    final pct =
+        totalEmpathy > 0
+            ? (option.empathyCount / totalEmpathy * 100).toStringAsFixed(1)
+            : '0.0';
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -261,7 +276,8 @@ class _PollShareCard extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: rank < 3 ? FontWeight.w700 : FontWeight.w500,
-                color: rank == 0 ? AppColors.textPrimary : AppColors.textSecondary,
+                color:
+                    rank == 0 ? AppColors.textPrimary : AppColors.textSecondary,
               ),
             ),
           ),
@@ -295,30 +311,23 @@ class _PollShareCard extends StatelessWidget {
     );
   }
 
-  Widget _todayOptionRow({
-    required PollOption option,
-    required int totalEmpathy,
-    required bool selected,
-  }) {
-    final percentage =
-        totalEmpathy > 0 ? (option.empathyCount / totalEmpathy * 100) : 0.0;
-    final showStats = totalEmpathy > 0;
-
+  Widget _todayOptionRow({required PollOption option}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: 13),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg,
+          vertical: 13,
+        ),
         decoration: BoxDecoration(
-          color: selected
-              ? AppColors.pollOptionSelectedBg
-              : AppColors.pollOptionBg.withValues(alpha: 0.85),
+          color: AppColors.pollOptionBg.withValues(alpha: 0.85),
           borderRadius: BorderRadius.circular(AppRadius.md),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _radioCircle(selected),
+            _radioCircle(false),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -328,10 +337,8 @@ class _PollShareCard extends StatelessWidget {
                     option.content,
                     style: TextStyle(
                       fontSize: 13,
-                      fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
-                      color: selected
-                          ? AppColors.pollOptionSelectedText
-                          : AppColors.pollOptionText,
+                      fontWeight: FontWeight.w400,
+                      color: AppColors.pollOptionText,
                       height: 1.35,
                     ),
                   ),
@@ -342,42 +349,13 @@ class _PollShareCard extends StatelessWidget {
                         option.displayAuthorLabel,
                         style: TextStyle(
                           fontSize: 10,
-                          color: selected
-                              ? AppColors.pollOptionSelectedText.withValues(alpha: 0.6)
-                              : AppColors.textDisabled,
+                          color: AppColors.textDisabled,
                         ),
                       ),
                     ),
                 ],
               ),
             ),
-            if (showStats) ...[
-              const SizedBox(width: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    '${percentage.toStringAsFixed(1)}%',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: selected
-                          ? AppColors.pollOptionSelectedText.withValues(alpha: 0.8)
-                          : AppColors.textSecondary,
-                    ),
-                  ),
-                  Text(
-                    '${option.empathyCount}명',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: selected
-                          ? AppColors.pollOptionSelectedText.withValues(alpha: 0.5)
-                          : AppColors.textDisabled,
-                    ),
-                  ),
-                ],
-              ),
-            ],
           ],
         ),
       ),
@@ -391,28 +369,31 @@ class _PollShareCard extends StatelessWidget {
       margin: const EdgeInsets.only(top: 1),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: isSelected
-            ? AppColors.pollOptionSelectedText.withValues(alpha: 0.15)
-            : Colors.transparent,
+        color:
+            isSelected
+                ? AppColors.pollOptionSelectedText.withValues(alpha: 0.15)
+                : Colors.transparent,
         border: Border.all(
-          color: isSelected
-              ? AppColors.pollOptionSelectedText.withValues(alpha: 0.6)
-              : AppColors.textDisabled.withValues(alpha: 0.5),
+          color:
+              isSelected
+                  ? AppColors.pollOptionSelectedText.withValues(alpha: 0.6)
+                  : AppColors.textDisabled.withValues(alpha: 0.5),
           width: isSelected ? 1.5 : 0.8,
         ),
       ),
-      child: isSelected
-          ? Center(
-              child: Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.pollOptionSelectedText,
+      child:
+          isSelected
+              ? Center(
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.pollOptionSelectedText,
+                  ),
                 ),
-              ),
-            )
-          : null,
+              )
+              : null,
     );
   }
 }

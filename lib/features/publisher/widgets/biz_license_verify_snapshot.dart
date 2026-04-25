@@ -10,6 +10,8 @@ class BizLicenseVerifySnapshot {
     this.hiraMatched,
     this.hiraNote,
     this.hiraMatchLevel,
+    this.attemptId,
+    this.profileRelation,
   });
 
   final String? status;
@@ -23,6 +25,8 @@ class BizLicenseVerifySnapshot {
 
   /// `strict` | `partial` | `none`
   final String? hiraMatchLevel;
+  final String? attemptId;
+  final String? profileRelation;
 
   factory BizLicenseVerifySnapshot.fromCallable(Map<String, dynamic> data) {
     final hm = data['hiraMatched'];
@@ -34,6 +38,8 @@ class BizLicenseVerifySnapshot {
       hiraMatched: hm is bool ? hm : null,
       hiraNote: data['hiraNote']?.toString(),
       hiraMatchLevel: data['hiraMatchLevel']?.toString(),
+      attemptId: data['attemptId']?.toString(),
+      profileRelation: data['profileRelation']?.toString(),
     );
   }
 
@@ -55,8 +61,15 @@ class BizLicenseVerifySnapshot {
 
   /// 프로필 반영 CTA — 국세청 단계 통과 시에만 허용
   bool get canApplyToProfileAfterNts {
-    return (status ?? '') == 'verified';
+    final s = status ?? '';
+    if (profileRelation == 'different_business' ||
+        profileRelation == 'unverified_existing_profile') return false;
+    return s == 'verified' || s == 'provisional';
   }
+
+  bool get isDifferentBusiness =>
+      profileRelation == 'different_business' ||
+      profileRelation == 'unverified_existing_profile';
 
   String get lineNormalBusiness {
     final s = status ?? '';
@@ -67,6 +80,9 @@ class BizLicenseVerifySnapshot {
       if (fr == 'business_closed' || fr == 'nts_not_matched') return '아니오';
       if (fr == 'ocr_failed') return '확인 불가';
       return '아니오';
+    }
+    if (s == 'needs_user_decision' || fr == 'different_business_number') {
+      return '기존 지점의 사업자번호와 다른 등록증입니다. 기존 정보를 덮어쓰지 않고 별도 인증 시도로 보관했어요.';
     }
     if (s == 'pending_auto') return '확인 중';
     if (s == 'manual_review') return '확인 불가(수동 검토)';
@@ -102,6 +118,15 @@ class BizLicenseVerifySnapshot {
           return '등록번호에 해당하는 사업자 정보를 찾을 수 없습니다.';
         case 'ocr_failed':
           return 'OCR 단계에서 중단되어 국세청 조회를 수행하지 않았습니다.';
+        case 'not_business_registration':
+          return '업로드한 이미지가 사업자등록증으로 보이지 않습니다. '
+              '국세청에서 발급한 사업자등록증 사본을 다시 올려주세요.';
+        case 'hira_mismatch_after_grace':
+          return '개원 1개월이 지났지만 심평원 등록 정보와 일치하지 않아 운영팀 검토가 필요합니다.';
+        case 'hira_mismatch_opened_at_unknown':
+          return '심평원 등록 정보와 일치하지 않고 개원일을 확인하지 못해 운영팀 검토가 필요합니다.';
+        case 'image_download_failed':
+          return '업로드한 이미지를 서버에서 받지 못했습니다. 다시 시도해 주세요.';
         default:
           return '사업자 상태 확인에 실패했습니다.';
       }
@@ -140,6 +165,18 @@ class BizLicenseVerifySnapshot {
         return '사업자번호 누락·형식 오류';
       case 'hira_mismatch':
         return '내부 검토 필요(모의)';
+      case 'not_business_registration':
+        return '사업자등록증이 아닌 이미지';
+      case 'hira_mismatch_after_grace':
+        return '심평원 불일치(개원 1개월 초과)';
+      case 'hira_mismatch_opened_at_unknown':
+        return '심평원 불일치(개원일 확인 불가)';
+      case 'image_download_failed':
+        return '이미지 다운로드 실패';
+      case 'different_business_number':
+        return '기존 사업자와 다른 번호';
+      case 'unverified_profile_requires_user_decision':
+        return '기존 치과와 별도 인증 시도';
       default:
         return code;
     }

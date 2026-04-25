@@ -1,17 +1,10 @@
-import 'dart:async';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
-import 'career_network_dedupe_helper.dart';
-
 class CareerProfileService {
   static final _db = FirebaseFirestore.instance;
   static final _auth = FirebaseAuth.instance;
-
-  /// [watchNetworkEntries] 구독 시 과도한 Firestore 호출 방지 (분 단위)
-  static final Map<String, DateTime> _lastNetworkMergeAt = {};
 
   static String? get _uid => _auth.currentUser?.uid;
 
@@ -50,30 +43,29 @@ class CareerProfileService {
   // 이력서 임상스킬(_clinicalPresets) + 소프트스킬(_softPresets)과 동일하게 유지
   static const skillMaster = <Map<String, dynamic>>[
     // ── 임상 스킬 ──
-    {'id': 'scaling',        'title': '스케일링',          'icon': 'cleaning_services'},
-    {'id': 'perio',          'title': '치주 관리',          'icon': 'favorite'},
-    {'id': 'fluoride',       'title': '불소도포',           'icon': 'water_drop'},
-    {'id': 'xray',           'title': '방사선 촬영',        'icon': 'radio'},
-    {'id': 'prostho',        'title': '인상 채득',          'icon': 'handyman'},
-    {'id': 'denture_imp',    'title': '덴처임프',           'icon': 'denture_imp'},
-    {'id': 'temp_crown',     'title': '임시치아 제작',      'icon': 'build_circle'},
-    {'id': 'ortho',          'title': '교정 와이어 교체',   'icon': 'architecture'},
-    {'id': 'implant',        'title': '임플란트 보조',      'icon': 'build'},
-    {'id': 'endo',           'title': '근관치료 보조',      'icon': 'medical_services'},
-    {'id': 'pediatric',      'title': '소아 진료 보조',     'icon': 'child_care'},
-    {'id': 'resin',          'title': '레진/실란트',        'icon': 'colorize'},
-    {'id': 'whitening',      'title': '치아미백',           'icon': 'auto_awesome'},
-    {'id': 'scanner',        'title': '구강스캐너',         'icon': 'document_scanner'},
-    {'id': 'photo',          'title': '구내,구외 포토',     'icon': 'photo_camera'},
+    {'id': 'scaling', 'title': '스케일링', 'icon': 'cleaning_services'},
+    {'id': 'perio', 'title': '치주 관리', 'icon': 'favorite'},
+    {'id': 'fluoride', 'title': '불소도포', 'icon': 'water_drop'},
+    {'id': 'xray', 'title': '방사선 촬영', 'icon': 'radio'},
+    {'id': 'prostho', 'title': '인상 채득', 'icon': 'handyman'},
+    {'id': 'temp_crown', 'title': '임시치아 제작', 'icon': 'build_circle'},
+    {'id': 'ortho', 'title': '교정 와이어 교체', 'icon': 'architecture'},
+    {'id': 'implant', 'title': '임플란트 보조', 'icon': 'build'},
+    {'id': 'endo', 'title': '근관치료 보조', 'icon': 'medical_services'},
+    {'id': 'pediatric', 'title': '소아 진료 보조', 'icon': 'child_care'},
+    {'id': 'resin', 'title': '레진/실란트', 'icon': 'colorize'},
+    {'id': 'whitening', 'title': '치아미백', 'icon': 'auto_awesome'},
+    {'id': 'scanner', 'title': '구강스캐너', 'icon': 'document_scanner'},
+    {'id': 'photo', 'title': '구내,구외 포토', 'icon': 'photo_camera'},
     // ── 소프트 스킬 ──
-    {'id': 'consult',        'title': '환자 상담',          'icon': 'chat_bubble'},
-    {'id': 'insurance',      'title': '보험청구',           'icon': 'receipt_long'},
-    {'id': 'chart',          'title': '차트 관리',          'icon': 'description'},
-    {'id': 'sterile',        'title': '감염 관리',          'icon': 'sanitizer'},
-    {'id': 'inventory',      'title': '재고 관리',          'icon': 'inventory'},
-    {'id': 'leadership',     'title': '팀 리더십',          'icon': 'groups'},
-    {'id': 'training',       'title': '신규 직원 교육',     'icon': 'school'},
-    {'id': 'reception',      'title': '고객 CS',            'icon': 'phone'},
+    {'id': 'consult', 'title': '환자 상담', 'icon': 'chat_bubble'},
+    {'id': 'insurance', 'title': '보험청구', 'icon': 'receipt_long'},
+    {'id': 'chart', 'title': '차트 관리', 'icon': 'description'},
+    {'id': 'sterile', 'title': '감염 관리', 'icon': 'sanitizer'},
+    {'id': 'inventory', 'title': '재고 관리', 'icon': 'inventory'},
+    {'id': 'leadership', 'title': '팀 리더십', 'icon': 'groups'},
+    {'id': 'training', 'title': '신규 직원 교육', 'icon': 'school'},
+    {'id': 'reception', 'title': '고객 CS', 'icon': 'phone'},
   ];
 
   static Future<Map<String, Map<String, dynamic>>> getMySkills() async {
@@ -191,7 +183,7 @@ class CareerProfileService {
     }
   }
 
-  // ── 치과 히스토리 (careerNetwork 컬렉션) ───────────────────
+  // ── 치과 네트워크 ────────────────────────────────────────
   static CollectionReference<Map<String, dynamic>>? get _networkRef {
     final uid = _uid;
     if (uid == null) return null;
@@ -201,24 +193,6 @@ class CareerProfileService {
   static Stream<List<DentalNetworkEntry>> watchNetworkEntries() {
     return _auth.authStateChanges().asyncExpand((user) {
       if (user == null) return const Stream.empty();
-      unawaited(
-        Future(() async {
-          try {
-            final now = DateTime.now();
-            final last = _lastNetworkMergeAt[user.uid];
-            if (last != null &&
-                now.difference(last) < const Duration(minutes: 3)) {
-              return;
-            }
-            _lastNetworkMergeAt[user.uid] = now;
-            await CareerNetworkDedupeHelper.mergeSimilarNetworkEntries(
-              _db.collection('users').doc(user.uid).collection('careerNetwork'),
-            );
-          } catch (e) {
-            debugPrint('⚠️ CareerProfileService network dedupe: $e');
-          }
-        }),
-      );
       return _db
           .collection('users')
           .doc(user.uid)
@@ -253,26 +227,6 @@ class CareerProfileService {
     await ref.doc(entryId).delete();
   }
 
-  /// `syncedFromResume == true`인 치과 히스토리 행만 일괄 삭제 (이력서 추출로 쌓인 줄만 비움)
-  static Future<int> deleteAllSyncedFromResumeNetworkEntries() async {
-    final ref = _networkRef;
-    if (ref == null) throw Exception('로그인이 필요합니다.');
-    final snap = await ref.where('syncedFromResume', isEqualTo: true).get();
-    final docs = snap.docs;
-    if (docs.isEmpty) return 0;
-
-    const chunk = 450;
-    for (var i = 0; i < docs.length; i += chunk) {
-      final batch = _db.batch();
-      final end = i + chunk > docs.length ? docs.length : i + chunk;
-      for (var j = i; j < end; j++) {
-        batch.delete(docs[j].reference);
-      }
-      await batch.commit();
-    }
-    return docs.length;
-  }
-
   static Future<void> updateCareerIdentity({
     required String status, // 'employed' | 'leave' | 'unemployed'
     String clinicName = '',
@@ -280,34 +234,61 @@ class CareerProfileService {
     List<String> specialtyTags = const [],
     bool useTotalCareerMonthsOverride = false,
     int? totalCareerMonthsOverride,
-    /// true: 총 경력 직접 입력 사용 중 — 프로필 연차 저장 시 덮어쓰지 않음(연차 변경 시만 동기화).
-    bool? careerOverrideLocked,
+    /// 사용자가 직접 경력기간 override 를 설정해 잠궜는지 여부.
+    /// true 면 자동 동기화(이력서·온보딩) 가 override 값을 덮어쓰지 않는다.
+    bool careerOverrideLocked = false,
   }) async {
     try {
       final ref = _userRef;
       if (ref == null) throw Exception('로그인이 필요합니다.');
 
-      final identityPayload = <String, dynamic>{
-        'status': status,
-        'clinicName': clinicName.trim(),
-        'currentStartDate':
-            currentStartDate != null
-                ? Timestamp.fromDate(currentStartDate)
-                : null,
-        'specialtyTags': specialtyTags,
-        'useTotalCareerMonthsOverride': useTotalCareerMonthsOverride,
-        'totalCareerMonthsOverride': totalCareerMonthsOverride,
-        'updatedAt': FieldValue.serverTimestamp(),
-      };
-      if (careerOverrideLocked != null) {
-        identityPayload['careerOverrideLocked'] = careerOverrideLocked;
-      }
-
       await ref.set({
-        'careerProfile': {'identity': identityPayload},
+        'careerProfile': {
+          'identity': {
+            'status': status,
+            'clinicName': clinicName.trim(),
+            'currentStartDate':
+                currentStartDate != null
+                    ? Timestamp.fromDate(currentStartDate)
+                    : null,
+            'specialtyTags': specialtyTags,
+            'useTotalCareerMonthsOverride': useTotalCareerMonthsOverride,
+            'totalCareerMonthsOverride': totalCareerMonthsOverride,
+            'careerOverrideLocked': careerOverrideLocked,
+            'updatedAt': FieldValue.serverTimestamp(),
+          },
+        },
       }, SetOptions(merge: true));
     } catch (e) {
       debugPrint('⚠️ CareerProfileService.updateCareerIdentity error: $e');
+      rethrow;
+    }
+  }
+
+  /// 이력서로부터 자동 동기화로 추가된 (`syncedFromResume == true`) 항목들을
+  /// 일괄 삭제. 삭제한 개수를 반환한다.
+  static Future<int> deleteAllSyncedFromResumeNetworkEntries() async {
+    final ref = _networkRef;
+    if (ref == null) throw Exception('로그인이 필요합니다.');
+    try {
+      final snap =
+          await ref.where('syncedFromResume', isEqualTo: true).get();
+      if (snap.docs.isEmpty) return 0;
+      // Firestore batch 는 500개 제한 — chunk 단위 처리
+      var deleted = 0;
+      for (var i = 0; i < snap.docs.length; i += 450) {
+        final end = (i + 450).clamp(0, snap.docs.length);
+        final batch = _db.batch();
+        for (final d in snap.docs.sublist(i, end)) {
+          batch.delete(d.reference);
+        }
+        await batch.commit();
+        deleted += end - i;
+      }
+      return deleted;
+    } catch (e) {
+      debugPrint(
+          '⚠️ CareerProfileService.deleteAllSyncedFromResumeNetworkEntries: $e');
       rethrow;
     }
   }
@@ -321,7 +302,8 @@ class DentalNetworkEntry {
   final List<String> tags;
   final List<String> acquiredSkills;
 
-  /// 이력서 저장 시 자동 동기화로 생성·갱신된 항목
+  /// 이력서 OCR/연동으로 자동 적재된 항목인지 표시.
+  /// true 면 "이력서에서 가져온 경력 전체 삭제" 일괄 정리 대상.
   final bool syncedFromResume;
 
   DentalNetworkEntry({
@@ -342,14 +324,11 @@ class DentalNetworkEntry {
     return m < 1 ? 1 : m;
   }
 
-  /// `YYYY.MM` 단위 — 연도만이 아니라 월까지 보여 검증·중복 확인에 유리
   String get periodLabel {
-    String ym(DateTime d) =>
-        '${d.year}.${d.month.toString().padLeft(2, '0')}';
-    final s = ym(startDate);
-    if (endDate == null) return '$s ~ 현재';
-    final e = ym(endDate!);
-    return '$s ~ $e';
+    final sy = startDate.year;
+    if (endDate == null) return '$sy ~ 현재';
+    final ey = endDate!.year;
+    return sy == ey ? '$sy' : '$sy ~ $ey';
   }
 
   DentalNetworkEntry copyWith({

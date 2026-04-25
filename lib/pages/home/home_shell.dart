@@ -22,7 +22,15 @@ class HomeShell extends StatefulWidget {
   /// OnboardingGate에서 온보딩 여부를 미리 판단해 전달
   /// true = 온보딩 실행, false = 일반 홈 화면
   final bool startWithOnboarding;
-  const HomeShell({super.key, this.startWithOnboarding = false});
+  final int initialTabIndex;
+  final int initialGrowthSubTabIndex;
+
+  const HomeShell({
+    super.key,
+    this.startWithOnboarding = false,
+    this.initialTabIndex = 0,
+    this.initialGrowthSubTabIndex = -1,
+  });
   @override
   State<HomeShell> createState() => _HomeShellState();
 }
@@ -47,7 +55,7 @@ class _HomeShellState extends State<HomeShell> {
 
   // ── 앱 온보딩 ──
   // OnboardingGate에서 이미 판단 완료 → 즉시 true로 설정
-  bool _onboardingChecked = true;
+  final bool _onboardingChecked = true;
   bool _onboardingActive = false;
   late final AppOnboardingController _onboardingCtrl;
 
@@ -74,12 +82,19 @@ class _HomeShellState extends State<HomeShell> {
       _onboardingActive = true;
       _selectedIndex = 0;
       _onboardingCtrl.start();
+    } else {
+      _selectedIndex = widget.initialTabIndex.clamp(0, 3).toInt();
     }
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // _checkOnboarding() 제거 — OnboardingGate에서 이미 처리됨
       _recordAppOpen();
       AdminActivityService.warmupCache();
+      if (!_onboardingActive &&
+          widget.initialTabIndex == 2 &&
+          widget.initialGrowthSubTabIndex >= 0) {
+        _onGrowthSubTabRequested(widget.initialGrowthSubTabIndex);
+      }
       // 로그인 후 아임웹 구매내역 자동 동기화 (fire-and-forget)
       _trySyncImwebPurchases();
     });
@@ -123,17 +138,17 @@ class _HomeShellState extends State<HomeShell> {
   void _trySyncImwebPurchases() {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null || user.email == null || user.email!.isEmpty) return;
+    final ebookService = context.read<EbookService>();
 
     unawaited(
       Future.delayed(Duration.zero, () async {
         try {
-          final service = context.read<EbookService>();
-          final result = await service.syncImwebPurchases();
+          final result = await ebookService.syncImwebPurchases();
           final synced = result['synced'] as int? ?? 0;
           if (synced > 0 && mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('📚 하이진랩 구매내역 ${synced}권을 불러왔습니다.'),
+                content: Text('📚 하이진랩 구매내역 $synced권을 불러왔습니다.'),
                 backgroundColor: AppColors.success,
                 behavior: SnackBarBehavior.floating,
                 duration: const Duration(seconds: 3),
@@ -283,9 +298,9 @@ class _HomeShellState extends State<HomeShell> {
             _onboardingActive && _onboardingCtrl.isTab0Step,
         onboardingBoldWord:
             (_onboardingActive &&
-                _onboardingCtrl.current == AppOnboardingStepId.step1a)
-            ? '저니'
-            : null,
+                    _onboardingCtrl.current == AppOnboardingStepId.step1a)
+                ? '저니'
+                : null,
         currentTabIndex: _selectedIndex,
       ),
       _bondPage,

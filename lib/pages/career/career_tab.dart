@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/career_profile_service.dart';
+import '../../features/resume/screens/resume_home_screen.dart';
+import '../../features/resume/screens/my_applications_screen.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../core/widgets/app_muted_card.dart';
@@ -13,8 +15,8 @@ import 'career_stage_section.dart';
 
 /// 커리어 탭 소탭바 (AppSegmentedControl 전용 헤더)
 ///
-/// 상단 인포·설정은 [job_page.dart]의 [_JobPageTitleBar]가 처리하며,
-/// 이 위젯은 소탭('채용 · 지원' / '커리어 카드')만 렌더링합니다.
+/// 타이틀·인포·설정은 [job_page.dart]의 [_JobPageTitleBar]가 처리하며,
+/// 이 위젯은 소탭('공고 보기' / '커리어 카드')만 렌더링합니다.
 class CareerTabHeader extends StatelessWidget {
   const CareerTabHeader({super.key});
 
@@ -22,13 +24,10 @@ class CareerTabHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppSegmentedControl(
       controller: DefaultTabController.of(context),
-      labels: const ['채용 · 지원', '커리어 카드'],
-      wipIndices: const {0},
-      margin: const EdgeInsets.fromLTRB(
-        AppSpacing.xl,
-        0,
-        AppSpacing.xl,
-        AppSpacing.xs,
+      labels: const ['공고 보기', '커리어 카드'],
+      margin: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.xl,
+        vertical: AppSpacing.xs,
       ),
     );
   }
@@ -66,6 +65,8 @@ class CareerTab extends StatelessWidget {
             CareerProfileService.skillMaster
                 .where((m) => skillsMap[m['id']]?['enabled'] == true)
                 .toList();
+        final previewSkills = enabledSkills.take(4).toList();
+        final hasMore = enabledSkills.length > 4;
 
         return StreamBuilder<List<DentalNetworkEntry>>(
           stream: CareerProfileService.watchNetworkEntries(),
@@ -85,7 +86,7 @@ class CareerTab extends StatelessWidget {
             return ListView(
               padding: const EdgeInsets.fromLTRB(
                 AppSpacing.lg,
-                AppSpacing.sm,
+                AppSpacing.lg,
                 AppSpacing.lg,
                 AppSpacing.xxl,
               ),
@@ -101,21 +102,29 @@ class CareerTab extends StatelessWidget {
                 const SizedBox(height: AppSpacing.lg),
 
                 // ══════════════════════════════════════════
-                // 2. 나의 치과 히스토리 + 나의 커리어 레벨 (Gray)
+                // 2. 내 이력서 + 지원 내역 (가로 반반, Gray)
+                // ══════════════════════════════════════════
+                _ShortcutRow(),
+                const SizedBox(height: AppSpacing.lg),
+
+                // ══════════════════════════════════════════
+                // 3. 나의 스킬 카드 (Gray)
+                // ══════════════════════════════════════════
+                _SkillSection(
+                  enabledSkills: enabledSkills,
+                  previewSkills: previewSkills,
+                  hasMore: hasMore,
+                  skillsMap: skillsMap,
+                ),
+                const SizedBox(height: AppSpacing.lg),
+
+                // ══════════════════════════════════════════
+                // 4. 커리어 단계 카드 + 치과 네트워크 통합 (Gray)
                 // ══════════════════════════════════════════
                 _StageAndNetworkCard(
                   totalCareerMonths: totalCareerMonths,
                   totalClinics: entries.length,
                   entries: entries,
-                ),
-                const SizedBox(height: AppSpacing.lg),
-
-                // ══════════════════════════════════════════
-                // 3. 나의 스킬 카드 (Gray) — 이력서/지원 단축은 채용 탭 상단
-                // ══════════════════════════════════════════
-                _SkillSection(
-                  enabledSkills: enabledSkills,
-                  totalMasterSkills: CareerProfileService.skillMaster.length,
                 ),
               ],
             );
@@ -344,7 +353,7 @@ class _IdentityFilledInner extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── 타이틀 행: titleLine + 수정 아이콘 ──
+        // ── 타이틀 행: titleLine + 유저분류 배지 + 수정 아이콘 ──
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
@@ -357,6 +366,13 @@ class _IdentityFilledInner extends StatelessWidget {
                   color: AppColors.onCardPrimary,
                 ),
               ),
+            ),
+            const SizedBox(width: 8),
+            // '치과위생사' 분류 배지 (기존 위 줄에서 이동)
+            AppBadge(
+              label: '치과위생사',
+              bgColor: AppColors.onCardPrimary.withOpacity(0.15),
+              textColor: AppColors.onCardPrimary,
             ),
             const SizedBox(width: 4),
             IconButton(
@@ -453,51 +469,122 @@ class _IdentityFilledInner extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════════
+// 2. 이력서 + 지원내역 바로가기 — 가로 반반, Gray(Muted) 배경
+// ══════════════════════════════════════════════════════════════
+class _ShortcutRow extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(child: _ShortcutCard(
+            icon: Icons.description_outlined,
+            label: '내 이력서',
+            description: '이력서 작성 및 지원',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ResumeHomeScreen()),
+            ),
+          )),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(child: _ShortcutCard(
+            icon: Icons.work_outline,
+            label: '지원 내역',
+            description: '지원 공고 현황 확인',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const MyApplicationsScreen()),
+            ),
+          )),
+        ],
+      ),
+    );
+  }
+}
+
+class _ShortcutCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String description;
+  final VoidCallback onTap;
+
+  const _ShortcutCard({
+    required this.icon,
+    required this.label,
+    required this.description,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AppMutedCard(
+      onTap: onTap,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: AppColors.accent.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(AppRadius.md),
+            ),
+            child: Icon(icon, color: AppColors.accent, size: 18),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            description,
+            style: const TextStyle(
+              fontSize: 11,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
 // 3. 스킬 카드 섹션 — Gray(Muted) 배경
 // ══════════════════════════════════════════════════════════════
 class _SkillSection extends StatelessWidget {
   final List<Map<String, dynamic>> enabledSkills;
-  final int totalMasterSkills;
+  final List<Map<String, dynamic>> previewSkills;
+  final bool hasMore;
+  final Map<String, Map<String, dynamic>> skillsMap;
 
   const _SkillSection({
     required this.enabledSkills,
-    required this.totalMasterSkills,
+    required this.previewSkills,
+    required this.hasMore,
+    required this.skillsMap,
   });
-
-  static const int _kColumns = 2;
 
   @override
   Widget build(BuildContext context) {
-    final owned = enabledSkills.length;
-    final subtitle = '총 $totalMasterSkills개 중 $owned개 스킬 보유 중';
-
     return AppMutedCard(
       padding: const EdgeInsets.all(AppSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── 헤더 + 소제목 ──
+          // ── 헤더 ──
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const CareerSectionTitle('나의 스킬 카드'),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary,
-                        height: 1.35,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              const CareerSectionTitle('나의 스킬 카드'),
+              const Spacer(),
               GestureDetector(
                 onTap: () => CareerSkillEditSheet.show(context),
                 child: AppBadge(
@@ -509,46 +596,42 @@ class _SkillSection extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          // ── 내용 (2열 그리드, 활성 스킬 전체) ──
+          // ── 내용 ──
           if (enabledSkills.isEmpty)
             SizedBox(
               width: double.infinity,
               child: _SkillEmptyState(onTap: () => CareerSkillEditSheet.show(context)),
             )
           else ...[
-            for (var i = 0; i < enabledSkills.length; i += _kColumns)
-              Padding(
-                padding: EdgeInsets.only(
-                  bottom: i + _kColumns < enabledSkills.length ? 10 : 0,
+            ...previewSkills.map((m) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: CareerSkillCard(
+                  info: CareerSkillInfo(
+                    id: m['id'] as String,
+                    title: m['title'] as String,
+                    icon: iconFromSkillName(m['icon'] as String),
+                  ),
                 ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: _skillCardFor(enabledSkills[i]),
+              );
+            }),
+            if (hasMore)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => CareerSkillEditSheet.show(context),
+                  child: Text(
+                    '더보기 (${enabledSkills.length - 4}개)',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary,
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child:
-                          i + 1 < enabledSkills.length
-                              ? _skillCardFor(enabledSkills[i + 1])
-                              : const SizedBox.shrink(),
-                    ),
-                  ],
+                  ),
                 ),
               ),
           ],
         ],
-      ),
-    );
-  }
-
-  Widget _skillCardFor(Map<String, dynamic> m) {
-    return CareerSkillCard(
-      info: CareerSkillInfo(
-        id: m['id'] as String,
-        title: m['title'] as String,
-        icon: iconFromSkillName(m['icon'] as String),
       ),
     );
   }
@@ -607,7 +690,7 @@ class _SkillEmptyState extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════════
-// 2. 나의 치과 히스토리 + 나의 커리어 레벨 통합 카드 — Gray(Muted) 배경
+// 4. 커리어 단계 + 치과 네트워크 통합 카드 — Gray(Muted) 배경
 // ══════════════════════════════════════════════════════════════
 class _StageAndNetworkCard extends StatelessWidget {
   final int totalCareerMonths;
@@ -627,16 +710,18 @@ class _StageAndNetworkCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _NetworkSection(entries: entries),
-          const SizedBox(height: AppSpacing.xl),
-          const Divider(color: AppColors.divider, height: 1),
-          const SizedBox(height: AppSpacing.lg),
-          const CareerSectionTitle('나의 커리어 레벨'),
+          const CareerSectionTitle('커리어 단계'),
           const SizedBox(height: 12),
           _StageContent(
             totalCareerMonths: totalCareerMonths,
             totalClinics: totalClinics,
           ),
+          const SizedBox(height: AppSpacing.xl),
+          // ── 구분선 ──
+          const Divider(color: AppColors.divider, height: 1),
+          const SizedBox(height: AppSpacing.lg),
+          // ── 치과 네트워크 ──
+          _NetworkSection(entries: entries),
         ],
       ),
     );
@@ -661,7 +746,7 @@ class _StageContent extends StatelessWidget {
   }
 }
 
-/// 나의 치과 히스토리 섹션 (Muted 배경 위에서 렌더)
+/// 치과 네트워크 섹션 (Muted 배경 위에서 렌더)
 class _NetworkSection extends StatefulWidget {
   final List<DentalNetworkEntry> entries;
   const _NetworkSection({required this.entries});
@@ -678,44 +763,24 @@ class _NetworkSectionState extends State<_NetworkSection> {
     final entries = widget.entries;
     final totalClinics = entries.length;
     final totalMonths = entries.fold(0, (sum, e) => sum + e.months);
+    final maxMonths = entries.isEmpty
+        ? 1
+        : entries.map((e) => e.months).reduce((a, b) => a > b ? a : b);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: InkWell(
-                onTap: () => setState(() => _expanded = !_expanded),
-                borderRadius: BorderRadius.circular(AppRadius.md),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const CareerSectionTitle('나의 치과 히스토리'),
-                      const SizedBox(height: 2),
-                      Text(
-                        totalClinics == 0
-                            ? kDentalHistoryEmptyHint
-                            : '총 $totalClinics곳 · 총 ${formatCareerMonths(totalMonths)}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: totalClinics == 0
-                              ? AppColors.accent
-                              : AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.center,
+        // ── 헤더 ──
+        InkWell(
+          onTap: () => setState(() => _expanded = !_expanded),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
               children: [
+                const Expanded(
+                  child: CareerSectionTitle('나의 치과 네트워크'),
+                ),
                 IconButton(
                   onPressed: () => DentalNetworkEditSheet.show(context),
                   icon: const Icon(Icons.add, size: 18),
@@ -727,37 +792,45 @@ class _NetworkSectionState extends State<_NetworkSection> {
                   padding: EdgeInsets.zero,
                   tooltip: '추가',
                 ),
-                InkWell(
-                  onTap: () => setState(() => _expanded = !_expanded),
-                  borderRadius: BorderRadius.circular(AppRadius.sm),
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 2),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          _expanded ? '접기' : '펼치기',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                        const SizedBox(width: 2),
-                        Icon(
-                          _expanded
-                              ? Icons.keyboard_arrow_up
-                              : Icons.keyboard_arrow_down,
-                          color: AppColors.textSecondary,
-                          size: 20,
-                        ),
-                      ],
-                    ),
+                const SizedBox(width: 2),
+                Text(
+                  _expanded ? '접기' : '펼치기',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textSecondary,
                   ),
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  _expanded
+                      ? Icons.keyboard_arrow_up
+                      : Icons.keyboard_arrow_down,
+                  color: AppColors.textSecondary,
                 ),
               ],
             ),
-          ],
+          ),
+        ),
+        const SizedBox(height: 4),
+        // ── 요약 텍스트 ──
+        GestureDetector(
+          onTap: () => setState(() => _expanded = !_expanded),
+          behavior: HitTestBehavior.opaque,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Text(
+              totalClinics == 0
+                  ? '아직 이력이 없어요  ·  탭해서 추가하기'
+                  : '총 $totalClinics곳 · 총 ${formatCareerMonths(totalMonths)}',
+              style: TextStyle(
+                fontSize: 12,
+                color: totalClinics == 0
+                    ? AppColors.accent
+                    : AppColors.textSecondary,
+              ),
+            ),
+          ),
         ),
         // ── 펼치기 내용 ──
         AnimatedCrossFade(
@@ -779,6 +852,7 @@ class _NetworkSectionState extends State<_NetworkSection> {
                             padding: const EdgeInsets.only(bottom: 10),
                             child: _NetworkTimelineItem(
                               entry: e,
+                              maxMonths: maxMonths,
                               onEdit: () => DentalNetworkEditSheet.show(
                                 context,
                                 editing: e,
@@ -850,7 +924,7 @@ class _NetworkEmptyHint extends StatelessWidget {
           const SizedBox(width: 10),
           const Expanded(
             child: Text(
-              kDentalHistoryEmptyHint,
+              '아직 이력이 없어요.\n첫 근무지를 추가하면 타임라인이 만들어져요.',
               style: TextStyle(
                 fontSize: 12,
                 height: 1.35,
@@ -870,20 +944,25 @@ class _NetworkEmptyHint extends StatelessWidget {
 
 class _NetworkTimelineItem extends StatelessWidget {
   final DentalNetworkEntry entry;
+  final int maxMonths;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
   const _NetworkTimelineItem({
     required this.entry,
+    required this.maxMonths,
     required this.onEdit,
     required this.onDelete,
   });
 
-  /// 세로 막대 고정 높이 (텍스트 블록·한 줄 아이콘과 균형)
-  static const double _barHeight = 40;
-
   @override
   Widget build(BuildContext context) {
+    final screenH = MediaQuery.of(context).size.height;
+    final kMaxBarH = (screenH * 0.13).clamp(80.0, 130.0);
+    final kMinBarH = (screenH * 0.035).clamp(22.0, 36.0);
+    final barHeight =
+        kMinBarH + (kMaxBarH - kMinBarH) * (entry.months / maxMonths);
+
     return Container(
       decoration: BoxDecoration(
         color: entry.isCurrent
@@ -897,14 +976,14 @@ class _NetworkTimelineItem extends StatelessWidget {
           width: 0.8,
         ),
       ),
-      padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
+      padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 6,
-            height: _barHeight,
-            margin: const EdgeInsets.only(right: 10),
+            width: 7,
+            height: barHeight,
+            margin: const EdgeInsets.only(top: 2, right: 12),
             decoration: BoxDecoration(
               color: entry.isCurrent
                   ? AppColors.accent
@@ -973,30 +1052,22 @@ class _NetworkTimelineItem extends StatelessWidget {
               ],
             ),
           ),
-          Row(
+          Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               IconButton(
                 onPressed: onEdit,
-                icon: const Icon(Icons.edit_outlined, size: 18),
+                icon: const Icon(Icons.edit_outlined, size: 16),
                 color: AppColors.textSecondary,
-                style: IconButton.styleFrom(
-                  padding: const EdgeInsets.all(4),
-                  minimumSize: const Size(32, 32),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  visualDensity: VisualDensity.compact,
-                ),
+                constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                padding: EdgeInsets.zero,
               ),
               IconButton(
                 onPressed: onDelete,
-                icon: const Icon(Icons.delete_outline, size: 18),
+                icon: const Icon(Icons.delete_outline, size: 16),
                 color: AppColors.error,
-                style: IconButton.styleFrom(
-                  padding: const EdgeInsets.all(4),
-                  minimumSize: const Size(32, 32),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  visualDensity: VisualDensity.compact,
-                ),
+                constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                padding: EdgeInsets.zero,
               ),
             ],
           ),

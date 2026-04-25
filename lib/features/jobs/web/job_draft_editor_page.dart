@@ -3,9 +3,12 @@ import 'dart:ui' as ui;
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+
+import '../../me/providers/me_providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/web_site_footer.dart';
 import '../../../core/theme/app_tokens.dart';
@@ -60,7 +63,7 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
 
   /// [ClinicProfileService.ensureDefaultProfileForDraft] 완료 후 true
   bool _profileReady = false;
-  String _editorStep = 'step1';
+  String _editorStep = 'step2';
   String? _aiError;
 
   /// 사업자 인증 완료 상태에서만 true — 새 등록증 교체 UI 진입
@@ -282,6 +285,153 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
       _profileReady = true;
       _extraDraftFields = {..._extraDraftFields, 'clinicProfileId': p.id};
     });
+  }
+
+  /// 헤더 칩에서 다른 지점을 골랐을 때.
+  ///
+  /// 드래프트의 `clinicProfileId` 를 바꾸고, 폼 본문 (치과명/주소/연락처) 을
+  /// 새 지점 기준으로 교체한다 — 사용자가 헷갈리지 않도록 확인 다이얼로그 1회.
+  Future<void> _switchToBranch(ClinicProfile next) async {
+    if (next.id == _selectedProfile?.id) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('지점을 바꿀까요?'),
+            content: Text(
+              '"${next.effectiveName}" 으로 전환하면 본문의 치과명·주소·연락처가\n'
+              '새 지점 정보로 바뀝니다. 사진과 본문 내용은 유지돼요.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('취소'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('전환'),
+              ),
+            ],
+          ),
+    );
+    if (ok != true || !mounted) return;
+
+    await JobDraftService.saveDraft(
+      draftId: widget.draftId,
+      formData: {'clinicProfileId': next.id},
+    );
+    if (!mounted) return;
+
+    setState(() {
+      _selectedProfile = next;
+      _extraDraftFields = {..._extraDraftFields, 'clinicProfileId': next.id};
+      // 본문 치과명/주소/연락처를 새 지점 기준으로 강제 교체.
+      _data = _data.copyWith(
+        clinicName: next.effectiveName,
+        address: next.address,
+        contact: next.phone,
+      );
+    });
+    // 자식 폼에도 즉시 반영.
+    _detailFormKey.currentState?.applyDraftFromParent(_data);
+  }
+
+  /// 드롭다운에서 "+ 새 지점 추가" 를 골랐을 때.
+  Future<void> _createAndSwitchBranch() async {
+    final newId = await ClinicProfileService.createProfile(
+      clinicName: '',
+      displayName: '',
+    );
+    if (newId == null || !mounted) return;
+    final created = await ClinicProfileService.getProfile(newId);
+    if (created == null || !mounted) return;
+
+    await JobDraftService.saveDraft(
+      draftId: widget.draftId,
+      formData: {'clinicProfileId': created.id},
+    );
+    if (!mounted) return;
+
+    setState(() {
+      _selectedProfile = created;
+      _extraDraftFields = {..._extraDraftFields, 'clinicProfileId': created.id};
+    });
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('새 지점을 추가했어요. 치과 인증 단계에서 등록증을 올려주세요.')),
+      );
+    }
+  }
+
+  Future<void> _deleteBranch(ClinicProfile profile) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('치과 정보를 삭제할까요?'),
+            content: Text(
+              '"${profile.effectiveName.isEmpty ? '이름 없음' : profile.effectiveName}" 정보를 삭제합니다.\n'
+              '이 치과로 작성 중인 공고는 다시 치과를 선택해야 할 수 있어요.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('취소'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+                child: const Text('삭제'),
+              ),
+            ],
+          ),
+    );
+    if (ok != true || !mounted) return;
+
+    final deleted = await ClinicProfileService.deleteProfile(profile.id);
+    if (!mounted) return;
+    if (!deleted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('삭제에 실패했습니다. 다시 시도해 주세요.')));
+      return;
+    }
+
+    final next = await ClinicProfileService.getPreferredProfileForJob();
+    if (!mounted) return;
+    if (next != null) {
+      await JobDraftService.saveDraft(
+        draftId: widget.draftId,
+        formData: {'clinicProfileId': next.id},
+      );
+      if (!mounted) return;
+      setState(() {
+        _selectedProfile = next;
+        _extraDraftFields = {..._extraDraftFields, 'clinicProfileId': next.id};
+      });
+    } else {
+      final newId = await ClinicProfileService.createProfile();
+      final created =
+          newId == null ? null : await ClinicProfileService.getProfile(newId);
+      if (!mounted) return;
+      if (created != null) {
+        await JobDraftService.saveDraft(
+          draftId: widget.draftId,
+          formData: {'clinicProfileId': created.id},
+        );
+      }
+      if (!mounted) return;
+      setState(() {
+        _selectedProfile = created;
+        _extraDraftFields = {
+          ..._extraDraftFields,
+          if (created != null) 'clinicProfileId': created.id,
+        };
+      });
+    }
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('치과 정보를 삭제했습니다.')));
   }
 
   /// 드래프트에 비어 있을 때 [ClinicProfile]로 치과명·주소·연락처 보강.
@@ -1012,6 +1162,11 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
   }
 
   Future<void> _goNextStep() async {
+    // 표시 순서: step2(공고 상세) → step1(치과 사진 첨부) → step3(치과 인증)
+    if (_editorStep == 'step2') {
+      await _setEditorStep('step1');
+      return;
+    }
     if (_editorStep == 'step1') {
       final pid = _selectedProfile?.id;
       if (pid != null) {
@@ -1028,19 +1183,16 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
           });
         }
       }
-      await _setEditorStep('step2');
-      return;
-    }
-    if (_editorStep == 'step2') {
       await _setEditorStep('step3');
     }
   }
 
   void _goPrevStep() {
+    // 표시 순서 역순: step3 → step1 → step2
     if (_editorStep == 'step3') {
-      _setEditorStep('step2');
-    } else if (_editorStep == 'step2') {
       _setEditorStep('step1');
+    } else if (_editorStep == 'step1') {
+      _setEditorStep('step2');
     }
   }
 
@@ -1251,29 +1403,18 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
         children: [
           JobStepNavButton.prev(
             step: JobPostStep.input,
-            onPressed: () => context.canPop()
-                ? context.pop()
-                : context.go('/post-job/input'),
+            onPressed:
+                () =>
+                    context.canPop()
+                        ? context.pop()
+                        : context.go('/post-job/input'),
           ),
           if (_selectedProfile != null) ...[
             const SizedBox(width: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppColors.accent.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(AppPublisher.softRadius),
-                border: Border.all(
-                  color: AppColors.accent.withValues(alpha: 0.2),
-                ),
-              ),
-              child: Text(
-                _selectedProfile!.effectiveName,
-                style: GoogleFonts.notoSansKr(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.accent,
-                ),
-              ),
+            _BranchSelectorChip(
+              selected: _selectedProfile!,
+              onPick: _switchToBranch,
+              onCreateNew: _createAndSwitchBranch,
             ),
           ],
         ],
@@ -1293,14 +1434,15 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
             GestureBinding.instance.pointerSignalResolver.register(event, (e) {
               if (e is! PointerScrollEvent) return;
               final ctrl =
-                  _mouseOnLeft ? _previewScrollController : _formScrollController;
+                  _mouseOnLeft
+                      ? _previewScrollController
+                      : _formScrollController;
               if (!ctrl.hasClients) return;
               final pos = ctrl.position;
-              final newOffset =
-                  (pos.pixels + e.scrollDelta.dy).clamp(
-                    pos.minScrollExtent,
-                    pos.maxScrollExtent,
-                  );
+              final newOffset = (pos.pixels + e.scrollDelta.dy).clamp(
+                pos.minScrollExtent,
+                pos.maxScrollExtent,
+              );
               pos.jumpTo(newOffset);
             });
           },
@@ -1374,9 +1516,7 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
         return Stack(
           children: [
             // ── 스크롤 콘텐츠 (전체 영역, 헤더·nav 뒤로 통과 → BackdropFilter 블러 대상) ──
-            Positioned.fill(
-              child: _buildStepContent(profile),
-            ),
+            Positioned.fill(child: _buildStepContent(profile)),
 
             // ── 상단 스티키 헤더 ──
             Positioned(
@@ -1387,12 +1527,7 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
             ),
 
             // ── 하단 nav 오버레이 ──
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: _buildStepNav(),
-            ),
+            Positioned(bottom: 0, left: 0, right: 0, child: _buildStepNav()),
           ],
         );
       },
@@ -1407,7 +1542,8 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
     switch (_editorStep) {
       case 'step3':
         return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 100, 24, 96),
+          controller: _formScrollController,
+          padding: const EdgeInsets.fromLTRB(24, 116, 24, 180),
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 720),
@@ -1463,8 +1599,7 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
   }
 
   Widget _buildStepHeader(ClinicProfile profile) {
-    final hasBanner =
-        !profile.isBusinessVerified || _aiError != null;
+    final hasBanner = !profile.canPublishJobs || _aiError != null;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       child: ClipRRect(
@@ -1486,63 +1621,55 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
                 ),
               ],
             ),
-            padding: EdgeInsets.fromLTRB(
-              20,
-              12,
-              20,
-              hasBanner ? 10 : 12,
-            ),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 720),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _buildVerificationStickyBanner(profile),
-                  if (_aiError != null) ...[
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.error.withValues(alpha: 0.08),
-                        border: const Border(
-                          left: BorderSide(
-                            color: AppColors.error,
-                            width: 3,
+            padding: EdgeInsets.fromLTRB(20, 12, 20, hasBanner ? 10 : 12),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 720),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildVerificationStickyBanner(profile),
+                    if (_aiError != null) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.error.withValues(alpha: 0.08),
+                          border: const Border(
+                            left: BorderSide(color: AppColors.error, width: 3),
                           ),
                         ),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.warning_amber_rounded,
-                            size: 18,
-                            color: AppColors.error,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              _aiError!,
-                              style: GoogleFonts.notoSansKr(
-                                fontSize: 13,
-                                color: AppColors.textPrimary,
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.warning_amber_rounded,
+                              size: 18,
+                              color: AppColors.error,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _aiError!,
+                                style: GoogleFonts.notoSansKr(
+                                  fontSize: 13,
+                                  color: AppColors.textPrimary,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
+                    ],
+                    const SizedBox(height: 12),
+                    _buildStepIndicator(),
                   ],
-                  const SizedBox(height: 12),
-                  _buildStepIndicator(),
-                ],
+                ),
               ),
             ),
           ),
         ),
       ),
-    ),
-  );
+    );
   }
 
   Future<void> _retryBusinessCheck(ClinicProfile profile) async {
@@ -1557,16 +1684,16 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
       if (u != null && mounted) {
         setState(() {
           _selectedProfile = u;
-          if (u.isBusinessVerified) {
+          if (u.canPublishJobs) {
             _licenseReplaceMode = false;
           }
         });
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('다시 확인에 실패했습니다: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('다시 확인에 실패했습니다: $e')));
       }
     } finally {
       if (mounted) setState(() => _retryingBusinessCheck = false);
@@ -1625,7 +1752,7 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
   }
 
   Widget _buildVerificationStickyBanner(ClinicProfile profile) {
-    if (profile.isBusinessVerified) return const SizedBox.shrink();
+    if (profile.canPublishJobs) return const SizedBox.shrink();
     final bv = profile.businessVerification;
     final fr = bv.failReason;
     String msg;
@@ -1695,22 +1822,21 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
   }
 
   Widget _buildStepIndicator() {
-    const labels = ['치과 사진 첨부', '공고 상세', '치과 인증'];
-    final idx =
-        _editorStep == 'step1'
-            ? 0
-            : _editorStep == 'step2'
-            ? 1
-            : 2;
+    // 표시 순서: 1) 공고 상세(step2) · 2) 치과 사진 첨부(step1) · 3) 치과 인증(step3)
+    // 내부 step ID(step1/step2/step3)는 콘텐츠/저장 호환성을 위해 그대로 둔다.
+    const items = <(String, String)>[
+      ('step2', '공고 상세'),
+      ('step1', '치과 사진 첨부'),
+      ('step3', '치과 인증'),
+    ];
+    final idx = items.indexWhere((e) => e.$1 == _editorStep);
     return Row(
       children: [
         for (int i = 0; i < 3; i++) ...[
           if (i > 0) const SizedBox(width: 8),
           Expanded(
             child: GestureDetector(
-              onTap: () => _setEditorStep(
-                i == 0 ? 'step1' : i == 1 ? 'step2' : 'step3',
-              ),
+              onTap: () => _setEditorStep(items[i].$1),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 height: AppPublisher.ctaHeight,
@@ -1720,8 +1846,9 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
                     color: i == idx ? AppColors.accent : AppColors.divider,
                     width: i == idx ? 0 : 1,
                   ),
-                  borderRadius:
-                      BorderRadius.circular(AppPublisher.buttonRadius),
+                  borderRadius: BorderRadius.circular(
+                    AppPublisher.buttonRadius,
+                  ),
                   boxShadow:
                       i == idx
                           ? [
@@ -1735,16 +1862,12 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
                 ),
                 child: Center(
                   child: Text(
-                    '${i + 1}) ${labels[i]}',
+                    '${i + 1}) ${items[i].$2}',
                     textAlign: TextAlign.center,
                     style: GoogleFonts.notoSansKr(
                       fontSize: 14,
-                      fontWeight:
-                          i == idx ? FontWeight.w700 : FontWeight.w600,
-                      color:
-                          i == idx
-                              ? AppColors.white
-                              : AppColors.textPrimary,
+                      fontWeight: i == idx ? FontWeight.w700 : FontWeight.w600,
+                      color: i == idx ? AppColors.white : AppColors.textPrimary,
                     ),
                   ),
                 ),
@@ -1767,7 +1890,9 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
       initialDraftUpdatedAt: _draftUpdatedAt,
       onDataChanged: _onDataChanged,
       onDraftIdChanged: (_) {},
-      onDraftSaved: (dt) { if (mounted) setState(() => _lastSavedAt = dt); },
+      onDraftSaved: (dt) {
+        if (mounted) setState(() => _lastSavedAt = dt);
+      },
       onSubmit: (_) async => _goToPublish(),
     );
   }
@@ -1777,6 +1902,13 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        _ClinicProfilePickerPanel(
+          selectedId: profile.id,
+          onPick: _switchToBranch,
+          onCreateNew: _createAndSwitchBranch,
+          onDelete: _deleteBranch,
+        ),
+        const SizedBox(height: 18),
         _buildLicenseSide(profile),
         const SizedBox(height: 24),
         PublisherClinicIdentitySection(
@@ -1812,7 +1944,7 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
         if (updated != null && mounted) {
           setState(() {
             _selectedProfile = updated;
-            if (updated.isBusinessVerified) {
+            if (updated.canPublishJobs) {
               _licenseReplaceMode = false;
             }
           });
@@ -1822,7 +1954,8 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
   }
 
   Widget _buildStepNav() {
-    final canGoBack = _editorStep != 'step1';
+    // 표시 순서상 첫 단계는 step2(공고 상세), 마지막 단계는 step3(치과 인증)
+    final canGoBack = _editorStep != 'step2';
     final showNext = _editorStep != 'step3';
     final saved = _lastSavedAt;
     final savedLabel =
@@ -1907,19 +2040,22 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
                             ),
                           ),
                         ),
-                        child: _isSaving
-                            ? const SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                            : Text(
-                              '임시 저장',
-                              style: GoogleFonts.notoSansKr(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+                        child:
+                            _isSaving
+                                ? const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                                : Text(
+                                  '임시 저장',
+                                  style: GoogleFonts.notoSansKr(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                       ),
                     ),
                     if (showNext) ...[
@@ -1953,6 +2089,225 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ClinicProfilePickerPanel extends ConsumerWidget {
+  const _ClinicProfilePickerPanel({
+    required this.selectedId,
+    required this.onPick,
+    required this.onCreateNew,
+    required this.onDelete,
+  });
+
+  final String selectedId;
+  final ValueChanged<ClinicProfile> onPick;
+  final VoidCallback onCreateNew;
+  final ValueChanged<ClinicProfile> onDelete;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profilesAsync = ref.watch(clinicProfilesProvider);
+    return profilesAsync.maybeWhen(
+      data: (profiles) {
+        final verified = profiles.where((p) => p.canPublishJobs).toList();
+        ClinicProfile? selected;
+        for (final p in profiles) {
+          if (p.id == selectedId) {
+            selected = p;
+            break;
+          }
+        }
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            border: Border.all(color: AppColors.divider),
+            borderRadius: BorderRadius.circular(AppPublisher.buttonRadius),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '공고에 사용할 치과',
+                          style: GoogleFonts.notoSansKr(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          profiles.length > 1
+                              ? '인증된 치과가 여러 개면 이 공고에 적용할 치과를 선택하세요.'
+                              : '기존 인증 치과가 있으면 새 공고와 복사 공고에 자동 적용돼요.',
+                          style: GoogleFonts.notoSansKr(
+                            fontSize: 12,
+                            height: 1.45,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  OutlinedButton.icon(
+                    onPressed: onCreateNew,
+                    icon: const Icon(Icons.add_business_rounded, size: 17),
+                    label: const Text('다른 치과 인증받기'),
+                  ),
+                ],
+              ),
+              if (profiles.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final p in profiles)
+                      _ClinicChoiceChip(
+                        profile: p,
+                        selected: p.id == selectedId,
+                        enabled: p.canPublishJobs || p.id == selectedId,
+                        onTap: () => onPick(p),
+                      ),
+                  ],
+                ),
+              ],
+              if (verified.isEmpty) ...[
+                const SizedBox(height: 12),
+                _InlineInfoBox(
+                  text: '게시 가능한 인증 치과가 아직 없어요. 등록증 확인을 완료해야 게시할 수 있습니다.',
+                  tone: _InlineInfoTone.warning,
+                ),
+              ],
+              if (selected != null) ...[
+                const SizedBox(height: 12),
+                _SelectedClinicActions(profile: selected, onDelete: onDelete),
+              ],
+            ],
+          ),
+        );
+      },
+      orElse: () => const SizedBox.shrink(),
+    );
+  }
+}
+
+class _ClinicChoiceChip extends StatelessWidget {
+  const _ClinicChoiceChip({
+    required this.profile,
+    required this.selected,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final ClinicProfile profile;
+  final bool selected;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final name =
+        profile.effectiveName.isEmpty ? '이름 없음' : profile.effectiveName;
+    final status = profile.canPublishJobs ? '인증됨' : '인증 필요';
+    return FilterChip(
+      selected: selected,
+      onSelected: enabled ? (_) => onTap() : null,
+      avatar: Icon(
+        profile.canPublishJobs ? Icons.verified_rounded : Icons.info_outline,
+        size: 16,
+        color:
+            profile.canPublishJobs ? AppColors.success : AppColors.textDisabled,
+      ),
+      label: Text('$name · $status'),
+      labelStyle: GoogleFonts.notoSansKr(
+        fontSize: 12,
+        fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+      ),
+      selectedColor: AppColors.accent.withValues(alpha: 0.12),
+      checkmarkColor: AppColors.accent,
+      side: BorderSide(color: selected ? AppColors.accent : AppColors.divider),
+    );
+  }
+}
+
+class _SelectedClinicActions extends StatelessWidget {
+  const _SelectedClinicActions({required this.profile, required this.onDelete});
+
+  final ClinicProfile profile;
+  final ValueChanged<ClinicProfile> onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final name =
+        profile.effectiveName.isEmpty ? '이름 없음' : profile.effectiveName;
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            profile.canPublishJobs
+                ? '현재 선택: $name · 게시 가능'
+                : '현재 선택: $name · 인증 필요',
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.notoSansKr(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color:
+                  profile.canPublishJobs
+                      ? AppColors.success
+                      : AppColors.textSecondary,
+            ),
+          ),
+        ),
+        TextButton.icon(
+          onPressed: () => onDelete(profile),
+          icon: const Icon(Icons.delete_outline, size: 16),
+          label: const Text('삭제'),
+          style: TextButton.styleFrom(
+            foregroundColor: AppColors.error,
+            disabledForegroundColor: AppColors.textDisabled,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+enum _InlineInfoTone { warning }
+
+class _InlineInfoBox extends StatelessWidget {
+  const _InlineInfoBox({required this.text, required this.tone});
+
+  final String text;
+  final _InlineInfoTone tone;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(AppPublisher.softRadius),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.35)),
+      ),
+      child: Text(
+        text,
+        style: GoogleFonts.notoSansKr(
+          fontSize: 12,
+          height: 1.45,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textPrimary,
         ),
       ),
     );
@@ -2148,6 +2503,145 @@ class _AiLoadingViewState extends State<_AiLoadingView> {
               ],
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+/// 헤더에 표시되는 "현재 지점" 칩. 클릭하면 다른 지점으로 전환하거나
+/// 새 지점을 추가할 수 있는 메뉴가 뜬다.
+class _BranchSelectorChip extends ConsumerWidget {
+  const _BranchSelectorChip({
+    required this.selected,
+    required this.onPick,
+    required this.onCreateNew,
+  });
+
+  final ClinicProfile selected;
+  final ValueChanged<ClinicProfile> onPick;
+  final VoidCallback onCreateNew;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profilesAsync = ref.watch(clinicProfilesProvider);
+    final profiles = profilesAsync.maybeWhen(
+      data: (list) => list,
+      orElse: () => const <ClinicProfile>[],
+    );
+
+    return PopupMenuButton<String>(
+      tooltip: '공고에 사용할 지점을 변경',
+      offset: const Offset(0, 36),
+      position: PopupMenuPosition.under,
+      itemBuilder: (ctx) {
+        final items = <PopupMenuEntry<String>>[];
+        if (profiles.isNotEmpty) {
+          items.add(
+            PopupMenuItem<String>(
+              enabled: false,
+              height: 28,
+              child: Text(
+                '지점 선택',
+                style: GoogleFonts.notoSansKr(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+          );
+          for (final p in profiles) {
+            final isCurrent = p.id == selected.id;
+            items.add(
+              PopupMenuItem<String>(
+                value: 'pick:${p.id}',
+                child: Row(
+                  children: [
+                    Icon(
+                      isCurrent ? Icons.check_circle : Icons.circle_outlined,
+                      size: 16,
+                      color:
+                          isCurrent ? AppColors.accent : AppColors.textDisabled,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        p.effectiveName.isEmpty ? '(이름 없음)' : p.effectiveName,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.notoSansKr(
+                          fontSize: 13,
+                          fontWeight:
+                              isCurrent ? FontWeight.w700 : FontWeight.w500,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+          items.add(const PopupMenuDivider());
+        }
+        items.add(
+          PopupMenuItem<String>(
+            value: 'create',
+            child: Row(
+              children: [
+                Icon(Icons.add, size: 16, color: AppColors.accent),
+                const SizedBox(width: 8),
+                Text(
+                  '새 지점 추가',
+                  style: GoogleFonts.notoSansKr(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.accent,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+        return items;
+      },
+      onSelected: (value) {
+        if (value == 'create') {
+          onCreateNew();
+          return;
+        }
+        if (value.startsWith('pick:')) {
+          final id = value.substring('pick:'.length);
+          final next = profiles.firstWhere(
+            (p) => p.id == id,
+            orElse: () => selected,
+          );
+          if (next.id != selected.id) onPick(next);
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: AppColors.accent.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(AppPublisher.softRadius),
+          border: Border.all(color: AppColors.accent.withValues(alpha: 0.2)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              selected.effectiveName.isEmpty
+                  ? '(이름 없음)'
+                  : selected.effectiveName,
+              style: GoogleFonts.notoSansKr(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.accent,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(Icons.expand_more, size: 14, color: AppColors.accent),
+          ],
         ),
       ),
     );

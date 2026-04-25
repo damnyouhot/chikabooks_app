@@ -2,6 +2,64 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 
 // ══════════════════════════════════════════════════════════════
+// 표본 한계 안내 배너
+//
+// activityLogs / appErrors 의 최근 N건만 읽어 클라이언트에서 집계하는
+// 화면(Feature·Behavior·오류 페이지 TOP)에서, 읽어들인 표본이 limit 에
+// 닿았을 때 "선택한 기간이 다 반영되지 않았을 수 있음"을 명시한다.
+//
+// 운영자가 30일 칩을 골라도 실제로는 최근 일부만 보고 있는 상황을
+// 모르고 의사결정하는 것을 방지하기 위함.
+// ══════════════════════════════════════════════════════════════
+class AdminSampleNotice extends StatelessWidget {
+  final int sampleSize;
+  final int limit;
+  final String periodLabel;
+
+  const AdminSampleNotice({
+    super.key,
+    required this.sampleSize,
+    required this.limit,
+    this.periodLabel = '선택한 기간',
+  });
+
+  bool get _truncated => limit > 0 && sampleSize >= limit;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_truncated) return const SizedBox.shrink();
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.info_outline, size: 16, color: AppColors.warning),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '표본 한계: 최근 $limit건만 읽어 집계했어요. '
+              '$periodLabel 전체가 다 반영되지 않았을 수 있어요. '
+              '기간을 짧게 보거나, 더 정확한 추세는 Trends 탭(일별 집계)을 참고하세요.',
+              style: const TextStyle(
+                fontSize: 11,
+                height: 1.4,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
 // KPI 카드 — 숫자 + 라벨 한 쌍
 // ══════════════════════════════════════════════════════════════
 class AdminKpiCard extends StatelessWidget {

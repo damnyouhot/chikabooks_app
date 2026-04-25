@@ -115,7 +115,7 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
 
   void _maybeSeedFromPersistedProfile() {
     final p = widget.persistedProfile;
-    if (p == null || !p.isBusinessVerified || widget.replacementMode) return;
+    if (p == null || !p.canPublishJobs || widget.replacementMode) return;
     if (_verifySnapshot != null || _isUploading) return;
     setState(() {
       _verifySnapshot = BizLicenseVerifySnapshot.fromPersistedClinicProfile(p);
@@ -158,7 +158,7 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
   void _syncHydratedSnapshotIfNeeded() {
     if (!_hydratedFromProfile || widget.replacementMode || _isUploading) return;
     final p = widget.persistedProfile;
-    if (p == null || !p.isBusinessVerified) return;
+    if (p == null || !p.canPublishJobs) return;
     final next = BizLicenseVerifySnapshot.fromPersistedClinicProfile(p);
     final ocr = _buildOcrMapFromProfile(p);
     final cur = _verifySnapshot;
@@ -256,9 +256,10 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
       await task;
       final docUrl = await ref.getDownloadURL();
 
-      final fn = FirebaseFunctions.instance.httpsCallable(
-        'verifyBusinessLicense',
-      );
+      // verifyBusinessLicense 는 asia-northeast3 리전에 배포되어 있음
+      // (functions/src/biz-license-verify.ts).
+      final fn = FirebaseFunctions.instanceFor(region: 'asia-northeast3')
+          .httpsCallable('verifyBusinessLicense');
       final result = await fn.call({
         'docUrl': docUrl,
         'profileId': widget.profileId,
@@ -278,7 +279,10 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
       };
 
       final empty = extracted.isEmpty;
-      final readFailed = empty && snapshot.failReason == 'ocr_failed';
+      final readFailed = empty &&
+          (snapshot.failReason == 'ocr_failed' ||
+              snapshot.failReason == 'not_business_registration' ||
+              snapshot.failReason == 'image_download_failed');
 
       if (mounted) {
         setState(() {
@@ -287,6 +291,49 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
           _ocrEmpty = empty;
           _ocrResult = empty ? null : extracted;
         });
+
+        // 사용자에게 즉시 피드백 — Gemini 가 사업자등록증이 아니라고 판정한 경우.
+        if (snapshot.failReason == 'not_business_registration') {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                '사업자등록증으로 인식되지 않았어요. 국세청 발급 사업자등록증 사본을 올려주세요.',
+              ),
+            ),
+          );
+        } else if (snapshot.isDifferentBusiness ||
+            snapshot.failReason == 'different_business_number') {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              duration: Duration(seconds: 7),
+              content: Text(
+                '기존 지점과 다른 사업자번호입니다. 기존 병원 정보는 바꾸지 않았어요. 새 지점 추가 또는 기존 사업자 교체를 선택해 주세요.',
+              ),
+            ),
+          );
+        } else if (!empty) {
+          // bizNo 가 현재 프로필의 기존 bizNo 와 다르면 "다른 사업자" 가능성 안내.
+          final newBiz = (extracted['bizNo'] ?? '').replaceAll(
+            RegExp(r'[^0-9]'),
+            '',
+          );
+          final oldBiz = (widget.persistedProfile?.businessVerification.bizNo ??
+                  '')
+              .replaceAll(RegExp(r'[^0-9]'), '');
+          if (newBiz.isNotEmpty &&
+              oldBiz.isNotEmpty &&
+              newBiz != oldBiz) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                duration: const Duration(seconds: 6),
+                content: const Text(
+                  '인식된 사업자번호가 기존과 달라요. 같은 지점이 맞다면 그대로 진행하고, '
+                  '다른 치과라면 상단의 지점 칩에서 "새 지점 추가" 를 사용해 주세요.',
+                ),
+              ),
+            );
+          }
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -525,7 +572,10 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
         ] else if (!_canApplyToProfile) ...[
           const SizedBox(height: 8),
           Text(
-            _ocrReadFailed || _ocrEmpty
+            snap.isDifferentBusiness ||
+                    snap.failReason == 'different_business_number'
+                ? '기존 지점과 다른 사업자입니다. 기존 병원 정보는 그대로 유지됩니다. 새 지점으로 추가하거나, 정말 교체할 때만 별도 확인 후 진행하세요.'
+                : _ocrReadFailed || _ocrEmpty
                 ? '등록증에서 정보를 읽고, 국세청 사업자 인증이 완료되어야 프로필에 반영할 수 있어요.'
                 : '국세청 사업자 인증이 완료된 뒤 프로필에 반영할 수 있어요.',
             style: GoogleFonts.notoSansKr(
@@ -537,7 +587,7 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
         ],
         const SizedBox(height: 14),
         if (widget.onReplaceLicenseWithDialog != null &&
-            widget.persistedProfile?.isBusinessVerified == true &&
+            widget.persistedProfile?.canPublishJobs == true &&
             !widget.replacementMode) ...[
           SizedBox(
             height: AppPublisher.ctaHeight,
@@ -592,7 +642,9 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
                   padding: const EdgeInsets.symmetric(horizontal: 14),
                 ),
                 child: Text(
-                  _profileApplied ? '프로필에 반영됨' : '프로필에 반영하기',
+                  _profileApplied
+                      ? (_hydratedFromProfile ? '현재 프로필 기준' : '프로필에 반영됨')
+                      : '프로필에 반영하기',
                   style: GoogleFonts.notoSansKr(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,

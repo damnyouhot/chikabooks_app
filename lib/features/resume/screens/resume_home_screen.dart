@@ -1,4 +1,5 @@
 import 'dart:io' show File;
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -14,10 +15,10 @@ import '../../../services/resume_draft_service.dart';
 import '../../../services/resume_file_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_tokens.dart';
-import '../../auth/web/web_account_menu_button.dart';
 import 'resume_edit_screen.dart';
 import 'ocr_review_screen.dart';
-/// 이력서 홈 화면 (탭: 새로 만들기·수정하기 / 기존 파일 그대로 쓰기)
+
+/// 이력서 홈 화면 (탭: 작성형 이력서 / 업로드 파일)
 class ResumeHomeScreen extends StatefulWidget {
   const ResumeHomeScreen({super.key});
 
@@ -59,7 +60,20 @@ class _ResumeHomeScreenState extends State<ResumeHomeScreen>
         ),
         centerTitle: false,
         iconTheme: const IconThemeData(color: AppColors.textPrimary),
-        actions: const [WebAccountMenuButton()],
+        actions: [
+          if (kIsWeb)
+            TextButton.icon(
+              icon: Icon(Icons.logout, size: 16, color: AppColors.textSecondary),
+              label: Text(
+                '로그아웃',
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+              ),
+              onPressed: () async {
+                await FirebaseAuth.instance.signOut();
+                if (context.mounted) context.go('/login');
+              },
+            ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           labelColor: AppColors.accent,
@@ -70,8 +84,8 @@ class _ResumeHomeScreenState extends State<ResumeHomeScreen>
             fontWeight: FontWeight.w700,
           ),
           tabs: const [
-            Tab(text: '새로 만들기·수정하기'),
-            Tab(text: '기존 파일 그대로 쓰기'),
+            Tab(text: '작성형 이력서'),
+            Tab(text: '업로드 파일'),
           ],
         ),
       ),
@@ -87,7 +101,7 @@ class _ResumeHomeScreenState extends State<ResumeHomeScreen>
 }
 
 // ═══════════════════════════════════════════════════════════
-// 탭 1: 새로 만들기·수정하기
+// 탭 1: 작성형 이력서
 // ═══════════════════════════════════════════════════════════
 class _WrittenResumeTab extends StatefulWidget {
   @override
@@ -95,22 +109,7 @@ class _WrittenResumeTab extends StatefulWidget {
 }
 
 class _WrittenResumeTabState extends State<_WrittenResumeTab> {
-  bool _cleaned = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _cleanupOnce();
-  }
-
-  Future<void> _cleanupOnce() async {
-    if (_cleaned) return;
-    _cleaned = true;
-    final count = await ResumeService.cleanupEmptyResumes();
-    if (count > 0 && mounted) {
-      debugPrint('🧹 빈 이력서 $count건 자동 정리됨');
-    }
-  }
+  bool _creating = false;
 
   @override
   Widget build(BuildContext context) {
@@ -138,13 +137,6 @@ class _WrittenResumeTabState extends State<_WrittenResumeTab> {
     List<Resume> resumes,
     List<ResumeDraft> drafts,
   ) {
-    // 임시저장 중인 이력서는 '내 이력서' 목록에서 제외
-    final draftResumeIds = drafts
-        .where((d) => d.resumeId != null && d.resumeId!.isNotEmpty)
-        .map((d) => d.resumeId!)
-        .toSet();
-    final savedResumes =
-        resumes.where((r) => !draftResumeIds.contains(r.id)).toList();
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 680),
@@ -152,49 +144,18 @@ class _WrittenResumeTabState extends State<_WrittenResumeTab> {
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.lg, 20, AppSpacing.lg, 40),
           children: [
-            Center(
-              child: Text(
-                '이력서 작성/ 관리 기능, 공고 작성/ 관리 기능은\n'
-                '추후 웹에서도 가능하게 제작됩니다.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 12,
-                  height: 1.45,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            // OCR 버튼 2열 정사각형
-            Row(
-              children: [
-                Expanded(
-                  child: _OcrTile(
-                    icon: Icons.camera_alt_outlined,
-                    label: '기존 이력서\n사진 올려 생성하기',
-                    subtitle: '촬영 또는 보관함',
-                    color: AppColors.accent,
-                    onTap: () => _openOcr(context, source: OcrInputSource.photo),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _OcrTile(
-                    icon: Icons.upload_file_outlined,
-                    label: '기존 이력서\n파일 올려 생성하기',
-                    subtitle: 'pdf · jpg · png',
-                    color: AppColors.resumeEmphasis,
-                    onTap: () => _openOcr(context, source: OcrInputSource.file),
-                  ),
-                ),
-              ],
+            _ActionButton(
+              icon: Icons.add_rounded,
+              label: _creating ? '이력서 준비 중...' : '새 이력서 만들기',
+              color: AppColors.accent,
+              onTap: _creating ? null : () => _createNew(context),
             ),
             const SizedBox(height: 10),
             _ActionButton(
-              icon: Icons.edit_note_rounded,
-              label: '처음부터 직접 작성하기',
-              color: AppColors.accent,
-              onTap: () => _createNew(context),
+              icon: Icons.camera_alt_outlined,
+              label: '사진으로 자동 입력 (OCR)',
+              color: AppColors.success,
+              onTap: () => _openOcr(context),
             ),
 
             if (drafts.isNotEmpty) ...[
@@ -204,7 +165,7 @@ class _WrittenResumeTabState extends State<_WrittenResumeTab> {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.resumeEmphasis,
+                  color: AppColors.warning,
                 ),
               ),
               const SizedBox(height: 8),
@@ -220,11 +181,11 @@ class _WrittenResumeTabState extends State<_WrittenResumeTab> {
 
             const SizedBox(height: 24),
 
-            if (savedResumes.isEmpty)
+            if (resumes.isEmpty)
               _EmptyState(message: '아직 작성한 이력서가 없어요')
             else ...[
               Text(
-                '내 이력서 (${savedResumes.length})',
+                '내 이력서 (${resumes.length})',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
@@ -232,7 +193,7 @@ class _WrittenResumeTabState extends State<_WrittenResumeTab> {
                 ),
               ),
               const SizedBox(height: 10),
-              ...savedResumes.map((r) => Padding(
+              ...resumes.map((r) => Padding(
                     padding: const EdgeInsets.only(bottom: 10),
                     child: _ResumeCard(
                       resume: r,
@@ -249,8 +210,17 @@ class _WrittenResumeTabState extends State<_WrittenResumeTab> {
   }
 
   Future<void> _createNew(BuildContext context) async {
-    final id = await ResumeService.createResume();
-    if (id != null && context.mounted) _navigateToEdit(context, id);
+    if (_creating) {
+      debugPrint('🚫 [_createNew] 이미 생성 중 — 클릭 무시');
+      return;
+    }
+    setState(() => _creating = true);
+    try {
+      final id = await ResumeService.createResume();
+      if (id != null && context.mounted) _navigateToEdit(context, id);
+    } finally {
+      if (mounted) setState(() => _creating = false);
+    }
   }
 
   void _openEdit(BuildContext context, String resumeId) =>
@@ -310,14 +280,12 @@ class _WrittenResumeTabState extends State<_WrittenResumeTab> {
     if (ok == true) await ResumeService.deleteResume(resume.id);
   }
 
-  void _openOcr(BuildContext context, {OcrInputSource source = OcrInputSource.photo}) {
+  void _openOcr(BuildContext context) {
     if (kIsWeb) {
       context.push('/applicant/resumes/import');
     } else {
       Navigator.push(context,
-          MaterialPageRoute(
-            builder: (_) => OcrReviewScreen(source: source),
-          ));
+          MaterialPageRoute(builder: (_) => const OcrReviewScreen()));
     }
   }
 
@@ -771,7 +739,7 @@ class _ActionButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   const _ActionButton({
     required this.icon,
@@ -819,81 +787,6 @@ class _ActionButton extends StatelessWidget {
               ),
               const Icon(Icons.chevron_right,
                   color: AppColors.textDisabled, size: 20),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════
-// OCR 정사각형 타일 버튼 (2열 배치용)
-// ═══════════════════════════════════════════════════════════
-class _OcrTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-  final String? subtitle;
-
-  const _OcrTile({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-    this.subtitle,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.white,
-      borderRadius: BorderRadius.circular(AppRadius.lg),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(AppRadius.lg),
-            border: Border.all(color: color.withOpacity(0.25)),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                ),
-                child: Icon(icon, color: color, size: 24),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                  height: 1.35,
-                ),
-              ),
-              if (subtitle != null) ...[
-                const SizedBox(height: 4),
-                Text(
-                  subtitle!,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: AppColors.textDisabled,
-                    height: 1.3,
-                  ),
-                ),
-              ],
             ],
           ),
         ),
@@ -987,7 +880,7 @@ class _ResumeCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: AppColors.accent.withValues(alpha: 0.08),
+                        color: AppColors.success.withOpacity(0.08),
                         borderRadius: BorderRadius.circular(AppRadius.xs),
                       ),
                       child: const Text(
@@ -995,7 +888,7 @@ class _ResumeCard extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w500,
-                          color: AppColors.accent,
+                          color: AppColors.success,
                         ),
                       ),
                     ),
@@ -1045,7 +938,7 @@ class _ResumeCard extends StatelessWidget {
 
   Color _completionColor(int count) {
     if (count >= 6) return AppColors.success;
-    if (count >= 3) return AppColors.resumeEmphasis;
+    if (count >= 3) return AppColors.warning;
     return AppColors.textSecondary;
   }
 
@@ -1087,7 +980,7 @@ class _DraftCard extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(AppRadius.md),
             border:
-                Border.all(color: AppColors.resumeEmphasis.withValues(alpha: 0.2)),
+                Border.all(color: AppColors.warning.withOpacity(0.2)),
           ),
           child: Row(
             children: [
@@ -1095,12 +988,12 @@ class _DraftCard extends StatelessWidget {
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                  color: AppColors.resumeEmphasis.withValues(alpha: 0.1),
+                  color: AppColors.warning.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(AppRadius.sm),
                 ),
                 child: Icon(
                   Icons.edit_note,
-                  color: AppColors.resumeEmphasis.withValues(alpha: 0.75),
+                  color: AppColors.warning.withOpacity(0.7),
                   size: 18,
                 ),
               ),
@@ -1123,7 +1016,7 @@ class _DraftCard extends StatelessWidget {
                       '임시저장됨',
                       style: TextStyle(
                         fontSize: 11,
-                        color: AppColors.resumeEmphasis.withValues(alpha: 0.85),
+                        color: AppColors.warning.withOpacity(0.7),
                       ),
                     ),
                   ],

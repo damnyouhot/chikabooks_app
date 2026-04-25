@@ -13,7 +13,14 @@ import '../../core/theme/app_colors.dart';
 
 /// 인증 상태 확인 게이트
 class AuthGate extends StatelessWidget {
-  const AuthGate({super.key});
+  final int initialTabIndex;
+  final int initialGrowthSubTabIndex;
+
+  const AuthGate({
+    super.key,
+    this.initialTabIndex = 0,
+    this.initialGrowthSubTabIndex = -1,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -25,7 +32,10 @@ class AuthGate extends StatelessWidget {
       UserProfileService.clearCache();
       return const SignInPage();
     }
-    return const OnboardingGate();
+    return OnboardingGate(
+      initialTabIndex: initialTabIndex,
+      initialGrowthSubTabIndex: initialGrowthSubTabIndex,
+    );
   }
 }
 
@@ -37,7 +47,14 @@ class AuthGate extends StatelessWidget {
 ///     └─ 지원자 계정      → HomeShell (온보딩 여부 반영)
 /// ────────────────────────────────────────────────────────────
 class OnboardingGate extends StatefulWidget {
-  const OnboardingGate({super.key});
+  final int initialTabIndex;
+  final int initialGrowthSubTabIndex;
+
+  const OnboardingGate({
+    super.key,
+    this.initialTabIndex = 0,
+    this.initialGrowthSubTabIndex = -1,
+  });
 
   @override
   State<OnboardingGate> createState() => _OnboardingGateState();
@@ -45,7 +62,7 @@ class OnboardingGate extends StatefulWidget {
 
 class _OnboardingGateState extends State<OnboardingGate> {
   bool? _shouldOnboard; // null=판단 중, true=온보딩 필요, false=스킵
-  bool? _isClinic;      // null=판단 중, true=치과 계정, false=지원자
+  bool? _isClinic; // null=판단 중, true=치과 계정, false=지원자
 
   @override
   void initState() {
@@ -75,6 +92,10 @@ class _OnboardingGateState extends State<OnboardingGate> {
     if (_isClinic!) {
       return const ClinicReadOnlyShell();
     }
-    return HomeShell(startWithOnboarding: _shouldOnboard!);
+    return HomeShell(
+      startWithOnboarding: _shouldOnboard!,
+      initialTabIndex: widget.initialTabIndex,
+      initialGrowthSubTabIndex: widget.initialGrowthSubTabIndex,
+    );
   }
 }

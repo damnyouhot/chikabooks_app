@@ -109,13 +109,9 @@ class CareerSkillCard extends StatelessWidget {
           Expanded(
             child: Text(
               info.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                fontSize: 11,
+                fontSize: 14,
                 fontWeight: FontWeight.w700,
-                height: 1.15,
-                letterSpacing: -0.2,
                 color: AppColors.textPrimary,
               ),
             ),
@@ -293,133 +289,75 @@ class _CareerSkillEditSheetState extends State<CareerSkillEditSheet> {
             )
           else
             Expanded(
-              child: CustomScrollView(
-                slivers: [
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.lg,
-                      0,
-                      AppSpacing.lg,
-                      0,
-                    ),
-                    sliver: SliverGrid(
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        mainAxisSpacing: 4,
-                        crossAxisSpacing: 8,
-                        childAspectRatio: 3.92,
+              child: ListView(
+                padding: EdgeInsets.fromLTRB(
+                  AppSpacing.lg, 0, AppSpacing.lg, bottomPad + AppSpacing.lg,
+                ),
+                children: [
+                  // ── skillMaster 스킬 목록 ────────────────
+                  ...CareerProfileService.skillMaster.map((m) {
+                    final id = m['id'] as String;
+                    final enabled = _local[id] ?? false;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _SkillToggleRow(
+                        title: m['title'] as String,
+                        icon: iconFromSkillName(m['icon'] as String),
+                        enabled: enabled,
+                        onToggle: () => setState(() => _local[id] = !enabled),
                       ),
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          final m = CareerProfileService.skillMaster[index];
-                          final id = m['id'] as String;
-                          final enabled = _local[id] ?? false;
-                          return _SkillToggleRow(
-                            title: m['title'] as String,
-                            icon: iconFromSkillName(m['icon'] as String),
-                            enabled: enabled,
-                            onToggle: () => setState(() => _local[id] = !enabled),
-                          );
-                        },
-                        childCount: CareerProfileService.skillMaster.length,
-                      ),
-                    ),
-                  ),
+                    );
+                  }),
+
+                  // ── 커스텀 스킬 목록 ──────────────────────
                   if (_customSkills.isNotEmpty) ...[
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(
-                          AppSpacing.lg,
-                          4,
-                          AppSpacing.lg,
-                          8,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: const [
-                            Divider(),
-                            SizedBox(height: 8),
-                            Text(
-                              '직접 추가한 스킬',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
+                    const Padding(
+                      padding: EdgeInsets.only(top: 4, bottom: 8),
+                      child: Divider(),
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        '직접 추가한 스킬',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary,
                         ),
                       ),
                     ),
-                    SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(
-                        AppSpacing.lg,
-                        0,
-                        AppSpacing.lg,
-                        0,
-                      ),
-                      sliver: SliverGrid(
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          mainAxisSpacing: 4,
-                          crossAxisSpacing: 8,
-                          childAspectRatio: 3.92,
+                    ...List.generate(_customSkills.length, (i) {
+                      final c = _customSkills[i];
+                      final enabled = c['enabled'] as bool;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: _SkillToggleRow(
+                          title: c['title'] as String,
+                          icon: Icons.star_outline,
+                          enabled: enabled,
+                          onToggle: () => setState(() => c['enabled'] = !enabled),
+                          onDelete: () => setState(() => _customSkills.removeAt(i)),
                         ),
-                        delegate: SliverChildBuilderDelegate(
-                          (context, i) {
-                            final c = _customSkills[i];
-                            final enabled = c['enabled'] as bool;
-                            return _SkillToggleRow(
-                              title: c['title'] as String,
-                              icon: Icons.star_outline,
-                              enabled: enabled,
-                              onToggle: () =>
-                                  setState(() => c['enabled'] = !enabled),
-                              onDelete: () =>
-                                  setState(() => _customSkills.removeAt(i)),
-                            );
-                          },
-                          childCount: _customSkills.length,
-                        ),
-                      ),
-                    ),
+                      );
+                    }),
                   ],
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        AppSpacing.lg,
-                        4,
-                        AppSpacing.lg,
-                        bottomPad + AppSpacing.lg,
+
+                  // ── 직접 추가하기 ─────────────────────────
+                  const SizedBox(height: 4),
+                  if (!_showCustomInput)
+                    OutlinedButton.icon(
+                      onPressed: () => setState(() => _showCustomInput = true),
+                      icon: const Icon(Icons.add, size: 16),
+                      label: const Text('직접 추가하기', style: TextStyle(fontSize: 13)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.accent,
+                        side: BorderSide(color: AppColors.accent.withOpacity(0.4)),
+                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
-                      child: !_showCustomInput
-                          ? OutlinedButton.icon(
-                              onPressed: () =>
-                                  setState(() => _showCustomInput = true),
-                              icon: const Icon(Icons.add, size: 16),
-                              label: const Text(
-                                '직접 추가하기',
-                                style: TextStyle(fontSize: 13),
-                              ),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: AppColors.accent,
-                                side: BorderSide(
-                                  color: AppColors.accent.withOpacity(0.4),
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 10,
-                                  horizontal: 16,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                              ),
-                            )
-                          : _buildCustomInput(),
-                    ),
-                  ),
+                    )
+                  else
+                    _buildCustomInput(),
                 ],
               ),
             ),
@@ -557,46 +495,39 @@ class _SkillToggleRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onToggle,
-      behavior: HitTestBehavior.opaque,
       child: Container(
-        width: double.infinity,
-        height: double.infinity,
-        alignment: Alignment.center,
         decoration: BoxDecoration(
           color: enabled ? AppColors.accent.withOpacity(0.10) : AppColors.surfaceMuted,
           borderRadius: BorderRadius.circular(AppRadius.lg),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         child: Row(
           children: [
             Container(
-              width: 20,
-              height: 20,
+              width: 26,
+              height: 26,
               decoration: BoxDecoration(
                 color: enabled ? AppColors.accent : AppColors.textDisabled,
                 borderRadius: BorderRadius.circular(AppRadius.sm),
               ),
               child: Icon(
                 enabled ? Icons.check : Icons.add,
-                size: 12,
+                size: 15,
                 color: AppColors.white,
               ),
             ),
-            const SizedBox(width: 5),
+            const SizedBox(width: 12),
             Icon(
               icon,
-              size: 14,
+              size: 18,
               color: enabled ? AppColors.textPrimary : AppColors.textDisabled,
             ),
-            const SizedBox(width: 5),
+            const SizedBox(width: 8),
             Expanded(
               child: Text(
                 title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 12,
-                  height: 1.15,
+                  fontSize: 14,
                   fontWeight: FontWeight.w700,
                   color: enabled ? AppColors.textPrimary : AppColors.textDisabled,
                 ),
@@ -605,10 +536,9 @@ class _SkillToggleRow extends StatelessWidget {
             if (onDelete != null)
               GestureDetector(
                 onTap: onDelete,
-                behavior: HitTestBehavior.opaque,
                 child: const Padding(
-                  padding: EdgeInsets.only(left: 2),
-                  child: Icon(Icons.close, size: 14, color: AppColors.textDisabled),
+                  padding: EdgeInsets.only(left: 8),
+                  child: Icon(Icons.close, size: 16, color: AppColors.textDisabled),
                 ),
               ),
           ],

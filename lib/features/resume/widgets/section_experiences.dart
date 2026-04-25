@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../../../models/resume.dart';
 import '../../../core/theme/app_colors.dart';
 import 'resume_ocr_prompt.dart';
-import 'resume_inline_underline_field.dart';
 
 /// D. 경력 섹션 (근무지별)
 class SectionExperiences extends StatefulWidget {
@@ -21,6 +20,19 @@ class SectionExperiences extends StatefulWidget {
 
 class _SectionExperiencesState extends State<SectionExperiences> {
   late List<ResumeExperience> _items;
+
+  static const _taskOptions = [
+    '치석 제거/스케일링',
+    '치주 관리/보조',
+    '예방처치(불소도포 등)',
+    '환자 교육/상담',
+    '구내진단용 방사선 촬영',
+    '진료 협조(임플란트)',
+    '진료 협조(교정)',
+    '진료 협조(소아)',
+    '예약/차트/CS',
+    '재고/운영 지원',
+  ];
 
   @override
   void initState() {
@@ -66,15 +78,13 @@ class _SectionExperiencesState extends State<SectionExperiences> {
         const SizedBox(height: 12),
         const ResumeOcrPrompt(),
 
-        ...List.generate(
-          _items.length,
-          (i) => _ExperienceCard(
-            index: i,
-            experience: _items[i],
-            onUpdate: (exp) => _updateAt(i, exp),
-            onRemove: () => _removeAt(i),
-          ),
-        ),
+        ...List.generate(_items.length, (i) => _ExperienceCard(
+              index: i,
+              experience: _items[i],
+              taskOptions: _taskOptions,
+              onUpdate: (exp) => _updateAt(i, exp),
+              onRemove: () => _removeAt(i),
+            )),
 
         const SizedBox(height: 12),
         OutlinedButton.icon(
@@ -94,12 +104,14 @@ class _SectionExperiencesState extends State<SectionExperiences> {
 class _ExperienceCard extends StatefulWidget {
   final int index;
   final ResumeExperience experience;
+  final List<String> taskOptions;
   final ValueChanged<ResumeExperience> onUpdate;
   final VoidCallback onRemove;
 
   const _ExperienceCard({
     required this.index,
     required this.experience,
+    required this.taskOptions,
     required this.onUpdate,
     required this.onRemove,
   });
@@ -113,7 +125,9 @@ class _ExperienceCardState extends State<_ExperienceCard> {
   late TextEditingController _regionCtrl;
   late TextEditingController _startCtrl;
   late TextEditingController _endCtrl;
+  late TextEditingController _toolsCtrl;
   late TextEditingController _achieveCtrl;
+  late List<String> _tasks;
 
   @override
   void initState() {
@@ -123,7 +137,9 @@ class _ExperienceCardState extends State<_ExperienceCard> {
     _regionCtrl = TextEditingController(text: e.region);
     _startCtrl = TextEditingController(text: e.start);
     _endCtrl = TextEditingController(text: e.end);
+    _toolsCtrl = TextEditingController(text: e.tools.join(', '));
     _achieveCtrl = TextEditingController(text: e.achievementsText ?? '');
+    _tasks = List.of(e.tasks);
   }
 
   @override
@@ -132,6 +148,7 @@ class _ExperienceCardState extends State<_ExperienceCard> {
     _regionCtrl.dispose();
     _startCtrl.dispose();
     _endCtrl.dispose();
+    _toolsCtrl.dispose();
     _achieveCtrl.dispose();
     super.dispose();
   }
@@ -142,6 +159,12 @@ class _ExperienceCardState extends State<_ExperienceCard> {
       region: _regionCtrl.text.trim(),
       start: _startCtrl.text.trim(),
       end: _endCtrl.text.trim(),
+      tasks: _tasks,
+      tools: _toolsCtrl.text
+          .split(',')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList(),
       achievementsText:
           _achieveCtrl.text.trim().isEmpty ? null : _achieveCtrl.text.trim(),
     ));
@@ -149,86 +172,112 @@ class _ExperienceCardState extends State<_ExperienceCard> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return Card(
       margin: const EdgeInsets.only(bottom: 14),
-      decoration: BoxDecoration(
-        color: AppColors.resumeFormSurface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.resumeFormBlockBorder),
-      ),
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                '경력 ${widget.index + 1}',
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 헤더
+            Row(
+              children: [
+                Text(
+                  '경력 ${widget.index + 1}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
-              ),
-              const Spacer(),
-              IconButton(
-                icon: const Icon(Icons.delete_outline, size: 18),
-                color: AppColors.error.withValues(alpha: 0.75),
-                onPressed: widget.onRemove,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          const Divider(height: 1, color: AppColors.divider),
-          const SizedBox(height: 14),
-          ResumeInlineUnderlineField(
-            label: '병원명 *',
-            hint: '예: 서울밝은치과',
-            controller: _clinicCtrl,
-            onChanged: (_) => _emit(),
-          ),
-          ResumeInlineUnderlineField(
-            label: '지역',
-            hint: '서울시 강남구',
-            controller: _regionCtrl,
-            onChanged: (_) => _emit(),
-          ),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: ResumeInlineUnderlineField(
-                  label: '시작',
-                  hint: '2023-03',
-                  controller: _startCtrl,
-                  labelWidth: 52,
-                  onChanged: (_) => _emit(),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, size: 18),
+                  color: AppColors.error.withOpacity(0.6),
+                  onPressed: widget.onRemove,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
                 ),
+              ],
+            ),
+            const SizedBox(height: 10),
+
+            _field('병원명 *', _clinicCtrl, '예: 서울밝은치과'),
+            _field('지역', _regionCtrl, '서울시 강남구'),
+            Row(
+              children: [
+                Expanded(child: _field('시작 (YYYY-MM)', _startCtrl, '2023-03')),
+                const SizedBox(width: 10),
+                Expanded(
+                    child:
+                        _field('종료 (YYYY-MM)', _endCtrl, '재직중')),
+              ],
+            ),
+
+            // 담당업무 체크리스트
+            const SizedBox(height: 8),
+            Text(
+              '담당 업무',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: ResumeInlineUnderlineField(
-                  label: '종료',
-                  hint: '재직중',
-                  controller: _endCtrl,
-                  labelWidth: 52,
-                  onChanged: (_) => _emit(),
-                ),
-              ),
-            ],
-          ),
-          ResumeInlineUnderlineField(
-            label: '소속, 담당, 성과',
-            hint: '치주과 소속 / 스케일링 담당 / 하루 평균 환자 30명',
-            controller: _achieveCtrl,
-            maxLines: 3,
-            onChanged: (_) => _emit(),
-          ),
-        ],
+            ),
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: widget.taskOptions.map((t) {
+                final selected = _tasks.contains(t);
+                return FilterChip(
+                  label: Text(t, style: const TextStyle(fontSize: 11)),
+                  selected: selected,
+                  selectedColor: AppColors.accent.withOpacity(0.12),
+                  checkmarkColor: AppColors.accent,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  onSelected: (val) {
+                    setState(() {
+                      if (val) {
+                        _tasks.add(t);
+                      } else {
+                        _tasks.remove(t);
+                      }
+                    });
+                    _emit();
+                  },
+                );
+              }).toList(),
+            ),
+
+            const SizedBox(height: 10),
+            _field('사용 툴/장비 (콤마 구분)', _toolsCtrl, 'CEREC, Medit i700'),
+            _field('성과 (선택)', _achieveCtrl, '하루 평균 환자 30명 처치'),
+          ],
+        ),
       ),
     );
   }
 
+  Widget _field(String label, TextEditingController ctrl, String hint) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: TextField(
+        controller: ctrl,
+        onChanged: (_) => _emit(),
+        decoration: InputDecoration(
+          labelText: label,
+          hintText: hint,
+          hintStyle: TextStyle(color: AppColors.textDisabled),
+          border: const OutlineInputBorder(),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          isDense: true,
+        ),
+        style: const TextStyle(fontSize: 13),
+      ),
+    );
+  }
 }
+

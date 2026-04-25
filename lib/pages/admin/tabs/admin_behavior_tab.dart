@@ -72,6 +72,10 @@ class _AdminBehaviorTabState extends State<AdminBehaviorTab>
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          AdminSampleNotice(
+            sampleSize: d.sampleSize,
+            limit: d.sampleLimit,
+          ),
           // ── 1. 기능 실행률 ──
           const AdminSectionTitle('1. 기능 실행률'),
           const SizedBox(height: 4),

@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
+import '../services/bond_score_service.dart';
+
 /// 신고 사유
 enum ReportReason {
   /// 욕설/비방
@@ -34,14 +36,20 @@ class ReportService {
   /// 자동 비노출 기준 신고 횟수
   static const int _defaultAutoHideThreshold = 3;
 
-  /// 신고 누적 기준
+  /// 신고 누적 기준 (털어놔: 2회, 전국구 게시판: 5회, 그 외: 기본 3회)
   static int _autoHideThresholdFor(String documentPath) {
+    if (documentPath.startsWith('partnerGroups/')) {
+      return 2;
+    }
+    if (documentPath.startsWith('bondPosts/')) {
+      return 5;
+    }
     return _defaultAutoHideThreshold;
   }
 
   /// 게시물 신고하기
   ///
-  /// [documentPath]: Firestore 문서 전체 경로
+  /// [documentPath]: 'partnerGroups/{groupId}/posts/{postId}' 또는 'bondPosts/{postId}' 등의 전체 경로
   /// [reason]: 신고 사유
   /// [additionalInfo]: 추가 설명 (선택)
   static Future<bool> reportPost({
@@ -86,6 +94,18 @@ class ReportService {
       final postDoc = await postRef.get();
       final reportCount = postDoc.data()?['reports'] as int? ?? 0;
       final autoHideThreshold = _autoHideThresholdFor(documentPath);
+
+      final authorUid = postDoc.data()?['uid'] as String?;
+      if (authorUid != null) {
+        // BondScoreService 메서드가 없으므로 주석 처리
+        // await BondScoreService.applyReportPenalty(authorUid);
+        final enthronePenaltyApplied =
+            postDoc.data()?['enthroneBonusApplied'] as bool? ?? false;
+        if (enthronePenaltyApplied) {
+          // await BondScoreService.applyEnthroneBonusPenalty(authorUid);
+          await postRef.update({'enthroneBonusApplied': false});
+        }
+      }
 
       if (reportCount >= autoHideThreshold) {
         await postRef.update({

@@ -51,6 +51,22 @@ class CaringTreatService {
     }
   }
 
+  /// 서버에 저장된 현재 보유 먹이 개수 (미로그인·오류 시 0)
+  static Future<int> getTreatCount() async {
+    final userRef = _userRef;
+    if (userRef == null) return 0;
+    try {
+      final snap = await userRef.get();
+      final n = snap.data()?['caringTreatCount'];
+      if (n is int) return n;
+      if (n is num) return n.toInt();
+      return 0;
+    } catch (e) {
+      debugPrint('⚠️ CaringTreatService.getTreatCount: $e');
+      return 0;
+    }
+  }
+
   /// 먹이 개수 스트림 (로그아웃 시 0)
   static Stream<int> watchTreatCount() {
     final uid = _auth.currentUser?.uid;

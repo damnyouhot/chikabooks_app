@@ -1,9 +1,11 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/config/app_initializer.dart';
 import 'core/config/app_providers.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
+import 'features/me/services/me_session.dart';
 
 Future<void> main() async {
   await AppInitializer.initialize();
@@ -13,7 +15,14 @@ Future<void> main() async {
   // ignore: avoid_print
   print('🔥 Firebase appId     = ${Firebase.app().options.appId}');
 
-  runApp(AppProviders(child: const ChikabooksApp()));
+  // 청구 정책(`config/billingPolicy`) 실시간 구독 — admin이 변경하면 즉시 반영
+  MeSession.start();
+
+  runApp(
+    ProviderScope(
+      child: AppProviders(child: const ChikabooksApp()),
+    ),
+  );
 }
 
 class ChikabooksApp extends StatelessWidget {

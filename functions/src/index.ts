@@ -3,21 +3,12 @@ import * as admin from "firebase-admin";
 import axios from "axios";
 import {parseStringPromise} from "xml2js";
 import * as crypto from "crypto";
-import { defineSecret } from "firebase-functions/params";
-import { resolvePollOpsFromRows } from "./poll-ops-hub";
-import { runCheckBusinessStatus } from "./business-verification";
-import { haversineMeters, linesForStationDisplayName } from "./metro_station_lines";
-
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
-
-/** 두 역할(치과/위생사) 동시 사용 및 결제 인증 체크 면제 관리자 계정 목록 */
-const ADMIN_WHITELIST = ["chikabooks.app@gmail.com", "damnyouhot@gmail.com"];
-
-const GOOGLE_MAPS_API_KEY = defineSecret("GOOGLE_MAPS_API_KEY");
-/** 심평원 병원정보 API — `defineSecret`로 바인딩해야 런타임에 값이 주입됨 */
-const HIRA_SERVICE_KEY = defineSecret("HIRA_SERVICE_KEY");
-/** 토스페이먼츠 시크릿 키 */
-const TOSS_SECRET_KEY = defineSecret("TOSS_SECRET_KEY");
+import {runCheckBusinessStatus} from "./business-verification";
+export {
+  adminListProvisionalProfiles,
+  adminSetProfileVerification,
+} from "./admin-verification";
+export {verifyBusinessLicense} from "./biz-license-verify";
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -31,18 +22,6 @@ enum SocialLoginError {
   APP_CHECK_REQUIRED = "APP_CHECK_REQUIRED",
   INVALID_INPUT = "INVALID_INPUT",
   INTERNAL_ERROR = "INTERNAL_ERROR",
-  EMAIL_ALREADY_IN_USE = "EMAIL_ALREADY_IN_USE",
-}
-
-/** Firebase Admin SDK 등에서 던진 오류의 `auth/...` 코드 추출 */
-function getFirebaseAuthErrorCode(error: unknown): string | null {
-  if (!error || typeof error !== "object") return null;
-  const e = error as {code?: unknown; errorInfo?: {code?: string}};
-  if (typeof e.code === "string") return e.code;
-  if (e.errorInfo && typeof e.errorInfo.code === "string") {
-    return e.errorInfo.code;
-  }
-  return null;
 }
 
 /**
@@ -107,40 +86,222 @@ function maskToken(token: string): string {
 }
 
 /**
- * 역할 중복 가입 차단 헬퍼
- *
- * 위생사(applicant) 가입/로그인 시 호출:
- * clinics_accounts에 같은 uid 또는 같은 normalizedEmail이 있으면 차단
+ * 추대 트리거: enthrone 서브컬렉션에 문서 생성 시
+ * 3개 달성 시 billboardPosts에 자동 등록
  */
-async function checkApplicantRoleDuplicate(
-  uid: string,
-  email: string | null
-): Promise<void> {
-  // 1) uid 기준
-  const clinicDoc = await db.collection("clinics_accounts").doc(uid).get();
-  if (clinicDoc.exists) {
-    throw new functions.https.HttpsError(
-      "permission-denied",
-      "이 계정은 이미 공고자 계정으로 가입되어 있어 위생사 계정으로 사용할 수 없습니다."
-    );
-  }
+export const onEnthroneCreated = functions
+  .region("asia-northeast3")
+  .firestore.document("partnerGroups/{groupId}/posts/{postId}/enthrones/{uid}")
+  .onCreate(async (snap, context) => {
+    const {groupId, postId} = context.params as {
+      groupId: string;
+      postId: string;
+    };
 
-  // 2) normalizedEmail 기준
-  if (email && email.trim().length > 0) {
-    const normalized = email.trim().toLowerCase();
-    const emailSnap = await db
-      .collection("clinics_accounts")
-      .where("normalizedEmail", "==", normalized)
-      .limit(1)
-      .get();
-    if (!emailSnap.empty) {
-      throw new functions.https.HttpsError(
-        "permission-denied",
-        "이 이메일은 이미 공고자 계정으로 가입되어 있어 위생사 계정으로 사용할 수 없습니다."
-      );
+    try {
+      console.log(`🔍 [onEnthroneCreated] groupId: ${groupId}, postId: ${postId}`);
+
+      // 1. 현재 추대 수 집계
+      const enthronesSnap = await snap.ref.parent.get();
+      const enthroneCount = enthronesSnap.size;
+      console.log(`🔍 [onEnthroneCreated] 현재 추대 수: ${enthroneCount}`);
+
+      // 2. 3개 달성 체크
+      if (enthroneCount >= 3) {
+        console.log("✅ [onEnthroneCreated] 3개 달성! 전광판 등록 시작...");
+
+        // 3. 게시물 정보 가져오기
+        const postDoc = await db
+          .collection("partnerGroups")
+          .doc(groupId)
+          .collection("posts")
+          .doc(postId)
+          .get();
+
+        if (!postDoc.exists) {
+          console.error("⚠️ [onEnthroneCreated] 게시물 없음");
+          return;
+        }
+
+        const postData = postDoc.data()!;
+
+        // 4. 이미 전광판에 등록되었는지 확인 (중복 방지)
+        const existingBillboard = await db
+          .collection("billboardPosts")
+          .where("sourceBondId", "==", groupId)
+          .where("sourcePostId", "==", postId)
+          .limit(1)
+          .get();
+
+        if (!existingBillboard.empty) {
+          console.log("⚠️ [onEnthroneCreated] 이미 전광판에 등록됨");
+          return;
+        }
+
+        // 5. 그룹 정보 가져오기 (그룹명)
+        const groupDoc = await db.collection("partnerGroups").doc(groupId).get();
+        const groupName = groupDoc.exists
+          ? (groupDoc.data()?.title || "익명의 결")
+          : "익명의 결";
+
+        // 6. 게시 조건 확인
+        if (
+          postData.publicEligible !== false &&
+          !postData.isDeleted &&
+          (postData.reports || 0) < 3
+        ) {
+          // 작성자 닉네임 조회 (billboardPosts에 스냅샷으로 저장)
+          const authorUid =
+            postData.uid ||
+            postData.authorUid ||
+            postData.userId ||
+            postData.authorId ||
+            null;
+
+          let authorNickname: string | null = null;
+          if (authorUid) {
+            try {
+              const userDoc = await db.collection("users").doc(authorUid).get();
+              if (userDoc.exists) {
+                const u = userDoc.data() || {};
+                authorNickname =
+                  u.nickname || u.name || u.displayName || authorUid;
+              } else {
+                authorNickname = authorUid;
+              }
+            } catch (e) {
+              console.log("⚠️ [onEnthroneCreated] 작성자 닉네임 조회 실패:", e);
+              authorNickname = authorUid;
+            }
+          }
+
+          // 7. 전광판에 등록
+          const now = admin.firestore.Timestamp.now();
+          const expiresAt = admin.firestore.Timestamp.fromMillis(
+            Date.now() + 12 * 60 * 60 * 1000 // 12시간 후
+          );
+
+          await db.collection("billboardPosts").add({
+            sourceBondId: groupId,
+            sourcePostId: postId,
+            textSnapshot: postData.text || postData.body || "",
+            enthroneCount: enthroneCount,
+            requiredCount: 3,
+            createdAt: now,
+            expiresAt: expiresAt,
+            status: "confirmed",
+            bondGroupName: groupName,
+            // 전국구 게시판에서는 닉네임을 보여주기 위해 기본 비익명 처리
+            isAnonymous: false,
+            authorId: authorUid,
+            authorNickname: authorNickname,
+            reactions: {},
+          });
+
+          console.log(`✅ [onEnthroneCreated] 전광판 등록 완료! (${groupId}/${postId})`);
+
+          // 8. 게시물에 전광판 등록 플래그 추가
+          await db
+            .collection("partnerGroups")
+            .doc(groupId)
+            .collection("posts")
+            .doc(postId)
+            .update({
+              onBillboard: true,
+              billboardedAt: now,
+            });
+        } else {
+          console.log("⚠️ [onEnthroneCreated] 게시 조건 불충족 (삭제/신고/비공개)");
+        }
+      } else {
+        console.log(`⏳ [onEnthroneCreated] 아직 ${3 - enthroneCount}개 더 필요`);
+      }
+    } catch (error) {
+      console.error("❌ [onEnthroneCreated] 에러:", error);
     }
-  }
-}
+  });
+
+/**
+ * 일일 요약 생성: 매일 19:00 KST에 실행
+ */
+export const generateDailySummary = functions
+  .pubsub.schedule("0 19 * * *") // 매일 19:00 (UTC+0 기준이므로 실제로는 10:00 UTC)
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    try {
+      const dateKey = getCurrentDateKey();
+
+      // 모든 활성 파트너 그룹 가져오기
+      const groupsSnap = await db
+        .collection("partnerGroups")
+        .where("isActive", "==", true)
+        .get();
+
+      for (const groupDoc of groupsSnap.docs) {
+        const groupId = groupDoc.id;
+        const groupData = groupDoc.data();
+        const memberUids = groupData.activeMemberUids || [];
+
+        // 각 멤버의 오늘 활동 집계
+        const activityCounts: {[key: string]: number} = {};
+        for (const uid of memberUids) {
+          // TODO: 실제 활동 집계 로직
+          // bondPosts, 투표, 리액션 등을 합산
+          activityCounts[uid] = 0;
+        }
+
+        // 요약 메시지 생성
+        const summaryMessage = generateSummaryMessage(activityCounts);
+        const ctaMessage = "함께 마무리해볼까요?";
+
+        // 저장
+        await db
+          .collection("partnerGroups")
+          .doc(groupId)
+          .collection("dailySummaries")
+          .doc(dateKey)
+          .set({
+            dateKey,
+            activityCounts,
+            summaryMessage,
+            ctaMessage,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+      }
+
+      console.log(`✅ Daily summaries generated for ${dateKey}`);
+    } catch (error) {
+      console.error("⚠️ generateDailySummary error:", error);
+    }
+  });
+
+/**
+ * 전광판 만료 처리: 매시간 실행
+ */
+export const expireBillboardPosts = functions
+  .pubsub.schedule("0 * * * *") // 매시간 0분
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    try {
+      const now = admin.firestore.Timestamp.now();
+
+      const expiredSnap = await db
+        .collection("billboardPosts")
+        .where("status", "==", "confirmed")
+        .where("expiresAt", "<=", now)
+        .get();
+
+      const batch = db.batch();
+      expiredSnap.docs.forEach((doc) => {
+        batch.update(doc.ref, {status: "expired"});
+      });
+
+      await batch.commit();
+      console.log(`✅ Expired ${expiredSnap.size} billboard posts`);
+    } catch (error) {
+      console.error("⚠️ expireBillboardPosts error:", error);
+    }
+  });
 
 // ────────────────────────────────────────
 // Helper Functions
@@ -155,96 +316,23 @@ function getCurrentDateKey(): string {
   return `${year}-${month}-${day}`;
 }
 
-/** HIRA CMS RSS (구 /rc/rss/rss_hira_*.xml 는 404 — 고객지원 RSS 안내 URL) */
-const HIRA_RSS_FEEDS = [
-  {
-    url: "https://www.hira.or.kr/cms/policy/03/01/01/01/act_notice.xml",
-    topic: "act",
-    filterKeyword: null,
-  },
-  {
-    url: "https://www.hira.or.kr/cms/inform/01/notice.xml",
-    topic: "notice",
-    filterKeyword: "치과",
-  },
-  {
-    url: "https://www.hira.or.kr/cms/policy/03/01/01/02/care_notice.xml",
-    topic: "material",
-    filterKeyword: null,
-  },
-  {
-    url: "https://www.hira.or.kr/cms/policy/03/01/04/02/request.xml",
-    topic: "billing",
-    filterKeyword: null,
-  },
-] as const;
+function generateSummaryMessage(
+  activityCounts: {[key: string]: number}
+): string {
+  const activeMembers = Object.values(activityCounts).filter(
+    (c) => c >= 1
+  ).length;
 
-/** CMS 피드 pubDate: "20260325 17:28:44" (KST) — RFC822가 아님 */
-function parseHiraRssPubDate(pubDate: string): Date {
-  const trimmed = (pubDate || "").trim();
-  const cms = /^(\d{4})(\d{2})(\d{2})\s+(\d{2}):(\d{2}):(\d{2})$/.exec(
-    trimmed
-  );
-  if (cms) {
-    const [, y, mo, d, h, mi, s] = cms;
-    return new Date(`${y}-${mo}-${d}T${h}:${mi}:${s}+09:00`);
+  switch (activeMembers) {
+  case 3:
+    return "오늘 우리 셋 다 움직였다 ✨";
+  case 2:
+    return "오늘은 두 명이 함께했다 🌙";
+  case 1:
+    return "오늘은 한 사람이 버텼다";
+  default:
+    return "오늘은 조용한 날 (내일 한 칸만 채워도 충분해)";
   }
-  const parsed = new Date(trimmed);
-  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
-}
-
-function absolutizeHiraLink(link: string): string {
-  const t = (link || "").trim();
-  if (!t) return t;
-  if (/^https?:\/\//i.test(t)) return t;
-  const base = "https://www.hira.or.kr";
-  return t.startsWith("/") ? `${base}${t}` : `${base}/${t}`;
-}
-
-/** RSS <description> HTML → 읽을 수 있는 plain text */
-function htmlToPlainText(html: string): string {
-  if (!html) return "";
-  return html
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&amp;/g, "&")
-    .replace(/&quot;/g, "\"")
-    .replace(/&#xD;\n?/g, "\n")
-    .replace(/<!\[CDATA\[/gi, "")
-    .replace(/\]\]>/g, "")
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/p>/gi, "\n")
-    .replace(/<\/div>/gi, "\n")
-    .replace(/<\/li>/gi, "\n")
-    .replace(/<\/tr>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&nbsp;/g, " ")
-    .replace(/[ \t]+/g, " ")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim()
-    .slice(0, 3000);
-}
-
-/** 본문에서 시행일 자동 추출 ("시행일자 : 2026.3.25." 등) */
-function extractEffectiveDate(
-  text: string
-): admin.firestore.Timestamp | null {
-  const patterns = [
-    /시행일[자]?\s*[:：]\s*(\d{4})[.\-/\s](\d{1,2})[.\-/\s](\d{1,2})/,
-    /(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})[.\s]*시행/,
-  ];
-  for (const re of patterns) {
-    const m = re.exec(text);
-    if (m) {
-      const d = new Date(
-        `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}T00:00:00+09:00`
-      );
-      if (!Number.isNaN(d.getTime())) {
-        return admin.firestore.Timestamp.fromDate(d);
-      }
-    }
-  }
-  return null;
 }
 
 // ────────────────────────────────────────
@@ -261,47 +349,6 @@ interface HiraUpdate {
   keywords: string[];
   actionHints: string[];
   fetchedAt: admin.firestore.Timestamp;
-  body?: string;
-  effectiveDate?: admin.firestore.Timestamp | null;
-  isDental?: "yes" | "no" | "maybe";
-}
-
-// ── 치과 관련성 분류 ──
-
-const DENTAL_WHITELIST = [
-  "치과", "구강", "악안면", "치주", "근관", "발치", "임플란트",
-  "틀니", "레진", "치석", "스케일링", "보철", "교정", "치아",
-  "치수", "치은", "치조골", "사랑니", "크라운", "브릿지", "의치",
-  "치과급여부", "치과기획부", "치과위생사",
-];
-
-const DENTAL_BLACKLIST = [
-  "한방", "한의원", "한의사", "한약", "약국", "조제", "약사",
-  "산부인과", "안과", "이비인후과", "정형외과", "피부과", "비뇨기과",
-  "항암제", "조영제", "투석", "인공신장", "방사선치료",
-  "정신건강", "요양병원",
-  "장애인 보조기기", "간호등급", "영양관리료", "차등제",
-  "요양기관", "입원료", "간호간병", "의료급여",
-  "재활", "호스피스", "장기요양", "보조기기",
-  "간호관리료", "치료식", "의료질평가",
-];
-
-const DENTAL_CODE_RE = /\b[UL]\d{3,5}\b/;
-
-function classifyDental(title: string, body: string): "yes" | "no" | "maybe" {
-  const text = `${title} ${body}`;
-
-  const hasCode = DENTAL_CODE_RE.test(text);
-  if (hasCode) return "yes";
-
-  const blackCount = DENTAL_BLACKLIST.filter((kw) => text.includes(kw)).length;
-  const whiteCount = DENTAL_WHITELIST.filter((kw) => text.includes(kw)).length;
-
-  if (whiteCount > 0 && blackCount === 0) return "yes";
-  if (whiteCount > 0 && whiteCount > blackCount) return "yes";
-  if (whiteCount > 0 && whiteCount <= blackCount) return "maybe";
-  if (blackCount > 0) return "no";
-  return "maybe";
 }
 
 /**
@@ -312,9 +359,20 @@ export const syncHiraUpdates = functions
   .timeZone("Asia/Seoul")
   .onRun(async () => {
     try {
+      const rssUrls = [
+        {
+          url: "https://www.hira.or.kr/rc/rss/rss_hira_act.xml",
+          topic: "act",
+        },
+        {
+          url: "https://www.hira.or.kr/rc/rss/rss_hira_notice.xml",
+          topic: "notice",
+        },
+      ];
+
       let totalProcessed = 0;
 
-      for (const {url, topic, filterKeyword} of HIRA_RSS_FEEDS) {
+      for (const {url, topic} of rssUrls) {
         try {
           const response = await axios.get(url, {timeout: 10000});
           const parsed = await parseStringPromise(response.data);
@@ -322,45 +380,37 @@ export const syncHiraUpdates = functions
 
           for (const item of items) {
             const title = item.title?.[0] || "";
-            const rawLink = item.link?.[0] || "";
-            const link = absolutizeHiraLink(rawLink);
+            const link = item.link?.[0] || "";
             const pubDate = item.pubDate?.[0] || "";
-            const descHtml = item.description?.[0] || "";
 
             if (!title || !link) continue;
 
-            const body = htmlToPlainText(descHtml);
-
-            if (filterKeyword &&
-                !title.includes(filterKeyword) &&
-                !body.includes(filterKeyword)) {
-              continue;
-            }
-
+            // docId = SHA-1(link)
             const docId = crypto
               .createHash("sha1")
               .update(link)
               .digest("hex");
 
+            // 이미 존재하는지 확인
             const docRef = db.collection("content_hira_updates").doc(docId);
             const docSnap = await docRef.get();
 
-            if (docSnap.exists) continue;
+            if (docSnap.exists) continue; // 이미 있으면 스킵
 
-            const isDental = classifyDental(title, body);
-            if (isDental === "no") continue;
-
-            const {score: rawScore, keywords} = calculateImpactScore(title);
-            const score = isDental === "maybe"
-              ? Math.round(rawScore * 0.5)
-              : rawScore;
+            // impactScore 계산
+            const {score, keywords} = calculateImpactScore(title);
             const impactLevel = getImpactLevel(score);
             const actionHints = generateActionHints(title);
-            const effectiveDate = extractEffectiveDate(body);
 
-            const publishedAt = admin.firestore.Timestamp.fromDate(
-              parseHiraRssPubDate(pubDate)
-            );
+            // publishedAt 변환
+            let publishedAt: admin.firestore.Timestamp;
+            try {
+              publishedAt = admin.firestore.Timestamp.fromDate(
+                new Date(pubDate)
+              );
+            } catch {
+              publishedAt = admin.firestore.Timestamp.now();
+            }
 
             const updateData: HiraUpdate = {
               title,
@@ -372,9 +422,6 @@ export const syncHiraUpdates = functions
               keywords,
               actionHints,
               fetchedAt: admin.firestore.Timestamp.now(),
-              body,
-              effectiveDate,
-              isDental,
             };
 
             await docRef.set(updateData);
@@ -404,29 +451,14 @@ export const buildHiraDigest = functions
         Date.now() - 14 * 24 * 60 * 60 * 1000
       );
 
-      // 최근 14일 내 치과 확정(yes) + impactScore 높은 순 3개
-      let snapshot = await db
+      // 최근 14일 내 impactScore 높은 순 3개
+      const snapshot = await db
         .collection("content_hira_updates")
-        .where("isDental", "==", "yes")
         .where("publishedAt", ">=", fourteenDaysAgo)
         .orderBy("publishedAt", "desc")
         .orderBy("impactScore", "desc")
         .limit(3)
         .get();
-
-      // "yes"가 3개 미만이면 "maybe"로 보충
-      if (snapshot.docs.length < 3) {
-        const maybeFallback = await db
-          .collection("content_hira_updates")
-          .where("isDental", "==", "maybe")
-          .where("publishedAt", ">=", fourteenDaysAgo)
-          .orderBy("publishedAt", "desc")
-          .orderBy("impactScore", "desc")
-          .limit(3 - snapshot.docs.length)
-          .get();
-        const allDocs = [...snapshot.docs, ...maybeFallback.docs];
-        snapshot = {docs: allDocs} as typeof snapshot;
-      }
 
       const topIds = snapshot.docs.map((doc) => doc.id);
 
@@ -545,13 +577,24 @@ function generateActionHints(title: string): string[] {
 export const syncHiraUpdatesHistorical = functions
   .https.onRequest(async (req, res): Promise<void> => {
     try {
+      const rssUrls = [
+        {
+          url: "https://www.hira.or.kr/rc/rss/rss_hira_act.xml",
+          topic: "act",
+        },
+        {
+          url: "https://www.hira.or.kr/rc/rss/rss_hira_notice.xml",
+          topic: "notice",
+        },
+      ];
+
       let totalProcessed = 0;
       const threeMonthsAgo = new Date();
       threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
 
       console.log(`📅 수집 시작: ${threeMonthsAgo.toISOString()} 이후 데이터`);
 
-      for (const {url, topic, filterKeyword} of HIRA_RSS_FEEDS) {
+      for (const {url, topic} of rssUrls) {
         try {
           const response = await axios.get(url, {timeout: 15000});
           const parsed = await parseStringPromise(response.data);
@@ -561,44 +604,36 @@ export const syncHiraUpdatesHistorical = functions
 
           for (const item of items) {
             const title = item.title?.[0] || "";
-            const rawLink = item.link?.[0] || "";
-            const link = absolutizeHiraLink(rawLink);
+            const link = item.link?.[0] || "";
             const pubDate = item.pubDate?.[0] || "";
-            const descHtml = item.description?.[0] || "";
 
             if (!title || !link) continue;
 
-            const publishedDate = parseHiraRssPubDate(pubDate);
-            if (publishedDate < threeMonthsAgo) continue;
-
-            const body = htmlToPlainText(descHtml);
-
-            if (filterKeyword &&
-                !title.includes(filterKeyword) &&
-                !body.includes(filterKeyword)) {
+            // 3개월 이내 데이터만
+            let publishedDate: Date;
+            try {
+              publishedDate = new Date(pubDate);
+              if (publishedDate < threeMonthsAgo) continue;
+            } catch {
               continue;
             }
 
+            // docId = SHA-1(link)
             const docId = crypto
               .createHash("sha1")
               .update(link)
               .digest("hex");
 
+            // 이미 존재하는지 확인
             const docRef = db.collection("content_hira_updates").doc(docId);
             const docSnap = await docRef.get();
 
             if (docSnap.exists) continue;
 
-            const isDental = classifyDental(title, body);
-            if (isDental === "no") continue;
-
-            const {score: rawScore, keywords} = calculateImpactScore(title);
-            const score = isDental === "maybe"
-              ? Math.round(rawScore * 0.5)
-              : rawScore;
+            // impactScore 계산
+            const {score, keywords} = calculateImpactScore(title);
             const impactLevel = getImpactLevel(score);
             const actionHints = generateActionHints(title);
-            const effectiveDate = extractEffectiveDate(body);
 
             const publishedAt = admin.firestore.Timestamp.fromDate(
               publishedDate
@@ -614,9 +649,6 @@ export const syncHiraUpdatesHistorical = functions
               keywords,
               actionHints,
               fetchedAt: admin.firestore.Timestamp.now(),
-              body,
-              effectiveDate,
-              isDental,
             };
 
             await docRef.set(updateData);
@@ -688,27 +720,13 @@ async function buildHiraDigestManually() {
       Date.now() - 14 * 24 * 60 * 60 * 1000
     );
 
-    let snapshot = await db
+    const snapshot = await db
       .collection("content_hira_updates")
-      .where("isDental", "==", "yes")
       .where("publishedAt", ">=", fourteenDaysAgo)
       .orderBy("publishedAt", "desc")
       .orderBy("impactScore", "desc")
       .limit(3)
       .get();
-
-    if (snapshot.docs.length < 3) {
-      const maybeFallback = await db
-        .collection("content_hira_updates")
-        .where("isDental", "==", "maybe")
-        .where("publishedAt", ">=", fourteenDaysAgo)
-        .orderBy("publishedAt", "desc")
-        .orderBy("impactScore", "desc")
-        .limit(3 - snapshot.docs.length)
-        .get();
-      const allDocs = [...snapshot.docs, ...maybeFallback.docs];
-      snapshot = {docs: allDocs} as typeof snapshot;
-    }
 
     const topIds = snapshot.docs.map((doc) => doc.id);
 
@@ -727,70 +745,6 @@ async function buildHiraDigestManually() {
     console.error("⚠️ buildHiraDigestManually error:", error);
   }
 }
-
-/**
- * 기존 Firestore 문서에 isDental 필드를 소급 적용하는 1회성 함수
- */
-export const reclassifyHiraDental = functions
-  .region("asia-northeast3")
-  .runWith({timeoutSeconds: 300, memory: "512MB"})
-  .https.onRequest(async (req, res): Promise<void> => {
-    try {
-      const snap = await db.collection("content_hira_updates").get();
-      let updated = 0;
-      let removed = 0;
-      let batch = db.batch();
-      let batchCount = 0;
-
-      for (const doc of snap.docs) {
-        const data = doc.data();
-        const title = data.title || "";
-        const body = data.body || "";
-        const isDental = classifyDental(title, body);
-
-        if (isDental === "no") {
-          batch.delete(doc.ref);
-          removed++;
-        } else {
-          const updates: {[key: string]: string | number} = {isDental};
-          if (isDental === "maybe" && typeof data.impactScore === "number") {
-            const {score: freshRaw} = calculateImpactScore(title);
-            updates.impactScore = Math.round(freshRaw * 0.5);
-            updates.impactLevel = getImpactLevel(updates.impactScore);
-          }
-          batch.update(doc.ref, updates);
-          updated++;
-        }
-        batchCount++;
-
-        if (batchCount >= 450) {
-          await batch.commit();
-          batch = db.batch();
-          batchCount = 0;
-        }
-      }
-
-      if (batchCount > 0) {
-        await batch.commit();
-      }
-
-      console.log(
-        `✅ reclassifyHiraDental: ${updated} updated, ${removed} removed`
-      );
-      res.status(200).json({
-        success: true,
-        updated,
-        removed,
-        total: snap.size,
-      });
-    } catch (error: any) {
-      console.error("⚠️ reclassifyHiraDental error:", error);
-      res.status(500).json({
-        success: false,
-        error: error.message || String(error),
-      });
-    }
-  });
 
 /**
  * Custom Token 발급 함수
@@ -957,12 +911,7 @@ export const verifyNaverToken = functions.https.onCall(
       const userData = response.data;
 
       // ========== 5. 응답 검증 ==========
-      const resultCode = userData.resultcode;
-      const resultOk =
-        resultCode === "00" ||
-        resultCode === 0 ||
-        String(resultCode) === "00";
-      if (!userData.response || !resultOk) {
+      if (!userData.response || userData.resultcode !== "00") {
         throw new functions.https.HttpsError(
           "unauthenticated",
           "네이버 토큰 검증 실패",
@@ -970,53 +919,22 @@ export const verifyNaverToken = functions.https.onCall(
         );
       }
 
-      const raw = userData.response as Record<string, unknown>;
-      const pickStr = (obj: Record<string, unknown>, keys: string[]): string | null => {
-        for (const k of keys) {
-          const v = obj[k];
-          if (typeof v === "string" && v.trim().length > 0) return v.trim();
-        }
-        return null;
-      };
+      const naverUser = userData.response;
+      const naverId = naverUser.id;
+      const email = naverUser.email || null;
+      const displayName = naverUser.name || null;
 
-      const pickEmail = (obj: Record<string, unknown>): string | null => {
-        for (const k of ["email", "user_email", "userEmail"]) {
-          const v = obj[k];
-          if (typeof v === "string" && v.trim().length > 0) return v.trim();
-        }
-        return null;
-      };
-
-      const naverId = String(raw.id ?? "");
-      let email = pickEmail(raw);
-      const profileEmailHint = (data.profileEmail as string | undefined)?.trim().toLowerCase();
-      if (!email && profileEmailHint && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profileEmailHint)) {
-        email = profileEmailHint;
-        console.log(
-          "verifyNaverToken: nid/me에 email 없음 → 앱에서 전달한 프로필 이메일 사용 (동일 세션)"
-        );
-      }
-      const displayName = pickStr(raw, ["name", "nickname"]);
-
-      const responseKeys = Object.keys(raw);
-      console.log(
-        `✅ 네이버 토큰 검증 성공 (네이버ID: ${naverId}, nid/me keys: ${responseKeys.join(",")}, emailPresent: ${!!pickEmail(raw)})`
-      );
+      console.log(`✅ 네이버 토큰 검증 성공 (네이버ID: ${naverId})`);
 
       // ========== 6. Firebase UID 생성 (prefix로 충돌 방지) ==========
-      const legacyUid = `naver_${naverId}`;
-      /** Firebase Auth 커스텀 UID는 `:` 미허용 → 레거시와 동일한 `naver_` 접두사만 사용 */
-      const uid = legacyUid;
+      const uid = `naver:${naverId}`;
+      const legacyUid = `naver_${naverId}`; // 기존 형식
 
       // ========== 6-1. 기존 사용자 마이그레이션 체크 ==========
       try {
         const legacyUser = await admin.auth().getUser(legacyUid);
         if (legacyUser) {
           console.log(`⚠️ 기존 사용자 발견 (${legacyUid}), 하위 호환 유지`);
-
-          // 역할 중복 체크: 공고자 계정이면 위생사 로그인 차단
-          await checkApplicantRoleDuplicate(legacyUid, email);
-
           // 기존 UID로 토큰 발급 (하위 호환성 유지)
           const customToken = await admin.auth().createCustomToken(legacyUid);
           
@@ -1028,7 +946,6 @@ export const verifyNaverToken = functions.https.onCall(
 
             const baseData: Record<string, unknown> = {
               email: email || null,
-              normalizedEmail: email ? email.trim().toLowerCase() : null,
               displayName: displayName || null,
               provider: "naver",
               providerId: naverId,
@@ -1045,17 +962,6 @@ export const verifyNaverToken = functions.https.onCall(
             transaction.set(naverLegacyUserRef, baseData, {merge: true});
           });
 
-          if (email && email.trim().length > 0) {
-            try {
-              await admin.auth().updateUser(legacyUid, {email: email.trim()});
-            } catch (authUpdErr: unknown) {
-              console.warn(
-                "verifyNaverToken: 기존 사용자 Auth email 갱신 실패(무시)",
-                String(authUpdErr)
-              );
-            }
-          }
-
           console.log(`✅ 기존 사용자 로그인 완료 (UID: ${legacyUid})`);
 
           return {
@@ -1065,13 +971,9 @@ export const verifyNaverToken = functions.https.onCall(
           };
         }
       } catch (error: any) {
-        if (error instanceof functions.https.HttpsError) throw error;
         // 기존 사용자가 없으면 새 형식으로 생성
         console.log(`✅ 신규 사용자, 새 UID 형식 사용: ${uid}`);
       }
-
-      // ========== 6-2. 신규 사용자 역할 중복 체크 ==========
-      await checkApplicantRoleDuplicate(uid, email);
 
       // ========== 7. Firebase Auth 사용자 생성/업데이트 ==========
       const updateData: admin.auth.UpdateRequest = {};
@@ -1082,37 +984,19 @@ export const verifyNaverToken = functions.https.onCall(
         updateData.email = email;
       }
 
-      // 빈 updateUser({}) 는 INVALID_ARGUMENT → 재로그인 시 createUser(uid) 가 uid 중복으로 실패할 수 있음
-      // (이메일·이름 미제공 네이버 계정에서 특히 자주 발생)
-      const hasAuthFields = Object.keys(updateData).length > 0;
-      if (hasAuthFields) {
-        await admin.auth().updateUser(uid, updateData).catch(async () => {
-          const createData: admin.auth.CreateRequest = {uid};
-          if (displayName) {
-            createData.displayName = displayName;
-          }
-          if (email && email.trim().length > 0) {
-            createData.email = email;
-          }
-          await admin.auth().createUser(createData);
-        });
-      } else {
-        try {
-          await admin.auth().getUser(uid);
-        } catch (e: unknown) {
-          const code =
-            e && typeof e === "object" && "code" in e
-              ? String((e as {code?: string}).code)
-              : "";
-          if (code === "auth/user-not-found") {
-            await admin.auth().createUser({uid});
-          } else {
-            throw e;
-          }
+      await admin.auth().updateUser(uid, updateData).catch(async () => {
+        const createData: admin.auth.CreateRequest = {uid};
+        if (displayName) {
+          createData.displayName = displayName;
         }
-      }
+        if (email && email.trim().length > 0) {
+          createData.email = email;
+        }
+        await admin.auth().createUser(createData);
+      });
 
       // ========== 8. Firestore users 컬렉션에 저장 ==========
+      // 조건부 필드(createdAt, excludeFromStats)는 트랜잭션으로 "없을 때만" 기록
       const naverNewUserRef = db.collection("users").doc(uid);
       await db.runTransaction(async (transaction) => {
         const snap = await transaction.get(naverNewUserRef);
@@ -1120,7 +1004,6 @@ export const verifyNaverToken = functions.https.onCall(
 
         const baseData: Record<string, unknown> = {
           email: email || null,
-          normalizedEmail: email ? email.trim().toLowerCase() : null,
           displayName: displayName || null,
           provider: "naver",
           providerId: naverId,
@@ -1148,37 +1031,9 @@ export const verifyNaverToken = functions.https.onCall(
         uid,
       };
     } catch (error: any) {
-      const authCode = getFirebaseAuthErrorCode(error);
-      console.error(
-        "⚠️ verifyNaverToken error:",
-        authCode || error?.code || "(no code)",
-        error?.message ?? error
-      );
+      console.error("⚠️ verifyNaverToken error:", error.message);
 
-      if (error instanceof functions.https.HttpsError) {
-        throw error;
-      }
-
-      // ========== 10. Firebase Auth (Admin) 오류 — internal 로만 묻히지 않도록 ==========
-      if (
-        authCode === "auth/email-already-exists" ||
-        authCode === "auth/email-already-in-use"
-      ) {
-        throw new functions.https.HttpsError(
-          "already-exists",
-          "이 이메일은 다른 로그인 방식으로 이미 가입되어 있습니다. 기존 방식으로 로그인하거나 계정 통합이 필요합니다.",
-          {errorCode: SocialLoginError.EMAIL_ALREADY_IN_USE, authCode}
-        );
-      }
-      if (authCode === "auth/uid-already-exists") {
-        throw new functions.https.HttpsError(
-          "aborted",
-          "계정 생성이 충돌했습니다. 잠시 후 다시 시도해 주세요.",
-          {errorCode: SocialLoginError.INTERNAL_ERROR, authCode}
-        );
-      }
-
-      // ========== 11. 에러 분류 및 전달 (네이버 API 등) ==========
+      // ========== 10. 에러 분류 및 전달 ==========
       if (axios.isAxiosError(error)) {
         if (error.response) {
           const status = error.response.status;
@@ -1325,19 +1180,14 @@ export const verifyKakaoToken = functions.https.onCall(
       console.log(`✅ 카카오 토큰 검증 성공 (카카오ID: ${kakaoId})`);
 
       // ========== 6. Firebase UID 생성 (prefix로 충돌 방지) ==========
-      const legacyUid = `kakao_${kakaoId}`;
-      /** Firebase Auth 커스텀 UID는 `:` 미허용 → 레거시와 동일한 `kakao_` 접두사만 사용 */
-      const uid = legacyUid;
+      const uid = `kakao:${kakaoId}`;
+      const legacyUid = `kakao_${kakaoId}`; // 기존 형식
 
       // ========== 6-1. 기존 사용자 마이그레이션 체크 ==========
       try {
         const legacyUser = await admin.auth().getUser(legacyUid);
         if (legacyUser) {
           console.log(`⚠️ 기존 사용자 발견 (${legacyUid}), 하위 호환 유지`);
-
-          // 역할 중복 체크: 공고자 계정이면 위생사 로그인 차단
-          await checkApplicantRoleDuplicate(legacyUid, email);
-
           // 기존 UID로 토큰 발급 (하위 호환성 유지)
           const customToken = await admin.auth().createCustomToken(legacyUid);
           
@@ -1349,7 +1199,6 @@ export const verifyKakaoToken = functions.https.onCall(
 
             const baseData: Record<string, unknown> = {
               email: email || null,
-              normalizedEmail: email ? email.trim().toLowerCase() : null,
               displayName: displayName || null,
               provider: "kakao",
               providerId: kakaoId,
@@ -1375,18 +1224,14 @@ export const verifyKakaoToken = functions.https.onCall(
           };
         }
       } catch (error: any) {
-        if (error instanceof functions.https.HttpsError) throw error;
         // 기존 사용자가 없으면 새 형식으로 생성
         console.log(`✅ 신규 사용자, 새 UID 형식 사용: ${uid}`);
       }
 
-      // ========== 6-2. 신규 사용자 역할 중복 체크 ==========
-      await checkApplicantRoleDuplicate(uid, email);
-
       // ========== 7. Firebase Auth 사용자 생성/조회 (email-already-exists 방지) ==========
-      let resolvedUid = uid; // 기본값: kakao_<카카오숫자ID>
+      let resolvedUid = uid; // 기본값: kakao:{kakaoId}
 
-      // 7-1. 먼저 kakao_* UID로 기존 계정 존재 여부 확인
+      // 7-1. 먼저 kakao: UID로 기존 계정 존재 여부 확인
       let userExists = false;
       try {
         await admin.auth().getUser(uid);
@@ -1428,8 +1273,6 @@ export const verifyKakaoToken = functions.https.onCall(
             console.log(`⚠️ 이메일(${email}) 이미 존재 → 기존 계정 UID 사용`);
             const existingUser = await admin.auth().getUserByEmail(email);
             resolvedUid = existingUser.uid;
-            // 연결되는 기존 UID에 대해서도 역할 중복 체크
-            await checkApplicantRoleDuplicate(resolvedUid, email);
             console.log(`✅ 기존 계정 UID로 연결: ${resolvedUid}`);
           } else {
             throw createError;
@@ -1438,6 +1281,9 @@ export const verifyKakaoToken = functions.https.onCall(
       }
 
       // ========== 8. Firestore users 컬렉션에 저장 ==========
+      // 조건부 필드(createdAt, excludeFromStats)는 트랜잭션으로 "없을 때만" 기록
+      // → createdAt: 기존 값 절대 덮어쓰지 않음
+      // → excludeFromStats: 기존 true(관리자/테스트 계정) 유지
       const kakaoNewUserRef = db.collection("users").doc(resolvedUid);
       await db.runTransaction(async (transaction) => {
         const snap = await transaction.get(kakaoNewUserRef);
@@ -1445,7 +1291,6 @@ export const verifyKakaoToken = functions.https.onCall(
 
         const baseData: Record<string, unknown> = {
           email: email || null,
-          normalizedEmail: email ? email.trim().toLowerCase() : null,
           displayName: displayName || null,
           provider: "kakao",
           providerId: kakaoId,
@@ -1474,13 +1319,6 @@ export const verifyKakaoToken = functions.https.onCall(
       };
     } catch (error: any) {
       console.error("⚠️ verifyKakaoToken error:", error.message);
-      if (error?.code) {
-        console.error("⚠️ verifyKakaoToken error.code:", error.code);
-      }
-
-      if (error instanceof functions.https.HttpsError) {
-        throw error;
-      }
 
       // ========== 10. 에러 분류 및 전달 ==========
       if (axios.isAxiosError(error)) {
@@ -1528,155 +1366,60 @@ export const verifyKakaoToken = functions.https.onCall(
   }
 );
 
+// ========== 파트너 매칭 시스템 ==========
+export {
+  requestPartnerMatching,
+  weeklyPartnerMatching,
+  expirePartnerGroups,
+} from "./partner-matching";
+
+// ========== 주중 보충 매칭 ==========
+export {
+  onGroupMemberChanged,
+  scheduledSupplementation,
+} from "./partner-supplementation";
+
+// ========== 소모임 나가기 ==========
+export { leavePartnerGroup } from "./partner-leave";
+
 // ========== 계정 삭제 ==========
 export { deleteMyAccount } from "./account-deletion";
 
-// ========== 행동 분석 일별 집계 ==========
-export { aggregateAnalyticsDaily } from "./scheduled-analytics";
+// ========== 청구/세금계산서/현금영수증 어댑터 ==========
+// 1차 운영: 요청 적재 + 운영팀 수동 처리
+// 2차 운영: 외주(Toss / 별도) API 연동 — 어댑터 내부만 교체, 화면 변경 0
+export { requestTaxInvoice } from "./billing/tossInvoiceAdapter";
+export { requestCashReceipt } from "./billing/cashReceiptAdapter";
 
-// ========== 공감투표 자동 종료 ==========
+// ========== 지갑 충전 (공고권 / 충전 잔액 패키지) ==========
+// 1차: 결제 위젯 미연동 → paymentRequests 큐에 적재 + 운영팀 수동 처리
+// 2차: Toss 위젯 redirect 후 confirm 시점에 chargeVouchers/Credit 트랜잭션 호출
 export {
-  adminAdvancePollQueue,
-  adminDeletePoll,
+  chargeVoucherPackage,
+  chargeCreditPackage,
+  applyPendingPayment,
+} from "./billing/walletCharge";
+
+// ========== 운영팀(admin) — 세금계산서/현금영수증 발급 완료 마킹 ==========
+export {
+  markTaxIssued,
+  markCashReceiptIssued,
+} from "./billing/billingOps";
+
+// ========== 인재풀: 과거 지원자에게 신규 공고 안내 이메일 큐 적재 ==========
+export {notifyPastApplicant} from "./notifications/notifyPastApplicant";
+
+// ========== 공감투표 자동 종료 / 운영 ==========
+// 매시 정각에 endsAt 지난 투표를 closed 로 전환하고 상위 3위 rank 부여.
+// manualClosePoll / adminAdvancePollQueue / adminDeletePoll 은 어드민 운영용.
+export {
   closeExpiredPolls,
   manualClosePoll,
+  adminAdvancePollQueue,
+  adminDeletePoll,
 } from "./poll-close";
 
-// 공감투표: 신고 누적 삭제 · 작성자 보기 삭제(공감 본인 1표)
-export {
-  authorDeletePollOptionWithVote,
-  onPollOptionReportThreshold,
-  purgePollOptionAfterReports,
-} from "./poll-option-moderation";
-
 // ========== 구인공고: 이미지 → 폼 자동채우기 (AI Vision) ==========
-
-/** 한 줄에서 휴대폰 → 지역번호 순으로 첫 전화번호만 추출 */
-function extractFirstPhoneFromHay(hay: string): string {
-  const patterns = [
-    /01[016789](?:[.\-\s]?\d{3,4}){2}/,
-    /0?2(?:[.\-\s]?\d{3,4}){2}/,
-    /0[3-6]\d(?:[.\-\s]?\d{3,4}){2}/,
-    /(?:070|050[2-8])(?:[.\-\s]?\d{3,4}){2}/,
-  ];
-  for (const re of patterns) {
-    const m = hay.match(re);
-    if (m) return m[0].replace(/\s/g, "");
-  }
-  return "";
-}
-
-/** description 본문에서 전화 + 이메일을 찾아 ` · `로 합침(한쪽만 있어도 반환). */
-function extractContactFromDescriptionBlob(text: string): string {
-  const raw = String(text ?? "").trim();
-  if (!raw) return "";
-  const flat = raw.replace(/\s+/g, " ");
-  const lines = raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  const haystacks = [flat, ...lines];
-
-  let phone = "";
-  for (const hay of haystacks) {
-    phone = extractFirstPhoneFromHay(hay);
-    if (phone) break;
-  }
-
-  const emailMatch = flat.match(
-    /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i
-  );
-  const email = emailMatch ? emailMatch[0].trim() : "";
-
-  const parts: string[] = [];
-  if (phone) parts.push(phone);
-  if (email) parts.push(email);
-  return parts.join(" · ");
-}
-
-/** 공백·대소문자 무시 중복 제거 후 ` · `로 합침 */
-function mergeContactParts(a: string, b: string): string {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  const pushChunk = (s: string) => {
-    const t = s.trim();
-    if (!t) return;
-    const key = t.replace(/\s+/g, " ").toLowerCase();
-    if (seen.has(key)) return;
-    seen.add(key);
-    out.push(t);
-  };
-  for (const chunk of a.split(/\s*·\s*/)) pushChunk(chunk);
-  for (const chunk of b.split(/\s*·\s*/)) pushChunk(chunk);
-  return out.join(" · ");
-}
-
-/** [parseJobImagesToForm] description 본문에서 한국식 주소 한 줄 후보 추출 */
-function extractAddressLineFromDescriptionBlob(text: string): string {
-  const raw = String(text ?? "").trim();
-  if (!raw) return "";
-  const lines = raw
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter((l) => l.length > 5);
-  const region =
-    /(서울시|서울특별시|부산광역시|대구광역시|인천광역시|광주광역시|대전광역시|울산광역시|세종|경기도|강원특별자치도|강원도|충청북도|충청남도|전북특별자치도|전라북도|전라남도|경상북도|경상남도|제주특별자치도|제주도|[가-힣]{2,12}(시|군|구))/;
-  let best = "";
-  for (const line of lines) {
-    if (!region.test(line)) continue;
-    if (/\d/.test(line) || /(로|길)\s*\d/.test(line)) {
-      if (line.length > best.length) best = line;
-    }
-  }
-  return best.trim();
-}
-
-/** 모델 출력 후 주소·연락처가 비었을 때 description에서만 보강 + 로그용 태그 */
-function postProcessAddressContactFromDescription(
-  description: string,
-  address: string,
-  contact: string,
-): {
-  address: string;
-  contact: string;
-  logTags: string[];
-  recoverySource: "none" | "description_regex" | "description_regex_both";
-} {
-  const logTags: string[] = [];
-  let addr = String(address ?? "").trim();
-  let ct = String(contact ?? "").trim();
-  const desc = String(description ?? "").trim();
-  let recoverySource: "none" | "description_regex" | "description_regex_both" = "none";
-  if (!desc) {
-    return { address: addr, contact: ct, logTags, recoverySource };
-  }
-  let touchedC = false;
-  let touchedA = false;
-  const fromDescContact = extractContactFromDescriptionBlob(desc);
-  if (!ct) {
-    if (fromDescContact) {
-      ct = fromDescContact;
-      touchedC = true;
-      logTags.push("contact_recovered_from_description");
-    }
-  } else if (fromDescContact) {
-    const merged = mergeContactParts(ct, fromDescContact);
-    if (merged !== ct.trim()) {
-      ct = merged;
-      touchedC = true;
-      logTags.push("contact_merged_with_description_regex");
-    }
-  }
-  if (!addr) {
-    const a = extractAddressLineFromDescriptionBlob(desc);
-    if (a) {
-      addr = a;
-      touchedA = true;
-      logTags.push("address_recovered_from_description");
-    }
-  }
-  if (touchedC && touchedA) recoverySource = "description_regex_both";
-  else if (touchedC || touchedA) recoverySource = "description_regex";
-  return { address: addr, contact: ct, logTags, recoverySource };
-}
-
 /**
  * parseJobImagesToForm
  *
@@ -1685,10 +1428,10 @@ function postProcessAddressContactFromDescription(
  *
  * Input  : { imageUrls: string[], jobId: string }
  * Output : { title, role, employmentType, workHours, salary,
- *            benefits, description, address, contact, clinicName, education }
+ *            benefits, description, address, contact, clinicName }
  */
 export const parseJobImagesToForm = functions
-  .runWith({ timeoutSeconds: 180, memory: "512MB", secrets: ["GEMINI_API_KEY"] })
+  .runWith({ timeoutSeconds: 60, memory: "512MB" })
   .https.onCall(async (data, context) => {
     if (!context.auth) {
       throw new functions.https.HttpsError(
@@ -1705,282 +1448,38 @@ export const parseJobImagesToForm = functions
       );
     }
 
-    // ── sourceType 분기 (image / text / mixed) ────────────────
-    const sourceType: string = data.sourceType ?? "image";
-    const rawText: string = data.rawText ?? "";
+    // ── TODO: OpenAI Vision 실제 연동 ──────────────────────────
+    // const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    // const response = await openai.chat.completions.create({ ... });
+    // ────────────────────────────────────────────────────────────
 
-    if (sourceType === "text" && !rawText.trim()) {
-      throw new functions.https.HttpsError(
-        "invalid-argument",
-        "텍스트 입력이 비어 있습니다."
-      );
-    }
-
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new functions.https.HttpsError("internal", "AI API 키가 설정되지 않았습니다.");
-    }
-
-    functions.logger.info("parseJobImagesToForm", {
-      uid: context.auth.uid, sourceType, imageCount: imageUrls.length, textLength: rawText.length,
+    // ── Mock 응답 (이미지 분석 없이 샘플 반환) ──────────────────
+    functions.logger.info("parseJobImagesToForm called (mock)", {
+      uid: context.auth.uid,
+      imageCount: imageUrls.length,
     });
 
-    const systemPrompt = `아래 치과 채용 공고 내용을 분석하여 반드시 아래 JSON 형식으로만 응답해줘.
-다른 텍스트 없이 순수 JSON만 반환해.
-원문에 명시된 정보만 추출하고, 없으면 빈 문자열·null·빈 배열을 사용해.
+    // 실제 연동 전까지 샘플 데이터 반환
+    const mockResult = {
+      clinicName: "",
+      title: "",
+      role: "",
+      employmentType: "",
+      workHours: "",
+      salary: "",
+      benefits: [] as string[],
+      description: "",
+      address: "",
+      contact: "",
+      _mock: true,
+      _message:
+        "AI 자동입력은 OpenAI 키 연동 후 활성화됩니다. 현재는 Mock 모드입니다.",
+    };
 
-[추출 우선순위 — 반드시 이 순서로 정보를 분리할 것]
-
-1순위 (핵심 구조화 필드 — 절대 description에 섞지 말 것):
-- mainDuties: 담당 업무 항목 (배열, 한 항목당 80자 이내)
-- workHours / salary / workDays: 근무 시간·급여·요일
-- applyMethod / closingDate: 지원 방법·마감일
-- benefits: 복리후생·수당·휴가·식대 등 복지성 항목 (배열)
-- subwayStationName / subwayLines / address: 교통·주소
-
-2순위 (병원 정보):
-- hospitalType / chairCount / staffCount
-- specialties: 주요 진료 과목 배열 (일반진료/교정/임플란트/소아치과/치주/보존/기타 중 해당하는 것)
-- hasOralScanner / hasCT / has3DPrinter: 장비 보유 여부 (true/false/null)
-- digitalEquipmentRaw: 위 3가지로 분류 안 된 기타 장비 설명 문자열
-
-3순위 (description — 분류 실패한 나머지만):
-- 병원 소개, 진료 철학, 팀 문화, 분위기 설명
-- 위 1·2순위로 분류된 내용은 절대 description에 다시 쓰지 말 것
-
-[상세 규칙]
-A) salary에는 급여만, workHours에는 근무 시간만. 이 내용을 description에 반복하지 않는다.
-B) 역·출구·도보 거리·지하철 노선은 benefits에 넣지 않는다.
-C) 체어·에어석션·스툴 등 시설은 description에 서술하고 benefits에 넣지 않는다.
-D) hospitalType은 clinic | network | hospital | general 중 하나. 모르면 빈 문자열.
-E) chairCount·staffCount는 원문에 숫자 있을 때만 정수, 없으면 null.
-F) workDays는 한글 요일 그대로 반환 (예: ["월","화","수","목","금"]).
-G) closingDate·recruitmentStart는 YYYY-MM-DD. 원문에 없으면 null.
-H) fieldStatus: 아래 키들을 빠짐없이 포함하고, 각각 confirmed(원문 명시) / inferred(추론) / missing(미기재) / conflict(원문과 불일치 가능) 중 하나. 앱은 동일 키로 뱃지를 표시한다.
-
-{
-  "clinicName": "치과명",
-  "title": "공고 제목",
-  "role": "직종",
-  "career": "경력 조건",
-  "education": "무관 | 고등학교 졸업 이상 | 전문대 졸업 이상 중 하나",
-  "employmentType": "고용 형태",
-  "workHours": "근무 시간",
-  "workDays": ["월", "화", "수", "목", "금"],
-  "weekendWork": "주말 근무 여부",
-  "nightShift": "야간 근무 여부",
-  "salary": "급여",
-  "mainDuties": ["업무1", "업무2"],
-  "benefits": ["복리후생1", "복리후생2"],
-  "description": "병원 소개·팀 문화 등 분류 안 된 나머지만",
-  "address": "근무지 주소",
-  "contact": "연락처",
-  "applyMethod": ["online", "phone"],
-  "hospitalType": "clinic | network | hospital | general",
-  "chairCount": null,
-  "staffCount": null,
-  "specialties": ["일반진료", "임플란트"],
-  "hasOralScanner": null,
-  "hasCT": null,
-  "has3DPrinter": null,
-  "digitalEquipmentRaw": "",
-  "requiredDocuments": ["이력서", "자기소개서"],
-  "subwayStationName": "강남역",
-  "subwayLines": ["2호선", "신분당선"],
-  "recruitmentStart": null,
-  "closingDate": null,
-  "fieldStatus": {
-    "title": "confirmed",
-    "clinicName": "confirmed",
-    "career": "confirmed",
-    "role": "confirmed",
-    "mainDuties": "confirmed",
-    "education": "confirmed",
-    "employmentType": "confirmed",
-    "salary": "confirmed",
-    "workHours": "confirmed",
-    "workDays": "confirmed",
-    "benefits": "confirmed",
-    "description": "inferred",
-    "address": "confirmed",
-    "contact": "missing",
-    "subwayStationName": "confirmed",
-    "applyMethod": "confirmed",
-    "hospitalType": "confirmed",
-    "chairCount": "missing",
-    "staffCount": "missing",
-    "specialties": "confirmed",
-    "hasOralScanner": "missing",
-    "hasCT": "missing",
-    "has3DPrinter": "missing",
-    "digitalEquipmentRaw": "missing",
-    "requiredDocuments": "missing",
-    "closingDate": "missing"
-  }
-}`;
-
-    const parts: Array<{text?: string; inlineData?: {mimeType: string; data: string}}> = [];
-    parts.push({text: systemPrompt});
-
-    if (sourceType === "text" || sourceType === "mixed") {
-      parts.push({text: "아래는 공고 텍스트입니다:\n" + rawText});
-    }
-
-    if ((sourceType === "image" || sourceType === "mixed") && imageUrls.length > 0) {
-      for (const url of imageUrls.slice(0, 10)) {
-        try {
-          const imgResp = await axios.get(url, {responseType: "arraybuffer", timeout: 15000});
-          const base64 = Buffer.from(imgResp.data).toString("base64");
-          const contentType = imgResp.headers["content-type"] || "image/jpeg";
-          parts.push({inlineData: {mimeType: contentType, data: base64}});
-        } catch (e) {
-          functions.logger.warn("이미지 다운로드 실패", {url, error: String(e)});
-        }
-      }
-    }
-
-    try {
-      const geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/" + GEMINI_MODEL + ":generateContent?key=" + apiKey;
-      const resp = await axios.post(geminiUrl, {
-        contents: [{parts}],
-        generationConfig: {responseMimeType: "application/json"},
-      }, {timeout: 110000});
-
-      const text = resp.data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
-      const parsed = JSON.parse(text);
-
-      const pickInt = (v: unknown): number | null => {
-        if (typeof v === "number" && Number.isFinite(v)) return Math.round(v);
-        if (typeof v === "string") {
-          const n = parseInt(String(v).replace(/[^\d]/g, ""), 10);
-          return Number.isFinite(n) ? n : null;
-        }
-        return null;
-      };
-
-      const subwayLinesRaw = Array.isArray(parsed.subwayLines)
-        ? parsed.subwayLines.map((s: unknown) => String(s).trim()).filter(Boolean)
-        : [];
-      const mainDutiesRaw = Array.isArray(parsed.mainDuties)
-        ? parsed.mainDuties.map((s: unknown) => String(s).trim()).filter(Boolean)
-        : [];
-      const specialtiesRaw = Array.isArray(parsed.specialties)
-        ? parsed.specialties.map((s: unknown) => String(s).trim()).filter(Boolean)
-        : [];
-
-      const pickBool = (v: unknown): boolean | null => {
-        if (typeof v === "boolean") return v;
-        if (typeof v === "string") {
-          const l = v.toLowerCase().trim();
-          if (l === "true" || l === "있음" || l === "있다" || l === "보유") return true;
-          if (l === "false" || l === "없음" || l === "없다") return false;
-        }
-        return null;
-      };
-
-      // fieldStatus: Gemini 응답 그대로 전달, 없으면 빈 객체
-      const fieldStatus: Record<string, string> = {};
-      if (parsed.fieldStatus && typeof parsed.fieldStatus === "object") {
-        for (const [k, v] of Object.entries(parsed.fieldStatus)) {
-          if (typeof v === "string") fieldStatus[k] = v;
-        }
-      }
-
-      const descriptionTrimmed = String(parsed.description ?? "").trim();
-      let addressOut = String(parsed.address ?? "").trim();
-      let contactOut = String(parsed.contact ?? "").trim();
-
-      const fieldGapTags: string[] = [];
-      if (!addressOut) fieldGapTags.push("address_missing_after_model");
-      if (!contactOut) fieldGapTags.push("contact_missing_after_model");
-
-      const recovered = postProcessAddressContactFromDescription(
-        descriptionTrimmed,
-        addressOut,
-        contactOut,
-      );
-      addressOut = recovered.address;
-      contactOut = recovered.contact;
-
-      const postTags: string[] = [...fieldGapTags, ...recovered.logTags];
-      if (!addressOut) postTags.push("address_still_empty_after_recovery");
-      if (!contactOut) postTags.push("contact_still_empty_after_recovery");
-
-      const clinicNameOut = String(parsed.clinicName ?? "").trim();
-      const reqDocs = Array.isArray(parsed.requiredDocuments) ? parsed.requiredDocuments : [];
-      functions.logger.info("parseJobImagesToForm_postprocess", {
-        uid: context.auth.uid,
-        sourceType,
-        imageCount: imageUrls.length,
-        descriptionLen: descriptionTrimmed.length,
-        clinicName: clinicNameOut,
-        address: addressOut,
-        contact: contactOut,
-        subwayStationName: String(parsed.subwayStationName ?? "").trim(),
-        requiredDocumentsCount: reqDocs.length,
-        fieldStatusAddress: fieldStatus["address"] ?? "",
-        fieldStatusContact: fieldStatus["contact"] ?? "",
-        recoverySource: recovered.recoverySource,
-        tags: [...new Set(postTags)],
-      });
-
-      return {
-        clinicName: String(parsed.clinicName ?? "").trim(),
-        title: String(parsed.title ?? "").trim(),
-        role: String(parsed.role ?? "").trim(),
-        career: String(parsed.career ?? "").trim(),
-        education: String(parsed.education ?? "").trim(),
-        employmentType: String(parsed.employmentType ?? "").trim(),
-        workHours: String(parsed.workHours ?? "").trim(),
-        salary: String(parsed.salary ?? "").trim(),
-        benefits: Array.isArray(parsed.benefits) ? parsed.benefits : [],
-        description: descriptionTrimmed,
-        address: addressOut,
-        contact: contactOut,
-        hospitalType: String(parsed.hospitalType ?? "").trim(),
-        workDays: Array.isArray(parsed.workDays) ? parsed.workDays : [],
-        weekendWork: parsed.weekendWork ?? "",
-        nightShift: parsed.nightShift ?? "",
-        chairCount: pickInt(parsed.chairCount),
-        staffCount: pickInt(parsed.staffCount),
-        specialties: specialtiesRaw,
-        hasOralScanner: pickBool(parsed.hasOralScanner),
-        hasCT: pickBool(parsed.hasCT),
-        has3DPrinter: pickBool(parsed.has3DPrinter),
-        digitalEquipmentRaw: parsed.digitalEquipmentRaw ? String(parsed.digitalEquipmentRaw).trim() : null,
-        subwayStationName: String(parsed.subwayStationName ?? "").trim(),
-        subwayLines: subwayLinesRaw,
-        mainDuties: mainDutiesRaw,
-        recruitmentStart: parsed.recruitmentStart ? String(parsed.recruitmentStart).trim() : null,
-        closingDate: parsed.closingDate ? String(parsed.closingDate).trim() : null,
-        fieldStatus,
-      };
-    } catch (e: unknown) {
-      functions.logger.error("Gemini API 호출 실패", {error: String(e)});
-      throw new functions.https.HttpsError("internal", "AI 분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
-    }
+    return mockResult;
   });
 
 // ========== 구인공고: 공고 생성 ==========
-/** 앱 [Job] salaryRange(만원)와 동기화하기 위한 급여 문자열 파싱 */
-function parseJobSalaryRange(salary: string): { min: number; max: number } {
-  const t = String(salary ?? "").replace(/\s/g, "");
-  if (!t) return { min: 0, max: 0 };
-  const range = t.match(/(\d{2,4})[~～\-](\d{2,4})/);
-  if (range) {
-    return { min: parseInt(range[1], 10), max: parseInt(range[2], 10) };
-  }
-  const singles = t.match(/(\d{2,4})/g);
-  if (singles && singles.length >= 2) {
-    return { min: parseInt(singles[0], 10), max: parseInt(singles[1], 10) };
-  }
-  if (singles && singles.length === 1) {
-    const v = parseInt(singles[0], 10);
-    return { min: v, max: v };
-  }
-  return { min: 0, max: 0 };
-}
-
 /**
  * createJobPosting
  *
@@ -2009,459 +1508,36 @@ export const createJobPosting = functions.https.onCall(
       }
     }
 
-    // ── images 다층 검증 ──────────────────────────────────────
-    const rawImages = data.images;
-    if (rawImages !== undefined && !Array.isArray(rawImages)) {
-      throw new functions.https.HttpsError("invalid-argument", "images는 배열이어야 합니다.");
-    }
-    const imagesArr: unknown[] = Array.isArray(rawImages) ? rawImages : [];
-    if (imagesArr.length > 10) {
-      throw new functions.https.HttpsError("invalid-argument", "이미지는 최대 10장입니다.");
-    }
-    const storagePrefix = "https://firebasestorage.googleapis.com/";
-    const validImages: string[] = [];
-    for (const url of imagesArr) {
-      if (
-        typeof url !== "string" ||
-        url.trim().length === 0 ||
-        url.length > 2000 ||
-        !url.startsWith(storagePrefix)
-      ) {
-        throw new functions.https.HttpsError(
-          "invalid-argument",
-          "유효하지 않은 이미지 URL이 포함되어 있습니다."
-        );
-      }
-      validImages.push(url.trim());
-    }
+    // clinicId는 users/{uid}.clinicId에서 가져오기
+    const userDoc = await db.collection("users").doc(uid).get();
+    const userData = userDoc.data() || {};
+    const clinicId = userData.clinicId || uid;
 
-    // clinics_accounts/{uid}에서 공고자 승인 상태 확인
-    const clinicAccDoc = await db.collection("clinics_accounts").doc(uid).get();
-    if (!clinicAccDoc.exists) {
-      throw new functions.https.HttpsError(
-        "permission-denied",
-        "공고자 계정이 아닙니다. 공고자 가입을 먼저 진행해주세요."
-      );
-    }
-    const clinicAccData = clinicAccDoc.data() || {};
-    if (clinicAccData.approvalStatus !== "approved" || clinicAccData.canPost !== true) {
-      throw new functions.https.HttpsError(
-        "permission-denied",
-        "공고 작성 권한이 없습니다. 사업자 인증 승인 후 공고를 작성할 수 있습니다."
-      );
-    }
-    const clinicId = clinicAccData.clinicId || uid;
-
-    const salaryStr = String(data.salary ?? "").trim();
-    const sr = parseJobSalaryRange(salaryStr);
-    const roleStr = String(data.role ?? "").trim();
-    const careerStr = String(data.career ?? "").trim();
-    const descStr = String(data.description ?? "").trim();
-
-    // district 자동 생성: 주소에서 시/구/동 추출
-    const addressStr = String(data.address ?? "").trim();
-    let district = "";
-    if (addressStr.length > 0) {
-      const parts = addressStr.split(/\s+/);
-      // 패턴: "서울시 강남구 역삼동 ..." → "역삼동 · 강남구"
-      // 또는: "서울 강남구 역삼동 ..." → "역삼동 · 강남구"
-      const guIdx = parts.findIndex((p) => p.endsWith("구") || p.endsWith("군"));
-      const dongIdx = parts.findIndex(
-        (p) => p.endsWith("동") || p.endsWith("읍") || p.endsWith("면") || p.endsWith("로") || p.endsWith("길")
-      );
-      const gu = guIdx >= 0 ? parts[guIdx] : "";
-      const dong = dongIdx >= 0 && dongIdx > guIdx ? parts[dongIdx] : "";
-      if (dong && gu) {
-        district = `${dong} · ${gu}`;
-      } else if (gu) {
-        district = gu;
-      } else if (parts.length >= 2) {
-        district = parts.slice(0, 2).join(" ");
-      }
-    }
-
-    // ── 신규 필드 검증 ────────────────────────────────────
-
-    // 병원 정보
-    const validHospitalTypes = ["clinic", "network", "hospital", "general"];
-    const hospitalType = typeof data.hospitalType === "string" && validHospitalTypes.includes(data.hospitalType)
-      ? data.hospitalType : null;
-    const chairCount = typeof data.chairCount === "number" && data.chairCount > 0
-      ? Math.floor(data.chairCount) : null;
-    const staffCount = typeof data.staffCount === "number" && data.staffCount > 0
-      ? Math.floor(data.staffCount) : null;
-
-    // 근무 조건
-    const validDays = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
-    const korDayMap: Record<string, string> = {
-      "월": "mon", "화": "tue", "수": "wed", "목": "thu",
-      "금": "fri", "토": "sat", "일": "sun",
-      "월요일": "mon", "화요일": "tue", "수요일": "wed", "목요일": "thu",
-      "금요일": "fri", "토요일": "sat", "일요일": "sun",
-    };
-    const workDays: string[] = Array.isArray(data.workDays)
-      ? data.workDays
-        .map((d: unknown) => {
-          if (typeof d !== "string") return null;
-          const trimmed = (d as string).trim();
-          return korDayMap[trimmed] ?? (validDays.includes(trimmed) ? trimmed : null);
-        })
-        .filter((d: string | null): d is string => d !== null)
-      : [];
-    const weekendWork = data.weekendWork === true;
-    const nightShift = data.nightShift === true;
-
-    // 지원 관련
-    const validMethods = ["online", "phone", "email"];
-    const applyMethod: string[] = Array.isArray(data.applyMethod)
-      ? data.applyMethod.filter((m: unknown) => typeof m === "string" && validMethods.includes(m as string))
-      : [];
-    const isAlwaysHiring = data.isAlwaysHiring === true;
-
-    // 마감일
-    let closingDate: admin.firestore.Timestamp | null = null;
-    if (!isAlwaysHiring && typeof data.closingDate === "string" && data.closingDate.trim()) {
-      try {
-        const d = new Date(data.closingDate.trim());
-        if (!isNaN(d.getTime())) closingDate = admin.firestore.Timestamp.fromDate(d);
-      } catch (_) { /* ignore */ }
-    }
-
-    // 교통편
-    let transportation: Record<string, unknown> | null = null;
-    if (data.transportation && typeof data.transportation === "object") {
-      const t = data.transportation;
-      transportation = {
-        subwayLines: Array.isArray(t.subwayLines) ? t.subwayLines.filter((s: unknown) => typeof s === "string") : [],
-        ...(typeof t.subwayStationName === "string" && t.subwayStationName.trim()
-          ? { subwayStationName: t.subwayStationName.trim() } : {}),
-        ...(typeof t.walkingDistanceMeters === "number" ? { walkingDistanceMeters: Math.floor(t.walkingDistanceMeters) } : {}),
-        ...(typeof t.walkingMinutes === "number" ? { walkingMinutes: Math.floor(t.walkingMinutes) } : {}),
-        ...(typeof t.exitNumber === "string" && t.exitNumber.trim() ? { exitNumber: t.exitNumber.trim() } : {}),
-        parking: t.parking === true,
-      };
-    }
-    const subwayLines: string[] = transportation
-      ? (transportation.subwayLines as string[]) ?? []
-      : [];
-    const hasParking = transportation ? transportation.parking === true : false;
-    const walkMin = transportation ? (transportation.walkingMinutes as number | undefined) : undefined;
-    const stationName = transportation ? (transportation.subwayStationName as string | undefined) : undefined;
-    const isNearStation = !!stationName && typeof walkMin === "number" && walkMin <= 10;
-
-    // 태그
-    const tags: string[] = Array.isArray(data.tags)
-      ? data.tags.filter((t: unknown) => typeof t === "string" && (t as string).trim().length > 0).slice(0, 30)
-      : [];
-
-    // 좌표
-    const lat = typeof data.lat === "number" && isFinite(data.lat) ? data.lat : null;
-    const lng = typeof data.lng === "number" && isFinite(data.lng) ? data.lng : null;
-
-    const jobData: Record<string, unknown> = {
+    const jobData = {
       createdBy: uid,
       clinicId,
       clinicName: String(data.clinicName ?? "").trim(),
       title: String(data.title ?? "").trim(),
-      role: roleStr,
-      type: roleStr,
-      career: careerStr || "미정",
+      role: String(data.role ?? "").trim(),
       employmentType: String(data.employmentType ?? "").trim(),
       workHours: String(data.workHours ?? "").trim(),
-      salary: salaryStr,
-      salaryText: salaryStr,
-      salaryMin: sr.min,
-      salaryMax: sr.max,
-      salaryRange: [sr.min, sr.max],
+      salary: String(data.salary ?? "").trim(),
       benefits: Array.isArray(data.benefits) ? data.benefits : [],
-      description: descStr,
-      details: descStr,
-      address: addressStr,
-      district,
+      description: String(data.description ?? "").trim(),
+      address: String(data.address ?? "").trim(),
       contact: String(data.contact ?? "").trim(),
-      images: validImages,
-      ...(lat != null && lng != null ? { lat, lng } : {}),
+      images: Array.isArray(data.images) ? data.images : [],
       status: "pending",
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      postedAt: admin.firestore.FieldValue.serverTimestamp(),
-      // 병원 정보
-      ...(hospitalType ? { hospitalType } : {}),
-      ...(chairCount ? { chairCount } : {}),
-      ...(staffCount ? { staffCount } : {}),
-      // 근무 조건
-      ...(workDays.length > 0 ? { workDays } : {}),
-      weekendWork,
-      nightShift,
-      // 지원 관련
-      ...(applyMethod.length > 0 ? { applyMethod } : {}),
-      isAlwaysHiring,
-      ...(closingDate ? { closingDate } : {}),
-      // 교통편
-      ...(transportation ? { transportation } : {}),
-      ...(subwayLines.length > 0 ? { subwayLines } : {}),
-      hasParking,
-      isNearStation,
-      // 태그
-      ...(tags.length > 0 ? { tags } : {}),
     };
 
-    // 클라이언트가 미리 생성한 jobId가 있으면 사용 (Storage 경로 일치)
-    const providedJobId = typeof data.jobId === "string" && data.jobId.trim() ? data.jobId.trim() : null;
-    let jobId: string;
-    if (providedJobId) {
-      await db.collection("jobs").doc(providedJobId).set(jobData);
-      jobId = providedJobId;
-    } else {
-      const ref = await db.collection("jobs").add(jobData);
-      jobId = ref.id;
-    }
+    const ref = await db.collection("jobs").add(jobData);
 
-    functions.logger.info("createJobPosting", { uid, jobId });
+    functions.logger.info("createJobPosting", { uid, jobId: ref.id });
 
-    return { jobId, status: "pending" };
+    return { jobId: ref.id, status: "pending" };
   }
 );
-
-/**
- * lookupNearbyStation
- *
- * 좌표(lat/lng) 또는 주소(address)를 받아 가장 가까운 지하철역을 자동 조회한다.
- * address만 보내면 Geocoding API로 좌표 변환 후 진행.
- * Google Geocoding API + Places API (Nearby Search) + Routes API (walking) 사용.
- *
- * Input:  { lat?: number, lng?: number, address?: string }
- * Output: { subwayStationName, subwayLines, walkingDistanceMeters, walkingMinutes, lat, lng } | { found: false }
- */
-export const lookupNearbyStation = functions
-  .runWith({ secrets: [GOOGLE_MAPS_API_KEY] })
-  .https.onCall(
-  async (data, context) => {
-    if (!context.auth) {
-      throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
-    }
-
-    const apiKey = GOOGLE_MAPS_API_KEY.value();
-    if (!apiKey) {
-      throw new functions.https.HttpsError(
-        "failed-precondition",
-        "서버에 Google Maps API 키가 설정되지 않았습니다."
-      );
-    }
-
-    let lat = Number(data.lat);
-    let lng = Number(data.lng);
-    const address = typeof data.address === "string" ? data.address.trim() : "";
-
-    functions.logger.info("lookupNearbyStation input", { lat, lng, address, hasLat: isFinite(lat), hasLng: isFinite(lng) });
-
-    // 좌표가 없거나 유효하지 않으면 주소로 지오코딩
-    if ((!isFinite(lat) || !isFinite(lng) || (lat === 0 && lng === 0)) && address.length > 0) {
-      try {
-        const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json`;
-        const geoRes = await axios.get(geocodeUrl, {
-          params: { address, key: apiKey, language: "ko", region: "kr" },
-        });
-        const geoStatus = geoRes.data?.status ?? "UNKNOWN";
-        const geoError = geoRes.data?.error_message ?? "";
-        functions.logger.info("lookupNearbyStation geocoding response", {
-          status: geoStatus, error: geoError, resultCount: geoRes.data?.results?.length ?? 0,
-        });
-        if (geoStatus !== "OK" && geoStatus !== "ZERO_RESULTS") {
-          return { found: false, reason: "Geocoding API 오류: " + geoStatus + " " + geoError };
-        }
-        const geoResult = geoRes.data?.results?.[0];
-        if (!geoResult) {
-          return { found: false, reason: "주소를 찾을 수 없습니다 (" + geoStatus + ")" };
-        }
-        lat = geoResult.geometry.location.lat;
-        lng = geoResult.geometry.location.lng;
-        functions.logger.info("lookupNearbyStation geocoded", { lat, lng, formattedAddress: geoResult.formatted_address });
-      } catch (e) {
-        functions.logger.error("lookupNearbyStation geocoding error", e);
-        throw new functions.https.HttpsError("internal", "주소 변환 중 오류가 발생했습니다.");
-      }
-    }
-
-    if (!isFinite(lat) || !isFinite(lng) || (lat === 0 && lng === 0)) {
-      throw new functions.https.HttpsError("invalid-argument", "유효한 좌표 또는 주소가 필요합니다.");
-    }
-
-    try {
-      // 1) Places API (Nearby Search) - 반경 1000m 내 subway_station
-      const SEARCH_RADIUS = 1000;
-      const placesUrl = "https://places.googleapis.com/v1/places:searchNearby";
-      const placesBody = {
-        includedTypes: ["subway_station"],
-        maxResultCount: 10,
-        languageCode: "ko",
-        regionCode: "KR",
-        locationRestriction: {
-          circle: {
-            center: { latitude: lat, longitude: lng },
-            radius: SEARCH_RADIUS,
-          },
-        },
-      };
-      let placesRes;
-      try {
-        placesRes = await axios.post(placesUrl, placesBody, {
-          headers: {
-            "Content-Type": "application/json",
-            "X-Goog-Api-Key": apiKey,
-            "X-Goog-FieldMask": "places.displayName,places.location",
-          },
-        });
-      } catch (placesErr: any) {
-        const status = placesErr?.response?.status ?? "unknown";
-        const msg = placesErr?.response?.data?.error?.message ?? placesErr?.message ?? "unknown";
-        functions.logger.error("lookupNearbyStation Places API call failed", { status, msg, lat, lng });
-        return { found: false, reason: `지하철역 검색 API 오류 (${status}): ${msg}` };
-      }
-
-      const places = placesRes.data?.places ?? [];
-      functions.logger.info("lookupNearbyStation Places API response", {
-        status: placesRes.status,
-        placeCount: places.length,
-        lat, lng, radius: SEARCH_RADIUS,
-      });
-      if (places.length === 0) {
-        return { found: false, reason: `반경 ${SEARCH_RADIUS}m 내 지하철역을 찾지 못했습니다.` };
-      }
-
-      // 2) 역별 직선거리 + Routes 도보거리(없으면 직선거리로 표시)
-      const routesUrl = "https://routes.googleapis.com/directions/v2:computeRoutes";
-      const parseRouteDurationSec = (route: Record<string, unknown> | undefined): number => {
-        if (!route) return 0;
-        const dur = route.duration;
-        if (typeof dur === "string") {
-          return parseInt(dur.replace("s", ""), 10) || 0;
-        }
-        if (dur && typeof dur === "object" && dur !== null && "seconds" in dur) {
-          const s = (dur as { seconds?: string }).seconds;
-          return s ? parseInt(s, 10) || 0 : 0;
-        }
-        return 0;
-      };
-      type StationRow = {
-        name: string;
-        stationLat: number;
-        stationLng: number;
-        lines: string[];
-        straightMeters: number;
-        walkingDistanceMeters: number;
-        walkingMinutes: number;
-      };
-      const stationResults: StationRow[] = [];
-
-      for (const p of places) {
-        let rawName: string = p.displayName?.text ?? "";
-        rawName = rawName.replace(/\s*\d+호선/g, "").trim() || rawName;
-        const sLat = p.location.latitude;
-        const sLng = p.location.longitude;
-        const straight = Math.round(haversineMeters(lat, lng, sLat, sLng));
-        const lines = linesForStationDisplayName(rawName);
-        let walkM = 0;
-        let walkMin = 0;
-        try {
-          const routesRes = await axios.post(routesUrl, {
-            origin: { location: { latLng: { latitude: lat, longitude: lng } } },
-            destination: { location: { latLng: { latitude: sLat, longitude: sLng } } },
-            travelMode: "WALK",
-          }, {
-            headers: {
-              "Content-Type": "application/json",
-              "X-Goog-Api-Key": apiKey,
-              "X-Goog-FieldMask": "routes.distanceMeters,routes.duration",
-            },
-          });
-          const route = routesRes.data?.routes?.[0] as Record<string, unknown> | undefined;
-          walkM = (route?.distanceMeters as number) ?? 0;
-          const durationSec = parseRouteDurationSec(route);
-          walkMin = durationSec > 0 ? Math.max(1, Math.round(durationSec / 60)) : 0;
-        } catch (routeErr) {
-          functions.logger.warn("lookupNearbyStation route calc failed for " + rawName, routeErr);
-        }
-        if (walkM <= 0) {
-          walkM = straight;
-        }
-        if (walkMin <= 0 && walkM > 0) {
-          walkMin = Math.max(1, Math.round(walkM / 80));
-        }
-        stationResults.push({
-          name: rawName,
-          stationLat: sLat,
-          stationLng: sLng,
-          lines,
-          straightMeters: straight,
-          walkingDistanceMeters: walkM,
-          walkingMinutes: walkMin,
-        });
-      }
-
-      if (stationResults.length === 0) {
-        return { found: false, reason: "역 도보 경로 계산에 실패했습니다." };
-      }
-
-      stationResults.sort((a, b) => a.straightMeters - b.straightMeters);
-      const deduped: StationRow[] = [];
-      const seenKeys = new Set<string>();
-      for (const s of stationResults) {
-        const key = `${s.stationLat.toFixed(4)},${s.stationLng.toFixed(4)}`;
-        if (seenKeys.has(key)) continue;
-        seenKeys.add(key);
-        deduped.push(s);
-      }
-      deduped.sort((a, b) => a.walkingDistanceMeters - b.walkingDistanceMeters);
-
-      const nearest = deduped[0];
-      return {
-        found: true,
-        lat,
-        lng,
-        subwayStationName: nearest.name,
-        subwayLines: nearest.lines,
-        walkingDistanceMeters: nearest.walkingDistanceMeters,
-        walkingMinutes: nearest.walkingMinutes,
-        stations: deduped.map((s) => ({
-          name: s.name,
-          lines: s.lines,
-          distanceMeters: s.walkingDistanceMeters,
-          walkingMinutes: s.walkingMinutes,
-        })),
-      };
-    } catch (e: unknown) {
-      functions.logger.error("lookupNearbyStation error", e);
-      throw new functions.https.HttpsError("internal", "교통편 조회 중 오류가 발생했습니다.");
-    }
-  }
-);
-
-/**
- * onJobDeleted
- *
- * 공고 문서 삭제 시 Storage에 연결된 이미지 파일도 함께 정리한다.
- */
-export const onJobDeleted = functions.firestore
-  .document("jobs/{jobId}")
-  .onDelete(async (snap) => {
-    const images: unknown[] = snap.data().images ?? [];
-    const bucket = admin.storage().bucket();
-
-    for (const url of images) {
-      if (typeof url !== "string") continue;
-      try {
-        // Storage download URL → 파일 경로 추출
-        // 형식: https://firebasestorage.googleapis.com/v0/b/{bucket}/o/{encodedPath}?...
-        const match = url.match(/\/o\/(.+?)(\?|$)/);
-        if (!match) continue;
-        const filePath = decodeURIComponent(match[1]);
-        await bucket.file(filePath).delete();
-      } catch (e) {
-        functions.logger.warn("onJobDeleted: 이미지 삭제 실패", { url, error: e });
-      }
-    }
-    functions.logger.info("onJobDeleted: 이미지 정리 완료", { jobId: snap.id, count: images.length });
-  });
 
 // ========== 치과 사업자 인증 ==========
 /**
@@ -2487,11 +1563,18 @@ export const submitClinicVerification = functions.https.onCall(
     }
 
     const uid = context.auth.uid;
+    const profileId =
+      typeof data.profileId === "string" && data.profileId.trim().length > 0
+        ? data.profileId.trim()
+        : null;
 
     // ── 직접 제출 모드 (finalSubmit: true) ──────────────
     if (data.finalSubmit === true) {
       const bizNo = String(data.bizNo ?? "").trim();
       const clinicName = String(data.clinicName ?? "").trim();
+      const ownerName = String(data.ownerName ?? "").trim();
+      const openedAt = String(data.openedAt ?? "").trim();
+      const address = String(data.address ?? "").trim();
 
       if (!bizNo || !clinicName) {
         throw new functions.https.HttpsError(
@@ -2500,7 +1583,76 @@ export const submitClinicVerification = functions.https.onCall(
         );
       }
 
-      // TODO: 실제 국세청 API 연동 (현재 Mock)
+      // ── N-지점 모델: 진짜 NTS+HIRA 검증 경로 ──────────
+      // profileId 가 있으면 입력값을 프로필에 먼저 저장하고 runCheckBusinessStatus
+      // (국세청 + 심평원) 를 돌려 provisional / rejected / manual_review 결정.
+      if (profileId) {
+        const profileRef = db
+          .collection("clinics_accounts")
+          .doc(uid)
+          .collection("clinic_profiles")
+          .doc(profileId);
+        await profileRef.set(
+          {
+            clinicName,
+            ownerName,
+            address,
+            "businessVerification.bizNo": bizNo,
+            "businessVerification.openedAt": openedAt,
+            "businessVerification.ocrResult": {
+              bizNo,
+              clinicName,
+              ownerName,
+              openedAt,
+              address,
+            },
+            "businessVerification.method": "manual_input",
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          {merge: true}
+        );
+
+        const checkResult = await runCheckBusinessStatus(db, uid, profileId);
+
+        // clinicVerifications/{uid} 레거시 문서도 함께 갱신
+        await db.collection("clinicVerifications").doc(uid).set(
+          {
+            status: checkResult.status,
+            bizNo,
+            clinicName,
+            ownerName,
+            openedAt,
+            address,
+            failReason: checkResult.failReason ?? null,
+            submittedAt: admin.firestore.FieldValue.serverTimestamp(),
+            reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
+            profileId,
+          },
+          {merge: true}
+        );
+
+        functions.logger.info("submitClinicVerification finalSubmit (real)", {
+          uid,
+          profileId,
+          bizNo,
+          status: checkResult.status,
+          failReason: checkResult.failReason,
+          hiraMatched: checkResult.hiraMatched,
+        });
+
+        return {
+          status: checkResult.status,
+          ntsValid:
+            checkResult.status === "provisional" ||
+            checkResult.status === "verified",
+          failReason: checkResult.failReason ?? null,
+          hiraMatched: checkResult.hiraMatched ?? null,
+          hiraMatchLevel: checkResult.hiraMatchLevel ?? null,
+          method: checkResult.method,
+        };
+      }
+
+      // ── 레거시 경로 (profileId 없음) — 단순 mock 처리 ───
       const ntsResult = {
         valid: true,
         state: "ACTIVE",
@@ -2508,25 +1660,26 @@ export const submitClinicVerification = functions.https.onCall(
         _message: "국세청 API 발급 후 실제 조회로 교체 예정",
       };
 
-      // clinicVerifications 문서 저장
+      // clinicVerifications 문서 저장 (uid 기준 — 레거시 호환 유지)
       await db.collection("clinicVerifications").doc(uid).set({
         status: ntsResult.valid ? "approved" : "rejected",
         bizNo,
         clinicName,
-        ownerName: String(data.ownerName ?? "").trim(),
-        openedAt: String(data.openedAt ?? "").trim(),
-        address: String(data.address ?? "").trim(),
+        ownerName,
+        openedAt,
+        address,
         nts: ntsResult,
         submittedAt: admin.firestore.FieldValue.serverTimestamp(),
         reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
+        profileId: null,
       });
 
-      // 승인 시 clinics + clinics_accounts 문서 업데이트
+      // 승인 시 clinics + users 문서 업데이트 (레거시 호환)
       if (ntsResult.valid) {
+        // 1) clinics/{clinicId} 생성 (clinicId = uid를 기본값으로 사용)
         const clinicId = uid;
         const clinicAddress = String(data.address ?? "").trim();
 
-        // 1) clinics/{clinicId} 생성/갱신
         await db.collection("clinics").doc(clinicId).set(
           {
             name: clinicName,
@@ -2540,17 +1693,13 @@ export const submitClinicVerification = functions.https.onCall(
           { merge: true }
         );
 
-        // 2) clinics_accounts/{uid} 승인 상태 업데이트
-        await db.collection("clinics_accounts").doc(uid).set(
+        // 2) users/{uid} role: "clinic" + clinicId 저장
+        await db.collection("users").doc(uid).set(
           {
+            role: "clinic",
             clinicId,
             clinicVerified: true,
-            approvalStatus: "approved",
-            canPost: true,
             clinic: { name: clinicName, bizNo },
-            onboarding: { business: "done" },
-            approvedAt: admin.firestore.FieldValue.serverTimestamp(),
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           },
           { merge: true }
         );
@@ -2584,15 +1733,38 @@ export const submitClinicVerification = functions.https.onCall(
       docUrl,
     });
 
-    // clinicVerifications 문서에 pending 상태로 저장
+    // clinicVerifications 문서에 pending 상태로 저장 (uid — 레거시)
     await db.collection("clinicVerifications").doc(uid).set(
       {
         status: "pending",
         docPath: docUrl,
         submittedAt: admin.firestore.FieldValue.serverTimestamp(),
+        profileId: profileId ?? null,
       },
       { merge: true }
     );
+
+    // N-지점 모델: 해당 지점 프로필에 docUrl 만 기록(상태는 finalSubmit 에서 결정)
+    if (profileId) {
+      await db
+        .collection("clinics_accounts")
+        .doc(uid)
+        .collection("clinic_profiles")
+        .doc(profileId)
+        .set(
+          {
+            bizRegImageUrl: docUrl,
+            businessVerification: {
+              status: "pending_auto",
+              docUrl,
+              method: "mock",
+              lastCheckAt: admin.firestore.FieldValue.serverTimestamp(),
+            },
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+    }
 
     return {
       bizNo: "",
@@ -2608,7 +1780,7 @@ export const submitClinicVerification = functions.https.onCall(
 );
 
 // ================================================================
-// syncImwebPurchases (v5 - 취소/환불 제외)
+// syncImwebPurchases (v4 - imweb_orders 통합)
 // ================================================================
 // 아임웹 구매내역을 Firestore users/{uid}/purchases/ 에 동기화한다.
 //
@@ -2616,10 +1788,8 @@ export const submitClinicVerification = functions.https.onCall(
 //   A) imweb_orders 컬렉션 검색 (CSV 과거 주문 보관소)
 //      - email + emailAliases 로 검색
 //      - linkedUid == null 인 항목만 처리 (코드 필터)
-//      - 취소사유·취소 상태 필드가 있으면 동기화하지 않음
 //
 //   B) 아임웹 API (최근 3개월, 신규 주문 감지)
-//      - 주문/품목주문/라인의 status·claim_* 등으로 취소·환불·반품 건 제외
 //      - 위 A에서 못 찾은 경우 보완
 //
 // 입력: { email: string }
@@ -2640,92 +1810,6 @@ function extractImwebList(body: Record<string, unknown>): Record<string, unknown
 // Rate Limit 방지: API 호출 간 딜레이 (1.5초)
 function imwebDelay(ms = 1500): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/** 아임웹 상태 문자열이 취소·환불·반품·클레임 완료 등인지 (한·영, 부분 문자열) */
-function imwebStatusIndicatesCancelledOrRefunded(value: unknown): boolean {
-  if (value === null || value === undefined) return false;
-  const s = String(value).trim();
-  if (!s) return false;
-  const lower = s.toLowerCase();
-  const asciiBad = [
-    "cancel",
-    "refund",
-    "return",
-    "exchange",
-    "void",
-    "reject",
-    "fail",
-  ];
-  for (const w of asciiBad) {
-    if (lower.includes(w)) return true;
-  }
-  const koBad = ["취소", "환불", "반품", "교환", "클레임", "부분취소", "부분환불"];
-  for (const w of koBad) {
-    if (s.includes(w)) return true;
-  }
-  return false;
-}
-
-/** 주문 목록 API 한 건이 통째로 취소/환불 등이면 동기화 대상에서 제외 */
-function shouldExcludeImwebOrderSummary(order: Record<string, unknown>): boolean {
-  if (imwebStatusIndicatesCancelledOrRefunded(order["order_status"])) return true;
-  if (imwebStatusIndicatesCancelledOrRefunded(order["status"])) return true;
-  if (imwebStatusIndicatesCancelledOrRefunded(order["payment_status"])) return true;
-  if (imwebStatusIndicatesCancelledOrRefunded(order["order_section_status"])) return true;
-  if (order["is_cancel"] === true || order["is_cancel"] === 1 || order["is_cancel"] === "Y") {
-    return true;
-  }
-  const cancelTs =
-    order["cancel_date"] ??
-    order["canceled_at"] ??
-    order["refund_finish_date"] ??
-    order["cancel_finish_date"];
-  if (cancelTs !== null && cancelTs !== undefined && cancelTs !== "" && cancelTs !== 0) {
-    return true;
-  }
-  return false;
-}
-
-/** 품목 주문(prod-order) 단위가 취소/클레임이면 라인 전체 제외 */
-function imwebProdOrderExcluded(po: Record<string, unknown>): boolean {
-  for (const v of [
-    po["status"],
-    po["claim_status"],
-    po["claim_type"],
-    po["delivery_status"],
-  ]) {
-    if (imwebStatusIndicatesCancelledOrRefunded(v)) return true;
-  }
-  return false;
-}
-
-/** 주문 + 품목 라인: 취소/환불 등이면 전자책 동기화 제외 */
-function shouldExcludeImwebLineAfterProdOk(
-  order: Record<string, unknown>,
-  item: Record<string, unknown>
-): boolean {
-  if (shouldExcludeImwebOrderSummary(order)) return true;
-  for (const v of [
-    item["status"],
-    item["order_item_status"],
-    item["claim_status"],
-    item["claim_type"],
-  ]) {
-    if (imwebStatusIndicatesCancelledOrRefunded(v)) return true;
-  }
-  return false;
-}
-
-/** Firestore imweb_orders 문서가 취소/환불 건이면 동기화 제외 (CSV에 취소사유 등) */
-function imwebOrderFirestoreDocIndicatesCancelled(data: Record<string, unknown>): boolean {
-  const reason =
-    data["cancelReason"] ?? data["cancel_reason"] ?? data["취소사유"];
-  if (reason != null && String(reason).trim() !== "") return true;
-  if (data["isCancelled"] === true || data["is_cancelled"] === true) return true;
-  const st = data["orderStatus"] ?? data["order_status"];
-  if (st != null && imwebStatusIndicatesCancelledOrRefunded(st)) return true;
-  return false;
 }
 
 export const syncImwebPurchases = functions
@@ -2797,36 +1881,15 @@ export const syncImwebPurchases = functions
       for (const doc of ordersSnap.docs) {
         const orderData = doc.data();
 
-        if (imwebOrderFirestoreDocIndicatesCancelled(orderData as Record<string, unknown>)) {
-          functions.logger.info("imweb_orders: 취소/환불 건 스킵", { docId: doc.id });
-          continue;
-        }
-
         // linkedUid == null 인 것만 처리 (코드 레벨 필터)
         if (orderData.linkedUid !== null && orderData.linkedUid !== undefined) {
-          // 이미 다른 uid 와 연결된 주문인 경우
+          // 이미 다른 uid 와 연결된 주문은 스킵
           if (orderData.linkedUid !== uid) {
-            // 연결된 uid 가 실제 존재하는 계정인지 확인
-            const linkedUserDoc = await db
-              .collection("users")
-              .doc(orderData.linkedUid as string)
-              .get();
-
-            if (linkedUserDoc.exists) {
-              // 진짜 다른 사람의 주문 → 스킵 (기존 동작 유지)
-              functions.logger.info("타 uid 연결 주문 스킵", {
-                docId: doc.id,
-                linkedUid: orderData.linkedUid,
-              });
-              continue;
-            }
-
-            // 탈퇴·삭제된 유령 uid → 현재 유저로 재연결 처리 (스킵하지 않음)
-            functions.logger.info("유령 linkedUid 감지, 현재 유저로 재연결", {
+            functions.logger.info("타 uid 연결 주문 스킵", {
               docId: doc.id,
-              ghostUid: orderData.linkedUid,
-              newUid: uid,
+              linkedUid: orderData.linkedUid,
             });
+            continue;
           }
           // 이미 이 uid 와 연결됐으면 상품코드 처리는 하되 linkedUid 재설정 불필요
         }
@@ -2925,15 +1988,6 @@ export const syncImwebPurchases = functions
 
               // searchEmails 중 하나와 매칭
               if (ordererEmail && searchEmails.includes(ordererEmail)) {
-                const o = order as Record<string, unknown>;
-                if (shouldExcludeImwebOrderSummary(o)) {
-                  functions.logger.info("API: 주문 목록에서 제외(취소/환불)", {
-                    orderNo,
-                    order_status: o["order_status"],
-                    status: o["status"],
-                  });
-                  continue;
-                }
                 myOrders.push(order);
                 seenOrderNos.add(orderNo);
               }
@@ -2958,31 +2012,13 @@ export const syncImwebPurchases = functions
               { headers }
             );
             const prodOrderList = extractImwebList(prodRes.data);
-            const orderRec = order as Record<string, unknown>;
 
             for (const prodOrder of prodOrderList) {
-              const po = prodOrder as Record<string, unknown>;
-              if (imwebProdOrderExcluded(po)) {
-                functions.logger.info("API: prod-order 제외", {
-                  orderNo,
-                  status: po["status"],
-                  claim_status: po["claim_status"],
-                });
-                continue;
-              }
               const items = prodOrder["items"];
               if (!Array.isArray(items)) continue;
 
               for (const item of items) {
                 const itemObj = item as Record<string, unknown>;
-                if (shouldExcludeImwebLineAfterProdOk(orderRec, itemObj)) {
-                  functions.logger.info("API: 품목 라인 제외", {
-                    orderNo,
-                    prodNo: itemObj["prod_no"],
-                    status: itemObj["status"],
-                  });
-                  continue;
-                }
                 const prodNo = String(itemObj["prod_no"] ?? "");
                 if (!prodNo || processedProductCodes.has(prodNo)) continue;
                 processedProductCodes.add(prodNo);
@@ -3042,16 +2078,15 @@ export const syncImwebPurchases = functions
 // 퀴즈 풀 자동 스케줄러
 //
 // 배포 규칙:
-//   1. 반드시 national_exam 1문제 + clinical 1문제 (quiz_pool.questionType 기준)
-//   2. 임상 쪽은 가능하면 국시와 다른 sourceBook 우선
-//   3. 임상만 2문제로 채우는 폴백 없음 — 한쪽 풀이 비면 스케줄 미생성
-//   4. 현재 사이클 usedQuizIds 에 이미 나간 문항 제외
-//   5. 2문제를 못 채우면 사이클 증가 후 1회 재시도, 그래도 불가면 중단
+//   1. 완전 랜덤 선정 (order 무관)
+//   2. 하루 2문제는 반드시 서로 다른 책(sourceBook)에서 1개씩
+//   3. 현재 사이클에서 이미 출제된 문제는 제외 (usedQuizIds)
+//   4. 각 책의 미출제 문제가 소진되면 → 사이클 증가, usedQuizIds 초기화
 //
 // Firestore 컬렉션:
 //   quiz_pool/{autoId}          — 원본 문제 은행
-//   quiz_schedule/{dateKey}     — 날짜별 배포 스냅샷 (items에 questionType 포함)
-//   quiz_meta/state             — 진행 상태 + 타입별 활성/배포 수
+//   quiz_schedule/{dateKey}     — 날짜별 배포 스케줄
+//   quiz_meta/state             — 진행 상태
 // ══════════════════════════════════════════════════════════════
 
 /** Fisher-Yates 셔플 */
@@ -3074,263 +2109,99 @@ function toDateKey(date: Date): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-/** 미설정 시 임상으로 간주 (기존 풀 호환) */
-function quizQuestionType(data: FirebaseFirestore.DocumentData): "national_exam" | "clinical" {
-  return data.questionType === "national_exam" ? "national_exam" : "clinical";
-}
-
-/** `config/quiz_content` — 임상·국시 풀 패킹 ID (공감투표와 무관) */
-const QUIZ_CONTENT_CONFIG_PATH = "config/quiz_content";
-
-interface QuizContentConfig {
-  currentClinicalPackId: string;
-  includeClinicalWithoutPack: boolean;
-  currentNationalPackId: string;
-  includeNationalWithoutPack: boolean;
-}
-
-async function loadQuizContentConfig(): Promise<QuizContentConfig> {
-  const snap = await db.doc(QUIZ_CONTENT_CONFIG_PATH).get();
-  const d = snap.exists ? snap.data()! : {};
-  return {
-    currentClinicalPackId: typeof d.currentClinicalPackId === "string"
-      ? d.currentClinicalPackId.trim()
-      : "",
-    includeClinicalWithoutPack: d.includeClinicalWithoutPack === true,
-    currentNationalPackId: typeof d.currentNationalPackId === "string"
-      ? d.currentNationalPackId.trim()
-      : "",
-    includeNationalWithoutPack: d.includeNationalWithoutPack === true,
-  };
-}
-
 /**
- * 임상 후보 필터
- * - currentClinicalPackId 비어 있음: 임상 전부 후보 (기존 동작)
- * - 비어 있지 않음: 해당 packId 이거나, packId 없음+includeClinicalWithoutPack
+ * 핵심 선정 로직:
+ * quiz_pool에서 오늘의 2문제를 선정한다.
+ *   - 각기 다른 책(sourceBook)에서 1문제씩
+ *   - 현재 사이클 내에서 이미 출제된 문제(usedQuizIds) 제외
+ *   - 미출제 문제 중 완전 랜덤 선택
+ *   - 어느 책이든 미출제 문제가 없으면 사이클 증가 후 풀 전체 재사용
  */
-function clinicalMatchesContentPack(
-  data: FirebaseFirestore.DocumentData,
-  cfg: QuizContentConfig,
-): boolean {
-  if (quizQuestionType(data) !== "clinical") return true;
-  if (!cfg.currentClinicalPackId) return true;
-  const pid = typeof data.packId === "string" ? data.packId.trim() : "";
-  if (!pid) return cfg.includeClinicalWithoutPack;
-  return pid === cfg.currentClinicalPackId;
-}
-
-/**
- * 국시 후보 필터 (임상과 동일 패턴)
- * - currentNationalPackId 비어 있음: 국시 전부 후보 (기존 동작)
- * - 비어 있지 않음: 해당 packId 이거나, packId 없음+includeNationalWithoutPack
- */
-function nationalMatchesContentPack(
-  data: FirebaseFirestore.DocumentData,
-  cfg: QuizContentConfig,
-): boolean {
-  if (quizQuestionType(data) !== "national_exam") return true;
-  if (!cfg.currentNationalPackId) return true;
-  const pid = typeof data.packId === "string" ? data.packId.trim() : "";
-  if (!pid) return cfg.includeNationalWithoutPack;
-  return pid === cfg.currentNationalPackId;
-}
-
-function poolDocMatchesContentPacks(
-  data: FirebaseFirestore.DocumentData,
-  cfg: QuizContentConfig,
-): boolean {
-  return clinicalMatchesContentPack(data, cfg) && nationalMatchesContentPack(data, cfg);
-}
-
-/** 활성 quiz_pool 전체를 타입·packId 기준으로 집계 (운영 허브용, 읽기 전용 스냅샷) */
-function computeQuizPoolPackBreakdown(
-  poolSnap: FirebaseFirestore.QuerySnapshot,
-): {
-  activeTotal: number;
-  nationalExam: {withoutPackId: number; byPack: {packId: string; count: number}[]};
-  clinical: {withoutPackId: number; byPack: {packId: string; count: number}[]};
-} {
-  const natMap = new Map<string, number>();
-  const clinMap = new Map<string, number>();
-  let natLoose = 0;
-  let clinLoose = 0;
-  for (const doc of poolSnap.docs) {
-    const d = doc.data();
-    const t = quizQuestionType(d);
-    const pid = typeof d.packId === "string" ? d.packId.trim() : "";
-    if (t === "national_exam") {
-      if (!pid) natLoose++;
-      else natMap.set(pid, (natMap.get(pid) ?? 0) + 1);
-    } else {
-      if (!pid) clinLoose++;
-      else clinMap.set(pid, (clinMap.get(pid) ?? 0) + 1);
-    }
-  }
-  const toSorted = (m: Map<string, number>) =>
-    [...m.entries()]
-      .map(([packId, count]) => ({packId, count}))
-      .sort((a, b) => b.count - a.count);
-  return {
-    activeTotal: poolSnap.size,
-    nationalExam: {withoutPackId: natLoose, byPack: toSorted(natMap)},
-    clinical: {withoutPackId: clinLoose, byPack: toSorted(clinMap)},
-  };
-}
-
-/** 대시보드용: 스케줄 후보(패크 필터 적용) 기준 타입별 개수 + 이번 사이클 배포 수 */
-function computeQuizMetaAnalytics(
-  poolSnap: FirebaseFirestore.QuerySnapshot,
-  usedQuizIds: string[],
-  contentCfg: QuizContentConfig,
-): {
-  totalActiveCount: number;
-  totalNationalActiveCount: number;
-  totalClinicalActiveCount: number;
-  usedNationalCount: number;
-  usedClinicalCount: number;
-} {
-  const used = new Set(usedQuizIds);
-  let totalNational = 0;
-  let totalClinical = 0;
-  let usedNational = 0;
-  let usedClinical = 0;
-  for (const doc of poolSnap.docs) {
-    if (!poolDocMatchesContentPacks(doc.data(), contentCfg)) continue;
-    const t = quizQuestionType(doc.data());
-    if (t === "national_exam") {
-      totalNational++;
-      if (used.has(doc.id)) usedNational++;
-    } else {
-      totalClinical++;
-      if (used.has(doc.id)) usedClinical++;
-    }
-  }
-  return {
-    totalActiveCount: totalNational + totalClinical,
-    totalNationalActiveCount: totalNational,
-    totalClinicalActiveCount: totalClinical,
-    usedNationalCount: usedNational,
-    usedClinicalCount: usedClinical,
-  };
-}
-
-/** 스케줄 문서 items[] 원소 — 앱은 questionType 필드로 배지 표시 */
-function buildScheduleItem(
-  d: FirebaseFirestore.QueryDocumentSnapshot,
-  nextCycleCount: number,
-): Record<string, unknown> {
-  const data = d.data();
-  const packVersion = typeof data.packVersion === "number" && Number.isFinite(data.packVersion)
-    ? data.packVersion
-    : 0;
-  return {
-    id: d.id,
-    order: data.order ?? 0,
-    question: data.question ?? "",
-    options: data.options ?? [],
-    correctIndex: data.correctIndex ?? 0,
-    explanation: data.explanation ?? "",
-    category: data.category ?? "",
-    difficulty: data.difficulty ?? "basic",
-    sourceBook: data.sourceBook ?? "",
-    sourceFileName: data.sourceFileName ?? "",
-    sourcePage: data.sourcePage ?? "",
-    sourceName: data.sourceName ?? "",
-    isActive: true,
-    lastCycleServed: nextCycleCount,
-    questionType: quizQuestionType(data),
-    packId: typeof data.packId === "string" ? data.packId : "",
-    packVersion,
-  };
-}
-
-/**
- * 오늘의 2문제 선정 — national_exam 1 + clinical 1 만 허용 (임상 2개 폴백 없음)
- */
-async function pickTodayQuizzes(
-  meta: FirebaseFirestore.DocumentData,
-  contentCfg: QuizContentConfig,
-): Promise<{
+async function pickTodayQuizzes(meta: FirebaseFirestore.DocumentData): Promise<{
   selectedDocs: FirebaseFirestore.QueryDocumentSnapshot[];
   nextCycleCount: number;
   nextUsedQuizIds: string[];
   wasReset: boolean;
 }> {
-  const usedQuizIds: string[] = meta.usedQuizIds ?? [];
-  const cycleCount = meta.cycleCount ?? 1;
+  const usedQuizIds: string[]   = meta.usedQuizIds   ?? [];
+  const cycleCount:  number     = meta.cycleCount     ?? 1;
+  const bookRotation: string[]  = meta.bookRotation   ?? [];
 
+  // ── 1. 전체 풀 조회 ──
   const poolSnap = await db
     .collection("quiz_pool")
     .where("isActive", "==", true)
     .get();
 
-  const allDocs = poolSnap.docs.filter((d) => poolDocMatchesContentPacks(d.data(), contentCfg));
+  const allDocs = poolSnap.docs;
 
-  const trySelect = (used: string[]): {
-    selected: FirebaseFirestore.QueryDocumentSnapshot[];
-    ok: boolean;
-  } => {
-    const national = shuffleArray(
-      allDocs.filter(
-        (d) =>
-          quizQuestionType(d.data()) === "national_exam" &&
-          !used.includes(d.id),
-      ),
-    );
-    const clinical = shuffleArray(
-      allDocs.filter(
-        (d) =>
-          quizQuestionType(d.data()) === "clinical" &&
-          !used.includes(d.id),
-      ),
-    );
+  // ── 2. 사용 가능한 책 목록 추출 ──
+  const bookSet = new Set(allDocs.map((d) => d.data().sourceBook as string));
+  const books   = bookRotation.filter((b) => bookSet.has(b));
+  // bookRotation에 없는 책도 포함
+  bookSet.forEach((b) => { if (!books.includes(b)) books.push(b); });
 
-    if (national.length >= 1 && clinical.length >= 1) {
-      const n = national[0];
-      const nBook = (n.data().sourceBook as string) || "";
-      const clinDiff = clinical.filter(
-        (d) => ((d.data().sourceBook as string) || "") !== nBook,
-      );
-      const pool = clinDiff.length ? clinDiff : clinical;
-      const c = pool[0];
-      return {selected: [n, c], ok: true};
+  // ── 3. 각 책에서 미출제 문제 그룹화 ──
+  const unusedByBook: Record<string, FirebaseFirestore.QueryDocumentSnapshot[]> = {};
+  for (const book of books) {
+    unusedByBook[book] = shuffleArray(
+      allDocs.filter(
+        (d) => d.data().sourceBook === book && !usedQuizIds.includes(d.id)
+      )
+    );
+  }
+
+  // ── 4. 서로 다른 책에서 1문제씩 선정 ──
+  //    books 중 미출제 문제가 있는 책 2개를 우선 선택 (셔플로 매일 다른 조합)
+  const shuffledBooks = shuffleArray(books);
+  const selected: FirebaseFirestore.QueryDocumentSnapshot[] = [];
+  const usedBooksToday: string[] = [];
+
+  for (const book of shuffledBooks) {
+    if (selected.length >= 2) break;
+    const candidates = unusedByBook[book];
+    if (candidates && candidates.length > 0) {
+      selected.push(candidates[0]);
+      usedBooksToday.push(book);
     }
+  }
 
-    return {selected: [], ok: false};
-  };
+  // ── 5. 사이클 소진 처리 ──
+  //    2문제를 채우지 못하면(어느 책이든 미출제 문제 없음) → 사이클 초기화
+  let wasReset     = false;
+  let nextCycle    = cycleCount;
+  let nextUsedIds  = [...usedQuizIds];
 
-  let wasReset = false;
-  let nextCycle = cycleCount;
-  let nextUsed = [...usedQuizIds];
-
-  let {selected, ok} = trySelect(nextUsed);
-
-  if (!ok || selected.length < 2) {
-    functions.logger.info("🔄 국시+임상 1+1 선정 불가 → 사이클 증가 및 usedQuizIds 초기화 후 재시도", {
+  if (selected.length < 2) {
+    functions.logger.info("🔄 풀 소진 → 사이클 증가 및 usedQuizIds 초기화", {
       cycleCount: cycleCount + 1,
     });
-    wasReset = true;
-    nextCycle = cycleCount + 1;
-    nextUsed = [];
-    ({selected, ok} = trySelect(nextUsed));
+    wasReset   = true;
+    nextCycle  = cycleCount + 1;
+    nextUsedIds = [];
+
+    // 초기화 후 재선정
+    const freshSelected: FirebaseFirestore.QueryDocumentSnapshot[] = [];
+    const freshShuffled = shuffleArray(books);
+    for (const book of freshShuffled) {
+      if (freshSelected.length >= 2) break;
+      const freshCandidates = shuffleArray(
+        allDocs.filter((d) => d.data().sourceBook === book)
+      );
+      if (freshCandidates.length > 0) {
+        freshSelected.push(freshCandidates[0]);
+      }
+    }
+    selected.splice(0, selected.length, ...freshSelected);
   }
 
-  if (!ok || selected.length < 2) {
-    return {
-      selectedDocs: selected,
-      nextCycleCount: nextCycle,
-      nextUsedQuizIds: nextUsed,
-      wasReset,
-    };
-  }
-
-  nextUsed = [...new Set([...nextUsed, ...selected.map((d) => d.id)])];
+  // 선정된 문제를 usedQuizIds에 추가
+  nextUsedIds = [...new Set([...nextUsedIds, ...selected.map((d) => d.id)])];
 
   return {
-    selectedDocs: selected,
-    nextCycleCount: nextCycle,
-    nextUsedQuizIds: nextUsed,
+    selectedDocs:    selected,
+    nextCycleCount:  nextCycle,
+    nextUsedQuizIds: nextUsedIds,
     wasReset,
   };
 }
@@ -3345,41 +2216,10 @@ export const scheduleQuizzes = functions
     const dateKey     = toDateKey(new Date());
     const scheduleRef = db.collection("quiz_schedule").doc(dateKey);
     const metaRef     = db.doc("quiz_meta/state");
-    const contentCfg  = await loadQuizContentConfig();
 
-    // ── 이미 생성됐으면 선정은 스킵하되, meta는 스케줄과 맞춤(usedQuizIds 누락 방지) ──
-    const scheduleSnapEarly = await scheduleRef.get();
-    if (scheduleSnapEarly.exists) {
-      const schedData = scheduleSnapEarly.data()!;
-      const todayQuizIds: string[] = Array.isArray(schedData.quizIds)
-        ? (schedData.quizIds as string[])
-        : [];
-      const scheduleCycle = typeof schedData.cycleCount === "number"
-        ? schedData.cycleCount
-        : 1;
-
-      const metaDocEarly = await metaRef.get();
-      const metaEarly = metaDocEarly.exists ? metaDocEarly.data()! : {};
-      const prevUsed: string[] = Array.isArray(metaEarly.usedQuizIds)
-        ? (metaEarly.usedQuizIds as string[])
-        : [];
-      const mergedUsed = [...new Set([...prevUsed, ...todayQuizIds])];
-
-      const poolSnapEarly = await db.collection("quiz_pool").where("isActive", "==", true).get();
-      const analyticsEarly = computeQuizMetaAnalytics(poolSnapEarly, mergedUsed, contentCfg);
-      await metaRef.set({
-        ...analyticsEarly,
-        lastScheduledDate: dateKey,
-        usedQuizIds: mergedUsed,
-        cycleCount: scheduleCycle,
-      }, { merge: true });
-      functions.logger.info("⏭️ 이미 스케줄 생성됨 — quiz_meta 동기화(usedQuizIds 병합)", {
-        dateKey,
-        totalActive: analyticsEarly.totalActiveCount,
-        todayIds: todayQuizIds.length,
-        mergedCount: mergedUsed.length,
-        scheduleCycle,
-      });
+    // ── 이미 생성됐으면 스킵 ──
+    if ((await scheduleRef.get()).exists) {
+      functions.logger.info("⏭️ 이미 스케줄 생성됨", { dateKey });
       return null;
     }
 
@@ -3390,33 +2230,38 @@ export const scheduleQuizzes = functions
 
     // ── 오늘의 문제 선정 ──
     const { selectedDocs, nextCycleCount, nextUsedQuizIds, wasReset } =
-      await pickTodayQuizzes(meta, contentCfg);
+      await pickTodayQuizzes(meta);
 
-    if (selectedDocs.length !== 2) {
-      functions.logger.warn(
-        "⚠️ 국시+임상 1+1 선정 실패 — 스케줄 미생성. 활성 풀·questionType·패크·usedQuizIds 확인",
-        { count: selectedDocs.length, dateKey },
-      );
-      return null;
-    }
-    const t0 = quizQuestionType(selectedDocs[0].data());
-    const t1 = quizQuestionType(selectedDocs[1].data());
-    if (t0 === t1) {
-      functions.logger.error("⚠️ 선정 결과 타입 중복 — 스케줄 미생성", { t0, t1, dateKey });
+    if (selectedDocs.length === 0) {
+      functions.logger.warn("⚠️ 선정된 문제 없음 — quiz_pool을 확인하세요");
       return null;
     }
 
     const quizIds = selectedDocs.map((d) => d.id);
-    const items = selectedDocs.map((d) => buildScheduleItem(d, nextCycleCount));
+    const items   = selectedDocs.map((d) => ({
+      id:             d.id,
+      order:          d.data().order          ?? 0,
+      question:       d.data().question       ?? "",
+      options:        d.data().options        ?? [],
+      correctIndex:   d.data().correctIndex   ?? 0,
+      explanation:    d.data().explanation    ?? "",
+      category:       d.data().category       ?? "",
+      difficulty:     d.data().difficulty     ?? "basic",
+      sourceBook:     d.data().sourceBook     ?? "",
+      sourceFileName: d.data().sourceFileName ?? "",
+      sourcePage:     d.data().sourcePage     ?? "",
+      isActive:       true,
+      lastCycleServed: nextCycleCount,
+    }));
 
     // ── quiz_schedule/{dateKey} 저장 ──
     await scheduleRef.set({
       quizIds,
       items,
-      cycleCount: nextCycleCount,
-      startOrder: selectedDocs[0].data().order ?? 0,
-      endOrder: selectedDocs[selectedDocs.length - 1].data().order ?? 0,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      cycleCount:  nextCycleCount,
+      startOrder:  items[0].order,
+      endOrder:    items[items.length - 1].order,
+      createdAt:   admin.firestore.FieldValue.serverTimestamp(),
     });
 
     // ── quiz_pool lastCycleServed 업데이트 ──
@@ -3430,28 +2275,25 @@ export const scheduleQuizzes = functions
     await batch.commit();
 
     // ── quiz_meta/state 업데이트 ──
-    const poolSnap = await db.collection("quiz_pool").where("isActive", "==", true).get();
-    const analytics = computeQuizMetaAnalytics(poolSnap, nextUsedQuizIds, contentCfg);
+    const poolSnap     = await db.collection("quiz_pool").where("isActive", "==", true).get();
+    const totalActive  = poolSnap.size;
 
     await metaRef.set({
-      cycleCount: nextCycleCount,
-      lastScheduledDate: dateKey,
+      cycleCount:         nextCycleCount,
+      totalActiveCount:   totalActive,
+      lastScheduledDate:  dateKey,
       dailyCount,
-      usedQuizIds: nextUsedQuizIds,
-      ...analytics,
+      usedQuizIds:        nextUsedQuizIds,
     }, { merge: true });
 
     functions.logger.info("✅ scheduleQuizzes 완료", {
       dateKey,
       quizIds,
       books: selectedDocs.map((d) => d.data().sourceBook),
-      questionTypes: selectedDocs.map((d) => quizQuestionType(d.data())),
       wasReset,
       cycleCount: nextCycleCount,
-      usedCount: nextUsedQuizIds.length,
-      clinicalPackId: contentCfg.currentClinicalPackId || "(전체 임상)",
-      nationalPackId: contentCfg.currentNationalPackId || "(전체 국시)",
-      ...analytics,
+      usedCount:  nextUsedQuizIds.length,
+      totalActive,
     });
 
     return null;
@@ -3492,38 +2334,38 @@ export const manualScheduleQuiz = functions
     const metaDoc  = await metaRef.get();
     const meta     = metaDoc.exists ? metaDoc.data()! : {};
     const dailyCount: number = meta.dailyCount ?? 2;
-    const contentCfg = await loadQuizContentConfig();
 
     const { selectedDocs, nextCycleCount, nextUsedQuizIds, wasReset } =
-      await pickTodayQuizzes(meta, contentCfg);
+      await pickTodayQuizzes(meta);
 
-    if (selectedDocs.length !== 2) {
-      return {
-        success: false,
-        message:
-          "국시·임상 각 1문항씩 선정할 수 없습니다. 활성 풀에 questionType(national_exam/clinical)과 " +
-          "미사용 문항이 충분한지, config/quiz_content 패크 필터를 확인하세요.",
-      };
-    }
-    const t0 = quizQuestionType(selectedDocs[0].data());
-    const t1 = quizQuestionType(selectedDocs[1].data());
-    if (t0 === t1) {
-      return {
-        success: false,
-        message: `선정 결과가 국시+임상 1+1이 아닙니다(동일 타입: ${t0}). quiz_pool을 확인하세요.`,
-      };
+    if (selectedDocs.length === 0) {
+      return { success: false, message: "quiz_pool에 활성화된 문제 없음" };
     }
 
     const quizIds = selectedDocs.map((d) => d.id);
-    const items = selectedDocs.map((d) => buildScheduleItem(d, nextCycleCount));
+    const items   = selectedDocs.map((d) => ({
+      id:             d.id,
+      order:          d.data().order          ?? 0,
+      question:       d.data().question       ?? "",
+      options:        d.data().options        ?? [],
+      correctIndex:   d.data().correctIndex   ?? 0,
+      explanation:    d.data().explanation    ?? "",
+      category:       d.data().category       ?? "",
+      difficulty:     d.data().difficulty     ?? "basic",
+      sourceBook:     d.data().sourceBook     ?? "",
+      sourceFileName: d.data().sourceFileName ?? "",
+      sourcePage:     d.data().sourcePage     ?? "",
+      isActive:       true,
+      lastCycleServed: nextCycleCount,
+    }));
 
     await scheduleRef.set({
       quizIds,
       items,
-      cycleCount: nextCycleCount,
-      startOrder: selectedDocs[0].data().order ?? 0,
-      endOrder: selectedDocs[selectedDocs.length - 1].data().order ?? 0,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      cycleCount:  nextCycleCount,
+      startOrder:  items[0].order,
+      endOrder:    items[items.length - 1].order,
+      createdAt:   admin.firestore.FieldValue.serverTimestamp(),
     });
 
     const batch = db.batch();
@@ -3535,2192 +2377,114 @@ export const manualScheduleQuiz = functions
     }
     await batch.commit();
 
-    const poolSnap = await db.collection("quiz_pool").where("isActive", "==", true).get();
-    const analytics = computeQuizMetaAnalytics(poolSnap, nextUsedQuizIds, contentCfg);
+    const poolSnap    = await db.collection("quiz_pool").where("isActive", "==", true).get();
+    const totalActive = poolSnap.size;
 
     await metaRef.set({
-      cycleCount: nextCycleCount,
+      cycleCount:        nextCycleCount,
+      totalActiveCount:  totalActive,
       lastScheduledDate: dateKey,
       dailyCount,
-      usedQuizIds: nextUsedQuizIds,
-      ...analytics,
+      usedQuizIds:       nextUsedQuizIds,
     }, { merge: true });
 
     return {
       success: true,
       dateKey,
       quizIds,
-      books: selectedDocs.map((d) => d.data().sourceBook),
-      questionTypes: selectedDocs.map((d) => quizQuestionType(d.data())),
+      books:   selectedDocs.map((d) => d.data().sourceBook),
       wasReset,
       message: `${dateKey} 스케줄 생성 완료 (${quizIds.length}문제, ${wasReset ? "사이클 초기화" : "정상"})`,
     };
   });
 
-function scheduleItemQuestionType(it: Record<string, unknown>): "national_exam" | "clinical" {
-  return it.questionType === "national_exam" ? "national_exam" : "clinical";
-}
-
-function orderBoundsFromItems(items: Record<string, unknown>[]): { startOrder: number; endOrder: number } {
-  if (items.length === 0) return { startOrder: 0, endOrder: 0 };
-  const orders = items.map((it) =>
-    typeof it.order === "number" && Number.isFinite(it.order) ? it.order : 0,
-  );
-  return { startOrder: Math.min(...orders), endOrder: Math.max(...orders) };
-}
-
-function findFirstScheduleSlotIndex(
-  items: Record<string, unknown>[],
-  slotType: "national_exam" | "clinical",
-): number {
-  return items.findIndex((it) => scheduleItemQuestionType(it) === slotType);
-}
-
-/** 스케줄 슬롯 1개 교체용: 패크 필터·타입·excludeIds·(가능하면) 다른 책 우선 */
-async function pickSingleScheduleReplacement(
-  slotType: "national_exam" | "clinical",
-  excludeIds: string[],
-  preferDifferentBookThan: string,
-  contentCfg: QuizContentConfig,
-): Promise<FirebaseFirestore.QueryDocumentSnapshot | null> {
-  const poolSnap = await db.collection("quiz_pool").where("isActive", "==", true).get();
-  const allDocs = poolSnap.docs.filter((d) => poolDocMatchesContentPacks(d.data(), contentCfg));
-  let candidates = allDocs.filter(
-    (d) => quizQuestionType(d.data()) === slotType && !excludeIds.includes(d.id),
-  );
-  const otherBook = (preferDifferentBookThan || "").trim();
-  if (otherBook) {
-    const diffBook = candidates.filter(
-      (d) => ((d.data().sourceBook as string) || "") !== otherBook,
-    );
-    if (diffBook.length) candidates = diffBook;
-  }
-  const shuffled = shuffleArray(candidates);
-  return shuffled[0] ?? null;
-}
-
-/** getContentOpsHub: 오늘 스케줄 기준 교체 후보 1문항씩(읽기 전용, 스케줄 미변경) */
-async function computeTodaySlotNextPreviewsForHub(
-  schedData: FirebaseFirestore.DocumentData,
-  contentCfg: QuizContentConfig,
-): Promise<{
-  national: Record<string, unknown> | null;
-  clinical: Record<string, unknown> | null;
-}> {
-  const rawItems = schedData.items;
-  if (!Array.isArray(rawItems)) {
-    return { national: null, clinical: null };
-  }
-  const items: Record<string, unknown>[] = rawItems.map((it) => {
-    if (typeof it === "object" && it !== null && !Array.isArray(it)) {
-      return { ...(it as Record<string, unknown>) };
-    }
-    return {};
-  });
-  const excludeIds = items.map((it) => String(it.id ?? "")).filter((id) => id.length > 0);
-  const natItem = items.find((it) => scheduleItemQuestionType(it) === "national_exam");
-  const clinItem = items.find((it) => scheduleItemQuestionType(it) === "clinical");
-  const clinBook = clinItem ? String(clinItem.sourceBook ?? "") : "";
-  const natBook = natItem ? String(natItem.sourceBook ?? "") : "";
-
-  const [natDoc, clinDoc] = await Promise.all([
-    pickSingleScheduleReplacement("national_exam", excludeIds, clinBook, contentCfg),
-    pickSingleScheduleReplacement("clinical", excludeIds, natBook, contentCfg),
-  ]);
-
-  const toPreview = (
-    d: FirebaseFirestore.QueryDocumentSnapshot | null,
-    qt: string,
-  ): Record<string, unknown> | null => {
-    if (!d) return null;
-    const data = d.data();
-    const q = String(data.question ?? "");
-    return {
-      id: d.id,
-      questionType: qt,
-      questionPreview: q.length > 220 ? `${q.slice(0, 220)}…` : q,
-      sourceBook: String(data.sourceBook ?? ""),
-      sourceFileName: String(data.sourceFileName ?? ""),
-      packId: typeof data.packId === "string" ? data.packId : "",
-    };
-  };
-
-  return {
-    national: toPreview(natDoc, "national_exam"),
-    clinical: toPreview(clinDoc, "clinical"),
-  };
-}
-
-/**
- * 어드민: 특정 날짜 quiz_schedule 에서 국시/임상 "첫 슬롯"만 제거 또는 교체.
- * remove: quiz_pool 원본 삭제 + 같은 타입 다음 문항으로 교체 (후보 없으면 슬롯 비움)
- * replace: quiz_pool 원본 유지 + 다른 문항으로 교체
- * quiz_meta · 사용자 기록은 수정하지 않음.
- */
-export const adminMutateQuizScheduleSlot = functions
+// ─────────────────────────────────────────────────────────
+// [일회성] 빈 이력서 일괄 정리 — 작업 완료 후 삭제할 것
+//   호출:  https://us-central1-<projectId>.cloudfunctions.net/devCleanupEmptyResumes?secret=cleanup_resumes_2026
+//   동작:  사용자별로 가장 최근 빈 이력서 1개만 남기고 나머지 빈 이력서는 모두 삭제
+//   판정:  profile.name/summary 비어 있고 licenses/experiences/skills/education/trainings/attachments 모두 비어 있음
+// ─────────────────────────────────────────────────────────
+export const devCleanupEmptyResumes = functions
   .region("us-central1")
-  .https.onCall(async (data, context) => {
-    if (!context.auth) {
-      throw new functions.https.HttpsError("unauthenticated", "로그인 필요");
-    }
-    const callerDoc = await db.collection("users").doc(context.auth.uid).get();
-    if (callerDoc.data()?.isAdmin !== true) {
-      throw new functions.https.HttpsError("permission-denied", "어드민 권한 필요");
-    }
-
-    const { dateKey: rawDate, action, slotType } = data as {
-      dateKey?: string;
-      action?: string;
-      slotType?: string;
-    };
-
-    if (action !== "remove" && action !== "replace") {
-      throw new functions.https.HttpsError(
-        "invalid-argument",
-        "action은 remove 또는 replace 여야 합니다.",
-      );
-    }
-    if (slotType !== "national_exam" && slotType !== "clinical") {
-      throw new functions.https.HttpsError(
-        "invalid-argument",
-        "slotType은 national_exam 또는 clinical 이어야 합니다.",
-      );
-    }
-
-    const dateKey = (rawDate && String(rawDate).trim()) || toDateKey(new Date());
-    const scheduleRef = db.collection("quiz_schedule").doc(dateKey);
-    const snap = await scheduleRef.get();
-    if (!snap.exists) {
-      return { success: false, message: `${dateKey} 스케줄이 없습니다.` };
-    }
-
-    const sched = snap.data()!;
-    const rawItems = sched.items;
-    if (!Array.isArray(rawItems)) {
-      return { success: false, message: "스케줄 items 형식이 올바르지 않습니다." };
-    }
-
-    const items: Record<string, unknown>[] = rawItems.map((it) => {
-      if (typeof it === "object" && it !== null && !Array.isArray(it)) {
-        return { ...(it as Record<string, unknown>) };
-      }
-      return {};
-    });
-
-    const st = slotType as "national_exam" | "clinical";
-    const idx = findFirstScheduleSlotIndex(items, st);
-    if (idx < 0) {
-      return { success: false, message: `${slotType} 슬롯을 찾을 수 없습니다.` };
-    }
-
-    const cycleCount = typeof sched.cycleCount === "number" && Number.isFinite(sched.cycleCount)
-      ? sched.cycleCount
-      : 1;
-    const contentCfg = await loadQuizContentConfig();
-
-    if (action === "remove") {
-      const removedItem = items[idx];
-      const removedPoolId = typeof removedItem.id === "string" ? removedItem.id : "";
-
-      items.splice(idx, 1);
-      const excludeIds = items
-        .map((it) => String(it.id ?? ""))
-        .filter((id) => id.length > 0);
-      if (removedPoolId) excludeIds.push(removedPoolId);
-
-      let preferBook = "";
-      for (const it of items) {
-        if (scheduleItemQuestionType(it) !== st) {
-          preferBook = String(it.sourceBook ?? "");
-          break;
-        }
-      }
-
-      const newDoc = await pickSingleScheduleReplacement(st, excludeIds, preferBook, contentCfg);
-      if (newDoc) {
-        const built = buildScheduleItem(newDoc, cycleCount);
-        items.splice(idx, 0, built);
-      }
-
-      const quizIds = items.map((it) => String(it.id ?? "")).filter((id) => id.length > 0);
-      const bounds = orderBoundsFromItems(items);
-      await scheduleRef.update({
-        items,
-        quizIds,
-        startOrder: bounds.startOrder,
-        endOrder: bounds.endOrder,
-      });
-
-      // quiz_pool 원본 삭제
-      if (removedPoolId) {
-        await db.collection("quiz_pool").doc(removedPoolId).delete();
-      }
-
-      return {
-        success: true,
-        dateKey,
-        action: "remove",
-        slotType,
-        quizIds,
-        deletedPoolId: removedPoolId || null,
-        newQuizId: newDoc ? newDoc.id : null,
-        message: newDoc
-          ? `문항 ${removedPoolId} 를 풀에서 삭제하고, 다음 문항 ${newDoc.id} 로 교체했습니다.`
-          : `문항 ${removedPoolId} 를 풀에서 삭제했습니다. 교체할 후보가 없어 슬롯은 비어 있습니다.`,
-      };
-    }
-
-    const [removed] = items.splice(idx, 1);
-    const excludeIds = items
-      .map((it) => String(it.id ?? ""))
-      .filter((id) => id.length > 0);
-
-    let preferBook = "";
-    for (const it of items) {
-      if (scheduleItemQuestionType(it) !== st) {
-        preferBook = String(it.sourceBook ?? "");
-        break;
-      }
-    }
-
-    const newDoc = await pickSingleScheduleReplacement(st, excludeIds, preferBook, contentCfg);
-    if (!newDoc) {
-      items.splice(idx, 0, removed);
-      return {
-        success: false,
-        message:
-          "교체할 문항이 없습니다. 활성 풀·콘텐츠 패크·이미 스케줄에 있는 ID 제외 조건을 확인하세요.",
-      };
-    }
-
-    const built = buildScheduleItem(newDoc, cycleCount);
-    items.splice(idx, 0, built);
-    const quizIds = items.map((it) => String(it.id ?? "")).filter((id) => id.length > 0);
-    const bounds = orderBoundsFromItems(items);
-
-    await scheduleRef.update({
-      items,
-      quizIds,
-      startOrder: bounds.startOrder,
-      endOrder: bounds.endOrder,
-    });
-
-    return {
-      success: true,
-      dateKey,
-      action: "replace",
-      slotType,
-      quizIds,
-      newQuizId: newDoc.id,
-      message: "해당 슬롯을 다른 문항으로 교체했습니다.",
-    };
-  });
-
-/**
- * 다음 일일 스케줄에 들어갈 문항 선정 시뮬 (읽기 전용)
- *
- * - `pickTodayQuizzes` 와 동일 알고리즘·셔플을 사용하나 Firestore 에 기록하지 않음
- * - 셔플 때문에 호출마다 결과가 달라질 수 있음 (실제 자정 배치와도 다를 수 있음)
- */
-export const previewNextQuizSelection = functions
-  .region("us-central1")
-  .https.onCall(async (_data, context) => {
-    if (!context.auth) {
-      throw new functions.https.HttpsError("unauthenticated", "로그인 필요");
-    }
-    const callerDoc = await db.collection("users").doc(context.auth.uid).get();
-    if (callerDoc.data()?.isAdmin !== true) {
-      throw new functions.https.HttpsError("permission-denied", "어드민 권한 필요");
-    }
-
-    const metaRef = db.doc("quiz_meta/state");
-    const metaDoc = await metaRef.get();
-    const meta = metaDoc.exists ? metaDoc.data()! : {};
-    const contentCfg = await loadQuizContentConfig();
-
-    const {selectedDocs, nextCycleCount, nextUsedQuizIds, wasReset} =
-      await pickTodayQuizzes(meta, contentCfg);
-
-    const trimPreview = (q: unknown, max: number): string => {
-      const s = typeof q === "string" ? q.trim() : "";
-      if (s.length <= max) return s;
-      return `${s.slice(0, max)}…`;
-    };
-
-    if (selectedDocs.length !== 2) {
-      return {
-        success: false,
-        readOnly: true,
-        message:
-          "국시+임상 1+1을 구성할 수 없습니다. 활성 풀·questionType·미사용(usedQuizIds)·패크 설정을 확인하세요.",
-      };
-    }
-
-    const items = selectedDocs.map((d) => {
-      const row = d.data();
-      return {
-        id: d.id,
-        questionType: quizQuestionType(row),
-        questionPreview: trimPreview(row.question, 140),
-        sourceBook: (row.sourceBook as string) || "",
-        packId: typeof row.packId === "string" ? row.packId : "",
-        sourceFileName: typeof row.sourceFileName === "string" ? row.sourceFileName : "",
-      };
-    });
-
-    return {
-      success: true,
-      readOnly: true,
-      disclaimer:
-        "자정 스케줄러와 같은 선정 로직이지만 셔플이 들어가 호출할 때마다 결과가 달라질 수 있습니다. 스케줄·메타·풀 문서는 변경하지 않습니다.",
-      wasReset,
-      cycleCountUsed: nextCycleCount,
-      hypotheticalUsedQuizIdsCount: nextUsedQuizIds.length,
-      contentConfig: contentCfg,
-      items,
-    };
-  });
-
-/**
- * quiz_meta/state 의 usedQuizIds·lastScheduledDate 를
- * 현재 사이클의 quiz_schedule 문서들과 다시 맞춤 (대시보드 불일치 보정).
- */
-export const rebuildQuizMetaFromSchedules = functions
-  .region("us-central1")
-  .https.onCall(async (data, context) => {
-    if (!context.auth) {
-      throw new functions.https.HttpsError("unauthenticated", "로그인 필요");
-    }
-    const callerDoc = await db.collection("users").doc(context.auth.uid).get();
-    if (callerDoc.data()?.isAdmin !== true) {
-      throw new functions.https.HttpsError("permission-denied", "어드민 권한 필요");
-    }
-
-    const metaRef = db.doc("quiz_meta/state");
-    const metaDoc = await metaRef.get();
-    const meta = metaDoc.exists ? metaDoc.data()! : {};
-    const cycleCount: number = (meta.cycleCount as number) ?? 1;
-
-    const schedSnap = await db.collection("quiz_schedule").get();
-    const idSet = new Set<string>();
-    let maxDateKey = "";
-
-    for (const doc of schedSnap.docs) {
-      const d = doc.data();
-      const c = (d.cycleCount as number) ?? 1;
-      if (c !== cycleCount) continue;
-
-      const ids = (d.quizIds as string[]) || [];
-      ids.forEach((id) => {
-        if (typeof id === "string" && id.length) idSet.add(id);
-      });
-
-      const key = doc.id;
-      if (/^\d{4}-\d{2}-\d{2}$/.test(key) && key > maxDateKey) {
-        maxDateKey = key;
-      }
-    }
-
-    const usedQuizIds = Array.from(idSet);
-    const contentCfg = await loadQuizContentConfig();
-    const poolSnap = await db.collection("quiz_pool").where("isActive", "==", true).get();
-    const analytics = computeQuizMetaAnalytics(poolSnap, usedQuizIds, contentCfg);
-
-    await metaRef.set({
-      usedQuizIds,
-      lastScheduledDate: maxDateKey || (meta.lastScheduledDate as string) || "",
-      ...analytics,
-    }, { merge: true });
-
-    return {
-      success: true,
-      cycleCount,
-      usedCount: usedQuizIds.length,
-      lastScheduledDate: maxDateKey || (meta.lastScheduledDate as string) || "",
-      ...analytics,
-      message: `사이클 ${cycleCount}: 스케줄에서 고유 문항 ${usedQuizIds.length}개로 동기화`,
-    };
-  });
-
-/**
- * 콘텐츠 운영 허브용 읽기 전용 스냅샷 (어드민)
- * - polls: displayOrder 오름차순
- * - quiz: config/quiz_content + quiz_meta/state + 최근 N일 quiz_schedule 요약
- */
-export const getContentOpsHub = functions
-  .region("us-central1")
-  .https.onCall(async (data, context) => {
-    if (!context.auth) {
-      throw new functions.https.HttpsError("unauthenticated", "로그인 필요");
-    }
-    const callerDoc = await db.collection("users").doc(context.auth.uid).get();
-    if (callerDoc.data()?.isAdmin !== true) {
-      throw new functions.https.HttpsError("permission-denied", "어드민 권한 필요");
-    }
-
-    const raw = data as { schedulePreviewDays?: number } | undefined;
-    const n = raw?.schedulePreviewDays;
-    const schedulePreviewDays =
-      typeof n === "number" && Number.isFinite(n) && n > 0 && n <= 60 ?
-        Math.floor(n) :
-        14;
-
-    const contentCfg = await loadQuizContentConfig();
-
-    const metaSnap = await db.doc("quiz_meta/state").get();
-    const meta = metaSnap.exists ? metaSnap.data()! : {};
-    const usedQuizIds: string[] = Array.isArray(meta.usedQuizIds) ?
-      (meta.usedQuizIds as string[]) :
-      [];
-
-    const metaSummary = {
-      cycleCount: (meta.cycleCount as number) ?? 1,
-      lastScheduledDate: (meta.lastScheduledDate as string) ?? "",
-      dailyCount: (meta.dailyCount as number) ?? 2,
-      usedQuizIdsCount: usedQuizIds.length,
-      usedQuizIdsSample: usedQuizIds.slice(0, 40),
-      totalActiveCount: (meta.totalActiveCount as number) ?? 0,
-      totalNationalActiveCount: (meta.totalNationalActiveCount as number) ?? 0,
-      totalClinicalActiveCount: (meta.totalClinicalActiveCount as number) ?? 0,
-      usedNationalCount: (meta.usedNationalCount as number) ?? 0,
-      usedClinicalCount: (meta.usedClinicalCount as number) ?? 0,
-    };
-
-    const pollsSnap = await db.collection("polls").get();
-    const pollRows = pollsSnap.docs.map((doc) => {
-      const d = doc.data();
-      let displayOrder: number;
-      if (typeof d.displayOrder === "number" && Number.isFinite(d.displayOrder)) {
-        displayOrder = d.displayOrder;
-      } else if (typeof d.dayIndex === "number" && Number.isFinite(d.dayIndex)) {
-        displayOrder = d.dayIndex;
-      } else {
-        const m = /^empathy_(\d+)$/.exec(doc.id);
-        displayOrder = m ? parseInt(m[1], 10) : 1_000_000;
-      }
-      const ts = (v: unknown): string | null => {
-        if (v && typeof (v as admin.firestore.Timestamp).toDate === "function") {
-          return (v as admin.firestore.Timestamp).toDate().toISOString();
-        }
-        return null;
-      };
-      return {
-        id: doc.id,
-        displayOrder,
-        question: (d.question as string) ?? "",
-        status: (d.status as string) ?? "",
-        category: (d.category as string) ?? "",
-        startsAt: ts(d.startsAt),
-        endsAt: ts(d.endsAt),
-        closedAt: ts(d.closedAt),
-        dayIndex: d.dayIndex ?? null,
-        totalEmpathyCount: typeof d.totalEmpathyCount === "number" ? d.totalEmpathyCount : 0,
-      };
-    });
-    pollRows.sort((a, b) => {
-      if (a.displayOrder !== b.displayOrder) return a.displayOrder - b.displayOrder;
-      return a.id.localeCompare(b.id);
-    });
-
-    const nowMs = Date.now();
-    const notYetStarted = pollRows.filter((p) => {
-      if (!p.startsAt) return false;
-      const t = Date.parse(p.startsAt);
-      return !Number.isNaN(t) && t > nowMs;
-    });
-    notYetStarted.sort((a, b) => {
-      if (a.displayOrder !== b.displayOrder) return a.displayOrder - b.displayOrder;
-      return a.id.localeCompare(b.id);
-    });
-    const pollNextPreview = notYetStarted[0] ?? null;
-
-    const poolSnapHub = await db.collection("quiz_pool").where("isActive", "==", true).get();
-    const quizPoolPackBreakdown = computeQuizPoolPackBreakdown(poolSnapHub);
-
-    const scheduleKeys: string[] = [];
-    for (let i = 0; i < schedulePreviewDays; i++) {
-      scheduleKeys.push(toDateKey(new Date(Date.now() - i * 86400000)));
-    }
-
-    const schedSnaps = await Promise.all(
-      scheduleKeys.map((k) => db.collection("quiz_schedule").doc(k).get()),
-    );
-
-    const schedules = schedSnaps.map((sdoc, i) => {
-      const k = scheduleKeys[i];
-      if (!sdoc.exists) {
-        return { dateKey: k, exists: false };
-      }
-      const sd = sdoc.data()!;
-      const items = (sd.items as unknown[]) || [];
-      const quizIds = (sd.quizIds as string[]) || [];
-      return {
-        dateKey: k,
-        exists: true,
-        cycleCount: (sd.cycleCount as number) ?? 1,
-        quizIds,
-        itemCount: items.length,
-        questionTypes: items.map((it) => {
-          const row = it as Record<string, unknown>;
-          return (row.questionType as string) || "clinical";
-        }),
-      };
-    });
-
-    let todaySlotNextPreviews: {
-      national: Record<string, unknown> | null;
-      clinical: Record<string, unknown> | null;
-    } = { national: null, clinical: null };
-    const todaySchedDoc = schedSnaps[0];
-    if (todaySchedDoc.exists) {
-      todaySlotNextPreviews = await computeTodaySlotNextPreviewsForHub(
-        todaySchedDoc.data()!,
-        contentCfg,
-      );
-    }
-
-    const pollOps = resolvePollOpsFromRows(
-      pollRows.map((r) => ({
-        id: r.id,
-        displayOrder: r.displayOrder,
-        question: r.question,
-        status: r.status,
-        startsAt: r.startsAt,
-        endsAt: r.endsAt,
-      })),
-      Date.now(),
-    );
-
-    return {
-      success: true,
-      generatedAt: new Date().toISOString(),
-      polls: pollRows,
-      pollNextPreview,
-      pollOps: {
-        ...pollOps,
-        totalPolls: pollRows.length,
-        closedPolls: pollRows.filter((p) => p.status === "closed").length,
-      },
-      quiz: {
-        contentConfig: contentCfg,
-        meta: metaSummary,
-        schedules,
-        poolPackBreakdown: quizPoolPackBreakdown,
-        todaySlotNextPreviews,
-      },
-    };
-  });
-
-// ─────────────────────────────────────────────────────────────
-// 심평원 보험인정기준 검색 프록시 (Callable)
-// ─────────────────────────────────────────────────────────────
-
-interface HiraSearchResult {
-  category: string;
-  reference: string;
-  title: string;
-  link: string;
-  date: string;
-  views: number;
-}
-
-// tabGbn 코드 → 탭 이름 폴백 (HTML span에 없을 때만)
-const HIRA_TAB_MAP: Record<string, string> = {
-  "01": "고시",
-  "02": "행정해석",
-  "09": "심사지침",
-  "10": "심의사례공개",
-  "17": "요양기관현지조사",
-  "18": "심사사례",
-};
-
-interface HiraTabEntry {
-  id: string;
-  label: string;
-  count: number;
-}
-
-/** 심평원 탭 스트립에서 id·표시명·건수 추출 (신규 탭 코드도 라벨 표시 가능) */
-function parseHiraTabList(html: string): HiraTabEntry[] {
-  const out: HiraTabEntry[] = [];
-  const tabRe = /goTabMove\('(\d+)'\)[^>]*><span>(.*?)<\/span><em>\((\d+)건\)<\/em>/g;
-  let tm;
-  while ((tm = tabRe.exec(html)) !== null) {
-    out.push({
-      id: tm[1],
-      label: tm[2].trim().replace(/\s+/g, " "),
-      count: parseInt(tm[3], 10),
-    });
-  }
-  return out;
-}
-
-function tabListToCounts(tabList: HiraTabEntry[]): Record<string, number> {
-  const tabCounts: Record<string, number> = {};
-  for (const t of tabList) {
-    tabCounts[t.label] = t.count;
-  }
-  return tabCounts;
-}
-
-function idToLabelMap(tabList: HiraTabEntry[]): Map<string, string> {
-  return new Map(tabList.map((t) => [t.id, t.label]));
-}
-
-function parseHiraRows(html: string, fallbackCategory = ""): HiraSearchResult[] {
-  const results: HiraSearchResult[] = [];
-  // viewInsuAdtCrtr(no, 'mtgHmeDd', 'sno', 'mtgMtrRegSno', 'RN')
-  const rowRe = /onclick="viewInsuAdtCrtr\(\s*\d+\s*,\s*'(\d+)'\s*,\s*'(\d+)'\s*,\s*'(\d+)'\s*,\s*'\d+'[^)]*\)[^"]*"[^>]*title="([^"]*)"[\s\S]*?<td class="col-date">([\d-]+)<\/td>[\s\S]*?<td class="col-views">([\d,]+)<\/td>/g;
-  let rm;
-  while ((rm = rowRe.exec(html)) !== null) {
-    const [, mtgHmeDd, sno, mtgMtrRegSno, titleRaw, date, viewsStr] = rm;
-    const title = titleRaw.replace(/\s*새창으로 열기\s*$/, "").trim();
-    const link =
-      "https://www.hira.or.kr/rc/insu/insuadtcrtr/InsuAdtCrtrPopup.do" +
-      `?mtgHmeDd=${mtgHmeDd}&sno=${sno}&mtgMtrRegSno=${mtgMtrRegSno}`;
-
-    // col-gubun 값 추출 시도
-    const categoryRe = new RegExp(
-      `<td class="col-gubun">(.*?)<\\/td>[\\s\\S]*?${mtgHmeDd}`
-    );
-    const catMatch = categoryRe.exec(html);
-    const category = catMatch ? catMatch[1].trim() : fallbackCategory;
-
-    // col-num2 (관련근거) 추출 시도
-    const refRe = new RegExp(
-      `<td class="col-gubun">.*?<\\/td>\\s*<td class="col-num2">(.*?)<\\/td>[\\s\\S]*?${mtgHmeDd}`
-    );
-    const refMatch = refRe.exec(html);
-    const reference = refMatch ? refMatch[1].trim() : "";
-
-    results.push({
-      category,
-      reference,
-      title,
-      link,
-      date,
-      views: parseInt(viewsStr.replace(/,/g, ""), 10),
-    });
-  }
-  return results;
-}
-
-
-async function fetchHiraTab(
-  keyword: string,
-  tabGbn: string,
-  pageIndex: number,
-  recordCountPerPage: number
-): Promise<string> {
-  const url =
-    "https://www.hira.or.kr/rc/insu/insuadtcrtr/InsuAdtCrtrList.do" +
-    "?pgmid=HIRAA030069000400";
-  const formData = new URLSearchParams({
-    pgmid: "HIRAA030069000400",
-    pageIndex: String(pageIndex),
-    tabGbn: tabGbn,
-    mtgHmeDd: "RN",
-    divRngCdSc: "",
-    sno: "",
-    mtgMtrRegSno: "",
-    seqListYn: "N",
-    seqList: "",
-    searchYn: "Y",
-    allViewYn: "",
-    decIteTpCd: tabGbn,
-    startDate: "",
-    endDate: "",
-    recordCountPerPage: String(recordCountPerPage),
-    searchKeyword: keyword,
-    startDt: "",
-    endDt: "",
-    searchCondition: "TXTALL",
-    searchWord: keyword,
-    searchKeyword2: "",
-  });
-  const resp = await axios.post(url, formData.toString(), {
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-    },
-    timeout: 30000,
-    responseType: "text",
-  });
-  return resp.data as string;
-}
-
-export const searchHiraInsurance = functions
-  .region("asia-northeast3")
-  .runWith({timeoutSeconds: 60, memory: "512MB"})
-  .https.onCall(
-  async (data: {
-    keyword: string;
-    page?: number;
-    tab?: string;
-    perPage?: number;
-  }) => {
-    const keyword = (data.keyword || "").trim();
-    if (!keyword || keyword.length < 2) {
-      throw new functions.https.HttpsError(
-        "invalid-argument",
-        "검색어는 2글자 이상이어야 합니다."
-      );
-    }
-
-    const pageIndex = data.page ?? 1;
-    const requestedTab = (data.tab ?? "all").trim();
-    const recordCountPerPage = Math.min(data.perPage ?? 20, 50);
-
-    try {
-      // 1단계: 탭01(고시)로 요청하여 탭 스트립(라벨·건수·id) 파악
-      const firstHtml = await fetchHiraTab(keyword, "01", 1, 5);
-      const tabList = parseHiraTabList(firstHtml);
-      const tabCounts = tabListToCounts(tabList);
-      const idLabel = idToLabelMap(tabList);
-      const totalAll = tabList.reduce((a, t) => a + t.count, 0);
-
-      // 특정 탭만 (고시 01 포함)
-      if (requestedTab !== "all") {
-        const tabHtml = await fetchHiraTab(
-          keyword,
-          requestedTab,
-          pageIndex,
-          recordCountPerPage
-        );
-        const catLabel =
-          idLabel.get(requestedTab) ??
-          HIRA_TAB_MAP[requestedTab] ??
-          requestedTab;
-        const rows = parseHiraRows(tabHtml, catLabel);
-        const thisCount =
-          tabList.find((t) => t.id === requestedTab)?.count ?? rows.length;
-        return {
-          success: true,
-          keyword,
-          totalAllCount: totalAll,
-          totalCount: thisCount,
-          page: pageIndex,
-          perPage: recordCountPerPage,
-          results: rows,
-          tabResults: { [requestedTab]: rows },
-          tabCounts,
-          tabs: tabList,
-        };
-      }
-
-      // 전체(all): 건수가 있는 탭들을 순회하여 결과 수집
-      const nonZeroTabs = tabList
-        .filter((t) => t.count > 0)
-        .map((t) => t.id);
-
-      if (nonZeroTabs.length === 0) {
-        return {
-          success: true,
-          keyword,
-          totalAllCount: 0,
-          totalCount: 0,
-          page: 1,
-          perPage: recordCountPerPage,
-          results: [],
-          tabCounts,
-          tabs: tabList,
-        };
-      }
-
-      const tabsToFetch = nonZeroTabs.slice(0, 3);
-      const tabHtmls = await Promise.all(
-        tabsToFetch.map((tabGbn) =>
-          fetchHiraTab(keyword, tabGbn, pageIndex, recordCountPerPage)
-        )
-      );
-
-      const allResults: HiraSearchResult[] = [];
-      const tabResults: Record<string, HiraSearchResult[]> = {};
-      for (let i = 0; i < tabsToFetch.length; i++) {
-        const tabGbn = tabsToFetch[i];
-        const categoryName =
-          idLabel.get(tabGbn) ?? HIRA_TAB_MAP[tabGbn] ?? tabGbn;
-        const rows = parseHiraRows(tabHtmls[i], categoryName);
-        allResults.push(...rows);
-        tabResults[tabGbn] = rows;
-      }
-
-      return {
-        success: true,
-        keyword,
-        totalAllCount: totalAll,
-        totalCount: totalAll,
-        page: pageIndex,
-        perPage: recordCountPerPage,
-        results: allResults,
-        tabResults,
-        tabCounts,
-        tabs: tabList,
-      };
-    } catch (err: any) {
-      console.error("searchHiraInsurance error:", err.message);
-      throw new functions.https.HttpsError(
-        "unavailable",
-        "심평원 서버 응답 오류. 잠시 후 다시 시도해주세요."
-      );
-    }
-  }
-);
-
-// ─────────────────────────────────────────────────────────────
-// 수가 조회 프록시 (data.go.kr 공공데이터 API)
-// ─────────────────────────────────────────────────────────────
-
-interface FeeScheduleItem {
-  code: string;
-  codeName: string;
-  category: string;
-  relativeValue: number;
-  unitPrice: number;
-  priceClinic: number;
-  priceHospital: number;
-  priceGeneral: number;
-  priceAdvanced: number;
-  payType: string;
-  startDate: string;
-  note: string;
-}
-
-export const searchFeeSchedule = functions
-  .region("asia-northeast3")
-  .runWith({timeoutSeconds: 30, memory: "256MB"})
-  .https.onCall(
-  async (data: {
-    keyword: string;
-    page?: number;
-    perPage?: number;
-  }) => {
-    const keyword = (data.keyword || "").trim();
-    if (!keyword) {
-      throw new functions.https.HttpsError(
-        "invalid-argument",
-        "검색어를 입력해 주세요."
-      );
-    }
-
-    const pageNo = data.page ?? 1;
-    const numOfRows = Math.min(data.perPage ?? 20, 50);
-
-    const apiKey = process.env.DATA_GO_KR_API_KEY;
-    if (!apiKey) {
-      throw new functions.https.HttpsError(
-        "failed-precondition",
-        "수가 조회 API 키가 설정되지 않았습니다."
-      );
-    }
-
-    const encoded = encodeURIComponent(keyword);
-    const isEngCode = /^[A-Za-z]\d/.test(keyword);
-    const isDivNo = /^[가-힣]/.test(keyword) && /\d/.test(keyword);
-
-    let searchParams = "";
-    if (isEngCode) {
-      searchParams = `&mdfeeCd=${encoded}`;
-    } else if (isDivNo) {
-      searchParams = `&mdfeeDivNo=${encoded}`;
-    } else {
-      searchParams = `&korNm=${encoded}`;
-    }
-
-    const apiUrl =
-      `https://apis.data.go.kr/B551182/mdfeeCrtrInfoService/getDiagnossMdfeeList` +
-      `?ServiceKey=${apiKey}` +
-      `&numOfRows=${numOfRows}&pageNo=${pageNo}` +
-      searchParams;
-
-    try {
-      const resp = await axios.get(apiUrl, {
-        timeout: 15000,
-      });
-
-      let parsed: any;
-      if (typeof resp.data === "string") {
-        if (resp.data.startsWith("<?xml")) {
-          parsed = await parseStringPromise(resp.data, {
-            explicitArray: false,
-            trim: true,
-          });
-        } else {
-          parsed = JSON.parse(resp.data);
-        }
-      } else {
-        parsed = resp.data;
-      }
-
-      const header = parsed?.response?.header;
-      if (header?.resultCode !== "00") {
-        console.error("API error:", header?.resultMsg);
-        throw new Error(header?.resultMsg || "API error");
-      }
-
-      const body = parsed?.response?.body;
-      if (!body) {
-        return {totalCount: 0, page: pageNo, perPage: numOfRows, items: []};
-      }
-
-      const totalCount = parseInt(body.totalCount || "0", 10);
-
-      let rawItems = body.items?.item;
-      if (!rawItems || (typeof rawItems === "string" && rawItems.trim() === "")) {
-        return {totalCount: 0, page: pageNo, perPage: numOfRows, items: []};
-      }
-
-      if (!Array.isArray(rawItems)) {
-        rawItems = [rawItems];
-      }
-
-      const items: FeeScheduleItem[] = rawItems.map((r: any) => {
-        const unprc2 = parseInt(r.unprc2 || "0", 10);
-        const unprc3 = parseInt(r.unprc3 || "0", 10);
-        const unprc4 = parseInt(r.unprc4 || "0", 10);
-        const unprc6 = parseInt(r.unprc6 || "0", 10);
-        const bestPrice = unprc2 || unprc3 || unprc4 || unprc6;
-
-        return {
-          code: r.mdfeeCd || "",
-          codeName: r.korNm || "",
-          category: r.mdfeeDivNo || "",
-          relativeValue: parseFloat(r.cvalPnt || "0"),
-          unitPrice: bestPrice,
-          priceClinic: unprc2,
-          priceHospital: unprc3,
-          priceGeneral: unprc4,
-          priceAdvanced: unprc6,
-          payType: r.payTpCd || "",
-          startDate: r.adtStaDd || "",
-          note: r.soprTpNm || "",
-        };
-      });
-
-      return {
-        totalCount,
-        page: pageNo,
-        perPage: numOfRows,
-        items,
-      };
-    } catch (err: any) {
-      console.error("searchFeeSchedule error:", err.message);
-      if (err.response?.data) {
-        console.error("API response:",
-          typeof err.response.data === "string"
-            ? err.response.data.substring(0, 500)
-            : JSON.stringify(err.response.data).substring(0, 500));
-      }
-      throw new functions.https.HttpsError(
-        "unavailable",
-        "수가 조회 서버 응답 오류. 잠시 후 다시 시도해주세요."
-      );
-    }
-  }
-);
-
-
-// ════════════════════════════════════════════════════════════════
-// 새 공고자 플로우 Callable (v2)
-// ════════════════════════════════════════════════════════════════
-
-/**
- * verifyBusinessLicense
- *
- * 1) 사업자등록증 이미지를 Gemini로 OCR
- * 2) clinic_profiles 에 OCR 결과·pending_auto 저장
- * 3) runCheckBusinessStatus — 국세청(Mock 가능) 검증 (별도 모듈)
- *
- * Input: { docUrl, profileId }
- * Output: { bizNo, clinicName, ownerName, address, openedAt, status, failReason?, checkMethod?, skipped? }
- */
-export const verifyBusinessLicense = functions
-  .runWith({
-    timeoutSeconds: 120,
-    memory: "512MB",
-    secrets: ["GEMINI_API_KEY", "NTS_SERVICE_KEY", HIRA_SERVICE_KEY],
-  })
-  .https.onCall(async (data, context) => {
-    if (!context.auth) {
-      throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
-    }
-    const uid = context.auth.uid;
-    const docUrl = String(data.docUrl ?? "").trim();
-    const profileId = String(data.profileId ?? "").trim();
-
-    if (!docUrl) {
-      throw new functions.https.HttpsError("invalid-argument", "등록증 이미지 URL이 없습니다.");
-    }
-    if (!profileId) {
-      throw new functions.https.HttpsError("invalid-argument", "profileId가 없습니다.");
-    }
-
-    const profileRef = db
-      .collection("clinics_accounts").doc(uid)
-      .collection("clinic_profiles").doc(profileId);
-    const profileDoc = await profileRef.get();
-    if (!profileDoc.exists) {
-      throw new functions.https.HttpsError("not-found", "치과 프로필을 찾을 수 없습니다.");
-    }
-
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new functions.https.HttpsError("internal", "AI API 키가 설정되지 않았습니다.");
-    }
-
-    functions.logger.info("verifyBusinessLicense", { uid, profileId, docUrl });
-
-    const bizPrompt = `아래 사업자등록증 이미지를 분석하여 반드시 아래 JSON 형식으로만 응답해줘.
-다른 텍스트 없이 순수 JSON만 반환해.
-필드가 파악되지 않으면 빈 문자열로 남겨. 절대 추측하지 말고 이미지에서 읽을 수 있는 정보만 추출해.
-
-{
-  "bizNo": "사업자등록번호 (예: 123-45-67890)",
-  "clinicName": "상호명",
-  "ownerName": "대표자명",
-  "address": "사업장 소재지",
-  "openedAt": "개업일 (예: 2020-01-15)"
-}`;
-
-    let extracted = { bizNo: "", clinicName: "", ownerName: "", address: "", openedAt: "" };
-
-    try {
-      const imgResp = await axios.get(docUrl, { responseType: "arraybuffer", timeout: 15000 });
-      const base64 = Buffer.from(imgResp.data).toString("base64");
-      const contentType = imgResp.headers["content-type"] || "image/jpeg";
-
-      const geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/" + GEMINI_MODEL + ":generateContent?key=" + apiKey;
-      const resp = await axios.post(geminiUrl, {
-        contents: [{
-          parts: [
-            { text: bizPrompt },
-            { inlineData: { mimeType: contentType, data: base64 } },
-          ],
-        }],
-        generationConfig: { responseMimeType: "application/json" },
-      }, { timeout: 45000 });
-
-      const text = resp.data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
-      const parsed = JSON.parse(text);
-      extracted = {
-        bizNo: parsed.bizNo ?? "",
-        clinicName: parsed.clinicName ?? "",
-        ownerName: parsed.ownerName ?? "",
-        address: parsed.address ?? "",
-        openedAt: parsed.openedAt ?? "",
-      };
-    } catch (e) {
-      functions.logger.error("Gemini OCR 실패", { error: String(e) });
-    }
-
-    const hasData = !!(extracted.bizNo || extracted.clinicName);
-
-    if (!hasData) {
-      await profileRef.update({
-        "businessVerification.status": "rejected",
-        "businessVerification.docUrl": docUrl,
-        "businessVerification.method": "gemini_v1",
-        "businessVerification.ocrResult": extracted,
-        "businessVerification.failReason": "ocr_failed",
-        "businessVerification.verifiedAt": null,
-        "bizRegImageUrl": docUrl,
-        "updatedAt": admin.firestore.FieldValue.serverTimestamp(),
-      });
-      return {
-        ...extracted,
-        status: "rejected",
-        failReason: "ocr_failed",
-      };
-    }
-
-    await profileRef.update({
-      ...(extracted.clinicName ? { clinicName: extracted.clinicName } : {}),
-      ...(extracted.ownerName ? { ownerName: extracted.ownerName } : {}),
-      ...(extracted.address ? { address: extracted.address } : {}),
-      "businessVerification.status": "pending_auto",
-      "businessVerification.bizNo": extracted.bizNo,
-      "businessVerification.docUrl": docUrl,
-      "businessVerification.method": "gemini_v1",
-      "businessVerification.ocrResult": extracted,
-      "businessVerification.failReason": admin.firestore.FieldValue.delete(),
-      "businessVerification.verifiedAt": null,
-      "bizRegImageUrl": docUrl,
-      "updatedAt": admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    const check = await runCheckBusinessStatus(
-      db,
-      uid,
-      profileId,
-      HIRA_SERVICE_KEY.value()
-    );
-
-    return {
-      ...extracted,
-      status: check.status,
-      failReason: check.failReason,
-      checkMethod: check.method,
-      skipped: check.skipped,
-      hiraMatched: check.hiraMatched,
-      hiraNote: check.hiraNote,
-      hiraMatchLevel: check.hiraMatchLevel,
-    };
-  });
-
-/**
- * checkBusinessStatus
- *
- * OCR 이후 국세청·Mock 검증만 재실행 (재시도·수동 트리거).
- * Input: { profileId }
- */
-export const checkBusinessStatus = functions
-  .runWith({
-    timeoutSeconds: 60,
-    memory: "256MB",
-    secrets: ["NTS_SERVICE_KEY", HIRA_SERVICE_KEY],
-  })
-  .https.onCall(async (data, context) => {
-    if (!context.auth) {
-      throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
-    }
-    const uid = context.auth.uid;
-    const profileId = String(data.profileId ?? "").trim();
-    if (!profileId) {
-      throw new functions.https.HttpsError("invalid-argument", "profileId가 필요합니다.");
-    }
-    const result = await runCheckBusinessStatus(
-      db,
-      uid,
-      profileId,
-      HIRA_SERVICE_KEY.value()
-    );
-    return result;
-  });
-
-/**
- * createOrder
- *
- * 게시 버튼 클릭 시 호출. Draft 유효성 검증 후 Order 문서를 생성한다.
- * 공고권 적용 시 amount=0으로 처리.
- *
- * Input: { draftId, clinicProfileId, voucherId? }
- * Output: { orderId, amount, requiresPayment }
- */
-export const createOrder = functions.https.onCall(
-  async (data, context) => {
-    if (!context.auth) {
-      throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
-    }
-    const uid = context.auth.uid;
-    const draftId = String(data.draftId ?? "").trim();
-    const clinicProfileId = String(data.clinicProfileId ?? "").trim();
-    const voucherId: string | null = data.voucherId ? String(data.voucherId).trim() : null;
-
-    if (!draftId || !clinicProfileId) {
-      throw new functions.https.HttpsError("invalid-argument", "draftId와 clinicProfileId는 필수입니다.");
-    }
-
-    // Draft 존재 및 소유권 확인
-    const draftDoc = await db.collection("jobDrafts").doc(draftId).get();
-    if (!draftDoc.exists || draftDoc.data()?.ownerUid !== uid) {
-      throw new functions.https.HttpsError("not-found", "Draft를 찾을 수 없습니다.");
-    }
-
-    // 계정 상태 확인
-    const accountDoc = await db.collection("clinics_accounts").doc(uid).get();
-    if (!accountDoc.exists) {
-      throw new functions.https.HttpsError("permission-denied", "공고자 계정이 없습니다.");
-    }
-    const accountData = accountDoc.data() || {};
-    const accountEmail = (accountData.normalizedEmail || accountData.email || "").toLowerCase();
-    const isAdminAccount = ADMIN_WHITELIST.includes(accountEmail);
-
-    const identityVerified = accountData.identityVerified === true || accountData.phoneVerified === true;
-    if (!isAdminAccount && !identityVerified) {
-      throw new functions.https.HttpsError("failed-precondition", "본인인증이 필요합니다.");
-    }
-
-    // 프로필 사업자 인증 확인
-    const profileDoc = await db
-      .collection("clinics_accounts").doc(uid)
-      .collection("clinic_profiles").doc(clinicProfileId)
-      .get();
-    if (!profileDoc.exists) {
-      throw new functions.https.HttpsError("not-found", "치과 프로필을 찾을 수 없습니다.");
-    }
-    const profileData = profileDoc.data() || {};
-    const bizStatus = profileData.businessVerification?.status;
-    if (!isAdminAccount && bizStatus !== "verified") {
-      throw new functions.https.HttpsError("failed-precondition", "사업자 인증이 필요합니다.");
-    }
-
-    // 동일 Draft 중복 주문 방지
-    const existingOrders = await db.collection("orders")
-      .where("ownerUid", "==", uid)
-      .where("draftId", "==", draftId)
-      .where("status", "in", ["created", "payment_pending"])
-      .limit(1)
-      .get();
-    if (!existingOrders.empty) {
-      const existing = existingOrders.docs[0];
-      return {
-        orderId: existing.id,
-        amount: existing.data().amount ?? 0,
-        requiresPayment: (existing.data().amount ?? 0) > 0,
-      };
-    }
-
-    // 기본 금액 (상품 정책에 따라 조정)
-    let amount = 50000; // 기본 30일 노출
-    let appliedVoucherId: string | null = null;
-
-    // 공고권 적용
-    if (voucherId) {
-      const voucherDoc = await db.collection("vouchers").doc(voucherId).get();
-      if (voucherDoc.exists) {
-        const v = voucherDoc.data()!;
-        if (v.ownerUid === uid && v.status === "active") {
-          const expiresAt = v.expiresAt?.toDate?.();
-          if (!expiresAt || expiresAt > new Date()) {
-            amount = 0;
-            appliedVoucherId = voucherId;
-          }
-        }
-      }
-    }
-
-    // Order 생성
-    const orderData = {
-      ownerUid: uid,
-      draftId,
-      clinicProfileId,
-      status: amount > 0 ? "created" : "created",
-      amount,
-      currency: "KRW",
-      voucherId: appliedVoucherId,
-      paymentProvider: appliedVoucherId ? "voucher_only" : null,
-      exposureDays: 30,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    };
-
-    const orderRef = await db.collection("orders").add(orderData);
-    functions.logger.info("createOrder", { uid, orderId: orderRef.id, amount, voucherId: appliedVoucherId });
-
-    return {
-      orderId: orderRef.id,
-      amount,
-      requiresPayment: amount > 0,
-    };
-  }
-);
-
-/**
- * confirmPayment
- *
- * 결제 완료(또는 공고권 전용 0원 결제) 후 호출.
- * PG 검증 → Order 상태 갱신 → Draft에서 jobs 문서 생성.
- *
- * Input: { orderId, paymentKey? }
- * Output: { jobId, success }
- */
-export const confirmPayment = functions
-  .runWith({ secrets: ["TOSS_SECRET_KEY"] })
-  .https.onCall(
-  async (data, context) => {
-    if (!context.auth) {
-      throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
-    }
-    const uid = context.auth.uid;
-    const orderId = String(data.orderId ?? "").trim();
-    const paymentKey: string | null = data.paymentKey ? String(data.paymentKey).trim() : null;
-
-    if (!orderId) {
-      throw new functions.https.HttpsError("invalid-argument", "orderId는 필수입니다.");
-    }
-
-    const orderRef = db.collection("orders").doc(orderId);
-    const orderDoc = await orderRef.get();
-    if (!orderDoc.exists || orderDoc.data()?.ownerUid !== uid) {
-      throw new functions.https.HttpsError("not-found", "주문을 찾을 수 없습니다.");
-    }
-
-    const orderData = orderDoc.data()!;
-    if (orderData.status === "paid") {
-      // 멱등성: 이미 처리된 주문
-      return { jobId: orderData.jobId ?? "", success: true };
-    }
-    if (orderData.status !== "created" && orderData.status !== "payment_pending") {
-      throw new functions.https.HttpsError("failed-precondition", "처리할 수 없는 주문 상태입니다.");
-    }
-
-    const amount = orderData.amount ?? 0;
-
-    // 유료 결제: 토스페이먼츠 서버 검증
-    if (amount > 0) {
-      if (!paymentKey) {
-        throw new functions.https.HttpsError("invalid-argument", "paymentKey가 필요합니다.");
-      }
-      try {
-        const secretKey = TOSS_SECRET_KEY.value();
-        const encoded = Buffer.from(`${secretKey}:`).toString("base64");
-        const tossRes = await axios.post(
-          "https://api.tosspayments.com/v1/payments/confirm",
-          { paymentKey, orderId, amount },
-          {
-            headers: {
-              Authorization: `Basic ${encoded}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-        functions.logger.info("confirmPayment: toss verified", {
-          orderId,
-          paymentKey,
-          status: tossRes.data?.status,
-        });
-      } catch (err: unknown) {
-        const axiosErr = err as { response?: { data?: { message?: string; code?: string } } };
-        const msg = axiosErr.response?.data?.message ?? "토스페이먼츠 검증 실패";
-        functions.logger.error("confirmPayment: toss verification failed", { orderId, msg });
-        throw new functions.https.HttpsError("internal", `결제 검증 실패: ${msg}`);
-      }
-    }
-
-    // Draft 데이터 로드
-    const draftDoc = await db.collection("jobDrafts").doc(orderData.draftId).get();
-    if (!draftDoc.exists) {
-      throw new functions.https.HttpsError("not-found", "Draft를 찾을 수 없습니다.");
-    }
-    const draftData = draftDoc.data()!;
-
-    // 프로필에서 치과 정보 병합
-    const profileDoc = await db
-      .collection("clinics_accounts").doc(uid)
-      .collection("clinic_profiles").doc(orderData.clinicProfileId)
-      .get();
-    const profileData = profileDoc.exists ? profileDoc.data()! : {};
-
-    const now = new Date();
-    const exposureDays = orderData.exposureDays ?? 30;
-    const expiresAt = new Date(now.getTime() + exposureDays * 24 * 60 * 60 * 1000);
-
-    // 급여 파싱
-    const salaryStr = String(draftData.salary ?? "").trim();
-    const sr = parseJobSalaryRange(salaryStr);
-
-    // district 자동 생성
-    const addrForDistrict = String(profileData.address || draftData.address || "");
-    let district = "";
-    if (addrForDistrict.length > 0) {
-      const parts = addrForDistrict.split(/\s+/);
-      const guIdx = parts.findIndex((p: string) => p.endsWith("구") || p.endsWith("군"));
-      const dongIdx = parts.findIndex(
-        (p: string) => p.endsWith("동") || p.endsWith("읍") || p.endsWith("면") || p.endsWith("로") || p.endsWith("길")
-      );
-      const gu = guIdx >= 0 ? parts[guIdx] : "";
-      const dong = dongIdx >= 0 && dongIdx > guIdx ? parts[dongIdx] : "";
-      if (dong && gu) district = `${dong} · ${gu}`;
-      else if (gu) district = gu;
-      else if (parts.length >= 2) district = parts.slice(0, 2).join(" ");
-    }
-
-    // 교통편 (draft의 transportation 객체 or flat 필드 통합)
-    const draftTrans = draftData.transportation as Record<string, unknown> | undefined;
-    const transObj: Record<string, unknown> | null = draftTrans
-      ? {
-          subwayLines: Array.isArray(draftTrans.subwayLines) ? draftTrans.subwayLines : [],
-          ...(typeof draftTrans.subwayStationName === "string" && (draftTrans.subwayStationName as string).trim()
-            ? { subwayStationName: (draftTrans.subwayStationName as string).trim() } : {}),
-          ...(typeof draftTrans.walkingDistanceMeters === "number" ? { walkingDistanceMeters: Math.floor(draftTrans.walkingDistanceMeters as number) } : {}),
-          ...(typeof draftTrans.walkingMinutes === "number" ? { walkingMinutes: Math.floor(draftTrans.walkingMinutes as number) } : {}),
-          ...(typeof draftTrans.exitNumber === "string" && (draftTrans.exitNumber as string).trim()
-            ? { exitNumber: (draftTrans.exitNumber as string).trim() } : {}),
-          parking: draftTrans.parking === true,
-        }
-      : null;
-    const jobSubwayLines: string[] = transObj
-      ? (transObj.subwayLines as string[])
-      : (Array.isArray(draftData.subwayLines) ? (draftData.subwayLines as string[]) : []);
-    const jobHasParking: boolean = transObj
-      ? transObj.parking === true
-      : (draftData.parking === true || (draftTrans?.parking === true));
-    const jobStationName = transObj ? (transObj.subwayStationName as string | undefined) : undefined;
-    const jobWalkMin = transObj ? (transObj.walkingMinutes as number | undefined) : undefined;
-    const isNearStation = !!jobStationName && typeof jobWalkMin === "number" && jobWalkMin <= 10;
-
-    // 마감일 (ISO 문자열 → Timestamp)
-    let closingDateTs: admin.firestore.Timestamp | null = null;
-    const closingRaw = draftData.closingDate;
-    if (closingRaw) {
-      if (closingRaw instanceof admin.firestore.Timestamp) {
-        closingDateTs = closingRaw;
-      } else if (typeof closingRaw === "string" && closingRaw.trim()) {
-        try {
-          const d = new Date(closingRaw.trim());
-          if (!isNaN(d.getTime())) closingDateTs = admin.firestore.Timestamp.fromDate(d);
-        } catch (_) { /* ignore */ }
-      }
-    }
-
-    // 좌표
-    const jobLat = typeof draftData.lat === "number" && isFinite(draftData.lat as number) ? draftData.lat as number : null;
-    const jobLng = typeof draftData.lng === "number" && isFinite(draftData.lng as number) ? draftData.lng as number : null;
-
-    // jobs 문서 생성
-    const jobData: Record<string, unknown> = {
-      createdBy: uid,
-      clinicProfileId: orderData.clinicProfileId,
-      orderId,
-      clinicName: profileData.displayName || profileData.clinicName || draftData.clinicName || "",
-      title: draftData.title || "",
-      role: draftData.role || "",
-      type: draftData.role || "",
-      career: draftData.career || "미정",
-      employmentType: String(draftData.employmentType ?? "").trim(),
-      workHours: String(draftData.workHours ?? "").trim(),
-      salary: salaryStr,
-      salaryText: salaryStr,
-      salaryMin: sr.min,
-      salaryMax: sr.max,
-      salaryRange: [sr.min, sr.max],
-      benefits: Array.isArray(draftData.benefits) ? draftData.benefits : [],
-      description: draftData.description || "",
-      details: draftData.description || "",
-      address: profileData.address || draftData.address || "",
-      district,
-      contact: String(draftData.contact ?? "").trim(),
-      images: Array.isArray(draftData.imageUrls) ? draftData.imageUrls : [],
-      tags: Array.isArray(draftData.tags) ? draftData.tags : [],
-      // ── 기본 정보 추가 ───────────────────────────────────────
-      education: String(draftData.education ?? "").trim(),
-      hireRoles: Array.isArray(draftData.hireRoles) ? draftData.hireRoles : [],
-      // ── 병원 정보 ─────────────────────────────────────────
-      ...(draftData.hospitalType ? { hospitalType: draftData.hospitalType } : {}),
-      ...(typeof draftData.chairCount === "number" ? { chairCount: Math.floor(draftData.chairCount as number) } : {}),
-      ...(typeof draftData.staffCount === "number" ? { staffCount: Math.floor(draftData.staffCount as number) } : {}),
-      specialties: Array.isArray(draftData.specialties) ? draftData.specialties : [],
-      ...(draftData.hasOralScanner != null ? { hasOralScanner: draftData.hasOralScanner } : {}),
-      ...(draftData.hasCT != null ? { hasCT: draftData.hasCT } : {}),
-      ...(draftData.has3DPrinter != null ? { has3DPrinter: draftData.has3DPrinter } : {}),
-      ...(draftData.digitalEquipmentRaw ? { digitalEquipmentRaw: String(draftData.digitalEquipmentRaw).trim() } : {}),
-      // ── 근무 조건 ────────────────────────────────────────
-      workDays: Array.isArray(draftData.workDays) ? draftData.workDays : [],
-      weekendWork: draftData.weekendWork === true,
-      nightShift: draftData.nightShift === true,
-      // ── 지원 관련 ────────────────────────────────────────
-      applyMethod: Array.isArray(draftData.applyMethod) ? draftData.applyMethod : [],
-      isAlwaysHiring: draftData.isAlwaysHiring === true,
-      ...(closingDateTs ? { closingDate: closingDateTs } : {}),
-      requiredDocuments: Array.isArray(draftData.requiredDocuments) ? draftData.requiredDocuments : [],
-      // ── 담당 업무 ────────────────────────────────────────
-      mainDutiesList: Array.isArray(draftData.mainDutiesList) ? draftData.mainDutiesList : [],
-      // ── 교통편 ──────────────────────────────────────────
-      ...(transObj ? { transportation: transObj } : {}),
-      ...(jobSubwayLines.length > 0 ? { subwayLines: jobSubwayLines } : {}),
-      hasParking: jobHasParking,
-      isNearStation,
-      // ── 좌표 ────────────────────────────────────────────
-      ...(jobLat != null && jobLng != null ? { lat: jobLat, lng: jobLng } : {}),
-      // ── 홍보이미지 ───────────────────────────────────────
-      promotionalImageUrls: Array.isArray(draftData.promotionalImageUrls) ? draftData.promotionalImageUrls : [],
-      // ── 메타 ─────────────────────────────────────────────
-      status: "active",
-      paymentStatus: "paid",
-      publishedAt: admin.firestore.FieldValue.serverTimestamp(),
-      expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      postedAt: admin.firestore.FieldValue.serverTimestamp(),
-    };
-
-    const jobRef = await db.collection("jobs").add(jobData);
-
-    // Order 상태 업데이트
-    const orderUpdates: Record<string, unknown> = {
-      status: "paid",
-      jobId: jobRef.id,
-      paidAt: admin.firestore.FieldValue.serverTimestamp(),
-    };
-    if (paymentKey) {
-      orderUpdates.providerTxId = paymentKey;
-      orderUpdates.paymentProvider = "toss";
-    }
-    await orderRef.update(orderUpdates);
-
-    // 공고권 사용 처리
-    if (orderData.voucherId) {
-      await db.collection("vouchers").doc(orderData.voucherId).update({
-        status: "used",
-        usedForOrderId: orderId,
-        usedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-    }
-
-    // Draft 상태 업데이트
-    await db.collection("jobDrafts").doc(orderData.draftId).update({
-      currentStep: "published",
-      publishedJobId: jobRef.id,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    functions.logger.info("confirmPayment success", { uid, orderId, jobId: jobRef.id });
-
-    return { jobId: jobRef.id, success: true };
-  }
-);
-
-/**
- * expireJobs (스케줄러)
- *
- * 매일 00:30 KST에 실행. expiresAt이 지난 active 공고를 closed로 전환.
- */
-export const expireJobs = functions
-  .pubsub.schedule("30 0 * * *")
-  .timeZone("Asia/Seoul")
-  .onRun(async () => {
-    const now = admin.firestore.Timestamp.now();
-    const snap = await db.collection("jobs")
-      .where("status", "==", "active")
-      .where("expiresAt", "<=", now)
-      .get();
-
-    if (snap.empty) {
-      functions.logger.info("expireJobs: no expired jobs");
-      return null;
-    }
-
-    const batch = db.batch();
-    for (const doc of snap.docs) {
-      batch.update(doc.ref, {
-        status: "closed",
-        closedAt: admin.firestore.FieldValue.serverTimestamp(),
-        closedReason: "expired",
-      });
-    }
-    await batch.commit();
-    functions.logger.info("expireJobs: closed", { count: snap.size });
-    return null;
-  });
-
-/**
- * onClinicAccountCreated
- *
- * clinics_accounts 문서 생성 시 가입 축하 무료 공고권(90일)을 자동 발급.
- * CI 중복 체크는 추후 토스 본인확인 연동 시 추가.
- */
-export const onClinicAccountCreated = functions.firestore
-  .document("clinics_accounts/{uid}")
-  .onCreate(async (snap, context) => {
-    const uid = context.params.uid;
-
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 90);
-
-    await db.collection("vouchers").add({
-      ownerUid: uid,
-      type: "signup_free",
-      status: "active",
-      issuedBy: "system",
-      issuedAt: admin.firestore.FieldValue.serverTimestamp(),
-      expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
-    });
-
-    functions.logger.info("onClinicAccountCreated: signup voucher issued", { uid });
-  });
-
-// ════════════════════════════════════════════════════════════════
-// 🔔 알림 스케줄러 (Phase 8-3)
-// ════════════════════════════════════════════════════════════════
-
-/**
- * notifyJobExpiringSoon
- *
- * 매일 09:00 KST 실행.
- * expiresAt이 7일 이내인 active 공고를 찾아 알림 문서를 생성합니다.
- * notifications/{uid}/items/{notificationId} 서브컬렉션에 기록.
- */
-export const notifyJobExpiringSoon = functions
-  .runWith({ timeoutSeconds: 120 })
-  .pubsub.schedule("every day 09:00")
-  .timeZone("Asia/Seoul")
-  .onRun(async () => {
-    const now = new Date();
-    const sevenDaysLater = new Date();
-    sevenDaysLater.setDate(now.getDate() + 7);
-
-    const snap = await db.collection("jobs")
-      .where("status", "==", "active")
-      .where("expiresAt", "<=", admin.firestore.Timestamp.fromDate(sevenDaysLater))
-      .where("expiresAt", ">", admin.firestore.Timestamp.fromDate(now))
-      .get();
-
-    if (snap.empty) {
-      functions.logger.info("notifyJobExpiringSoon: no expiring jobs");
-      return null;
-    }
-
-    const batch = db.batch();
-    const notified = new Set<string>();
-
-    for (const doc of snap.docs) {
-      const data = doc.data();
-      const uid = data.createdBy as string;
-      if (!uid || notified.has(`${uid}_${doc.id}`)) continue;
-
-      const expiresAt = (data.expiresAt as admin.firestore.Timestamp).toDate();
-      const daysLeft = Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-      const title = data.title || "(제목 없음)";
-
-      const ref = db.collection("notifications").doc(uid)
-        .collection("items").doc();
-      batch.set(ref, {
-        type: "job_expiring",
-        jobId: doc.id,
-        title: `공고 만료 예정 (${daysLeft}일 남음)`,
-        body: `"${title}" 공고가 ${daysLeft}일 후 만료됩니다.`,
-        read: false,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-      notified.add(`${uid}_${doc.id}`);
-    }
-
-    await batch.commit();
-    functions.logger.info("notifyJobExpiringSoon: sent", { count: notified.size });
-    return null;
-  });
-
-/**
- * remindStaleDrafts
- *
- * 매일 10:00 KST 실행.
- * 24시간 이상 방치된 임시저장(jobDrafts)에 대해 리마인드 알림을 보냅니다.
- * 동일 드래프트에 대해 24시간 내 중복 알림은 보내지 않습니다.
- */
-export const remindStaleDrafts = functions
-  .runWith({ timeoutSeconds: 120 })
-  .pubsub.schedule("every day 10:00")
-  .timeZone("Asia/Seoul")
-  .onRun(async () => {
-    const now = new Date();
-    const oneDayAgo = new Date();
-    oneDayAgo.setDate(now.getDate() - 1);
-    const threeDaysAgo = new Date();
-    threeDaysAgo.setDate(now.getDate() - 3);
-
-    // 1~3일 사이 방치된 드래프트 (너무 오래된 건 제외)
-    const snap = await db.collection("jobDrafts")
-      .where("updatedAt", "<=", admin.firestore.Timestamp.fromDate(oneDayAgo))
-      .where("updatedAt", ">=", admin.firestore.Timestamp.fromDate(threeDaysAgo))
-      .where("status", "in", ["draft", "ai_generated", "editing"])
-      .get();
-
-    if (snap.empty) {
-      functions.logger.info("remindStaleDrafts: no stale drafts");
-      return null;
-    }
-
-    const batch = db.batch();
-    let count = 0;
-
-    for (const doc of snap.docs) {
-      const data = doc.data();
-      const uid = data.ownerUid as string;
-      if (!uid) continue;
-
-      const title = data.title || data.clinicName || "작성 중인 공고";
-
-      // 중복 방지: 같은 draftId로 24시간 내 알림이 있는지 확인
-      const existing = await db.collection("notifications").doc(uid)
-        .collection("items")
-        .where("type", "==", "draft_reminder")
-        .where("draftId", "==", doc.id)
-        .where("createdAt", ">", admin.firestore.Timestamp.fromDate(oneDayAgo))
-        .limit(1)
-        .get();
-
-      if (!existing.empty) continue;
-
-      const ref = db.collection("notifications").doc(uid)
-        .collection("items").doc();
-      batch.set(ref, {
-        type: "draft_reminder",
-        draftId: doc.id,
-        title: "임시저장 공고가 있어요",
-        body: `"${title}" 공고를 이어서 작성해보세요.`,
-        read: false,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-      count++;
-    }
-
-    if (count > 0) await batch.commit();
-    functions.logger.info("remindStaleDrafts: sent", { count });
-    return null;
-  });
-
-/**
- * notifyVoucherExpiringSoon
- *
- * 매일 09:30 KST 실행.
- * 7일 이내 만료 예정인 active 공고권에 대해 알림을 보냅니다.
- */
-export const notifyVoucherExpiringSoon = functions
-  .runWith({ timeoutSeconds: 120 })
-  .pubsub.schedule("every day 09:30")
-  .timeZone("Asia/Seoul")
-  .onRun(async () => {
-    const now = new Date();
-    const sevenDaysLater = new Date();
-    sevenDaysLater.setDate(now.getDate() + 7);
-
-    const snap = await db.collection("vouchers")
-      .where("status", "==", "active")
-      .where("expiresAt", "<=", admin.firestore.Timestamp.fromDate(sevenDaysLater))
-      .where("expiresAt", ">", admin.firestore.Timestamp.fromDate(now))
-      .get();
-
-    if (snap.empty) {
-      functions.logger.info("notifyVoucherExpiringSoon: no expiring vouchers");
-      return null;
-    }
-
-    const batch = db.batch();
-    const notified = new Set<string>();
-
-    for (const doc of snap.docs) {
-      const data = doc.data();
-      const uid = data.ownerUid as string;
-      if (!uid || notified.has(uid)) continue;
-
-      const expiresAt = (data.expiresAt as admin.firestore.Timestamp).toDate();
-      const daysLeft = Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-
-      const ref = db.collection("notifications").doc(uid)
-        .collection("items").doc();
-      batch.set(ref, {
-        type: "voucher_expiring",
-        voucherId: doc.id,
-        title: "무료 공고권 만료 예정",
-        body: `보유한 무료 공고권이 ${daysLeft}일 후 만료됩니다. 지금 공고를 등록해보세요!`,
-        read: false,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-      notified.add(uid);
-    }
-
-    await batch.commit();
-    functions.logger.info("notifyVoucherExpiringSoon: sent", { count: notified.size });
-    return null;
-  });
-
-// ========== 이력서: 이미지 → 필드 자동추출 (Gemini Vision) ==========
-
-/**
- * extractResumeFromImages
- *
- * 이력서 이미지 URL 목록을 받아 Gemini Vision으로 이력서 필드를 추출한다.
- * Firestore `resumeImportDrafts/{draftId}` 문서를 직접 업데이트하며
- * 결과를 반환한다.
- *
- * Input  : { draftId: string, imageUrls: string[] }
- * Output : { ok: true, fields: {...}, confidence: {...} }
- *          또는 오류 시 HttpsError
- */
-export const extractResumeFromImages = functions
-  .runWith({ timeoutSeconds: 180, memory: "512MB", secrets: ["GEMINI_API_KEY"] })
-  .https.onCall(async (data, context) => {
-    if (!context.auth) {
-      throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
-    }
-
-    const draftId: string = data.draftId ?? "";
-    const imageUrls: string[] = data.imageUrls ?? [];
-
-    if (!draftId) {
-      throw new functions.https.HttpsError("invalid-argument", "draftId가 없습니다.");
-    }
-    if (!imageUrls.length) {
-      throw new functions.https.HttpsError("invalid-argument", "이미지 URL이 없습니다.");
-    }
-
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      await db.collection("resumeImportDrafts").doc(draftId).update({
-        status: "failed",
-        failReason: "api_key_missing",
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-      throw new functions.https.HttpsError("internal", "AI API 키가 설정되지 않았습니다.");
-    }
-
-    // 소유자 확인
-    const draftDoc = await db.collection("resumeImportDrafts").doc(draftId).get();
-    if (!draftDoc.exists) {
-      throw new functions.https.HttpsError("not-found", "드래프트 문서를 찾을 수 없습니다.");
-    }
-    if (draftDoc.data()?.ownerUid !== context.auth.uid) {
-      throw new functions.https.HttpsError("permission-denied", "권한이 없습니다.");
-    }
-
-    functions.logger.info("extractResumeFromImages start", {
-      uid: context.auth.uid,
-      draftId,
-      imageCount: imageUrls.length,
-    });
-
-    const resumePrompt = `아래 이력서 이미지를 분석하여 반드시 아래 JSON 형식으로만 응답해줘.
-다른 텍스트 없이 순수 JSON만 반환해.
-원문에 명시된 정보만 추출하고, 없으면 빈 문자열을 사용해.
-치과 구직자(치과위생사/치과조무사 등) 이력서를 기준으로 추출해.
-
-{
-  "name": "성명",
-  "phone": "연락처 (숫자와 - 만 포함)",
-  "email": "이메일",
-  "address": "현 거주지 또는 주소",
-  "birthDate": "생년월일 (YYYY-MM-DD 형식, 없으면 빈 문자열)",
-  "gender": "성별 (남/여/빈 문자열)",
-  "licenses": ["면허·자격증명 (예: 치과위생사면허, 치과기공사면허)"],
-  "licenseNumbers": ["면허번호"],
-  "experiences": [
-    {
-      "clinicName": "근무지명",
-      "role": "직종/직위",
-      "startDate": "YYYY-MM",
-      "endDate": "YYYY-MM 또는 현재",
-      "description": "담당업무 요약"
-    }
-  ],
-  "skills": ["보유 스킬 (예: 스케일링, 교정, CAD/CAM)"],
-  "education": [
-    {
-      "school": "학교명",
-      "major": "전공",
-      "degree": "학위/졸업구분",
-      "graduatedAt": "YYYY-MM"
-    }
-  ],
-  "summary": "자기소개 또는 지원 동기 요약 (없으면 빈 문자열)",
-  "confidence": {
-    "name": 0.0,
-    "phone": 0.0,
-    "email": 0.0,
-    "address": 0.0,
-    "birthDate": 0.0,
-    "licenses": 0.0,
-    "experiences": 0.0,
-    "skills": 0.0,
-    "education": 0.0,
-    "summary": 0.0
-  }
-}
-
-confidence 값은 0.0(전혀 확신 없음) ~ 1.0(명확히 확인됨) 사이로 설정해.`;
-
-    const parts: Array<{text?: string; inlineData?: {mimeType: string; data: string}}> = [];
-    parts.push({text: resumePrompt});
-
-    for (const url of imageUrls.slice(0, 8)) {
-      try {
-        const imgResp = await axios.get(url, {responseType: "arraybuffer", timeout: 20000});
-        const base64 = Buffer.from(imgResp.data).toString("base64");
-        const contentType = (imgResp.headers["content-type"] as string) || "image/jpeg";
-        parts.push({inlineData: {mimeType: contentType, data: base64}});
-      } catch (e) {
-        functions.logger.warn("이력서 이미지 다운로드 실패", {url, error: String(e)});
-      }
-    }
-
-    if (parts.length < 2) {
-      await db.collection("resumeImportDrafts").doc(draftId).update({
-        status: "failed",
-        failReason: "no_images_downloaded",
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-      throw new functions.https.HttpsError("internal", "이미지를 다운로드할 수 없습니다.");
-    }
-
-    try {
-      const geminiUrl =
-        "https://generativelanguage.googleapis.com/v1beta/models/" +
-        GEMINI_MODEL +
-        ":generateContent?key=" +
-        apiKey;
-
-      const resp = await axios.post(
-        geminiUrl,
-        {
-          contents: [{parts}],
-          generationConfig: {responseMimeType: "application/json"},
-        },
-        {timeout: 120000},
-      );
-
-      const rawTextRaw = resp.data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
-
-      // Gemini가 마크다운 코드펜스·주석·비표준 따옴표로 감쌀 수 있으므로 전처리
-      let rawText = rawTextRaw
-        .replace(/^```(?:json)?\s*/im, "")  // 앞쪽 ```json 또는 ``` 제거
-        .replace(/\s*```\s*$/m, "")         // 뒤쪽 ``` 제거
-        .trim();
-
-      // JSON 객체 블록만 추출 (앞뒤에 설명 문구가 붙는 경우 대비)
-      const jsonBlockMatch = rawText.match(/\{[\s\S]*\}/);
-      if (jsonBlockMatch) rawText = jsonBlockMatch[0];
-
-      functions.logger.info("extractResumeFromImages raw", {
-        draftId,
-        rawLen: rawText.length,
-        preview: rawText.slice(0, 120),
-      });
-
-      const parsed = JSON.parse(rawText);
-
-      const confRaw = parsed.confidence ?? {};
-      const confidence: Record<string, number> = {};
-      for (const key of ["name", "phone", "email", "address", "birthDate", "licenses", "experiences", "skills", "education", "summary"]) {
-        const v = confRaw[key];
-        confidence[key] = typeof v === "number" ? Math.min(1, Math.max(0, v)) : 0.0;
-      }
-
-      const suggestedFields: Record<string, unknown> = {
-        name:          String(parsed.name ?? "").trim(),
-        phone:         String(parsed.phone ?? "").trim(),
-        email:         String(parsed.email ?? "").trim(),
-        address:       String(parsed.address ?? "").trim(),
-        birthDate:     String(parsed.birthDate ?? "").trim(),
-        gender:        String(parsed.gender ?? "").trim(),
-        licenses:      Array.isArray(parsed.licenses) ? parsed.licenses.map((s: unknown) => String(s).trim()).filter(Boolean) : [],
-        licenseNumbers: Array.isArray(parsed.licenseNumbers) ? parsed.licenseNumbers.map((s: unknown) => String(s).trim()).filter(Boolean) : [],
-        experiences:   Array.isArray(parsed.experiences) ? parsed.experiences : [],
-        skills:        Array.isArray(parsed.skills) ? parsed.skills.map((s: unknown) => String(s).trim()).filter(Boolean) : [],
-        education:     Array.isArray(parsed.education) ? parsed.education : [],
-        summary:       String(parsed.summary ?? "").trim(),
-      };
-
-      await db.collection("resumeImportDrafts").doc(draftId).update({
-        suggestedFields,
-        confidence,
-        status: "ready",
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-
-      functions.logger.info("extractResumeFromImages done", {
-        uid: context.auth.uid,
-        draftId,
-        fieldsExtracted: Object.keys(suggestedFields).filter((k) => {
-          const v = suggestedFields[k];
-          return Array.isArray(v) ? v.length > 0 : String(v ?? "").trim().length > 0;
-        }).length,
-      });
-
-      return {ok: true, fields: suggestedFields, confidence};
-    } catch (e: unknown) {
-      functions.logger.error("extractResumeFromImages Gemini 실패", {error: String(e), draftId});
-      await db.collection("resumeImportDrafts").doc(draftId).update({
-        status: "failed",
-        failReason: "gemini_error",
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      }).catch(() => {/* 오류 무시 */});
-      throw new functions.https.HttpsError("internal", "AI 분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
-    }
-  });
-
-// ================================================================
-// revokeRefundedPurchases (매일 새벽 3시 — 전날 환불/취소 자동 처리)
-// ================================================================
-// 아임웹 API에서 전날(KST) 환불·취소 완료된 주문을 조회하고,
-// 해당 유저의 users/{uid}/purchases/{ebookId} 문서를 삭제한다.
-//
-// 삭제 전 열람 여부(lastReadAt, progress 등)를 포함해
-// revoked_purchases 컬렉션에 기록 → 운영 감사 추적 가능.
-//
-// 실행 기준: Asia/Seoul 03:00 (전날 KST 00:00~23:59:59 범위)
-// ================================================================
-export const revokeRefundedPurchases = functions
-  .region("us-central1")
-  .runWith({ timeoutSeconds: 300, memory: "256MB" })
-  .pubsub.schedule("0 3 * * *")
-  .timeZone("Asia/Seoul")
-  .onRun(async () => {
-    functions.logger.info("revokeRefundedPurchases: 시작");
-
-    // ── 아임웹 API 키 로드 ──────────────────────────────────
-    const keysSnap = await db.collection("api_keys").doc("imweb_keys").get();
-    if (!keysSnap.exists) {
-      functions.logger.warn("revokeRefundedPurchases: imweb_keys 없음, 종료");
+  .runWith({ timeoutSeconds: 540, memory: "512MB" })
+  .https.onRequest(async (req, res) => {
+    const secret = (req.query.secret || req.body?.secret) as string | undefined;
+    if (secret !== "cleanup_resumes_2026") {
+      res.status(401).json({ ok: false, error: "unauthorized" });
       return;
     }
-    const keysData    = keysSnap.data()!;
-    const imwebKey    = keysData.key        as string;
-    const imwebSecret = keysData.secret_key as string;
 
-    // ── 아임웹 인증 ─────────────────────────────────────────
-    const authRes = await axios.get(
-      `https://api.imweb.me/v2/auth?key=${imwebKey}&secret=${imwebSecret}`
-    );
-    const accessToken: string = authRes.data?.access_token;
-    if (!accessToken) {
-      functions.logger.warn("revokeRefundedPurchases: access_token 발급 실패, 종료");
-      return;
-    }
-    const headers = { "access-token": accessToken };
+    const dryRun = req.query.dryRun === "true";
 
-    // ── 전날(KST) 00:00 ~ 23:59:59 → Unix 타임스탬프 ────────
-    // 서버는 UTC 기준이므로 KST(UTC+9) 보정
-    const nowKst       = new Date(Date.now() + 9 * 60 * 60 * 1000);
-    const yKst         = new Date(nowKst);
-    yKst.setUTCDate(yKst.getUTCDate() - 1);
+    const isEmpty = (d: FirebaseFirestore.DocumentData): boolean => {
+      const profile = d.profile || {};
+      const profileEmpty =
+        (!profile.name || profile.name === "") &&
+        (!profile.summary || profile.summary === "");
+      const arrEmpty = (k: string) => !Array.isArray(d[k]) || d[k].length === 0;
+      return (
+        profileEmpty &&
+        arrEmpty("licenses") &&
+        arrEmpty("experiences") &&
+        arrEmpty("skills") &&
+        arrEmpty("education") &&
+        arrEmpty("trainings") &&
+        arrEmpty("attachments")
+      );
+    };
 
-    const dayStartUtc  = new Date(Date.UTC(
-      yKst.getUTCFullYear(), yKst.getUTCMonth(), yKst.getUTCDate(),
-      0, 0, 0
-    ) - 9 * 60 * 60 * 1000);                        // KST 00:00 → UTC
+    try {
+      const snap = await db.collection("resumes").get();
+      const byUser = new Map<string, Array<{ id: string; updatedAt: number }>>();
 
-    const dayEndUtc    = new Date(Date.UTC(
-      yKst.getUTCFullYear(), yKst.getUTCMonth(), yKst.getUTCDate(),
-      23, 59, 59
-    ) - 9 * 60 * 60 * 1000);                        // KST 23:59:59 → UTC
+      let totalEmpty = 0;
+      snap.docs.forEach((doc) => {
+        const data = doc.data();
+        if (!isEmpty(data)) return;
+        totalEmpty++;
+        const uid = data.ownerUid as string;
+        if (!uid) return;
+        const upd = data.updatedAt?.toMillis?.() ?? 0;
+        const arr = byUser.get(uid) ?? [];
+        arr.push({ id: doc.id, updatedAt: upd });
+        byUser.set(uid, arr);
+      });
 
-    const fromSec = Math.floor(dayStartUtc.getTime() / 1000);
-    const toSec   = Math.floor(dayEndUtc.getTime()   / 1000);
+      let deletedCount = 0;
+      const perUserDeleted: Record<string, number> = {};
 
-    functions.logger.info("revokeRefundedPurchases: 대상 기간", {
-      from: dayStartUtc.toISOString(),
-      to:   dayEndUtc.toISOString(),
-    });
+      for (const [uid, items] of byUser.entries()) {
+        items.sort((a, b) => b.updatedAt - a.updatedAt);
+        const toDelete = items.slice(1); // 최신 1개만 남김
+        if (toDelete.length === 0) continue;
 
-    // ── ebooks 맵 로드 (imwebProductCode → ebookId) ─────────
-    const ebooksSnap = await db.collection("ebooks").get();
-    const ebookMap   = new Map<string, string>();
-    for (const doc of ebooksSnap.docs) {
-      const code = doc.data().imwebProductCode as string | undefined;
-      if (code) ebookMap.set(code, doc.id);
-    }
-
-    // ── 아임웹 주문 페이지 순회 ─────────────────────────────
-    let revoked = 0;
-    let skipped = 0;
-    let page    = 1;
-
-    while (page <= 20) {
-      const url =
-        `https://api.imweb.me/v2/shop/orders` +
-        `?order_date_from=${fromSec}` +
-        `&order_date_to=${toSec}` +
-        `&order_version=v2` +
-        `&page=${page}` +
-        `&limit=100`;
-
-      if (page > 1) await imwebDelay(1500);
-
-      const res  = await axios.get(url, { headers });
-      const list = extractImwebList(res.data);
-      if (list.length === 0) break;
-
-      for (const order of list) {
-        const o = order as Record<string, unknown>;
-
-        // 취소·환불·반품 상태인 주문만 처리
-        if (!shouldExcludeImwebOrderSummary(o)) {
-          skipped++;
-          continue;
-        }
-
-        const orderer      = o["orderer"] as Record<string, unknown> | undefined;
-        const ordererEmail = (orderer?.["email"] as string | undefined)
-          ?.trim().toLowerCase();
-        if (!ordererEmail) continue;
-
-        // 이메일 기준 uid 조회 (email 직접 매칭 → emailAliases 매칭)
-        let uid: string | null = null;
-        const byEmail = await db.collection("users")
-          .where("email", "==", ordererEmail).limit(1).get();
-        if (!byEmail.empty) {
-          uid = byEmail.docs[0].id;
-        } else {
-          const byAlias = await db.collection("users")
-            .where("emailAliases", "array-contains", ordererEmail).limit(1).get();
-          if (!byAlias.empty) uid = byAlias.docs[0].id;
-        }
-        if (!uid) continue;
-
-        // prod-orders 조회 → 취소된 품목 파악
-        const orderNo = String(o["order_no"] ?? "");
-        if (!orderNo) continue;
-
-        await imwebDelay(1500);
-        const prodRes  = await axios.get(
-          `https://api.imweb.me/v2/shop/orders/${orderNo}/prod-orders`,
-          { headers }
-        );
-        const prodList = extractImwebList(prodRes.data);
-
-        for (const prodOrder of prodList) {
-          const items = prodOrder["items"];
-          if (!Array.isArray(items)) continue;
-
-          for (const item of items) {
-            const it     = item as Record<string, unknown>;
-            const prodNo = String(it["prod_no"] ?? "");
-            if (!prodNo) continue;
-
-            const ebookId = ebookMap.get(prodNo);
-            if (!ebookId) continue;
-
-            // 해당 유저의 purchases 문서 존재 여부 확인
-            const purchaseRef = db
-              .collection("users").doc(uid)
-              .collection("purchases").doc(ebookId);
-            const purchaseDoc = await purchaseRef.get();
-            if (!purchaseDoc.exists) continue;
-
-            const pd         = purchaseDoc.data() ?? {};
-            const lastReadAt = pd["lastReadAt"] ?? null;
-            const hadRead    = lastReadAt !== null;
-
-            // revoked_purchases 로그 기록 + purchases 삭제 (배치)
-            const logRef = db.collection("revoked_purchases").doc();
-            const batch  = db.batch();
-
-            batch.set(logRef, {
-              uid,
-              email:        ordererEmail,
-              ebookId,
-              imwebOrderNo: orderNo,
-              imwebProdNo:  prodNo,
-              revokedAt:    admin.firestore.FieldValue.serverTimestamp(),
-              hadRead,
-              lastReadAt:   lastReadAt ?? null,
-              lastPage:     pd["lastPage"]   ?? null,
-              progress:     pd["progress"]   ?? null,
-              purchasedAt:  pd["purchasedAt"] ?? null,
-              source:       pd["source"]      ?? null,
-              revokedBy:    "revokeRefundedPurchases_scheduler",
+        if (!dryRun) {
+          // batch 삭제 (500개 단위)
+          for (let i = 0; i < toDelete.length; i += 400) {
+            const batch = db.batch();
+            toDelete.slice(i, i + 400).forEach((it) => {
+              batch.delete(db.collection("resumes").doc(it.id));
             });
-
-            batch.delete(purchaseRef);
             await batch.commit();
-
-            revoked++;
-            functions.logger.info("revokeRefundedPurchases: purchases 삭제", {
-              uid,
-              email: ordererEmail,
-              ebookId,
-              orderNo,
-              hadRead,
-            });
           }
         }
+        deletedCount += toDelete.length;
+        perUserDeleted[uid] = toDelete.length;
       }
 
-      if (list.length < 100) break;
-      page++;
+      res.status(200).json({
+        ok: true,
+        dryRun,
+        totalResumes: snap.size,
+        totalEmpty,
+        usersAffected: Object.keys(perUserDeleted).length,
+        deletedCount,
+        perUserDeleted,
+        note: "각 사용자당 가장 최근 빈 이력서 1개는 보존",
+      });
+    } catch (e: unknown) {
+      const err = e as Error;
+      res.status(500).json({ ok: false, error: err?.message ?? String(e) });
     }
-
-    functions.logger.info("revokeRefundedPurchases: 완료", {
-      revoked,
-      skipped,
-      targetDate: dayStartUtc.toISOString().slice(0, 10),
-    });
   });
+

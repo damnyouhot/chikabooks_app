@@ -2,12 +2,80 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // ══════════════════════════════════════════════════
+    // 파트너 그룹
+    // ══════════════════════════════════════════════════
+    match /partnerGroups/{groupId} {
+      // 그룹 멤버만 읽기 가능
+      allow read: if request.auth != null && 
+                     request.auth.uid in resource.data.memberUids;
+      // 쓰기는 서버만 (Cloud Functions)
+      allow write: if false;
+
+      // ── 슬롯 (서버만 쓰기) ──
+      match /slots/{slotId} {
+        allow read: if request.auth != null && 
+                       request.auth.uid in get(/databases/$(database)/documents/partnerGroups/$(groupId)).data.memberUids;
+        allow write: if false; // 서버만
+      }
+
+      // ── 이벤트 로그 (서버 내부용) ──
+      match /events/{eventId} {
+        allow read: if false; // 클라이언트 읽기 금지
+        allow write: if false; // 서버만
+      }
+
+      // ── 멤버 메타 ──
+      match /memberMeta/{uid} {
+        allow read: if request.auth != null && 
+                       request.auth.uid in get(/databases/$(database)/documents/partnerGroups/$(groupId)).data.memberUids;
+        allow write: if false;
+      }
+
+      // ── 활동 로그 (기존) ──
+      match /activityLogs/{logId} {
+        allow read: if request.auth != null && 
+                       request.auth.uid in get(/databases/$(database)/documents/partnerGroups/$(groupId)).data.memberUids;
+        allow write: if false;
+      }
+
+      // ── 게시물 (bondGroups 내부) ──
+      match /posts/{postId} {
+        allow read: if request.auth != null && 
+                       request.auth.uid in get(/databases/$(database)/documents/partnerGroups/$(groupId)).data.memberUids;
+        allow write: if request.auth != null && 
+                        request.auth.uid in get(/databases/$(database)/documents/partnerGroups/$(groupId)).data.memberUids;
+
+        // ── 추대 서브컬렉션 ──
+        match /enthrones/{enthUID} {
+          allow read: if request.auth != null && 
+                         request.auth.uid in get(/databases/$(database)/documents/partnerGroups/$(groupId)).data.memberUids;
+          allow create: if request.auth != null && 
+                           request.auth.uid == enthUID &&
+                           request.auth.uid in get(/databases/$(database)/documents/partnerGroups/$(groupId)).data.memberUids;
+          allow delete: if request.auth != null && request.auth.uid == enthUID;
+        }
+      }
+
+      // ── 일일 요약 ──
+      match /dailySummaries/{dateKey} {
+        allow read: if request.auth != null && 
+                       request.auth.uid in get(/databases/$(database)/documents/partnerGroups/$(groupId)).data.memberUids;
+        allow write: if false; // 서버만 (Cloud Functions)
+      }
+    }
+
+    // ══════════════════════════════════════════════════
     // 유저
     // ══════════════════════════════════════════════════
     match /users/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
-      // 본인 문서 전체 쓰기 — careerProfile, lastImportedResumeId, lastImportedResumeAt 등
       allow write: if request.auth != null && request.auth.uid == uid;
+
+      // ── 파트너 인박스 (서버만 쓰기) ──
+      match /partnerInbox/{inboxId} {
+        allow read: if request.auth != null && request.auth.uid == uid;
+        allow write: if false; // 서버만
+      }
 
       // ── 📝 나만 보는 한 줄 기록 (notes) ──
       match /notes/{noteId} {
@@ -20,63 +88,6 @@ service cloud.firestore {
         allow read: if request.auth != null && request.auth.uid == uid;
         allow write: if request.auth != null && request.auth.uid == uid;
       }
-
-      // 공감·퀴즈 보상 먹이 중복 방지 (클라이언트 트랜잭션)
-      match /caringTreatGrants/{grantId} {
-        allow read, write: if request.auth != null && request.auth.uid == uid;
-      }
-    }
-
-    // ══════════════════════════════════════════════════
-    // 공고자(치과) 마스터 계정
-    // ══════════════════════════════════════════════════
-    match /clinics_accounts/{uid} {
-      allow read: if request.auth != null && request.auth.uid == uid;
-
-      // 생성: 본인만 + 서버 전용 필드 초기값 고정
-      allow create: if request.auth != null && request.auth.uid == uid
-        && request.resource.data.approvalStatus == 'pending'
-        && request.resource.data.canPost == false;
-
-      // 수정: 본인만 + 서버 전용 필드(승인·인증) 변경 불가
-      allow update: if request.auth != null && request.auth.uid == uid
-        && request.resource.data.approvalStatus == resource.data.approvalStatus
-        && request.resource.data.canPost == resource.data.canPost
-        && request.resource.data.clinicVerified == resource.data.clinicVerified
-        && request.resource.data.get('identityVerified', false) == resource.data.get('identityVerified', false);
-
-      allow delete: if false;
-
-      // ── 치과 프로필 (다중 지점 지원) ──
-      match /clinic_profiles/{profileId} {
-        allow read: if request.auth != null && request.auth.uid == uid;
-        allow create: if request.auth != null && request.auth.uid == uid;
-        // 사업자 인증 상태는 서버만 변경 가능
-        allow update: if request.auth != null && request.auth.uid == uid
-          && request.resource.data.get('businessVerification', {}).get('status', 'none')
-             == resource.data.get('businessVerification', {}).get('status', 'none');
-        allow delete: if false;
-      }
-    }
-
-    // ══════════════════════════════════════════════════
-    // 🎫 공고권 (Vouchers)
-    // ══════════════════════════════════════════════════
-    match /vouchers/{voucherId} {
-      allow read: if request.auth != null
-        && resource.data.ownerUid == request.auth.uid;
-      // 생성·수정·삭제: 서버만 (발급/사용/만료 처리)
-      allow create, update, delete: if false;
-    }
-
-    // ══════════════════════════════════════════════════
-    // 🧾 주문 (Orders)
-    // ══════════════════════════════════════════════════
-    match /orders/{orderId} {
-      allow read: if request.auth != null
-        && resource.data.ownerUid == request.auth.uid;
-      // 생성·수정·삭제: 서버만 (결제 검증 후 상태 전환)
-      allow create, update, delete: if false;
     }
 
     // ══════════════════════════════════════════════════
@@ -97,11 +108,82 @@ service cloud.firestore {
     }
 
     // ══════════════════════════════════════════════════
-    // 🔐 API 키 (클라이언트 접근 금지 — Admin SDK/콘솔만)
-    // Cloud Functions는 보안 규칙을 우회하므로 sync 등 서버 코드는 그대로 동작함.
+    // 결을 같이하기 게시물 (Bond Posts)
+    // ══════════════════════════════════════════════════
+    match /bondPosts/{postId} {
+      // 읽기: 로그인한 모든 유저 (단, 숨김 처리된 글 제외)
+      allow read: if request.auth != null;
+      
+      // 쓰기: 로그인한 유저, 자신의 uid로만 작성 (deleted_user로 작성 금지)
+      allow create: if request.auth != null && 
+        request.resource.data.uid == request.auth.uid &&
+        request.resource.data.uid != "deleted_user" &&
+        request.resource.data.text is string &&
+        request.resource.data.text.size() <= 200 &&
+        request.resource.data.dateKey is string &&
+        request.resource.data.timeSlot is string &&
+        request.resource.data.bondGroupId is string &&
+        request.resource.data.reports == 0;
+      
+      // 수정: 본인 게시물만 (익명화된 게시물 수정 금지)
+      allow update: if request.auth != null && 
+        resource.data.uid == request.auth.uid &&
+        resource.data.uid != "deleted_user";
+      
+      // 삭제: 본인 게시물만
+      allow delete: if request.auth != null && 
+        resource.data.uid == request.auth.uid;
+
+      // ── 신고 서브컬렉션 ──
+      match /reports/{reportId} {
+        // 읽기: 본인이 신고한 기록만 확인 가능
+        allow read: if request.auth != null && 
+          reportId == request.auth.uid;
+        // 쓰기: 로그인한 유저만 (중복 신고는 서비스 로직에서 처리)
+        allow create: if request.auth != null && 
+          request.resource.data.reporterUid == request.auth.uid;
+        allow update, delete: if false; // 신고는 생성만 가능
+      }
+    }
+
+    // ══════════════════════════════════════════════════
+    // 전광판 게시물 (Billboard Posts)
+    // ══════════════════════════════════════════════════
+    match /billboardPosts/{postId} {
+      // 읽기: 개발용 - 모든 사용자 허용 (임시)
+      allow read: if true;
+      // 생성/삭제: 서버만 (Cloud Functions)
+      allow create, delete: if false;
+      // 업데이트: 반응 집계(reactions)만 클라이언트 허용
+      allow update: if request.auth != null &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions']);
+
+      // ── 유저별 반응 (글당 1개, 토글/변경) ──
+      match /userReactions/{uid} {
+        allow read: if request.auth != null;
+        allow create, update: if request.auth != null &&
+          request.auth.uid == uid &&
+          request.resource.data.uid == request.auth.uid &&
+          request.resource.data.emoji in ['👏', '❤️', '🔥', '😢'];
+        allow delete: if request.auth != null && request.auth.uid == uid;
+      }
+    }
+
+    // ══════════════════════════════════════════════════
+    // 파트너 그룹 내 주간 스탬프
+    // ══════════════════════════════════════════════════
+    match /partnerGroups/{groupId}/weeklyStamps/{stampId} {
+      allow read: if request.auth != null && 
+        request.auth.uid in get(/databases/$(database)/documents/partnerGroups/$(groupId)).data.memberUids;
+      allow write: if false; // 서버만
+    }
+
+    // ══════════════════════════════════════════════════
+    // 🔐 API 키 (로그인한 모든 사용자 읽기 가능, 쓰기는 금지)
     // ══════════════════════════════════════════════════
     match /api_keys/{keyDoc} {
-      allow read, write: if false;
+      allow read: if request.auth != null; // 로그인한 모든 사용자
+      allow write: if false; // 콘솔 또는 서버에서만 수정
     }
 
     // ══════════════════════════════════════════════════
@@ -299,186 +381,103 @@ service cloud.firestore {
     }
 
     // ══════════════════════════════════════════════════
-    // 📋 피드백 게시판 (Feedbacks)
+    // 💳 지갑 (공고권 + 충전 잔액) — 클라이언트 읽기 전용
+    //   - 모든 잔액 변동(차감/충전/환불)은 Cloud Functions에서만 수행
+    //   - ledger 서브컬렉션도 동일하게 클라이언트 쓰기 금지
     // ══════════════════════════════════════════════════
-    function isAdminUser() {
-      return request.auth != null &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
-    }
+    match /wallets/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false; // 서버만
 
-    match /feedbacks/{feedbackId} {
-      // 읽기: public 글은 로그인한 모든 유저, private는 관리자 또는 작성자만
-      allow read: if request.auth != null && (
-        resource.data.visibility == 'public' ||
-        isAdminUser() ||
-        resource.data.uid == request.auth.uid
-      );
-
-      // 생성: 로그인한 본인 uid로만
-      allow create: if request.auth != null &&
-        request.resource.data.uid == request.auth.uid &&
-        request.resource.data.text is string &&
-        request.resource.data.text.size() > 0 &&
-        request.resource.data.text.size() <= 1000 &&
-        request.resource.data.visibility in ['public', 'private'] &&
-        request.resource.data.type in ['improvement', 'positive'] &&
-        request.resource.data.priority in ['high', 'medium', 'low'];
-
-      // 수정: 작성자(text/type/priority/visibility 변경) 또는 관리자(adminStatus 포함 전체)
-      allow update: if request.auth != null && (
-        isAdminUser() ||
-        (
-          resource.data.uid == request.auth.uid &&
-          request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['text', 'type', 'priority', 'visibility', 'updatedAt'])
-        )
-      );
-
-      // 삭제: 작성자 또는 관리자
-      allow delete: if request.auth != null && (
-        resource.data.uid == request.auth.uid || isAdminUser()
-      );
-
-      // ── 댓글 서브컬렉션 ──
-      match /comments/{commentId} {
-        // 읽기: 부모 피드백 읽기 권한과 동일
-        allow read: if request.auth != null && (
-          get(/databases/$(database)/documents/feedbacks/$(feedbackId)).data.visibility == 'public' ||
-          isAdminUser() ||
-          get(/databases/$(database)/documents/feedbacks/$(feedbackId)).data.uid == request.auth.uid
-        );
-
-        // 생성: 로그인한 본인 uid로만, 텍스트 최대 500자
-        allow create: if request.auth != null &&
-          request.resource.data.uid == request.auth.uid &&
-          request.resource.data.text is string &&
-          request.resource.data.text.size() > 0 &&
-          request.resource.data.text.size() <= 500;
-
-        // 수정: 불가
-        allow update: if false;
-
-        // 삭제: 댓글 작성자 또는 관리자
-        allow delete: if request.auth != null && (
-          resource.data.uid == request.auth.uid || isAdminUser()
-        );
+      match /ledger/{entryId} {
+        allow read: if request.auth != null && request.auth.uid == uid;
+        allow write: if false; // 서버만
       }
     }
 
     // ══════════════════════════════════════════════════
-    // 🗳️ 공감투표 (Empathy Polls)
+    // 🧾 주문 (Orders) — 본인 주문만 읽기, 쓰기는 서버만
+    //   - createOrder / confirmPayment Callable에서만 생성/수정
     // ══════════════════════════════════════════════════
-    match /polls/{pollId} {
-      // 읽기: 로그인한 모든 유저
-      allow read: if request.auth != null;
-      // 쓰기: 서버(Cloud Functions / 관리 콘솔)만
+    match /orders/{orderId} {
+      allow read: if request.auth != null &&
+        resource.data.ownerUid == request.auth.uid;
       allow create, update, delete: if false;
-
-      // ── 보기(선택지) ──
-      match /options/{optionId} {
-        allow read: if request.auth != null;
-
-        // 사용자 보기 추가: 로그인 유저만, isSystem=false 강제
-        allow create: if request.auth != null
-          && request.resource.data.isSystem == false
-          && request.resource.data.authorUid == request.auth.uid
-          && request.resource.data.content is string
-          && request.resource.data.content.size() > 0
-          && request.resource.data.content.size() <= 50
-          && request.resource.data.authorNickname is string
-          && request.resource.data.authorNickname.size() <= 30
-          && request.resource.data.empathyCount == 0
-          && request.resource.data.reportCount == 0
-          && request.resource.data.isHidden == false;
-
-        // empathyCount/reportCount/isHidden 변경은 트랜잭션에서 처리
-        // 클라이언트 트랜잭션도 통과하도록 허용
-        allow update: if request.auth != null;
-
-        // 사용자 추가 보기: 작성자만 삭제 — 공감 0 또는 공감 1(본인 표만)
-        allow delete: if request.auth != null
-          && resource.data.isSystem == false
-          && resource.data.authorUid == request.auth.uid
-          && (
-            resource.data.empathyCount == 0
-            || (
-              resource.data.empathyCount == 1
-              && exists(/databases/$(database)/documents/polls/$(pollId)/votes/$(request.auth.uid))
-              && get(/databases/$(database)/documents/polls/$(pollId)/votes/$(request.auth.uid)).data.optionId == optionId
-            )
-          );
-
-        // ── 신고 서브컬렉션 ──
-        match /reports/{reportId} {
-          // 보기 작성자가 삭제 전 신고 문서 정리용으로 조회
-          allow read: if request.auth != null
-            && get(/databases/$(database)/documents/polls/$(pollId)/options/$(optionId)).data.authorUid == request.auth.uid;
-          allow create: if request.auth != null
-            && request.auth.uid == reportId
-            && request.resource.data.reason is string
-            && request.resource.data.reason.size() >= 1
-            && request.resource.data.reason.size() <= 80;
-          allow update: if false;
-          allow delete: if request.auth != null
-            && get(/databases/$(database)/documents/polls/$(pollId)/options/$(optionId)).data.authorUid == request.auth.uid;
-        }
-      }
-
-      // ── 투표(votes) ──
-      match /votes/{voteUid} {
-        // 읽기: 본인만
-        allow read: if request.auth != null && request.auth.uid == voteUid;
-        // 생성/수정: 본인만 (트랜잭션에서 사용)
-        allow create, update: if request.auth != null
-          && request.auth.uid == voteUid;
-        // 본인 문서만 삭제 (작성자 보기 삭제 시 공감 정리용, CF에서도 Admin으로 삭제)
-        allow delete: if request.auth != null && request.auth.uid == voteUid;
-      }
-
-      // ── 종료 투표 한마디 댓글 ──
-      match /pollComments/{commentId} {
-        allow read: if request.auth != null;
-        allow create: if request.auth != null
-          && (
-            get(/databases/$(database)/documents/polls/$(pollId)).data.status == 'closed'
-            || get(/databases/$(database)/documents/polls/$(pollId)).data.endsAt < request.time
-          )
-          && request.resource.data.uid == request.auth.uid
-          && request.resource.data.text is string
-          && request.resource.data.text.size() > 0
-          && request.resource.data.text.size() <= 300;
-        allow update, delete: if false;
-      }
     }
 
     // ══════════════════════════════════════════════════
-    // 📊 행동 분석 일별 집계 (Analytics Daily)
+    // 🧾 세금계산서 / 현금영수증 발급 요청
+    //   - 클라이언트는 직접 쓰지 않고, requestTaxInvoice / requestCashReceipt
+    //     Callable을 통해서만 적재 (서버에서 ownerUid 강제)
+    //   - 본인 요청 내역은 본인만 읽기
     // ══════════════════════════════════════════════════
-    match /analytics_daily/{dateKey} {
-      allow read: if request.auth != null && isAdminUser();
-      allow write: if false; // Cloud Functions만
+    match /taxRequests/{reqId} {
+      allow read: if request.auth != null &&
+        resource.data.ownerUid == request.auth.uid;
+      allow write: if false; // 서버만 (Callable 경유)
+    }
+    match /cashReceiptRequests/{reqId} {
+      allow read: if request.auth != null &&
+        resource.data.ownerUid == request.auth.uid;
+      allow write: if false; // 서버만 (Callable 경유)
     }
 
     // ══════════════════════════════════════════════════
-    // 📦 퀴즈 패크 메타 (임상 세트 전환용, 읽기만)
+    // 💸 결제 요청 큐 (1차 운영: 운영팀 수동 입금 확인)
+    //   - chargeVoucherPackage / chargeCreditPackage Callable에서만 적재
+    //   - 본인 요청만 읽기, 쓰기는 서버만 (applyPendingPayment 에서 status 변경)
     // ══════════════════════════════════════════════════
-    match /quiz_packs/{packId} {
-      allow read: if request.auth != null;
+    match /paymentRequests/{reqId} {
+      allow read: if request.auth != null &&
+        resource.data.ownerUid == request.auth.uid;
       allow write: if false;
     }
 
     // ══════════════════════════════════════════════════
-    // 🔔 알림 (Notifications)
+    // 🏥 병원(지점) 프로필 (clinics_accounts/{uid}/clinic_profiles/*)
+    //   - 본인만 읽기/쓰기 — 다지점 운영 시 지점별 프로필 1건씩
+    //   - businessVerification 등 사업자 정보 포함 (개인정보 보호)
+    //   - 결제/공고 권한 판단의 1차 기준이라 외부 공개 금지
     // ══════════════════════════════════════════════════
-    match /notifications/{uid} {
-      match /items/{itemId} {
-        allow read: if request.auth != null && request.auth.uid == uid;
-        // 클라이언트는 read 플래그만 변경 가능
-        allow update: if request.auth != null && request.auth.uid == uid
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
-        // 생성·삭제: 서버만
-        allow create, delete: if false;
-      }
+    match /clinics_accounts/{uid}/clinic_profiles/{profileId} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // 사업자 인증 시도 기록 — 확정 프로필과 분리된 임시/실패/다른 사업자 시도.
+    // 클라이언트는 본인 기록을 읽기만 하고, 생성/수정은 Cloud Functions(Admin SDK)가 담당한다.
+    match /clinics_accounts/{uid}/clinic_profiles/{profileId}/verification_attempts/{attemptId} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    // ══════════════════════════════════════════════════
+    // 🔔 알림 환경설정 (clinics_accounts/{uid}/notificationPrefs/*)
+    //   - 본인만 읽기/쓰기 (이메일/전화는 본인 운영 정보, 민감 자격증명 아님)
+    // ══════════════════════════════════════════════════
+    match /clinics_accounts/{uid}/notificationPrefs/{docId} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // ══════════════════════════════════════════════════
+    // 👥 인재풀 (applicantPool) — 운영자가 본인 지점에 ⭐로 등록한 지원자
+    //   경로: clinics_accounts/{ownerUid}/branches/{branchId}/applicantPool/{applicantUid}
+    //   - 본인(ownerUid)만 읽기/쓰기 가능
+    //   - 메모/태그/상태/즐겨찾기 등 운영자 전용 메타데이터
+    // ══════════════════════════════════════════════════
+    match /clinics_accounts/{ownerUid}/branches/{branchId}/applicantPool/{applicantUid} {
+      allow read, write: if request.auth != null
+        && request.auth.uid == ownerUid;
+    }
+
+    // ══════════════════════════════════════════════════
+    // 📧 알림 발송 큐 (notifyQueue) — 서버 전용
+    //   - 클라이언트는 직접 쓰기 금지 (notifyPastApplicant Callable 경유)
+    //   - 본인이 발송 요청한 항목 읽기만 가능 (모니터링/디버그용)
+    // ══════════════════════════════════════════════════
+    match /notifyQueue/{itemId} {
+      allow read: if request.auth != null
+        && resource.data.ownerUid == request.auth.uid;
+      allow write: if false;
     }
 
     // ══════════════════════════════════════════════════

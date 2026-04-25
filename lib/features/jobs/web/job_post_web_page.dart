@@ -206,6 +206,16 @@ class _JobPostWebPageState extends State<JobPostWebPage>
                   style: WebTypo.heading(color: AppColors.textPrimary),
                 ),
                 const Spacer(),
+                // 내 정보 (마이페이지) 진입
+                TextButton.icon(
+                  onPressed: () => context.push('/me'),
+                  icon: const Icon(Icons.account_box_outlined, size: 16),
+                  label: const Text('내 정보'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.accent,
+                    textStyle: const TextStyle(fontSize: 13),
+                  ),
+                ),
                 // 사업자 인증 버튼
                 TextButton.icon(
                   onPressed: () => context.push('/clinic-verify'),

@@ -40,18 +40,12 @@ class _ClinicReadOnlyView extends StatelessWidget {
         scrolledUnderElevation: 0,
         title: const Text(
           '공고 보기',
-          style: TextStyle(
-            fontWeight: FontWeight.w700,
-            fontSize: 18,
-          ),
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
         ),
         actions: [
           TextButton(
             onPressed: () => FirebaseAuth.instance.signOut(),
-            child: const Text(
-              '로그아웃',
-              style: TextStyle(color: Colors.grey),
-            ),
+            child: const Text('로그아웃', style: TextStyle(color: Colors.grey)),
           ),
         ],
       ),
@@ -68,7 +62,7 @@ class _ClinicReadOnlyView extends StatelessWidget {
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '치과(공고자) 계정은 공고 열람만 가능해요.\n공고 등록·채용은 웹 치과 로그인을 이용해주세요.',
+                    '치과(공고자) 계정은 공고 열람만 가능해요.\n공고 등록은 hygienelab.kr 을 이용해주세요.',
                     style: TextStyle(
                       fontSize: 12,
                       color: Color(0xFF856404),
@@ -79,23 +73,9 @@ class _ClinicReadOnlyView extends StatelessWidget {
               ],
             ),
           ),
-          // 공고 목록 (스크롤 허용, 탭 차단)
+          // 공고 목록 (스크롤만 허용)
           Expanded(
-            child: Stack(
-              children: [
-                const JobListingsScreen(onMapToggle: _noOp),
-                // 투명 오버레이: 탭/롱프레스 흡수, 드래그(스크롤)는 하위 위젯에 전달
-                Positioned.fill(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.translucent,
-                    onTap: () {},
-                    onLongPress: () {},
-                    onDoubleTap: () {},
-                    child: const SizedBox.expand(),
-                  ),
-                ),
-              ],
-            ),
+            child: const JobListingsScreen(onMapToggle: _noOp, readOnly: true),
           ),
         ],
       ),

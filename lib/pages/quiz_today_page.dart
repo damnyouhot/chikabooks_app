@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -9,34 +7,12 @@ import '../core/widgets/app_badge.dart';
 import '../core/widgets/app_muted_card.dart';
 import '../core/widgets/app_primary_card.dart';
 import '../core/widgets/glass_card.dart';
-import '../models/quiz_pool_item.dart';
 import '../models/quiz_schedule.dart';
-import '../services/admin_activity_service.dart';
-import '../services/funnel_onboarding_service.dart';
-import '../services/quiz_content_config_service.dart';
-import '../services/quiz_accuracy_stats.dart';
-import '../services/caring_treat_service.dart';
 import '../services/quiz_pool_service.dart';
-import '../widgets/caring/floating_treat_burst.dart';
 import '../widgets/quiz/quiz_share_capture.dart';
 
 /// 퀴즈 탭 글래스 모드 플래그
 const bool kQuizGlassMode = false;
-
-Map<String, int> _parseAccuracyDist(Map<String, dynamic>? raw) {
-  if (raw == null) return {};
-  return raw.map((k, v) => MapEntry(k, (v as num).toInt()));
-}
-
-/// 정답률이 [myPct]보다 높은 버킷 인원 합 + 1.
-int _rankFromAccuracyDist(int myPct, Map<String, int> dist) {
-  var above = 0;
-  for (final e in dist.entries) {
-    final p = int.tryParse(e.key) ?? -1;
-    if (p > myPct) above += e.value;
-  }
-  return above + 1;
-}
 
 /// 오늘의 퀴즈 페이지
 ///
@@ -56,11 +32,10 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
   int _totalWrong = 0;
   int _weekCorrect = 0;
   int _weekWrong = 0;
-  int _rankWeek = 1;
-  int _rankAll = 1;
-  int _participantsWeek = 1;
-  int _participantsAll = 1;
+  int _totalUsers = 1;
+  int _myRank = 1;
   bool _statsLoaded = false;
+  Map<String, int> _scoreDistribution = {};
 
   // ── 오늘 스케줄 & 유저 기록 ──
   QuizSchedule? _todaySchedule;
@@ -74,9 +49,6 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
 
   // ── 지난 퀴즈 펼치기 여부 ──
   bool _recentExpanded = false;
-
-  /// 오늘 스케줄 로드 후 1회만 퀴즈 오픈 먹이 시도
-  bool _quizOpenTreatAttempted = false;
 
   @override
   void initState() {
@@ -96,9 +68,7 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
         return;
       }
 
-      final weekKey = QuizPoolService.currentWeekKey;
-
-      // 유저 개인 통계 + 통산·주간 글로벌 집계 병렬 로드
+      // 유저 개인 통계 + 글로벌 집계 병렬 로드 (서버 우선 → 최신 순위 보장)
       final results = await Future.wait([
         FirebaseFirestore.instance
             .collection('users')
@@ -110,95 +80,76 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
             .collection('quiz_global')
             .doc('stats')
             .get(const GetOptions(source: Source.server)),
-        FirebaseFirestore.instance
-            .collection('quiz_global')
-            .doc('weekly_$weekKey')
-            .get(const GetOptions(source: Source.server)),
       ]);
 
       final userDoc = results[0];
       final globalDoc = results[1];
-      final weeklyDoc = results[2];
       if (!mounted) return;
 
-      int participantsAll = 0;
-      Map<String, int> distAll = {};
+      // 글로벌 집계에서 참여자 수 · 점수 분포 추출
+      int totalParticipants = 1;
+      Map<String, dynamic> distribution = {};
       if (globalDoc.exists) {
         final gData = globalDoc.data() ?? {};
-        participantsAll =
-            (gData['totalParticipantsAccuracy'] as num?)?.toInt() ?? 0;
-        distAll = _parseAccuracyDist(
-          gData['accuracyDistribution'] as Map<String, dynamic>?,
+        totalParticipants = (gData['totalParticipants'] as num?)?.toInt() ?? 1;
+        if (totalParticipants < 1) totalParticipants = 1;
+        distribution = Map<String, dynamic>.from(
+          gData['scoreDistribution'] as Map<String, dynamic>? ?? {},
         );
         debugPrint(
-          '📊 [LoadStats] global: pAll=$participantsAll distAll=$distAll',
+          '📊 [LoadStats] global exists: participants=$totalParticipants, dist=$distribution',
         );
       } else {
         debugPrint('📊 [LoadStats] quiz_global/stats 문서 없음');
       }
 
-      int participantsWeek = 0;
-      Map<String, int> distWeek = {};
-      if (weeklyDoc.exists) {
-        final wData = weeklyDoc.data() ?? {};
-        participantsWeek =
-            (wData['totalParticipantsWeekly'] as num?)?.toInt() ?? 0;
-        distWeek = _parseAccuracyDist(
-          wData['accuracyDistribution'] as Map<String, dynamic>?,
-        );
-      }
-
       if (userDoc.exists) {
         final data = userDoc.data() ?? {};
 
+        // 이번 주 월요일 dateKey (KST 기준)
+        final nowKst = DateTime.now().toUtc().add(const Duration(hours: 9));
+        final monday = nowKst.subtract(Duration(days: nowKst.weekday - 1));
+        final thisWeekKey =
+            '${monday.year}-${monday.month.toString().padLeft(2, '0')}-${monday.day.toString().padLeft(2, '0')}';
         final storedWeekKey = data['weekKey'] as String?;
-        final isSameWeek = storedWeekKey == weekKey;
+        final isSameWeek = storedWeekKey == thisWeekKey;
 
         final totalCorrect = (data['totalCorrect'] as num?)?.toInt() ?? 0;
-        final totalWrong = (data['totalWrong'] as num?)?.toInt() ?? 0;
-        final weekCorrect =
-            isSameWeek ? ((data['weekCorrect'] as num?)?.toInt() ?? 0) : 0;
-        final weekWrong =
-            isSameWeek ? ((data['weekWrong'] as num?)?.toInt() ?? 0) : 0;
 
-        final myAllPct =
-            QuizAccuracyStats.accuracyPercent(totalCorrect, totalWrong);
-        final myWeekPct =
-            QuizAccuracyStats.accuracyPercent(weekCorrect, weekWrong);
-
-        final rankAll = myAllPct == null
-            ? 1
-            : _rankFromAccuracyDist(myAllPct, distAll);
-        final rankWeek = myWeekPct == null
-            ? 1
-            : _rankFromAccuracyDist(myWeekPct, distWeek);
+        // 순위 계산: 내 totalCorrect보다 높은 사람 수 + 1
+        int peopleAboveMe = 0;
+        for (final entry in distribution.entries) {
+          final score = int.tryParse(entry.key) ?? 0;
+          if (score > totalCorrect) {
+            peopleAboveMe += (entry.value as num?)?.toInt() ?? 0;
+          }
+        }
 
         debugPrint(
-          '📊 [LoadStats] allPct=$myAllPct rankAll=$rankAll/$participantsAll '
-          'weekPct=$myWeekPct rankWeek=$rankWeek/$participantsWeek',
+          '📊 [LoadStats] myTotalCorrect=$totalCorrect, '
+          'peopleAboveMe=$peopleAboveMe, '
+          'rank=${peopleAboveMe + 1}/$totalParticipants',
         );
 
         setState(() {
           _totalCorrect = totalCorrect;
-          _totalWrong = totalWrong;
-          _weekCorrect = weekCorrect;
-          _weekWrong = weekWrong;
-          _rankAll = rankAll;
-          _rankWeek = rankWeek;
-          _participantsAll = participantsAll;
-          _participantsWeek = participantsWeek;
+          _totalWrong = (data['totalWrong'] as num?)?.toInt() ?? 0;
+          _weekCorrect =
+              isSameWeek ? ((data['weekCorrect'] as num?)?.toInt() ?? 0) : 0;
+          _weekWrong =
+              isSameWeek ? ((data['weekWrong'] as num?)?.toInt() ?? 0) : 0;
+          _myRank = peopleAboveMe + 1;
+          _totalUsers = totalParticipants;
+          _scoreDistribution = distribution.map(
+            (k, v) => MapEntry(k, (v as num).toInt()),
+          );
           _statsLoaded = true;
         });
       } else {
+        // 퀴즈 미참여자: 점수 0 → 모든 참여자보다 아래
         setState(() {
-          _totalCorrect = 0;
-          _totalWrong = 0;
-          _weekCorrect = 0;
-          _weekWrong = 0;
-          _rankAll = participantsAll > 0 ? participantsAll : 1;
-          _rankWeek = participantsWeek > 0 ? participantsWeek : 1;
-          _participantsAll = participantsAll;
-          _participantsWeek = participantsWeek;
+          _myRank = totalParticipants;
+          _totalUsers = totalParticipants;
           _statsLoaded = true;
         });
       }
@@ -211,9 +162,8 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
   Future<void> _loadTodaySchedule() async {
     try {
       final dateKey = QuizPoolService.todayKey;
-      final cfgF = QuizContentConfigService.getConfig();
       final results = await Future.wait([
-        cfgF.then((c) => QuizPoolService.getTodaySchedule(contentConfig: c)),
+        QuizPoolService.getTodaySchedule(),
         QuizPoolService.getHistory(dateKey),
       ]);
 
@@ -223,10 +173,6 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
           _todayHistory = results[1] as UserQuizHistory?;
           _scheduleLoaded = true;
         });
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          unawaited(_tryGrantQuizOpenTreat());
-        });
       }
     } catch (e) {
       debugPrint('⚠️ 오늘 퀴즈 로드 실패: $e');
@@ -234,23 +180,11 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
     }
   }
 
-  Future<void> _tryGrantQuizOpenTreat() async {
-    if (_quizOpenTreatAttempted) return;
-    final s = _todaySchedule;
-    if (s == null) return;
-    _quizOpenTreatAttempted = true;
-    final ok = await CaringTreatService.tryGrantQuizDayOpened(s.dateKey);
-    if (ok && mounted) {
-      FloatingTreatBurst.show(context, iconCount: 2);
-    }
-  }
-
   Future<void> _loadRecentSchedules() async {
     if (_recentLoaded) return;
     try {
-      final cfg = await QuizContentConfigService.getConfig();
       final results = await Future.wait([
-        QuizPoolService.getRecentSchedules(days: 3, contentConfig: cfg),
+        QuizPoolService.getRecentSchedules(days: 3),
         QuizPoolService.getRecentHistories(days: 4),
       ]);
 
@@ -274,6 +208,8 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
     required bool isCorrect,
     required List<String> allIds,
   }) {
+    final prevTotalCorrect = _totalCorrect;
+
     setState(() {
       if (isCorrect) {
         _totalCorrect++;
@@ -294,20 +230,31 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
         correctCount: (prev?.correctCount ?? 0) + (isCorrect ? 1 : 0),
         rewardGranted: prev?.rewardGranted ?? false,
       );
+
+      // 로컬 순위 즉시 반영 (서버 왕복 대기 없이)
+      if (isCorrect && _scoreDistribution.isNotEmpty) {
+        final oldKey = prevTotalCorrect.toString();
+        final newKey = _totalCorrect.toString();
+        final oldCount = (_scoreDistribution[oldKey] ?? 0) - 1;
+        if (oldCount > 0) {
+          _scoreDistribution[oldKey] = oldCount;
+        } else {
+          _scoreDistribution.remove(oldKey);
+        }
+        _scoreDistribution[newKey] = (_scoreDistribution[newKey] ?? 0) + 1;
+
+        int peopleAboveMe = 0;
+        for (final entry in _scoreDistribution.entries) {
+          final score = int.tryParse(entry.key) ?? 0;
+          if (score > _totalCorrect) {
+            peopleAboveMe += entry.value;
+          }
+        }
+        _myRank = peopleAboveMe + 1;
+      }
     });
 
-    AdminActivityService.log(ActivityEventType.quizCompleted, page: 'growth');
-    unawaited(FunnelOnboardingService.tryLogFirstQuiz());
-
-    if (isCorrect) {
-      unawaited(() async {
-        final ok = await CaringTreatService.tryGrantQuizCorrect(dateKey, quizId);
-        if (ok && mounted) {
-          FloatingTreatBurst.show(context, iconCount: 3);
-        }
-      }());
-    }
-
+    // Firestore 저장 → 서버 동기화 (백업)
     QuizPoolService.saveAnswer(
       dateKey: dateKey,
       quizId: quizId,
@@ -321,11 +268,9 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
   Widget build(BuildContext context) {
     if (!kQuizGlassMode) {
       return ListView(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.xl,
-          AppSpacing.sm,
-          AppSpacing.xl,
-          AppSpacing.lg,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.xl,
+          vertical: AppSpacing.lg,
         ),
         children: _buildChildren(),
       );
@@ -375,11 +320,9 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
           ),
         ),
         ListView(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.xl,
-            AppSpacing.sm,
-            AppSpacing.xl,
-            AppSpacing.lg,
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.xl,
+            vertical: AppSpacing.lg,
           ),
           children: _buildChildren(),
         ),
@@ -391,14 +334,12 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
     return [
       // ── 성적 카드 ──
       _QuizStatsCard(
-        weekCorrect: _weekCorrect,
-        weekWrong: _weekWrong,
-        weekRank: _rankWeek,
-        weekParticipants: _participantsWeek,
         totalCorrect: _totalCorrect,
         totalWrong: _totalWrong,
-        allRank: _rankAll,
-        allParticipants: _participantsAll,
+        weekCorrect: _weekCorrect,
+        weekWrong: _weekWrong,
+        myRank: _myRank,
+        totalUsers: _totalUsers,
         isLoaded: _statsLoaded,
         glassMode: kQuizGlassMode,
       ),
@@ -478,15 +419,15 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
         child: _QuizCard(
           index: i + 1,
           quizId: item.id,
+          dateKey: dateKey,
           question: item.question,
           options: item.options,
+          questionType: item.questionType,
           correctIndex: item.correctIndex,
           explanation: item.explanation,
-          questionType: item.questionType,
           sourceBook: item.sourceBook,
           sourceFileName: item.sourceFileName,
           sourcePage: item.sourcePage,
-          sourceName: item.sourceName,
           savedAnswer: savedAnswer,
           glassMode: kQuizGlassMode,
           onAnswered:
@@ -507,40 +448,25 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
 // 성적 카드
 // ══════════════════════════════════════════════════════════════
 class _QuizStatsCard extends StatelessWidget {
-  final int weekCorrect;
-  final int weekWrong;
-  final int weekRank;
-  final int weekParticipants;
   final int totalCorrect;
   final int totalWrong;
-  final int allRank;
-  final int allParticipants;
+  final int weekCorrect;
+  final int weekWrong;
+  final int myRank;
+  final int totalUsers;
   final bool isLoaded;
   final bool glassMode;
 
   const _QuizStatsCard({
-    required this.weekCorrect,
-    required this.weekWrong,
-    required this.weekRank,
-    required this.weekParticipants,
     required this.totalCorrect,
     required this.totalWrong,
-    required this.allRank,
-    required this.allParticipants,
+    required this.weekCorrect,
+    required this.weekWrong,
+    required this.myRank,
+    required this.totalUsers,
     required this.isLoaded,
     this.glassMode = false,
   });
-
-  /// 통산·주간 공통: 상위% 표시(참가자 0이면 —).
-  /// N=1(나 혼자)일 때 rank/N*100 = 100%가 되어 꼴찌처럼 보이는 문제 방지:
-  /// 참가자 1명이면 비율 계산 대신 0.01%로 고정.
-  static String _formatTopPctLabel(int rank, int participants) {
-    if (participants <= 0) return '—';
-    if (participants == 1) return '0.01%';
-    final raw = (rank / participants * 100).clamp(0.0, 100.0);
-    final s = raw >= 10 ? raw.toStringAsFixed(1) : raw.toStringAsFixed(2);
-    return '$s%';
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -548,12 +474,8 @@ class _QuizStatsCard extends StatelessWidget {
     final weekTotal = weekCorrect + weekWrong;
     final totalRate = totalTotal > 0 ? (totalCorrect / totalTotal * 100) : 0.0;
     final weekRate = weekTotal > 0 ? (weekCorrect / weekTotal * 100) : 0.0;
-    final weekTopStr = weekTotal > 0
-        ? _formatTopPctLabel(weekRank, weekParticipants)
-        : '—';
-    final allTopStr = totalTotal > 0
-        ? _formatTopPctLabel(allRank, allParticipants)
-        : '—';
+    final topPercent =
+        totalUsers > 0 ? (myRank / totalUsers * 100).clamp(1.0, 100.0) : 100.0;
 
     final dividerColor =
         glassMode
@@ -579,8 +501,7 @@ class _QuizStatsCard extends StatelessWidget {
                       '이번 주',
                       weekCorrect,
                       weekWrong,
-                      weekTotal > 0 ? weekRate : null,
-                      weekTopStr,
+                      weekRate,
                     ),
                   ),
                   VerticalDivider(width: 1, thickness: 1, color: dividerColor),
@@ -589,8 +510,40 @@ class _QuizStatsCard extends StatelessWidget {
                       '통산',
                       totalCorrect,
                       totalWrong,
-                      totalTotal > 0 ? totalRate : null,
-                      allTopStr,
+                      totalRate,
+                    ),
+                  ),
+                  VerticalDivider(width: 1, thickness: 1, color: dividerColor),
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          '순위',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color:
+                                glassMode
+                                    ? AppColors.white.withValues(alpha: 0.6)
+                                    : AppColors.onCardPrimary.withValues(
+                                      alpha: 0.7,
+                                    ),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          '상위 ${topPercent.toStringAsFixed(1)}%',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color:
+                                glassMode
+                                    ? AppColors.white
+                                    : AppColors.creamWhite,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -610,128 +563,43 @@ class _QuizStatsCard extends StatelessWidget {
     );
   }
 
-  Widget _statColumn(
-    String label,
-    int correct,
-    int wrong,
-    double? rate,
-    String topPctLabel,
-  ) {
+  Widget _statColumn(String label, int correct, int wrong, double rate) {
     final labelColor =
         glassMode
             ? AppColors.white.withValues(alpha: 0.6)
             : AppColors.onCardPrimary.withValues(alpha: 0.7);
-    final sectionLabelStyle = TextStyle(
-      fontSize: 10,
-      color: labelColor,
-      fontWeight: FontWeight.w600,
-    );
     final valueColor = glassMode ? AppColors.white : AppColors.onCardPrimary;
     final subColor =
         glassMode
             ? AppColors.white.withValues(alpha: 0.4)
             : AppColors.onCardPrimary.withValues(alpha: 0.55);
-    final topColor =
-        glassMode
-            ? AppColors.white.withValues(alpha: 0.85)
-            : AppColors.creamWhite;
-    final innerDivider =
-        glassMode
-            ? AppColors.white.withValues(alpha: 0.12)
-            : AppColors.onCardPrimary.withValues(alpha: 0.15);
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Text(
           label,
-          textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 11,
             color: labelColor,
             fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: 8),
-        IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      '성적',
-                      textAlign: TextAlign.center,
-                      style: sectionLabelStyle,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      rate != null ? '${rate.toStringAsFixed(0)}%' : '—',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: valueColor,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '✓$correct / ✗$wrong',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w500,
-                        color: subColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                child: VerticalDivider(
-                  width: 1,
-                  thickness: 1,
-                  color: innerDivider,
-                ),
-              ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      '순위',
-                      textAlign: TextAlign.center,
-                      style: sectionLabelStyle,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '상위',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: labelColor,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      topPctLabel,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: topColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+        const SizedBox(height: 6),
+        Text(
+          '${rate.toStringAsFixed(0)}%',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: valueColor,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          '✓$correct / ✗$wrong',
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w500,
+            color: subColor,
           ),
         ),
       ],
@@ -965,15 +833,15 @@ class _RecentDayQuizGroup extends StatelessWidget {
             child: _QuizCard(
               index: i + 1,
               quizId: item.id,
+              dateKey: schedule.dateKey,
               question: item.question,
               options: item.options,
+              questionType: item.questionType,
               correctIndex: item.correctIndex,
               explanation: item.explanation,
-              questionType: item.questionType,
               sourceBook: item.sourceBook,
               sourceFileName: item.sourceFileName,
               sourcePage: item.sourcePage,
-              sourceName: item.sourceName,
               savedAnswer: savedAnswer,
               readOnly: true, // 지난 퀴즈: 답 변경 불가
               glassMode: glassMode,
@@ -1032,15 +900,15 @@ class _ScoreBadge extends StatelessWidget {
 class _QuizCard extends StatefulWidget {
   final int index;
   final String quizId;
+  final String dateKey;
   final String question;
   final List<String> options;
+  final String questionType;
   final int correctIndex;
   final String explanation;
-  final String questionType;
-  final String sourceBook;     // 출처 책 이름
-  final String sourceFileName; // 출처 파일명 (e.g. 치과책방_…pdf — 스토리지 파일명 접두 유지)
-  final String sourcePage;     // 출처 페이지
-  final String sourceName;    // 국시 등 책 외 출처 한 줄
+  final String sourceBook; // 출처 책 이름
+  final String sourceFileName; // 출처 파일명 (e.g. 치과책방_신입을_위한_친절한_임상문답.pdf)
+  final String sourcePage; // 출처 페이지
   final int? savedAnswer;
   final bool readOnly;
   final bool glassMode;
@@ -1049,15 +917,15 @@ class _QuizCard extends StatefulWidget {
   const _QuizCard({
     required this.index,
     required this.quizId,
+    required this.dateKey,
     required this.question,
     required this.options,
+    required this.questionType,
     required this.correctIndex,
     required this.explanation,
-    this.questionType = QuizPoolItem.kClinical,
     this.sourceBook = '',
     this.sourceFileName = '',
     this.sourcePage = '',
-    this.sourceName = '',
     this.savedAnswer,
     this.readOnly = false,
     this.glassMode = false,
@@ -1097,15 +965,16 @@ class _QuizCardState extends State<_QuizCard> {
         context,
         qIndex: widget.index,
         question: widget.question,
+        options: widget.options,
         questionType: widget.questionType,
         quizId: widget.quizId,
+        dateKey: widget.dateKey,
       );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('공유에 실패했어요. $e')),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('공유에 실패했어요. $e')));
     }
   }
 
@@ -1204,27 +1073,19 @@ class _QuizCardState extends State<_QuizCard> {
       }),
     );
 
-    final typeBadgeBg =
-        widget.glassMode
-            ? AppColors.white.withValues(alpha: 0.14)
-            : (widget.questionType == QuizPoolItem.kNationalExam
-                ? AppColors.accent.withValues(alpha: 0.14)
-                : AppColors.disabledBg);
-    final typeBadgeText =
-        widget.glassMode
-            ? AppColors.white.withValues(alpha: 0.95)
-            : (widget.questionType == QuizPoolItem.kNationalExam
-                ? AppColors.accent
-                : AppColors.textSecondary);
-
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 공감 투표 카드와 동일: 첫 줄 Q · 국시/임상 · 공유, 질문은 그 아래
+        // 질문 헤더
         Padding(
-          padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.xl, AppSpacing.lg, 0),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.xl,
+            AppSpacing.xl,
+            AppSpacing.xl,
+            AppSpacing.lg,
+          ),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               AppBadge(
                 label: 'Q${widget.index}',
@@ -1237,37 +1098,37 @@ class _QuizCardState extends State<_QuizCard> {
                         ? AppColors.white
                         : AppColors.pollBadgeText,
               ),
-              const SizedBox(width: 8),
-              AppBadge(
-                label: QuizPoolItem.badgeLabelForType(widget.questionType),
-                bgColor: typeBadgeBg,
-                textColor: typeBadgeText,
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  widget.question,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: questionColor,
+                    height: 1.4,
+                  ),
+                ),
               ),
-              const Spacer(),
-              IconButton(
-                icon: const Icon(Icons.share_outlined, size: 20),
-                color:
-                    widget.glassMode
-                        ? AppColors.white.withValues(alpha: 0.85)
-                        : AppColors.textSecondary,
-                tooltip: '공유',
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                onPressed: _shareQuizAsImage,
-              ),
+              if (!widget.readOnly)
+                IconButton(
+                  icon: Icon(
+                    Icons.share_outlined,
+                    size: 20,
+                    color:
+                        widget.glassMode
+                            ? AppColors.white.withValues(alpha: 0.65)
+                            : AppColors.textSecondary,
+                  ),
+                  tooltip: '공유',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 36,
+                    minHeight: 36,
+                  ),
+                  onPressed: _shareQuizAsImage,
+                ),
             ],
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(AppSpacing.xl, 10, AppSpacing.xl, AppSpacing.lg),
-          child: Text(
-            widget.question,
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-              color: questionColor,
-              height: 1.45,
-            ),
           ),
         ),
 
@@ -1276,28 +1137,6 @@ class _QuizCardState extends State<_QuizCard> {
           padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
           child: optionList,
         ),
-
-        // 임상 문제 참고 안내 (보기 아래)
-        if (widget.questionType == QuizPoolItem.kClinical)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.xl,
-              0,
-              AppSpacing.xl,
-              AppSpacing.sm,
-            ),
-            child: Text(
-              '참고: 임상 문제는 노하우나 적용의 유연성에 대한 내용으로 상황에 따라 해석이 달라질 수 있습니다.',
-              style: TextStyle(
-                fontSize: 11,
-                height: 1.45,
-                color:
-                    widget.glassMode
-                        ? AppColors.white.withValues(alpha: 0.45)
-                        : AppColors.textDisabled,
-              ),
-            ),
-          ),
 
         // 정답 피드백 + 해설
         if (_answered)
@@ -1335,10 +1174,9 @@ class _QuizCardState extends State<_QuizCard> {
                     ),
                   ),
                 ],
-                // 출처 표시 (임상만 — 국시는 표시하지 않음)
-                if (widget.questionType == QuizPoolItem.kClinical &&
-                    (widget.sourceBook.isNotEmpty ||
-                        widget.sourceFileName.isNotEmpty)) ...[
+                // 출처 표시
+                if (widget.sourceBook.isNotEmpty ||
+                    widget.sourceFileName.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Row(
                     children: [
@@ -1354,24 +1192,22 @@ class _QuizCardState extends State<_QuizCard> {
                       Expanded(
                         child: Text(
                           () {
-                            // sourceFileName에서 .pdf 제거 후 '_' → 공백 (표시용)
-                            // 출처 브랜드: 이미 '치과책방'이면 유지, 없으면 접두(구 '하이진랩' 접두는 치과책방으로 치환)
-                            String bookName = widget.sourceFileName.isNotEmpty
-                                ? widget.sourceFileName.replaceAll(
-                                    RegExp(r'\.pdf$', caseSensitive: false), '')
-                                : widget.sourceBook;
+                            // sourceFileName에서 .pdf 제거 후
+                            // 첫 번째 '_' 이후의 '_'만 공백으로 변환
+                            // 예: 치과책방_신입을_위한_친절한_임상문답.pdf
+                            //   → 치과책방_신입을 위한 친절한 임상문답
+                            String bookName =
+                                widget.sourceFileName.isNotEmpty
+                                    ? widget.sourceFileName.replaceAll(
+                                      RegExp(r'\.pdf$', caseSensitive: false),
+                                      '',
+                                    )
+                                    : widget.sourceBook;
 
                             if (bookName.isNotEmpty) {
                               bookName = bookName.replaceAll('_', ' ');
-                              const kChikabooks = '치과책방';
-                              const kHygieneLab = '하이진랩';
-                              if (!bookName.startsWith(kChikabooks)) {
-                                if (bookName.startsWith(kHygieneLab)) {
-                                  bookName =
-                                      '$kChikabooks${bookName.substring(kHygieneLab.length)}';
-                                } else {
-                                  bookName = '$kChikabooks $bookName';
-                                }
+                              if (!bookName.startsWith('치과책방')) {
+                                bookName = '치과책방 $bookName';
                               }
                             }
 

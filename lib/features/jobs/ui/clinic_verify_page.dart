@@ -3,11 +3,13 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../auth/web/web_account_menu_button.dart';
+import '../../me/providers/me_providers.dart';
 import '../services/job_image_uploader.dart';
 
 /// 치과 사업자 인증 페이지 (/clinic-verify)
@@ -17,14 +19,18 @@ import '../services/job_image_uploader.dart';
 /// 2. AI가 자동으로 정보 읽기 (Mock → 실제 OpenAI 연동 예정)
 /// 3. 국세청 API로 사업자 실재 확인 (Mock → 실제 API 발급 후 연동 예정)
 /// 4. 통과 시 clinicVerified = true 처리
-class ClinicVerifyPage extends StatefulWidget {
-  const ClinicVerifyPage({super.key});
+class ClinicVerifyPage extends ConsumerStatefulWidget {
+  const ClinicVerifyPage({super.key, this.profileId});
+
+  /// 어느 지점(clinic_profiles 문서 id)에 대해 인증을 진행할지.
+  /// null 이면 레거시 동작(uid 기준 단일 인증).
+  final String? profileId;
 
   @override
-  State<ClinicVerifyPage> createState() => _ClinicVerifyPageState();
+  ConsumerState<ClinicVerifyPage> createState() => _ClinicVerifyPageState();
 }
 
-class _ClinicVerifyPageState extends State<ClinicVerifyPage> {
+class _ClinicVerifyPageState extends ConsumerState<ClinicVerifyPage> {
   XFile? _docImage;
   bool _isLoading = false;
   bool _submitted = false;
@@ -83,7 +89,11 @@ class _ClinicVerifyPageState extends State<ClinicVerifyPage> {
       final callable = FirebaseFunctions.instance.httpsCallable(
         'submitClinicVerification',
       );
-      final result = await callable.call({'docUrl': urls.first, 'uid': uid});
+      final result = await callable.call({
+        'docUrl': urls.first,
+        'uid': uid,
+        if (widget.profileId != null) 'profileId': widget.profileId,
+      });
       final res = Map<String, dynamic>.from(result.data as Map);
 
       // 3) 결과를 폼에 자동 입력
@@ -132,6 +142,7 @@ class _ClinicVerifyPageState extends State<ClinicVerifyPage> {
         'openedAt': _openedAtCtrl.text.trim(),
         'address': _addressCtrl.text.trim(),
         'finalSubmit': true,
+        if (widget.profileId != null) 'profileId': widget.profileId,
       });
       if (mounted) setState(() => _submitted = true);
     } catch (e) {
@@ -207,6 +218,21 @@ class _ClinicVerifyPageState extends State<ClinicVerifyPage> {
 
   // ── 안내 배너 ──────────────────────────────────────────
   Widget _buildInfoBanner() {
+    String? targetName;
+    if (widget.profileId != null) {
+      final profilesAsync = ref.watch(clinicProfilesProvider);
+      profilesAsync.whenData((list) {
+        for (final p in list) {
+          if (p.id == widget.profileId) {
+            targetName = p.effectiveName.isNotEmpty
+                ? p.effectiveName
+                : (p.clinicName.isNotEmpty ? p.clinicName : '이름 없음');
+            break;
+          }
+        }
+      });
+    }
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -214,21 +240,50 @@ class _ClinicVerifyPageState extends State<ClinicVerifyPage> {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.accent.withOpacity(0.2)),
       ),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.info_outline, color: AppColors.accent.withOpacity(0.8), size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              '사업자등록증을 올리면 AI가 자동으로 정보를 읽어줘요.\n'
-              '내용을 확인하고 제출하면 검토 후 구인공고 등록이 가능해요.',
-              style: TextStyle(
-                fontSize: 13,
-                color: AppColors.textPrimary.withOpacity(0.8),
-                height: 1.5,
-              ),
+          if (widget.profileId != null) ...[
+            Row(
+              children: [
+                Icon(Icons.local_hospital_outlined,
+                    size: 16, color: AppColors.accent),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    '대상 지점: ${targetName ?? '...'}',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
             ),
+            const SizedBox(height: 8),
+          ],
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.info_outline,
+                  color: AppColors.accent.withOpacity(0.8), size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  widget.profileId != null
+                      ? '사업자등록증을 올리면 AI가 자동으로 정보를 읽어줘요.\n'
+                          '제출 시 위 지점에 대한 인증 정보로 저장돼요.'
+                      : '사업자등록증을 올리면 AI가 자동으로 정보를 읽어줘요.\n'
+                          '내용을 확인하고 제출하면 검토 후 구인공고 등록이 가능해요.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textPrimary.withOpacity(0.8),
+                    height: 1.5,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

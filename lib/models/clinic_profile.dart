@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 enum BizVerificationStatus {
   none,
   pendingAuto,
+  provisional,
   verified,
   rejected,
   manualReview;
@@ -17,7 +18,9 @@ enum BizVerificationStatus {
       // 레거시(구 verifyBusinessLicense)
       case 'auto_verified':
       case 'pending_manual':
-        return BizVerificationStatus.pendingAuto;
+        return BizVerificationStatus.provisional;
+      case 'provisional':
+        return BizVerificationStatus.provisional;
       case 'verified':
         return BizVerificationStatus.verified;
       case 'rejected':
@@ -35,6 +38,8 @@ enum BizVerificationStatus {
         return 'none';
       case BizVerificationStatus.pendingAuto:
         return 'pending_auto';
+      case BizVerificationStatus.provisional:
+        return 'provisional';
       case BizVerificationStatus.verified:
         return 'verified';
       case BizVerificationStatus.rejected:
@@ -44,7 +49,16 @@ enum BizVerificationStatus {
     }
   }
 
+  /// 운영팀 최종 승인까지 끝남 (정식 인증 마크 표시)
   bool get isVerified => this == BizVerificationStatus.verified;
+
+  /// 자동 1~4단계는 통과했고 운영팀 최종 검토만 남은 상태
+  bool get isProvisional => this == BizVerificationStatus.provisional;
+
+  /// 공고 게시 가능 여부 — provisional / verified 모두 가능
+  bool get canPublishJobs =>
+      this == BizVerificationStatus.verified ||
+      this == BizVerificationStatus.provisional;
 
   /// OCR 완료 후 국세청 등 검증 대기
   bool get isPendingVerification => this == BizVerificationStatus.pendingAuto;
@@ -64,6 +78,7 @@ class BusinessVerification {
   final DateTime? lastCheckAt;
   /// `nts` | `mock` | `mock_hira` | `nts_error` | `server_skip` …
   final String? checkMethod;
+  final DateTime? openedAt;
 
   /// 심평원 병원정보 보조 대조
   final bool? hiraMatched;
@@ -71,6 +86,8 @@ class BusinessVerification {
 
   /// `strict` | `partial` | `none` — 서버 B안 단계형
   final String? hiraMatchLevel;
+  final String? policyReason;
+  final int? newClinicGraceDaysSinceOpened;
 
   const BusinessVerification({
     this.status = BizVerificationStatus.none,
@@ -82,9 +99,12 @@ class BusinessVerification {
     this.failReason,
     this.lastCheckAt,
     this.checkMethod,
+    this.openedAt,
     this.hiraMatched,
     this.hiraNote,
     this.hiraMatchLevel,
+    this.policyReason,
+    this.newClinicGraceDaysSinceOpened,
   });
 
   factory BusinessVerification.fromMap(Map<String, dynamic>? data) {
@@ -99,9 +119,14 @@ class BusinessVerification {
       failReason: data['failReason'] as String?,
       lastCheckAt: (data['lastCheckAt'] as Timestamp?)?.toDate(),
       checkMethod: data['checkMethod'] as String?,
+      openedAt: (data['openedAt'] as Timestamp?)?.toDate() ??
+          _parseOpenedAtFromOcr(data['ocrResult']),
       hiraMatched: data['hiraMatched'] as bool?,
       hiraNote: data['hiraNote'] as String?,
       hiraMatchLevel: data['hiraMatchLevel'] as String?,
+      policyReason: data['policyReason'] as String?,
+      newClinicGraceDaysSinceOpened:
+          (data['newClinicGraceDaysSinceOpened'] as num?)?.toInt(),
     );
   }
 
@@ -117,10 +142,33 @@ class BusinessVerification {
         if (lastCheckAt != null)
           'lastCheckAt': Timestamp.fromDate(lastCheckAt!),
         if (checkMethod != null) 'checkMethod': checkMethod,
+        if (openedAt != null) 'openedAt': Timestamp.fromDate(openedAt!),
         if (hiraMatched != null) 'hiraMatched': hiraMatched,
         if (hiraNote != null) 'hiraNote': hiraNote,
         if (hiraMatchLevel != null) 'hiraMatchLevel': hiraMatchLevel,
+        if (policyReason != null) 'policyReason': policyReason,
+        if (newClinicGraceDaysSinceOpened != null)
+          'newClinicGraceDaysSinceOpened': newClinicGraceDaysSinceOpened,
       };
+}
+
+DateTime? _parseOpenedAtFromOcr(Object? raw) {
+  if (raw is! Map) return null;
+  final value = raw['openedAt'];
+  if (value == null) return null;
+  final text = value.toString().trim();
+  final match = RegExp(r'^(\d{4})[-./년\s]?(\d{1,2})[-./월\s]?(\d{1,2})')
+      .firstMatch(text);
+  if (match == null) return null;
+  final year = int.tryParse(match.group(1)!);
+  final month = int.tryParse(match.group(2)!);
+  final day = int.tryParse(match.group(3)!);
+  if (year == null || month == null || day == null) return null;
+  final parsed = DateTime(year, month, day);
+  if (parsed.year != year || parsed.month != month || parsed.day != day) {
+    return null;
+  }
+  return parsed;
 }
 
 /// 치과 프로필 (clinic_profiles 서브컬렉션 문서)
@@ -204,6 +252,9 @@ class ClinicProfile {
       displayName.isNotEmpty ? displayName : clinicName;
 
   bool get isBusinessVerified => businessVerification.status.isVerified;
+
+  /// 공고 게시 가능 여부 — 정식 인증(verified) 또는 조건부 승인(provisional)
+  bool get canPublishJobs => businessVerification.status.canPublishJobs;
 
   ClinicProfile copyWith({
     String? clinicName,

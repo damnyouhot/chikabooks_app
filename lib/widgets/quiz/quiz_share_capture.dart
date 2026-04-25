@@ -12,7 +12,9 @@ import '../../core/theme/app_tokens.dart';
 import '../../core/widgets/app_badge.dart';
 import '../../models/quiz_pool_item.dart';
 
-/// 오늘의 퀴즈 카드를 이미지로 캡처해 SNS 공유 (텍스트 공유 없음)
+const String _kShareBaseUrl = 'https://chikabooks3rd.web.app';
+
+/// 오늘의 퀴즈 카드를 이미지로 캡처해 SNS 공유
 class QuizShareCapture {
   QuizShareCapture._();
 
@@ -22,11 +24,15 @@ class QuizShareCapture {
     BuildContext context, {
     required int qIndex,
     required String question,
+    required List<String> options,
     required String questionType,
     required String quizId,
+    required String dateKey,
   }) async {
     // 비동기 전에 앵커 계산 (async gap 이후 context 사용 방지)
     final shareOrigin = sharePositionOriginForShare(context);
+    final shareUrl =
+        '$_kShareBaseUrl/quiz?date=${Uri.encodeComponent(dateKey)}&quizId=${Uri.encodeComponent(quizId)}';
 
     final overlay = Overlay.maybeOf(context, rootOverlay: true);
     if (overlay == null) {
@@ -37,31 +43,34 @@ class QuizShareCapture {
     late OverlayEntry entry;
 
     entry = OverlayEntry(
-      builder: (ctx) => Positioned(
-        left: -8000,
-        top: 0,
-        child: Material(
-          color: AppColors.appBg,
-          child: RepaintBoundary(
-            key: key,
-            child: SizedBox(
-              width: _kCardWidth,
-              child: _QuizShareCard(
-                qIndex: qIndex,
-                question: question,
-                questionType: questionType,
+      builder:
+          (ctx) => Positioned(
+            left: -8000,
+            top: 0,
+            child: Material(
+              color: AppColors.appBg,
+              child: RepaintBoundary(
+                key: key,
+                child: SizedBox(
+                  width: _kCardWidth,
+                  child: _QuizShareCard(
+                    qIndex: qIndex,
+                    question: question,
+                    options: options,
+                    questionType: questionType,
+                  ),
+                ),
               ),
             ),
           ),
-        ),
-      ),
     );
 
     overlay.insert(entry);
 
     try {
       await Future<void>.delayed(const Duration(milliseconds: 80));
-      final boundary = key.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      final boundary =
+          key.currentContext?.findRenderObject() as RenderRepaintBoundary?;
       if (boundary == null) {
         throw StateError('캡처 영역을 찾을 수 없어요.');
       }
@@ -80,6 +89,7 @@ class QuizShareCapture {
 
       await Share.shareXFiles(
         [XFile(path, mimeType: 'image/png')],
+        text: '오늘의 퀴즈를 풀어보세요.\n$shareUrl',
         sharePositionOrigin: shareOrigin,
       );
     } finally {
@@ -92,11 +102,13 @@ class _QuizShareCard extends StatelessWidget {
   const _QuizShareCard({
     required this.qIndex,
     required this.question,
+    required this.options,
     required this.questionType,
   });
 
   final int qIndex;
   final String question;
+  final List<String> options;
   final String questionType;
 
   @override
@@ -112,7 +124,11 @@ class _QuizShareCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.quiz_outlined, size: 18, color: AppColors.textDisabled),
+              Icon(
+                Icons.quiz_outlined,
+                size: 18,
+                color: AppColors.textDisabled,
+              ),
               const SizedBox(width: 8),
               const Text(
                 '오늘의 퀴즈',
@@ -135,7 +151,12 @@ class _QuizShareCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, 0),
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.lg,
+                    AppSpacing.lg,
+                    AppSpacing.lg,
+                    0,
+                  ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
@@ -147,18 +168,25 @@ class _QuizShareCard extends StatelessWidget {
                       const SizedBox(width: 8),
                       AppBadge(
                         label: typeLabel,
-                        bgColor: isNational
-                            ? AppColors.accent.withValues(alpha: 0.14)
-                            : AppColors.disabledBg,
-                        textColor: isNational
-                            ? AppColors.accent
-                            : AppColors.textSecondary,
+                        bgColor:
+                            isNational
+                                ? AppColors.accent.withValues(alpha: 0.14)
+                                : AppColors.disabledBg,
+                        textColor:
+                            isNational
+                                ? AppColors.accent
+                                : AppColors.textSecondary,
                       ),
                     ],
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(AppSpacing.xl, 10, AppSpacing.xl, AppSpacing.lg),
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.xl,
+                    10,
+                    AppSpacing.xl,
+                    AppSpacing.md,
+                  ),
                   child: Text(
                     question,
                     style: const TextStyle(
@@ -169,15 +197,31 @@ class _QuizShareCard extends StatelessWidget {
                     ),
                   ),
                 ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, AppSpacing.sm),
+                  child: Column(
+                    children: List.generate(
+                      options.length,
+                      (i) => _optionRow(i, options[i]),
+                    ),
+                  ),
+                ),
                 const Divider(height: 1),
                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: AppSpacing.xl),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 12,
+                    horizontal: AppSpacing.xl,
+                  ),
                   child: Row(
                     children: [
-                      Icon(Icons.menu_book_outlined, size: 14, color: AppColors.textDisabled),
+                      Icon(
+                        Icons.menu_book_outlined,
+                        size: 14,
+                        color: AppColors.textDisabled,
+                      ),
                       const SizedBox(width: 6),
                       Text(
-                        '치카 북스',
+                        '치카 북스에서 정답 확인하기',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -191,6 +235,62 @@ class _QuizShareCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _optionRow(int index, String option) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg,
+          vertical: 13,
+        ),
+        decoration: BoxDecoration(
+          color: AppColors.pollOptionBg.withValues(alpha: 0.85),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 18,
+              height: 18,
+              margin: const EdgeInsets.only(top: 1),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: AppColors.textDisabled.withValues(alpha: 0.5),
+                  width: 0.8,
+                ),
+              ),
+              child: Center(
+                child: Text(
+                  String.fromCharCode(65 + index),
+                  style: const TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textDisabled,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                option,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w400,
+                  color: AppColors.pollOptionText,
+                  height: 1.35,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -22,6 +22,7 @@ import '../../auth/web/web_account_menu_button.dart';
 import '../../publisher/services/clinic_profile_service.dart';
 import '../ui/job_post_form.dart';
 import 'job_post_top_bar.dart';
+import 'widgets/payment_consent.dart';
 
 // ── 상품 클래스 정의 ──────────────────────────────────────────
 enum _ProductClass { a, b, c }
@@ -132,6 +133,10 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
   final _sectionKeyA = GlobalKey();
   final _sectionKeyB = GlobalKey();
   final _sectionKeyC = GlobalKey();
+
+  /// 결제 직전 필수 동의 상태(이용약관/개인정보/환불).
+  bool _consentAllRequired = false;
+  PaymentConsentState? _consentState;
 
   @override
   void initState() {
@@ -259,6 +264,20 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
   Future<void> _confirmPurchase() async {
     if (_isProcessing) return;
 
+    // 결제 직전 필수 동의(이용약관/개인정보/환불) 가드.
+    // UI 버튼은 비활성화돼 있지만, 안전망으로 한 번 더 검증한다.
+    if (!_consentAllRequired) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '결제 진행 전 필수 동의 항목을 모두 체크해 주세요.',
+            style: GoogleFonts.notoSansKr(fontSize: 13),
+          ),
+        ),
+      );
+      return;
+    }
+
     final cid = _clinicProfileId;
     if (cid == null) {
       // clinicProfileId 없으면 ensureDefault 재시도
@@ -297,10 +316,19 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
       final voucherId =
           _vouchers.isNotEmpty ? _vouchers.first.id : null;
 
+      final cs = _consentState;
+      final consentPayload = PaymentConsentVersions.payload(
+        agreeTerms: cs?.terms ?? false,
+        agreePrivacy: cs?.privacy ?? false,
+        agreeRefund: cs?.refund ?? false,
+        withdrawalNoticeShown: cs?.withdrawalNoticeShown ?? true,
+      );
+
       final orderResult = await OrderService.createOrder(
         draftId: widget.draftId,
         clinicProfileId: pid,
         voucherId: voucherId,
+        consents: consentPayload,
       );
 
       if (!mounted) return;
@@ -1060,10 +1088,22 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
             padding: const EdgeInsets.only(bottom: 16),
             child: _buildVoucherChip(),
           ),
+        // ── 결제 직전 필수 동의 (전자상거래법·개인정보보호법 대응) ──
+        PaymentConsentSection(
+          onAllRequiredChanged: (v) {
+            if (mounted && _consentAllRequired != v) {
+              setState(() => _consentAllRequired = v);
+            }
+          },
+          onStateChanged: (s) => _consentState = s,
+        ),
+        const SizedBox(height: 16),
         SizedBox(
           height: AppPublisher.ctaHeight,
           child: ElevatedButton(
-            onPressed: _isProcessing ? null : _confirmPurchase,
+            onPressed: (_isProcessing || !_consentAllRequired)
+                ? null
+                : _confirmPurchase,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.accent,
               foregroundColor: AppColors.white,
@@ -1093,52 +1133,6 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
                       letterSpacing: -0.4,
                     ),
                   ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        Center(
-          child: RichText(
-            textAlign: TextAlign.center,
-            text: TextSpan(
-              style: GoogleFonts.notoSansKr(
-                fontSize: 12,
-                color: AppColors.textSecondary,
-                height: 1.6,
-              ),
-              children: [
-                const TextSpan(text: '결제 진행 시 '),
-                TextSpan(
-                  text: '이용약관',
-                  style: const TextStyle(
-                    decoration: TextDecoration.underline,
-                    color: AppColors.blue,
-                  ),
-                  recognizer: TapGestureRecognizer()
-                    ..onTap = () => context.push('/terms'),
-                ),
-                const TextSpan(text: ', '),
-                TextSpan(
-                  text: '개인정보처리방침',
-                  style: const TextStyle(
-                    decoration: TextDecoration.underline,
-                    color: AppColors.blue,
-                  ),
-                  recognizer: TapGestureRecognizer()
-                    ..onTap = () => context.push('/privacy'),
-                ),
-                const TextSpan(text: ', '),
-                TextSpan(
-                  text: '환불 및 청약철회 정책',
-                  style: const TextStyle(
-                    decoration: TextDecoration.underline,
-                    color: AppColors.blue,
-                  ),
-                  recognizer: TapGestureRecognizer()
-                    ..onTap = () => context.push('/refund'),
-                ),
-                const TextSpan(text: '에 동의한 것으로 봅니다.'),
-              ],
-            ),
           ),
         ),
         const SizedBox(height: 28),

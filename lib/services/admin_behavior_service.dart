@@ -103,6 +103,8 @@ class AdminBehaviorService {
         segments: segments,
         firstActions: firstActions,
         retention: retention,
+        sampleSize: snap.docs.length,
+        sampleLimit: readLimit,
       );
     } catch (e, st) {
       debugPrint('❌ [Behavior] analyze 실패: $e');
@@ -437,6 +439,15 @@ class BehaviorAnalysis {
   final List<MetricCard> firstActions;
   final RetentionData retention;
 
+  /// activityLogs 에서 실제로 읽어들인 문서 수
+  final int sampleSize;
+
+  /// Firestore 요청 시 사용한 limit
+  final int sampleLimit;
+
+  /// sampleSize == sampleLimit 이면 true (= 더 오래된 활동이 잘렸을 가능성)
+  bool get truncated => sampleLimit > 0 && sampleSize >= sampleLimit;
+
   const BehaviorAnalysis({
     required this.totalLoginUsers,
     required this.featureUsage,
@@ -446,6 +457,8 @@ class BehaviorAnalysis {
     required this.segments,
     required this.firstActions,
     required this.retention,
+    this.sampleSize = 0,
+    this.sampleLimit = 0,
   });
 }
 

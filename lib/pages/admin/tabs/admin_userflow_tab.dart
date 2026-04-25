@@ -72,7 +72,8 @@ class _AdminUserFlowTabState extends State<AdminUserFlowTab>
           _InfoBanner(
             text:
                 '순차 온보딩 퍼널입니다. 각 단계 인원은 **이전 단계를 통과한 유저만** 포함됩니다(교집합). '
-                '②~⑤ 이벤트는 계정당 1회만 기록됩니다.',
+                '②~⑤ 이벤트는 계정당 1회만 기록됩니다. '
+                '①은 비로그인 방문자도 포함되므로 ①→② 전환율은 낮게 나오는 게 정상이에요.',
           ),
           const SizedBox(height: 16),
 
