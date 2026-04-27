@@ -22,7 +22,7 @@
           }
         },
         {
-          "client_id": "215876124758-kjskotu3j5ljbn8vo7sjrh417krndodd.apps.googleusercontent.com",
+          "client_id": "215876124758-12ug5ea0en6vmhn987af94k7gj6fbo0b.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
@@ -35,8 +35,15 @@
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "215876124758-dgrun2571e7uuscf9pa22rubruae2elb.apps.googleusercontent.com",
+              "client_id": "215876124758-12ug5ea0en6vmhn987af94k7gj6fbo0b.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "215876124758-4dghmea4dv8uf2br7d9st4njg0j5jth7.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.chikabooks.chikabooksApp"
+              }
             }
           ]
         }
@@ -59,7 +66,15 @@
           }
         },
         {
-          "client_id": "215876124758-kjskotu3j5ljbn8vo7sjrh417krndodd.apps.googleusercontent.com",
+          "client_id": "215876124758-ao4on490uqmgo88e4d5skped7k2h87ge.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.chikabooks.tenth",
+            "certificate_hash": "4289ad2485746abe977e953c8e2b7ec10dac56f4"
+          }
+        },
+        {
+          "client_id": "215876124758-12ug5ea0en6vmhn987af94k7gj6fbo0b.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
@@ -72,8 +87,15 @@
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "215876124758-dgrun2571e7uuscf9pa22rubruae2elb.apps.googleusercontent.com",
+              "client_id": "215876124758-12ug5ea0en6vmhn987af94k7gj6fbo0b.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "215876124758-4dghmea4dv8uf2br7d9st4njg0j5jth7.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.chikabooks.chikabooksApp"
+              }
             }
           ]
         }

@@ -36,7 +36,7 @@ class PollShareCapture {
     final shareText =
         isPastStyle
             ? '지난 공감 투표 결과를 확인해보세요.\n$shareUrl'
-            : '오늘의 공감 투표에 참여해보세요.\n$shareUrl';
+            : '오늘의 공감투표에 참여해보세요.\n$shareUrl';
 
     final overlay = Overlay.maybeOf(context, rootOverlay: true);
     if (overlay == null) {
@@ -135,7 +135,7 @@ class _PollShareCard extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                isPastStyle ? '지난 공감 투표' : '오늘의 공감 투표',
+                isPastStyle ? '지난 공감 투표' : '오늘의 공감투표',
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,

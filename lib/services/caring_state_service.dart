@@ -52,8 +52,8 @@ class CaringStateService {
   static const double longSleepMoodPenalty = 2.0;
 
   /// bond 미접속 패널티
-  static const double bondAbsencePenaltyPerDay = 3.0;
-  static const double bondAbsenceMaxPenalty = 9.0;
+  static const double bondAbsencePenaltyPerDay = 2.0;
+  static const double bondAbsenceMaxPenalty = 6.0;
 
   /// bond — 정산 구간 내 밥 없음: [bondUnfedHoursPerPenalty]시간마다 −1
   static const double bondUnfedHoursPerPenalty = 8.0;
@@ -77,10 +77,19 @@ class CaringStateService {
   static const double cleanBondVeryBadThreshold = 30.0;
   static const int cleanBondHighRewardHours = 4;
   static const int cleanBondGoodRewardHours = 6;
-  static const int cleanBondBadPenaltyHours = 4;
-  static const int cleanBondVeryBadPenaltyHours = 2;
-  static const int cleanBondDailyGainCap = 3;
-  static const int cleanBondDailyLossCap = 4;
+  static const int cleanBondBadPenaltyHours = 3;
+  static const int cleanBondVeryBadPenaltyHours = 3;
+  static const int cleanBondPenaltyPerStep = 2;
+  static const int cleanBondDailyGainCap = 4;
+  static const int cleanBondDailyLossCap = 6;
+
+  /// 관리 실패 기반 유대 패널티
+  static const double hungerBondBadThreshold = 30.0;
+  static const int hungerBondBadPenaltyHours = 3;
+  static const int hungerBondPenaltyPerStep = 2;
+  static const double energyBondBadThreshold = 25.0;
+  static const int energyBondBadPenaltyHours = 5;
+  static const int energyBondPenaltyPerStep = 2;
 
   // ═══════════════════════ 읽기 ═══════════════════════
 
@@ -133,10 +142,6 @@ class CaringStateService {
     final elapsed = now.difference(lastActive);
     final hours = elapsed.inMinutes / 60.0;
 
-    if (hours < 0.05) {
-      return state.copyWith(lastActiveAt: now);
-    }
-
     double hunger = state.hunger;
     double mood = state.mood;
     double energy = state.energy;
@@ -146,15 +151,52 @@ class CaringStateService {
     var cleanlinessBadSince = state.cleanlinessBadSince;
     var lastCleanBondRewardAt = state.lastCleanBondRewardAt;
     var lastCleanBondPenaltyAt = state.lastCleanBondPenaltyAt;
+    var hungerLowSince = state.hungerLowSince;
+    var energyLowSince = state.energyLowSince;
+    var lastHungerBondPenaltyAt = state.lastHungerBondPenaltyAt;
+    var lastEnergyBondPenaltyAt = state.lastEnergyBondPenaltyAt;
     var cleanBondDateKey = state.cleanBondDateKey;
     var dailyCleanBondGain = state.dailyCleanBondGain;
     var dailyCleanBondLoss = state.dailyCleanBondLoss;
+    var dailyVisitDateKey = state.dailyVisitDateKey;
+    var dailyVisitCount = state.dailyVisitCount;
 
     final todayKey = _dateKey(now);
     if (cleanBondDateKey != todayKey) {
       cleanBondDateKey = todayKey;
       dailyCleanBondGain = 0;
       dailyCleanBondLoss = 0;
+    }
+
+    final skipDailyBondForLongSleep = state.isSleeping &&
+        state.sleepStartedAt != null &&
+        now.difference(state.sleepStartedAt!) >= longSleepThreshold;
+
+    if (dailyVisitDateKey != todayKey) {
+      dailyVisitDateKey = todayKey;
+      dailyVisitCount = 0;
+    }
+    dailyVisitCount += 1;
+    if (!skipDailyBondForLongSleep) {
+      if (dailyVisitCount == 1) {
+        bond = min(100, bond + 2);
+        debugPrint('✅ 일일 첫 접속 bond +2');
+      } else if (dailyVisitCount == 3 || dailyVisitCount == 5) {
+        bond = min(100, bond + 1);
+        debugPrint('✅ 일일 ${dailyVisitCount}회 접속 bond +1');
+      }
+    }
+
+    if (hours < 0.05) {
+      return state.copyWith(
+        bond: bond,
+        lastActiveAt: now,
+        cleanBondDateKey: cleanBondDateKey,
+        dailyCleanBondGain: dailyCleanBondGain,
+        dailyCleanBondLoss: dailyCleanBondLoss,
+        dailyVisitDateKey: dailyVisitDateKey,
+        dailyVisitCount: dailyVisitCount,
+      );
     }
 
     if (state.isSleeping) {
@@ -189,18 +231,8 @@ class CaringStateService {
       debugPrint('🔻 bond 미접속 패널티: -$penalty ($absentDays일)');
     }
 
-    // ── 일일 첫 접속 bond +1 ──
-    final lastDateKey = state.lastActiveAt != null ? _dateKey(state.lastActiveAt!) : null;
-    final skipDailyBondForLongSleep = state.isSleeping &&
-        state.sleepStartedAt != null &&
-        now.difference(state.sleepStartedAt!) >= longSleepThreshold;
-    if (lastDateKey != todayKey && !skipDailyBondForLongSleep) {
-      bond = min(100, bond + 1);
-      debugPrint('✅ 일일 첫 접속 bond +1');
-    }
-
     // ── bond: 밥 안 준 누적 시간 → 8h당 -1
-    // lastFeedAt 있으면 마지막 밥부터, 없으면 이번 정산 구간만(마지막 활동~now).
+    // 낮은 배고픔 상태 패널티가 메인이므로, 기존 밥 없음 패널티는 보조 안전장치로 유지.
     final t0 = state.lastActiveAt ?? now;
     final lastFeed = state.lastFeedAt;
     final double unfedHours = lastFeed != null
@@ -287,21 +319,64 @@ class CaringStateService {
         lastCleanBondPenaltyAt ?? cleanlinessBadSince,
       );
       final elapsedPenaltyHours = now.difference(penaltyRef).inMinutes / 60.0;
-      final remainingLoss = cleanBondDailyLossCap - dailyCleanBondLoss;
-      final steps = min(
-        (elapsedPenaltyHours / penaltyHours).floor(),
-        max(0, remainingLoss),
-      );
+      final steps = (elapsedPenaltyHours / penaltyHours).floor();
       if (steps > 0) {
-        bond = max(0.0, bond - steps);
-        dailyCleanBondLoss += steps;
+        final penalty = steps * cleanBondPenaltyPerStep;
+        bond = max(0.0, bond - penalty);
+        dailyCleanBondLoss += penalty;
         lastCleanBondPenaltyAt = penaltyRef.add(
           Duration(hours: penaltyHours * steps),
         );
-        debugPrint('🔻 bond 청결 낮음 패널티: -$steps');
+        debugPrint('🔻 bond 청결 낮음 패널티: -$penalty');
       }
     } else {
       cleanlinessBadSince = null;
+    }
+
+    // ── hunger: 낮은 배고픔 상태 유지 → 3h당 -3 ──
+    if (hunger < hungerBondBadThreshold) {
+      hungerLowSince ??= state.lastActiveAt ?? now;
+      final penaltyRef = _laterOf(
+        hungerLowSince,
+        lastHungerBondPenaltyAt ?? hungerLowSince,
+      );
+      final elapsedPenaltyHours = now.difference(penaltyRef).inMinutes / 60.0;
+      final steps =
+          (elapsedPenaltyHours / hungerBondBadPenaltyHours).floor();
+      if (steps > 0) {
+        final penalty = steps * hungerBondPenaltyPerStep;
+        bond = max(0.0, bond - penalty);
+        dailyCleanBondLoss += penalty;
+        lastHungerBondPenaltyAt = penaltyRef.add(
+          Duration(hours: hungerBondBadPenaltyHours * steps),
+        );
+        debugPrint('🔻 bond 배고픔 낮음 패널티: -$penalty');
+      }
+    } else {
+      hungerLowSince = null;
+    }
+
+    // ── energy: 낮은 에너지 상태 유지 → 5h당 -3 ──
+    if (energy < energyBondBadThreshold) {
+      energyLowSince ??= state.lastActiveAt ?? now;
+      final penaltyRef = _laterOf(
+        energyLowSince,
+        lastEnergyBondPenaltyAt ?? energyLowSince,
+      );
+      final elapsedPenaltyHours = now.difference(penaltyRef).inMinutes / 60.0;
+      final steps =
+          (elapsedPenaltyHours / energyBondBadPenaltyHours).floor();
+      if (steps > 0) {
+        final penalty = steps * energyBondPenaltyPerStep;
+        bond = max(0.0, bond - penalty);
+        dailyCleanBondLoss += penalty;
+        lastEnergyBondPenaltyAt = penaltyRef.add(
+          Duration(hours: energyBondBadPenaltyHours * steps),
+        );
+        debugPrint('🔻 bond 에너지 낮음 패널티: -$penalty');
+      }
+    } else {
+      energyLowSince = null;
     }
 
     // ── 쓰다듬기: 3시간 밖 타임스탬프 제거 ──
@@ -323,9 +398,17 @@ class CaringStateService {
       cleanlinessBadSince: cleanlinessBadSince,
       lastCleanBondRewardAt: lastCleanBondRewardAt,
       lastCleanBondPenaltyAt: lastCleanBondPenaltyAt,
+      hungerLowSince: hungerLowSince,
+      energyLowSince: energyLowSince,
+      lastHungerBondPenaltyAt: lastHungerBondPenaltyAt,
+      lastEnergyBondPenaltyAt: lastEnergyBondPenaltyAt,
+      clearHungerLowSince: hungerLowSince == null,
+      clearEnergyLowSince: energyLowSince == null,
       cleanBondDateKey: cleanBondDateKey,
       dailyCleanBondGain: dailyCleanBondGain,
       dailyCleanBondLoss: dailyCleanBondLoss,
+      dailyVisitDateKey: dailyVisitDateKey,
+      dailyVisitCount: dailyVisitCount,
       // 한 번도 깨우기 API를 안 탄 유저도 연속 깨어 있음 패널티가 누적되도록
       lastWakeAt: state.lastWakeAt ?? (!state.isSleeping ? t0 : null),
     );
@@ -528,9 +611,17 @@ class CaringState {
   final DateTime? cleanlinessBadSince;
   final DateTime? lastCleanBondRewardAt;
   final DateTime? lastCleanBondPenaltyAt;
+  final DateTime? hungerLowSince;
+  final DateTime? energyLowSince;
+  final DateTime? lastHungerBondPenaltyAt;
+  final DateTime? lastEnergyBondPenaltyAt;
   final String? cleanBondDateKey;
   final int dailyCleanBondGain;
   final int dailyCleanBondLoss;
+  final String? dailyVisitDateKey;
+  final int dailyVisitCount;
+  final String? touchBondDateKey;
+  final int dailyTouchBondGain;
 
   // ── 밥주기 연속 카운터 (시간 기반) ──
   final int consecutiveFeedCount;
@@ -562,9 +653,17 @@ class CaringState {
     this.cleanlinessBadSince,
     this.lastCleanBondRewardAt,
     this.lastCleanBondPenaltyAt,
+    this.hungerLowSince,
+    this.energyLowSince,
+    this.lastHungerBondPenaltyAt,
+    this.lastEnergyBondPenaltyAt,
     this.cleanBondDateKey,
     this.dailyCleanBondGain = 0,
     this.dailyCleanBondLoss = 0,
+    this.dailyVisitDateKey,
+    this.dailyVisitCount = 0,
+    this.touchBondDateKey,
+    this.dailyTouchBondGain = 0,
     this.consecutiveFeedCount = 0,
     this.lastFeedAt,
     this.hasGreetedDate,
@@ -604,9 +703,19 @@ class CaringState {
           (m['lastCleanBondRewardAt'] as Timestamp?)?.toDate(),
       lastCleanBondPenaltyAt:
           (m['lastCleanBondPenaltyAt'] as Timestamp?)?.toDate(),
+      hungerLowSince: (m['hungerLowSince'] as Timestamp?)?.toDate(),
+      energyLowSince: (m['energyLowSince'] as Timestamp?)?.toDate(),
+      lastHungerBondPenaltyAt:
+          (m['lastHungerBondPenaltyAt'] as Timestamp?)?.toDate(),
+      lastEnergyBondPenaltyAt:
+          (m['lastEnergyBondPenaltyAt'] as Timestamp?)?.toDate(),
       cleanBondDateKey: m['cleanBondDateKey'],
       dailyCleanBondGain: m['dailyCleanBondGain'] ?? 0,
       dailyCleanBondLoss: m['dailyCleanBondLoss'] ?? 0,
+      dailyVisitDateKey: m['dailyVisitDateKey'],
+      dailyVisitCount: m['dailyVisitCount'] ?? 0,
+      touchBondDateKey: m['touchBondDateKey'],
+      dailyTouchBondGain: m['dailyTouchBondGain'] ?? 0,
       consecutiveFeedCount: m['consecutiveFeedCount'] ?? 0,
       lastFeedAt: (m['lastFeedAt'] as Timestamp?)?.toDate(),
       hasGreetedDate: m['hasGreetedDate'],
@@ -633,9 +742,17 @@ class CaringState {
       'cleanlinessBadSince': cleanlinessBadSince != null ? Timestamp.fromDate(cleanlinessBadSince!) : null,
       'lastCleanBondRewardAt': lastCleanBondRewardAt != null ? Timestamp.fromDate(lastCleanBondRewardAt!) : null,
       'lastCleanBondPenaltyAt': lastCleanBondPenaltyAt != null ? Timestamp.fromDate(lastCleanBondPenaltyAt!) : null,
+      'hungerLowSince': hungerLowSince != null ? Timestamp.fromDate(hungerLowSince!) : null,
+      'energyLowSince': energyLowSince != null ? Timestamp.fromDate(energyLowSince!) : null,
+      'lastHungerBondPenaltyAt': lastHungerBondPenaltyAt != null ? Timestamp.fromDate(lastHungerBondPenaltyAt!) : null,
+      'lastEnergyBondPenaltyAt': lastEnergyBondPenaltyAt != null ? Timestamp.fromDate(lastEnergyBondPenaltyAt!) : null,
       'cleanBondDateKey': cleanBondDateKey,
       'dailyCleanBondGain': dailyCleanBondGain,
       'dailyCleanBondLoss': dailyCleanBondLoss,
+      'dailyVisitDateKey': dailyVisitDateKey,
+      'dailyVisitCount': dailyVisitCount,
+      'touchBondDateKey': touchBondDateKey,
+      'dailyTouchBondGain': dailyTouchBondGain,
       'consecutiveFeedCount': consecutiveFeedCount,
       'lastFeedAt': lastFeedAt != null ? Timestamp.fromDate(lastFeedAt!) : null,
       'hasGreetedDate': hasGreetedDate,
@@ -658,15 +775,25 @@ class CaringState {
     DateTime? cleanlinessBadSince,
     DateTime? lastCleanBondRewardAt,
     DateTime? lastCleanBondPenaltyAt,
+    DateTime? hungerLowSince,
+    DateTime? energyLowSince,
+    DateTime? lastHungerBondPenaltyAt,
+    DateTime? lastEnergyBondPenaltyAt,
     String? cleanBondDateKey,
     int? dailyCleanBondGain,
     int? dailyCleanBondLoss,
+    String? dailyVisitDateKey,
+    int? dailyVisitCount,
+    String? touchBondDateKey,
+    int? dailyTouchBondGain,
     int? consecutiveFeedCount,
     DateTime? lastFeedAt,
     String? hasGreetedDate,
     DateTime? lastWakeAt,
     bool clearCleanlinessGoodSince = false,
     bool clearCleanlinessBadSince = false,
+    bool clearHungerLowSince = false,
+    bool clearEnergyLowSince = false,
   }) {
     return CaringState(
       hunger: (hunger ?? this.hunger).clamp(0, 100),
@@ -689,9 +816,23 @@ class CaringState {
           lastCleanBondRewardAt ?? this.lastCleanBondRewardAt,
       lastCleanBondPenaltyAt:
           lastCleanBondPenaltyAt ?? this.lastCleanBondPenaltyAt,
+      hungerLowSince: clearHungerLowSince
+          ? null
+          : (hungerLowSince ?? this.hungerLowSince),
+      energyLowSince: clearEnergyLowSince
+          ? null
+          : (energyLowSince ?? this.energyLowSince),
+      lastHungerBondPenaltyAt:
+          lastHungerBondPenaltyAt ?? this.lastHungerBondPenaltyAt,
+      lastEnergyBondPenaltyAt:
+          lastEnergyBondPenaltyAt ?? this.lastEnergyBondPenaltyAt,
       cleanBondDateKey: cleanBondDateKey ?? this.cleanBondDateKey,
       dailyCleanBondGain: dailyCleanBondGain ?? this.dailyCleanBondGain,
       dailyCleanBondLoss: dailyCleanBondLoss ?? this.dailyCleanBondLoss,
+      dailyVisitDateKey: dailyVisitDateKey ?? this.dailyVisitDateKey,
+      dailyVisitCount: dailyVisitCount ?? this.dailyVisitCount,
+      touchBondDateKey: touchBondDateKey ?? this.touchBondDateKey,
+      dailyTouchBondGain: dailyTouchBondGain ?? this.dailyTouchBondGain,
       consecutiveFeedCount: consecutiveFeedCount ?? this.consecutiveFeedCount,
       lastFeedAt: lastFeedAt ?? this.lastFeedAt,
       hasGreetedDate: hasGreetedDate ?? this.hasGreetedDate,

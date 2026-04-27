@@ -78,22 +78,26 @@ class _FeeLookupSectionState extends State<FeeLookupSection> {
       children: [
         _buildSearchBar(),
         Expanded(
-          child: showGuide
-              ? Center(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
-                    child: _buildGuideState(),
-                  ),
-                )
-              : _isSearching
+          child:
+              showGuide
+                  ? Center(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: AppSpacing.md,
+                      ),
+                      child: _buildGuideState(),
+                    ),
+                  )
+                  : _isSearching
                   ? const Center(child: CircularProgressIndicator())
                   : SingleChildScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.only(bottom: AppSpacing.xl),
-                      child: _error != null
-                          ? _buildErrorState()
-                          : _buildResultSection(context),
-                    ),
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.only(bottom: AppSpacing.xl),
+                    child:
+                        _error != null
+                            ? _buildErrorState()
+                            : _buildResultSection(context),
+                  ),
         ),
       ],
     );
@@ -113,28 +117,33 @@ class _FeeLookupSectionState extends State<FeeLookupSection> {
         onSubmitted: (_) {
           if (_query.isNotEmpty) _doSearch();
         },
-        style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
+          color: AppColors.textPrimary,
+        ),
         decoration: InputDecoration(
           hintText: '수가코드 또는 행위명 검색 (예: 다197가, 스케일링)',
           hintStyle: TextStyle(
             fontSize: 13,
-            color: AppColors.textPrimary.withOpacity(0.35),
+            color: AppColors.textPrimary.withValues(alpha: 0.35),
           ),
           prefixIcon: Icon(
             Icons.search,
             size: 20,
-            color: AppColors.textPrimary.withOpacity(0.4),
+            color: AppColors.textPrimary.withValues(alpha: 0.4),
           ),
-          suffixIcon: _query.isNotEmpty
-              ? GestureDetector(
-                  onTap: _clearSearch,
-                  child: Icon(
-                    Icons.close,
-                    size: 18,
-                    color: AppColors.textPrimary.withOpacity(0.4),
-                  ),
-                )
-              : null,
+          suffixIcon:
+              _query.isNotEmpty
+                  ? GestureDetector(
+                    onTap: _clearSearch,
+                    child: Icon(
+                      Icons.close,
+                      size: 18,
+                      color: AppColors.textPrimary.withValues(alpha: 0.4),
+                    ),
+                  )
+                  : null,
           filled: true,
           fillColor: AppColors.surfaceMuted,
           contentPadding: const EdgeInsets.symmetric(
@@ -160,8 +169,11 @@ class _FeeLookupSectionState extends State<FeeLookupSection> {
         padding: const EdgeInsets.all(AppSpacing.xxl),
         child: Column(
           children: [
-            Icon(Icons.medical_information_outlined,
-                size: 44, color: AppColors.accent.withOpacity(0.5)),
+            Icon(
+              Icons.medical_information_outlined,
+              size: 44,
+              color: AppColors.accent.withValues(alpha: 0.5),
+            ),
             const SizedBox(height: AppSpacing.lg),
             const Text(
               '수가 코드·행위명으로 검색하세요',
@@ -195,10 +207,7 @@ class _FeeLookupSectionState extends State<FeeLookupSection> {
                   label: '복합레진',
                   onTap: () => _quickSearch('복합레진'),
                 ),
-                _QuickSearchChip(
-                  label: '발치',
-                  onTap: () => _quickSearch('발치'),
-                ),
+                _QuickSearchChip(label: '발치', onTap: () => _quickSearch('발치')),
                 _QuickSearchChip(
                   label: '근관치료',
                   onTap: () => _quickSearch('근관치료'),
@@ -231,7 +240,10 @@ class _FeeLookupSectionState extends State<FeeLookupSection> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(
-            AppSpacing.xl, AppSpacing.sm, AppSpacing.xl, AppSpacing.lg,
+            AppSpacing.xl,
+            AppSpacing.sm,
+            AppSpacing.xl,
+            AppSpacing.lg,
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -241,18 +253,18 @@ class _FeeLookupSectionState extends State<FeeLookupSection> {
                   '전체 ${_result!.totalCount}건 ($_currentPage/$totalPages 페이지)',
                   style: const TextStyle(
                     fontSize: 12,
+                    fontWeight: FontWeight.w700,
                     color: AppColors.textDisabled,
                   ),
                 ),
               ),
               if (canPolicyJump)
                 OutlinedButton(
-                  onPressed: () =>
-                      widget.onOpenPolicySearch!(_query.trim()),
+                  onPressed: () => widget.onOpenPolicySearch!(_query.trim()),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.accent,
                     side: BorderSide(
-                      color: AppColors.accent.withOpacity(0.45),
+                      color: AppColors.accent.withValues(alpha: 0.45),
                     ),
                     padding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.md,
@@ -268,7 +280,7 @@ class _FeeLookupSectionState extends State<FeeLookupSection> {
                     "'$_query'로 제도 변경 조회하기",
                     style: const TextStyle(
                       fontSize: 12,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
@@ -278,13 +290,15 @@ class _FeeLookupSectionState extends State<FeeLookupSection> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
           child: Column(
-            children: _result!.items
-                .map((item) => _FeeItemCard(
-                      item: item,
-                      onTap: () =>
-                          _FeeDetailSheet.show(context, item),
-                    ))
-                .toList(),
+            children:
+                _result!.items
+                    .map(
+                      (item) => _FeeItemCard(
+                        item: item,
+                        onTap: () => _FeeDetailSheet.show(context, item),
+                      ),
+                    )
+                    .toList(),
           ),
         ),
         if (totalPages > 1) _buildPagination(totalPages),
@@ -312,7 +326,7 @@ class _FeeLookupSectionState extends State<FeeLookupSection> {
             style: const TextStyle(
               fontSize: 13,
               color: AppColors.textSecondary,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(width: AppSpacing.md),
@@ -336,18 +350,28 @@ class _FeeLookupSectionState extends State<FeeLookupSection> {
         padding: const EdgeInsets.all(AppSpacing.xxl),
         child: Column(
           children: [
-            const Icon(Icons.search_off,
-                size: 40, color: AppColors.textDisabled),
+            const Icon(
+              Icons.search_off,
+              size: 40,
+              color: AppColors.textDisabled,
+            ),
             const SizedBox(height: AppSpacing.md),
             Text(
               '"$_query"에 대한 수가 정보가 없습니다',
-              style:
-                  const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textSecondary,
+              ),
             ),
             const SizedBox(height: AppSpacing.xs),
             const Text(
               '코드 또는 행위명을 다시 확인해 보세요',
-              style: TextStyle(fontSize: 12, color: AppColors.textDisabled),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textDisabled,
+              ),
             ),
           ],
         ),
@@ -365,13 +389,19 @@ class _FeeLookupSectionState extends State<FeeLookupSection> {
         padding: const EdgeInsets.all(AppSpacing.xxl),
         child: Column(
           children: [
-            const Icon(Icons.error_outline,
-                size: 40, color: AppColors.textDisabled),
+            const Icon(
+              Icons.error_outline,
+              size: 40,
+              color: AppColors.textDisabled,
+            ),
             const SizedBox(height: AppSpacing.md),
             Text(
               _error ?? '오류가 발생했습니다',
-              style:
-                  const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textSecondary,
+              ),
             ),
             const SizedBox(height: AppSpacing.lg),
             GestureDetector(
@@ -381,7 +411,7 @@ class _FeeLookupSectionState extends State<FeeLookupSection> {
                 style: TextStyle(
                   fontSize: 13,
                   color: AppColors.accent,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
@@ -419,7 +449,7 @@ class _FeeItemCard extends StatelessWidget {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.accent.withOpacity(0.08),
+                        color: AppColors.accent.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(AppRadius.xs),
                       ),
                       child: Text(
@@ -440,19 +470,25 @@ class _FeeItemCard extends StatelessWidget {
                           vertical: 1,
                         ),
                         decoration: BoxDecoration(
-                          color: item.payType == '급여'
-                              ? const Color(0xFF2E7D32).withOpacity(0.08)
-                              : const Color(0xFFE65100).withOpacity(0.08),
+                          color:
+                              item.payType == '급여'
+                                  ? const Color(
+                                    0xFF2E7D32,
+                                  ).withValues(alpha: 0.08)
+                                  : const Color(
+                                    0xFFE65100,
+                                  ).withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(AppRadius.xs),
                         ),
                         child: Text(
                           item.payType,
                           style: TextStyle(
                             fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: item.payType == '급여'
-                                ? const Color(0xFF2E7D32)
-                                : const Color(0xFFE65100),
+                            fontWeight: FontWeight.w700,
+                            color:
+                                item.payType == '급여'
+                                    ? const Color(0xFF2E7D32)
+                                    : const Color(0xFFE65100),
                           ),
                         ),
                       ),
@@ -466,6 +502,7 @@ class _FeeItemCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             fontSize: 10,
+                            fontWeight: FontWeight.w700,
                             color: AppColors.textDisabled,
                           ),
                         ),
@@ -504,7 +541,7 @@ class _FeeItemCard extends StatelessWidget {
                               style: const TextStyle(
                                 fontSize: 11,
                                 color: AppColors.textSecondary,
-                                fontWeight: FontWeight.w500,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                           ),
@@ -513,6 +550,7 @@ class _FeeItemCard extends StatelessWidget {
                               '적용 ${_formatFeeDate(item.startDate)}~',
                               style: const TextStyle(
                                 fontSize: 10,
+                                fontWeight: FontWeight.w700,
                                 color: AppColors.textDisabled,
                               ),
                             ),
@@ -539,6 +577,7 @@ class _FeeItemCard extends StatelessWidget {
                     item.note,
                     style: const TextStyle(
                       fontSize: 11,
+                      fontWeight: FontWeight.w700,
                       color: AppColors.textSecondary,
                       height: 1.3,
                     ),
@@ -585,13 +624,14 @@ class _FeeDetailSheet extends StatelessWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
       ),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(ctx).bottom),
-        child: SizedBox(
-          height: h * 0.78,
-          child: _FeeDetailSheet(item: item),
-        ),
-      ),
+      builder:
+          (ctx) => Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(ctx).bottom),
+            child: SizedBox(
+              height: h * 0.78,
+              child: _FeeDetailSheet(item: item),
+            ),
+          ),
     );
   }
 
@@ -670,6 +710,7 @@ class _FeeDetailSheet extends StatelessWidget {
                         item.category,
                         style: const TextStyle(
                           fontSize: 12,
+                          fontWeight: FontWeight.w700,
                           color: AppColors.textSecondary,
                         ),
                       ),
@@ -678,18 +719,20 @@ class _FeeDetailSheet extends StatelessWidget {
               ],
               const SizedBox(height: AppSpacing.lg),
               _DetailRow(
-                  label: '상대가치점수',
-                  value: '${item.relativeValue.toStringAsFixed(2)}점'),
+                label: '상대가치점수',
+                value: '${item.relativeValue.toStringAsFixed(2)}점',
+              ),
               if (item.startDate.isNotEmpty)
                 _DetailRow(
-                    label: '적용 시작',
-                    value: '${_formatFeeDate(item.startDate)}~'),
+                  label: '적용 시작',
+                  value: '${_formatFeeDate(item.startDate)}~',
+                ),
               const SizedBox(height: AppSpacing.md),
               const Text(
                 '기관별 단가 (원)',
                 style: TextStyle(
                   fontSize: 13,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                   color: AppColors.textSecondary,
                 ),
               ),
@@ -701,7 +744,7 @@ class _FeeDetailSheet extends StatelessWidget {
                   '비고',
                   style: TextStyle(
                     fontSize: 13,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -710,6 +753,7 @@ class _FeeDetailSheet extends StatelessWidget {
                   item.note,
                   style: const TextStyle(
                     fontSize: 14,
+                    fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
                     height: 1.45,
                   ),
@@ -736,16 +780,17 @@ class _DetailChip extends StatelessWidget {
         vertical: 4,
       ),
       decoration: BoxDecoration(
-        color: isPay
-            ? const Color(0xFF2E7D32).withOpacity(0.1)
-            : const Color(0xFFE65100).withOpacity(0.1),
+        color:
+            isPay
+                ? const Color(0xFF2E7D32).withValues(alpha: 0.1)
+                : const Color(0xFFE65100).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(AppRadius.xs),
       ),
       child: Text(
         label,
         style: TextStyle(
           fontSize: 11,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w700,
           color: isPay ? const Color(0xFF2E7D32) : const Color(0xFFE65100),
         ),
       ),
@@ -771,6 +816,7 @@ class _DetailRow extends StatelessWidget {
               label,
               style: const TextStyle(
                 fontSize: 13,
+                fontWeight: FontWeight.w700,
                 color: AppColors.textDisabled,
               ),
             ),
@@ -780,7 +826,7 @@ class _DetailRow extends StatelessWidget {
               value,
               style: const TextStyle(
                 fontSize: 14,
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w700,
                 color: AppColors.textPrimary,
               ),
             ),
@@ -821,6 +867,7 @@ class _DetailPriceTable extends StatelessWidget {
           label,
           style: const TextStyle(
             fontSize: 13,
+            fontWeight: FontWeight.w700,
             color: AppColors.textSecondary,
           ),
         ),
@@ -828,7 +875,7 @@ class _DetailPriceTable extends StatelessWidget {
           price > 0 ? _formatPriceWon(price) : '-',
           style: TextStyle(
             fontSize: 15,
-            fontWeight: price > 0 ? FontWeight.w700 : FontWeight.w400,
+            fontWeight: FontWeight.w700,
             color: price > 0 ? AppColors.textPrimary : AppColors.textDisabled,
           ),
         ),
@@ -851,6 +898,7 @@ class _PriceChip extends StatelessWidget {
             label,
             style: const TextStyle(
               fontSize: 9,
+              fontWeight: FontWeight.w700,
               color: AppColors.textDisabled,
             ),
           ),
@@ -859,7 +907,7 @@ class _PriceChip extends StatelessWidget {
             price > 0 ? _fmt(price) : '-',
             style: TextStyle(
               fontSize: price > 0 ? 12 : 11,
-              fontWeight: price > 0 ? FontWeight.w700 : FontWeight.w400,
+              fontWeight: FontWeight.w700,
               color: price > 0 ? AppColors.textPrimary : AppColors.textDisabled,
             ),
           ),
@@ -897,7 +945,7 @@ class _QuickSearchChip extends StatelessWidget {
           color: AppColors.surfaceMuted,
           borderRadius: BorderRadius.circular(AppRadius.md),
           border: Border.all(
-            color: AppColors.textDisabled.withOpacity(0.2),
+            color: AppColors.textDisabled.withValues(alpha: 0.2),
           ),
         ),
         child: Text(
@@ -905,7 +953,7 @@ class _QuickSearchChip extends StatelessWidget {
           style: const TextStyle(
             fontSize: 12,
             color: AppColors.textSecondary,
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ),
@@ -936,7 +984,7 @@ class _PaginationBtn extends StatelessWidget {
           style: TextStyle(
             fontSize: 13,
             color: AppColors.accent,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ),

@@ -311,6 +311,7 @@ class _HomeShellState extends State<HomeShell> {
         careerSkillAutoHintToken: _careerSkillAutoHintToken,
       ),
     ];
+    final bottomNavHeight = 72.0 + MediaQuery.of(context).viewPadding.bottom;
 
     return Scaffold(
       body: Stack(
@@ -338,31 +339,34 @@ class _HomeShellState extends State<HomeShell> {
         ],
       ),
       // BottomNavigationBar: 색상은 AppTheme.light (bottomNavigationBarTheme)에서 고정 관리
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: _onTap,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
-            label: '나',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.people_outline),
-            activeIcon: Icon(Icons.people),
-            label: '같이',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.menu_book_outlined),
-            activeIcon: Icon(Icons.menu_book),
-            label: '성장하기',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.work_outline),
-            activeIcon: Icon(Icons.work),
-            label: '커리어',
-          ),
-        ],
+      bottomNavigationBar: SizedBox(
+        height: bottomNavHeight,
+        child: BottomNavigationBar(
+          currentIndex: _selectedIndex,
+          onTap: _onTap,
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline),
+              activeIcon: Icon(Icons.person),
+              label: '나',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.people_outline),
+              activeIcon: Icon(Icons.people),
+              label: '같이',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.menu_book_outlined),
+              activeIcon: Icon(Icons.menu_book),
+              label: '성장하기',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.work_outline),
+              activeIcon: Icon(Icons.work),
+              label: '커리어',
+            ),
+          ],
+        ),
       ),
     );
   }

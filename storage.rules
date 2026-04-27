@@ -26,6 +26,24 @@ service firebase.storage {
                       request.resource.size < 10 * 1024 * 1024;
     }
 
+    // 궁금해요 선배 게시글 이미지: 로그인한 사용자만, 게시글당 압축 이미지 업로드
+    match /seniorQuestions/{questionId}/images/{fileName} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null &&
+                      request.resource.size < 8 * 1024 * 1024 &&
+                      request.resource.contentType.matches('image/.*');
+      allow update, delete: if false;
+    }
+
+    // 속닥속닥 댓글 이미지: 댓글당 1장 압축 이미지 업로드
+    match /seniorQuestions/{questionId}/comments/{commentId}/images/{fileName} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null &&
+                      request.resource.size < 8 * 1024 * 1024 &&
+                      request.resource.contentType.matches('image/.*');
+      allow update, delete: if false;
+    }
+
     // 나머지: 로그인한 사용자 읽기만 허용, 쓰기는 금지
     match /{allPaths=**} {
       allow read:  if request.auth != null;

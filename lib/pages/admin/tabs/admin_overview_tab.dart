@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../models/admin_dashboard_models.dart';
+import '../../../models/daily_word.dart';
 import '../../../models/quiz_pool_item.dart';
 import '../../../models/quiz_schedule.dart';
 import '../../../services/admin_dashboard_service.dart';
+import '../../../services/daily_word_service.dart';
 import '../../../services/quiz_content_config_service.dart';
 import '../../../services/quiz_pool_service.dart';
 import '../widgets/admin_common_widgets.dart';
@@ -47,6 +49,8 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
   bool _previewingNextQuiz = false;
   bool _mutatingNationalSlot = false;
   bool _mutatingClinicalSlot = false;
+  DailyWordOpsSummary? _dailyWordOps;
+  bool _advancingDailyWordTurn = false;
 
   /// `getContentOpsHub` 에서만 채움 — 공감투표 운영 + 퀴즈 슬롯 미리보기
   Map<String, dynamic>? _overviewPollOps;
@@ -108,6 +112,7 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
         AdminDashboardService.getQuizMetaState(),
         cfgF.then((c) => QuizPoolService.getTodaySchedule(contentConfig: c)),
         _loadOverviewHub(),
+        DailyWordService.loadOpsSummary(),
       ]);
 
       if (!mounted) {
@@ -125,15 +130,16 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
       }
 
       setState(() {
-        _totalUsers   = results[0] as int;
-        _newUsers     = results[1] as int;
-        _activeUsers  = results[2] as int;
-        _longAbsent   = results[3] as int;
+        _totalUsers = results[0] as int;
+        _newUsers = results[1] as int;
+        _activeUsers = results[2] as int;
+        _longAbsent = results[3] as int;
         _recentErrors = results[4] as int;
-        _noteCount    = results[5] as int;
+        _noteCount = results[5] as int;
         _careerGroups = results[6] as List<CareerGroupCount>;
-        _quizMeta     = results[7] as QuizMetaState?;
+        _quizMeta = results[7] as QuizMetaState?;
         _todaySchedule = results[8] as QuizSchedule?;
+        _dailyWordOps = results[10] as DailyWordOpsSummary?;
         _overviewPollOps = pollOps;
         _quizSlotNextPreviews = slotPreviews;
         _lastSync = DateTime.now();
@@ -141,7 +147,6 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
       });
 
       debugPrint('✅ [Overview] _load() 완료 — _lastSync=$_lastSync');
-
     } catch (e, stack) {
       debugPrint('❌ [Overview] _load() 예외 발생!');
       debugPrint('❌ error: $e');
@@ -177,15 +182,15 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
     try {
       await AdminDashboardService.rebuildQuizMetaFromSchedules();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('퀴즈 메타가 스케줄과 동기화되었습니다.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('퀴즈 메타가 스케줄과 동기화되었습니다.')));
       await _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('동기화 실패: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('동기화 실패: $e')));
     } finally {
       if (mounted) setState(() => _syncingQuizMeta = false);
     }
@@ -195,23 +200,24 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
     final today = QuizPoolService.todayKey;
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('오늘 퀴즈 스케줄 다시 만들기'),
-        content: Text(
-          '날짜 $today 의 quiz_schedule을 덮어씁니다.\n'
-          '모든 사용자의 오늘 퀴즈가 새로 선정된 문항으로 바뀝니다. 진행할까요?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('취소'),
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('오늘 퀴즈 스케줄 다시 만들기'),
+            content: Text(
+              '날짜 $today 의 quiz_schedule을 덮어씁니다.\n'
+              '모든 사용자의 오늘 퀴즈가 새로 선정된 문항으로 바뀝니다. 진행할까요?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('취소'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('덮어쓰기'),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('덮어쓰기'),
-          ),
-        ],
-      ),
     );
     if (ok != true || !mounted) return;
 
@@ -223,17 +229,16 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
       );
       if (!mounted) return;
       final success = data?['success'] == true;
-      final msg = data?['message'] as String? ??
+      final msg =
+          data?['message'] as String? ??
           (success ? '스케줄을 갱신했습니다.' : '스케줄 갱신에 실패했습니다.');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(msg)),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
       await _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('오류: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('오류: $e')));
     } finally {
       if (mounted) setState(() => _reschedulingTodayQuiz = false);
     }
@@ -245,16 +250,16 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
       final m = await AdminDashboardService.previewNextQuizSelection();
       if (!mounted) return;
       if (m == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('시뮬 응답이 비어 있습니다.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('시뮬 응답이 비어 있습니다.')));
         return;
       }
       if (m['success'] != true) {
         final msg = m['message'] as String? ?? '시뮬에 실패했습니다.';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(msg)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(msg)));
         return;
       }
 
@@ -283,151 +288,216 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
 
       await showDialog<void>(
         context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('예상 다음 문제 (시뮬)'),
-          content: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  disclaimer,
-                  style: TextStyle(
-                    fontSize: 12,
-                    height: 1.35,
-                    color: AppColors.textSecondary.withValues(alpha: 0.95),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  '가정 사이클: $cycle · 이 선정까지 사이클 초기화 경로: ${wasReset ? "예" : "아니오"} · '
-                  '가정 usedQuizIds 길이: $usedN',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    height: 1.35,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  packLine('임상 패크', clinId, clinLoose),
-                  style: const TextStyle(fontSize: 11, color: AppColors.textDisabled),
-                ),
-                Text(
-                  packLine('국시 패크', natId, natLoose),
-                  style: const TextStyle(fontSize: 11, color: AppColors.textDisabled),
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  '이번 호출에서 뽑힌 문항',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                ...itemsRaw.map((raw) {
-                  if (raw is! Map) {
-                    return const SizedBox.shrink();
-                  }
-                  final e = Map<String, dynamic>.from(raw);
-                  final qt = e['questionType'] as String? ?? '';
-                  final id = e['id'] as String? ?? '';
-                  final q = e['questionPreview'] as String? ?? '';
-                  final book = e['sourceBook'] as String? ?? '';
-                  final fn = e['sourceFileName'] as String? ?? '';
-                  final pack = e['packId'] as String? ?? '';
-                  final typeKo =
-                      qt == 'national_exam' ? '국시' : (qt == 'clinical' ? '임상' : qt);
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '$typeKo · $id',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.accent,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          q,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            height: 1.35,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        if (book.isNotEmpty || fn.isNotEmpty || pack.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              [
-                                if (book.isNotEmpty) book,
-                                if (fn.isNotEmpty) fn,
-                                if (pack.isNotEmpty) 'pack: $pack',
-                              ].join(' · '),
+        builder:
+            (ctx) => AlertDialog(
+              title: const Text('예상 다음 문제 (시뮬)'),
+              content: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      disclaimer,
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.35,
+                        color: AppColors.textSecondary.withValues(alpha: 0.95),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      '가정 사이클: $cycle · 이 선정까지 사이클 초기화 경로: ${wasReset ? "예" : "아니오"} · '
+                      '가정 usedQuizIds 길이: $usedN',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        height: 1.35,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      packLine('임상 패크', clinId, clinLoose),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textDisabled,
+                      ),
+                    ),
+                    Text(
+                      packLine('국시 패크', natId, natLoose),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textDisabled,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      '이번 호출에서 뽑힌 문항',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    ...itemsRaw.map((raw) {
+                      if (raw is! Map) {
+                        return const SizedBox.shrink();
+                      }
+                      final e = Map<String, dynamic>.from(raw);
+                      final qt = e['questionType'] as String? ?? '';
+                      final id = e['id'] as String? ?? '';
+                      final q = e['questionPreview'] as String? ?? '';
+                      final book = e['sourceBook'] as String? ?? '';
+                      final fn = e['sourceFileName'] as String? ?? '';
+                      final pack = e['packId'] as String? ?? '';
+                      final typeKo =
+                          qt == 'national_exam'
+                              ? '국시'
+                              : (qt == 'clinical' ? '임상' : qt);
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '$typeKo · $id',
                               style: const TextStyle(
-                                fontSize: 10,
-                                color: AppColors.textDisabled,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.accent,
                               ),
                             ),
-                          ),
-                      ],
-                    ),
-                  );
-                }),
+                            const SizedBox(height: 2),
+                            Text(
+                              q,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                height: 1.35,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            if (book.isNotEmpty ||
+                                fn.isNotEmpty ||
+                                pack.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  [
+                                    if (book.isNotEmpty) book,
+                                    if (fn.isNotEmpty) fn,
+                                    if (pack.isNotEmpty) 'pack: $pack',
+                                  ].join(' · '),
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    color: AppColors.textDisabled,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('닫기'),
+                ),
               ],
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('닫기'),
-            ),
-          ],
-        ),
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('시뮬 오류: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('시뮬 오류: $e')));
     } finally {
       if (mounted) setState(() => _previewingNextQuiz = false);
     }
   }
 
+  Future<void> _advanceDailyWordTurn() async {
+    final ops = _dailyWordOps;
+    final currentWords = ops?.currentWords ?? const <DailyWord>[];
+    if (currentWords.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('넘길 오늘 단어가 없습니다.')));
+      return;
+    }
+
+    final wordList = currentWords.map((word) => word.english).join(', ');
+    final ok = await showDialog<bool>(
+      context: context,
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('오늘 단어 다음턴으로 넘기기'),
+            content: Text(
+              '현재 운영 기준 오늘 단어 ${currentWords.length}개를 전역 제외 처리합니다.\n\n'
+              '$wordList\n\n'
+              '이 단어들은 앞으로 오늘 단어 후보에서 빠지고, 기존 사용자별 오늘 배정 문서에 포함되어 있으면 다음 로드 때 새 단어로 재생성됩니다.\n'
+              '원본 단어풀과 사용자별 아는 단어/저장 기록은 삭제하지 않습니다.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('취소'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('다음턴으로 넘기기'),
+              ),
+            ],
+          ),
+    );
+    if (ok != true || !mounted) return;
+
+    setState(() => _advancingDailyWordTurn = true);
+    try {
+      final nextOps = await DailyWordService.skipCurrentTurn();
+      if (!mounted) return;
+      setState(() => _dailyWordOps = nextOps);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('오늘 단어를 다음턴으로 넘겼습니다.')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('오늘 단어 넘기기 실패: $e')));
+    } finally {
+      if (mounted) setState(() => _advancingDailyWordTurn = false);
+    }
+  }
+
   Future<void> _mutateTodayScheduleSlot(String action, String slotType) async {
     final today = QuizPoolService.todayKey;
-    final typeKo =
-        slotType == QuizPoolItem.kNationalExam ? '국시' : '임상';
+    final typeKo = slotType == QuizPoolItem.kNationalExam ? '국시' : '임상';
 
     if (action == 'remove') {
       final ok = await showDialog<bool>(
         context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text('$typeKo 문항 삭제'),
-          content: Text(
-            '현재 $typeKo 문항을 quiz_pool에서 영구 삭제하고,\n'
-            '같은 타입의 다음 문항으로 자동 교체합니다.\n\n'
-            '사용자 풀이 기록·quiz_meta·전역 통계는 변경되지 않습니다.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('취소'),
+        builder:
+            (ctx) => AlertDialog(
+              title: Text('$typeKo 문항 삭제'),
+              content: Text(
+                '현재 $typeKo 문항을 quiz_pool에서 영구 삭제하고,\n'
+                '같은 타입의 다음 문항으로 자동 교체합니다.\n\n'
+                '사용자 풀이 기록·quiz_meta·전역 통계는 변경되지 않습니다.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('취소'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('제거'),
+                ),
+              ],
             ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('제거'),
-            ),
-          ],
-        ),
       );
       if (ok != true || !mounted) return;
     }
@@ -448,17 +518,15 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
       );
       if (!mounted) return;
       final success = data?['success'] == true;
-      final msg = data?['message'] as String? ??
-          (success ? '반영되었습니다.' : '요청에 실패했습니다.');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(msg)),
-      );
+      final msg =
+          data?['message'] as String? ?? (success ? '반영되었습니다.' : '요청에 실패했습니다.');
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
       if (success) await _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('오류: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('오류: $e')));
     } finally {
       if (mounted) {
         setState(() {
@@ -475,23 +543,24 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
   Future<void> _advancePollQueue() async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('다음 공감투표로 넘기기'),
-        content: const Text(
-          '현재 진행 중인 투표를 종료(순위 확정)하고, '
-          'displayOrder 기준 다음 미종료 투표를 지금 시작합니다.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('취소'),
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('다음 공감투표로 넘기기'),
+            content: const Text(
+              '현재 진행 중인 투표를 종료(순위 확정)하고, '
+              'displayOrder 기준 다음 미종료 투표를 지금 시작합니다.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('취소'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('진행'),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('진행'),
-          ),
-        ],
-      ),
     );
     if (ok != true || !mounted) return;
 
@@ -500,15 +569,15 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
       final data = await AdminDashboardService.adminAdvancePollQueue();
       if (!mounted) return;
       final success = data?['success'] == true;
-      final msg = data?['message'] as String? ??
-          (success ? '처리했습니다.' : '실패했습니다.');
+      final msg =
+          data?['message'] as String? ?? (success ? '처리했습니다.' : '실패했습니다.');
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
       if (success) await _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('오류: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('오류: $e')));
     } finally {
       if (mounted) setState(() => _advancingPollQueue = false);
     }
@@ -517,9 +586,9 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
   Future<void> _deleteCurrentPollFromOverview() async {
     final current = _overviewPollOps?['current'];
     if (current is! Map) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('삭제할 현재 투표 정보가 없습니다.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('삭제할 현재 투표 정보가 없습니다.')));
       return;
     }
     final pollId = current['id'] as String? ?? '';
@@ -527,65 +596,67 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
 
     final step1 = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('현재 투표 완전 삭제'),
-        content: Text(
-          '투표 $pollId 및 보기·공감·댓글 등 하위 데이터가 영구 삭제됩니다.\n'
-          '삭제 후 다음 대기 투표가 자동으로 활성화됩니다.\n\n'
-          '계속할까요?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('취소'),
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('현재 투표 완전 삭제'),
+            content: Text(
+              '투표 $pollId 및 보기·공감·댓글 등 하위 데이터가 영구 삭제됩니다.\n'
+              '삭제 후 다음 대기 투표가 자동으로 활성화됩니다.\n\n'
+              '계속할까요?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('취소'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: TextButton.styleFrom(foregroundColor: AppColors.error),
+                child: const Text('다음'),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('다음'),
-          ),
-        ],
-      ),
     );
     if (step1 != true || !mounted) return;
 
     final ctrl = TextEditingController();
     final step2 = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('문서 ID 확인'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '삭제할 문서 ID를 정확히 입력하세요.\n대상: $pollId',
-              style: const TextStyle(fontSize: 13),
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('문서 ID 확인'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '삭제할 문서 ID를 정확히 입력하세요.\n대상: $pollId',
+                  style: const TextStyle(fontSize: 13),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: ctrl,
+                  decoration: const InputDecoration(
+                    labelText: '문서 ID',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  autocorrect: false,
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: ctrl,
-              decoration: const InputDecoration(
-                labelText: '문서 ID',
-                border: OutlineInputBorder(),
-                isDense: true,
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('취소'),
               ),
-              autocorrect: false,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('취소'),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: TextButton.styleFrom(foregroundColor: AppColors.error),
+                child: const Text('삭제 실행'),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('삭제 실행'),
-          ),
-        ],
-      ),
     );
     final typed = ctrl.text.trim();
     ctrl.dispose();
@@ -599,15 +670,15 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
       );
       if (!mounted) return;
       final success = r?['success'] == true;
-      final msg = r?['message'] as String? ??
-          (success ? '삭제했습니다.' : '삭제에 실패했습니다.');
+      final msg =
+          r?['message'] as String? ?? (success ? '삭제했습니다.' : '삭제에 실패했습니다.');
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
       if (success) await _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('오류: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('오류: $e')));
     } finally {
       if (mounted) setState(() => _deletingCurrentPoll = false);
     }
@@ -632,28 +703,39 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
               child: Text(
                 '마지막 동기화: ${_formatTime(_lastSync!)}',
                 style: const TextStyle(
-                    fontSize: 11, color: AppColors.textDisabled),
+                  fontSize: 11,
+                  color: AppColors.textDisabled,
+                ),
               ),
             ),
 
           // ── KPI 카드 그리드 ──────────────────────────────────
           AdminSectionTitle('핵심 지표 (${widget.period})'),
-          _KpiGrid(kpis: [
-            DashboardKpi(label: '총 사용자', value: '$_totalUsers명'),
-            DashboardKpi(
+          _KpiGrid(
+            kpis: [
+              DashboardKpi(label: '총 사용자', value: '$_totalUsers명'),
+              DashboardKpi(
                 label: '기간 신규 가입',
                 value: '+$_newUsers명',
-                sublabel: widget.period),
-            DashboardKpi(
+                sublabel: widget.period,
+              ),
+              DashboardKpi(
                 label: '활성 유저',
                 value: '$_activeUsers명',
-                sublabel: widget.period),
-            DashboardKpi(
+                sublabel: widget.period,
+              ),
+              DashboardKpi(
                 label: '기록하기 수',
                 value: '$_noteCount건',
-                sublabel: widget.period),
-            DashboardKpi(label: '장기 미접속', value: '$_longAbsent명', sublabel: '14일+'),
-          ]),
+                sublabel: widget.period,
+              ),
+              DashboardKpi(
+                label: '장기 미접속',
+                value: '$_longAbsent명',
+                sublabel: '14일+',
+              ),
+            ],
+          ),
 
           const SizedBox(height: 8),
 
@@ -700,6 +782,15 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
 
           const SizedBox(height: 20),
 
+          const AdminSectionTitle('오늘 단어 풀 현황'),
+          _DailyWordPoolCard(
+            ops: _dailyWordOps,
+            advancing: _advancingDailyWordTurn,
+            onAdvanceTurn: _advanceDailyWordTurn,
+          ),
+
+          const SizedBox(height: 20),
+
           AdminSectionTitle('오늘 문제 (quiz_schedule)'),
           Padding(
             padding: const EdgeInsets.only(bottom: 6),
@@ -716,21 +807,17 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
             schedule: _todaySchedule,
             mutatingNational: _mutatingNationalSlot,
             mutatingClinical: _mutatingClinicalSlot,
-            operationsLocked:
-                _syncingQuizMeta || _reschedulingTodayQuiz,
+            operationsLocked: _syncingQuizMeta || _reschedulingTodayQuiz,
             onSlotAction: _mutateTodayScheduleSlot,
-            nextNationalPreview:
-                _coerceMap(_quizSlotNextPreviews?['national']),
-            nextClinicalPreview:
-                _coerceMap(_quizSlotNextPreviews?['clinical']),
+            nextNationalPreview: _coerceMap(_quizSlotNextPreviews?['national']),
+            nextClinicalPreview: _coerceMap(_quizSlotNextPreviews?['clinical']),
           ),
 
           const SizedBox(height: 20),
 
           // ── 연차별 분포 ──────────────────────────────────────
           const AdminSectionTitle('연차별 사용자 분포'),
-          _CareerGroupChart(
-              groups: _careerGroups, totalUsers: _totalUsers),
+          _CareerGroupChart(groups: _careerGroups, totalUsers: _totalUsers),
 
           const SizedBox(height: 32),
         ],
@@ -763,11 +850,12 @@ class _KpiGrid extends StatelessWidget {
         childAspectRatio: 1.7,
       ),
       itemCount: kpis.length,
-      itemBuilder: (_, i) => AdminKpiCard(
-        label: kpis[i].label,
-        value: kpis[i].value,
-        sublabel: kpis[i].sublabel,
-      ),
+      itemBuilder:
+          (_, i) => AdminKpiCard(
+            label: kpis[i].label,
+            value: kpis[i].value,
+            sublabel: kpis[i].sublabel,
+          ),
     );
   }
 }
@@ -784,13 +872,15 @@ class _ErrorKpiCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: isAlert
-            ? AppColors.error.withOpacity(0.08)
-            : AppColors.surfaceMuted,
+        color:
+            isAlert
+                ? AppColors.error.withValues(alpha: 0.08)
+                : AppColors.surfaceMuted,
         borderRadius: BorderRadius.circular(14),
-        border: isAlert
-            ? Border.all(color: AppColors.error.withOpacity(0.3))
-            : null,
+        border:
+            isAlert
+                ? Border.all(color: AppColors.error.withValues(alpha: 0.3))
+                : null,
       ),
       child: Row(
         children: [
@@ -808,8 +898,7 @@ class _ErrorKpiCard extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
-                  color:
-                      isAlert ? AppColors.error : AppColors.textPrimary,
+                  color: isAlert ? AppColors.error : AppColors.textPrimary,
                 ),
               ),
               Text(
@@ -824,8 +913,7 @@ class _ErrorKpiCard extends StatelessWidget {
           if (isAlert) ...[
             const Spacer(),
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: AppColors.error,
                 borderRadius: BorderRadius.circular(99),
@@ -846,8 +934,7 @@ class _ErrorKpiCard extends StatelessWidget {
 class _CareerGroupChart extends StatelessWidget {
   final List<CareerGroupCount> groups;
   final int totalUsers;
-  const _CareerGroupChart(
-      {required this.groups, required this.totalUsers});
+  const _CareerGroupChart({required this.groups, required this.totalUsers});
 
   @override
   Widget build(BuildContext context) {
@@ -855,52 +942,55 @@ class _CareerGroupChart extends StatelessWidget {
     final maxCount = groups.fold(0, (m, g) => g.count > m ? g.count : m);
 
     return Column(
-      children: groups.map((g) {
-        final ratio = maxCount > 0 ? g.count / maxCount : 0.0;
-        final pct = totalUsers > 0
-            ? (g.count / totalUsers * 100).toStringAsFixed(1)
-            : '0.0';
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 68,
-                child: Text(
-                  g.label,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
+      children:
+          groups.map((g) {
+            final ratio = maxCount > 0 ? g.count / maxCount : 0.0;
+            final pct =
+                totalUsers > 0
+                    ? (g.count / totalUsers * 100).toStringAsFixed(1)
+                    : '0.0';
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 68,
+                    child: Text(
+                      g.label,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: ratio.toDouble(),
-                    minHeight: 14,
-                    backgroundColor: AppColors.surfaceMuted,
-                    valueColor:
-                        const AlwaysStoppedAnimation(AppColors.accent),
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: ratio.toDouble(),
+                        minHeight: 14,
+                        backgroundColor: AppColors.surfaceMuted,
+                        valueColor: const AlwaysStoppedAnimation(
+                          AppColors.accent,
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 72,
-                child: Text(
-                  '${g.count}명 ($pct%)',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: AppColors.textSecondary,
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 72,
+                    child: Text(
+                      '${g.count}명 ($pct%)',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
-            ],
-          ),
-        );
-      }).toList(),
+            );
+          }).toList(),
     );
   }
 }
@@ -989,10 +1079,7 @@ class _QuizPoolCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             '남은 문항 약 $remaining문제 (하루 $daily문제 기준 약 $daysLeft일치)',
-            style: const TextStyle(
-              fontSize: 11,
-              color: AppColors.textDisabled,
-            ),
+            style: const TextStyle(fontSize: 11, color: AppColors.textDisabled),
           ),
           const SizedBox(height: 14),
           _QuizDepletionGauge(
@@ -1021,10 +1108,7 @@ class _QuizPoolCard extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             '마지막 스케줄: ${meta!.lastScheduledDate}  ·  하루 $daily문제 배포',
-            style: const TextStyle(
-              fontSize: 11,
-              color: AppColors.textDisabled,
-            ),
+            style: const TextStyle(fontSize: 11, color: AppColors.textDisabled),
           ),
           const SizedBox(height: 8),
           Text(
@@ -1044,60 +1128,65 @@ class _QuizPoolCard extends StatelessWidget {
             children: [
               TextButton.icon(
                 onPressed: syncing ? null : onSyncFromSchedules,
-                icon: syncing
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.sync, size: 18),
+                icon:
+                    syncing
+                        ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                        : const Icon(Icons.sync, size: 18),
                 label: Text(syncing ? '동기화 중…' : '스케줄 기준으로 메타 동기화'),
                 style: TextButton.styleFrom(
                   foregroundColor: AppColors.accent,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                 ),
               ),
               TextButton.icon(
-                onPressed: (syncing || reschedulingToday)
-                    ? null
-                    : onRescheduleToday,
-                icon: reschedulingToday
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.event_repeat, size: 18),
+                onPressed:
+                    (syncing || reschedulingToday) ? null : onRescheduleToday,
+                icon:
+                    reschedulingToday
+                        ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                        : const Icon(Icons.event_repeat, size: 18),
                 label: Text(
-                  reschedulingToday
-                      ? '오늘 스케줄 재생성 중…'
-                      : '오늘 스케줄 다시 만들기',
+                  reschedulingToday ? '오늘 스케줄 재생성 중…' : '오늘 스케줄 다시 만들기',
                 ),
                 style: TextButton.styleFrom(
                   foregroundColor: AppColors.textPrimary,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                 ),
               ),
               TextButton.icon(
-                onPressed: (syncing || reschedulingToday || previewingNext)
-                    ? null
-                    : onPreviewNext,
-                icon: previewingNext
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.visibility_outlined, size: 18),
-                label: Text(
-                  previewingNext ? '시뮬 실행 중…' : '예상 다음 문제 (시뮬)',
-                ),
+                onPressed:
+                    (syncing || reschedulingToday || previewingNext)
+                        ? null
+                        : onPreviewNext,
+                icon:
+                    previewingNext
+                        ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                        : const Icon(Icons.visibility_outlined, size: 18),
+                label: Text(previewingNext ? '시뮬 실행 중…' : '예상 다음 문제 (시뮬)'),
                 style: TextButton.styleFrom(
                   foregroundColor: AppColors.textSecondary,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                 ),
               ),
             ],
@@ -1144,58 +1233,59 @@ class _EmpathyPollOpsSection extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.divider),
       ),
-      child: row == null
-          ? Text(
-              '$label 없음',
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppColors.textSecondary,
+      child:
+          row == null
+              ? Text(
+                '$label 없음',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
+              )
+              : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.accent,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    row['id'] as String? ?? '',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: AppColors.textDisabled,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    (row['question'] as String? ?? '').trim().isEmpty
+                        ? '(질문 없음)'
+                        : (row['question'] as String),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      height: 1.35,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '#${row['displayOrder']} · ${row['status']} · '
+                    '시작 ${_shortIso(row['startsAt'] as String?)} · '
+                    '종료 ${_shortIso(row['endsAt'] as String?)}',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: AppColors.textDisabled,
+                    ),
+                  ),
+                ],
               ),
-            )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.accent,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  row['id'] as String? ?? '',
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: AppColors.textDisabled,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  (row['question'] as String? ?? '').trim().isEmpty
-                      ? '(질문 없음)'
-                      : (row['question'] as String),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    height: 1.35,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '#${row['displayOrder']} · ${row['status']} · '
-                  '시작 ${_shortIso(row['startsAt'] as String?)} · '
-                  '종료 ${_shortIso(row['endsAt'] as String?)}',
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: AppColors.textDisabled,
-                  ),
-                ),
-              ],
-            ),
     );
   }
 
@@ -1218,14 +1308,15 @@ class _EmpathyPollOpsSection extends StatelessWidget {
 
     final total = (pollOps!['totalPolls'] as num?)?.toInt() ?? 0;
     final closed = (pollOps!['closedPolls'] as num?)?.toInt() ?? 0;
-    final remaining =
-        (pollOps!['remainingNotClosed'] as num?)?.toInt() ?? 0;
-    final current = pollOps!['current'] is Map
-        ? Map<String, dynamic>.from(pollOps!['current'] as Map)
-        : null;
-    final next = pollOps!['next'] is Map
-        ? Map<String, dynamic>.from(pollOps!['next'] as Map)
-        : null;
+    final remaining = (pollOps!['remainingNotClosed'] as num?)?.toInt() ?? 0;
+    final current =
+        pollOps!['current'] is Map
+            ? Map<String, dynamic>.from(pollOps!['current'] as Map)
+            : null;
+    final next =
+        pollOps!['next'] is Map
+            ? Map<String, dynamic>.from(pollOps!['next'] as Map)
+            : null;
 
     final busy = advancing || deleting;
     final canOps = current != null && !busy && !globalLocked;
@@ -1259,24 +1350,26 @@ class _EmpathyPollOpsSection extends StatelessWidget {
             children: [
               OutlinedButton.icon(
                 onPressed: canOps ? onAdvance : null,
-                icon: advancing
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.skip_next_outlined, size: 18),
+                icon:
+                    advancing
+                        ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                        : const Icon(Icons.skip_next_outlined, size: 18),
                 label: Text(advancing ? '처리 중…' : '다음'),
               ),
               OutlinedButton.icon(
                 onPressed: canOps ? onDeleteCurrent : null,
-                icon: deleting
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.delete_outline, size: 18),
+                icon:
+                    deleting
+                        ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                        : const Icon(Icons.delete_outline, size: 18),
                 label: Text(deleting ? '삭제 중…' : '삭제'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.error,
@@ -1316,6 +1409,129 @@ class _EmpathyPollOpsSection extends StatelessWidget {
   }
 }
 
+class _DailyWordPoolCard extends StatelessWidget {
+  final DailyWordOpsSummary? ops;
+  final bool advancing;
+  final VoidCallback onAdvanceTurn;
+
+  const _DailyWordPoolCard({
+    required this.ops,
+    required this.advancing,
+    required this.onAdvanceTurn,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (ops == null) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceMuted,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: const Text(
+          '오늘 단어 풀 데이터 없음',
+          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+        ),
+      );
+    }
+
+    final total = ops!.totalActiveCount;
+    final used = ops!.skippedCount;
+    final remaining = ops!.remainingCount;
+    final daysLeft =
+        DailyWordService.dailyCount > 0
+            ? (remaining / DailyWordService.dailyCount).ceil()
+            : 0;
+    final currentWords = ops!.currentWords;
+    final canAdvance = currentWords.isNotEmpty && !advancing;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                '단어 소모 집계',
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              ),
+              Text(
+                '$used / $total',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '남은 단어 약 $remaining개 (하루 ${DailyWordService.dailyCount}개 기준 약 $daysLeft일치)',
+            style: const TextStyle(fontSize: 11, color: AppColors.textDisabled),
+          ),
+          const SizedBox(height: 14),
+          _QuizDepletionGauge(
+            label: '오늘 단어 풀',
+            used: used,
+            total: total,
+            remaining: remaining,
+            barColor: AppColors.accent,
+            unit: '개',
+          ),
+          const SizedBox(height: 12),
+          Text(
+            currentWords.isEmpty
+                ? '현재 노출 후보가 없습니다.'
+                : '현재 노출 후보: ${currentWords.map((word) => word.english).join(' · ')}',
+            style: const TextStyle(
+              fontSize: 11,
+              color: AppColors.textSecondary,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '소모 수에는 전역 제외 단어와 현재 노출 후보가 함께 포함됩니다. '
+            '다음턴으로 넘기면 현재 후보가 전역 제외 목록에 추가되어 앞으로 노출 후보에서 빠집니다. '
+            '원본 JSON과 사용자별 저장/아는 단어 기록은 유지됩니다.',
+            style: TextStyle(
+              fontSize: 10,
+              height: 1.35,
+              color: AppColors.textDisabled.withValues(alpha: 0.95),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: canAdvance ? onAdvanceTurn : null,
+            icon:
+                advancing
+                    ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                    : const Icon(Icons.skip_next_outlined, size: 18),
+            label: Text(advancing ? '넘기는 중…' : '현재 단어 다음턴으로 넘기기'),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.accent,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// quiz_meta 기준 소진 게이지 (버튼 없음)
 class _QuizDepletionGauge extends StatelessWidget {
   final String label;
@@ -1323,6 +1539,7 @@ class _QuizDepletionGauge extends StatelessWidget {
   final int total;
   final int remaining;
   final Color barColor;
+  final String unit;
 
   const _QuizDepletionGauge({
     required this.label,
@@ -1330,6 +1547,7 @@ class _QuizDepletionGauge extends StatelessWidget {
     required this.total,
     required this.remaining,
     required this.barColor,
+    this.unit = '문제',
   });
 
   @override
@@ -1370,11 +1588,8 @@ class _QuizDepletionGauge extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          total > 0 ? '남음 $remaining문제' : '활성 후보 없음',
-          style: const TextStyle(
-            fontSize: 10,
-            color: AppColors.textDisabled,
-          ),
+          total > 0 ? '남음 $remaining$unit' : '활성 후보 없음',
+          style: const TextStyle(fontSize: 10, color: AppColors.textDisabled),
         ),
       ],
     );
@@ -1485,8 +1700,7 @@ class _ScheduleSlotCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final canTap =
-        item != null && !busy && !globalOpsLocked && !siblingBusy;
+    final canTap = item != null && !busy && !globalOpsLocked && !siblingBusy;
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -1510,10 +1724,7 @@ class _ScheduleSlotCard extends StatelessWidget {
           if (item == null)
             const Text(
               '이 날짜 스케줄에 해당 타입 슬롯이 없습니다.',
-              style: TextStyle(
-                fontSize: 12,
-                color: AppColors.textSecondary,
-              ),
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
             )
           else ...[
             Text(
@@ -1526,7 +1737,9 @@ class _ScheduleSlotCard extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              item!.question.trim().isEmpty ? '(질문 텍스트 없음)' : item!.question.trim(),
+              item!.question.trim().isEmpty
+                  ? '(질문 텍스트 없음)'
+                  : item!.question.trim(),
               maxLines: 4,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
@@ -1590,13 +1803,14 @@ class _ScheduleSlotCard extends StatelessWidget {
             children: [
               OutlinedButton.icon(
                 onPressed: canTap ? onReplace : null,
-                icon: busy
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.skip_next_outlined, size: 18),
+                icon:
+                    busy
+                        ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                        : const Icon(Icons.skip_next_outlined, size: 18),
                 label: Text(busy ? '처리 중…' : '다음'),
               ),
               OutlinedButton.icon(

@@ -24,6 +24,7 @@ class AppMutedButton extends StatelessWidget {
     this.isActive = false,
     this.activeColor,
     this.padding,
+    this.fontWeight = FontWeight.w500,
   });
 
   final VoidCallback onTap;
@@ -43,11 +44,14 @@ class AppMutedButton extends StatelessWidget {
   /// 내부 패딩. 기본값: symmetric(horizontal:12, vertical:10)
   final EdgeInsetsGeometry? padding;
 
+  final FontWeight fontWeight;
+
   @override
   Widget build(BuildContext context) {
-    final bgColor = isActive
-        ? (activeColor ?? AppColors.surfaceMuted)
-        : AppColors.surfaceMuted;
+    final bgColor =
+        isActive
+            ? (activeColor ?? AppColors.surfaceMuted)
+            : AppColors.surfaceMuted;
 
     final contentColor = AppColors.textSecondary;
 
@@ -56,21 +60,18 @@ class AppMutedButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: padding ??
+        padding:
+            padding ??
             const EdgeInsets.symmetric(
               horizontal: AppSpacing.md,
               vertical: AppSpacing.sm + 2,
             ),
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: borderRadius,
-        ),
+        decoration: BoxDecoration(color: bgColor, borderRadius: borderRadius),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (icon != null)
-              Icon(icon, size: 14, color: contentColor),
+            if (icon != null) Icon(icon, size: 14, color: contentColor),
             if (icon != null && label != null)
               const SizedBox(width: AppSpacing.xs),
             if (label != null)
@@ -78,7 +79,7 @@ class AppMutedButton extends StatelessWidget {
                 label!,
                 style: TextStyle(
                   fontSize: 12,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: fontWeight,
                   color: contentColor,
                 ),
               ),
@@ -88,4 +89,3 @@ class AppMutedButton extends StatelessWidget {
     );
   }
 }
-

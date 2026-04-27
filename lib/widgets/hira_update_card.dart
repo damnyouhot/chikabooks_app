@@ -22,10 +22,7 @@ import 'hira_web_view_sheet.dart';
 class HiraUpdateCard extends StatelessWidget {
   final HiraUpdate update;
 
-  const HiraUpdateCard({
-    super.key,
-    required this.update,
-  });
+  const HiraUpdateCard({super.key, required this.update});
 
   @override
   Widget build(BuildContext context) {
@@ -78,30 +75,33 @@ class HiraUpdateCard extends StatelessWidget {
             const SizedBox(height: AppSpacing.md),
 
             // ── 업무 영향 체크 (actionHints) ──
-            ...update.actionHints.take(3).map(
-              (hint) => Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.check_circle_outline,
-                      size: 14,
-                      color: AppColors.textDisabled,
-                    ),
-                    const SizedBox(width: AppSpacing.sm - 2),
-                    Expanded(
-                      child: Text(
-                        hint,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
+            ...update.actionHints
+                .take(3)
+                .map(
+                  (hint) => Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.check_circle_outline,
+                          size: 14,
+                          color: AppColors.textDisabled,
                         ),
-                      ),
+                        const SizedBox(width: AppSpacing.sm - 2),
+                        Expanded(
+                          child: Text(
+                            hint,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
 
             const SizedBox(height: AppSpacing.md),
 
@@ -114,13 +114,12 @@ class HiraUpdateCard extends StatelessWidget {
                     onTap: () => _openWebView(context),
                     icon: Icons.open_in_new,
                     label: '원문 보기',
+                    fontWeight: FontWeight.w700,
                     padding: const EdgeInsets.symmetric(vertical: 10),
                   ),
                 ),
                 const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: _SaveButton(update: update),
-                ),
+                Expanded(child: _SaveButton(update: update)),
                 const SizedBox(width: AppSpacing.sm),
                 _CommentButton(
                   commentCount: update.commentCount,
@@ -144,11 +143,7 @@ class HiraUpdateCard extends StatelessWidget {
   }
 
   void _openWebView(BuildContext context) {
-    HiraWebViewSheet.show(
-      context,
-      url: update.link,
-      title: update.title,
-    );
+    HiraWebViewSheet.show(context, url: update.link, title: update.title);
   }
 
   void _openCommentSheet(BuildContext context) {
@@ -186,6 +181,7 @@ class _SaveButton extends StatelessWidget {
           icon: isSaved ? Icons.bookmark : Icons.bookmark_border,
           label: isSaved ? '저장됨' : '저장',
           isActive: isSaved,
+          fontWeight: FontWeight.w700,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         );
       },
@@ -193,9 +189,10 @@ class _SaveButton extends StatelessWidget {
   }
 
   Future<void> _toggleSave(BuildContext context, bool currentlySaved) async {
-    final success = currentlySaved
-        ? await HiraUpdateService.unsaveUpdate(update.id)
-        : await HiraUpdateService.saveUpdate(update);
+    final success =
+        currentlySaved
+            ? await HiraUpdateService.unsaveUpdate(update.id)
+            : await HiraUpdateService.saveUpdate(update);
     if (context.mounted && success) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -219,6 +216,7 @@ class _CommentButton extends StatelessWidget {
       onTap: onTap,
       icon: Icons.mode_comment_outlined,
       label: commentCount > 0 ? '$commentCount' : null,
+      fontWeight: FontWeight.w700,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
     );
   }

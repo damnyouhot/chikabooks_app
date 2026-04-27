@@ -35,8 +35,16 @@ class AppTheme {
         elevation: 0,
         type: BottomNavigationBarType.fixed,
         // 선택 시 크기 변화 없이 볼드만
-        selectedLabelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-        unselectedLabelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w400),
+        selectedLabelStyle: TextStyle(
+          fontSize: 12,
+          height: 1.0,
+          fontWeight: FontWeight.w700,
+        ),
+        unselectedLabelStyle: TextStyle(
+          fontSize: 12,
+          height: 1.0,
+          fontWeight: FontWeight.w400,
+        ),
         selectedIconTheme: IconThemeData(size: 24),
         unselectedIconTheme: IconThemeData(size: 24),
       ),

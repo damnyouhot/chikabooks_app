@@ -66,10 +66,12 @@ class HiraUpdateDetailSheet extends StatelessWidget {
                   Row(
                     children: [
                       Text(
-                        DateFormat('yyyy년 MM월 dd일 발표').format(update.publishedAt),
+                        DateFormat(
+                          'yyyy년 MM월 dd일 발표',
+                        ).format(update.publishedAt),
                         style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.textPrimary.withOpacity(0.45),
+                          color: AppColors.textPrimary.withValues(alpha: 0.45),
                         ),
                       ),
                       if (update.effectiveDate != null) ...[
@@ -90,7 +92,7 @@ class HiraUpdateDetailSheet extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary.withOpacity(0.8),
+                        color: AppColors.textPrimary.withValues(alpha: 0.8),
                       ),
                     ),
                     const SizedBox(height: AppSpacing.md),
@@ -105,6 +107,7 @@ class HiraUpdateDetailSheet extends StatelessWidget {
                         update.body,
                         style: const TextStyle(
                           fontSize: 13,
+                          fontWeight: FontWeight.w700,
                           color: AppColors.textSecondary,
                           height: 1.6,
                         ),
@@ -120,7 +123,7 @@ class HiraUpdateDetailSheet extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary.withOpacity(0.8),
+                        color: AppColors.textPrimary.withValues(alpha: 0.8),
                       ),
                     ),
                     const SizedBox(height: AppSpacing.md),
@@ -133,7 +136,9 @@ class HiraUpdateDetailSheet extends StatelessWidget {
                             Icon(
                               Icons.check_circle_outline,
                               size: 16,
-                              color: AppColors.textPrimary.withOpacity(0.45),
+                              color: AppColors.textPrimary.withValues(
+                                alpha: 0.45,
+                              ),
                             ),
                             const SizedBox(width: AppSpacing.sm),
                             Expanded(
@@ -141,7 +146,10 @@ class HiraUpdateDetailSheet extends StatelessWidget {
                                 hint,
                                 style: TextStyle(
                                   fontSize: 13,
-                                  color: AppColors.textPrimary.withOpacity(0.65),
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textPrimary.withValues(
+                                    alpha: 0.65,
+                                  ),
                                   height: 1.4,
                                 ),
                               ),
@@ -160,20 +168,20 @@ class HiraUpdateDetailSheet extends StatelessWidget {
                         child: AppMutedButton(
                           icon: Icons.open_in_new,
                           label: '원문 보기',
-                          onTap: () => HiraWebViewSheet.show(
-                            context,
-                            url: update.link,
-                            title: update.title,
-                          ),
+                          fontWeight: FontWeight.w700,
+                          onTap:
+                              () => HiraWebViewSheet.show(
+                                context,
+                                url: update.link,
+                                title: update.title,
+                              ),
                           padding: const EdgeInsets.symmetric(
                             vertical: AppSpacing.md,
                           ),
                         ),
                       ),
                       const SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        child: _SaveButton(update: update),
-                      ),
+                      Expanded(child: _SaveButton(update: update)),
                     ],
                   ),
                   const SizedBox(height: AppSpacing.md),
@@ -183,9 +191,11 @@ class HiraUpdateDetailSheet extends StatelessWidget {
                     width: double.infinity,
                     child: AppMutedButton(
                       icon: Icons.mode_comment_outlined,
-                      label: update.commentCount > 0
-                          ? '댓글 ${update.commentCount}개'
-                          : '댓글 쓰기',
+                      label:
+                          update.commentCount > 0
+                              ? '댓글 ${update.commentCount}개'
+                              : '댓글 쓰기',
+                      fontWeight: FontWeight.w700,
                       onTap: () {
                         Navigator.pop(context);
                         showModalBottomSheet(
@@ -234,7 +244,7 @@ class HiraUpdateDetailSheet extends StatelessWidget {
                 child: Icon(
                   Icons.close,
                   size: 22,
-                  color: AppColors.textPrimary.withOpacity(0.45),
+                  color: AppColors.textPrimary.withValues(alpha: 0.45),
                 ),
               ),
             ],
@@ -286,7 +296,8 @@ class _SaveButton extends StatelessWidget {
           icon: isSaved ? Icons.bookmark : Icons.bookmark_border,
           label: isSaved ? '저장됨' : '저장',
           isActive: isSaved,
-          activeColor: AppColors.accent.withOpacity(0.12),
+          activeColor: AppColors.accent.withValues(alpha: 0.12),
+          fontWeight: FontWeight.w700,
           onTap: () => _toggleSave(context, isSaved),
           padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
         );
@@ -295,9 +306,10 @@ class _SaveButton extends StatelessWidget {
   }
 
   Future<void> _toggleSave(BuildContext context, bool currentlySaved) async {
-    final success = currentlySaved
-        ? await HiraUpdateService.unsaveUpdate(update.id)
-        : await HiraUpdateService.saveUpdate(update);
+    final success =
+        currentlySaved
+            ? await HiraUpdateService.unsaveUpdate(update.id)
+            : await HiraUpdateService.saveUpdate(update);
 
     if (context.mounted && success) {
       ScaffoldMessenger.of(context).showSnackBar(

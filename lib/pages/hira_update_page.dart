@@ -4,6 +4,7 @@ import '../widgets/fee_lookup_section.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_tokens.dart';
 import '../core/widgets/app_segmented_control.dart';
+import '../services/content_read_state_service.dart';
 
 /// 보험정보 페이지 (구 제도 변경)
 ///
@@ -24,21 +25,35 @@ class HiraUpdatePage extends StatefulWidget {
 class _HiraUpdatePageState extends State<HiraUpdatePage>
     with SingleTickerProviderStateMixin {
   late TabController _tabCtrl;
-  final ValueNotifier<String?> _policySearchRequest = ValueNotifier<String?>(null);
+  final ValueNotifier<String?> _policySearchRequest = ValueNotifier<String?>(
+    null,
+  );
+  int _lastMarkedTabIndex = -1;
 
   @override
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 2, vsync: this);
+    _tabCtrl.addListener(_markCurrentTabSeen);
     widget.tabRequestNotifier?.addListener(_onExternalTabRequest);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _markCurrentTabSeen());
   }
 
   @override
   void dispose() {
+    _tabCtrl.removeListener(_markCurrentTabSeen);
     widget.tabRequestNotifier?.removeListener(_onExternalTabRequest);
     _tabCtrl.dispose();
     _policySearchRequest.dispose();
     super.dispose();
+  }
+
+  void _markCurrentTabSeen() {
+    if (!mounted || _lastMarkedTabIndex == _tabCtrl.index) return;
+    _lastMarkedTabIndex = _tabCtrl.index;
+    if (_tabCtrl.index == 1) {
+      ContentReadStateService.markSeen(ContentReadKeys.hiraPolicyUpdates);
+    }
   }
 
   void _onExternalTabRequest() {
@@ -68,15 +83,24 @@ class _HiraUpdatePageState extends State<HiraUpdatePage>
       color: AppColors.appBg,
       child: Column(
         children: [
-          AppSegmentedControl(
-            controller: _tabCtrl,
-            labels: const ['수가 조회', '제도 변경'],
-            margin: const EdgeInsets.fromLTRB(
-              AppSpacing.xl,
-              AppSpacing.xs,
-              AppSpacing.xl,
-              AppSpacing.sm,
-            ),
+          StreamBuilder<Set<int>>(
+            stream: ContentReadStateService.watchNewIndices(const {
+              1: [ContentReadKeys.hiraPolicyUpdates],
+            }),
+            initialData: const {},
+            builder: (context, snapshot) {
+              return AppSegmentedControl(
+                controller: _tabCtrl,
+                labels: const ['수가 조회', '제도 변경'],
+                newIndices: snapshot.data ?? const {},
+                margin: const EdgeInsets.fromLTRB(
+                  AppSpacing.xl,
+                  AppSpacing.xs,
+                  AppSpacing.xl,
+                  AppSpacing.sm,
+                ),
+              );
+            },
           ),
           Expanded(
             child: TabBarView(
@@ -85,9 +109,7 @@ class _HiraUpdatePageState extends State<HiraUpdatePage>
                 FeeLookupSection(
                   onOpenPolicySearch: _openPolicySearchWithKeyword,
                 ),
-                HiraUpdateSection(
-                  policySearchRequest: _policySearchRequest,
-                ),
+                HiraUpdateSection(policySearchRequest: _policySearchRequest),
               ],
             ),
           ),

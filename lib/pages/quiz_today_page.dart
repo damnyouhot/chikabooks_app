@@ -722,6 +722,7 @@ class _RecentQuizSection extends StatelessWidget {
             '지난 퀴즈 기록이 없습니다.',
             style: TextStyle(
               fontSize: 13,
+              fontWeight: FontWeight.w700,
               color:
                   glassMode
                       ? AppColors.white.withValues(alpha: 0.4)
@@ -1056,11 +1057,7 @@ class _QuizCardState extends State<_QuizCard> {
                       widget.options[i],
                       style: TextStyle(
                         fontSize: 13,
-                        fontWeight:
-                            (!_answered && isSelected) ||
-                                    (_answered && isCorrect)
-                                ? FontWeight.w700
-                                : FontWeight.w400,
+                        fontWeight: FontWeight.w700,
                         color: textColor,
                       ),
                     ),
@@ -1104,7 +1101,7 @@ class _QuizCardState extends State<_QuizCard> {
                   widget.question,
                   style: TextStyle(
                     fontSize: 15,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
                     color: questionColor,
                     height: 1.4,
                   ),
@@ -1157,7 +1154,7 @@ class _QuizCardState extends State<_QuizCard> {
                   style: TextStyle(
                     fontSize: 13,
                     color: feedbackColor,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 if (widget.explanation.isNotEmpty) ...[
@@ -1166,6 +1163,7 @@ class _QuizCardState extends State<_QuizCard> {
                     widget.explanation,
                     style: TextStyle(
                       fontSize: 12,
+                      fontWeight: FontWeight.w700,
                       color:
                           widget.glassMode
                               ? AppColors.white.withValues(alpha: 0.55)

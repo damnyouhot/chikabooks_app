@@ -27,6 +27,7 @@ class _HiraUpdateSectionState extends State<HiraUpdateSection> {
   HiraSearchResponse? _deepResult;
   String? _deepError;
   int _deepPage = 1;
+
   /// `all` = 전 탭 병합, 그 외 = 심평원 tabGbn (01, 02, 99, …)
   String _deepTabId = 'all';
 
@@ -111,8 +112,11 @@ class _HiraUpdateSectionState extends State<HiraUpdateSection> {
     if (r == null) return 0;
     if (_deepTabId == 'all') return r.totalAllCount;
     return r.tabCounts[_deepTabId] ??
-        r.tabs.firstWhere((t) => t.id == _deepTabId,
-                orElse: () => HiraSearchTabInfo(id: '', label: '', count: 0))
+        r.tabs
+            .firstWhere(
+              (t) => t.id == _deepTabId,
+              orElse: () => HiraSearchTabInfo(id: '', label: '', count: 0),
+            )
             .count;
   }
 
@@ -123,7 +127,8 @@ class _HiraUpdateSectionState extends State<HiraUpdateSection> {
     final nextTab = tab ?? _deepTabId;
 
     // 로컬 탭 전환: 기존 응답에 tabResults가 있으면 API 재호출 없이 즉시 전환
-    if (nextTab != 'all' && _deepResult != null &&
+    if (nextTab != 'all' &&
+        _deepResult != null &&
         _deepResult!.tabResults.containsKey(nextTab)) {
       setState(() {
         _deepTabId = nextTab;
@@ -203,7 +208,9 @@ class _HiraUpdateSectionState extends State<HiraUpdateSection> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildSearchBar(),
-                if (_deepResult != null || _isDeepSearching || _deepError != null)
+                if (_deepResult != null ||
+                    _isDeepSearching ||
+                    _deepError != null)
                   _buildDeepSearchSection()
                 else
                   _buildLocalSection(all),
@@ -243,28 +250,33 @@ class _HiraUpdateSectionState extends State<HiraUpdateSection> {
             _doDeepSearch(page: 1, tab: 'all');
           }
         },
-        style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
+          color: AppColors.textPrimary,
+        ),
         decoration: InputDecoration(
           hintText: '코드·키워드 검색 (예: 구강, K08, 스케일링)',
           hintStyle: TextStyle(
             fontSize: 13,
-            color: AppColors.textPrimary.withOpacity(0.35),
+            color: AppColors.textPrimary.withValues(alpha: 0.35),
           ),
           prefixIcon: Icon(
             Icons.search,
             size: 20,
-            color: AppColors.textPrimary.withOpacity(0.4),
+            color: AppColors.textPrimary.withValues(alpha: 0.4),
           ),
-          suffixIcon: _query.isNotEmpty
-              ? GestureDetector(
-                  onTap: _clearSearch,
-                  child: Icon(
-                    Icons.close,
-                    size: 18,
-                    color: AppColors.textPrimary.withOpacity(0.4),
-                  ),
-                )
-              : null,
+          suffixIcon:
+              _query.isNotEmpty
+                  ? GestureDetector(
+                    onTap: _clearSearch,
+                    child: Icon(
+                      Icons.close,
+                      size: 18,
+                      color: AppColors.textPrimary.withValues(alpha: 0.4),
+                    ),
+                  )
+                  : null,
           filled: true,
           fillColor: AppColors.surfaceMuted,
           contentPadding: const EdgeInsets.symmetric(
@@ -289,25 +301,24 @@ class _HiraUpdateSectionState extends State<HiraUpdateSection> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSectionHeader(
-          title: _query.isEmpty
-              ? '수가·급여 변경 리스트 (건강보험심사평가원)'
-              : '"$_query" 검색결과',
-          subtitle: _query.isEmpty
-              ? '최근 ${all.length}건의 변경사항'
-              : '${updates.length}건 일치',
+          title: _query.isEmpty ? '수가·급여 변경 리스트 (건강보험심사평가원)' : '"$_query" 검색결과',
+          subtitle:
+              _query.isEmpty
+                  ? '최근 ${all.length}건의 변경사항'
+                  : '${updates.length}건 일치',
         ),
-        if (_query.isNotEmpty && _query.length >= 2)
-          _buildDeepSearchHint(),
+        if (_query.isNotEmpty && _query.length >= 2) _buildDeepSearchHint(),
         if (updates.isEmpty && _query.isNotEmpty)
           _buildNoResultState()
         else ...[
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
             child: Column(
-              children: updates
-                  .take(3)
-                  .map((u) => HiraUpdateCard(update: u))
-                  .toList(),
+              children:
+                  updates
+                      .take(3)
+                      .map((u) => HiraUpdateCard(update: u))
+                      .toList(),
             ),
           ),
           if (updates.length > 3) ...[
@@ -327,10 +338,11 @@ class _HiraUpdateSectionState extends State<HiraUpdateSection> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
               child: Column(
-                children: updates
-                    .skip(3)
-                    .map((u) => HiraUpdateCompactItem(update: u))
-                    .toList(),
+                children:
+                    updates
+                        .skip(3)
+                        .map((u) => HiraUpdateCompactItem(update: u))
+                        .toList(),
               ),
             ),
           ],
@@ -342,7 +354,10 @@ class _HiraUpdateSectionState extends State<HiraUpdateSection> {
   Widget _buildDeepSearchHint() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(
-        AppSpacing.xl, 0, AppSpacing.xl, AppSpacing.md,
+        AppSpacing.xl,
+        0,
+        AppSpacing.xl,
+        AppSpacing.md,
       ),
       child: GestureDetector(
         onTap: () => _doDeepSearch(page: 1, tab: 'all'),
@@ -352,7 +367,7 @@ class _HiraUpdateSectionState extends State<HiraUpdateSection> {
             vertical: AppSpacing.md,
           ),
           decoration: BoxDecoration(
-            color: AppColors.accent.withOpacity(0.06),
+            color: AppColors.accent.withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(AppRadius.md),
           ),
           child: Row(
@@ -365,12 +380,11 @@ class _HiraUpdateSectionState extends State<HiraUpdateSection> {
                   style: TextStyle(
                     fontSize: 13,
                     color: AppColors.accent,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
-              Icon(Icons.arrow_forward_ios,
-                  size: 14, color: AppColors.accent),
+              Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.accent),
             ],
           ),
         ),
@@ -385,14 +399,11 @@ class _HiraUpdateSectionState extends State<HiraUpdateSection> {
       children: [
         _buildSectionHeader(
           title: '심평원 보험인정기준 검색',
-          subtitle: _isDeepSearching
-              ? '검색 중...'
-              : '분류 칩을 눌러 해당 유형만 볼 수 있어요',
+          subtitle: _isDeepSearching ? '검색 중...' : '분류 칩을 눌러 해당 유형만 볼 수 있어요',
         ),
 
         if (_deepResult != null && !_isDeepSearching) _buildTabFilterChips(),
-        if (_deepResult != null && !_isDeepSearching)
-          _buildDeepPageLine(),
+        if (_deepResult != null && !_isDeepSearching) _buildDeepPageLine(),
 
         if (_isDeepSearching)
           const Padding(
@@ -403,19 +414,18 @@ class _HiraUpdateSectionState extends State<HiraUpdateSection> {
           _buildErrorState()
         else if (_deepResult != null && _activeResults.isEmpty)
           _buildNoResultState()
-        else if (_deepResult != null)
-          ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-              child: Column(
-                children: _activeResults
-                    .map((r) => _DeepSearchResultItem(result: r))
-                    .toList(),
-              ),
+        else if (_deepResult != null) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+            child: Column(
+              children:
+                  _activeResults
+                      .map((r) => _DeepSearchResultItem(result: r))
+                      .toList(),
             ),
-            if (_activeResults.length < _activeCount)
-              _buildPagination(),
-          ],
+          ),
+          if (_activeResults.length < _activeCount) _buildPagination(),
+        ],
       ],
     );
   }
@@ -440,7 +450,9 @@ class _HiraUpdateSectionState extends State<HiraUpdateSection> {
             onTap: () => _doDeepSearch(page: 1, tab: 'all'),
           ),
           if (r.tabs.isNotEmpty)
-            ...r.tabs.where((t) => t.count > 0).map(
+            ...r.tabs
+                .where((t) => t.count > 0)
+                .map(
                   (t) => _DeepFilterChip(
                     label: '${t.label} ${t.count}건',
                     selected: _deepTabId == t.id,
@@ -459,11 +471,11 @@ class _HiraUpdateSectionState extends State<HiraUpdateSection> {
       return const SizedBox.shrink();
     }
     final pp = r.perPage.clamp(1, 50);
-    final totalPages =
-        ((count + pp - 1) / pp).ceil().clamp(1, 99999);
-    final line = _deepTabId == 'all'
-        ? '${r.page}/$totalPages 페이지 · 합산 ${r.totalAllCount}건'
-        : '${r.page}/$totalPages 페이지 · 이 분류 $count건 (전체 ${r.totalAllCount}건)';
+    final totalPages = ((count + pp - 1) / pp).ceil().clamp(1, 99999);
+    final line =
+        _deepTabId == 'all'
+            ? '${r.page}/$totalPages 페이지 · 합산 ${r.totalAllCount}건'
+            : '${r.page}/$totalPages 페이지 · 이 분류 $count건 (전체 ${r.totalAllCount}건)';
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.xl,
@@ -475,6 +487,7 @@ class _HiraUpdateSectionState extends State<HiraUpdateSection> {
         line,
         style: const TextStyle(
           fontSize: 12,
+          fontWeight: FontWeight.w700,
           color: AppColors.textDisabled,
         ),
       ),
@@ -483,8 +496,7 @@ class _HiraUpdateSectionState extends State<HiraUpdateSection> {
 
   Widget _buildPagination() {
     final pp = _deepResult!.perPage.clamp(1, 50);
-    final totalPages =
-        ((_activeCount + pp - 1) / pp).ceil().clamp(1, 99999);
+    final totalPages = ((_activeCount + pp - 1) / pp).ceil().clamp(1, 99999);
     return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.xl,
@@ -504,7 +516,7 @@ class _HiraUpdateSectionState extends State<HiraUpdateSection> {
             style: const TextStyle(
               fontSize: 13,
               color: AppColors.textSecondary,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(width: AppSpacing.md),
@@ -527,7 +539,10 @@ class _HiraUpdateSectionState extends State<HiraUpdateSection> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(
-            AppSpacing.xl, AppSpacing.sm, AppSpacing.xl, AppSpacing.xs,
+            AppSpacing.xl,
+            AppSpacing.sm,
+            AppSpacing.xl,
+            AppSpacing.xs,
           ),
           child: Row(
             children: [
@@ -553,12 +568,16 @@ class _HiraUpdateSectionState extends State<HiraUpdateSection> {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(
-            AppSpacing.xl, 0, AppSpacing.xl, AppSpacing.lg,
+            AppSpacing.xl,
+            0,
+            AppSpacing.xl,
+            AppSpacing.lg,
           ),
           child: Text(
             subtitle,
             style: const TextStyle(
               fontSize: 12,
+              fontWeight: FontWeight.w700,
               color: AppColors.textDisabled,
             ),
           ),
@@ -588,9 +607,11 @@ class _HiraUpdateSectionState extends State<HiraUpdateSection> {
               '새로운 수가·급여 변경사항이 발표되면\n자동으로 업데이트됩니다',
               textAlign: TextAlign.center,
               style: TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textDisabled,
-                  height: 1.4),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textDisabled,
+                height: 1.4,
+              ),
             ),
           ],
         ),
@@ -608,13 +629,19 @@ class _HiraUpdateSectionState extends State<HiraUpdateSection> {
         padding: const EdgeInsets.all(AppSpacing.xxl),
         child: Column(
           children: [
-            const Icon(Icons.search_off,
-                size: 40, color: AppColors.textDisabled),
+            const Icon(
+              Icons.search_off,
+              size: 40,
+              color: AppColors.textDisabled,
+            ),
             const SizedBox(height: AppSpacing.md),
             Text(
               '"$_query"에 대한 결과가 없습니다',
-              style:
-                  const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textSecondary,
+              ),
             ),
             const SizedBox(height: AppSpacing.xs),
             const Text(
@@ -637,13 +664,19 @@ class _HiraUpdateSectionState extends State<HiraUpdateSection> {
         padding: const EdgeInsets.all(AppSpacing.xxl),
         child: Column(
           children: [
-            const Icon(Icons.error_outline,
-                size: 40, color: AppColors.textDisabled),
+            const Icon(
+              Icons.error_outline,
+              size: 40,
+              color: AppColors.textDisabled,
+            ),
             const SizedBox(height: AppSpacing.md),
             Text(
               _deepError ?? '오류가 발생했습니다',
-              style:
-                  const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textSecondary,
+              ),
             ),
             const SizedBox(height: AppSpacing.lg),
             GestureDetector(
@@ -653,7 +686,7 @@ class _HiraUpdateSectionState extends State<HiraUpdateSection> {
                 style: TextStyle(
                   fontSize: 13,
                   color: AppColors.accent,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
@@ -679,11 +712,8 @@ class _DeepFilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = selected
-        ? AppColors.segmentSelected
-        : AppColors.surfaceMuted;
-    final fg =
-        selected ? AppColors.onSegmentSelected : AppColors.textSecondary;
+    final bg = selected ? AppColors.segmentSelected : AppColors.surfaceMuted;
+    final fg = selected ? AppColors.onSegmentSelected : AppColors.textSecondary;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -697,17 +727,18 @@ class _DeepFilterChip extends StatelessWidget {
           decoration: BoxDecoration(
             color: bg,
             borderRadius: BorderRadius.circular(AppRadius.sm),
-            border: emphasize && !selected
-                ? Border.all(
-                    color: AppColors.accent.withValues(alpha: 0.35),
-                  )
-                : null,
+            border:
+                emphasize && !selected
+                    ? Border.all(
+                      color: AppColors.accent.withValues(alpha: 0.35),
+                    )
+                    : null,
           ),
           child: Text(
             label,
             style: TextStyle(
               fontSize: 11,
-              fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+              fontWeight: FontWeight.w700,
               color: fg,
             ),
           ),
@@ -728,12 +759,13 @@ class _DeepSearchResultItem extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: AppMutedCard(
         padding: const EdgeInsets.all(AppSpacing.lg),
-        onTap: () => HiraWebViewSheet.show(
-          context,
-          url: result.link,
-          title: result.title,
-          searchContext: result,
-        ),
+        onTap:
+            () => HiraWebViewSheet.show(
+              context,
+              url: result.link,
+              title: result.title,
+              searchContext: result,
+            ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -745,14 +777,14 @@ class _DeepSearchResultItem extends StatelessWidget {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.accent.withOpacity(0.08),
+                    color: AppColors.accent.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(AppRadius.xs),
                   ),
                   child: Text(
                     result.category,
                     style: TextStyle(
                       fontSize: 10,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
                       color: AppColors.accent,
                     ),
                   ),
@@ -765,6 +797,7 @@ class _DeepSearchResultItem extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 11,
+                      fontWeight: FontWeight.w700,
                       color: AppColors.textDisabled,
                     ),
                   ),
@@ -790,23 +823,31 @@ class _DeepSearchResultItem extends StatelessWidget {
                   result.date,
                   style: const TextStyle(
                     fontSize: 11,
+                    fontWeight: FontWeight.w700,
                     color: AppColors.textDisabled,
                   ),
                 ),
                 const SizedBox(width: AppSpacing.md),
-                Icon(Icons.visibility_outlined,
-                    size: 12, color: AppColors.textDisabled),
+                Icon(
+                  Icons.visibility_outlined,
+                  size: 12,
+                  color: AppColors.textDisabled,
+                ),
                 const SizedBox(width: 3),
                 Text(
                   '${result.views}',
                   style: const TextStyle(
                     fontSize: 11,
+                    fontWeight: FontWeight.w700,
                     color: AppColors.textDisabled,
                   ),
                 ),
                 const Spacer(),
-                Icon(Icons.open_in_new,
-                    size: 14, color: AppColors.textDisabled),
+                Icon(
+                  Icons.open_in_new,
+                  size: 14,
+                  color: AppColors.textDisabled,
+                ),
               ],
             ),
           ],
@@ -839,7 +880,7 @@ class _PaginationButton extends StatelessWidget {
           style: TextStyle(
             fontSize: 13,
             color: AppColors.accent,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ),

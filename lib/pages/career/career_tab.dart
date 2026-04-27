@@ -7,6 +7,7 @@ import '../../core/theme/app_tokens.dart';
 import '../../core/widgets/app_muted_card.dart';
 import '../../core/widgets/app_segmented_control.dart';
 import '../../core/widgets/app_badge.dart';
+import '../../services/content_read_state_service.dart';
 import 'career_shared.dart';
 import 'career_identity_section.dart';
 import 'career_skill_section.dart';
@@ -17,18 +18,65 @@ import 'career_stage_section.dart';
 ///
 /// 타이틀·인포·설정은 [job_page.dart]의 [_JobPageTitleBar]가 처리하며,
 /// 이 위젯은 소탭('공고 보기' / '커리어 카드')만 렌더링합니다.
-class CareerTabHeader extends StatelessWidget {
+class CareerTabHeader extends StatefulWidget {
   const CareerTabHeader({super.key});
 
   @override
+  State<CareerTabHeader> createState() => _CareerTabHeaderState();
+}
+
+class _CareerTabHeaderState extends State<CareerTabHeader> {
+  TabController? _controller;
+  int _lastMarkedTabIndex = -1;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final next = DefaultTabController.of(context);
+    if (_controller == next) return;
+    _controller?.removeListener(_markCurrentTabSeen);
+    _controller = next;
+    _controller?.addListener(_markCurrentTabSeen);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _markCurrentTabSeen());
+  }
+
+  @override
+  void dispose() {
+    _controller?.removeListener(_markCurrentTabSeen);
+    super.dispose();
+  }
+
+  void _markCurrentTabSeen() {
+    final controller = _controller;
+    if (!mounted ||
+        controller == null ||
+        _lastMarkedTabIndex == controller.index) {
+      return;
+    }
+    _lastMarkedTabIndex = controller.index;
+    if (controller.index == 0) {
+      ContentReadStateService.markSeen(ContentReadKeys.jobs);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return AppSegmentedControl(
-      controller: DefaultTabController.of(context),
-      labels: const ['공고 보기', '커리어 카드'],
-      margin: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.xl,
-        vertical: AppSpacing.xs,
-      ),
+    return StreamBuilder<Set<int>>(
+      stream: ContentReadStateService.watchNewIndices(const {
+        0: [ContentReadKeys.jobs],
+      }),
+      initialData: const {},
+      builder: (context, snapshot) {
+        return AppSegmentedControl(
+          controller: DefaultTabController.of(context),
+          labels: const ['공고 보기', '커리어 카드'],
+          newIndices: snapshot.data ?? const {},
+          margin: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.xl,
+            vertical: AppSpacing.xs,
+          ),
+        );
+      },
     );
   }
 }
@@ -183,7 +231,10 @@ class _TopCareerCard extends StatelessWidget {
           // ── 섹션 라벨 ──
           Padding(
             padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg, AppSpacing.md, AppSpacing.lg, 0,
+              AppSpacing.lg,
+              AppSpacing.md,
+              AppSpacing.lg,
+              0,
             ),
             child: Text(
               '커리어 카드',
@@ -198,13 +249,14 @@ class _TopCareerCard extends StatelessWidget {
           // ── 기존 Identity 카드 내용 ──
           Padding(
             padding: const EdgeInsets.all(AppSpacing.lg),
-            child: identity == null
-                ? _IdentityEmptyInner()
-                : _IdentityFilledInner(
-                    identity: identity!,
-                    totalCareerMonths: totalCareerMonths,
-                    autoMonths: autoMonths,
-                  ),
+            child:
+                identity == null
+                    ? _IdentityEmptyInner()
+                    : _IdentityFilledInner(
+                      identity: identity!,
+                      totalCareerMonths: totalCareerMonths,
+                      autoMonths: autoMonths,
+                    ),
           ),
         ],
       ),
@@ -224,7 +276,7 @@ class _IdentityEmptyInner extends StatelessWidget {
             const Text(
               '내 커리어 카드',
               style: TextStyle(
-                fontSize: 16,            // 기존 16 유지 (동일)
+                fontSize: 16, // 기존 16 유지 (동일)
                 fontWeight: FontWeight.w800,
                 color: AppColors.onCardPrimary,
               ),
@@ -339,8 +391,7 @@ class _IdentityFilledInner extends StatelessWidget {
     }
 
     final titleLine = switch (status) {
-      'leave' =>
-        clinicName.isEmpty ? '잠시 쉬는 중' : '$clinicName · 잠시 쉬는 중',
+      'leave' => clinicName.isEmpty ? '잠시 쉬는 중' : '$clinicName · 잠시 쉬는 중',
       'unemployed' => '다음 치과를 기다리는 중',
       _ =>
         clinicName.isEmpty
@@ -361,7 +412,7 @@ class _IdentityFilledInner extends StatelessWidget {
               child: Text(
                 titleLine,
                 style: const TextStyle(
-                  fontSize: 16,            // 14 → 16 (다른 카드 타이틀과 통일)
+                  fontSize: 16, // 14 → 16 (다른 카드 타이틀과 통일)
                   fontWeight: FontWeight.w900,
                   color: AppColors.onCardPrimary,
                 ),
@@ -478,25 +529,33 @@ class _ShortcutRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(child: _ShortcutCard(
-            icon: Icons.description_outlined,
-            label: '내 이력서',
-            description: '이력서 작성 및 지원',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ResumeHomeScreen()),
+          Expanded(
+            child: _ShortcutCard(
+              icon: Icons.description_outlined,
+              label: '내 이력서',
+              description: '이력서 작성 및 지원',
+              onTap:
+                  () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ResumeHomeScreen()),
+                  ),
             ),
-          )),
+          ),
           const SizedBox(width: AppSpacing.sm),
-          Expanded(child: _ShortcutCard(
-            icon: Icons.work_outline,
-            label: '지원 내역',
-            description: '지원 공고 현황 확인',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const MyApplicationsScreen()),
+          Expanded(
+            child: _ShortcutCard(
+              icon: Icons.work_outline,
+              label: '지원 내역',
+              description: '지원 공고 현황 확인',
+              onTap:
+                  () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const MyApplicationsScreen(),
+                    ),
+                  ),
             ),
-          )),
+          ),
         ],
       ),
     );
@@ -600,7 +659,9 @@ class _SkillSection extends StatelessWidget {
           if (enabledSkills.isEmpty)
             SizedBox(
               width: double.infinity,
-              child: _SkillEmptyState(onTap: () => CareerSkillEditSheet.show(context)),
+              child: _SkillEmptyState(
+                onTap: () => CareerSkillEditSheet.show(context),
+              ),
             )
           else ...[
             ...previewSkills.map((m) {
@@ -763,9 +824,10 @@ class _NetworkSectionState extends State<_NetworkSection> {
     final entries = widget.entries;
     final totalClinics = entries.length;
     final totalMonths = entries.fold(0, (sum, e) => sum + e.months);
-    final maxMonths = entries.isEmpty
-        ? 1
-        : entries.map((e) => e.months).reduce((a, b) => a > b ? a : b);
+    final maxMonths =
+        entries.isEmpty
+            ? 1
+            : entries.map((e) => e.months).reduce((a, b) => a > b ? a : b);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -778,9 +840,7 @@ class _NetworkSectionState extends State<_NetworkSection> {
             padding: const EdgeInsets.symmetric(vertical: 4),
             child: Row(
               children: [
-                const Expanded(
-                  child: CareerSectionTitle('나의 치과 네트워크'),
-                ),
+                const Expanded(child: CareerSectionTitle('나의 치과 네트워크')),
                 IconButton(
                   onPressed: () => DentalNetworkEditSheet.show(context),
                   icon: const Icon(Icons.add, size: 18),
@@ -825,44 +885,47 @@ class _NetworkSectionState extends State<_NetworkSection> {
                   : '총 $totalClinics곳 · 총 ${formatCareerMonths(totalMonths)}',
               style: TextStyle(
                 fontSize: 12,
-                color: totalClinics == 0
-                    ? AppColors.accent
-                    : AppColors.textSecondary,
+                color:
+                    totalClinics == 0
+                        ? AppColors.accent
+                        : AppColors.textSecondary,
               ),
             ),
           ),
         ),
         // ── 펼치기 내용 ──
         AnimatedCrossFade(
-          crossFadeState: _expanded
-              ? CrossFadeState.showSecond
-              : CrossFadeState.showFirst,
+          crossFadeState:
+              _expanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
           duration: const Duration(milliseconds: 200),
           firstChild: const SizedBox(height: 0),
           secondChild: Padding(
             padding: const EdgeInsets.only(top: 12),
-            child: entries.isEmpty
-                ? _NetworkEmptyHint(
-                    onAdd: () => DentalNetworkEditSheet.show(context),
-                  )
-                : Column(
-                    children: entries
-                        .map(
-                          (e) => Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: _NetworkTimelineItem(
-                              entry: e,
-                              maxMonths: maxMonths,
-                              onEdit: () => DentalNetworkEditSheet.show(
-                                context,
-                                editing: e,
-                              ),
-                              onDelete: () => _confirmDelete(context, e),
-                            ),
-                          ),
-                        )
-                        .toList(),
-                  ),
+            child:
+                entries.isEmpty
+                    ? _NetworkEmptyHint(
+                      onAdd: () => DentalNetworkEditSheet.show(context),
+                    )
+                    : Column(
+                      children:
+                          entries
+                              .map(
+                                (e) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 10),
+                                  child: _NetworkTimelineItem(
+                                    entry: e,
+                                    maxMonths: maxMonths,
+                                    onEdit:
+                                        () => DentalNetworkEditSheet.show(
+                                          context,
+                                          editing: e,
+                                        ),
+                                    onDelete: () => _confirmDelete(context, e),
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                    ),
           ),
         ),
       ],
@@ -875,23 +938,24 @@ class _NetworkSectionState extends State<_NetworkSection> {
   ) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('삭제하시겠어요?'),
-        content: Text('"${entry.clinicName}" 이력을 삭제합니다.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('취소'),
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('삭제하시겠어요?'),
+            content: Text('"${entry.clinicName}" 이력을 삭제합니다.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('취소'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text(
+                  '삭제',
+                  style: TextStyle(color: AppColors.error),
+                ),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text(
-              '삭제',
-              style: TextStyle(color: AppColors.error),
-            ),
-          ),
-        ],
-      ),
     );
     if (ok == true) {
       await CareerProfileService.deleteNetworkEntry(entry.id);
@@ -932,10 +996,7 @@ class _NetworkEmptyHint extends StatelessWidget {
               ),
             ),
           ),
-          TextButton(
-            onPressed: onAdd,
-            child: const Text('추가하기'),
-          ),
+          TextButton(onPressed: onAdd, child: const Text('추가하기')),
         ],
       ),
     );
@@ -965,14 +1026,16 @@ class _NetworkTimelineItem extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: entry.isCurrent
-            ? AppColors.accent.withOpacity(0.08)
-            : AppColors.appBg,
+        color:
+            entry.isCurrent
+                ? AppColors.accent.withOpacity(0.08)
+                : AppColors.appBg,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(
-          color: entry.isCurrent
-              ? AppColors.accent.withOpacity(0.18)
-              : AppColors.divider,
+          color:
+              entry.isCurrent
+                  ? AppColors.accent.withOpacity(0.18)
+                  : AppColors.divider,
           width: 0.8,
         ),
       ),
@@ -985,9 +1048,8 @@ class _NetworkTimelineItem extends StatelessWidget {
             height: barHeight,
             margin: const EdgeInsets.only(top: 2, right: 12),
             decoration: BoxDecoration(
-              color: entry.isCurrent
-                  ? AppColors.accent
-                  : AppColors.textDisabled,
+              color:
+                  entry.isCurrent ? AppColors.accent : AppColors.textDisabled,
               borderRadius: BorderRadius.circular(AppRadius.md),
             ),
           ),
@@ -1024,29 +1086,33 @@ class _NetworkTimelineItem extends StatelessWidget {
                   Wrap(
                     spacing: 4,
                     runSpacing: 4,
-                    children: entry.tags
-                        .map(
-                          (t) => Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.sm,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.textDisabled.withOpacity(0.12),
-                              borderRadius:
-                                  BorderRadius.circular(AppRadius.full),
-                            ),
-                            child: Text(
-                              t,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textSecondary,
+                    children:
+                        entry.tags
+                            .map(
+                              (t) => Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.sm,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.textDisabled.withOpacity(
+                                    0.12,
+                                  ),
+                                  borderRadius: BorderRadius.circular(
+                                    AppRadius.full,
+                                  ),
+                                ),
+                                child: Text(
+                                  t,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                        )
-                        .toList(),
+                            )
+                            .toList(),
                   ),
                 ],
               ],

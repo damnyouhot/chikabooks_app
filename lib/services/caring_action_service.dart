@@ -110,10 +110,11 @@ class CaringActionService {
       }
 
       final treatCount = await CaringTreatService.getTreatCount();
-      if (treatCount <= 0) {
+      if (treatCount < CaringTreatService.feedCost) {
         return FeedResult(
           success: false,
-          rejectMent: '투표나 퀴즈를 풀면 먹이가 생겨요',
+          rejectMent:
+              '밥주기에는 먹이 ${CaringTreatService.feedCost}개가 필요해요.',
         );
       }
 
@@ -147,7 +148,7 @@ class CaringActionService {
       } else if (isConsecutive) {
         hungerDelta = 15; moodDelta = -3; energyDelta = -8; bondDelta = 0;
       } else {
-        hungerDelta = 25; moodDelta = 8; energyDelta = 0; bondDelta = 2;
+        hungerDelta = 25; moodDelta = 8; energyDelta = 0; bondDelta = 1;
       }
 
       // mood < 30 → bond 보상 절반 (내림)
@@ -229,9 +230,13 @@ class CaringActionService {
 
       double moodDelta;
       double bondDelta;
+      final todayKey = _dateKey(now);
+      final dailyTouchBondGain =
+          state.touchBondDateKey == todayKey ? state.dailyTouchBondGain : 0;
 
       if (count < 3) {
-        moodDelta = 5; bondDelta = 1;
+        moodDelta = 5;
+        bondDelta = dailyTouchBondGain < 3 ? 1 : 0;
       } else if (count < 6) {
         moodDelta = 1; bondDelta = 0;
       } else {
@@ -252,6 +257,9 @@ class CaringActionService {
         mood: state.mood + moodDelta,
         bond: state.bond + bondDelta,
         touchTimestamps: [...trimmed, now],
+        touchBondDateKey: todayKey,
+        dailyTouchBondGain:
+            dailyTouchBondGain + (bondDelta > 0 ? bondDelta.toInt() : 0),
         lastActiveAt: now,
       );
 
@@ -560,6 +568,9 @@ class CaringActionService {
     if (pool.isEmpty) return '';
     return pool[_random.nextInt(pool.length)];
   }
+
+  static String _dateKey(DateTime dt) =>
+      '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
 }
 
 // ═══════════════════════ 결과 객체들 ═══════════════════════

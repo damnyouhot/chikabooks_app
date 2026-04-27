@@ -256,7 +256,7 @@ class BondPollSectionState extends State<BondPollSection> {
             _activePoll!.id,
           );
           if (!mounted || !ok) return;
-          FloatingTreatBurst.show(context, iconCount: 2);
+          FloatingTreatBurst.show(context, iconCount: 1);
         }());
       }
     } else if (context.mounted) {
@@ -530,7 +530,7 @@ class BondPollSectionState extends State<BondPollSection> {
             ),
             const SizedBox(width: 6),
             const Text(
-              '오늘의 공감 투표',
+              '오늘의 공감투표',
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
@@ -631,6 +631,7 @@ class BondPollSectionState extends State<BondPollSection> {
                       '$totalEmpathy명 참여',
                       style: const TextStyle(
                         fontSize: 11,
+                        fontWeight: FontWeight.w700,
                         color: AppColors.textDisabled,
                       ),
                     ),
@@ -661,6 +662,7 @@ class BondPollSectionState extends State<BondPollSection> {
               maxLength: EmpathyPollService.maxOptionLength,
               style: const TextStyle(
                 fontSize: 13,
+                fontWeight: FontWeight.w700,
                 color: AppColors.textPrimary,
               ),
               decoration: InputDecoration(
@@ -718,6 +720,7 @@ class BondPollSectionState extends State<BondPollSection> {
                     '닉네임 비공개',
                     style: TextStyle(
                       fontSize: 11,
+                      fontWeight: FontWeight.w700,
                       color:
                           _addingOption
                               ? AppColors.textDisabled
@@ -810,10 +813,7 @@ class BondPollSectionState extends State<BondPollSection> {
                             option.content,
                             style: TextStyle(
                               fontSize: 13,
-                              fontWeight:
-                                  isSelected
-                                      ? FontWeight.w700
-                                      : FontWeight.w400,
+                              fontWeight: FontWeight.w700,
                               color:
                                   isSelected
                                       ? AppColors.pollOptionSelectedText
@@ -1031,7 +1031,7 @@ class BondPollSectionState extends State<BondPollSection> {
                   icon: const Icon(Icons.expand_more, size: 18),
                   label: const Text(
                     '이전 투표 더보기',
-                    style: TextStyle(fontSize: 13),
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
                   ),
                 ),
               ),
@@ -1070,6 +1070,7 @@ class BondPollSectionState extends State<BondPollSection> {
                   '$totalEmpathy명 참여',
                   style: const TextStyle(
                     fontSize: 11,
+                    fontWeight: FontWeight.w700,
                     color: AppColors.textDisabled,
                   ),
                 ),
@@ -1115,7 +1116,7 @@ class BondPollSectionState extends State<BondPollSection> {
                       '전체 보기',
                       style: TextStyle(
                         fontSize: 12,
-                        fontWeight: FontWeight.w500,
+                        fontWeight: FontWeight.w700,
                         color: AppColors.accent,
                       ),
                     ),
@@ -1132,7 +1133,7 @@ class BondPollSectionState extends State<BondPollSection> {
                       '접기',
                       style: TextStyle(
                         fontSize: 12,
-                        fontWeight: FontWeight.w500,
+                        fontWeight: FontWeight.w700,
                         color: AppColors.textDisabled,
                       ),
                     ),
@@ -1195,6 +1196,7 @@ class BondPollSectionState extends State<BondPollSection> {
               c.text,
               style: const TextStyle(
                 fontSize: 13,
+                fontWeight: FontWeight.w700,
                 height: 1.35,
                 color: AppColors.textPrimary,
               ),
@@ -1231,6 +1233,7 @@ class BondPollSectionState extends State<BondPollSection> {
               maxLines: 2,
               style: const TextStyle(
                 fontSize: 13,
+                fontWeight: FontWeight.w700,
                 color: AppColors.textPrimary,
               ),
               decoration: InputDecoration(
@@ -1326,7 +1329,7 @@ class BondPollSectionState extends State<BondPollSection> {
                   option.content,
                   style: TextStyle(
                     fontSize: 13,
-                    fontWeight: rank == 0 ? FontWeight.w600 : FontWeight.w400,
+                    fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
                   ),
                 ),
