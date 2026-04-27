@@ -74,13 +74,14 @@ class _QuickApplySheetState extends State<QuickApplySheet> {
 
   Future<void> _submitApplication() async {
     if (!_formKey.currentState!.validate()) return;
+    FocusManager.instance.primaryFocus?.unfocus();
 
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('로그인이 필요합니다.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('로그인이 필요합니다.')));
       }
       return;
     }
@@ -98,7 +99,6 @@ class _QuickApplySheetState extends State<QuickApplySheet> {
         message: _messageController.text.trim(),
       );
 
-
       if (mounted) {
         Navigator.pop(context, true);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -111,9 +111,9 @@ class _QuickApplySheetState extends State<QuickApplySheet> {
     } catch (e) {
       debugPrint('⚠️ 지원 실패: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('지원 실패: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('지원 실패: $e')));
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
@@ -132,6 +132,7 @@ class _QuickApplySheetState extends State<QuickApplySheet> {
       ),
       child: SafeArea(
         child: SingleChildScrollView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: const EdgeInsets.all(AppSpacing.xl),
           child: Form(
             key: _formKey,
@@ -166,7 +167,10 @@ class _QuickApplySheetState extends State<QuickApplySheet> {
                       ),
                     ),
                     IconButton(
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: () {
+                        FocusManager.instance.primaryFocus?.unfocus();
+                        Navigator.pop(context);
+                      },
                       icon: const Icon(Icons.close),
                       color: AppColors.textSecondary,
                     ),
@@ -209,6 +213,8 @@ class _QuickApplySheetState extends State<QuickApplySheet> {
                 const SizedBox(height: AppSpacing.sm),
                 TextFormField(
                   controller: _nameController,
+                  onTapOutside:
+                      (_) => FocusManager.instance.primaryFocus?.unfocus(),
                   decoration: InputDecoration(
                     hintText: '이름을 입력하세요',
                     hintStyle: const TextStyle(color: AppColors.textDisabled),
@@ -244,6 +250,8 @@ class _QuickApplySheetState extends State<QuickApplySheet> {
                 const SizedBox(height: AppSpacing.sm),
                 TextFormField(
                   controller: _phoneController,
+                  onTapOutside:
+                      (_) => FocusManager.instance.primaryFocus?.unfocus(),
                   keyboardType: TextInputType.phone,
                   decoration: InputDecoration(
                     hintText: '010-0000-0000',
@@ -279,43 +287,49 @@ class _QuickApplySheetState extends State<QuickApplySheet> {
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 Row(
-                  children: ['신입', '경력'].map((career) {
-                    final isSelected = _career == career;
-                    return Expanded(
-                      child: Padding(
-                        padding: EdgeInsets.only(
-                          right: career == '신입' ? AppSpacing.sm : 0,
-                          left: career == '경력' ? AppSpacing.sm : 0,
-                        ),
-                        child: InkWell(
-                          onTap: () => setState(() => _career = career),
-                          borderRadius: BorderRadius.circular(AppRadius.md),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 180),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? AppColors.segmentSelected
-                                  : AppColors.surfaceMuted,
-                              borderRadius:
-                                  BorderRadius.circular(AppRadius.md),
+                  children:
+                      ['신입', '경력'].map((career) {
+                        final isSelected = _career == career;
+                        return Expanded(
+                          child: Padding(
+                            padding: EdgeInsets.only(
+                              right: career == '신입' ? AppSpacing.sm : 0,
+                              left: career == '경력' ? AppSpacing.sm : 0,
                             ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              career,
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: isSelected
-                                    ? AppColors.onSegmentSelected
-                                    : AppColors.textSecondary,
+                            child: InkWell(
+                              onTap: () => setState(() => _career = career),
+                              borderRadius: BorderRadius.circular(AppRadius.md),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 180),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
+                                decoration: BoxDecoration(
+                                  color:
+                                      isSelected
+                                          ? AppColors.segmentSelected
+                                          : AppColors.surfaceMuted,
+                                  borderRadius: BorderRadius.circular(
+                                    AppRadius.md,
+                                  ),
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  career,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color:
+                                        isSelected
+                                            ? AppColors.onSegmentSelected
+                                            : AppColors.textSecondary,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
+                        );
+                      }).toList(),
                 ),
                 const SizedBox(height: AppSpacing.lg),
 
@@ -331,6 +345,8 @@ class _QuickApplySheetState extends State<QuickApplySheet> {
                 const SizedBox(height: AppSpacing.sm),
                 TextFormField(
                   controller: _messageController,
+                  onTapOutside:
+                      (_) => FocusManager.instance.primaryFocus?.unfocus(),
                   maxLines: 2,
                   maxLength: 100,
                   decoration: InputDecoration(
@@ -355,30 +371,33 @@ class _QuickApplySheetState extends State<QuickApplySheet> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.accent,
                       foregroundColor: AppColors.onAccent,
-                      padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: AppSpacing.lg,
+                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(AppRadius.md),
                       ),
                       elevation: 0,
                     ),
-                    child: _isSubmitting
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                AppColors.onAccent,
+                    child:
+                        _isSubmitting
+                            ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  AppColors.onAccent,
+                                ),
+                              ),
+                            )
+                            : const Text(
+                              '지원하기',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
-                          )
-                        : const Text(
-                            '지원하기',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
                   ),
                 ),
               ],

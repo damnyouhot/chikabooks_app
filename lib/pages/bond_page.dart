@@ -82,6 +82,8 @@ class BondPageState extends State<BondPage>
                 controller: _tabCtrl,
                 children: [
                   CustomScrollView(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
                     slivers: [
                       SliverToBoxAdapter(child: BondPollSection(key: _pollKey)),
                       const SliverToBoxAdapter(child: SizedBox(height: 40)),

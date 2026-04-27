@@ -55,6 +55,7 @@ class _SeniorQuestionCommentsSheetState
   Future<void> _submit() async {
     final body = _inputCtrl.text.trim();
     if (body.isEmpty || _submitting) return;
+    FocusManager.instance.primaryFocus?.unfocus();
     setState(() => _submitting = true);
     final ok =
         _replyToCommentId == null
@@ -114,7 +115,10 @@ class _SeniorQuestionCommentsSheetState
                   ),
                   const Spacer(),
                   IconButton(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () {
+                      FocusManager.instance.primaryFocus?.unfocus();
+                      Navigator.pop(context);
+                    },
                     icon: const Icon(Icons.close),
                   ),
                 ],
@@ -138,6 +142,8 @@ class _SeniorQuestionCommentsSheetState
                     );
                   }
                   return ListView.builder(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
                     padding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.lg,
                     ),
@@ -482,6 +488,8 @@ class _InputBar extends StatelessWidget {
                 Expanded(
                   child: TextField(
                     controller: controller,
+                    onTapOutside:
+                        (_) => FocusManager.instance.primaryFocus?.unfocus(),
                     minLines: 1,
                     maxLines: 3,
                     maxLength: SeniorQuestionService.maxCommentLength,

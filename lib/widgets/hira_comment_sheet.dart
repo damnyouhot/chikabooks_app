@@ -29,7 +29,7 @@ class _HiraCommentSheetState extends State<HiraCommentSheet> {
   Future<void> _sendComment() async {
     final text = _controller.text.trim();
     debugPrint('🔍 _sendComment 시작: text="$text", isSending=$_isSending');
-    
+
     if (text.isEmpty || _isSending) {
       debugPrint('⚠️ 텍스트가 비어있거나 이미 전송 중');
       return;
@@ -38,10 +38,7 @@ class _HiraCommentSheetState extends State<HiraCommentSheet> {
     setState(() => _isSending = true);
     debugPrint('🔍 HiraCommentService.addComment 호출...');
 
-    final success = await HiraCommentService.addComment(
-      widget.update.id,
-      text,
-    );
+    final success = await HiraCommentService.addComment(widget.update.id, text);
 
     debugPrint('🔍 addComment 결과: success=$success');
 
@@ -57,9 +54,9 @@ class _HiraCommentSheetState extends State<HiraCommentSheet> {
           ),
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('댓글 등록에 실패했습니다')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('댓글 등록에 실패했습니다')));
       }
     }
   }
@@ -70,7 +67,9 @@ class _HiraCommentSheetState extends State<HiraCommentSheet> {
       height: MediaQuery.of(context).size.height * 0.7,
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(AppRadius.xl),
+        ),
       ),
       child: Column(
         children: [
@@ -78,9 +77,7 @@ class _HiraCommentSheetState extends State<HiraCommentSheet> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
             decoration: const BoxDecoration(
-              border: Border(
-                bottom: BorderSide(color: AppColors.divider),
-              ),
+              border: Border(bottom: BorderSide(color: AppColors.divider)),
             ),
             child: Row(
               children: [
@@ -94,7 +91,10 @@ class _HiraCommentSheetState extends State<HiraCommentSheet> {
                 ),
                 const Spacer(),
                 GestureDetector(
-                  onTap: () => Navigator.pop(context),
+                  onTap: () {
+                    FocusManager.instance.primaryFocus?.unfocus();
+                    Navigator.pop(context);
+                  },
                   child: const Icon(
                     Icons.close,
                     size: 22,
@@ -112,9 +112,7 @@ class _HiraCommentSheetState extends State<HiraCommentSheet> {
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(
-                    child: CircularProgressIndicator(
-                      color: AppColors.accent,
-                    ),
+                    child: CircularProgressIndicator(color: AppColors.accent),
                   );
                 }
 
@@ -143,12 +141,13 @@ class _HiraCommentSheetState extends State<HiraCommentSheet> {
                 }
 
                 return ListView.separated(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   itemCount: comments.length,
-                  separatorBuilder: (_, __) => const Divider(
-                    height: 1,
-                    color: AppColors.divider,
-                  ),
+                  separatorBuilder:
+                      (_, __) =>
+                          const Divider(height: 1, color: AppColors.divider),
                   itemBuilder: (context, i) {
                     final comment = comments[i];
                     return _CommentItem(
@@ -171,9 +170,7 @@ class _HiraCommentSheetState extends State<HiraCommentSheet> {
             ),
             decoration: const BoxDecoration(
               color: AppColors.surfaceMuted,
-              border: Border(
-                top: BorderSide(color: AppColors.divider),
-              ),
+              border: Border(top: BorderSide(color: AppColors.divider)),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
@@ -187,12 +184,12 @@ class _HiraCommentSheetState extends State<HiraCommentSheet> {
                     decoration: BoxDecoration(
                       color: AppColors.white,
                       borderRadius: BorderRadius.circular(AppRadius.full),
-                      border: Border.all(
-                        color: AppColors.divider,
-                      ),
+                      border: Border.all(color: AppColors.divider),
                     ),
                     child: TextField(
                       controller: _controller,
+                      onTapOutside:
+                          (_) => FocusManager.instance.primaryFocus?.unfocus(),
                       maxLines: null,
                       maxLength: 200,
                       style: const TextStyle(
@@ -219,17 +216,19 @@ class _HiraCommentSheetState extends State<HiraCommentSheet> {
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
-                      color: _isSending
-                          ? AppColors.disabledBg
-                          : AppColors.accent.withOpacity(0.8),
+                      color:
+                          _isSending
+                              ? AppColors.disabledBg
+                              : AppColors.accent.withOpacity(0.8),
                       borderRadius: BorderRadius.circular(22),
                     ),
                     child: Icon(
                       Icons.send,
                       size: 20,
-                      color: _isSending
-                          ? AppColors.textDisabled
-                          : AppColors.textPrimary,
+                      color:
+                          _isSending
+                              ? AppColors.textDisabled
+                              : AppColors.textPrimary,
                     ),
                   ),
                 ),
@@ -247,33 +246,31 @@ class _CommentItem extends StatelessWidget {
   final HiraComment comment;
   final String updateId;
 
-  const _CommentItem({
-    required this.comment,
-    required this.updateId,
-  });
+  const _CommentItem({required this.comment, required this.updateId});
 
   static const _emojiList = ['👍', '❤️', '😊', '💪', '🎉'];
 
   Future<void> _deleteComment(BuildContext context) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('댓글 삭제'),
-        content: const Text('댓글을 삭제하시겠습니까?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('취소'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('댓글 삭제'),
+            content: const Text('댓글을 삭제하시겠습니까?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('취소'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text(
+                  '삭제',
+                  style: TextStyle(color: AppColors.error),
+                ),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text(
-              '삭제',
-              style: TextStyle(color: AppColors.error),
-            ),
-          ),
-        ],
-      ),
     );
 
     if (confirmed == true && context.mounted) {
@@ -389,8 +386,7 @@ class _CommentItem extends StatelessWidget {
                   ),
                   builder: (context, snap) {
                     final data = snap.data;
-                    final counts =
-                        (data?['counts'] as Map<String, int>?) ?? {};
+                    final counts = (data?['counts'] as Map<String, int>?) ?? {};
                     final myEmoji = data?['myEmoji'] as String?;
 
                     return Wrap(
@@ -404,18 +400,18 @@ class _CommentItem extends StatelessWidget {
                               emoji: emoji,
                               count: counts[emoji] ?? 0,
                               isSelected: myEmoji == emoji,
-                              onTap: () =>
-                                  HiraCommentService.toggleCommentReaction(
-                                updateId,
-                                comment.id,
-                                emoji,
-                              ),
+                              onTap:
+                                  () =>
+                                      HiraCommentService.toggleCommentReaction(
+                                        updateId,
+                                        comment.id,
+                                        emoji,
+                                      ),
                             ),
                         // "+" 버튼으로 이모지 추가
                         InkWell(
                           borderRadius: BorderRadius.circular(12),
-                          onTap: () => _showEmojiPicker(
-                              context, myEmoji),
+                          onTap: () => _showEmojiPicker(context, myEmoji),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 6,
@@ -449,39 +445,45 @@ class _CommentItem extends StatelessWidget {
   void _showEmojiPicker(BuildContext context, String? myEmoji) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('이모지 선택', style: TextStyle(fontSize: 14)),
-        content: Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: _emojiList.map((emoji) {
-            final isSelected = myEmoji == emoji;
-            return GestureDetector(
-              onTap: () {
-                HiraCommentService.toggleCommentReaction(
-                  updateId,
-                  comment.id,
-                  emoji,
-                );
-                Navigator.pop(ctx);
-              },
-              child: Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? AppColors.accent.withOpacity(0.4)
-                      : AppColors.surfaceMuted,
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
-                  child: Text(emoji, style: const TextStyle(fontSize: 20)),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ),
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('이모지 선택', style: TextStyle(fontSize: 14)),
+            content: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children:
+                  _emojiList.map((emoji) {
+                    final isSelected = myEmoji == emoji;
+                    return GestureDetector(
+                      onTap: () {
+                        HiraCommentService.toggleCommentReaction(
+                          updateId,
+                          comment.id,
+                          emoji,
+                        );
+                        Navigator.pop(ctx);
+                      },
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color:
+                              isSelected
+                                  ? AppColors.accent.withOpacity(0.4)
+                                  : AppColors.surfaceMuted,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: Text(
+                            emoji,
+                            style: const TextStyle(fontSize: 20),
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+            ),
+          ),
     );
   }
 }
@@ -508,20 +510,16 @@ class _ReactionChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.accent.withOpacity(0.3)
-              : AppColors.surfaceMuted,
+          color:
+              isSelected
+                  ? AppColors.accent.withOpacity(0.3)
+                  : AppColors.surfaceMuted,
           borderRadius: BorderRadius.circular(AppRadius.md),
-          border: isSelected
-              ? Border.all(color: AppColors.accent, width: 1)
-              : null,
+          border:
+              isSelected ? Border.all(color: AppColors.accent, width: 1) : null,
         ),
-        child: Text(
-          '$emoji$count',
-          style: const TextStyle(fontSize: 14),
-        ),
+        child: Text('$emoji$count', style: const TextStyle(fontSize: 14)),
       ),
     );
   }
 }
-

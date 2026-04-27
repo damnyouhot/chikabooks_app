@@ -56,6 +56,7 @@ class _SeniorQuestionFeedState extends State<SeniorQuestionFeed> {
   Future<void> _submit() async {
     final body = _bodyCtrl.text.trim();
     if (body.isEmpty || _posting) return;
+    FocusManager.instance.primaryFocus?.unfocus();
     final category = _category;
     if (category == null) {
       _snack('질문 유형을 선택해 주세요.');
@@ -96,6 +97,7 @@ class _SeniorQuestionFeedState extends State<SeniorQuestionFeed> {
         return RefreshIndicator(
           onRefresh: () async => setState(() {}),
           child: ListView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.lg,
               AppSpacing.md,
@@ -103,6 +105,19 @@ class _SeniorQuestionFeedState extends State<SeniorQuestionFeed> {
               48,
             ),
             children: [
+              _Composer(
+                controller: _bodyCtrl,
+                images: _images,
+                category: _category,
+                isAnonymous: _isAnonymous,
+                posting: _posting,
+                onCategoryChanged: (v) => setState(() => _category = v),
+                onAnonymousChanged: (v) => setState(() => _isAnonymous = v),
+                onPickImages: _pickImages,
+                onRemoveImage: (i) => setState(() => _images.removeAt(i)),
+                onSubmit: _submit,
+              ),
+              const SizedBox(height: AppSpacing.md),
               if (snap.connectionState == ConnectionState.waiting &&
                   questions.isEmpty)
                 const Padding(
@@ -118,19 +133,6 @@ class _SeniorQuestionFeedState extends State<SeniorQuestionFeed> {
                     child: SeniorQuestionCard(question: q, isAdmin: _isAdmin),
                   ),
                 ),
-              if (questions.isNotEmpty) const SizedBox(height: AppSpacing.sm),
-              _Composer(
-                controller: _bodyCtrl,
-                images: _images,
-                category: _category,
-                isAnonymous: _isAnonymous,
-                posting: _posting,
-                onCategoryChanged: (v) => setState(() => _category = v),
-                onAnonymousChanged: (v) => setState(() => _isAnonymous = v),
-                onPickImages: _pickImages,
-                onRemoveImage: (i) => setState(() => _images.removeAt(i)),
-                onSubmit: _submit,
-              ),
             ],
           ),
         );
@@ -203,6 +205,7 @@ class _Composer extends StatelessWidget {
           const SizedBox(height: AppSpacing.sm),
           TextField(
             controller: controller,
+            onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
             minLines: 2,
             maxLines: 8,
             maxLength: SeniorQuestionService.maxBodyLength,

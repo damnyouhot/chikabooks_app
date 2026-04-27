@@ -70,6 +70,7 @@ class _SeniorQuestionCardState extends State<SeniorQuestionCard> {
     final body = _commentCtrl.text.trim();
     if ((body.isEmpty && _commentImage == null) || _submittingComment) return;
 
+    FocusManager.instance.primaryFocus?.unfocus();
     setState(() => _submittingComment = true);
     final ok =
         _replyToCommentId == null
@@ -428,6 +429,7 @@ class _SeniorQuestionCardState extends State<SeniorQuestionCard> {
   }
 
   void _cancelEditing() {
+    FocusManager.instance.primaryFocus?.unfocus();
     setState(() {
       _editCtrl.text = question.body;
       _editAnonymous = question.isAnonymous;
@@ -444,6 +446,7 @@ class _SeniorQuestionCardState extends State<SeniorQuestionCard> {
       _snack('내용을 입력해 주세요.');
       return;
     }
+    FocusManager.instance.primaryFocus?.unfocus();
     final ok = await SeniorQuestionService.updateQuestion(
       questionId: question.id,
       body: body,
@@ -795,6 +798,7 @@ class _CommentTileState extends State<_CommentTile> {
       _snack('내용을 입력해 주세요.');
       return;
     }
+    FocusManager.instance.primaryFocus?.unfocus();
     setState(() => _saving = true);
     final ok = await SeniorQuestionService.updateComment(
       questionId: questionId,
@@ -915,6 +919,7 @@ class _CommentEditBox extends StatelessWidget {
         children: [
           TextField(
             controller: controller,
+            onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
             minLines: 2,
             maxLines: 5,
             maxLength: SeniorQuestionService.maxCommentLength,
@@ -1227,6 +1232,8 @@ class _InlineCommentInput extends StatelessWidget {
               Expanded(
                 child: TextField(
                   controller: controller,
+                  onTapOutside:
+                      (_) => FocusManager.instance.primaryFocus?.unfocus(),
                   minLines: 1,
                   maxLines: 3,
                   maxLength: SeniorQuestionService.maxCommentLength,
@@ -1606,6 +1613,7 @@ class _InlineEditBox extends StatelessWidget {
           const SizedBox(height: AppSpacing.xs),
           TextField(
             controller: controller,
+            onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
             minLines: 3,
             maxLines: 8,
             maxLength: SeniorQuestionService.maxBodyLength,

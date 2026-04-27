@@ -75,6 +75,7 @@ class _DiaryInputSheetState extends State<DiaryInputSheet> {
     final text = _controller.text.trim();
     if (text.isEmpty && _selectedImages.isEmpty) return;
 
+    FocusManager.instance.primaryFocus?.unfocus();
     setState(() => _isSaving = true);
 
     try {
@@ -82,11 +83,12 @@ class _DiaryInputSheetState extends State<DiaryInputSheet> {
       if (uid == null) throw Exception('로그인 필요');
 
       // 1) Firestore 문서 먼저 생성 (noteId 확보)
-      final docRef = FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .collection('notes')
-          .doc();
+      final docRef =
+          FirebaseFirestore.instance
+              .collection('users')
+              .doc(uid)
+              .collection('notes')
+              .doc();
       final noteId = docRef.id;
 
       // 2) 사진 업로드
@@ -120,9 +122,7 @@ class _DiaryInputSheetState extends State<DiaryInputSheet> {
   }
 
   void _showSnack(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg)),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   @override
@@ -158,6 +158,7 @@ class _DiaryInputSheetState extends State<DiaryInputSheet> {
                 const Spacer(),
                 GestureDetector(
                   onTap: () {
+                    FocusManager.instance.primaryFocus?.unfocus();
                     Navigator.pop(context);
                     Navigator.push(
                       context,
@@ -167,8 +168,10 @@ class _DiaryInputSheetState extends State<DiaryInputSheet> {
                     );
                   },
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.accent.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
@@ -201,6 +204,8 @@ class _DiaryInputSheetState extends State<DiaryInputSheet> {
             // ── 본문 입력 ──
             TextField(
               controller: _controller,
+              onTapOutside:
+                  (_) => FocusManager.instance.primaryFocus?.unfocus(),
               maxLength: 500,
               maxLines: 4,
               minLines: 2,
@@ -208,16 +213,20 @@ class _DiaryInputSheetState extends State<DiaryInputSheet> {
               onChanged: (_) => setState(() {}),
               decoration: InputDecoration(
                 hintText: '지금 마음을 한 문장으로 남겨볼까?',
-                hintStyle:
-                    TextStyle(color: AppColors.textDisabled, fontSize: 14),
+                hintStyle: TextStyle(
+                  color: AppColors.textDisabled,
+                  fontSize: 14,
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(color: AppColors.divider),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide:
-                      const BorderSide(color: AppColors.accent, width: 1.5),
+                  borderSide: const BorderSide(
+                    color: AppColors.accent,
+                    width: 1.5,
+                  ),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -235,10 +244,11 @@ class _DiaryInputSheetState extends State<DiaryInputSheet> {
                   scrollDirection: Axis.horizontal,
                   itemCount: _selectedImages.length,
                   separatorBuilder: (_, __) => const SizedBox(width: 8),
-                  itemBuilder: (context, i) => _ImageThumb(
-                    file: _selectedImages[i],
-                    onRemove: () => _removeImage(i),
-                  ),
+                  itemBuilder:
+                      (context, i) => _ImageThumb(
+                        file: _selectedImages[i],
+                        onRemove: () => _removeImage(i),
+                      ),
                 ),
               ),
             ],
@@ -250,8 +260,10 @@ class _DiaryInputSheetState extends State<DiaryInputSheet> {
                 GestureDetector(
                   onTap: _isSaving ? null : _pickImages,
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.surfaceMuted,
                       borderRadius: BorderRadius.circular(10),
@@ -259,8 +271,11 @@ class _DiaryInputSheetState extends State<DiaryInputSheet> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.camera_alt_outlined,
-                            size: 18, color: AppColors.textSecondary),
+                        Icon(
+                          Icons.camera_alt_outlined,
+                          size: 18,
+                          color: AppColors.textSecondary,
+                        ),
                         const SizedBox(width: 6),
                         Text(
                           '사진 ${_selectedImages.length}/${DiaryImageService.maxImages}',
@@ -279,7 +294,9 @@ class _DiaryInputSheetState extends State<DiaryInputSheet> {
                   Text(
                     '최대 ${DiaryImageService.maxImages}장',
                     style: const TextStyle(
-                        fontSize: 11, color: AppColors.textDisabled),
+                      fontSize: 11,
+                      color: AppColors.textDisabled,
+                    ),
                   ),
               ],
             ),
@@ -291,8 +308,10 @@ class _DiaryInputSheetState extends State<DiaryInputSheet> {
               children: [
                 TextButton(
                   onPressed: _isSaving ? null : () => Navigator.pop(context),
-                  child: const Text('취소',
-                      style: TextStyle(color: AppColors.textPrimary)),
+                  child: const Text(
+                    '취소',
+                    style: TextStyle(color: AppColors.textPrimary),
+                  ),
                 ),
                 const SizedBox(width: 8),
                 ElevatedButton(
@@ -305,16 +324,21 @@ class _DiaryInputSheetState extends State<DiaryInputSheet> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 24, vertical: 12),
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
                   ),
-                  child: _isSaving
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: AppColors.white),
-                        )
-                      : const Text('저장'),
+                  child:
+                      _isSaving
+                          ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.white,
+                            ),
+                          )
+                          : const Text('저장'),
                 ),
               ],
             ),
@@ -337,20 +361,32 @@ class _ImageThumb extends StatelessWidget {
       children: [
         ClipRRect(
           borderRadius: BorderRadius.circular(10),
-          child: kIsWeb
-              ? FutureBuilder<Uint8List>(
-                  future: file.readAsBytes(),
-                  builder: (ctx, snap) {
-                    if (!snap.hasData) {
-                      return const SizedBox(
-                          width: 80, height: 80, child: Placeholder());
-                    }
-                    return Image.memory(snap.data!,
-                        width: 80, height: 80, fit: BoxFit.cover);
-                  },
-                )
-              : Image.file(File(file.path),
-                  width: 80, height: 80, fit: BoxFit.cover),
+          child:
+              kIsWeb
+                  ? FutureBuilder<Uint8List>(
+                    future: file.readAsBytes(),
+                    builder: (ctx, snap) {
+                      if (!snap.hasData) {
+                        return const SizedBox(
+                          width: 80,
+                          height: 80,
+                          child: Placeholder(),
+                        );
+                      }
+                      return Image.memory(
+                        snap.data!,
+                        width: 80,
+                        height: 80,
+                        fit: BoxFit.cover,
+                      );
+                    },
+                  )
+                  : Image.file(
+                    File(file.path),
+                    width: 80,
+                    height: 80,
+                    fit: BoxFit.cover,
+                  ),
         ),
         Positioned(
           top: 2,
@@ -363,8 +399,7 @@ class _ImageThumb extends StatelessWidget {
                 color: Colors.black54,
                 shape: BoxShape.circle,
               ),
-              child:
-                  const Icon(Icons.close, size: 14, color: Colors.white),
+              child: const Icon(Icons.close, size: 14, color: Colors.white),
             ),
           ),
         ),

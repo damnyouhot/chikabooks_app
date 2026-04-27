@@ -18,11 +18,7 @@ Future<void> main() async {
   // 청구 정책(`config/billingPolicy`) 실시간 구독 — admin이 변경하면 즉시 반영
   MeSession.start();
 
-  runApp(
-    ProviderScope(
-      child: AppProviders(child: const ChikabooksApp()),
-    ),
-  );
+  runApp(ProviderScope(child: AppProviders(child: const ChikabooksApp())));
 }
 
 class ChikabooksApp extends StatelessWidget {
@@ -37,11 +33,15 @@ class ChikabooksApp extends StatelessWidget {
       routerConfig: appRouter,
       // iOS/Android 텍스트 크기 통일 (시스템 폰트 크기 설정 무시)
       builder: (context, child) {
-        return MediaQuery(
-          data: MediaQuery.of(context).copyWith(
-            textScaler: TextScaler.noScaling,
+        return GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+          child: MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: TextScaler.noScaling),
+            child: child!,
           ),
-          child: child!,
         );
       },
     );

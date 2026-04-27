@@ -659,6 +659,8 @@ class BondPollSectionState extends State<BondPollSection> {
           Expanded(
             child: TextField(
               controller: _addOptionController,
+              onTapOutside:
+                  (_) => FocusManager.instance.primaryFocus?.unfocus(),
               maxLength: EmpathyPollService.maxOptionLength,
               style: const TextStyle(
                 fontSize: 13,
@@ -1229,6 +1231,8 @@ class BondPollSectionState extends State<BondPollSection> {
           Expanded(
             child: TextField(
               controller: ctrl,
+              onTapOutside:
+                  (_) => FocusManager.instance.primaryFocus?.unfocus(),
               maxLength: EmpathyPollService.maxPollCommentLength,
               maxLines: 2,
               style: const TextStyle(

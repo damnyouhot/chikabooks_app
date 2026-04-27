@@ -290,7 +290,6 @@ class _TodayWordViewState extends State<_TodayWordView> {
   int _knownCount = 0;
   int _reviewCount = 0;
   int _savedCount = 0;
-  int _totalActiveCount = 0;
 
   @override
   void initState() {
@@ -309,7 +308,6 @@ class _TodayWordViewState extends State<_TodayWordView> {
       _knownCount = deck.knownCount;
       _reviewCount = deck.reviewLaterCount;
       _savedCount = deck.savedCount;
-      _totalActiveCount = deck.totalActiveCount;
       _loading = false;
     });
   }
@@ -438,10 +436,6 @@ class _TodayWordViewState extends State<_TodayWordView> {
           knownCount: _knownCount,
           reviewCount: _reviewCount,
           savedCount: _savedCount,
-          completedCount:
-              _words.where((word) => _actions.containsKey(word.id)).length,
-          totalTodayCount: _words.length,
-          totalPoolCount: _totalActiveCount,
         ),
         const SizedBox(height: AppSpacing.lg),
         Row(
@@ -785,17 +779,11 @@ class _TodayWordStatsCard extends StatelessWidget {
     required this.knownCount,
     required this.reviewCount,
     required this.savedCount,
-    required this.completedCount,
-    required this.totalTodayCount,
-    required this.totalPoolCount,
   });
 
   final int knownCount;
   final int reviewCount;
   final int savedCount;
-  final int completedCount;
-  final int totalTodayCount;
-  final int totalPoolCount;
 
   @override
   Widget build(BuildContext context) {
@@ -831,8 +819,8 @@ class _TodayWordStatsCard extends StatelessWidget {
             ),
             Expanded(
               child: _statColumn(
-                label: '오늘 완료',
-                value: '$completedCount/$totalTodayCount',
+                label: '총 학습 단어',
+                value: '${knownCount + reviewCount}개',
                 caption: '저장 $savedCount개',
               ),
             ),

@@ -26,7 +26,7 @@ class SeniorQuestionService {
 
   static Stream<List<SeniorQuestion>> watchQuestions() {
     return _questions
-        .orderBy('createdAt')
+        .orderBy('createdAt', descending: true)
         .limit(50)
         .snapshots()
         .map(
