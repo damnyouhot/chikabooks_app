@@ -5,10 +5,9 @@
  * 호출되는 OCR + 1차 검증 callable.
  *
  * 전 단계(legacy ghost) 와 달리 이 구현은:
- *   1. Gemini Vision 으로 이미지 안의 사업자등록증 여부를 **명시적으로 판정**하고
- *      (isBusinessRegistration / confidence), 그렇지 않다면 즉시 'ocr_failed'
- *      + failReason='not_business_registration' 으로 끝낸다.
- *   2. 통과 시 OCR 필드(상호·대표자·주소·등록번호·개업일) 를 추출.
+ *   1. Gemini Vision 으로 사업자등록증 여부를 판정하되, 판정값은 보조 신호로만 쓴다.
+ *   2. OCR 필드(상호·대표자·주소·등록번호·개업일) 를 추출하고, 읽힌 값이 있으면
+ *      국세청 진위확인/상태조회가 최종 판단하도록 넘긴다.
  *   3. 추출 결과를 clinic_profiles/{profileId}.businessVerification.ocrResult
  *      및 docUrl 에 명확히 저장한다 (이전 사용자 데이터가 화면에 잔존하지 않게
  *      모든 필드를 명시적으로 set).
@@ -66,7 +65,10 @@ async function fetchImageBytes(
     responseType: "arraybuffer",
     timeout: 20000,
   });
-  const ct = String(resp.headers["content-type"] ?? "image/jpeg");
+  const ct = String(resp.headers["content-type"] ?? "image/jpeg")
+    .split(";")[0]
+    .trim()
+    .toLowerCase();
   // application/octet-stream 같은 일반 타입이면 jpeg 로 가정 (Gemini 가 거의 다 읽음)
   const safeMime = ct.startsWith("image/") || ct === "application/pdf" ?
     ct :
@@ -96,18 +98,16 @@ async function callGeminiOcr(
     return {...EMPTY_OCR, rejectReason: "ocr_key_missing"};
   }
 
-  const prompt = `당신은 한국 국세청이 발급한 "사업자등록증(Business Registration Certificate)" 만을 처리하는 OCR 모듈입니다.
+  const prompt = `당신은 한국 사업자등록증과 사업자 관련 문서를 읽는 OCR 모듈입니다.
 
-다음 이미지가 정말로 한국 국세청이 발급한 사업자등록증인지 먼저 판정한 뒤, JSON 만 반환하세요. 마크다운/설명/주석 금지.
+다음 이미지가 한국 사업자등록증 사본인지 먼저 판정한 뒤, 보이는 사업자 정보를 최대한 추출해서 JSON 만 반환하세요. 마크다운/설명/주석 금지.
 
-판정 기준 (모두 만족해야 isBusinessRegistration=true):
-- 문서 상단에 "사업자등록증" 이라는 제목이 있어야 합니다.
-- 발급기관(국세청, 세무서) 표기가 있어야 합니다.
-- "등록번호" 또는 "사업자등록번호" 항목이 있고, 10자리 숫자(하이픈 포함 가능)가 보여야 합니다.
-- "상호(법인명)" 또는 "법인명/단체명" 항목이 있어야 합니다.
-- "대표자" 또는 "성명" 항목이 있어야 합니다.
+판정 기준:
+- "사업자등록증" 제목, 국세청/세무서 표기, 등록번호, 상호, 대표자, 개업일, 사업장 소재지 중 여러 항목이 보이면 isBusinessRegistration=true 로 판단하세요.
+- 스캔·촬영·PDF 캡처·일부 잘림·흐린 이미지에서는 제목이나 발급기관이 잘려도 등록번호/상호/대표자/주소/개업일이 사업자등록증 양식처럼 보이면 true 로 판단하세요.
+- 10자리 사업자등록번호는 보이는 숫자를 최대한 읽으세요. 확신이 낮아도 숫자 형태가 보이면 bizNo 에 넣고 confidence 를 낮추세요.
 
-만약 세금계산서, 계산서, 영수증, 거래명세서, 명함, 계약서, 일반 사진, 신분증, 진료확인서, 이력서, 기타 다른 문서이면 isBusinessRegistration=false 로 하고 rejectReason 에 한국어로 어떤 종류의 이미지로 보이는지 짧게 적으세요.
+만약 세금계산서, 계산서, 영수증, 거래명세서, 명함, 계약서, 일반 사진, 신분증, 진료확인서, 이력서, 기타 다른 문서이면 isBusinessRegistration=false 로 하고 rejectReason 에 한국어로 어떤 종류의 이미지로 보이는지 짧게 적으세요. 단, 사업자등록번호/상호/대표자/개업일/주소가 보이면 null 처리하지 말고 그대로 추출하세요. 서버가 국세청 API로 진위 여부를 다시 확인합니다.
 
 응답 JSON 스키마:
 {
@@ -122,7 +122,6 @@ async function callGeminiOcr(
 }
 
 규칙:
-- isBusinessRegistration=false 인 경우 bizNo/clinicName/ownerName/address/openedAt 은 모두 null.
 - bizNo 는 하이픈 포함 형식(예: "123-45-67890") 으로.
 - openedAt 은 "YYYY-MM-DD" 형식. 모르면 null.
 - 텍스트가 흐려서 100% 확신 못 하는 필드는 null.`;
@@ -288,48 +287,36 @@ export const verifyBusinessLicense = functions
     // 1) Gemini OCR + 문서 종류 판정
     const ocr = await callGeminiOcr(bytes, mimeType);
 
-    // 2) 사업자등록증이 아니면 즉시 거절 (NTS 호출 안 함 → 비용/오인 방지)
-    const CONFIDENCE_THRESHOLD = 0.7;
-    if (
-      !ocr.isBusinessRegistration ||
-      ocr.confidence < CONFIDENCE_THRESHOLD
-    ) {
-      const attemptRef = await createAttempt({
-        status: "rejected",
-        failReason: "not_business_registration",
-        checkMethod: "ocr",
-        profileMutation: "none",
-        isBusinessRegistration: false,
-        confidence: ocr.confidence,
-        rejectReason: ocr.rejectReason ?? null,
-      });
-      return buildEmptyResponse({
-        failReason: "not_business_registration",
-        rejectReason: ocr.rejectReason ?? null,
-        confidence: ocr.confidence,
-        attemptId: attemptRef.id,
-      });
-    }
-
-    // 3) 통과 — OCR 필드 정리
+    // 2) OCR 필드 정리. AI의 문서종류 판정은 참고값으로만 쓰고,
+    //    사업자번호가 읽히면 국세청 진위확인/상태조회가 최종 판단하게 한다.
     const clinicName = String(ocr.clinicName ?? "").trim();
     const ownerName = String(ocr.ownerName ?? "").trim();
     const address = String(ocr.address ?? "").trim();
     const bizNo = String(ocr.bizNo ?? "").trim();
     const openedAt = String(ocr.openedAt ?? "").trim();
+    const hasBizNo = normalizeBizNo(bizNo).length === 10;
 
-    // OCR 가 통과했지만 핵심 필드가 비어있으면 ocr_failed 처리
-    if (!bizNo || !clinicName) {
+    if (!hasBizNo) {
+      const failReason = "ocr_failed";
       const attemptRef = await createAttempt({
         status: "rejected",
-        failReason: "ocr_failed",
+        failReason,
         checkMethod: "ocr",
         profileMutation: "none",
-        isBusinessRegistration: true,
+        isBusinessRegistration: ocr.isBusinessRegistration,
         confidence: ocr.confidence,
+        rejectReason: ocr.rejectReason ?? null,
+        ocrResult: {
+          bizNo,
+          clinicName,
+          ownerName,
+          address,
+          openedAt,
+        },
       });
       return buildEmptyResponse({
-        failReason: "ocr_failed",
+        failReason,
+        rejectReason: ocr.rejectReason ?? null,
         confidence: ocr.confidence,
         attemptId: attemptRef.id,
       });
@@ -375,8 +362,9 @@ export const verifyBusinessLicense = functions
       profileMutation: "none",
       profileRelation,
       previousBizNo: currentBv.bizNo ?? null,
-      isBusinessRegistration: true,
+      isBusinessRegistration: ocr.isBusinessRegistration,
       confidence: ocr.confidence,
+      rejectReason: ocr.rejectReason ?? null,
       ocrResult: {
         bizNo,
         clinicName,
@@ -405,7 +393,7 @@ export const verifyBusinessLicense = functions
         hiraMatched: null,
         hiraNote: null,
         hiraMatchLevel: null,
-        isBusinessRegistration: true,
+        isBusinessRegistration: ocr.isBusinessRegistration,
         confidence: ocr.confidence,
         attemptId: attemptRef.id,
         profileRelation,
@@ -427,9 +415,10 @@ export const verifyBusinessLicense = functions
           checkMethod: "ocr",
           status: "pending_auto",
           openedAt,
-          isBusinessRegistration: true,
+          isBusinessRegistration: ocr.isBusinessRegistration,
           confidence: ocr.confidence,
-          rejectReason: admin.firestore.FieldValue.delete(),
+          rejectReason: ocr.rejectReason ??
+            admin.firestore.FieldValue.delete(),
           ocrResult: {
             bizNo,
             clinicName,
@@ -450,7 +439,7 @@ export const verifyBusinessLicense = functions
       {
         status: checkResult.status,
         failReason: checkResult.failReason ?? null,
-        checkMethod: checkResult.method,
+        checkMethod: checkResult.checkMethod ?? checkResult.method,
         hiraMatched: checkResult.hiraMatched ?? null,
         hiraNote: checkResult.hiraNote ?? null,
         hiraMatchLevel: checkResult.hiraMatchLevel ?? null,
@@ -468,12 +457,12 @@ export const verifyBusinessLicense = functions
       openedAt,
       status: checkResult.status,
       failReason: checkResult.failReason ?? null,
-      checkMethod: checkResult.method,
+      checkMethod: checkResult.checkMethod ?? checkResult.method,
       skipped: checkResult.skipped === true,
       hiraMatched: checkResult.hiraMatched ?? null,
       hiraNote: checkResult.hiraNote ?? null,
       hiraMatchLevel: checkResult.hiraMatchLevel ?? null,
-      isBusinessRegistration: true,
+      isBusinessRegistration: ocr.isBusinessRegistration,
       confidence: ocr.confidence,
       attemptId: attemptRef.id,
       profileRelation,

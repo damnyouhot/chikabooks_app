@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/foundation.dart';
@@ -1979,11 +1978,12 @@ class JobPostFormState extends State<JobPostForm> {
     } catch (e) {
       _showSnack('등록 실패: $e');
     } finally {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _isSubmitting = false;
           _uploadProgress.clear();
         });
+      }
     }
   }
 
@@ -2214,8 +2214,7 @@ class JobPostFormState extends State<JobPostForm> {
               color: enabled ? AppColors.accent : AppColors.divider,
             ),
             shape: RoundedRectangleBorder(
-              borderRadius:
-                  BorderRadius.circular(AppPublisher.buttonRadius),
+              borderRadius: BorderRadius.circular(AppPublisher.buttonRadius),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 10),
             minimumSize: Size.zero,
@@ -2234,7 +2233,7 @@ class JobPostFormState extends State<JobPostForm> {
       required bool hasItems,
     }) {
       return Padding(
-        padding: const EdgeInsets.fromLTRB(20, 28, 20, 28),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -2267,40 +2266,41 @@ class JobPostFormState extends State<JobPostForm> {
             ),
             const SizedBox(width: 16),
             Expanded(
-              child: hasItems
-                  ? thumbsArea
-                  : Container(
-                      height: 64,
-                      decoration: BoxDecoration(
-                        color: AppColors.accent.withValues(alpha: 0.03),
-                        border: Border.all(
-                          color: AppColors.divider,
-                          width: 1,
-                        ),
-                        borderRadius: BorderRadius.circular(
-                          AppPublisher.softRadius,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.cloud_upload_outlined,
-                            size: 18,
-                            color: AppColors.textDisabled,
+              child:
+                  hasItems
+                      ? thumbsArea
+                      : Container(
+                        height: 110,
+                        decoration: BoxDecoration(
+                          color: AppColors.accent.withValues(alpha: 0.03),
+                          border: Border.all(
+                            color: AppColors.divider,
+                            width: 1,
                           ),
-                          const SizedBox(width: 6),
-                          Text(
-                            '클릭하거나 사진 끌어다 놓거나',
-                            style: _ft(
-                              size: 11,
-                              weight: FontWeight.w500,
+                          borderRadius: BorderRadius.circular(
+                            AppPublisher.softRadius,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.cloud_upload_outlined,
+                              size: 18,
                               color: AppColors.textDisabled,
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 6),
+                            Text(
+                              '클릭하거나 사진 끌어다 놓거나',
+                              style: _ft(
+                                size: 11,
+                                weight: FontWeight.w500,
+                                color: AppColors.textDisabled,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
             ),
           ],
         ),
@@ -2325,7 +2325,7 @@ class JobPostFormState extends State<JobPostForm> {
             hideHintsAndButton: true,
           ),
         ),
-        const Divider(height: 24, thickness: 1, color: AppColors.divider),
+        const Divider(height: 12, thickness: 1, color: AppColors.divider),
         compactRow(
           title: '홍보이미지',
           desc: '공고 홍보 영역에\n그대로 노출됩니다.',
@@ -2337,7 +2337,7 @@ class JobPostFormState extends State<JobPostForm> {
           hasItems: _data.promotionalImageUrls.isNotEmpty,
           thumbsArea: _buildPromotionalImageSection(hideHintsAndButton: true),
         ),
-        const Divider(height: 24, thickness: 1, color: AppColors.divider),
+        const Divider(height: 12, thickness: 1, color: AppColors.divider),
         compactRow(
           title: '로고파일',
           desc: '공고에 노출됩니다.\n(1장)',
@@ -2458,93 +2458,93 @@ class JobPostFormState extends State<JobPostForm> {
           ],
           if (_data.promotionalImageUrls.isNotEmpty) ...[
             SizedBox(
-              height: 88,
+              height: 150,
               child: Scrollbar(
                 thumbVisibility: true,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemCount: _data.promotionalImageUrls.length,
                   separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (_, i) {
-                  final url = _data.promotionalImageUrls[i];
-                  final progress = _promoUploadProgress[i];
-                  return Stack(
-                    children: [
-                      ClipRRect(
-                        borderRadius: _rBox,
-                        child: Image.network(
-                          url,
-                          width: 72,
-                          height: 72,
-                          fit: BoxFit.cover,
-                          errorBuilder:
-                              (_, __, ___) => Container(
-                                width: 72,
-                                height: 72,
-                                color: AppColors.surfaceMuted,
-                                child: const Icon(
-                                  Icons.broken_image_outlined,
-                                  color: AppColors.textDisabled,
+                  itemBuilder: (_, i) {
+                    final url = _data.promotionalImageUrls[i];
+                    final progress = _promoUploadProgress[i];
+                    return Stack(
+                      children: [
+                        ClipRRect(
+                          borderRadius: _rBox,
+                          child: Image.network(
+                            url,
+                            width: 122,
+                            height: 122,
+                            fit: BoxFit.cover,
+                            errorBuilder:
+                                (_, __, ___) => Container(
+                                  width: 122,
+                                  height: 122,
+                                  color: AppColors.surfaceMuted,
+                                  child: const Icon(
+                                    Icons.broken_image_outlined,
+                                    color: AppColors.textDisabled,
+                                  ),
                                 ),
-                              ),
+                          ),
                         ),
-                      ),
-                      if (progress != null && progress < 1.0)
-                        Positioned.fill(
-                          child: ClipRRect(
-                            borderRadius: _rBox,
-                            child: Container(
-                              color: AppColors.black.withOpacity(0.45),
-                              child: Center(
-                                child: Text(
-                                  '${(progress * 100).toInt()}%',
-                                  style: const TextStyle(
-                                    color: AppColors.white,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
+                        if (progress != null && progress < 1.0)
+                          Positioned.fill(
+                            child: ClipRRect(
+                              borderRadius: _rBox,
+                              child: Container(
+                                color: AppColors.black.withOpacity(0.45),
+                                child: Center(
+                                  child: Text(
+                                    '${(progress * 100).toInt()}%',
+                                    style: const TextStyle(
+                                      color: AppColors.white,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                      if (progress == null || progress >= 1.0)
-                        Positioned(
-                          top: 2,
-                          right: 2,
-                          child: GestureDetector(
-                            onTap: () {
-                              final list = List<String>.from(
-                                _data.promotionalImageUrls,
-                              )..removeAt(i);
-                              setState(
-                                () =>
-                                    _data = _data.copyWith(
-                                      promotionalImageUrls: list,
-                                    ),
-                              );
-                              _notify();
-                              _scheduleAutoSave();
-                            },
-                            child: Container(
-                              width: 20,
-                              height: 20,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: AppColors.black.withOpacity(0.54),
-                              ),
-                              child: const Icon(
-                                Icons.close,
-                                size: 12,
-                                color: AppColors.white,
+                        if (progress == null || progress >= 1.0)
+                          Positioned(
+                            top: 2,
+                            right: 2,
+                            child: GestureDetector(
+                              onTap: () {
+                                final list = List<String>.from(
+                                  _data.promotionalImageUrls,
+                                )..removeAt(i);
+                                setState(
+                                  () =>
+                                      _data = _data.copyWith(
+                                        promotionalImageUrls: list,
+                                      ),
+                                );
+                                _notify();
+                                _scheduleAutoSave();
+                              },
+                              child: Container(
+                                width: 20,
+                                height: 20,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: AppColors.black.withOpacity(0.54),
+                                ),
+                                child: const Icon(
+                                  Icons.close,
+                                  size: 12,
+                                  color: AppColors.white,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                    ],
-                  );
-                },
-              ),
+                      ],
+                    );
+                  },
+                ),
               ),
             ),
             const SizedBox(height: 12),
@@ -2597,22 +2597,24 @@ class JobPostFormState extends State<JobPostForm> {
       key: kIsWeb ? _logoDropBoundaryKey : null,
       duration: const Duration(milliseconds: 150),
       padding: _logoDropActive ? const EdgeInsets.all(10) : EdgeInsets.zero,
-      decoration: _pubWeb
-          ? (_logoDropActive
-              ? const BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(color: AppColors.accent, width: 2),
+      decoration:
+          _pubWeb
+              ? (_logoDropActive
+                  ? const BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(color: AppColors.accent, width: 2),
+                    ),
+                  )
+                  : null)
+              : BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(
+                    color:
+                        _logoDropActive ? AppColors.accent : AppColors.divider,
+                    width: _logoDropActive ? 2 : 1,
                   ),
-                )
-              : null)
-          : BoxDecoration(
-              border: Border(
-                bottom: BorderSide(
-                  color: _logoDropActive ? AppColors.accent : AppColors.divider,
-                  width: _logoDropActive ? 2 : 1,
                 ),
               ),
-            ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2645,18 +2647,19 @@ class JobPostFormState extends State<JobPostForm> {
                       borderRadius: _rBox,
                       child: Image.network(
                         logoUrl,
-                        width: 72,
-                        height: 72,
+                        width: 122,
+                        height: 122,
                         fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => Container(
-                          width: 72,
-                          height: 72,
-                          color: AppColors.surfaceMuted,
-                          child: const Icon(
-                            Icons.broken_image_outlined,
-                            color: AppColors.textDisabled,
-                          ),
-                        ),
+                        errorBuilder:
+                            (_, __, ___) => Container(
+                              width: 122,
+                              height: 122,
+                              color: AppColors.surfaceMuted,
+                              child: const Icon(
+                                Icons.broken_image_outlined,
+                                color: AppColors.textDisabled,
+                              ),
+                            ),
                       ),
                     ),
                     Positioned(
@@ -2798,77 +2801,77 @@ class JobPostFormState extends State<JobPostForm> {
           // 이미지 그리드
           if (_data.images.isNotEmpty) ...[
             SizedBox(
-              height: 88,
+              height: 150,
               child: Scrollbar(
                 thumbVisibility: true,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemCount: _data.images.length,
                   separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (_, i) {
-                  final progress = _uploadProgress[i];
-                  return Stack(
-                    children: [
-                      ClipRRect(
-                        borderRadius: _rBox,
-                        child: _buildThumbnail(_data.images[i]),
-                      ),
-                      // 업로드 진행도 오버레이
-                      if (progress != null && progress < 1.0)
-                        Positioned.fill(
-                          child: ClipRRect(
-                            borderRadius: _rBox,
-                            child: Container(
-                              color: AppColors.black.withOpacity(0.45),
-                              child: Center(
-                                child: Text(
-                                  '${(progress * 100).toInt()}%',
-                                  style: const TextStyle(
-                                    color: AppColors.white,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
+                  itemBuilder: (_, i) {
+                    final progress = _uploadProgress[i];
+                    return Stack(
+                      children: [
+                        ClipRRect(
+                          borderRadius: _rBox,
+                          child: _buildThumbnail(_data.images[i]),
+                        ),
+                        // 업로드 진행도 오버레이
+                        if (progress != null && progress < 1.0)
+                          Positioned.fill(
+                            child: ClipRRect(
+                              borderRadius: _rBox,
+                              child: Container(
+                                color: AppColors.black.withOpacity(0.45),
+                                child: Center(
+                                  child: Text(
+                                    '${(progress * 100).toInt()}%',
+                                    style: const TextStyle(
+                                      color: AppColors.white,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                      // 삭제 버튼
-                      if (progress == null || progress >= 1.0)
-                        Positioned(
-                          top: 2,
-                          right: 2,
-                          child: GestureDetector(
-                            onTap: () {
-                              final removed = _data.images[i];
-                              final list = List<XFile>.from(_data.images)
-                                ..removeAt(i);
-                              // 웹 캐시도 함께 정리
-                              _previewCache.remove(removed.name);
-                              setState(
-                                () => _data = _data.copyWith(images: list),
-                              );
-                              _notify();
-                            },
-                            child: Container(
-                              width: 20,
-                              height: 20,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: AppColors.black.withOpacity(0.54),
-                              ),
-                              child: const Icon(
-                                Icons.close,
-                                size: 12,
-                                color: AppColors.white,
+                        // 삭제 버튼
+                        if (progress == null || progress >= 1.0)
+                          Positioned(
+                            top: 2,
+                            right: 2,
+                            child: GestureDetector(
+                              onTap: () {
+                                final removed = _data.images[i];
+                                final list = List<XFile>.from(_data.images)
+                                  ..removeAt(i);
+                                // 웹 캐시도 함께 정리
+                                _previewCache.remove(removed.name);
+                                setState(
+                                  () => _data = _data.copyWith(images: list),
+                                );
+                                _notify();
+                              },
+                              child: Container(
+                                width: 20,
+                                height: 20,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: AppColors.black.withOpacity(0.54),
+                                ),
+                                child: const Icon(
+                                  Icons.close,
+                                  size: 12,
+                                  color: AppColors.white,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                    ],
-                  );
-                },
-              ),
+                      ],
+                    );
+                  },
+                ),
               ),
             ),
             const SizedBox(height: 12),
@@ -2877,54 +2880,54 @@ class JobPostFormState extends State<JobPostForm> {
             Row(
               children: [
                 // 이미지 추가 버튼
-              SizedBox(
-                height: _pubWeb ? AppPublisher.ctaHeight : null,
-                child: OutlinedButton.icon(
-                  onPressed: _data.images.length < 10 ? _pickImages : null,
-                  icon: const Icon(
-                    Icons.add_photo_alternate_outlined,
-                    size: 18,
-                  ),
-                  label: Text('사진 추가 (${_data.images.length}/10)'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.textPrimary,
-                    side: BorderSide(color: AppColors.divider),
-                    shape: RoundedRectangleBorder(borderRadius: _rBtn),
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                  ),
-                ),
-              ),
-              if (!_webEditorMode) ...[
-                SizedBox(width: _pubWeb ? AppPublisher.formButtonRowGap : 10),
-                // AI 자동채움 (웹 편집기 Stepper 에서는 숨김 — 상단 AI 초안과 중복)
                 SizedBox(
                   height: _pubWeb ? AppPublisher.ctaHeight : null,
-                  child: ElevatedButton.icon(
-                    onPressed: _isLoadingAi ? null : _runAiAutofill,
-                    icon:
-                        _isLoadingAi
-                            ? const SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: AppColors.white,
-                              ),
-                            )
-                            : const Icon(Icons.auto_awesome, size: 18),
-                    label: Text(_isLoadingAi ? '분석 중...' : 'AI로 자동 채우기'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.cardEmphasis,
-                      foregroundColor: AppColors.onCardEmphasis,
-                      elevation: 0,
+                  child: OutlinedButton.icon(
+                    onPressed: _data.images.length < 10 ? _pickImages : null,
+                    icon: const Icon(
+                      Icons.add_photo_alternate_outlined,
+                      size: 18,
+                    ),
+                    label: Text('사진 추가 (${_data.images.length}/10)'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.textPrimary,
+                      side: BorderSide(color: AppColors.divider),
                       shape: RoundedRectangleBorder(borderRadius: _rBtn),
                       padding: const EdgeInsets.symmetric(horizontal: 14),
                     ),
                   ),
                 ),
+                if (!_webEditorMode) ...[
+                  SizedBox(width: _pubWeb ? AppPublisher.formButtonRowGap : 10),
+                  // AI 자동채움 (웹 편집기 Stepper 에서는 숨김 — 상단 AI 초안과 중복)
+                  SizedBox(
+                    height: _pubWeb ? AppPublisher.ctaHeight : null,
+                    child: ElevatedButton.icon(
+                      onPressed: _isLoadingAi ? null : _runAiAutofill,
+                      icon:
+                          _isLoadingAi
+                              ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppColors.white,
+                                ),
+                              )
+                              : const Icon(Icons.auto_awesome, size: 18),
+                      label: Text(_isLoadingAi ? '분석 중...' : 'AI로 자동 채우기'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.cardEmphasis,
+                        foregroundColor: AppColors.onCardEmphasis,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: _rBtn),
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                      ),
+                    ),
+                  ),
+                ],
               ],
-            ],
-          ),
+            ),
         ],
       ),
     );
@@ -2952,13 +2955,13 @@ class JobPostFormState extends State<JobPostForm> {
       if (_isHttpImagePath(file.path)) {
         return Image.network(
           file.path,
-          width: 72,
-          height: 72,
+          width: 122,
+          height: 122,
           fit: BoxFit.cover,
           errorBuilder:
               (_, __, ___) => Container(
-                width: 72,
-                height: 72,
+                width: 122,
+                height: 122,
                 color: AppColors.surfaceMuted,
                 child: const Icon(
                   Icons.image_outlined,
@@ -2969,11 +2972,11 @@ class JobPostFormState extends State<JobPostForm> {
       }
       final bytes = _previewCache[file.name];
       if (bytes != null) {
-        return Image.memory(bytes, width: 72, height: 72, fit: BoxFit.cover);
+        return Image.memory(bytes, width: 122, height: 122, fit: BoxFit.cover);
       }
       return Container(
-        width: 72,
-        height: 72,
+        width: 122,
+        height: 122,
         color: AppColors.surfaceMuted,
         child: const Center(
           child: Icon(Icons.image_outlined, color: AppColors.textDisabled),
@@ -2982,8 +2985,8 @@ class JobPostFormState extends State<JobPostForm> {
     }
     return Image.file(
       File(file.path),
-      width: 72,
-      height: 72,
+      width: 122,
+      height: 122,
       fit: BoxFit.cover,
     );
   }

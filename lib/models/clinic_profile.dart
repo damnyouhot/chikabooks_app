@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// 사업자 인증 상태
-/// Firestore / Cloud Functions 문자열과 동기화 (`pending` 은 `pendingAuto` 로 매핑)
+/// 사업자 인증 상태 (Firestore / Cloud Functions 문자열과 동기화)
 enum BizVerificationStatus {
   none,
   pendingAuto,
@@ -49,42 +48,31 @@ enum BizVerificationStatus {
     }
   }
 
-  /// 운영팀 최종 승인까지 끝남 (정식 인증 마크 표시)
   bool get isVerified => this == BizVerificationStatus.verified;
 
-  /// 자동 1~4단계는 통과했고 운영팀 최종 검토만 남은 상태
   bool get isProvisional => this == BizVerificationStatus.provisional;
 
-  /// 공고 게시 가능 여부 — provisional / verified 모두 가능
   bool get canPublishJobs =>
       this == BizVerificationStatus.verified ||
       this == BizVerificationStatus.provisional;
 
-  /// OCR 완료 후 국세청 등 검증 대기
   bool get isPendingVerification => this == BizVerificationStatus.pendingAuto;
 }
 
-/// 사업자 인증 정보
 class BusinessVerification {
   final BizVerificationStatus status;
   final String bizNo;
   final String? docUrl;
   final Map<String, dynamic>? ocrResult;
   final DateTime? verifiedAt;
-  /// OCR: `gemini_v1` 등 / 검증: `nts`, `mock`, `mock_hira` 등
   final String? method;
-  /// 서버 전용 사유 코드 (예: `ocr_failed`, `nts_api_error`, `hira_mismatch`)
   final String? failReason;
   final DateTime? lastCheckAt;
-  /// `nts` | `mock` | `mock_hira` | `nts_error` | `server_skip` …
   final String? checkMethod;
   final DateTime? openedAt;
 
-  /// 심평원 병원정보 보조 대조
   final bool? hiraMatched;
   final String? hiraNote;
-
-  /// `strict` | `partial` | `none` — 서버 B안 단계형
   final String? hiraMatchLevel;
   final String? policyReason;
   final int? newClinicGraceDaysSinceOpened;
@@ -119,7 +107,8 @@ class BusinessVerification {
       failReason: data['failReason'] as String?,
       lastCheckAt: (data['lastCheckAt'] as Timestamp?)?.toDate(),
       checkMethod: data['checkMethod'] as String?,
-      openedAt: (data['openedAt'] as Timestamp?)?.toDate() ??
+      openedAt:
+          (data['openedAt'] as Timestamp?)?.toDate() ??
           _parseOpenedAtFromOcr(data['ocrResult']),
       hiraMatched: data['hiraMatched'] as bool?,
       hiraNote: data['hiraNote'] as String?,
@@ -131,25 +120,42 @@ class BusinessVerification {
   }
 
   Map<String, dynamic> toMap() => {
-        'status': status.value,
-        'bizNo': bizNo,
-        if (docUrl != null) 'docUrl': docUrl,
-        if (ocrResult != null) 'ocrResult': ocrResult,
-        if (verifiedAt != null)
-          'verifiedAt': Timestamp.fromDate(verifiedAt!),
-        if (method != null) 'method': method,
-        if (failReason != null) 'failReason': failReason,
-        if (lastCheckAt != null)
-          'lastCheckAt': Timestamp.fromDate(lastCheckAt!),
-        if (checkMethod != null) 'checkMethod': checkMethod,
-        if (openedAt != null) 'openedAt': Timestamp.fromDate(openedAt!),
-        if (hiraMatched != null) 'hiraMatched': hiraMatched,
-        if (hiraNote != null) 'hiraNote': hiraNote,
-        if (hiraMatchLevel != null) 'hiraMatchLevel': hiraMatchLevel,
-        if (policyReason != null) 'policyReason': policyReason,
-        if (newClinicGraceDaysSinceOpened != null)
-          'newClinicGraceDaysSinceOpened': newClinicGraceDaysSinceOpened,
-      };
+    'status': status.value,
+    'bizNo': bizNo,
+    if (docUrl != null) 'docUrl': docUrl,
+    if (ocrResult != null) 'ocrResult': ocrResult,
+    if (verifiedAt != null) 'verifiedAt': Timestamp.fromDate(verifiedAt!),
+    if (method != null) 'method': method,
+    if (failReason != null) 'failReason': failReason,
+    if (lastCheckAt != null) 'lastCheckAt': Timestamp.fromDate(lastCheckAt!),
+    if (checkMethod != null) 'checkMethod': checkMethod,
+    if (openedAt != null) 'openedAt': Timestamp.fromDate(openedAt!),
+    if (hiraMatched != null) 'hiraMatched': hiraMatched,
+    if (hiraNote != null) 'hiraNote': hiraNote,
+    if (hiraMatchLevel != null) 'hiraMatchLevel': hiraMatchLevel,
+    if (policyReason != null) 'policyReason': policyReason,
+    if (newClinicGraceDaysSinceOpened != null)
+      'newClinicGraceDaysSinceOpened': newClinicGraceDaysSinceOpened,
+  };
+
+  bool get hasStoredData =>
+      status != BizVerificationStatus.none ||
+      bizNo.trim().isNotEmpty ||
+      (docUrl?.trim().isNotEmpty ?? false) ||
+      (ocrResult?.isNotEmpty == true) ||
+      [
+        verifiedAt,
+        method,
+        failReason,
+        lastCheckAt,
+        checkMethod,
+        openedAt,
+        hiraMatched,
+        hiraNote,
+        hiraMatchLevel,
+        policyReason,
+        newClinicGraceDaysSinceOpened,
+      ].any((v) => v != null);
 }
 
 DateTime? _parseOpenedAtFromOcr(Object? raw) {
@@ -157,8 +163,9 @@ DateTime? _parseOpenedAtFromOcr(Object? raw) {
   final value = raw['openedAt'];
   if (value == null) return null;
   final text = value.toString().trim();
-  final match = RegExp(r'^(\d{4})[-./년\s]?(\d{1,2})[-./월\s]?(\d{1,2})')
-      .firstMatch(text);
+  final match = RegExp(
+    r'^(\d{4})[-./년\s]?(\d{1,2})[-./월\s]?(\d{1,2})',
+  ).firstMatch(text);
   if (match == null) return null;
   final year = int.tryParse(match.group(1)!);
   final month = int.tryParse(match.group(2)!);
@@ -171,17 +178,12 @@ DateTime? _parseOpenedAtFromOcr(Object? raw) {
   return parsed;
 }
 
-/// 치과 프로필 (clinic_profiles 서브컬렉션 문서)
-///
 /// Firestore: `clinics_accounts/{uid}/clinic_profiles/{profileId}`
 class ClinicProfile {
   final String id;
   final String ownerUid;
 
-  /// 사업자등록증 기준 공식 상호명
   final String clinicName;
-
-  /// 구직자에게 노출되는 치과명 (사용자가 수정 가능)
   final String displayName;
 
   final String address;
@@ -228,7 +230,10 @@ class ClinicProfile {
     );
   }
 
-  factory ClinicProfile.fromDoc(DocumentSnapshot doc, {required String ownerUid}) {
+  factory ClinicProfile.fromDoc(
+    DocumentSnapshot doc, {
+    required String ownerUid,
+  }) {
     return ClinicProfile.fromMap(
       doc.data() as Map<String, dynamic>,
       id: doc.id,
@@ -237,24 +242,34 @@ class ClinicProfile {
   }
 
   Map<String, dynamic> toMap() => {
-        'clinicName': clinicName,
-        'displayName': displayName,
-        'address': address,
-        'ownerName': ownerName,
-        'phone': phone,
-        'businessVerification': businessVerification.toMap(),
-        if (bizRegImageUrl != null) 'bizRegImageUrl': bizRegImageUrl,
-        'updatedAt': FieldValue.serverTimestamp(),
-      };
+    'clinicName': clinicName,
+    'displayName': displayName,
+    'address': address,
+    'ownerName': ownerName,
+    'phone': phone,
+    'businessVerification': businessVerification.toMap(),
+    if (bizRegImageUrl != null) 'bizRegImageUrl': bizRegImageUrl,
+    'updatedAt': FieldValue.serverTimestamp(),
+  };
 
-  /// 공고에 노출할 치과명 (displayName 우선, 없으면 clinicName)
-  String get effectiveName =>
-      displayName.isNotEmpty ? displayName : clinicName;
+  String get effectiveName => displayName.isNotEmpty ? displayName : clinicName;
 
   bool get isBusinessVerified => businessVerification.status.isVerified;
 
-  /// 공고 게시 가능 여부 — 정식 인증(verified) 또는 조건부 승인(provisional)
   bool get canPublishJobs => businessVerification.status.canPublishJobs;
+
+  bool get hasStoredVerification =>
+      businessVerification.hasStoredData ||
+      (bizRegImageUrl?.trim().isNotEmpty ?? false);
+
+  bool get hasEnteredInfo =>
+      clinicName.trim().isNotEmpty ||
+      displayName.trim().isNotEmpty ||
+      address.trim().isNotEmpty ||
+      ownerName.trim().isNotEmpty ||
+      phone.trim().isNotEmpty;
+
+  bool get isBlankPlaceholder => !hasEnteredInfo && !hasStoredVerification;
 
   ClinicProfile copyWith({
     String? clinicName,
@@ -273,15 +288,10 @@ class ClinicProfile {
       address: address ?? this.address,
       ownerName: ownerName ?? this.ownerName,
       phone: phone ?? this.phone,
-      businessVerification:
-          businessVerification ?? this.businessVerification,
+      businessVerification: businessVerification ?? this.businessVerification,
       bizRegImageUrl: bizRegImageUrl ?? this.bizRegImageUrl,
       createdAt: createdAt,
       updatedAt: updatedAt,
     );
   }
-
-  /// Stepper·UI용: 인증 진행 중 (OCR 후 검증 대기)
-  bool get isBusinessVerificationPending =>
-      businessVerification.status.isPendingVerification;
 }

@@ -180,28 +180,31 @@ class _MeClinicPageState extends ConsumerState<MeClinicPage> {
               child: Center(child: CircularProgressIndicator()),
             ),
         error: (error, _) => _LoadErrorState(error: error),
-        data:
-            (profiles) => Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _IntroPanel(branchCount: profiles.length),
-                const SizedBox(height: AppSpacing.lg),
-                _AddBranchButton(
-                  onPressed: _creating ? null : _addBranch,
-                  loading: _creating,
+        data: (profiles) {
+          final visibleProfiles =
+              profiles.where((p) => !p.isBlankPlaceholder).toList();
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _IntroPanel(branchCount: visibleProfiles.length),
+              const SizedBox(height: AppSpacing.lg),
+              _AddBranchButton(
+                onPressed: _creating ? null : _addBranch,
+                loading: _creating,
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              if (visibleProfiles.isEmpty)
+                _EmptyState(onAdd: _creating ? null : _addBranch)
+              else
+                _BranchGrid(
+                  profiles: visibleProfiles,
+                  onEdit: (id) => _openEditor(id),
+                  onDelete: _deleteBranch,
+                  onClearBusinessVerification: _clearBusinessVerification,
                 ),
-                const SizedBox(height: AppSpacing.lg),
-                if (profiles.isEmpty)
-                  _EmptyState(onAdd: _creating ? null : _addBranch)
-                else
-                  _BranchGrid(
-                    profiles: profiles,
-                    onEdit: (id) => _openEditor(id),
-                    onDelete: _deleteBranch,
-                    onClearBusinessVerification: _clearBusinessVerification,
-                  ),
-              ],
-            ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -243,7 +246,7 @@ class _IntroPanel extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12.5,
                     height: 1.5,
-                    color: AppColors.onCardPrimary.withOpacity(0.85),
+                    color: AppColors.onCardPrimary.withValues(alpha: 0.85),
                   ),
                 ),
               ],
@@ -280,7 +283,7 @@ class _AddBranchButton extends StatelessWidget {
         style: OutlinedButton.styleFrom(
           padding: const EdgeInsets.symmetric(vertical: 14),
           foregroundColor: AppColors.accent,
-          side: BorderSide(color: AppColors.accent.withOpacity(0.5)),
+          side: BorderSide(color: AppColors.accent.withValues(alpha: 0.5)),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.md),
           ),
@@ -400,7 +403,7 @@ class _BranchCard extends StatelessWidget {
             isActive
                 ? [
                   BoxShadow(
-                    color: AppColors.accent.withOpacity(0.10),
+                    color: AppColors.accent.withValues(alpha: 0.10),
                     blurRadius: 10,
                     offset: const Offset(0, 2),
                   ),
@@ -414,7 +417,7 @@ class _BranchCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
-                color: AppColors.accent.withOpacity(0.10),
+                color: AppColors.accent.withValues(alpha: 0.10),
                 borderRadius: BorderRadius.circular(AppRadius.full),
               ),
               child: Row(
@@ -614,7 +617,7 @@ class _VerifyBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.10),
+        color: color.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(AppRadius.full),
       ),
       child: Row(
@@ -656,7 +659,7 @@ class _EmptyState extends StatelessWidget {
           Icon(
             Icons.local_hospital_outlined,
             size: 40,
-            color: AppColors.textSecondary.withOpacity(0.6),
+            color: AppColors.textSecondary.withValues(alpha: 0.6),
           ),
           const SizedBox(height: 12),
           Text(
@@ -713,7 +716,7 @@ class _LoadErrorState extends StatelessWidget {
           Icon(
             Icons.error_outline,
             size: 36,
-            color: AppColors.textSecondary.withOpacity(0.7),
+            color: AppColors.textSecondary.withValues(alpha: 0.7),
           ),
           const SizedBox(height: 10),
           Text(
@@ -733,7 +736,7 @@ class _LoadErrorState extends StatelessWidget {
             error.toString(),
             style: TextStyle(
               fontSize: 11,
-              color: AppColors.textSecondary.withOpacity(0.7),
+              color: AppColors.textSecondary.withValues(alpha: 0.7),
               fontFamily: 'monospace',
             ),
             textAlign: TextAlign.center,

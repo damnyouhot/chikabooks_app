@@ -35,9 +35,10 @@ class OrderService {
 
   /// 주문 상태 실시간 감시
   static Stream<JobOrder?> watchOrder(String orderId) {
-    return _col.doc(orderId).snapshots().map(
-          (doc) => doc.exists ? JobOrder.fromDoc(doc) : null,
-        );
+    return _col
+        .doc(orderId)
+        .snapshots()
+        .map((doc) => doc.exists ? JobOrder.fromDoc(doc) : null);
   }
 
   /// 내 주문 목록 (최근순)
@@ -45,10 +46,11 @@ class OrderService {
     final uid = _uid;
     if (uid == null) return [];
     try {
-      final snap = await _col
-          .where('ownerUid', isEqualTo: uid)
-          .orderBy('createdAt', descending: true)
-          .get();
+      final snap =
+          await _col
+              .where('ownerUid', isEqualTo: uid)
+              .orderBy('createdAt', descending: true)
+              .get();
       return snap.docs.map((d) => JobOrder.fromDoc(d)).toList();
     } catch (e) {
       debugPrint('⚠️ OrderService.getMyOrders: $e');
@@ -61,12 +63,13 @@ class OrderService {
     final uid = _uid;
     if (uid == null) return null;
     try {
-      final snap = await _col
-          .where('ownerUid', isEqualTo: uid)
-          .where('draftId', isEqualTo: draftId)
-          .where('status', whereIn: ['created', 'payment_pending'])
-          .limit(1)
-          .get();
+      final snap =
+          await _col
+              .where('ownerUid', isEqualTo: uid)
+              .where('draftId', isEqualTo: draftId)
+              .where('status', whereIn: ['created', 'payment_pending'])
+              .limit(1)
+              .get();
       if (snap.docs.isEmpty) return null;
       return JobOrder.fromDoc(snap.docs.first);
     } catch (e) {
@@ -116,8 +119,9 @@ class OrderService {
     String? paymentKey,
   }) async {
     try {
-      final callable =
-          FirebaseFunctions.instance.httpsCallable('confirmPayment');
+      final callable = FirebaseFunctions.instance.httpsCallable(
+        'confirmPayment',
+      );
       final result = await callable.call({
         'orderId': orderId,
         if (paymentKey != null) 'paymentKey': paymentKey,
@@ -129,6 +133,30 @@ class OrderService {
       );
     } catch (e) {
       debugPrint('⚠️ OrderService.confirmPayment: $e');
+      rethrow;
+    }
+  }
+
+  /// 테스트 계정 전용: 인증/결제 절차 없이 서버에서 바로 공고를 게시한다.
+  static Future<ConfirmPaymentResult> publishTestJobWithoutPayment({
+    required String draftId,
+    required String clinicProfileId,
+  }) async {
+    try {
+      final callable = FirebaseFunctions.instance.httpsCallable(
+        'publishTestJobWithoutPayment',
+      );
+      final result = await callable.call({
+        'draftId': draftId,
+        'clinicProfileId': clinicProfileId,
+      });
+      final data = Map<String, dynamic>.from(result.data as Map);
+      return ConfirmPaymentResult(
+        jobId: data['jobId'] as String,
+        success: data['success'] as bool? ?? true,
+      );
+    } catch (e) {
+      debugPrint('⚠️ OrderService.publishTestJobWithoutPayment: $e');
       rethrow;
     }
   }
@@ -154,8 +182,5 @@ class ConfirmPaymentResult {
   final String jobId;
   final bool success;
 
-  const ConfirmPaymentResult({
-    required this.jobId,
-    required this.success,
-  });
+  const ConfirmPaymentResult({required this.jobId, required this.success});
 }

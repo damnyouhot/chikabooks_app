@@ -24,6 +24,8 @@ import '../../pages/career/career_resume_shortcuts_row.dart';
 
 /// C목록에 끼워 넣는 A·B 행용 썸네일 (기존 96의 60%)
 const double _kAbThumbInCListSide = kJobListingAbThumbSide;
+const int _kLevel1Limit = 8;
+const int _kLevel2Limit = 10;
 
 /// 채용 소탭 - 목록 모드
 ///
@@ -68,6 +70,8 @@ class _JobListingsScreenState extends State<JobListingsScreen> {
 
   // ── Level 3 페이지네이션 상태 ────────────────────────────────
   List<Job> _level3Jobs = [];
+  List<Job> _level1Jobs = [];
+  List<Job> _level2Jobs = [];
   bool _level3Loading = false;
   bool _level3HasMore = true;
   DocumentSnapshot? _level3LastDoc;
@@ -87,6 +91,7 @@ class _JobListingsScreenState extends State<JobListingsScreen> {
       if (!mounted) return;
       _filterNotifier = context.read<JobFilterNotifier>();
       _filterNotifier!.addListener(_onFilterChanged);
+      _loadHighlightedJobs();
       _loadLevel3(reset: true);
       if (widget.readOnly) {
         _onScroll();
@@ -138,6 +143,22 @@ class _JobListingsScreenState extends State<JobListingsScreen> {
   }
 
   void _onFilterChanged() => _loadLevel3(reset: true);
+
+  Future<void> _loadHighlightedJobs() async {
+    final svc = context.read<JobService>();
+    final results = await Future.wait([
+      svc.fetchHighlightedJobs(jobLevel: 1, limit: _kLevel1Limit),
+      svc.fetchHighlightedJobs(jobLevel: 2, limit: _kLevel2Limit),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _level1Jobs = results[0];
+      _level2Jobs = results[1];
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _updatePinnedPremiumVisibility();
+    });
+  }
 
   void _onScroll() {
     _updatePinnedPremiumVisibility();
@@ -191,8 +212,9 @@ class _JobListingsScreenState extends State<JobListingsScreen> {
     try {
       final svc = context.read<JobService>();
       final result = await svc.fetchJobsPaged(
-        pageSize: 15,
+        pageSize: 30,
         startAfter: _level3LastDoc,
+        jobLevel: 3,
       );
 
       if (!mounted) return;
@@ -235,9 +257,9 @@ class _JobListingsScreenState extends State<JobListingsScreen> {
     final safeBottom = MediaQuery.of(context).padding.bottom;
 
     // Level 2 dedup: Level 1에 이미 노출된 공고 제외
-    final level1Ids = mockLevel1Jobs.map((j) => j.id).toSet();
+    final level1Ids = _level1Jobs.map((j) => j.id).toSet();
     final deduped2 =
-        mockLevel2Jobs.where((j) => !level1Ids.contains(j.id)).toList();
+        _level2Jobs.where((j) => !level1Ids.contains(j.id)).toList();
 
     return Stack(
       clipBehavior: Clip.none,
@@ -269,7 +291,10 @@ class _JobListingsScreenState extends State<JobListingsScreen> {
 
               // ── 프리미엄: 2열 그리드 (진입 시 고정 캐러셀 없음) ──
               SliverToBoxAdapter(
-                child: _PremiumGridSection(jobs: mockLevel1Jobs),
+                child: _PremiumGridSection(
+                  jobs: _level1Jobs,
+                  onJobTap: widget.readOnly ? null : _navigateToDetail,
+                ),
               ),
 
               // ── 추천: 게시판형 행 (상단 위치로 고정 캐러셀 임계값 측정) ──
@@ -329,7 +354,7 @@ class _JobListingsScreenState extends State<JobListingsScreen> {
               shadowColor: Colors.black26,
               surfaceTintColor: Colors.transparent,
               child: JobLevel1Carousel(
-                jobs: mockLevel1Jobs,
+                jobs: _level1Jobs,
                 onJobTap: widget.readOnly ? (_, __) {} : null,
               ),
             ),
@@ -417,10 +442,10 @@ class _JobListingsScreenState extends State<JobListingsScreen> {
     }
 
     // A·B클래스 공고 — 동일 필터 적용 (정렬은 A→B 원래 순서 유지)
-    final level1Ids = mockLevel1Jobs.map((j) => j.id).toSet();
+    final level1Ids = _level1Jobs.map((j) => j.id).toSet();
     final rawFixed = <Job>[
-      ...mockLevel1Jobs,
-      ...mockLevel2Jobs.where((j) => !level1Ids.contains(j.id)),
+      ..._level1Jobs,
+      ..._level2Jobs.where((j) => !level1Ids.contains(j.id)),
     ];
     final fixedTop = _applyNonSortFilters(rawFixed, jobFilter);
 
@@ -898,8 +923,9 @@ class _MapToggleChip extends StatelessWidget {
 // ── 프리미엄: 2열 그리드 (구 B클래스) ───────────────────────────────
 class _PremiumGridSection extends StatelessWidget {
   final List<Job> jobs;
+  final ValueChanged<Job>? onJobTap;
 
-  const _PremiumGridSection({required this.jobs});
+  const _PremiumGridSection({required this.jobs, required this.onJobTap});
 
   @override
   Widget build(BuildContext context) {
@@ -958,7 +984,11 @@ class _PremiumGridSection extends StatelessWidget {
                 mainAxisExtent: 262,
               ),
               itemCount: jobs.length,
-              itemBuilder: (_, i) => JobListingCardPremium(job: jobs[i]),
+              itemBuilder:
+                  (_, i) => JobListingCardPremium(
+                    job: jobs[i],
+                    onTap: onJobTap == null ? null : () => onJobTap!(jobs[i]),
+                  ),
             ),
           ),
         ],

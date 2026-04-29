@@ -72,17 +72,8 @@ extension _ProductClassExt on _ProductClass {
       '지원자 무제한',
       '공고 수정 무제한',
     ],
-    _ProductClass.b => [
-      '추천 섹션 우선 노출',
-      '추천 블루 배지 표시',
-      '공고 30일 유지',
-      '지원자 무제한',
-    ],
-    _ProductClass.c => [
-      '일반 목록 노출',
-      '공고 14일 유지',
-      '지원자 50명 제한',
-    ],
+    _ProductClass.b => ['추천 섹션 우선 노출', '추천 블루 배지 표시', '공고 30일 유지', '지원자 무제한'],
+    _ProductClass.c => ['일반 목록 노출', '공고 14일 유지', '지원자 50명 제한'],
   };
 
   Color get badgeColor => switch (this) {
@@ -137,6 +128,12 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
   /// 결제 직전 필수 동의 상태(이용약관/개인정보/환불).
   bool _consentAllRequired = false;
   PaymentConsentState? _consentState;
+
+  bool get _isTestPublisher {
+    final email =
+        FirebaseAuth.instance.currentUser?.email?.trim().toLowerCase() ?? '';
+    return email == 'doug@dougasfilm.com' || email == 'doug@douglasfilm.com';
+  }
 
   @override
   void initState() {
@@ -213,11 +210,12 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
 
   JobPostData _buildPreviewDataFromDraft(JobDraft d) {
     final imageUrls = d.imageUrls;
-    final images = imageUrls.map((u) {
-      final seg = Uri.tryParse(u)?.pathSegments.last;
-      final name = (seg?.isNotEmpty == true) ? seg! : 'image.jpg';
-      return XFile(u, name: name);
-    }).toList();
+    final images =
+        imageUrls.map((u) {
+          final seg = Uri.tryParse(u)?.pathSegments.last;
+          final name = (seg?.isNotEmpty == true) ? seg! : 'image.jpg';
+          return XFile(u, name: name);
+        }).toList();
     return JobPostData(
       clinicName: d.clinicName,
       title: d.title,
@@ -313,8 +311,7 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
       );
 
       final pid = _clinicProfileId!;
-      final voucherId =
-          _vouchers.isNotEmpty ? _vouchers.first.id : null;
+      final voucherId = _vouchers.isNotEmpty ? _vouchers.first.id : null;
 
       final cs = _consentState;
       final consentPayload = PaymentConsentVersions.payload(
@@ -323,6 +320,17 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
         agreeRefund: cs?.refund ?? false,
         withdrawalNoticeShown: cs?.withdrawalNoticeShown ?? true,
       );
+
+      if (_isTestPublisher) {
+        final confirmResult = await OrderService.publishTestJobWithoutPayment(
+          draftId: widget.draftId,
+          clinicProfileId: pid,
+        );
+        if (mounted && confirmResult.success) {
+          context.go('/post-job/success/${confirmResult.jobId}');
+        }
+        return;
+      }
 
       final orderResult = await OrderService.createOrder(
         draftId: widget.draftId,
@@ -391,9 +399,11 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
     return JobPostTopBar(
       currentStep: JobPostStep.product,
       prevStep: JobPostStep.edit,
-      onPrev: () => context.canPop()
-          ? context.pop()
-          : context.go('/post-job/edit/${widget.draftId}'),
+      onPrev:
+          () =>
+              context.canPop()
+                  ? context.pop()
+                  : context.go('/post-job/edit/${widget.draftId}'),
       trailing: kIsWeb ? const WebAccountMenuButton() : null,
     );
   }
@@ -442,9 +452,10 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
             if (event is! PointerScrollEvent) return;
             GestureBinding.instance.pointerSignalResolver.register(event, (e) {
               if (e is! PointerScrollEvent) return;
-              final ctrl = _mouseOnLeft
-                  ? _previewScrollController
-                  : _rightScrollController;
+              final ctrl =
+                  _mouseOnLeft
+                      ? _previewScrollController
+                      : _rightScrollController;
               if (!ctrl.hasClients) return;
               final pos = ctrl.position;
               pos.jumpTo(
@@ -457,8 +468,7 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
           },
           child: MouseRegion(
             onHover: (event) {
-              final isLeft =
-                  event.localPosition.dx < constraints.maxWidth / 2;
+              final isLeft = event.localPosition.dx < constraints.maxWidth / 2;
               if (isLeft != _mouseOnLeft) {
                 setState(() => _mouseOnLeft = isLeft);
               }
@@ -572,7 +582,8 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
     final parts = address.trim().split(RegExp(r'\s+'));
     for (final p in parts) {
       if ((p.endsWith('동') || p.endsWith('읍') || p.endsWith('면')) &&
-          p.length >= 3) return p;
+          p.length >= 3)
+        return p;
     }
     for (final p in parts) {
       if ((p.endsWith('구') || p.endsWith('군')) && p.length >= 3) return p;
@@ -618,10 +629,7 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
                   color: AppColors.appBg,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _previewAppBar(),
-                      _previewTabBar(),
-                    ],
+                    children: [_previewAppBar(), _previewTabBar()],
                   ),
                 ),
               ),
@@ -655,11 +663,17 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
             ),
           ),
           const Spacer(),
-          const Icon(Icons.search_rounded,
-              size: 22, color: AppColors.textPrimary),
+          const Icon(
+            Icons.search_rounded,
+            size: 22,
+            color: AppColors.textPrimary,
+          ),
           const SizedBox(width: 8),
-          const Icon(Icons.notifications_none_rounded,
-              size: 22, color: AppColors.textPrimary),
+          const Icon(
+            Icons.notifications_none_rounded,
+            size: 22,
+            color: AppColors.textPrimary,
+          ),
         ],
       ),
     );
@@ -682,9 +696,10 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
             style: TextStyle(
               fontSize: 12,
               fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
-              color: selected
-                  ? AppColors.onSegmentSelected
-                  : AppColors.onSegmentUnselected,
+              color:
+                  selected
+                      ? AppColors.onSegmentSelected
+                      : AppColors.onSegmentUnselected,
             ),
           ),
         ),
@@ -698,10 +713,7 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
         borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: Row(
-        children: [
-          tabItem('채용 · 지원', true),
-          tabItem('커리어 카드', false),
-        ],
+        children: [tabItem('채용 · 지원', true), tabItem('커리어 카드', false)],
       ),
     );
   }
@@ -710,9 +722,12 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
 
   Widget _buildUnifiedListingContent() {
     final cls = _selected;
-    final aJob = cls == _ProductClass.a ? _buildJobFromDraft(jobLevel: 1) : null;
-    final bJob = cls == _ProductClass.b ? _buildJobFromDraft(jobLevel: 2) : null;
-    final cJob = cls == _ProductClass.c ? _buildJobFromDraft(jobLevel: 3) : null;
+    final aJob =
+        cls == _ProductClass.a ? _buildJobFromDraft(jobLevel: 1) : null;
+    final bJob =
+        cls == _ProductClass.b ? _buildJobFromDraft(jobLevel: 2) : null;
+    final cJob =
+        cls == _ProductClass.c ? _buildJobFromDraft(jobLevel: 3) : null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -761,10 +776,7 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
           const Expanded(
             child: Text(
               '치과명, 동네로 검색',
-              style: TextStyle(
-                fontSize: 15,
-                color: AppColors.textDisabled,
-              ),
+              style: TextStyle(fontSize: 15, color: AppColors.textDisabled),
             ),
           ),
           const SizedBox(width: 6),
@@ -871,25 +883,28 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
   }
 
   Divider get _rowDivider => const Divider(
-        height: 0.5,
-        thickness: 0.5,
-        indent: 16,
-        endIndent: 16,
-        color: AppColors.divider,
-      );
+    height: 0.5,
+    thickness: 0.5,
+    indent: 16,
+    endIndent: 16,
+    color: AppColors.divider,
+  );
 
   // ── A 클래스: 프리미엄 2열 그리드 ────────────────────────────────
 
   Widget _previewSectionA(Job? customerJob) {
     const itemH = 262.0;
     final customerIds = customerJob != null ? {customerJob.id} : <String>{};
-    final mocks = mockLevel1Jobs
-        .where((j) => !customerIds.contains(j.id))
-        .take(customerJob != null ? 3 : 4)
-        .toList();
+    final mocks =
+        mockLevel1Jobs
+            .where((j) => !customerIds.contains(j.id))
+            .take(customerJob != null ? 3 : 4)
+            .toList();
     final allItems = [if (customerJob != null) customerJob, ...mocks];
 
-    Widget gridPair(Job left, Job? right, {
+    Widget gridPair(
+      Job left,
+      Job? right, {
       double leftOpacity = 1.0,
       double rightOpacity = 1.0,
     }) {
@@ -916,7 +931,8 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
               const SizedBox(width: 10),
               right != null
                   ? cell(right, rightOpacity)
-                  : const Expanded(child: SizedBox.shrink()),            ],
+                  : const Expanded(child: SizedBox.shrink()),
+            ],
           ),
         ),
       );
@@ -956,10 +972,11 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
 
   Widget _previewSectionB(Job? customerJob) {
     final l1Ids = mockLevel1Jobs.map((j) => j.id).toSet();
-    final baseMocks = mockLevel2Jobs
-        .where((j) => !l1Ids.contains(j.id))
-        .take(customerJob != null ? 3 : 4)
-        .toList();
+    final baseMocks =
+        mockLevel2Jobs
+            .where((j) => !l1Ids.contains(j.id))
+            .take(customerJob != null ? 3 : 4)
+            .toList();
     final allRows = [if (customerJob != null) customerJob, ...baseMocks];
 
     return Container(
@@ -976,7 +993,10 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
           for (int i = 0; i < allRows.length; i++) ...[
             Opacity(
               opacity: (customerJob != null && i == 0) ? 1.0 : 0.38,
-              child: JobListingRowRecommended(job: allRows[i], hideSamplePrefix: true),
+              child: JobListingRowRecommended(
+                job: allRows[i],
+                hideSamplePrefix: true,
+              ),
             ),
             if (i < allRows.length - 1) _rowDivider,
           ],
@@ -989,10 +1009,11 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
 
   Widget _previewSectionC(Job? customerJob) {
     final l1Ids = mockLevel1Jobs.map((j) => j.id).toSet();
-    final baseMocks = mockLevel2Jobs
-        .where((j) => !l1Ids.contains(j.id))
-        .take(customerJob != null ? 4 : 5)
-        .toList();
+    final baseMocks =
+        mockLevel2Jobs
+            .where((j) => !l1Ids.contains(j.id))
+            .take(customerJob != null ? 4 : 5)
+            .toList();
     final allRows = [if (customerJob != null) customerJob, ...baseMocks];
 
     return Container(
@@ -1009,7 +1030,10 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
           for (int i = 0; i < allRows.length; i++) ...[
             Opacity(
               opacity: (customerJob != null && i == 0) ? 1.0 : 0.38,
-              child: JobListingRowBasic(job: allRows[i], hideSamplePrefix: true),
+              child: JobListingRowBasic(
+                job: allRows[i],
+                hideSamplePrefix: true,
+              ),
             ),
             if (i < allRows.length - 1) _rowDivider,
           ],
@@ -1101,9 +1125,10 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
         SizedBox(
           height: AppPublisher.ctaHeight,
           child: ElevatedButton(
-            onPressed: (_isProcessing || !_consentAllRequired)
-                ? null
-                : _confirmPurchase,
+            onPressed:
+                (_isProcessing || !_consentAllRequired)
+                    ? null
+                    : _confirmPurchase,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.accent,
               foregroundColor: AppColors.white,
@@ -1114,25 +1139,26 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
                 borderRadius: BorderRadius.circular(AppPublisher.buttonRadius),
               ),
             ),
-            child: _isProcessing
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: AppColors.white,
+            child:
+                _isProcessing
+                    ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.white,
+                      ),
+                    )
+                    : Text(
+                      _vouchers.isNotEmpty
+                          ? '무료 공고권으로 게시하기  ·  ${_selected.label}'
+                          : '${_selected.priceLabel}  ·  결제하고 게시하기',
+                      style: GoogleFonts.notoSansKr(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.4,
+                      ),
                     ),
-                  )
-                : Text(
-                    _vouchers.isNotEmpty
-                        ? '무료 공고권으로 게시하기  ·  ${_selected.label}'
-                        : '${_selected.priceLabel}  ·  결제하고 게시하기',
-                    style: GoogleFonts.notoSansKr(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.4,
-                    ),
-                  ),
           ),
         ),
         const SizedBox(height: 28),
@@ -1183,16 +1209,21 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
                       shape: BoxShape.circle,
                       color: isSelected ? AppColors.blue : Colors.transparent,
                       border: Border.all(
-                        color: isSelected
-                            ? AppColors.blue
-                            : AppColors.textDisabled,
+                        color:
+                            isSelected
+                                ? AppColors.blue
+                                : AppColors.textDisabled,
                         width: 2,
                       ),
                     ),
-                    child: isSelected
-                        ? const Icon(Icons.check,
-                            size: 12, color: AppColors.white)
-                        : null,
+                    child:
+                        isSelected
+                            ? const Icon(
+                              Icons.check,
+                              size: 12,
+                              color: AppColors.white,
+                            )
+                            : null,
                   ),
                   Expanded(
                     child: Row(
@@ -1207,9 +1238,10 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
                                   style: GoogleFonts.notoSansKr(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w800,
-                                    color: isSelected
-                                        ? AppColors.blue
-                                        : AppColors.textPrimary,
+                                    color:
+                                        isSelected
+                                            ? AppColors.blue
+                                            : AppColors.textPrimary,
                                     letterSpacing: -0.4,
                                   ),
                                 ),
@@ -1243,9 +1275,10 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
                           style: GoogleFonts.notoSansKr(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
-                            color: isSelected
-                                ? AppColors.blue
-                                : AppColors.textPrimary,
+                            color:
+                                isSelected
+                                    ? AppColors.blue
+                                    : AppColors.textPrimary,
                             letterSpacing: -0.4,
                           ),
                         ),
@@ -1260,14 +1293,18 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
                   decoration: BoxDecoration(
-                    color: isSelected
-                        ? AppColors.blue.withValues(alpha: 0.10)
-                        : AppColors.surfaceMuted,
-                    borderRadius:
-                        BorderRadius.circular(AppPublisher.softRadius),
+                    color:
+                        isSelected
+                            ? AppColors.blue.withValues(alpha: 0.10)
+                            : AppColors.surfaceMuted,
+                    borderRadius: BorderRadius.circular(
+                      AppPublisher.softRadius,
+                    ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -1275,9 +1312,10 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
                       Icon(
                         Icons.check_circle_rounded,
                         size: 13,
-                        color: isSelected
-                            ? AppColors.blue
-                            : AppColors.textSecondary,
+                        color:
+                            isSelected
+                                ? AppColors.blue
+                                : AppColors.textSecondary,
                       ),
                       const SizedBox(width: 5),
                       Text(
@@ -1286,9 +1324,10 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
                           letterSpacing: -0.4,
-                          color: isSelected
-                              ? AppColors.blue
-                              : AppColors.textSecondary,
+                          color:
+                              isSelected
+                                  ? AppColors.blue
+                                  : AppColors.textSecondary,
                         ),
                       ),
                     ],
@@ -1302,10 +1341,7 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
                 child: Row(
                   children: [
                     Expanded(
-                      child: Container(
-                        height: 0.5,
-                        color: AppColors.divider,
-                      ),
+                      child: Container(height: 0.5, color: AppColors.divider),
                     ),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -1320,10 +1356,7 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
                       ),
                     ),
                     Expanded(
-                      child: Container(
-                        height: 0.5,
-                        color: AppColors.divider,
-                      ),
+                      child: Container(height: 0.5, color: AppColors.divider),
                     ),
                   ],
                 ),
@@ -1361,17 +1394,17 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
         ),
       );
     }
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: rows);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: rows,
+    );
   }
 
   Widget _featureItem((String, String) f, Color color) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          f.$1,
-          style: TextStyle(fontSize: 13, color: color),
-        ),
+        Text(f.$1, style: TextStyle(fontSize: 13, color: color)),
         const SizedBox(width: 4),
         Expanded(
           child: Text(
@@ -1408,8 +1441,7 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
                 topRight: Radius.circular(AppPublisher.buttonRadius),
               ),
             ),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             child: Row(
               children: [
                 Expanded(
@@ -1466,11 +1498,12 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
   }) {
     return Container(
       decoration: BoxDecoration(
-        border: isLast
-            ? null
-            : const Border(
-                bottom: BorderSide(color: AppColors.divider, width: 0.5),
-              ),
+        border:
+            isLast
+                ? null
+                : const Border(
+                  bottom: BorderSide(color: AppColors.divider, width: 0.5),
+                ),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       child: Row(
@@ -1495,8 +1528,7 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
     );
   }
 
-  Widget _tableCell(String text,
-      {bool highlight = false, bool dim = false}) {
+  Widget _tableCell(String text, {bool highlight = false, bool dim = false}) {
     return Expanded(
       flex: 3,
       child: Text(
@@ -1506,9 +1538,10 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
           fontSize: 11,
           fontWeight: highlight ? FontWeight.w700 : FontWeight.w500,
           letterSpacing: -0.4,
-          color: highlight
-              ? AppColors.blue
-              : dim
+          color:
+              highlight
+                  ? AppColors.blue
+                  : dim
                   ? AppColors.textDisabled
                   : AppColors.textSecondary,
         ),
@@ -1526,8 +1559,11 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.card_giftcard_rounded,
-              size: 18, color: AppColors.accent),
+          const Icon(
+            Icons.card_giftcard_rounded,
+            size: 18,
+            color: AppColors.accent,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(

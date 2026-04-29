@@ -24,10 +24,11 @@ class JobService {
             .collection('jobs')
             .orderBy('createdAt', descending: true)
             .get();
-    List<Job> jobs = snapshot.docs
-        .map((d) => Job.fromDoc(d))
-        .where((j) => j.isListedInApp)
-        .toList();
+    List<Job> jobs =
+        snapshot.docs
+            .map((d) => Job.fromDoc(d))
+            .where((j) => j.isListedInApp)
+            .toList();
 
     if (careerFilter != '전체') {
       jobs = jobs.where((job) => job.career == careerFilter).toList();
@@ -55,21 +56,18 @@ class JobService {
   Job _jobFetchFallback(String id) {
     final mock = findMockJobById(id);
     if (mock != null) return mock;
-    return Job.fromJson(
-      {
-        'postedAt': Timestamp.now(),
-        'title': '공고를 찾을 수 없어요',
-        'clinicName': '',
-        'career': '미정',
-        'salaryRange': [0, 0],
-        'details':
-            '삭제되었거나 주소가 잘못되었을 수 있어요. '
-            '로그인 상태와 네트워크를 확인해 주세요.',
-        'benefits': <String>[],
-        'images': <String>[],
-      },
-      docId: id,
-    );
+    return Job.fromJson({
+      'postedAt': Timestamp.now(),
+      'title': '공고를 찾을 수 없어요',
+      'clinicName': '',
+      'career': '미정',
+      'salaryRange': [0, 0],
+      'details':
+          '삭제되었거나 주소가 잘못되었을 수 있어요. '
+          '로그인 상태와 네트워크를 확인해 주세요.',
+      'benefits': <String>[],
+      'images': <String>[],
+    }, docId: id);
   }
 
   Future<Job> fetchJob(String id) async {
@@ -109,9 +107,10 @@ class JobService {
   ///
   /// 반환 타입: (jobs, lastDoc, hasMore)
   Future<({List<Job> jobs, DocumentSnapshot? lastDoc, bool hasMore})>
-      fetchJobsPaged({
+  fetchJobsPaged({
     int pageSize = 15,
     DocumentSnapshot? startAfter,
+    int? jobLevel,
   }) async {
     Query<Map<String, dynamic>> q = _db
         .collection('jobs')
@@ -123,14 +122,48 @@ class JobService {
     }
 
     final snap = await q.get();
-    final jobs = snap.docs
-        .map((d) => Job.fromDoc(d))
-        .where((j) => j.isListedInApp)
-        .toList();
+    final jobs =
+        snap.docs
+            .map((d) => Job.fromDoc(d))
+            .where((j) => j.isListedInApp)
+            .where((j) => jobLevel == null || j.jobLevel == jobLevel)
+            .toList();
     final lastDoc = snap.docs.isNotEmpty ? snap.docs.last : null;
     final hasMore = snap.docs.length >= pageSize;
 
     return (jobs: jobs, lastDoc: lastDoc, hasMore: hasMore);
+  }
+
+  /// A/B 클래스처럼 상단 고정 노출되는 실제 공고를 가져온다.
+  ///
+  /// 복합 인덱스 없이 동작하도록 최신 공고 묶음을 받은 뒤 클라이언트에서
+  /// `jobLevel`을 걸러낸다. 현재 앱 노출 상한은 A 8개, B 10개다.
+  Future<List<Job>> fetchHighlightedJobs({
+    required int jobLevel,
+    required int limit,
+  }) async {
+    try {
+      final snap =
+          await _db
+              .collection('jobs')
+              .orderBy('createdAt', descending: true)
+              .limit(120)
+              .get();
+      final jobs =
+          snap.docs
+              .map((d) => Job.fromDoc(d))
+              .where((j) => j.isListedInApp && j.jobLevel == jobLevel)
+              .toList();
+      jobs.sort((a, b) {
+        final priority = b.priorityScore.compareTo(a.priorityScore);
+        if (priority != 0) return priority;
+        return b.postedAt.compareTo(a.postedAt);
+      });
+      return jobs.take(limit).toList();
+    } catch (e) {
+      debugPrint('⚠️ fetchHighlightedJobs(level=$jobLevel) error: $e');
+      return [];
+    }
   }
 
   // ══════════════════════════════════════════════
@@ -153,10 +186,11 @@ class JobService {
               .limit(200) // 성능을 위해 제한
               .get();
 
-      List<Job> jobs = snapshot.docs
-          .map((d) => Job.fromDoc(d))
-          .where((j) => j.isListedInApp)
-          .toList();
+      List<Job> jobs =
+          snapshot.docs
+              .map((d) => Job.fromDoc(d))
+              .where((j) => j.isListedInApp)
+              .toList();
 
       // 2. 반경 필터링
       jobs =
@@ -249,17 +283,19 @@ class JobService {
             .get(const GetOptions(source: Source.cache));
         if (snapshot.docs.isEmpty) throw Exception('cache empty');
       } catch (_) {
-        snapshot = await _db
-            .collection('jobs')
-            .orderBy('createdAt', descending: true)
-            .limit(kPreviewLimit)
-            .get();
+        snapshot =
+            await _db
+                .collection('jobs')
+                .orderBy('createdAt', descending: true)
+                .limit(kPreviewLimit)
+                .get();
       }
 
-      List<Job> jobs = snapshot.docs
-          .map((d) => Job.fromDoc(d))
-          .where((j) => j.isListedInApp)
-          .toList();
+      List<Job> jobs =
+          snapshot.docs
+              .map((d) => Job.fromDoc(d))
+              .where((j) => j.isListedInApp)
+              .toList();
 
       // 위치 기반 필터링 (옵션)
       if (userLocation != null) {
@@ -274,8 +310,8 @@ class JobService {
             }).toList();
       }
 
-      final count    = jobs.length;
-      final hasMore  = count >= kPreviewLimit; // 8개 채워졌으면 더 있을 수 있음
+      final count = jobs.length;
+      final hasMore = count >= kPreviewLimit; // 8개 채워졌으면 더 있을 수 있음
       final clinicName =
           jobs.isNotEmpty
               ? (jobs.first.clinicName.isNotEmpty

@@ -1539,6 +1539,177 @@ export const createJobPosting = functions.https.onCall(
   }
 );
 
+const TEST_PUBLISHER_EMAILS = new Set([
+  "doug@dougasfilm.com",
+  "doug@douglasfilm.com",
+]);
+
+function resolveJobLevel(productTier: unknown): number {
+  const tier = String(productTier ?? "").trim().toLowerCase();
+  switch (tier) {
+  case "premium":
+  case "a":
+  case "a_class":
+    return 1;
+  case "standard":
+  case "b":
+  case "b_class":
+    return 2;
+  default:
+    return 3;
+  }
+}
+
+function displayDaysForTier(productTier: unknown): number {
+  const tier = String(productTier ?? "").trim().toLowerCase();
+  if (tier === "premium") return 60;
+  if (tier === "standard") return 30;
+  return 14;
+}
+
+function stringList(raw: unknown): string[] {
+  return Array.isArray(raw)
+    ? raw.filter((v): v is string => typeof v === "string")
+    : [];
+}
+
+// ========== 구인공고: 테스트 계정 무결제 게시 ==========
+export const publishTestJobWithoutPayment = functions.https.onCall(
+  async (data, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError(
+        "unauthenticated",
+        "로그인이 필요합니다."
+      );
+    }
+
+    const uid = context.auth.uid;
+    const email = String(context.auth.token.email ?? "").trim().toLowerCase();
+    if (!TEST_PUBLISHER_EMAILS.has(email)) {
+      throw new functions.https.HttpsError(
+        "permission-denied",
+        "테스트 계정만 사용할 수 있습니다."
+      );
+    }
+
+    const draftId = String(data?.draftId ?? "").trim();
+    const clinicProfileId = String(data?.clinicProfileId ?? "").trim();
+    if (!draftId || !clinicProfileId) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "draftId와 clinicProfileId가 필요합니다."
+      );
+    }
+
+    const draftRef = db.collection("jobDrafts").doc(draftId);
+    const draftSnap = await draftRef.get();
+    if (!draftSnap.exists) {
+      throw new functions.https.HttpsError(
+        "not-found",
+        "공고 임시저장을 찾을 수 없습니다."
+      );
+    }
+
+    const draft = draftSnap.data() ?? {};
+    if (draft.ownerUid !== uid) {
+      throw new functions.https.HttpsError(
+        "permission-denied",
+        "본인 공고만 게시할 수 있습니다."
+      );
+    }
+
+    const profileRef = db
+      .collection("clinics_accounts")
+      .doc(uid)
+      .collection("clinic_profiles")
+      .doc(clinicProfileId);
+    const profileSnap = await profileRef.get();
+    const profile = profileSnap.exists ? profileSnap.data() ?? {} : {};
+
+    const productTier = draft.productTier ?? "standard";
+    const now = admin.firestore.Timestamp.now();
+    const adEndAt = admin.firestore.Timestamp.fromMillis(
+      now.toMillis() + displayDaysForTier(productTier) * 24 * 60 * 60 * 1000
+    );
+    const clinicName = String(
+      draft.clinicName ??
+      profile.displayName ??
+      profile.clinicName ??
+      ""
+    ).trim();
+    const address = String(draft.address ?? profile.address ?? "").trim();
+    const phone = String(draft.contact ?? profile.phone ?? "").trim();
+
+    const jobData = {
+      ownerUid: uid,
+      createdBy: uid,
+      clinicId: uid,
+      clinicProfileId,
+      clinicName,
+      title: String(draft.title ?? "").trim(),
+      role: String(draft.role ?? "").trim(),
+      type: String(draft.role ?? "").trim(),
+      career: String(draft.career ?? "").trim(),
+      education: String(draft.education ?? "").trim(),
+      employmentType: String(draft.employmentType ?? "").trim(),
+      workHours: String(draft.workHours ?? "").trim(),
+      salary: String(draft.salary ?? "").trim(),
+      salaryText: String(draft.salary ?? "").trim(),
+      benefits: stringList(draft.benefits),
+      description: String(draft.description ?? "").trim(),
+      details: String(draft.description ?? "").trim(),
+      address,
+      contact: phone,
+      images: stringList(draft.imageUrls),
+      rawImageUrls: stringList(draft.rawImageUrls),
+      promotionalImageUrls: stringList(draft.promotionalImageUrls),
+      logoUrl: typeof draft.logoUrl === "string" ? draft.logoUrl : null,
+      hospitalType: draft.hospitalType ?? null,
+      chairCount: draft.chairCount ?? null,
+      staffCount: draft.staffCount ?? null,
+      specialties: stringList(draft.specialties),
+      workDays: stringList(draft.workDays),
+      weekendWork: draft.weekendWork === true,
+      nightShift: draft.nightShift === true,
+      applyMethod: stringList(draft.applyMethod),
+      requiredDocuments: stringList(draft.requiredDocuments),
+      isAlwaysHiring: draft.isAlwaysHiring === true,
+      transportation: draft.transportation ?? null,
+      subwayLines: stringList(draft.subwayLines),
+      tags: stringList(draft.tags),
+      mainDutiesList: stringList(draft.mainDutiesList),
+      productTier,
+      productLabel: draft.productLabel ?? "테스트 공고",
+      jobLevel: resolveJobLevel(productTier),
+      priorityScore: resolveJobLevel(productTier) === 1 ? 100 : 50,
+      status: "active",
+      paymentStatus: "test_bypassed",
+      testBypass: true,
+      postedAt: now,
+      adStartAt: now,
+      adEndAt,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    const jobRef = await db.collection("jobs").add(jobData);
+    await draftRef.update({
+      currentStep: "published",
+      publishedJobId: jobRef.id,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    functions.logger.info("publishTestJobWithoutPayment", {
+      uid,
+      email,
+      draftId,
+      jobId: jobRef.id,
+    });
+
+    return {jobId: jobRef.id, success: true};
+  }
+);
+
 // ========== 치과 사업자 인증 ==========
 /**
  * submitClinicVerification
@@ -1649,6 +1820,7 @@ export const submitClinicVerification = functions.https.onCall(
           hiraMatched: checkResult.hiraMatched ?? null,
           hiraMatchLevel: checkResult.hiraMatchLevel ?? null,
           method: checkResult.method,
+          checkMethod: checkResult.checkMethod ?? checkResult.method,
         };
       }
 

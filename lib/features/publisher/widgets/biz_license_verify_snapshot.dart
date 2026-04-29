@@ -63,7 +63,9 @@ class BizLicenseVerifySnapshot {
   bool get canApplyToProfileAfterNts {
     final s = status ?? '';
     if (profileRelation == 'different_business' ||
-        profileRelation == 'unverified_existing_profile') return false;
+        profileRelation == 'unverified_existing_profile') {
+      return false;
+    }
     return s == 'verified' || s == 'provisional';
   }
 
@@ -116,11 +118,12 @@ class BizLicenseVerifySnapshot {
           return '국세청 정보상 폐업·휴업 등으로 판단되었습니다.';
         case 'nts_not_matched':
           return '등록번호에 해당하는 사업자 정보를 찾을 수 없습니다.';
+        case 'nts_validate_not_matched':
+          return '등록번호·대표자명·개업일 등이 국세청 등록정보와 일치하지 않습니다.';
         case 'ocr_failed':
           return 'OCR 단계에서 중단되어 국세청 조회를 수행하지 않았습니다.';
         case 'not_business_registration':
-          return '업로드한 이미지가 사업자등록증으로 보이지 않습니다. '
-              '국세청에서 발급한 사업자등록증 사본을 다시 올려주세요.';
+          return '등록증 정보를 충분히 읽지 못했습니다. 더 선명한 파일로 다시 시도해 주세요.';
         case 'hira_mismatch_after_grace':
           return '개원 1개월이 지났지만 심평원 등록 정보와 일치하지 않아 운영팀 검토가 필요합니다.';
         case 'hira_mismatch_opened_at_unknown':
@@ -157,6 +160,8 @@ class BizLicenseVerifySnapshot {
         return '폐업·휴업 등';
       case 'nts_not_matched':
         return '등록번호 미조회';
+      case 'nts_validate_not_matched':
+        return '국세청 진위확인 불일치';
       case 'ocr_failed':
         return '등록증 OCR 실패';
       case 'nts_api_error':
@@ -166,7 +171,7 @@ class BizLicenseVerifySnapshot {
       case 'hira_mismatch':
         return '내부 검토 필요(모의)';
       case 'not_business_registration':
-        return '사업자등록증이 아닌 이미지';
+        return '등록증 OCR 실패';
       case 'hira_mismatch_after_grace':
         return '심평원 불일치(개원 1개월 초과)';
       case 'hira_mismatch_opened_at_unknown':
@@ -187,6 +192,9 @@ class BizLicenseVerifySnapshot {
     if (m.isEmpty) return '';
     if (m == 'nts') {
       return '조회: 국세청 오픈API · 사업자등록번호만 전송';
+    }
+    if (m == 'nts_validate') {
+      return '조회: 국세청 진위확인 API · 사업자번호/대표자/개업일 전송';
     }
     if (m.startsWith('mock')) {
       return '조회: 개발용 시뮬레이션(운영은 국세청 API)';

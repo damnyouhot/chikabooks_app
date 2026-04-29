@@ -16,10 +16,18 @@ export type RunCheckStatus =
   | "manual_review"
   | "pending_auto";
 
+export type RunCheckMethod =
+  | "nts"
+  | "nts_validate"
+  | "nts_error"
+  | "server_skip"
+  | "mock";
+
 export interface RunCheckResult {
   status: RunCheckStatus;
   failReason?: string;
   method: "nts" | "mock";
+  checkMethod?: RunCheckMethod;
   /** 이미 verified였거나 검증을 건너뜀 */
   skipped?: boolean;
   /** 심평원 병원목록 대조 (보조) */
@@ -43,6 +51,12 @@ export function normalizeBizNoDigits(raw: string): string {
 interface NtsParseResult {
   valid: boolean;
   closed: boolean;
+}
+
+interface NtsValidateResult {
+  matched: boolean;
+  skipped: boolean;
+  failReason?: string;
 }
 
 /**
@@ -81,6 +95,87 @@ async function callNtsStatusApi(
     stt.includes("휴업") ||
     String(row.b_stt_cd ?? "") === "03";
   return {valid: true, closed};
+}
+
+function formatDateYmd(date: Date): string {
+  const y = String(date.getUTCFullYear()).padStart(4, "0");
+  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(date.getUTCDate()).padStart(2, "0");
+  return `${y}${m}${d}`;
+}
+
+function normalizeOpenedAtYmd(value: unknown): string {
+  if (value instanceof admin.firestore.Timestamp) {
+    return formatDateYmd(value.toDate());
+  }
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return formatDateYmd(value);
+  }
+
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+
+  const digits = raw.replace(/[^0-9]/g, "");
+  if (digits.length >= 8) {
+    return digits.slice(0, 8);
+  }
+
+  const parsed = parseOpenedAt(raw);
+  return parsed ? formatDateYmd(parsed) : "";
+}
+
+/**
+ * 국세청 오픈API — 사업자등록정보 진위확인 (validate)
+ * OCR 값이 사업자등록증 판정보다 낮은 확신도로 읽히더라도, 국세청 일치 여부를
+ * 우선 신뢰하기 위한 단계다.
+ */
+async function callNtsValidateApi(args: {
+  bizNoDigits: string;
+  openedAtRaw: unknown;
+  ownerName: string;
+  clinicName: string;
+  serviceKey: string;
+}): Promise<NtsValidateResult> {
+  const startDt = normalizeOpenedAtYmd(args.openedAtRaw);
+  const ownerName = args.ownerName.trim();
+  if (!startDt || !ownerName) {
+    return {
+      matched: false,
+      skipped: true,
+      failReason: "missing_nts_validate_fields",
+    };
+  }
+
+  const url = "https://api.odcloud.kr/api/nts-businessman/v1/validate";
+  const resp = await axios.post(
+    url,
+    {
+      businesses: [
+        {
+          b_no: args.bizNoDigits,
+          start_dt: startDt,
+          p_nm: ownerName,
+          b_nm: args.clinicName.trim(),
+        },
+      ],
+    },
+    {
+      params: {serviceKey: args.serviceKey},
+      timeout: 20000,
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+      },
+    }
+  );
+
+  const validCnt = Number(resp.data?.valid_cnt ?? 0);
+  const row = resp.data?.data?.[0];
+  const validCode = String(row?.valid ?? "");
+  return {
+    matched: validCnt > 0 || validCode === "01",
+    skipped: false,
+  };
 }
 
 async function runHiraSupplement(
@@ -167,6 +262,7 @@ function daysSince(openedAt: Date, now = new Date()): number {
 async function applyHiraDecision(args: {
   profileRef: FirebaseFirestore.DocumentReference<FirebaseFirestore.DocumentData>;
   method: "nts" | "mock";
+  checkMethod?: RunCheckMethod;
   bizNoRaw: string;
   hira: {matched: boolean | null; note: string; level: HiraMatchLevel};
   openedAtRaw: unknown;
@@ -199,7 +295,7 @@ async function applyHiraDecision(args: {
       admin.firestore.FieldValue.delete(),
     "businessVerification.lastCheckAt":
       admin.firestore.FieldValue.serverTimestamp(),
-    "businessVerification.checkMethod": args.method,
+    "businessVerification.checkMethod": args.checkMethod ?? args.method,
     "businessVerification.verifiedAt": null,
     "businessVerification.hiraMatched": args.hira.matched,
     "businessVerification.hiraNote": args.hira.note,
@@ -220,6 +316,7 @@ async function applyHiraDecision(args: {
     status,
     failReason,
     method: args.method,
+    checkMethod: args.checkMethod ?? args.method,
     hiraMatched: args.hira.matched,
     hiraNote: args.hira.note,
     hiraMatchLevel: args.hira.level,
@@ -261,6 +358,7 @@ export async function runCheckBusinessStatus(
   const bizNoRaw = String(bv.bizNo ?? ocr.bizNo ?? "").trim();
   const bizNoDigits = normalizeBizNoDigits(bizNoRaw);
   const clinicName = String(data.clinicName ?? ocr.clinicName ?? "").trim();
+  const ownerName = String(data.ownerName ?? ocr.ownerName ?? "").trim();
   const addressStr = String(data.address ?? ocr.address ?? "").trim();
   const openedAtRaw = bv.openedAt ?? ocr.openedAt ?? data.openedAt;
 
@@ -271,6 +369,8 @@ export async function runCheckBusinessStatus(
     return {
       status: bv.status as RunCheckStatus,
       method: "mock",
+      checkMethod:
+        bv.checkMethod === "nts_validate" ? "nts_validate" : undefined,
       skipped: true,
       hiraMatched:
         typeof bv.hiraMatched === "boolean" ? bv.hiraMatched : null,
@@ -293,6 +393,7 @@ export async function runCheckBusinessStatus(
       status: "manual_review",
       failReason: "missing_or_invalid_biz_no",
       method: "mock",
+      checkMethod: "server_skip",
     };
   }
 
@@ -317,6 +418,7 @@ export async function runCheckBusinessStatus(
         status: "rejected",
         failReason: "business_closed",
         method: "mock",
+        checkMethod: "mock",
       };
     }
     const hiraMock = m.hiraMismatch ?
@@ -326,6 +428,7 @@ export async function runCheckBusinessStatus(
     return applyHiraDecision({
       profileRef,
       method: "mock",
+      checkMethod: "mock",
       bizNoRaw,
       hira: hiraMock,
       openedAtRaw,
@@ -333,6 +436,32 @@ export async function runCheckBusinessStatus(
   }
 
   try {
+    const validate = await callNtsValidateApi({
+      bizNoDigits,
+      openedAtRaw,
+      ownerName,
+      clinicName,
+      serviceKey,
+    });
+    if (!validate.skipped && !validate.matched) {
+      await profileRef.update({
+        "businessVerification.status": "rejected",
+        "businessVerification.bizNo": bizNoRaw,
+        "businessVerification.failReason": "nts_validate_not_matched",
+        "businessVerification.lastCheckAt":
+          admin.firestore.FieldValue.serverTimestamp(),
+        "businessVerification.checkMethod": "nts_validate",
+        "businessVerification.verifiedAt": null,
+        "updatedAt": admin.firestore.FieldValue.serverTimestamp(),
+      });
+      return {
+        status: "rejected",
+        failReason: "nts_validate_not_matched",
+        method: "nts",
+        checkMethod: "nts_validate",
+      };
+    }
+
     const nts = await callNtsStatusApi(bizNoDigits, serviceKey);
     if (nts.closed) {
       await profileRef.update({
@@ -349,6 +478,7 @@ export async function runCheckBusinessStatus(
         status: "rejected",
         failReason: "business_closed",
         method: "nts",
+        checkMethod: "nts",
       };
     }
     if (!nts.valid) {
@@ -366,6 +496,7 @@ export async function runCheckBusinessStatus(
         status: "rejected",
         failReason: "nts_not_matched",
         method: "nts",
+        checkMethod: "nts",
       };
     }
 
@@ -377,6 +508,7 @@ export async function runCheckBusinessStatus(
     return applyHiraDecision({
       profileRef,
       method: "nts",
+      checkMethod: validate.skipped ? "nts" : "nts_validate",
       bizNoRaw,
       hira: hiraNts,
       openedAtRaw,
@@ -400,6 +532,7 @@ export async function runCheckBusinessStatus(
       status: "pending_auto",
       failReason: "nts_api_error",
       method: "nts",
+      checkMethod: "nts_error",
     };
   }
 }

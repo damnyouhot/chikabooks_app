@@ -106,11 +106,13 @@ class JobListingSmallChip extends StatelessWidget {
 class JobListingCardPremium extends StatefulWidget {
   final Job job;
   final bool hideSamplePrefix;
+  final VoidCallback? onTap;
 
   const JobListingCardPremium({
     super.key,
     required this.job,
     this.hideSamplePrefix = false,
+    this.onTap,
   });
 
   @override
@@ -132,14 +134,16 @@ class _JobListingCardPremiumState extends State<JobListingCardPremium> {
     final job = widget.job;
     final images = job.images;
     final hasMultiple = images.length > 1;
-    final title = widget.hideSamplePrefix
-        ? _stripSample(job.displayTitle)
-        : job.displayTitle;
-    final clinic = widget.hideSamplePrefix
-        ? _stripSample(job.displayClinicName)
-        : job.displayClinicName;
+    final title =
+        widget.hideSamplePrefix
+            ? _stripSample(job.displayTitle)
+            : job.displayTitle;
+    final clinic =
+        widget.hideSamplePrefix
+            ? _stripSample(job.displayClinicName)
+            : job.displayClinicName;
 
-    return Container(
+    final card = Container(
       decoration: BoxDecoration(
         color: AppColors.appBg,
         borderRadius: BorderRadius.circular(AppRadius.md),
@@ -159,25 +163,26 @@ class _JobListingCardPremiumState extends State<JobListingCardPremium> {
                 children: [
                   images.isNotEmpty
                       ? PageView.builder(
-                          controller: _imgCtrl,
-                          itemCount: images.length,
-                          onPageChanged: (i) => setState(() => _imgPage = i),
-                          itemBuilder: (_, i) => JobCoverImage(
-                            source: images[i],
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                          ),
-                        )
-                      : Container(
-                          color: AppColors.surfaceMuted,
-                          child: const Center(
-                            child: Icon(
-                              Icons.business_outlined,
-                              size: 22,
-                              color: AppColors.textDisabled,
+                        controller: _imgCtrl,
+                        itemCount: images.length,
+                        onPageChanged: (i) => setState(() => _imgPage = i),
+                        itemBuilder:
+                            (_, i) => JobCoverImage(
+                              source: images[i],
+                              fit: BoxFit.cover,
+                              width: double.infinity,
                             ),
+                      )
+                      : Container(
+                        color: AppColors.surfaceMuted,
+                        child: const Center(
+                          child: Icon(
+                            Icons.business_outlined,
+                            size: 22,
+                            color: AppColors.textDisabled,
                           ),
                         ),
+                      ),
                   if (hasMultiple)
                     Positioned(
                       bottom: 6,
@@ -193,9 +198,10 @@ class _JobListingCardPremiumState extends State<JobListingCardPremium> {
                             width: sel ? 12 : 5,
                             height: 5,
                             decoration: BoxDecoration(
-                              color: sel
-                                  ? AppColors.white
-                                  : AppColors.white.withValues(alpha: 0.55),
+                              color:
+                                  sel
+                                      ? AppColors.white
+                                      : AppColors.white.withValues(alpha: 0.55),
                               borderRadius: BorderRadius.circular(3),
                             ),
                           );
@@ -208,7 +214,9 @@ class _JobListingCardPremiumState extends State<JobListingCardPremium> {
                     right: 6,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 5, vertical: 2),
+                        horizontal: 5,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.black.withValues(alpha: 0.50),
                         borderRadius: BorderRadius.circular(6),
@@ -320,15 +328,25 @@ class _JobListingCardPremiumState extends State<JobListingCardPremium> {
                 Wrap(
                   spacing: 3,
                   runSpacing: 2,
-                  children: (job.tags.isNotEmpty ? job.tags : job.benefits)
-                      .take(2)
-                      .map((b) => JobListingSmallChip(label: b))
-                      .toList(),
+                  children:
+                      (job.tags.isNotEmpty ? job.tags : job.benefits)
+                          .take(2)
+                          .map((b) => JobListingSmallChip(label: b))
+                          .toList(),
                 ),
               ],
             ),
           ),
         ],
+      ),
+    );
+    if (widget.onTap == null) return card;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        onTap: widget.onTap,
+        child: card,
       ),
     );
   }
@@ -353,12 +371,12 @@ class JobListingRowRecommended extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final title = hideSamplePrefix
-        ? _stripSample(job.displayTitle)
-        : job.displayTitle;
-    final clinic = hideSamplePrefix
-        ? _stripSample(job.displayClinicName)
-        : job.displayClinicName;
+    final title =
+        hideSamplePrefix ? _stripSample(job.displayTitle) : job.displayTitle;
+    final clinic =
+        hideSamplePrefix
+            ? _stripSample(job.displayClinicName)
+            : job.displayClinicName;
     return InkWell(
       onTap: onTap,
       child: Container(
@@ -444,10 +462,11 @@ class JobListingRowRecommended extends StatelessWidget {
                     Wrap(
                       spacing: 3,
                       runSpacing: 0,
-                      children: job.tags
-                          .take(3)
-                          .map((t) => JobListingSmallChip(label: t))
-                          .toList(),
+                      children:
+                          job.tags
+                              .take(3)
+                              .map((t) => JobListingSmallChip(label: t))
+                              .toList(),
                     ),
                   ],
                 ],
@@ -491,12 +510,12 @@ class JobListingRowBasic extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final role = job.listRoleLine;
-    final title = hideSamplePrefix
-        ? _stripSample(job.displayTitle)
-        : job.displayTitle;
-    final clinic = hideSamplePrefix
-        ? _stripSample(job.displayClinicName)
-        : job.displayClinicName;
+    final title =
+        hideSamplePrefix ? _stripSample(job.displayTitle) : job.displayTitle;
+    final clinic =
+        hideSamplePrefix
+            ? _stripSample(job.displayClinicName)
+            : job.displayClinicName;
 
     return InkWell(
       onTap: onTap,

@@ -757,6 +757,7 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
           await JobDraftService.saveDraft(draftId: newId, formData: fields);
         }
       }
+      if (!mounted) return;
       context.push('/post-job/edit/$newId', extra: {'sourceType': 'copy'});
     } catch (_) {
       if (mounted) {
@@ -796,6 +797,7 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
       if (fields.isNotEmpty) {
         await JobDraftService.saveDraft(draftId: newId, formData: fields);
       }
+      if (!mounted) return;
       context.push('/post-job/edit/$newId', extra: {'sourceType': 'copy'});
     } catch (_) {
       if (mounted) {

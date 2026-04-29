@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -28,6 +27,20 @@ class WebLoginPage extends StatefulWidget {
 }
 
 class _WebLoginPageState extends State<WebLoginPage> {
+  Widget _buildClinicSide() {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      initialData: FirebaseAuth.instance.currentUser,
+      builder: (context, snapshot) {
+        final user = snapshot.data;
+        if (user != null) {
+          return _LoggedInClinicCard(user: user, nextRoute: widget.nextRoute);
+        }
+        return _ClinicLoginCard(nextRoute: widget.nextRoute);
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -53,7 +66,7 @@ class _WebLoginPageState extends State<WebLoginPage> {
                         children: [
                           _ApplicantLoginCard(nextRoute: widget.nextRoute),
                           const SizedBox(height: 20),
-                          _ClinicLoginCard(nextRoute: widget.nextRoute),
+                          _buildClinicSide(),
                         ],
                       );
                     }
@@ -66,9 +79,7 @@ class _WebLoginPageState extends State<WebLoginPage> {
                           ),
                         ),
                         const SizedBox(width: 24),
-                        Expanded(
-                          child: _ClinicLoginCard(nextRoute: widget.nextRoute),
-                        ),
+                        Expanded(child: _buildClinicSide()),
                       ],
                     );
                   },
@@ -169,6 +180,155 @@ class _WebLoginPageState extends State<WebLoginPage> {
   }
 }
 
+class _LoggedInClinicCard extends StatelessWidget {
+  const _LoggedInClinicCard({required this.user, this.nextRoute});
+
+  final User user;
+  final String? nextRoute;
+
+  @override
+  Widget build(BuildContext context) {
+    final email = user.email?.trim();
+    final displayName = user.displayName?.trim();
+    final title =
+        displayName != null && displayName.isNotEmpty
+            ? displayName
+            : email != null && email.isNotEmpty
+            ? email
+            : '로그인된 계정';
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        border: Border.all(color: AppColors.divider),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.divider.withValues(alpha: 0.25),
+            blurRadius: 30,
+            offset: const Offset(0, 20),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppColors.success.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.verified_user_outlined,
+                  color: AppColors.success,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '현재 로그인됨',
+                      style: GoogleFonts.notoSansKr(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      '치과 공고 등록 계정',
+                      style: GoogleFonts.notoSansKr(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.accent.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppColors.accent.withValues(alpha: 0.12),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.notoSansKr(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                if (email != null && email.isNotEmpty && email != title) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    email,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.notoSansKr(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          PubPrimaryButton(
+            label: '공고 등록으로 돌아가기',
+            onPressed: () => context.go(nextRoute ?? '/post-job'),
+          ),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: () => context.push('/me'),
+            icon: const Icon(Icons.account_box_outlined, size: 17),
+            label: const Text('내 정보 보기'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.accent,
+              side: BorderSide(color: AppColors.accent.withValues(alpha: 0.35)),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
+              if (context.mounted) context.go('/login');
+            },
+            child: Text(
+              '다른 계정으로 로그인',
+              style: GoogleFonts.notoSansKr(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════
 // 지원자 로그인 카드 (소셜 + 이메일)
 // ═══════════════════════════════════════════════════════════════
@@ -232,7 +392,7 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
         if (!mounted) return;
         context.go(
           status.canPost
-              ? (widget.nextRoute ?? '/post-job')
+              ? (widget.nextRoute ?? '/post-job/input')
               : '/publisher/onboarding',
         );
       } else {
@@ -498,9 +658,7 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
             '네이버로 로그인',
             _naverTapped ? AppColors.surfaceMuted : _kNaver,
             _naverTapped ? AppColors.textDisabled : AppColors.white,
-            _naverTapped
-                ? null
-                : () => setState(() => _naverTapped = true),
+            _naverTapped ? null : () => setState(() => _naverTapped = true),
             trailingLabel: '웹에서는 메일로 로그인 해야 해요',
           ),
 
@@ -511,35 +669,33 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: !_naverTapped
-                    ? null
-                    : () => setState(() {
-                        _isPasswordReset = true;
-                        _showEmailForm = false;
-                        _resetSent = false;
-                        _errorMsg = null;
-                      }),
+                onPressed:
+                    !_naverTapped
+                        ? null
+                        : () => setState(() {
+                          _isPasswordReset = true;
+                          _showEmailForm = false;
+                          _resetSent = false;
+                          _errorMsg = null;
+                        }),
                 icon: Icon(
                   Icons.lock_reset,
                   size: 15,
-                  color: _naverTapped
-                      ? AppColors.white
-                      : AppColors.textDisabled,
+                  color:
+                      _naverTapped ? AppColors.white : AppColors.textDisabled,
                 ),
                 label: Text(
                   '네이버 로그인 가입자 비밀번호 만들기',
                   style: GoogleFonts.notoSansKr(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: _naverTapped
-                        ? AppColors.white
-                        : AppColors.textDisabled,
+                    color:
+                        _naverTapped ? AppColors.white : AppColors.textDisabled,
                   ),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _naverTapped
-                      ? _kNaver
-                      : AppColors.surfaceMuted,
+                  backgroundColor:
+                      _naverTapped ? _kNaver : AppColors.surfaceMuted,
                   disabledBackgroundColor: AppColors.surfaceMuted,
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(vertical: 10),
@@ -992,7 +1148,7 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
       if (!mounted) return;
 
       if (status.canPost) {
-        context.go(widget.nextRoute ?? '/post-job');
+        context.go(widget.nextRoute ?? '/post-job/input');
       } else {
         context.go('/publisher/onboarding');
       }

@@ -50,7 +50,6 @@ class BizLicenseUploadSection extends StatefulWidget {
 }
 
 class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
-  bool _dismissed = false;
   bool _isUploading = false;
   double _uploadProgress = 0;
 
@@ -314,11 +313,11 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
           _ocrResult = empty ? null : extracted;
         });
 
-        // 사용자에게 즉시 피드백 — Gemini 가 사업자등록증이 아니라고 판정한 경우.
+        // 사용자에게 즉시 피드백 — OCR 이 사업자번호를 충분히 읽지 못한 경우.
         if (snapshot.failReason == 'not_business_registration') {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('사업자등록증으로 인식되지 않았어요. 국세청 발급 사업자등록증 사본을 올려주세요.'),
+              content: Text('등록증 정보를 충분히 읽지 못했어요. 더 선명한 파일로 다시 시도해 주세요.'),
             ),
           );
         } else if (snapshot.isDifferentBusiness ||
@@ -364,21 +363,6 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
     }
   }
 
-  void _clearResultAndNotifyParent() {
-    setState(() {
-      _ocrResult = null;
-      _verifySnapshot = null;
-      _ocrReadFailed = false;
-      _ocrEmpty = false;
-      _profileApplied = false;
-      _hydratedFromProfile = false;
-    });
-    widget.onCompleted?.call();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _maybeSeedFromPersistedProfile();
-    });
-  }
-
   Future<void> _applyOcrToProfile() async {
     if (!_canApplyToProfile) return;
     if (_ocrResult == null) return;
@@ -420,8 +404,6 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
 
   @override
   Widget build(BuildContext context) {
-    if (_dismissed) return const SizedBox.shrink();
-
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -455,25 +437,6 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
                   fontWeight: FontWeight.w700,
                   color: AppColors.textPrimary,
                 ),
-              ),
-            ),
-            IconButton(
-              onPressed: () {
-                if (widget.replacementMode &&
-                    widget.onReplacementCancel != null) {
-                  widget.onReplacementCancel!();
-                } else {
-                  setState(() => _dismissed = true);
-                }
-              },
-              icon: const Icon(Icons.close, size: 18),
-              tooltip: widget.replacementMode ? '취소' : '닫기',
-              style: IconButton.styleFrom(
-                foregroundColor: AppColors.textDisabled,
-                padding: const EdgeInsets.all(4),
-                minimumSize: const Size(32, 32),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                visualDensity: VisualDensity.compact,
               ),
             ),
           ],
@@ -532,17 +495,6 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
                 onPressed: widget.onReplacementCancel,
                 child: Text(
                   '취소',
-                  style: GoogleFonts.notoSansKr(
-                    fontSize: 12,
-                    color: AppColors.textDisabled,
-                  ),
-                ),
-              )
-            else
-              TextButton(
-                onPressed: () => setState(() => _dismissed = true),
-                child: Text(
-                  '나중에 할게요',
                   style: GoogleFonts.notoSansKr(
                     fontSize: 12,
                     color: AppColors.textDisabled,
@@ -735,17 +687,6 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
                 ),
               ),
             ),
-            if (!_hydratedFromProfile)
-              TextButton(
-                onPressed: _clearResultAndNotifyParent,
-                child: Text(
-                  '반영 안 함',
-                  style: GoogleFonts.notoSansKr(
-                    fontSize: 12,
-                    color: AppColors.textDisabled,
-                  ),
-                ),
-              ),
           ],
         ),
       ],

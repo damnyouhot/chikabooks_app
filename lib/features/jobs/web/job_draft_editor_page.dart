@@ -1275,13 +1275,15 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
       if (lower.contains('있') ||
           lower.contains('예') ||
           lower == 'true' ||
-          lower == 'yes')
+          lower == 'yes') {
         return true;
+      }
       if (lower.contains('없') ||
           lower.contains('아니') ||
           lower == 'false' ||
-          lower == 'no')
+          lower == 'no') {
         return false;
+      }
     }
     return null;
   }
@@ -1565,7 +1567,7 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
                         ? context.pop()
                         : context.go('/post-job/input'),
           ),
-          if (_selectedProfile != null) ...[
+          if (_selectedProfile?.isBlankPlaceholder == false) ...[
             const SizedBox(width: 6),
             _BranchSelectorChip(
               selected: _selectedProfile!,
@@ -1691,6 +1693,8 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
   }
 
   Widget _buildStepContent(ClinicProfile profile) {
+    final topPadding = _stepContentTopPadding(profile);
+
     // step별 스크롤 전략:
     //   step1 — 컴팩트 이미지 섹션, 외부 스크롤 최소화
     //   step2 — 공고 상세 폼, 세로 스크롤 허용
@@ -1699,7 +1703,7 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
       case 'step3':
         return SingleChildScrollView(
           controller: _formScrollController,
-          padding: const EdgeInsets.fromLTRB(24, 168, 24, 180),
+          padding: EdgeInsets.fromLTRB(24, topPadding, 24, 180),
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 720),
@@ -1711,7 +1715,7 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
       case 'step2':
         return SingleChildScrollView(
           controller: _formScrollController,
-          padding: const EdgeInsets.fromLTRB(24, 100, 24, 96),
+          padding: EdgeInsets.fromLTRB(24, topPadding, 24, 96),
           child: LayoutBuilder(
             builder: (ctx, bc) {
               final w = bc.maxWidth > 720 ? 720.0 : bc.maxWidth;
@@ -1741,10 +1745,10 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
           ),
         );
 
-      default: // step1 — 치과 사진 첨부도 상단 스티키 헤더 아래까지 충분히 스크롤
+      default: // step1 — 치과 사진 첨부: 상단 배너 높이 반영 + 세로 스크롤
         return SingleChildScrollView(
           controller: _formScrollController,
-          padding: const EdgeInsets.fromLTRB(24, 168, 24, 180),
+          padding: EdgeInsets.fromLTRB(24, topPadding, 24, 96),
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 720),
@@ -1753,6 +1757,14 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
           ),
         );
     }
+  }
+
+  double _stepContentTopPadding(ClinicProfile profile) {
+    final hasVerificationBanner = !profile.canPublishJobs;
+    final hasAiError = _aiError != null;
+    if (hasVerificationBanner && hasAiError) return 220;
+    if (hasVerificationBanner || hasAiError) return 172;
+    return 120;
   }
 
   Widget _buildStepHeader(ClinicProfile profile) {
@@ -2099,8 +2111,8 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
           onPick: _switchToBranch,
           onCreateNew: _createAndSwitchBranch,
           onDelete: _deleteBranch,
+          bottomSpacing: 18,
         ),
-        const SizedBox(height: 18),
         _buildLicenseSide(profile),
         const SizedBox(height: 24),
         PublisherClinicIdentitySection(
@@ -2294,27 +2306,34 @@ class _ClinicProfilePickerPanel extends ConsumerWidget {
     required this.onPick,
     required this.onCreateNew,
     required this.onDelete,
+    this.bottomSpacing = 0,
   });
 
   final String selectedId;
   final ValueChanged<ClinicProfile> onPick;
   final VoidCallback onCreateNew;
   final ValueChanged<ClinicProfile> onDelete;
+  final double bottomSpacing;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profilesAsync = ref.watch(clinicProfilesProvider);
     return profilesAsync.maybeWhen(
       data: (profiles) {
-        final verified = profiles.where((p) => p.canPublishJobs).toList();
+        final visibleProfiles =
+            profiles.where((p) => !p.isBlankPlaceholder).toList();
+        if (visibleProfiles.isEmpty) return const SizedBox.shrink();
+
+        final verified =
+            visibleProfiles.where((p) => p.canPublishJobs).toList();
         ClinicProfile? selected;
-        for (final p in profiles) {
+        for (final p in visibleProfiles) {
           if (p.id == selectedId) {
             selected = p;
             break;
           }
         }
-        return Container(
+        final panel = Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: AppColors.white,
@@ -2340,8 +2359,10 @@ class _ClinicProfilePickerPanel extends ConsumerWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          profiles.length > 1
+                          visibleProfiles.length > 1
                               ? '인증된 치과가 여러 개면 이 공고에 적용할 치과를 선택하세요.'
+                              : visibleProfiles.isEmpty
+                              ? '등록증 확인을 시작하면 이 공고에 사용할 치과 정보가 채워져요.'
                               : '기존 인증 치과가 있으면 새 공고와 복사 공고에 자동 적용돼요.',
                           style: GoogleFonts.notoSansKr(
                             fontSize: 12,
@@ -2360,13 +2381,13 @@ class _ClinicProfilePickerPanel extends ConsumerWidget {
                   ),
                 ],
               ),
-              if (profiles.isNotEmpty) ...[
+              if (visibleProfiles.isNotEmpty) ...[
                 const SizedBox(height: 14),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    for (final p in profiles)
+                    for (final p in visibleProfiles)
                       _ClinicChoiceChip(
                         profile: p,
                         selected: p.id == selectedId,
@@ -2389,6 +2410,11 @@ class _ClinicProfilePickerPanel extends ConsumerWidget {
               ],
             ],
           ),
+        );
+        if (bottomSpacing <= 0) return panel;
+        return Padding(
+          padding: EdgeInsets.only(bottom: bottomSpacing),
+          child: panel,
         );
       },
       orElse: () => const SizedBox.shrink(),
@@ -2719,7 +2745,7 @@ class _BranchSelectorChip extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final profilesAsync = ref.watch(clinicProfilesProvider);
     final profiles = profilesAsync.maybeWhen(
-      data: (list) => list,
+      data: (list) => list.where((p) => !p.isBlankPlaceholder).toList(),
       orElse: () => const <ClinicProfile>[],
     );
 

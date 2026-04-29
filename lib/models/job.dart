@@ -51,6 +51,7 @@ class Job {
   // ── 기본 정보 추가 ──────────────────────────────
   /// 학력 조건 (예: "대졸 이상", "무관")
   final String education;
+
   /// 모집 직종 목록 (복수 직종 모집 시 사용)
   final List<String> hireRoles;
 
@@ -59,11 +60,13 @@ class Job {
   final String? hospitalType;
   final int? chairCount;
   final int? staffCount;
+
   /// 진료과목 태그 (임플란트, 교정 등)
   final List<String> specialties;
   final bool? hasOralScanner;
   final bool? hasCT;
   final bool? has3DPrinter;
+
   /// 기타 디지털 장비 자유 입력 텍스트
   final String? digitalEquipmentRaw;
 
@@ -77,6 +80,7 @@ class Job {
   /// online | phone | email (복수 선택)
   final List<String> applyMethod;
   final bool isAlwaysHiring;
+
   /// 제출 서류 목록
   final List<String> requiredDocuments;
 
@@ -85,6 +89,7 @@ class Job {
 
   // ── 교통편 (3.4) ────────────────────────────────
   final TransportationInfo? transportation;
+
   /// 필터용 최상위 배열 (transportation.subwayLines와 동일값)
   final List<String> subwayLines;
   final bool hasParking;
@@ -256,14 +261,12 @@ class Job {
       address = (json['address'] as String?)?.trim() ?? '';
     }
 
-    final salaryRaw = (json['salaryText'] ?? json['salary'] ?? '').toString().trim();
+    final salaryRaw =
+        (json['salaryText'] ?? json['salary'] ?? '').toString().trim();
     var range = _parseSalaryRange(json['salaryRange']);
     final smin = json['salaryMin'];
     final smax = json['salaryMax'];
-    if (range[0] == 0 &&
-        range[1] == 0 &&
-        smin is num &&
-        smax is num) {
+    if (range[0] == 0 && range[1] == 0 && smin is num && smax is num) {
       range = [smin.toInt(), smax.toInt()];
     }
     if (range[0] == 0 && range[1] == 0 && salaryRaw.isNotEmpty) {
@@ -279,20 +282,20 @@ class Job {
 
     final detailsRaw = (json['details'] as String?)?.trim() ?? '';
     final description = (json['description'] as String?)?.trim() ?? '';
-    final resolvedDetails =
-        detailsRaw.isNotEmpty ? detailsRaw : description;
+    final resolvedDetails = detailsRaw.isNotEmpty ? detailsRaw : description;
 
     final emp = (json['employmentType'] as String?)?.trim() ?? '';
 
     // ── 교통편 ──
     final transRaw = json['transportation'];
-    final TransportationInfo? trans = transRaw is Map<String, dynamic>
-        ? TransportationInfo.fromJson(transRaw)
-        : null;
+    final TransportationInfo? trans =
+        transRaw is Map<String, dynamic>
+            ? TransportationInfo.fromJson(transRaw)
+            : null;
 
     // isNearStation: 명시 값 우선, 없으면 transportation 기반 자동 판정
-    final bool nearStation = (json['isNearStation'] as bool?) ??
-        (trans?.isNearStation ?? false);
+    final bool nearStation =
+        (json['isNearStation'] as bool?) ?? (trans?.isNearStation ?? false);
 
     return Job(
       id: docId ?? (json['id'] as String? ?? ''),
@@ -314,7 +317,7 @@ class Job {
       details: resolvedDetails,
       benefits: List<String>.from(json['benefits'] ?? []),
       images: List<String>.from(json['images'] ?? []),
-      jobLevel: (json['jobLevel'] as int?) ?? 3,
+      jobLevel: _resolveJobLevel(json),
       matchScore: (json['matchScore'] as int?) ?? 0,
       isNearStation: nearStation,
       closingDate: closing,
@@ -348,7 +351,9 @@ class Job {
       // 태그
       tags: List<String>.from(json['tags'] ?? []),
       // 홍보 이미지
-      promotionalImageUrls: List<String>.from(json['promotionalImageUrls'] ?? []),
+      promotionalImageUrls: List<String>.from(
+        json['promotionalImageUrls'] ?? [],
+      ),
       // 광고
       adStartAt: parseTs(json['adStartAt']),
       adEndAt: parseTs(json['adEndAt']),
@@ -366,6 +371,33 @@ class Job {
     return [0, 0];
   }
 
+  static int _resolveJobLevel(Map<String, dynamic> json) {
+    final explicit = (json['jobLevel'] as num?)?.toInt();
+    if (explicit == 1 || explicit == 2 || explicit == 3) return explicit!;
+
+    final tier =
+        (json['productTier'] ?? json['tier'] ?? '')
+            .toString()
+            .trim()
+            .toLowerCase();
+    switch (tier) {
+      case 'premium':
+      case 'a':
+      case 'a_class':
+        return 1;
+      case 'standard':
+      case 'b':
+      case 'b_class':
+        return 2;
+      case 'basic':
+      case 'c':
+      case 'c_class':
+        return 3;
+      default:
+        return 3;
+    }
+  }
+
   /// 급여 문자열에서 만원 단위 숫자 범위 추정 (예: "250~300만", "월 280")
   static List<int> _inferSalaryRangeFromText(String raw) {
     final s = raw.replaceAll(RegExp(r'\s'), '');
@@ -375,10 +407,10 @@ class Job {
     if (m != null) {
       return [int.parse(m.group(1)!), int.parse(m.group(2)!)];
     }
-    final nums = RegExp(r'\d{2,4}')
-        .allMatches(s)
-        .map((x) => int.parse(x.group(0)!))
-        .toList();
+    final nums =
+        RegExp(
+          r'\d{2,4}',
+        ).allMatches(s).map((x) => int.parse(x.group(0)!)).toList();
     if (nums.length >= 2) return [nums[0], nums[1]];
     if (nums.length == 1) return [nums[0], nums[0]];
     return [0, 0];
@@ -410,12 +442,10 @@ class Job {
   String get workDaysSummary {
     if (workDays.isEmpty) return '';
     const weekdayOrder = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-    final sorted = List<String>.from(workDays)
-      ..sort((a, b) =>
-          weekdayOrder.indexOf(a).compareTo(weekdayOrder.indexOf(b)));
-    final labels = sorted
-        .map((d) => workDayLabels[d] ?? d)
-        .toList();
+    final sorted = List<String>.from(workDays)..sort(
+      (a, b) => weekdayOrder.indexOf(a).compareTo(weekdayOrder.indexOf(b)),
+    );
+    final labels = sorted.map((d) => workDayLabels[d] ?? d).toList();
 
     if (_isConsecutiveRange(sorted, weekdayOrder)) {
       return '${labels.first}~${labels.last}';
@@ -440,66 +470,62 @@ class Job {
   };
 
   Map<String, dynamic> toJson() => {
-        'title': title,
-        'clinicName': clinicName,
-        'location': {
-          'address': address,
-          'lat': lat,
-          'lng': lng,
-        },
-        'district': district,
-        'type': type,
-        'career': career,
-        'salaryRange': salaryRange,
-        'salaryText': salaryText,
-        'employmentType': employmentType,
-        'workHours': workHours,
-        'contact': contact,
-        if (status != null) 'status': status,
-        'postedAt': Timestamp.fromDate(postedAt),
-        'details': details,
-        'benefits': benefits,
-        'images': images,
-        'jobLevel': jobLevel,
-        'matchScore': matchScore,
-        'isNearStation': isNearStation,
-        if (closingDate != null)
-          'closingDate': Timestamp.fromDate(closingDate!),
-        'canApplyNow': canApplyNow,
-        // 기본 정보 추가
-        if (education.isNotEmpty) 'education': education,
-        if (hireRoles.isNotEmpty) 'hireRoles': hireRoles,
-        // 병원 정보
-        if (hospitalType != null) 'hospitalType': hospitalType,
-        if (chairCount != null) 'chairCount': chairCount,
-        if (staffCount != null) 'staffCount': staffCount,
-        if (specialties.isNotEmpty) 'specialties': specialties,
-        if (hasOralScanner != null) 'hasOralScanner': hasOralScanner,
-        if (hasCT != null) 'hasCT': hasCT,
-        if (has3DPrinter != null) 'has3DPrinter': has3DPrinter,
-        if (digitalEquipmentRaw != null && digitalEquipmentRaw!.isNotEmpty)
-          'digitalEquipmentRaw': digitalEquipmentRaw,
-        // 근무 조건
-        if (workDays.isNotEmpty) 'workDays': workDays,
-        'weekendWork': weekendWork,
-        'nightShift': nightShift,
-        // 지원 관련
-        if (applyMethod.isNotEmpty) 'applyMethod': applyMethod,
-        'isAlwaysHiring': isAlwaysHiring,
-        if (requiredDocuments.isNotEmpty) 'requiredDocuments': requiredDocuments,
-        // 담당 업무
-        if (mainDutiesList.isNotEmpty) 'mainDutiesList': mainDutiesList,
-        // 교통편
-        if (transportation != null) 'transportation': transportation!.toJson(),
-        if (subwayLines.isNotEmpty) 'subwayLines': subwayLines,
-        'hasParking': hasParking,
-        // 태그
-        if (tags.isNotEmpty) 'tags': tags,
-        // 홍보 이미지
-        if (promotionalImageUrls.isNotEmpty) 'promotionalImageUrls': promotionalImageUrls,
-        // 광고
-        if (adStartAt != null) 'adStartAt': Timestamp.fromDate(adStartAt!),
-        if (adEndAt != null) 'adEndAt': Timestamp.fromDate(adEndAt!),
-        if (priorityScore != 0) 'priorityScore': priorityScore,
-      };
+    'title': title,
+    'clinicName': clinicName,
+    'location': {'address': address, 'lat': lat, 'lng': lng},
+    'district': district,
+    'type': type,
+    'career': career,
+    'salaryRange': salaryRange,
+    'salaryText': salaryText,
+    'employmentType': employmentType,
+    'workHours': workHours,
+    'contact': contact,
+    if (status != null) 'status': status,
+    'postedAt': Timestamp.fromDate(postedAt),
+    'details': details,
+    'benefits': benefits,
+    'images': images,
+    'jobLevel': jobLevel,
+    'matchScore': matchScore,
+    'isNearStation': isNearStation,
+    if (closingDate != null) 'closingDate': Timestamp.fromDate(closingDate!),
+    'canApplyNow': canApplyNow,
+    // 기본 정보 추가
+    if (education.isNotEmpty) 'education': education,
+    if (hireRoles.isNotEmpty) 'hireRoles': hireRoles,
+    // 병원 정보
+    if (hospitalType != null) 'hospitalType': hospitalType,
+    if (chairCount != null) 'chairCount': chairCount,
+    if (staffCount != null) 'staffCount': staffCount,
+    if (specialties.isNotEmpty) 'specialties': specialties,
+    if (hasOralScanner != null) 'hasOralScanner': hasOralScanner,
+    if (hasCT != null) 'hasCT': hasCT,
+    if (has3DPrinter != null) 'has3DPrinter': has3DPrinter,
+    if (digitalEquipmentRaw != null && digitalEquipmentRaw!.isNotEmpty)
+      'digitalEquipmentRaw': digitalEquipmentRaw,
+    // 근무 조건
+    if (workDays.isNotEmpty) 'workDays': workDays,
+    'weekendWork': weekendWork,
+    'nightShift': nightShift,
+    // 지원 관련
+    if (applyMethod.isNotEmpty) 'applyMethod': applyMethod,
+    'isAlwaysHiring': isAlwaysHiring,
+    if (requiredDocuments.isNotEmpty) 'requiredDocuments': requiredDocuments,
+    // 담당 업무
+    if (mainDutiesList.isNotEmpty) 'mainDutiesList': mainDutiesList,
+    // 교통편
+    if (transportation != null) 'transportation': transportation!.toJson(),
+    if (subwayLines.isNotEmpty) 'subwayLines': subwayLines,
+    'hasParking': hasParking,
+    // 태그
+    if (tags.isNotEmpty) 'tags': tags,
+    // 홍보 이미지
+    if (promotionalImageUrls.isNotEmpty)
+      'promotionalImageUrls': promotionalImageUrls,
+    // 광고
+    if (adStartAt != null) 'adStartAt': Timestamp.fromDate(adStartAt!),
+    if (adEndAt != null) 'adEndAt': Timestamp.fromDate(adEndAt!),
+    if (priorityScore != 0) 'priorityScore': priorityScore,
+  };
 }
