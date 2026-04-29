@@ -27,7 +27,7 @@ class AdminDashboardPage extends StatefulWidget {
 
 class _AdminDashboardPageState extends State<AdminDashboardPage> {
   // ── 기간 필터 ──────────────────────────────────────────────────
-  _Period _period = _Period.week;
+  _Period _period = _Period.today;
 
   DateTime get _since {
     final now = DateTime.now();

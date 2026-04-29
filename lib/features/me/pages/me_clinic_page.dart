@@ -54,9 +54,114 @@ class _MeClinicPageState extends ConsumerState<MeClinicPage> {
     if (!mounted) return;
     await showDialog(
       context: context,
-      builder: (_) => _EditBranchDialog(
-        initial: profile,
-        isNew: isNew,
+      builder: (_) => _EditBranchDialog(initial: profile, isNew: isNew),
+    );
+  }
+
+  Future<bool?> _showImpactConfirmDialog({
+    required String title,
+    required String message,
+    required String detail,
+    required String confirmLabel,
+  }) {
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder:
+          (ctx) => AlertDialog(
+            title: Text(title),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(message),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withOpacity(0.10),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    border: Border.all(
+                      color: AppColors.warning.withOpacity(0.35),
+                    ),
+                  ),
+                  child: Text(
+                    detail,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      height: 1.45,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('취소'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.error,
+                  foregroundColor: AppColors.white,
+                ),
+                child: Text(confirmLabel),
+              ),
+            ],
+          ),
+    );
+  }
+
+  Future<void> _deleteBranch(ClinicProfile profile) async {
+    final ok = await _showImpactConfirmDialog(
+      title: '병원 정보를 삭제할까요?',
+      message:
+          '"${profile.effectiveName.isEmpty ? '이름 없음' : profile.effectiveName}" 병원 정보를 삭제합니다.',
+      detail:
+          '이 병원으로 작성 중인 공고와 이미 올린 공고의 인증 연결이 영향을 받을 수 있어요. '
+          '삭제 후에는 게시·수정 전에 병원 정보를 다시 선택하고 사업자 인증을 다시 받아야 합니다.',
+      confirmLabel: '삭제하기',
+    );
+    if (ok != true || !mounted) return;
+
+    final deleted = await ClinicProfileService.deleteProfile(profile.id);
+    if (!mounted) return;
+    if (!deleted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('병원 정보 삭제에 실패했습니다.')));
+      return;
+    }
+    if (ref.read(meActiveBranchProvider) == profile.id) {
+      ref.read(meActiveBranchProvider.notifier).set(null);
+    }
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('병원 정보를 삭제했습니다.')));
+  }
+
+  Future<void> _clearBusinessVerification(ClinicProfile profile) async {
+    final ok = await _showImpactConfirmDialog(
+      title: '사업자 인증 정보를 삭제할까요?',
+      message:
+          '"${profile.effectiveName.isEmpty ? '이름 없음' : profile.effectiveName}"의 사업자 인증 정보를 삭제합니다.',
+      detail:
+          '작성 중인 공고와 이미 올린 공고가 이 인증 상태를 참조합니다. '
+          '삭제하면 게시 가능 상태가 해제되고, 게시·수정 전에 사업자등록증을 다시 올려 재인증해야 합니다.',
+      confirmLabel: '인증 삭제',
+    );
+    if (ok != true || !mounted) return;
+
+    final cleared = await ClinicProfileService.clearBusinessVerification(
+      profile.id,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(cleared ? '사업자 인증 정보를 삭제했습니다.' : '인증 정보 삭제에 실패했습니다.'),
       ),
     );
   }
@@ -69,30 +174,34 @@ class _MeClinicPageState extends ConsumerState<MeClinicPage> {
       title: '병원 정보',
       activeMenuId: 'clinic',
       child: asyncProfiles.when(
-        loading: () => const Padding(
-          padding: EdgeInsets.symmetric(vertical: 60),
-          child: Center(child: CircularProgressIndicator()),
-        ),
-        error: (error, _) => _LoadErrorState(error: error),
-        data: (profiles) => Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _IntroPanel(branchCount: profiles.length),
-            const SizedBox(height: AppSpacing.lg),
-            _AddBranchButton(
-              onPressed: _creating ? null : _addBranch,
-              loading: _creating,
+        loading:
+            () => const Padding(
+              padding: EdgeInsets.symmetric(vertical: 60),
+              child: Center(child: CircularProgressIndicator()),
             ),
-            const SizedBox(height: AppSpacing.lg),
-            if (profiles.isEmpty)
-              _EmptyState(onAdd: _creating ? null : _addBranch)
-            else
-              _BranchGrid(
-                profiles: profiles,
-                onEdit: (id) => _openEditor(id),
-              ),
-          ],
-        ),
+        error: (error, _) => _LoadErrorState(error: error),
+        data:
+            (profiles) => Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _IntroPanel(branchCount: profiles.length),
+                const SizedBox(height: AppSpacing.lg),
+                _AddBranchButton(
+                  onPressed: _creating ? null : _addBranch,
+                  loading: _creating,
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                if (profiles.isEmpty)
+                  _EmptyState(onAdd: _creating ? null : _addBranch)
+                else
+                  _BranchGrid(
+                    profiles: profiles,
+                    onEdit: (id) => _openEditor(id),
+                    onDelete: _deleteBranch,
+                    onClearBusinessVerification: _clearBusinessVerification,
+                  ),
+              ],
+            ),
       ),
     );
   }
@@ -114,8 +223,11 @@ class _IntroPanel extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.local_hospital_outlined,
-              color: AppColors.onCardPrimary, size: 24),
+          const Icon(
+            Icons.local_hospital_outlined,
+            color: AppColors.onCardPrimary,
+            size: 24,
+          ),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
@@ -156,13 +268,14 @@ class _AddBranchButton extends StatelessWidget {
       width: double.infinity,
       child: OutlinedButton.icon(
         onPressed: onPressed,
-        icon: loading
-            ? const SizedBox(
-                width: 14,
-                height: 14,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : const Icon(Icons.add, size: 18),
+        icon:
+            loading
+                ? const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+                : const Icon(Icons.add, size: 18),
         label: Text(loading ? '지점 추가 중...' : '지점 추가하기'),
         style: OutlinedButton.styleFrom(
           padding: const EdgeInsets.symmetric(vertical: 14),
@@ -179,10 +292,17 @@ class _AddBranchButton extends StatelessWidget {
 
 // ── 지점 카드 그리드 ────────────────────────────────────
 class _BranchGrid extends ConsumerWidget {
-  const _BranchGrid({required this.profiles, required this.onEdit});
+  const _BranchGrid({
+    required this.profiles,
+    required this.onEdit,
+    required this.onDelete,
+    required this.onClearBusinessVerification,
+  });
 
   final List<ClinicProfile> profiles;
   final void Function(String id) onEdit;
+  final ValueChanged<ClinicProfile> onDelete;
+  final ValueChanged<ClinicProfile> onClearBusinessVerification;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -192,17 +312,22 @@ class _BranchGrid extends ConsumerWidget {
     final highlightActive = profiles.length > 1 && activeBranchId != null;
     return LayoutBuilder(
       builder: (context, constraints) {
-        final cards = profiles
-            .map((p) => _BranchCard(
-                  profile: p,
-                  onEdit: () => onEdit(p.id),
-                  isActive: highlightActive && p.id == activeBranchId,
-                ))
-            .toList();
+        final cards =
+            profiles
+                .map(
+                  (p) => _BranchCard(
+                    profile: p,
+                    onEdit: () => onEdit(p.id),
+                    onDelete: () => onDelete(p),
+                    onClearBusinessVerification:
+                        () => onClearBusinessVerification(p),
+                    isActive: highlightActive && p.id == activeBranchId,
+                  ),
+                )
+                .toList();
         // [옵션 A] 지점 1개면 풀폭 1-column. 2개 이상 + wide(>=640) 면 2-column.
         // 그 외는 1-column.
-        final useTwoColumn =
-            cards.length >= 2 && constraints.maxWidth >= 640;
+        final useTwoColumn = cards.length >= 2 && constraints.maxWidth >= 640;
         if (!useTwoColumn) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -246,11 +371,15 @@ class _BranchCard extends StatelessWidget {
   const _BranchCard({
     required this.profile,
     required this.onEdit,
+    required this.onDelete,
+    required this.onClearBusinessVerification,
     required this.isActive,
   });
 
   final ClinicProfile profile;
   final VoidCallback onEdit;
+  final VoidCallback onDelete;
+  final VoidCallback onClearBusinessVerification;
 
   /// 헤더 "보기 기준" 드롭다운에서 이 지점이 선택돼 있을 때 true.
   /// (다지점 + 특정 지점 선택 상황에서만 true; 1지점/전체합산 모드에선 항상 false)
@@ -267,23 +396,23 @@ class _BranchCard extends StatelessWidget {
           color: isActive ? AppColors.accent : AppColors.divider,
           width: isActive ? 1.5 : 1,
         ),
-        boxShadow: isActive
-            ? [
-                BoxShadow(
-                  color: AppColors.accent.withOpacity(0.10),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
-                ),
-              ]
-            : null,
+        boxShadow:
+            isActive
+                ? [
+                  BoxShadow(
+                    color: AppColors.accent.withOpacity(0.10),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+                : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (isActive) ...[
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 color: AppColors.accent.withOpacity(0.10),
                 borderRadius: BorderRadius.circular(AppRadius.full),
@@ -291,8 +420,11 @@ class _BranchCard extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: const [
-                  Icon(Icons.visibility_outlined,
-                      size: 11, color: AppColors.accent),
+                  Icon(
+                    Icons.visibility_outlined,
+                    size: 11,
+                    color: AppColors.accent,
+                  ),
                   SizedBox(width: 4),
                   Text(
                     '지금 보고 있는 지점',
@@ -327,7 +459,9 @@ class _BranchCard extends StatelessWidget {
                       Text(
                         '공식 상호: ${profile.clinicName}',
                         style: WebTypo.caption(
-                            color: AppColors.textSecondary, size: 11.5),
+                          color: AppColors.textSecondary,
+                          size: 11.5,
+                        ),
                       ),
                     ],
                   ],
@@ -343,7 +477,9 @@ class _BranchCard extends StatelessWidget {
             _MetaRow(icon: Icons.phone_outlined, text: profile.phone),
           if (profile.ownerName.isNotEmpty)
             _MetaRow(
-                icon: Icons.person_outline, text: '대표 ${profile.ownerName}'),
+              icon: Icons.person_outline,
+              text: '대표 ${profile.ownerName}',
+            ),
           if (profile.address.isEmpty &&
               profile.phone.isEmpty &&
               profile.ownerName.isEmpty)
@@ -352,18 +488,39 @@ class _BranchCard extends StatelessWidget {
               child: Text(
                 '아직 주소·연락처가 비어 있어요. 정보를 채워주세요.',
                 style: WebTypo.caption(
-                    color: AppColors.textSecondary, size: 12),
+                  color: AppColors.textSecondary,
+                  size: 12,
+                ),
               ),
             ),
           const SizedBox(height: AppSpacing.md),
-          Row(
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: [
               OutlinedButton.icon(
                 onPressed: onEdit,
                 icon: const Icon(Icons.edit_outlined, size: 16),
                 label: const Text('수정'),
               ),
-              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                onPressed: onDelete,
+                icon: const Icon(Icons.delete_outline, size: 16),
+                label: const Text('삭제'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.error,
+                  side: BorderSide(color: AppColors.error.withOpacity(0.45)),
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: onClearBusinessVerification,
+                icon: const Icon(Icons.gpp_maybe_outlined, size: 16),
+                label: const Text('인증 삭제'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.error,
+                  side: BorderSide(color: AppColors.error.withOpacity(0.45)),
+                ),
+              ),
               if (!profile.canPublishJobs)
                 FilledButton.icon(
                   onPressed: () => context.go('/me/verify'),
@@ -373,7 +530,9 @@ class _BranchCard extends StatelessWidget {
                     backgroundColor: AppColors.accent,
                     foregroundColor: AppColors.white,
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 10),
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
                   ),
                 ),
             ],
@@ -402,8 +561,9 @@ class _MetaRow extends StatelessWidget {
           Expanded(
             child: Text(
               text,
-              style: WebTypo.body(color: AppColors.textPrimary)
-                  .copyWith(fontSize: 12.5, height: 1.45),
+              style: WebTypo.body(
+                color: AppColors.textPrimary,
+              ).copyWith(fontSize: 12.5, height: 1.45),
             ),
           ),
         ],
@@ -421,35 +581,35 @@ class _VerifyBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final (label, color, icon) = switch (status) {
       BizVerificationStatus.verified => (
-          '인증 완료',
-          AppColors.success,
-          Icons.verified
-        ),
+        '인증 완료',
+        AppColors.success,
+        Icons.verified,
+      ),
       BizVerificationStatus.provisional => (
-          '조건부 승인',
-          AppColors.accent,
-          Icons.task_alt_outlined
-        ),
+        '조건부 승인',
+        AppColors.accent,
+        Icons.task_alt_outlined,
+      ),
       BizVerificationStatus.pendingAuto => (
-          '인증 진행중',
-          AppColors.warning,
-          Icons.hourglass_bottom_outlined
-        ),
+        '인증 진행중',
+        AppColors.warning,
+        Icons.hourglass_bottom_outlined,
+      ),
       BizVerificationStatus.manualReview => (
-          '운영팀 검토중',
-          AppColors.warning,
-          Icons.support_agent_outlined
-        ),
+        '운영팀 검토중',
+        AppColors.warning,
+        Icons.support_agent_outlined,
+      ),
       BizVerificationStatus.rejected => (
-          '인증 거절',
-          AppColors.error,
-          Icons.error_outline
-        ),
+        '인증 거절',
+        AppColors.error,
+        Icons.error_outline,
+      ),
       BizVerificationStatus.none => (
-          '미인증',
-          AppColors.textSecondary,
-          Icons.shield_outlined
-        ),
+        '미인증',
+        AppColors.textSecondary,
+        Icons.shield_outlined,
+      ),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -493,11 +653,16 @@ class _EmptyState extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Icon(Icons.local_hospital_outlined,
-              size: 40, color: AppColors.textSecondary.withOpacity(0.6)),
+          Icon(
+            Icons.local_hospital_outlined,
+            size: 40,
+            color: AppColors.textSecondary.withOpacity(0.6),
+          ),
           const SizedBox(height: 12),
-          Text('아직 등록된 지점이 없어요',
-              style: WebTypo.sectionTitle(color: AppColors.textPrimary)),
+          Text(
+            '아직 등록된 지점이 없어요',
+            style: WebTypo.sectionTitle(color: AppColors.textPrimary),
+          ),
           const SizedBox(height: 6),
           Text(
             '첫 번째 지점을 등록하고 인증을 완료하면 공고를 발행할 수 있습니다.',
@@ -511,8 +676,7 @@ class _EmptyState extends StatelessWidget {
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.accent,
               foregroundColor: AppColors.white,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
             ),
           ),
         ],
@@ -546,13 +710,14 @@ class _LoadErrorState extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Icon(Icons.error_outline,
-              size: 36, color: AppColors.textSecondary.withOpacity(0.7)),
+          Icon(
+            Icons.error_outline,
+            size: 36,
+            color: AppColors.textSecondary.withOpacity(0.7),
+          ),
           const SizedBox(height: 10),
           Text(
-            permission
-                ? '병원 정보를 불러올 권한이 없습니다'
-                : '병원 정보를 불러오지 못했습니다',
+            permission ? '병원 정보를 불러올 권한이 없습니다' : '병원 정보를 불러오지 못했습니다',
             style: WebTypo.sectionTitle(color: AppColors.textPrimary),
           ),
           const SizedBox(height: 6),
@@ -635,13 +800,13 @@ class _EditBranchDialogState extends State<_EditBranchDialog> {
     setState(() => _saving = false);
     if (ok) {
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('지점 정보를 저장했습니다.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('지점 정보를 저장했습니다.')));
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('저장에 실패했습니다.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('저장에 실패했습니다.')));
     }
   }
 
@@ -668,11 +833,7 @@ class _EditBranchDialogState extends State<_EditBranchDialog> {
                 hint: '예: 의료법인 미소가득의료재단 미소가득치과의원',
               ),
               const SizedBox(height: 12),
-              _Field(
-                label: '주소',
-                controller: _address,
-                hint: '서울특별시 강남구 ...',
-              ),
+              _Field(label: '주소', controller: _address, hint: '서울특별시 강남구 ...'),
               const SizedBox(height: 12),
               _Field(label: '대표자명', controller: _ownerName),
               const SizedBox(height: 12),
@@ -687,7 +848,9 @@ class _EditBranchDialogState extends State<_EditBranchDialog> {
                 '※ 노출명과 공식 상호를 분리해서 관리할 수 있습니다.\n'
                 '   노출명만 비워두면 공식 상호로 표시됩니다.',
                 style: WebTypo.caption(
-                    color: AppColors.textSecondary, size: 11.5),
+                  color: AppColors.textSecondary,
+                  size: 11.5,
+                ),
               ),
             ],
           ),
@@ -729,9 +892,10 @@ class _Field extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: const TextStyle(
-                fontSize: 12, fontWeight: FontWeight.w700)),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+        ),
         const SizedBox(height: 6),
         TextField(
           controller: controller,
@@ -742,8 +906,10 @@ class _Field extends StatelessWidget {
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppRadius.md),
             ),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 10,
+            ),
           ),
         ),
       ],

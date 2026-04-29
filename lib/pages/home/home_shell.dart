@@ -12,6 +12,7 @@ import '../onboarding/onboarding_profile_screen.dart';
 import '../../services/user_profile_service.dart';
 import '../../services/admin_activity_service.dart';
 import '../../services/ebook_service.dart';
+import '../../services/content_read_state_service.dart';
 import '../../features/onboarding/app_onboarding_controller.dart';
 import '../../features/onboarding/app_onboarding_overlay.dart';
 import '../../features/feedback/widgets/feedback_fab.dart';
@@ -40,6 +41,18 @@ class _HomeShellState extends State<HomeShell> {
 
   /// Bond 탭 인덱스
   static const int _bondTabIndex = 1;
+  static const Map<int, List<String>> _mainNavContentKeys = {
+    1: [ContentReadKeys.bondPolls, ContentReadKeys.seniorQuestions],
+    2: [
+      ContentReadKeys.todayQuiz,
+      ContentReadKeys.todayWords,
+      ContentReadKeys.hiraPolicyUpdates,
+      ContentReadKeys.ebooks,
+      ContentReadKeys.savedHiraUpdates,
+      ContentReadKeys.savedWords,
+    ],
+    3: [ContentReadKeys.jobs],
+  };
 
   // 탭 인덱스 → 화면 레이블 맵
   static const _tabLabels = ['나(캐릭터)', '같이(파트너)', '성장하기', '커리어'];
@@ -339,33 +352,138 @@ class _HomeShellState extends State<HomeShell> {
         ],
       ),
       // BottomNavigationBar: 색상은 AppTheme.light (bottomNavigationBarTheme)에서 고정 관리
-      bottomNavigationBar: SizedBox(
-        height: bottomNavHeight,
-        child: BottomNavigationBar(
-          currentIndex: _selectedIndex,
-          onTap: _onTap,
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline),
-              activeIcon: Icon(Icons.person),
-              label: '나',
+      bottomNavigationBar: StreamBuilder<Set<int>>(
+        stream: ContentReadStateService.watchNewIndices(_mainNavContentKeys),
+        initialData: const {},
+        builder: (context, snapshot) {
+          final newMainTabs = snapshot.data ?? const <int>{};
+
+          return SizedBox(
+            height: bottomNavHeight,
+            child: BottomNavigationBar(
+              currentIndex: _selectedIndex,
+              onTap: _onTap,
+              items: [
+                const BottomNavigationBarItem(
+                  icon: Icon(Icons.person_outline),
+                  activeIcon: Icon(Icons.person),
+                  label: '나',
+                ),
+                BottomNavigationBarItem(
+                  icon: _NavIconWithNewBadge(
+                    icon: Icons.people_outline,
+                    showNew: newMainTabs.contains(1),
+                  ),
+                  activeIcon: _NavIconWithNewBadge(
+                    icon: Icons.people,
+                    showNew: newMainTabs.contains(1),
+                  ),
+                  label: '같이',
+                ),
+                BottomNavigationBarItem(
+                  icon: _NavIconWithNewBadge(
+                    icon: Icons.menu_book_outlined,
+                    showNew: newMainTabs.contains(2),
+                  ),
+                  activeIcon: _NavIconWithNewBadge(
+                    icon: Icons.menu_book,
+                    showNew: newMainTabs.contains(2),
+                  ),
+                  label: '성장하기',
+                ),
+                BottomNavigationBarItem(
+                  icon: _NavIconWithNewBadge(
+                    icon: Icons.work_outline,
+                    showNew: newMainTabs.contains(3),
+                  ),
+                  activeIcon: _NavIconWithNewBadge(
+                    icon: Icons.work,
+                    showNew: newMainTabs.contains(3),
+                  ),
+                  label: '커리어',
+                ),
+              ],
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.people_outline),
-              activeIcon: Icon(Icons.people),
-              label: '같이',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.menu_book_outlined),
-              activeIcon: Icon(Icons.menu_book),
-              label: '성장하기',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.work_outline),
-              activeIcon: Icon(Icons.work),
-              label: '커리어',
-            ),
-          ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _NavIconWithNewBadge extends StatelessWidget {
+  const _NavIconWithNewBadge({required this.icon, required this.showNew});
+
+  final IconData icon;
+  final bool showNew;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 30,
+      height: 24,
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: [
+          Icon(icon),
+          if (showNew)
+            const Positioned(top: -7, right: -13, child: _NavNewBadge()),
+        ],
+      ),
+    );
+  }
+}
+
+class _NavNewBadge extends StatefulWidget {
+  const _NavNewBadge();
+
+  @override
+  State<_NavNewBadge> createState() => _NavNewBadgeState();
+}
+
+class _NavNewBadgeState extends State<_NavNewBadge>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _opacity;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 850),
+    )..repeat(reverse: true);
+    _opacity = Tween<double>(
+      begin: 0.45,
+      end: 1,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _opacity,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFD84D),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: const Text(
+          'NEW',
+          style: TextStyle(
+            fontSize: 8,
+            fontWeight: FontWeight.w800,
+            color: AppColors.blue,
+            letterSpacing: 0.2,
+          ),
         ),
       ),
     );

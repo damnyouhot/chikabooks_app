@@ -364,27 +364,14 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
   }
 
   Future<void> _deleteBranch(ClinicProfile profile) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder:
-          (ctx) => AlertDialog(
-            title: const Text('치과 정보를 삭제할까요?'),
-            content: Text(
-              '"${profile.effectiveName.isEmpty ? '이름 없음' : profile.effectiveName}" 정보를 삭제합니다.\n'
-              '이 치과로 작성 중인 공고는 다시 치과를 선택해야 할 수 있어요.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('취소'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                style: FilledButton.styleFrom(backgroundColor: AppColors.error),
-                child: const Text('삭제'),
-              ),
-            ],
-          ),
+    final ok = await _showImpactConfirmDialog(
+      title: '치과 정보를 삭제할까요?',
+      message:
+          '"${profile.effectiveName.isEmpty ? '이름 없음' : profile.effectiveName}" 병원 정보를 삭제합니다.',
+      detail:
+          '이 병원으로 작성 중인 공고와 이미 올린 공고의 인증 연결이 영향을 받을 수 있어요. '
+          '삭제 후에는 게시·수정 전에 병원 정보를 다시 선택하고 사업자 인증을 다시 받아야 합니다.',
+      confirmLabel: '삭제하기',
     );
     if (ok != true || !mounted) return;
 
@@ -432,6 +419,175 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('치과 정보를 삭제했습니다.')));
+  }
+
+  Future<bool?> _showImpactConfirmDialog({
+    required String title,
+    required String message,
+    required String detail,
+    required String confirmLabel,
+  }) {
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                borderRadius: BorderRadius.circular(AppPublisher.buttonRadius),
+                border: Border.all(color: AppColors.divider),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.12),
+                    blurRadius: 24,
+                    offset: const Offset(0, 12),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: AppColors.error.withValues(alpha: 0.10),
+                            borderRadius: BorderRadius.circular(
+                              AppPublisher.softRadius,
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.warning_amber_rounded,
+                            size: 20,
+                            color: AppColors.error,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                style: GoogleFonts.notoSansKr(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                message,
+                                style: GoogleFonts.notoSansKr(
+                                  fontSize: 13,
+                                  height: 1.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(
+                          AppPublisher.softRadius,
+                        ),
+                        border: Border.all(
+                          color: AppColors.warning.withValues(alpha: 0.35),
+                        ),
+                      ),
+                      child: Text(
+                        detail,
+                        style: GoogleFonts.notoSansKr(
+                          fontSize: 12,
+                          height: 1.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 22),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SizedBox(
+                            height: AppPublisher.ctaHeight,
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.textSecondary,
+                                side: const BorderSide(
+                                  color: AppColors.divider,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    AppPublisher.buttonRadius,
+                                  ),
+                                ),
+                              ),
+                              child: Text(
+                                '취소',
+                                style: GoogleFonts.notoSansKr(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: SizedBox(
+                            height: AppPublisher.ctaHeight,
+                            child: ElevatedButton(
+                              onPressed: () => Navigator.pop(ctx, true),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.error,
+                                foregroundColor: AppColors.white,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    AppPublisher.buttonRadius,
+                                  ),
+                                ),
+                              ),
+                              child: Text(
+                                confirmLabel,
+                                style: GoogleFonts.notoSansKr(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   /// 드래프트에 비어 있을 때 [ClinicProfile]로 치과명·주소·연락처 보강.
@@ -1543,7 +1699,7 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
       case 'step3':
         return SingleChildScrollView(
           controller: _formScrollController,
-          padding: const EdgeInsets.fromLTRB(24, 116, 24, 180),
+          padding: const EdgeInsets.fromLTRB(24, 168, 24, 180),
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 720),
@@ -1585,9 +1741,10 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
           ),
         );
 
-      default: // step1 — 스크롤 없이 컴팩트하게
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(24, 100, 24, 96),
+      default: // step1 — 치과 사진 첨부도 상단 스티키 헤더 아래까지 충분히 스크롤
+        return SingleChildScrollView(
+          controller: _formScrollController,
+          padding: const EdgeInsets.fromLTRB(24, 168, 24, 180),
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 720),
@@ -1749,6 +1906,41 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
     if (ok == true && mounted) {
       setState(() => _licenseReplaceMode = true);
     }
+  }
+
+  Future<bool> _clearBusinessVerification(ClinicProfile profile) async {
+    final ok = await _showImpactConfirmDialog(
+      title: '사업자 인증 정보를 삭제할까요?',
+      message:
+          '"${profile.effectiveName.isEmpty ? '이름 없음' : profile.effectiveName}"의 사업자 인증 결과를 삭제합니다.',
+      detail:
+          '작성 중인 공고와 이미 올린 공고가 이 인증 상태를 참조합니다. '
+          '삭제하면 게시 가능 상태가 해제되고, 게시·수정 전에 사업자등록증을 다시 올려 재인증해야 합니다.',
+      confirmLabel: '인증 삭제',
+    );
+    if (ok != true || !mounted) return false;
+
+    final cleared = await ClinicProfileService.clearBusinessVerification(
+      profile.id,
+    );
+    if (!mounted) return false;
+    if (!cleared) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('인증 정보 삭제에 실패했습니다.')));
+      return false;
+    }
+
+    final updated = await ClinicProfileService.getProfile(profile.id);
+    if (!mounted) return false;
+    setState(() {
+      if (updated != null) _selectedProfile = updated;
+      _licenseReplaceMode = false;
+    });
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('사업자 인증 정보를 삭제했습니다.')));
+    return true;
   }
 
   Widget _buildVerificationStickyBanner(ClinicProfile profile) {
@@ -1933,6 +2125,7 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
       replacementMode: _licenseReplaceMode,
       persistedProfile: profile,
       onReplaceLicenseWithDialog: _onTapReplaceBusinessLicense,
+      onClearBusinessVerification: () => _clearBusinessVerification(profile),
       onReplacementCancel:
           _licenseReplaceMode
               ? () {

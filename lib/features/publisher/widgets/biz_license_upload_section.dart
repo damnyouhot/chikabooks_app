@@ -29,6 +29,9 @@ class BizLicenseUploadSection extends StatefulWidget {
   /// 부모(예: 공고 에디터)에서 확인 다이얼로그 후 `replacementMode` 로 전환
   final Future<void> Function()? onReplaceLicenseWithDialog;
 
+  /// 부모에서 영향 안내 다이얼로그 후 Firestore 인증 스냅샷을 초기화
+  final Future<bool> Function()? onClearBusinessVerification;
+
   const BizLicenseUploadSection({
     super.key,
     required this.profileId,
@@ -38,6 +41,7 @@ class BizLicenseUploadSection extends StatefulWidget {
     this.onReplacementCancel,
     this.persistedProfile,
     this.onReplaceLicenseWithDialog,
+    this.onClearBusinessVerification,
   });
 
   @override
@@ -82,6 +86,22 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
     if (_ocrReadFailed || _ocrEmpty) return false;
     if (_ocrResult == null || _ocrResult!.isEmpty) return false;
     return snap.canApplyToProfileAfterNts;
+  }
+
+  Future<void> _clearPersistedVerification() async {
+    final clear = widget.onClearBusinessVerification;
+    if (clear == null) return;
+    final cleared = await clear();
+    if (!mounted) return;
+    if (!cleared) return;
+    setState(() {
+      _ocrResult = null;
+      _verifySnapshot = null;
+      _ocrReadFailed = false;
+      _ocrEmpty = false;
+      _profileApplied = false;
+      _hydratedFromProfile = false;
+    });
   }
 
   Map<String, String>? _buildOcrMapFromProfile(ClinicProfile p) {
@@ -258,8 +278,9 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
 
       // verifyBusinessLicense 는 asia-northeast3 리전에 배포되어 있음
       // (functions/src/biz-license-verify.ts).
-      final fn = FirebaseFunctions.instanceFor(region: 'asia-northeast3')
-          .httpsCallable('verifyBusinessLicense');
+      final fn = FirebaseFunctions.instanceFor(
+        region: 'asia-northeast3',
+      ).httpsCallable('verifyBusinessLicense');
       final result = await fn.call({
         'docUrl': docUrl,
         'profileId': widget.profileId,
@@ -279,7 +300,8 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
       };
 
       final empty = extracted.isEmpty;
-      final readFailed = empty &&
+      final readFailed =
+          empty &&
           (snapshot.failReason == 'ocr_failed' ||
               snapshot.failReason == 'not_business_registration' ||
               snapshot.failReason == 'image_download_failed');
@@ -296,9 +318,7 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
         if (snapshot.failReason == 'not_business_registration') {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text(
-                '사업자등록증으로 인식되지 않았어요. 국세청 발급 사업자등록증 사본을 올려주세요.',
-              ),
+              content: Text('사업자등록증으로 인식되지 않았어요. 국세청 발급 사업자등록증 사본을 올려주세요.'),
             ),
           );
         } else if (snapshot.isDifferentBusiness ||
@@ -320,9 +340,7 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
           final oldBiz = (widget.persistedProfile?.businessVerification.bizNo ??
                   '')
               .replaceAll(RegExp(r'[^0-9]'), '');
-          if (newBiz.isNotEmpty &&
-              oldBiz.isNotEmpty &&
-              newBiz != oldBiz) {
+          if (newBiz.isNotEmpty && oldBiz.isNotEmpty && newBiz != oldBiz) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 duration: const Duration(seconds: 6),
@@ -533,6 +551,25 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
               ),
           ],
         ),
+        if (widget.onClearBusinessVerification != null) ...[
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: _clearPersistedVerification,
+            icon: const Icon(Icons.delete_outline, size: 16),
+            label: Text(
+              '저장된 인증 정보 삭제',
+              style: GoogleFonts.notoSansKr(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.error,
+              padding: EdgeInsets.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -589,30 +626,65 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
         if (widget.onReplaceLicenseWithDialog != null &&
             widget.persistedProfile?.canPublishJobs == true &&
             !widget.replacementMode) ...[
-          SizedBox(
-            height: AppPublisher.ctaHeight,
-            width: double.infinity,
-            child: OutlinedButton(
-              onPressed: () async {
-                await widget.onReplaceLicenseWithDialog!.call();
-              },
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.accent,
-                side: const BorderSide(color: AppColors.accent),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(
-                    AppPublisher.buttonRadius,
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: AppPublisher.ctaHeight,
+                  child: OutlinedButton(
+                    onPressed: () async {
+                      await widget.onReplaceLicenseWithDialog!.call();
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.accent,
+                      side: const BorderSide(color: AppColors.accent),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(
+                          AppPublisher.buttonRadius,
+                        ),
+                      ),
+                    ),
+                    child: Text(
+                      '등록증 다시 올리기',
+                      style: GoogleFonts.notoSansKr(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
                 ),
               ),
-              child: Text(
-                '등록증 다시 올리기',
-                style: GoogleFonts.notoSansKr(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
+              if (widget.onClearBusinessVerification != null) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  child: SizedBox(
+                    height: AppPublisher.ctaHeight,
+                    child: OutlinedButton.icon(
+                      onPressed: _clearPersistedVerification,
+                      icon: const Icon(Icons.delete_outline, size: 16),
+                      label: Text(
+                        '인증 정보 삭제',
+                        style: GoogleFonts.notoSansKr(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.error,
+                        side: BorderSide(
+                          color: AppColors.error.withValues(alpha: 0.55),
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                            AppPublisher.buttonRadius,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ),
+              ],
+            ],
           ),
           const SizedBox(height: 12),
         ],

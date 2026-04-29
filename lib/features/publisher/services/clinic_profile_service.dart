@@ -216,6 +216,26 @@ class ClinicProfileService {
     }
   }
 
+  /// 사업자 인증 스냅샷만 초기화한다.
+  ///
+  /// 프로필 자체는 유지하되 게시 가능 상태는 해제되므로, 이 프로필로 연결된
+  /// 작성 중/게시 공고는 다음 게시·수정 전에 다시 인증을 받아야 한다.
+  static Future<bool> clearBusinessVerification(String profileId) async {
+    final uid = _uid;
+    if (uid == null || profileId.isEmpty) return false;
+    try {
+      await _col(uid).doc(profileId).update({
+        'businessVerification': const BusinessVerification().toMap(),
+        'bizRegImageUrl': FieldValue.delete(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      return true;
+    } catch (e) {
+      debugPrint('⚠️ ClinicProfileService.clearBusinessVerification: $e');
+      return false;
+    }
+  }
+
   // ── 수정 ──────────────────────────────────────────────
 
   /// 프로필 정보 수정 (businessVerification 제외 — 서버만)
