@@ -8,6 +8,7 @@ import '../core/widgets/app_muted_card.dart';
 import '../core/widgets/app_primary_card.dart';
 import '../core/widgets/glass_card.dart';
 import '../models/quiz_schedule.dart';
+import '../services/caring_treat_service.dart';
 import '../services/quiz_pool_service.dart';
 import '../widgets/quiz/quiz_share_capture.dart';
 
@@ -254,14 +255,22 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
       }
     });
 
-    // Firestore 저장 → 서버 동기화 (백업)
+    // Firestore 저장 → 서버 동기화 (백업) + 먹이 지급
     QuizPoolService.saveAnswer(
       dateKey: dateKey,
       quizId: quizId,
       selectedIndex: selectedIndex,
       allQuizIds: allIds,
       isCorrect: isCorrect,
-    ).then((_) => _loadStats());
+    ).then((outcome) async {
+      if (outcome.recordedNewAnswer) {
+        await CaringTreatService.tryGrantQuizFirstAnswer(dateKey, quizId);
+        if (outcome.isCorrect) {
+          await CaringTreatService.tryGrantQuizCorrect(dateKey, quizId);
+        }
+      }
+      if (mounted) _loadStats();
+    });
   }
 
   @override

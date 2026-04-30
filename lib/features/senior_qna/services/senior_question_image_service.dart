@@ -97,4 +97,23 @@ class SeniorQuestionImageService {
     );
     return task.ref.getDownloadURL();
   }
+
+  static Future<String?> uploadReplyImage({
+    required String questionId,
+    required String commentId,
+    required String replyId,
+    required XFile file,
+  }) async {
+    final bytes = await compress(file);
+    if (bytes == null) return null;
+    final stamp = DateTime.now().millisecondsSinceEpoch;
+    final ref = _storage.ref(
+      'seniorQuestions/$questionId/images/reply_${commentId}_${replyId}_$stamp.jpg',
+    );
+    final task = await ref.putData(
+      bytes,
+      SettableMetadata(contentType: 'image/jpeg'),
+    );
+    return task.ref.getDownloadURL();
+  }
 }

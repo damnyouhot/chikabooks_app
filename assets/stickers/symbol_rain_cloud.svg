@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <rect width="256" height="256" rx="48" fill="#EAF7FF"/>
+  <path d="M79 144 C54 144 45 111 68 96 C72 73 96 61 116 73 C134 50 174 60 178 92 C201 96 213 122 195 138 C188 144 178 146 166 146H79Z" fill="#FFFFFF" stroke="#24324B" stroke-width="8"/>
+  <path d="M91 170 L79 195 M128 170 L116 195 M165 170 L153 195" stroke="#4A9BFF" stroke-width="9" stroke-linecap="round"/>
+  <text x="128" y="226" text-anchor="middle" font-family="sans-serif" font-size="28" font-weight="800" fill="#24324B">Dl„</text>
+</svg>

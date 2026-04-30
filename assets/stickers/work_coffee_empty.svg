@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <rect width="256" height="256" rx="48" fill="#FFF8E8"/>
+  <path d="M78 88 H162 V150 C162 175 144 190 120 190 H112 C92 190 78 174 78 150Z" fill="#FFFFFF" stroke="#2B2B2B" stroke-width="8"/>
+  <path d="M162 104 H180 C198 104 198 137 162 137" fill="none" stroke="#2B2B2B" stroke-width="8" stroke-linecap="round"/>
+  <path d="M94 130 H145" stroke="#C9C9C9" stroke-width="8" stroke-linecap="round"/>
+  <path d="M96 63 C89 50 107 43 99 31 M126 63 C119 50 137 43 129 31 M156 63 C149 50 167 43 159 31" fill="none" stroke="#999999" stroke-width="6" stroke-linecap="round"/>
+  <text x="128" y="226" text-anchor="middle" font-family="sans-serif" font-size="25" font-weight="800" fill="#2B2B2B">t˜x ÆL</text>
+</svg>

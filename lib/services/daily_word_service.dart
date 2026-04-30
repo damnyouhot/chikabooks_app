@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import '../models/daily_word.dart';
+import 'caring_treat_service.dart';
 
 class DailyWordService {
   DailyWordService._();
@@ -366,6 +367,14 @@ class DailyWordService {
               ? FieldValue.serverTimestamp()
               : FieldValue.delete(),
     }, SetOptions(merge: true));
+
+    if (status == DailyWordStatus.known ||
+        status == DailyWordStatus.reviewLater) {
+      await CaringTreatService.tryGrantDailyWordPick(
+        dateKey: todayKey,
+        wordId: word.id,
+      );
+    }
   }
 
   static Future<void> setSavedWord({

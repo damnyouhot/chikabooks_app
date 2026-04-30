@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../services/user_profile_service.dart';
 import '../../../services/caring_treat_service.dart';
+import '../data/senior_stickers.dart';
 import '../models/senior_question.dart';
 import 'senior_question_image_service.dart';
 
@@ -43,12 +44,14 @@ class SeniorQuestionService {
     required String category,
     required bool isAnonymous,
     List<XFile> images = const [],
+    String? stickerId,
   }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return null;
     final trimmed = body.trim();
     if (trimmed.isEmpty || trimmed.length > maxBodyLength) return null;
     if (!categories.contains(category)) return null;
+    final normalizedStickerId = _normalizeStickerId(stickerId);
 
     try {
       final docRef = _questions.doc();
@@ -65,6 +68,7 @@ class SeniorQuestionService {
         'isAnonymous': isAnonymous,
         'body': trimmed,
         'imageUrls': imageUrls,
+        'stickerId': normalizedStickerId,
         'likeCount': 0,
         'cheerCount': 0,
         'commentCount': 0,
@@ -93,12 +97,14 @@ class SeniorQuestionService {
     required bool isAnonymous,
     bool removeImages = false,
     XFile? replacementImage,
+    String? stickerId,
   }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return false;
     final trimmed = body.trim();
     if (trimmed.isEmpty || trimmed.length > maxBodyLength) return false;
     if (!categories.contains(category)) return false;
+    final normalizedStickerId = _normalizeStickerId(stickerId);
 
     try {
       final ref = _questions.doc(questionId);
@@ -111,6 +117,7 @@ class SeniorQuestionService {
         'category': _normalizeCategory(category),
         'isAnonymous': isAnonymous,
         'authorNickname': await _nicknameForWrite(isAnonymous),
+        'stickerId': normalizedStickerId,
         'updatedAt': FieldValue.serverTimestamp(),
       };
       if (replacementImage != null) {
@@ -148,6 +155,10 @@ class SeniorQuestionService {
         'deletedAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
+      await CaringTreatService.revokeWhisperWrite(
+        contentType: 'question',
+        contentId: questionId,
+      );
       return true;
     } catch (e) {
       debugPrint('⚠️ SeniorQuestionService.deleteQuestion: $e');
@@ -158,13 +169,23 @@ class SeniorQuestionService {
   static Future<bool> toggleQuestionReaction({
     required String questionId,
     required String type,
-  }) {
+  }) async {
     final field = type == 'cheers' ? 'cheerCount' : 'likeCount';
-    return _toggleReaction(
+    final r = await _toggleReaction(
       targetRef: _questions.doc(questionId),
       reactionCollection: type,
       countField: field,
     );
+    if (r.success) {
+      final suffix = type == 'cheers' ? 'cheer' : 'like';
+      final grantKey = 'q_${questionId}_$suffix';
+      if (!r.reactionAdded) {
+        await CaringTreatService.revokeWhisperReaction(grantKey: grantKey);
+        return r.success;
+      }
+      await CaringTreatService.tryGrantWhisperReaction(grantKey: grantKey);
+    }
+    return r.success;
   }
 
   static Stream<List<SeniorComment>> watchComments(String questionId) {
@@ -187,12 +208,16 @@ class SeniorQuestionService {
     required String body,
     required bool isAnonymous,
     XFile? image,
+    String? stickerId,
   }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return false;
     final trimmed = body.trim();
     if (trimmed.length > maxCommentLength) return false;
-    if (trimmed.isEmpty && image == null) return false;
+    final normalizedStickerId = _normalizeStickerId(stickerId);
+    if (trimmed.isEmpty && image == null && normalizedStickerId == null) {
+      return false;
+    }
 
     try {
       final questionRef = _questions.doc(questionId);
@@ -206,7 +231,10 @@ class SeniorQuestionService {
                 commentId: commentRef.id,
                 file: image,
               );
-      if (trimmed.isEmpty && imageUrl == null) return false;
+      if (trimmed.isEmpty && imageUrl == null && normalizedStickerId == null) {
+        return false;
+      }
+      final storedBody = _bodyForStorage(trimmed, normalizedStickerId);
       final batch = _db.batch();
       batch.set(
         commentRef,
@@ -214,8 +242,9 @@ class SeniorQuestionService {
           uid,
           nickname,
           isAnonymous,
-          trimmed,
+          storedBody,
           imageUrl == null ? const [] : [imageUrl],
+          normalizedStickerId,
         ),
       );
       batch.update(questionRef, {'commentCount': FieldValue.increment(1)});
@@ -234,8 +263,8 @@ class SeniorQuestionService {
   static Future<bool> toggleCommentLike({
     required String questionId,
     required String commentId,
-  }) {
-    return _toggleReaction(
+  }) async {
+    final r = await _toggleReaction(
       targetRef: _questions
           .doc(questionId)
           .collection('comments')
@@ -243,6 +272,15 @@ class SeniorQuestionService {
       reactionCollection: 'likes',
       countField: 'likeCount',
     );
+    if (r.success) {
+      final grantKey = 'c_${questionId}_${commentId}_like';
+      if (!r.reactionAdded) {
+        await CaringTreatService.revokeWhisperReaction(grantKey: grantKey);
+        return r.success;
+      }
+      await CaringTreatService.tryGrantWhisperReaction(grantKey: grantKey);
+    }
+    return r.success;
   }
 
   static Stream<List<SeniorReply>> watchReplies({
@@ -264,11 +302,17 @@ class SeniorQuestionService {
     required String commentId,
     required String body,
     required bool isAnonymous,
+    XFile? image,
+    String? stickerId,
   }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return false;
     final trimmed = body.trim();
-    if (trimmed.isEmpty || trimmed.length > maxCommentLength) return false;
+    if (trimmed.length > maxCommentLength) return false;
+    final normalizedStickerId = _normalizeStickerId(stickerId);
+    if (trimmed.isEmpty && image == null && normalizedStickerId == null) {
+      return false;
+    }
 
     try {
       final commentRef = _questions
@@ -277,8 +321,31 @@ class SeniorQuestionService {
           .doc(commentId);
       final replyRef = commentRef.collection('replies').doc();
       final nickname = await _nicknameForWrite(isAnonymous);
+      final imageUrl =
+          image == null
+              ? null
+              : await SeniorQuestionImageService.uploadReplyImage(
+                questionId: questionId,
+                commentId: commentId,
+                replyId: replyRef.id,
+                file: image,
+              );
+      if (trimmed.isEmpty && imageUrl == null && normalizedStickerId == null) {
+        return false;
+      }
+      final storedBody = _bodyForStorage(trimmed, normalizedStickerId);
       final batch = _db.batch();
-      batch.set(replyRef, _replyMap(uid, nickname, isAnonymous, trimmed));
+      batch.set(
+        replyRef,
+        _replyMap(
+          uid,
+          nickname,
+          isAnonymous,
+          storedBody,
+          imageUrl == null ? const [] : [imageUrl],
+          normalizedStickerId,
+        ),
+      );
       batch.update(commentRef, {'replyCount': FieldValue.increment(1)});
       await batch.commit();
       await CaringTreatService.tryGrantWhisperWrite(
@@ -296,18 +363,27 @@ class SeniorQuestionService {
     required String questionId,
     required String commentId,
     required String replyId,
-  }) {
+  }) async {
     final replyRef = _questions
         .doc(questionId)
         .collection('comments')
         .doc(commentId)
         .collection('replies')
         .doc(replyId);
-    return _toggleReaction(
+    final r = await _toggleReaction(
       targetRef: replyRef,
       reactionCollection: 'likes',
       countField: 'likeCount',
     );
+    if (r.success) {
+      final grantKey = 'r_${questionId}_${commentId}_${replyId}_like';
+      if (!r.reactionAdded) {
+        await CaringTreatService.revokeWhisperReaction(grantKey: grantKey);
+        return r.success;
+      }
+      await CaringTreatService.tryGrantWhisperReaction(grantKey: grantKey);
+    }
+    return r.success;
   }
 
   static Future<bool> reportQuestion(String questionId) {
@@ -381,18 +457,31 @@ class SeniorQuestionService {
     return categories.contains(raw) ? raw : categories.first;
   }
 
+  static String? _normalizeStickerId(String? raw) {
+    final v = raw?.trim();
+    if (v == null || v.isEmpty) return null;
+    return v.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+  }
+
+  static String _bodyForStorage(String trimmed, String? stickerId) {
+    if (trimmed.isNotEmpty || stickerId == null) return trimmed;
+    return seniorStickerFallbackBody(stickerId);
+  }
+
   static Map<String, dynamic> _commentMap(
     String uid,
     String nickname,
     bool isAnonymous,
     String body,
     List<String> imageUrls,
+    String? stickerId,
   ) => {
     'uid': uid,
     'authorNickname': nickname,
     'isAnonymous': isAnonymous,
     'body': body,
     'imageUrls': imageUrls,
+    'stickerId': stickerId,
     'likeCount': 0,
     'replyCount': 0,
     'reportCount': 0,
@@ -477,6 +566,10 @@ class SeniorQuestionService {
       });
       batch.update(questionRef, {'commentCount': FieldValue.increment(-1)});
       await batch.commit();
+      await CaringTreatService.revokeWhisperWrite(
+        contentType: 'comment',
+        contentId: commentId,
+      );
       return true;
     } catch (e) {
       debugPrint('⚠️ SeniorQuestionService.deleteComment: $e');
@@ -489,11 +582,15 @@ class SeniorQuestionService {
     String nickname,
     bool isAnonymous,
     String body,
+    List<String> imageUrls,
+    String? stickerId,
   ) => {
     'uid': uid,
     'authorNickname': nickname,
     'isAnonymous': isAnonymous,
     'body': body,
+    'imageUrls': imageUrls,
+    'stickerId': stickerId,
     'likeCount': 0,
     'reportCount': 0,
     'isHidden': false,
@@ -501,32 +598,35 @@ class SeniorQuestionService {
     'createdAt': FieldValue.serverTimestamp(),
   };
 
-  static Future<bool> _toggleReaction({
+  static Future<({bool success, bool reactionAdded})> _toggleReaction({
     required DocumentReference<Map<String, dynamic>> targetRef,
     required String reactionCollection,
     required String countField,
   }) async {
     final uid = _auth.currentUser?.uid;
-    if (uid == null) return false;
+    if (uid == null) return (success: false, reactionAdded: false);
     try {
       final reactionRef = targetRef.collection(reactionCollection).doc(uid);
+      var reactionAdded = false;
       await _db.runTransaction((tx) async {
         final reactionSnap = await tx.get(reactionRef);
         if (reactionSnap.exists) {
           tx.delete(reactionRef);
           tx.update(targetRef, {countField: FieldValue.increment(-1)});
+          reactionAdded = false;
         } else {
           tx.set(reactionRef, {
             'uid': uid,
             'createdAt': FieldValue.serverTimestamp(),
           });
           tx.update(targetRef, {countField: FieldValue.increment(1)});
+          reactionAdded = true;
         }
       });
-      return true;
+      return (success: true, reactionAdded: reactionAdded);
     } catch (e) {
       debugPrint('⚠️ SeniorQuestionService._toggleReaction: $e');
-      return false;
+      return (success: false, reactionAdded: false);
     }
   }
 

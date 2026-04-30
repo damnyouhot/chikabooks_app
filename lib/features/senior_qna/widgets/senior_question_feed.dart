@@ -8,6 +8,7 @@ import '../models/senior_question.dart';
 import '../services/senior_question_image_service.dart';
 import '../services/senior_question_service.dart';
 import 'senior_question_card.dart';
+import 'senior_sticker_widgets.dart';
 
 class SeniorQuestionFeed extends StatefulWidget {
   const SeniorQuestionFeed({super.key});
@@ -19,6 +20,7 @@ class SeniorQuestionFeed extends StatefulWidget {
 class _SeniorQuestionFeedState extends State<SeniorQuestionFeed> {
   final _bodyCtrl = TextEditingController();
   final List<XFile> _images = [];
+  String? _stickerId;
   bool _isAdmin = false;
   bool _isAnonymous = false;
   String? _category;
@@ -53,6 +55,12 @@ class _SeniorQuestionFeedState extends State<SeniorQuestionFeed> {
     if (picked.isNotEmpty && mounted) setState(() => _images.addAll(picked));
   }
 
+  Future<void> _pickSticker() async {
+    final id = await showSeniorStickerPicker(context, selectedId: _stickerId);
+    if (!mounted || id == null) return;
+    setState(() => _stickerId = id);
+  }
+
   Future<void> _submit() async {
     final body = _bodyCtrl.text.trim();
     if (body.isEmpty || _posting) return;
@@ -68,6 +76,7 @@ class _SeniorQuestionFeedState extends State<SeniorQuestionFeed> {
       category: category,
       isAnonymous: _isAnonymous,
       images: _images,
+      stickerId: _stickerId,
     );
     if (!mounted) return;
     setState(() => _posting = false);
@@ -78,6 +87,7 @@ class _SeniorQuestionFeedState extends State<SeniorQuestionFeed> {
     _bodyCtrl.clear();
     _images.clear();
     setState(() {
+      _stickerId = null;
       _isAnonymous = false;
       _category = null;
     });
@@ -108,6 +118,7 @@ class _SeniorQuestionFeedState extends State<SeniorQuestionFeed> {
               _Composer(
                 controller: _bodyCtrl,
                 images: _images,
+                stickerId: _stickerId,
                 category: _category,
                 isAnonymous: _isAnonymous,
                 posting: _posting,
@@ -115,6 +126,8 @@ class _SeniorQuestionFeedState extends State<SeniorQuestionFeed> {
                 onAnonymousChanged: (v) => setState(() => _isAnonymous = v),
                 onPickImages: _pickImages,
                 onRemoveImage: (i) => setState(() => _images.removeAt(i)),
+                onPickSticker: _pickSticker,
+                onRemoveSticker: () => setState(() => _stickerId = null),
                 onSubmit: _submit,
               ),
               const SizedBox(height: AppSpacing.md),
@@ -144,6 +157,7 @@ class _SeniorQuestionFeedState extends State<SeniorQuestionFeed> {
 class _Composer extends StatelessWidget {
   final TextEditingController controller;
   final List<XFile> images;
+  final String? stickerId;
   final String? category;
   final bool isAnonymous;
   final bool posting;
@@ -151,11 +165,14 @@ class _Composer extends StatelessWidget {
   final ValueChanged<bool> onAnonymousChanged;
   final VoidCallback onPickImages;
   final ValueChanged<int> onRemoveImage;
+  final VoidCallback onPickSticker;
+  final VoidCallback onRemoveSticker;
   final VoidCallback onSubmit;
 
   const _Composer({
     required this.controller,
     required this.images,
+    required this.stickerId,
     required this.category,
     required this.isAnonymous,
     required this.posting,
@@ -163,6 +180,8 @@ class _Composer extends StatelessWidget {
     required this.onAnonymousChanged,
     required this.onPickImages,
     required this.onRemoveImage,
+    required this.onPickSticker,
+    required this.onRemoveSticker,
     required this.onSubmit,
   });
 
@@ -245,6 +264,10 @@ class _Composer extends StatelessWidget {
               ),
             ),
           ],
+          if (stickerId != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            SeniorStickerChip(stickerId: stickerId!, onRemove: onRemoveSticker),
+          ],
           const SizedBox(height: AppSpacing.xs),
           Row(
             children: [
@@ -253,6 +276,12 @@ class _Composer extends StatelessWidget {
                 label:
                     '이미지 ${images.length}/${SeniorQuestionImageService.maxImages}',
                 onTap: posting ? null : onPickImages,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              _ComposerAction(
+                icon: Icons.emoji_emotions_outlined,
+                label: stickerId == null ? '스티커' : '스티커 변경',
+                onTap: posting ? null : onPickSticker,
               ),
               const SizedBox(width: AppSpacing.sm),
               Checkbox(

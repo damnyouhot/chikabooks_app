@@ -18,12 +18,13 @@ import '../services/funnel_onboarding_service.dart';
 ///
 /// ── 핵심 정책 ────────────────────────────────
 /// 밥주기:
-///   1회차(정상): hunger+25, mood+8, bond+2
+///   1회차(정상): hunger+25, mood+8, bond+1 (mood<30이면 bond 절반)
 ///   2회차(10분내 연속): hunger+15, mood-3, energy-8
 ///   3회차: 1시간 쿨타임 차단
 ///   과식(hunger≥85, 우선): hunger+5, mood-2, energy-3
 ///   mood<30 → bond 절반(내림), energy<30 → 리액션 확률 50%
-///   보유 먹이(caringTreatCount) 0이면 밥주기 불가
+///   보유 먹이(caringTreatCount)가 [CaringTreatService.feedCost] 미만이면 밥주기 불가
+///   (먹이 적립: 퀴즈·공감투표·속닥속닥·오늘 단어 등 — [CaringTreatService] 참고)
 /// 터치 (최근 3시간 슬라이딩 윈도우 내 횟수):
 ///   1~3회: mood+5, bond+1
 ///   4~6회: mood+1, bond+0
@@ -99,8 +100,7 @@ class CaringActionService {
         return FeedResult(success: false, rejectMent: '로그인이 필요합니다.');
       }
 
-      final state =
-          fromLocal ?? await CaringStateService.loadState();
+      final state = fromLocal ?? await CaringStateService.loadState();
 
       if (state.isSleeping) {
         return FeedResult(
@@ -113,8 +113,7 @@ class CaringActionService {
       if (treatCount < CaringTreatService.feedCost) {
         return FeedResult(
           success: false,
-          rejectMent:
-              '밥주기에는 먹이 ${CaringTreatService.feedCost}개가 필요해요.',
+          rejectMent: '밥주기에는 먹이 ${CaringTreatService.feedCost}개가 필요해요.',
         );
       }
 
@@ -131,9 +130,11 @@ class CaringActionService {
           final remaining = _feedCooldownMin - elapsed.inMinutes;
           return FeedResult(
             success: false,
-            rejectMent: '${_pickRandom(CaringMents.feedCooldown)} ($remaining분 후)',
+            rejectMent:
+                '${_pickRandom(CaringMents.feedCooldown)} ($remaining분 후)',
           );
-        } else if (feedCount == 1 && elapsed.inMinutes >= _feedConsecutiveWindowMin) {
+        } else if (feedCount == 1 &&
+            elapsed.inMinutes >= _feedConsecutiveWindowMin) {
           feedCount = 0;
         }
       }
@@ -144,11 +145,20 @@ class CaringActionService {
       double hungerDelta, moodDelta, energyDelta, bondDelta;
 
       if (isOverfed) {
-        hungerDelta = 5; moodDelta = -2; energyDelta = -3; bondDelta = 0;
+        hungerDelta = 5;
+        moodDelta = -2;
+        energyDelta = -3;
+        bondDelta = 0;
       } else if (isConsecutive) {
-        hungerDelta = 15; moodDelta = -3; energyDelta = -8; bondDelta = 0;
+        hungerDelta = 15;
+        moodDelta = -3;
+        energyDelta = -8;
+        bondDelta = 0;
       } else {
-        hungerDelta = 25; moodDelta = 8; energyDelta = 0; bondDelta = 1;
+        hungerDelta = 25;
+        moodDelta = 8;
+        energyDelta = 0;
+        bondDelta = 1;
       }
 
       // mood < 30 → bond 보상 절반 (내림)
@@ -199,7 +209,7 @@ class CaringActionService {
 
   // ═══════════════════════ 터치 (Touch) ═══════════════════════
 
-  /// 최근 3시간 내 횟수 — 1~3: mood+5, bond+1 | 4~6: mood+1, bond+0 | 7+: mood-1
+  /// 최근 3시간 내 횟수 — 1~3: mood+5, bond+1 | 4~6: mood+1, bond+0 | 7+: 변화 없음
   /// energy<30 → mood 보상 절반 | mood<30 → bond 절반
   ///
   /// [fromLocal]: [tryFeed]와 동일. null이면 로드 후 저장, 아니면 저장 생략.
@@ -210,8 +220,7 @@ class CaringActionService {
         return TouchResult(ment: '로그인이 필요합니다.', state: null);
       }
 
-      final state =
-          fromLocal ?? await CaringStateService.loadState();
+      final state = fromLocal ?? await CaringStateService.loadState();
 
       if (state.isSleeping) {
         return TouchResult(
@@ -238,9 +247,11 @@ class CaringActionService {
         moodDelta = 5;
         bondDelta = dailyTouchBondGain < 3 ? 1 : 0;
       } else if (count < 6) {
-        moodDelta = 1; bondDelta = 0;
+        moodDelta = 1;
+        bondDelta = 0;
       } else {
-        moodDelta = -1; bondDelta = 0;
+        moodDelta = 0;
+        bondDelta = 0;
       }
 
       // energy < 30 → mood 보상 절반 (내림, 양수일 때만)
@@ -269,11 +280,7 @@ class CaringActionService {
 
       final ment = _pickTouchMent(state, count);
 
-      return TouchResult(
-        ment: ment,
-        isEffective: count < 3,
-        state: updated,
-      );
+      return TouchResult(ment: ment, isEffective: count < 3, state: updated);
     } catch (e) {
       debugPrint('⚠️ CaringActionService.tryTouch error: $e');
       return TouchResult(ment: '오류가 발생했어요.', state: null);
@@ -298,8 +305,7 @@ class CaringActionService {
         return WashResult(ment: '로그인이 필요합니다.', state: null);
       }
 
-      final state =
-          fromLocal ?? await CaringStateService.loadState();
+      final state = fromLocal ?? await CaringStateService.loadState();
 
       if (state.isSleeping) {
         return WashResult(
@@ -310,9 +316,10 @@ class CaringActionService {
 
       final now = DateTime.now();
       final before = state.cleanliness;
-      final cleanDelta = before >= 100
-          ? 0.0
-          : before >= 85
+      final cleanDelta =
+          before >= 100
+              ? 0.0
+              : before >= 85
               ? 1.0
               : 2.0;
       final energyDelta = before >= 85 ? -0.1 : -0.2;
@@ -324,14 +331,14 @@ class CaringActionService {
         energy: state.energy + energyDelta,
         lastWashedAt: now,
         lastActiveAt: now,
-        cleanlinessGoodSince: after >=
-                CaringStateService.cleanBondGoodThreshold
-            ? state.cleanlinessGoodSince ?? now
-            : null,
-        cleanlinessBadSince: after <
-                CaringStateService.cleanBondBadThreshold
-            ? state.cleanlinessBadSince ?? now
-            : null,
+        cleanlinessGoodSince:
+            after >= CaringStateService.cleanBondGoodThreshold
+                ? state.cleanlinessGoodSince ?? now
+                : null,
+        cleanlinessBadSince:
+            after < CaringStateService.cleanBondBadThreshold
+                ? state.cleanlinessBadSince ?? now
+                : null,
         clearCleanlinessGoodSince:
             after < CaringStateService.cleanBondGoodThreshold,
         clearCleanlinessBadSince:
@@ -342,10 +349,7 @@ class CaringActionService {
         await CaringStateService.saveState(updated);
       }
 
-      return WashResult(
-        ment: _pickWashMent(state, after),
-        state: updated,
-      );
+      return WashResult(ment: _pickWashMent(state, after), state: updated);
     } catch (e) {
       debugPrint('⚠️ CaringActionService.tryWash error: $e');
       return WashResult(ment: '오류가 발생했어요.', state: null);
@@ -377,7 +381,6 @@ class CaringActionService {
 
   // ═══════════════════════ 재우기 / 깨우기 ═══════════════════════
 
-
   /// 재우기 시작
   ///
   /// [fromLocal]이 있으면 `loadState`·내부 저장 생략, 잠든 상태만 계산해 반환(저장은 호출자).
@@ -408,18 +411,18 @@ class CaringActionService {
   /// [fromLocal]: [startSleep]과 동일. 있으면 서버 읽기 없이 판단·벌점 일관성 확보.
   /// 멘트 분기와 [CaringStateService.wake]는 동일 [DateTime]으로 맞춤.
   static Future<WakeResult> wakeUp({CaringState? fromLocal}) async {
-    final state =
-        fromLocal ?? await CaringStateService.loadState();
+    final state = fromLocal ?? await CaringStateService.loadState();
     if (!state.isSleeping) {
       return WakeResult(state: state, ment: '이미 깨어 있어요.');
     }
 
     final clock = DateTime.now();
-    final sleepElapsed = state.sleepStartedAt != null
-        ? clock.difference(state.sleepStartedAt!)
-        : Duration.zero;
-    final isShort = sleepElapsed.inMinutes <=
-        CaringStateService.shortSleepThresholdMin;
+    final sleepElapsed =
+        state.sleepStartedAt != null
+            ? clock.difference(state.sleepStartedAt!)
+            : Duration.zero;
+    final isShort =
+        sleepElapsed.inMinutes <= CaringStateService.shortSleepThresholdMin;
     final isLongSleep = sleepElapsed >= CaringStateService.longSleepThreshold;
 
     final woken = await CaringStateService.wake(
@@ -427,9 +430,10 @@ class CaringActionService {
       persist: fromLocal == null,
       now: clock,
     );
-    final ment = isShort
-        ? _pickRandom(CaringMents.sleepShort)
-        : isLongSleep
+    final ment =
+        isShort
+            ? _pickRandom(CaringMents.sleepShort)
+            : isLongSleep
             ? CaringMents.sleepWakeLongMent
             : _pickRandom(CaringMents.sleepWake);
 
@@ -515,10 +519,9 @@ class CaringActionService {
         }
       }
 
-      await userRef.set(
-        {'lastOpenAt': FieldValue.serverTimestamp()},
-        SetOptions(merge: true),
-      );
+      await userRef.set({
+        'lastOpenAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
 
       final careerProfile = data['careerProfile'] as Map<String, dynamic>?;
       final skills = (careerProfile?['skills'] as Map<String, dynamic>?) ?? {};
@@ -541,11 +544,12 @@ class CaringActionService {
       }
 
       final lastNetworkCount = (data['lastKnownNetworkCount'] as int?) ?? -1;
-      final networkSnap = await _db
-          .collection('users')
-          .doc(uid)
-          .collection('careerNetwork')
-          .get();
+      final networkSnap =
+          await _db
+              .collection('users')
+              .doc(uid)
+              .collection('careerNetwork')
+              .get();
       final currentNetworkCount = networkSnap.docs.length;
       if (lastNetworkCount >= 0 && currentNetworkCount > lastNetworkCount) {
         events.add('new_workplace');
@@ -613,7 +617,11 @@ class WakeResult {
   final String ment;
   final bool isShortSleep;
 
-  WakeResult({required this.state, required this.ment, this.isShortSleep = false});
+  WakeResult({
+    required this.state,
+    required this.ment,
+    this.isShortSleep = false,
+  });
 }
 
 class DiaryResult {

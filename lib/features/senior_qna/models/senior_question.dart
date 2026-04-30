@@ -8,6 +8,7 @@ class SeniorQuestion {
   final bool isAnonymous;
   final String body;
   final List<String> imageUrls;
+  final String? stickerId;
   final int likeCount;
   final int cheerCount;
   final int commentCount;
@@ -26,6 +27,7 @@ class SeniorQuestion {
     required this.isAnonymous,
     required this.body,
     required this.imageUrls,
+    required this.stickerId,
     required this.likeCount,
     required this.cheerCount,
     required this.commentCount,
@@ -47,6 +49,7 @@ class SeniorQuestion {
       isAnonymous: data['isAnonymous'] as bool? ?? false,
       body: data['body'] as String? ?? '',
       imageUrls: List<String>.from(data['imageUrls'] as List? ?? const []),
+      stickerId: data['stickerId'] as String?,
       likeCount: data['likeCount'] as int? ?? 0,
       cheerCount: data['cheerCount'] as int? ?? 0,
       commentCount: data['commentCount'] as int? ?? 0,
@@ -73,6 +76,7 @@ class SeniorComment {
   final bool isAnonymous;
   final String body;
   final List<String> imageUrls;
+  final String? stickerId;
   final int likeCount;
   final int replyCount;
   final int reportCount;
@@ -88,6 +92,7 @@ class SeniorComment {
     required this.isAnonymous,
     required this.body,
     required this.imageUrls,
+    required this.stickerId,
     required this.likeCount,
     required this.replyCount,
     required this.reportCount,
@@ -106,6 +111,7 @@ class SeniorComment {
       isAnonymous: data['isAnonymous'] as bool? ?? false,
       body: data['body'] as String? ?? '',
       imageUrls: List<String>.from(data['imageUrls'] as List? ?? const []),
+      stickerId: data['stickerId'] as String?,
       likeCount: data['likeCount'] as int? ?? 0,
       replyCount: data['replyCount'] as int? ?? 0,
       reportCount: data['reportCount'] as int? ?? 0,
@@ -129,6 +135,8 @@ class SeniorReply {
   final String authorNickname;
   final bool isAnonymous;
   final String body;
+  final List<String> imageUrls;
+  final String? stickerId;
   final int likeCount;
   final int reportCount;
   final bool isHidden;
@@ -141,6 +149,8 @@ class SeniorReply {
     required this.authorNickname,
     required this.isAnonymous,
     required this.body,
+    required this.imageUrls,
+    required this.stickerId,
     required this.likeCount,
     required this.reportCount,
     required this.isHidden,
@@ -156,6 +166,8 @@ class SeniorReply {
       authorNickname: data['authorNickname'] as String? ?? '',
       isAnonymous: data['isAnonymous'] as bool? ?? false,
       body: data['body'] as String? ?? '',
+      imageUrls: List<String>.from(data['imageUrls'] as List? ?? const []),
+      stickerId: data['stickerId'] as String?,
       likeCount: data['likeCount'] as int? ?? 0,
       reportCount: data['reportCount'] as int? ?? 0,
       isHidden: data['isHidden'] as bool? ?? false,

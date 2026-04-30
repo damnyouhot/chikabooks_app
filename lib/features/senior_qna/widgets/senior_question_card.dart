@@ -4,9 +4,12 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_tokens.dart';
+import '../data/senior_stickers.dart';
 import '../models/senior_question.dart';
 import '../services/senior_question_image_service.dart';
 import '../services/senior_question_service.dart';
+import 'senior_question_share_capture.dart';
+import 'senior_sticker_widgets.dart';
 
 class SeniorQuestionCard extends StatefulWidget {
   final SeniorQuestion question;
@@ -26,7 +29,9 @@ class _SeniorQuestionCardState extends State<SeniorQuestionCard> {
   final _commentCtrl = TextEditingController();
   late final TextEditingController _editCtrl;
   XFile? _commentImage;
+  String? _commentStickerId;
   XFile? _editReplacementImage;
+  String? _editStickerId;
   String? _replyToCommentId;
   String? _replyToName;
   bool _isEditing = false;
@@ -56,6 +61,7 @@ class _SeniorQuestionCardState extends State<SeniorQuestionCard> {
       _editCategory = _categoryOrDefault(question.category);
       _editReplacementImage = null;
       _editRemoveImages = false;
+      _editStickerId = question.stickerId;
     }
   }
 
@@ -68,7 +74,10 @@ class _SeniorQuestionCardState extends State<SeniorQuestionCard> {
 
   Future<void> _submitComment() async {
     final body = _commentCtrl.text.trim();
-    if ((body.isEmpty && _commentImage == null) || _submittingComment) return;
+    if ((body.isEmpty && _commentImage == null && _commentStickerId == null) ||
+        _submittingComment) {
+      return;
+    }
 
     FocusManager.instance.primaryFocus?.unfocus();
     setState(() => _submittingComment = true);
@@ -79,12 +88,15 @@ class _SeniorQuestionCardState extends State<SeniorQuestionCard> {
               body: body,
               isAnonymous: _commentAnonymous,
               image: _commentImage,
+              stickerId: _commentStickerId,
             )
             : await SeniorQuestionService.addReply(
               questionId: question.id,
               commentId: _replyToCommentId!,
               body: body,
               isAnonymous: _commentAnonymous,
+              image: _commentImage,
+              stickerId: _commentStickerId,
             );
     if (!mounted) return;
     setState(() {
@@ -92,6 +104,7 @@ class _SeniorQuestionCardState extends State<SeniorQuestionCard> {
       if (ok) {
         _commentCtrl.clear();
         _commentImage = null;
+        _commentStickerId = null;
         _replyToCommentId = null;
         _replyToName = null;
         _commentAnonymous = false;
@@ -105,6 +118,24 @@ class _SeniorQuestionCardState extends State<SeniorQuestionCard> {
     final picked = await SeniorQuestionImageService.pickImages(remaining: 1);
     if (!mounted || picked.isEmpty) return;
     setState(() => _commentImage = picked.first);
+  }
+
+  Future<void> _pickCommentSticker() async {
+    final id = await showSeniorStickerPicker(
+      context,
+      selectedId: _commentStickerId,
+    );
+    if (!mounted || id == null) return;
+    setState(() => _commentStickerId = id);
+  }
+
+  Future<void> _pickEditSticker() async {
+    final id = await showSeniorStickerPicker(
+      context,
+      selectedId: _editStickerId,
+    );
+    if (!mounted || id == null) return;
+    setState(() => _editStickerId = id);
   }
 
   Future<void> _pickEditReplacementImage() async {
@@ -216,6 +247,7 @@ class _SeniorQuestionCardState extends State<SeniorQuestionCard> {
                 currentImageUrls: question.imageUrls,
                 replacementImage: _editReplacementImage,
                 removeImages: _editRemoveImages,
+                stickerId: _editStickerId,
                 onCategoryChanged: (v) => setState(() => _editCategory = v),
                 onAnonymousChanged: (v) => setState(() => _editAnonymous = v),
                 onPickImage: _pickEditReplacementImage,
@@ -226,6 +258,8 @@ class _SeniorQuestionCardState extends State<SeniorQuestionCard> {
                     }),
                 onRemoveReplacement:
                     () => setState(() => _editReplacementImage = null),
+                onPickSticker: _pickEditSticker,
+                onRemoveSticker: () => setState(() => _editStickerId = null),
                 onCancel: _cancelEditing,
                 onSave: _saveEditing,
               ),
@@ -249,6 +283,10 @@ class _SeniorQuestionCardState extends State<SeniorQuestionCard> {
               question.imageUrls.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.sm),
             _ImageGrid(urls: question.imageUrls),
+          ],
+          if (!hiddenForUser && !_isEditing && question.stickerId != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            SeniorStickerView(stickerId: question.stickerId!, size: 62),
           ],
           const SizedBox(height: AppSpacing.sm),
           Row(
@@ -283,6 +321,13 @@ class _SeniorQuestionCardState extends State<SeniorQuestionCard> {
                 count: question.commentCount,
                 onTap: () => setState(() => _commentsExpanded = true),
               ),
+              if (!hiddenForUser && !_isEditing)
+                _ActionButton(
+                  icon: Icons.share_outlined,
+                  iconColor: AppColors.textSecondary,
+                  label: '공유',
+                  onTap: _shareQuestion,
+                ),
             ],
           ),
           if (!_commentsExpanded && question.commentCount > 0) ...[
@@ -303,15 +348,12 @@ class _SeniorQuestionCardState extends State<SeniorQuestionCard> {
                     _replyToCommentId = null;
                     _replyToName = null;
                   }),
-              image: _replyToCommentId == null ? _commentImage : null,
-              onPickImage:
-                  _replyToCommentId == null && !_submittingComment
-                      ? _pickCommentImage
-                      : null,
-              onRemoveImage:
-                  _replyToCommentId == null
-                      ? () => setState(() => _commentImage = null)
-                      : null,
+              image: _commentImage,
+              stickerId: _commentStickerId,
+              onPickImage: !_submittingComment ? _pickCommentImage : null,
+              onRemoveImage: () => setState(() => _commentImage = null),
+              onPickSticker: !_submittingComment ? _pickCommentSticker : null,
+              onRemoveSticker: () => setState(() => _commentStickerId = null),
               onSubmit: _submitComment,
             ),
           ],
@@ -424,6 +466,7 @@ class _SeniorQuestionCardState extends State<SeniorQuestionCard> {
       _editCategory = _categoryOrDefault(question.category);
       _editReplacementImage = null;
       _editRemoveImages = false;
+      _editStickerId = question.stickerId;
       _isEditing = true;
     });
   }
@@ -436,6 +479,7 @@ class _SeniorQuestionCardState extends State<SeniorQuestionCard> {
       _editCategory = _categoryOrDefault(question.category);
       _editReplacementImage = null;
       _editRemoveImages = false;
+      _editStickerId = question.stickerId;
       _isEditing = false;
     });
   }
@@ -454,6 +498,7 @@ class _SeniorQuestionCardState extends State<SeniorQuestionCard> {
       isAnonymous: _editAnonymous,
       removeImages: _editRemoveImages,
       replacementImage: _editReplacementImage,
+      stickerId: _editStickerId,
     );
     if (!mounted) return;
     if (ok) {
@@ -477,6 +522,15 @@ class _SeniorQuestionCardState extends State<SeniorQuestionCard> {
     final success = await SeniorQuestionService.deleteQuestion(question.id);
     if (!mounted) return;
     _snack(success ? '글을 삭제했어요.' : '삭제에 실패했어요.');
+  }
+
+  Future<void> _shareQuestion() async {
+    try {
+      await SeniorQuestionShareCapture.share(context, question: question);
+    } catch (e) {
+      if (!mounted) return;
+      _snack('공유에 실패했어요. $e');
+    }
   }
 
   Future<void> _confirmReport() async {
@@ -706,6 +760,7 @@ class _CommentTileState extends State<_CommentTile> {
               name: comment.displayName,
               body: hiddenForUser ? '신고 누적으로 숨김 처리된 댓글입니다.' : comment.body,
               imageUrls: hiddenForUser ? const [] : comment.imageUrls,
+              stickerId: hiddenForUser ? null : comment.stickerId,
               isHiddenForAdmin: comment.isHidden && isAdmin,
             ),
           Row(
@@ -1117,7 +1172,8 @@ class _ReplyTile extends StatelessWidget {
           _Bubble(
             name: reply.displayName,
             body: hiddenForUser ? '신고 누적으로 숨김 처리된 답글입니다.' : reply.body,
-            imageUrls: const [],
+            imageUrls: hiddenForUser ? const [] : reply.imageUrls,
+            stickerId: hiddenForUser ? null : reply.stickerId,
             isHiddenForAdmin: reply.isHidden && isAdmin,
             compact: true,
           ),
@@ -1171,10 +1227,13 @@ class _InlineCommentInput extends StatelessWidget {
   final bool anonymous;
   final bool submitting;
   final XFile? image;
+  final String? stickerId;
   final ValueChanged<bool> onAnonymousChanged;
   final VoidCallback onCancelReply;
   final VoidCallback? onPickImage;
   final VoidCallback? onRemoveImage;
+  final VoidCallback? onPickSticker;
+  final VoidCallback? onRemoveSticker;
   final VoidCallback onSubmit;
 
   const _InlineCommentInput({
@@ -1183,10 +1242,13 @@ class _InlineCommentInput extends StatelessWidget {
     required this.anonymous,
     required this.submitting,
     required this.image,
+    required this.stickerId,
     required this.onAnonymousChanged,
     required this.onCancelReply,
     required this.onPickImage,
     required this.onRemoveImage,
+    required this.onPickSticker,
+    required this.onRemoveSticker,
     required this.onSubmit,
   });
 
@@ -1269,23 +1331,40 @@ class _InlineCommentInput extends StatelessWidget {
             const SizedBox(height: AppSpacing.xs),
             _CommentImagePreview(file: image!, onRemove: onRemoveImage),
           ],
+          if (stickerId != null) ...[
+            const SizedBox(height: AppSpacing.xs),
+            SeniorStickerChip(stickerId: stickerId!, onRemove: onRemoveSticker),
+          ],
           Row(
             children: [
-              if (replyToName == null) ...[
-                IconButton(
-                  onPressed: submitting ? null : onPickImage,
-                  icon: Icon(
-                    image == null ? Icons.image_outlined : Icons.image,
-                    size: 18,
-                  ),
-                  color:
-                      image == null
-                          ? AppColors.textSecondary
-                          : AppColors.cardEmphasis,
-                  visualDensity: VisualDensity.compact,
-                  tooltip: '사진 첨부',
+              IconButton(
+                onPressed: submitting ? null : onPickImage,
+                icon: Icon(
+                  image == null ? Icons.image_outlined : Icons.image,
+                  size: 18,
                 ),
-              ],
+                color:
+                    image == null
+                        ? AppColors.textSecondary
+                        : AppColors.cardEmphasis,
+                visualDensity: VisualDensity.compact,
+                tooltip: '사진 첨부',
+              ),
+              IconButton(
+                onPressed: submitting ? null : onPickSticker,
+                icon: Icon(
+                  stickerId == null
+                      ? Icons.emoji_emotions_outlined
+                      : Icons.emoji_emotions,
+                  size: 18,
+                ),
+                color:
+                    stickerId == null
+                        ? AppColors.textSecondary
+                        : AppColors.cardEmphasis,
+                visualDensity: VisualDensity.compact,
+                tooltip: '스티커 첨부',
+              ),
               Checkbox(
                 value: anonymous,
                 onChanged:
@@ -1571,11 +1650,14 @@ class _InlineEditBox extends StatelessWidget {
   final List<String> currentImageUrls;
   final XFile? replacementImage;
   final bool removeImages;
+  final String? stickerId;
   final ValueChanged<String> onCategoryChanged;
   final ValueChanged<bool> onAnonymousChanged;
   final VoidCallback onPickImage;
   final VoidCallback onRemoveCurrentImages;
   final VoidCallback onRemoveReplacement;
+  final VoidCallback onPickSticker;
+  final VoidCallback onRemoveSticker;
   final VoidCallback onCancel;
   final VoidCallback onSave;
 
@@ -1586,11 +1668,14 @@ class _InlineEditBox extends StatelessWidget {
     required this.currentImageUrls,
     required this.replacementImage,
     required this.removeImages,
+    required this.stickerId,
     required this.onCategoryChanged,
     required this.onAnonymousChanged,
     required this.onPickImage,
     required this.onRemoveCurrentImages,
     required this.onRemoveReplacement,
+    required this.onPickSticker,
+    required this.onRemoveSticker,
     required this.onCancel,
     required this.onSave,
   });
@@ -1641,6 +1726,15 @@ class _InlineEditBox extends StatelessWidget {
             onPickImage: onPickImage,
             onRemoveCurrentImages: onRemoveCurrentImages,
             onRemoveReplacement: onRemoveReplacement,
+          ),
+          if (stickerId != null) ...[
+            const SizedBox(height: AppSpacing.xs),
+            SeniorStickerChip(stickerId: stickerId!, onRemove: onRemoveSticker),
+          ],
+          TextButton.icon(
+            onPressed: onPickSticker,
+            icon: const Icon(Icons.emoji_emotions_outlined, size: 16),
+            label: Text(stickerId == null ? '스티커 추가' : '스티커 변경'),
           ),
           Row(
             children: [
@@ -1777,6 +1871,7 @@ class _Bubble extends StatelessWidget {
   final String name;
   final String body;
   final List<String> imageUrls;
+  final String? stickerId;
   final bool isHiddenForAdmin;
   final bool compact;
 
@@ -1784,12 +1879,15 @@ class _Bubble extends StatelessWidget {
     required this.name,
     required this.body,
     required this.imageUrls,
+    required this.stickerId,
     required this.isHiddenForAdmin,
     this.compact = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final visibleBody =
+        isSeniorStickerFallbackBody(body, stickerId) ? '' : body;
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(compact ? AppSpacing.sm : AppSpacing.md),
@@ -1822,10 +1920,10 @@ class _Bubble extends StatelessWidget {
               ],
             ],
           ),
-          if (body.isNotEmpty) ...[
+          if (visibleBody.isNotEmpty) ...[
             const SizedBox(height: 3),
             Text(
-              body,
+              visibleBody,
               style: TextStyle(
                 fontSize: compact ? 12 : 13,
                 fontWeight: FontWeight.w700,
@@ -1835,8 +1933,19 @@ class _Bubble extends StatelessWidget {
             ),
           ],
           if (imageUrls.isNotEmpty) ...[
-            SizedBox(height: body.isEmpty ? AppSpacing.xs : AppSpacing.sm),
+            SizedBox(
+              height: visibleBody.isEmpty ? AppSpacing.xs : AppSpacing.sm,
+            ),
             _CommentImage(url: imageUrls.first),
+          ],
+          if (stickerId != null) ...[
+            SizedBox(
+              height:
+                  visibleBody.isEmpty && imageUrls.isEmpty
+                      ? AppSpacing.xs
+                      : AppSpacing.sm,
+            ),
+            SeniorStickerView(stickerId: stickerId!, size: compact ? 50 : 62),
           ],
         ],
       ),
@@ -1986,14 +2095,14 @@ class _ActionButton extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
   final String label;
-  final int count;
+  final int? count;
   final VoidCallback onTap;
 
   const _ActionButton({
     required this.icon,
     required this.iconColor,
     required this.label,
-    required this.count,
+    this.count,
     required this.onTap,
   });
 
@@ -2002,7 +2111,10 @@ class _ActionButton extends StatelessWidget {
     return TextButton.icon(
       onPressed: onTap,
       icon: Icon(icon, size: 14, color: iconColor),
-      label: Text('$label $count', overflow: TextOverflow.ellipsis),
+      label: Text(
+        count == null ? label : '$label $count',
+        overflow: TextOverflow.ellipsis,
+      ),
       style: TextButton.styleFrom(
         foregroundColor: AppColors.textSecondary,
         visualDensity: VisualDensity.compact,

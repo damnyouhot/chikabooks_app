@@ -6,6 +6,16 @@ import '../models/quiz_pool_item.dart';
 import '../models/quiz_schedule.dart';
 import 'quiz_accuracy_stats.dart';
 
+/// `QuizPoolService.saveAnswer`가 통계에 새로 반영했는지 여부.
+class QuizAnswerSaveResult {
+  final bool recordedNewAnswer;
+  final bool isCorrect;
+  const QuizAnswerSaveResult({
+    required this.recordedNewAnswer,
+    required this.isCorrect,
+  });
+}
+
 /// 퀴즈 풀 & 스케줄 관리 서비스
 ///
 /// Firestore 컬렉션:
@@ -167,7 +177,7 @@ class QuizPoolService {
   /// - 이미 답한 quizId면 통계 increment 생략 (중복 카운트 방지)
   /// - answers 맵은 기존 값과 병합하여 저장 (다른 퀴즈 답 보존)
   /// - weekKey가 바뀌면 weekCorrect/weekWrong 초기화 후 저장
-  static Future<void> saveAnswer({
+  static Future<QuizAnswerSaveResult> saveAnswer({
     required String dateKey,
     required String quizId,
     required int selectedIndex,
@@ -175,7 +185,12 @@ class QuizPoolService {
     required bool isCorrect,
   }) async {
     final uid = _uid;
-    if (uid == null) return;
+    if (uid == null) {
+      return QuizAnswerSaveResult(
+        recordedNewAnswer: false,
+        isCorrect: isCorrect,
+      );
+    }
     try {
       final userRef  = _db.collection('users').doc(uid);
       final histRef  = userRef.collection(_historyCollection).doc(dateKey);
@@ -189,7 +204,7 @@ class QuizPoolService {
       final globalRef = _db.collection('quiz_global').doc('stats');
       final weeklyRef = _db.collection('quiz_global').doc('weekly_$weekKey');
 
-      await _db.runTransaction((tx) async {
+      final recordedNewAnswer = await _db.runTransaction<bool>((tx) async {
         // ── 1. 기존 값 읽기 (트랜잭션 내 읽기는 쓰기 전에 모두 수행) ──
         final histSnap   = await tx.get(histRef);
         final statsSnap  = await tx.get(statsRef);
@@ -223,7 +238,7 @@ class QuizPoolService {
         });
 
         // 이미 답했던 문제면 통계·집계 모두 변경 없음
-        if (alreadyAnswered) return;
+        if (alreadyAnswered) return false;
 
         // ── 5. 개인 통계 저장: 주차 변경 시 초기화 ──
         final storedWeekKey = statsData['weekKey'] as String?;
@@ -342,9 +357,18 @@ class QuizPoolService {
           'accuracyDistribution': wDist,
           'lastUpdatedAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
+        return true;
       });
+      return QuizAnswerSaveResult(
+        recordedNewAnswer: recordedNewAnswer,
+        isCorrect: isCorrect,
+      );
     } catch (e) {
       debugPrint('⚠️ QuizPoolService.saveAnswer: $e');
+      return QuizAnswerSaveResult(
+        recordedNewAnswer: false,
+        isCorrect: isCorrect,
+      );
     }
   }
 

@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_tokens.dart';
+import '../data/senior_stickers.dart';
 import '../models/senior_question.dart';
+import '../services/senior_question_image_service.dart';
 import '../services/senior_question_service.dart';
+import 'senior_sticker_widgets.dart';
 
 class SeniorQuestionCommentsSheet extends StatefulWidget {
   final SeniorQuestion question;
@@ -43,6 +47,8 @@ class _SeniorQuestionCommentsSheetState
   final _inputCtrl = TextEditingController();
   String? _replyToCommentId;
   String? _replyToName;
+  XFile? _image;
+  String? _stickerId;
   bool _anonymous = false;
   bool _submitting = false;
 
@@ -54,7 +60,9 @@ class _SeniorQuestionCommentsSheetState
 
   Future<void> _submit() async {
     final body = _inputCtrl.text.trim();
-    if (body.isEmpty || _submitting) return;
+    if ((body.isEmpty && _image == null && _stickerId == null) || _submitting) {
+      return;
+    }
     FocusManager.instance.primaryFocus?.unfocus();
     setState(() => _submitting = true);
     final ok =
@@ -63,18 +71,24 @@ class _SeniorQuestionCommentsSheetState
               questionId: widget.question.id,
               body: body,
               isAnonymous: _anonymous,
+              image: _image,
+              stickerId: _stickerId,
             )
             : await SeniorQuestionService.addReply(
               questionId: widget.question.id,
               commentId: _replyToCommentId!,
               body: body,
               isAnonymous: _anonymous,
+              image: _image,
+              stickerId: _stickerId,
             );
     if (!mounted) return;
     setState(() {
       _submitting = false;
       if (ok) {
         _inputCtrl.clear();
+        _image = null;
+        _stickerId = null;
         _replyToCommentId = null;
         _replyToName = null;
         _anonymous = false;
@@ -85,6 +99,18 @@ class _SeniorQuestionCommentsSheetState
         context,
       ).showSnackBar(const SnackBar(content: Text('등록에 실패했어요. 다시 시도해 주세요.')));
     }
+  }
+
+  Future<void> _pickImage() async {
+    final picked = await SeniorQuestionImageService.pickImages(remaining: 1);
+    if (!mounted || picked.isEmpty) return;
+    setState(() => _image = picked.first);
+  }
+
+  Future<void> _pickSticker() async {
+    final id = await showSeniorStickerPicker(context, selectedId: _stickerId);
+    if (!mounted || id == null) return;
+    setState(() => _stickerId = id);
   }
 
   @override
@@ -168,12 +194,18 @@ class _SeniorQuestionCommentsSheetState
               replyToName: _replyToName,
               anonymous: _anonymous,
               submitting: _submitting,
+              image: _image,
+              stickerId: _stickerId,
               onCancelReply:
                   () => setState(() {
                     _replyToCommentId = null;
                     _replyToName = null;
                   }),
               onAnonymousChanged: (v) => setState(() => _anonymous = v),
+              onPickImage: _pickImage,
+              onRemoveImage: () => setState(() => _image = null),
+              onPickSticker: _pickSticker,
+              onRemoveSticker: () => setState(() => _stickerId = null),
               onSubmit: _submit,
             ),
           ],
@@ -207,6 +239,8 @@ class _CommentTile extends StatelessWidget {
           _Bubble(
             name: comment.displayName,
             body: hiddenForUser ? '신고 누적으로 숨김 처리된 댓글입니다.' : comment.body,
+            imageUrls: hiddenForUser ? const [] : comment.imageUrls,
+            stickerId: hiddenForUser ? null : comment.stickerId,
             isHiddenForAdmin: comment.isHidden && isAdmin,
           ),
           Row(
@@ -302,6 +336,8 @@ class _ReplyTile extends StatelessWidget {
           _Bubble(
             name: reply.displayName,
             body: hiddenForUser ? '신고 누적으로 숨김 처리된 답글입니다.' : reply.body,
+            imageUrls: hiddenForUser ? const [] : reply.imageUrls,
+            stickerId: hiddenForUser ? null : reply.stickerId,
             isHiddenForAdmin: reply.isHidden && isAdmin,
             compact: true,
           ),
@@ -352,18 +388,24 @@ class _ReplyTile extends StatelessWidget {
 class _Bubble extends StatelessWidget {
   final String name;
   final String body;
+  final List<String> imageUrls;
+  final String? stickerId;
   final bool isHiddenForAdmin;
   final bool compact;
 
   const _Bubble({
     required this.name,
     required this.body,
+    required this.imageUrls,
+    required this.stickerId,
     required this.isHiddenForAdmin,
     this.compact = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final visibleBody =
+        isSeniorStickerFallbackBody(body, stickerId) ? '' : body;
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(compact ? AppSpacing.sm : AppSpacing.md),
@@ -396,16 +438,60 @@ class _Bubble extends StatelessWidget {
               ],
             ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            body,
-            style: TextStyle(
-              fontSize: compact ? 12 : 13,
-              height: 1.45,
-              color: AppColors.textPrimary,
+          if (visibleBody.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              visibleBody,
+              style: TextStyle(
+                fontSize: compact ? 12 : 13,
+                height: 1.45,
+                color: AppColors.textPrimary,
+              ),
             ),
-          ),
+          ],
+          if (imageUrls.isNotEmpty) ...[
+            SizedBox(
+              height: visibleBody.isEmpty ? AppSpacing.xs : AppSpacing.sm,
+            ),
+            _AttachedImage(url: imageUrls.first),
+          ],
+          if (stickerId != null) ...[
+            SizedBox(
+              height:
+                  visibleBody.isEmpty && imageUrls.isEmpty
+                      ? AppSpacing.xs
+                      : AppSpacing.sm,
+            ),
+            SeniorStickerView(stickerId: stickerId!, size: compact ? 50 : 62),
+          ],
         ],
+      ),
+    );
+  }
+}
+
+class _AttachedImage extends StatelessWidget {
+  final String url;
+
+  const _AttachedImage({required this.url});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 190,
+      height: 125,
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Image.network(
+        url,
+        fit: BoxFit.contain,
+        errorBuilder:
+            (_, __, ___) => const Center(
+              child: Icon(Icons.broken_image_outlined, size: 18),
+            ),
       ),
     );
   }
@@ -437,8 +523,14 @@ class _InputBar extends StatelessWidget {
   final String? replyToName;
   final bool anonymous;
   final bool submitting;
+  final XFile? image;
+  final String? stickerId;
   final VoidCallback onCancelReply;
   final ValueChanged<bool> onAnonymousChanged;
+  final VoidCallback onPickImage;
+  final VoidCallback onRemoveImage;
+  final VoidCallback onPickSticker;
+  final VoidCallback onRemoveSticker;
   final VoidCallback onSubmit;
 
   const _InputBar({
@@ -446,8 +538,14 @@ class _InputBar extends StatelessWidget {
     required this.replyToName,
     required this.anonymous,
     required this.submitting,
+    required this.image,
+    required this.stickerId,
     required this.onCancelReply,
     required this.onAnonymousChanged,
+    required this.onPickImage,
+    required this.onRemoveImage,
+    required this.onPickSticker,
+    required this.onRemoveSticker,
     required this.onSubmit,
   });
 
@@ -483,6 +581,17 @@ class _InputBar extends StatelessWidget {
                   TextButton(onPressed: onCancelReply, child: const Text('취소')),
                 ],
               ),
+            if (image != null) ...[
+              const SizedBox(height: AppSpacing.xs),
+              _ImagePreview(file: image!, onRemove: onRemoveImage),
+            ],
+            if (stickerId != null) ...[
+              const SizedBox(height: AppSpacing.xs),
+              SeniorStickerChip(
+                stickerId: stickerId!,
+                onRemove: onRemoveSticker,
+              ),
+            ],
             Row(
               children: [
                 Expanded(
@@ -518,6 +627,34 @@ class _InputBar extends StatelessWidget {
             ),
             Row(
               children: [
+                IconButton(
+                  onPressed: submitting ? null : onPickImage,
+                  icon: Icon(
+                    image == null ? Icons.image_outlined : Icons.image,
+                    size: 19,
+                  ),
+                  color:
+                      image == null
+                          ? AppColors.textSecondary
+                          : AppColors.cardEmphasis,
+                  visualDensity: VisualDensity.compact,
+                  tooltip: '사진 첨부',
+                ),
+                IconButton(
+                  onPressed: submitting ? null : onPickSticker,
+                  icon: Icon(
+                    stickerId == null
+                        ? Icons.emoji_emotions_outlined
+                        : Icons.emoji_emotions,
+                    size: 19,
+                  ),
+                  color:
+                      stickerId == null
+                          ? AppColors.textSecondary
+                          : AppColors.cardEmphasis,
+                  visualDensity: VisualDensity.compact,
+                  tooltip: '스티커 첨부',
+                ),
                 Checkbox(
                   value: anonymous,
                   onChanged:
@@ -540,6 +677,61 @@ class _InputBar extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ImagePreview extends StatelessWidget {
+  final XFile file;
+  final VoidCallback onRemove;
+
+  const _ImagePreview({required this.file, required this.onRemove});
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Stack(
+        children: [
+          FutureBuilder(
+            future: file.readAsBytes(),
+            builder: (_, snap) {
+              return ClipRRect(
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                child:
+                    snap.hasData
+                        ? Image.memory(
+                          snap.data!,
+                          width: 180,
+                          height: 120,
+                          fit: BoxFit.contain,
+                        )
+                        : Container(
+                          width: 180,
+                          height: 120,
+                          color: AppColors.surfaceMuted,
+                        ),
+              );
+            },
+          ),
+          Positioned(
+            top: 4,
+            right: 4,
+            child: GestureDetector(
+              onTap: onRemove,
+              child: Container(
+                width: 22,
+                height: 22,
+                decoration: const BoxDecoration(
+                  color: Colors.black54,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close, color: Colors.white, size: 13),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

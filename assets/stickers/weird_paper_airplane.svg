@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <rect width="256" height="256" rx="48" fill="#EFFFFB"/>
+  <path d="M45 117 L205 51 L160 192 L125 141 L45 117Z" fill="#FFFFFF" stroke="#24324B" stroke-width="8" stroke-linejoin="round"/>
+  <path d="M125 141 L205 51 L97 130" fill="none" stroke="#24324B" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M52 166 C75 155 90 182 112 170" fill="none" stroke="#00A6A6" stroke-width="7" stroke-linecap="round"/>
+  <text x="128" y="226" text-anchor="middle" font-family="sans-serif" font-size="26" font-weight="800" fill="#24324B"> $ôÄ</text>
+</svg>

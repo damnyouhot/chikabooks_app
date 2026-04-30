@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <rect width="256" height="256" rx="48" fill="#F2F2F2"/>
+  <rect x="58" y="61" width="140" height="102" rx="18" fill="#FFFFFF" stroke="#2B2B2B" stroke-width="8"/>
+  <path d="M90 101 L116 127 M116 101 L90 127 M140 101 L166 127 M166 101 L140 127" stroke="#FF4D4D" stroke-width="8" stroke-linecap="round"/>
+  <path d="M98 180 H158" stroke="#2B2B2B" stroke-width="9" stroke-linecap="round"/>
+  <text x="128" y="226" text-anchor="middle" font-family="sans-serif" font-size="27" font-weight="800" fill="#2B2B2B">à8 ÆL</text>
+</svg>

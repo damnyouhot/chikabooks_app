@@ -1197,59 +1197,60 @@ class _CaringPageState extends State<CaringPage> with TickerProviderStateMixin {
   void _showTreatGuideDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text(
-          '먹이 얻는 방법',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-        ),
-        content: const SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                '공감투표에서 처음 선택하면 먹이 1개를 얻어요.',
-                style: TextStyle(fontSize: 12, height: 1.5),
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text(
+              '먹이 얻는 방법',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            content: const SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '공감투표 첫 선택: 1개',
+                    style: TextStyle(fontSize: 12, height: 1.5),
+                  ),
+                  SizedBox(height: 6),
+                  Text(
+                    '오늘의 퀴즈 첫 풀이: 1개\n'
+                    '정답 보너스: 1개\n'
+                    '퀴즈는 하루 최대 4개',
+                    style: TextStyle(fontSize: 12, height: 1.5),
+                  ),
+                  SizedBox(height: 6),
+                  Text(
+                    '속닥속닥 글·댓글·답글 작성: 2개\n'
+                    '좋아요·힘내요: 1개\n'
+                    '속닥 보상은 하루 최대 10개',
+                    style: TextStyle(fontSize: 12, height: 1.5),
+                  ),
+                  SizedBox(height: 6),
+                  Text(
+                    '오늘 단어 선택: 1개\n'
+                    '하루 최대 3개',
+                    style: TextStyle(fontSize: 12, height: 1.5),
+                  ),
+                  SizedBox(height: 12),
+                  Text(
+                    '밥주기 1번에는 먹이 3개가 필요해요.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
               ),
-              SizedBox(height: 6),
-              Text(
-                '오늘의 퀴즈를 열면 하루 1번 먹이 1개를 얻어요.',
-                style: TextStyle(fontSize: 12, height: 1.5),
-              ),
-              SizedBox(height: 6),
-              Text(
-                '퀴즈를 맞혀도 먹이 1개를 얻어요.',
-                style: TextStyle(fontSize: 12, height: 1.5),
-              ),
-              SizedBox(height: 6),
-              Text(
-                '속닥속닥에 글이나 댓글을 쓰면 먹이 1개를 얻어요.',
-                style: TextStyle(fontSize: 12, height: 1.5),
-              ),
-              SizedBox(height: 6),
-              Text(
-                '속닥속닥 보상은 하루 최대 2개까지 받을 수 있어요.',
-                style: TextStyle(fontSize: 12, height: 1.5),
-              ),
-              SizedBox(height: 12),
-              Text(
-                '밥주기 1번에는 먹이 3개가 필요해요.',
-                style: TextStyle(
-                  fontSize: 12,
-                  height: 1.5,
-                  fontWeight: FontWeight.w700,
-                ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('닫기'),
               ),
             ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('닫기'),
-          ),
-        ],
-      ),
     );
   }
 
