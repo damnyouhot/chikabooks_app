@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -7,6 +8,7 @@ import '../data/senior_stickers.dart';
 import '../models/senior_question.dart';
 import '../services/senior_question_image_service.dart';
 import '../services/senior_question_service.dart';
+import '../services/senior_sticker_usage_service.dart';
 import 'senior_sticker_widgets.dart';
 
 class SeniorQuestionCommentsSheet extends StatefulWidget {
@@ -110,6 +112,8 @@ class _SeniorQuestionCommentsSheetState
   Future<void> _pickSticker() async {
     final id = await showSeniorStickerPicker(context, selectedId: _stickerId);
     if (!mounted || id == null) return;
+    await SeniorStickerUsageService.recordSticker(id);
+    if (!mounted) return;
     setState(() => _stickerId = id);
   }
 
@@ -242,22 +246,39 @@ class _CommentTile extends StatelessWidget {
             imageUrls: hiddenForUser ? const [] : comment.imageUrls,
             stickerId: hiddenForUser ? null : comment.stickerId,
             isHiddenForAdmin: comment.isHidden && isAdmin,
-          ),
-          Row(
-            children: [
-              _TinyAction(
-                label: '좋아요 ${comment.likeCount}',
-                onTap:
-                    () => SeniorQuestionService.toggleCommentLike(
-                      questionId: questionId,
-                      commentId: comment.id,
-                    ),
-              ),
-              _TinyAction(label: '답글 ${comment.replyCount}', onTap: onReply),
-              _TinyAction(label: '신고', onTap: () => _reportComment(context)),
-              if (comment.isHidden && isAdmin)
-                _TinyAction(label: '복구', onTap: () => _restoreComment(context)),
-            ],
+            actions: Wrap(
+              alignment: WrapAlignment.end,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                StreamBuilder<bool>(
+                  stream: SeniorQuestionService.watchCommentLikeSelected(
+                    questionId: questionId,
+                    commentId: comment.id,
+                  ),
+                  builder: (_, snap) {
+                    final selected = snap.data ?? false;
+                    return _TinyAction(
+                      icon: selected ? Icons.favorite : Icons.favorite_border,
+                      iconColor:
+                          selected ? AppColors.error : AppColors.textSecondary,
+                      label: '좋아요 ${comment.likeCount}',
+                      onTap:
+                          () => SeniorQuestionService.toggleCommentLike(
+                            questionId: questionId,
+                            commentId: comment.id,
+                          ),
+                    );
+                  },
+                ),
+                _TinyAction(label: '답글 ${comment.replyCount}', onTap: onReply),
+                _TinyAction(label: '신고', onTap: () => _reportComment(context)),
+                if (comment.isHidden && isAdmin)
+                  _TinyAction(
+                    label: '복구',
+                    onTap: () => _restoreComment(context),
+                  ),
+              ],
+            ),
           ),
           StreamBuilder<List<SeniorReply>>(
             stream: SeniorQuestionService.watchReplies(
@@ -291,6 +312,27 @@ class _CommentTile extends StatelessWidget {
   }
 
   Future<void> _reportComment(BuildContext context) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('댓글 신고'),
+            content: const Text(
+              '이 댓글을 신고할까요?\n신고가 일정 수준 이상 누적되면 자동으로 숨김 처리됩니다.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('취소'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('신고'),
+              ),
+            ],
+          ),
+    );
+    if (confirm != true) return;
     final ok = await SeniorQuestionService.reportComment(
       questionId: questionId,
       commentId: comment.id,
@@ -328,6 +370,8 @@ class _ReplyTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hiddenForUser = reply.isHidden && !isAdmin;
+    final myUid = FirebaseAuth.instance.currentUser?.uid;
+    final isAuthor = myUid != null && reply.uid == myUid;
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: Column(
@@ -340,29 +384,128 @@ class _ReplyTile extends StatelessWidget {
             stickerId: hiddenForUser ? null : reply.stickerId,
             isHiddenForAdmin: reply.isHidden && isAdmin,
             compact: true,
-          ),
-          Row(
-            children: [
-              _TinyAction(
-                label: '좋아요 ${reply.likeCount}',
-                onTap:
-                    () => SeniorQuestionService.toggleReplyLike(
-                      questionId: questionId,
-                      commentId: commentId,
-                      replyId: reply.id,
+            actions: Wrap(
+              alignment: WrapAlignment.end,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                StreamBuilder<bool>(
+                  stream: SeniorQuestionService.watchReplyLikeSelected(
+                    questionId: questionId,
+                    commentId: commentId,
+                    replyId: reply.id,
+                  ),
+                  builder: (_, snap) {
+                    final selected = snap.data ?? false;
+                    return _TinyAction(
+                      icon: selected ? Icons.favorite : Icons.favorite_border,
+                      iconColor:
+                          selected ? AppColors.error : AppColors.textSecondary,
+                      label: '좋아요 ${reply.likeCount}',
+                      onTap:
+                          () => SeniorQuestionService.toggleReplyLike(
+                            questionId: questionId,
+                            commentId: commentId,
+                            replyId: reply.id,
+                          ),
+                    );
+                  },
+                ),
+                _TinyAction(label: '신고', onTap: () => _reportReply(context)),
+                if (isAuthor)
+                  PopupMenuButton<String>(
+                    color: AppColors.appBg,
+                    elevation: 4,
+                    position: PopupMenuPosition.under,
+                    offset: const Offset(0, 4),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                     ),
-              ),
-              _TinyAction(label: '신고', onTap: () => _reportReply(context)),
-              if (reply.isHidden && isAdmin)
-                _TinyAction(label: '복구', onTap: () => _restoreReply(context)),
-            ],
+                    icon: const Icon(
+                      Icons.more_horiz,
+                      size: 17,
+                      color: AppColors.textSecondary,
+                    ),
+                    onSelected: (value) {
+                      if (value == 'delete') _confirmDelete(context);
+                    },
+                    itemBuilder:
+                        (_) => const [
+                          PopupMenuItem(
+                            value: 'delete',
+                            child: Text(
+                              '삭제',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.error,
+                              ),
+                            ),
+                          ),
+                        ],
+                  ),
+                if (reply.isHidden && isAdmin)
+                  _TinyAction(label: '복구', onTap: () => _restoreReply(context)),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
+  Future<void> _confirmDelete(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('답글 삭제'),
+            content: const Text('이 답글을 삭제할까요?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('취소'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('삭제'),
+              ),
+            ],
+          ),
+    );
+    if (ok != true) return;
+    final success = await SeniorQuestionService.deleteReply(
+      questionId: questionId,
+      commentId: commentId,
+      replyId: reply.id,
+    );
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(success ? '답글을 삭제했어요.' : '삭제에 실패했어요.')),
+    );
+  }
+
   Future<void> _reportReply(BuildContext context) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('답글 신고'),
+            content: const Text(
+              '이 답글을 신고할까요?\n신고가 일정 수준 이상 누적되면 자동으로 숨김 처리됩니다.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('취소'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('신고'),
+              ),
+            ],
+          ),
+    );
+    if (confirm != true) return;
     final ok = await SeniorQuestionService.reportReply(
       questionId: questionId,
       commentId: commentId,
@@ -392,6 +535,7 @@ class _Bubble extends StatelessWidget {
   final String? stickerId;
   final bool isHiddenForAdmin;
   final bool compact;
+  final Widget? actions;
 
   const _Bubble({
     required this.name,
@@ -400,15 +544,23 @@ class _Bubble extends StatelessWidget {
     required this.stickerId,
     required this.isHiddenForAdmin,
     this.compact = false,
+    this.actions,
   });
 
   @override
   Widget build(BuildContext context) {
     final visibleBody =
         isSeniorStickerFallbackBody(body, stickerId) ? '' : body;
+    final basePadding = compact ? AppSpacing.sm : AppSpacing.md;
+    final bottomPadding = actions == null ? basePadding : (compact ? 2.0 : 4.0);
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(compact ? AppSpacing.sm : AppSpacing.md),
+      padding: EdgeInsets.fromLTRB(
+        basePadding,
+        basePadding,
+        basePadding,
+        bottomPadding,
+      ),
       decoration: BoxDecoration(
         color:
             isHiddenForAdmin
@@ -464,6 +616,10 @@ class _Bubble extends StatelessWidget {
             ),
             SeniorStickerView(stickerId: stickerId!, size: compact ? 50 : 62),
           ],
+          if (actions != null) ...[
+            SizedBox(height: compact ? AppSpacing.xs : AppSpacing.sm),
+            Align(alignment: Alignment.centerRight, child: actions!),
+          ],
         ],
       ),
     );
@@ -498,10 +654,17 @@ class _AttachedImage extends StatelessWidget {
 }
 
 class _TinyAction extends StatelessWidget {
+  final IconData? icon;
+  final Color? iconColor;
   final String label;
   final VoidCallback onTap;
 
-  const _TinyAction({required this.label, required this.onTap});
+  const _TinyAction({
+    this.icon,
+    this.iconColor,
+    required this.label,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -511,9 +674,18 @@ class _TinyAction extends StatelessWidget {
         visualDensity: VisualDensity.compact,
         foregroundColor: AppColors.textSecondary,
         padding: const EdgeInsets.symmetric(horizontal: 8),
-        minimumSize: const Size(0, 32),
+        minimumSize: const Size(0, 24),
       ),
-      child: Text(label, style: const TextStyle(fontSize: 12)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 13, color: iconColor),
+            const SizedBox(width: 3),
+          ],
+          Text(label, style: const TextStyle(fontSize: 12)),
+        ],
+      ),
     );
   }
 }

@@ -617,6 +617,65 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
     });
   }
 
+  static String _compactCompare(String value) {
+    return value.replaceAll(RegExp(r'\s+'), '').toLowerCase();
+  }
+
+  Future<void> _mergeLicenseOcrIntoDraft(
+    Map<String, String> extracted,
+    ClinicProfile profile,
+  ) async {
+    final latestProfile = await ClinicProfileService.getProfile(profile.id);
+    if (!mounted) return;
+    if (latestProfile != null) {
+      setState(() => _selectedProfile = latestProfile);
+    }
+
+    final regName = (extracted['clinicName'] ?? '').trim();
+    final regAddress = (extracted['address'] ?? '').trim();
+    final currentName = _data.clinicName.trim();
+    final currentAddress = _data.address.trim();
+
+    var next = _data;
+    var changed = false;
+    var nameMismatch = false;
+
+    if (regName.isNotEmpty) {
+      if (currentName.isEmpty ||
+          _compactCompare(currentName) != _compactCompare(regName)) {
+        next = next.copyWith(clinicName: regName);
+        changed = true;
+        nameMismatch = currentName.isNotEmpty;
+      }
+    }
+    if (regAddress.isNotEmpty && currentAddress.isEmpty) {
+      next = next.copyWith(address: regAddress);
+      changed = true;
+    }
+
+    if (changed) {
+      setState(() => _data = next);
+      _detailFormKey.currentState?.applyDraftFromParent(next);
+      await JobDraftService.saveDraft(
+        draftId: widget.draftId,
+        formData: {...next.toMap(), ..._extraDraftFields},
+      );
+      if (mounted) setState(() => _lastSavedAt = DateTime.now());
+    }
+
+    if (nameMismatch && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 7),
+          content: Text(
+            '공고 노출명을 인증 상호($regName) 기준으로 맞췄어요. '
+            '노출명을 다르게 쓰는 경우, 실제 인증 상호와 너무 다르면 검토 과정에서 반려될 수 있습니다.',
+          ),
+        ),
+      );
+    }
+  }
+
   void _applyDraftToData(JobDraft draft) {
     setState(() {
       _draftReady = true;
@@ -959,6 +1018,31 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
               res['subwayStationName'] as String?,
               d.subwayStationName,
             );
+    final exitNumberOut =
+        mergeEmptyOnly
+            ? _mergeStrNullablePreferExisting(
+              d.exitNumber,
+              res['exitNumber'] as String?,
+            )
+            : _firstNonEmptyNullable(
+              res['exitNumber'] as String?,
+              d.exitNumber,
+            );
+    final walkingMinutesAi = _parseIntLike(res['walkingMinutes']);
+    final walkingMinutesOut =
+        mergeEmptyOnly
+            ? (d.walkingMinutes ?? walkingMinutesAi)
+            : (walkingMinutesAi ?? d.walkingMinutes);
+    final walkingDistanceAi = _parseIntLike(res['walkingDistanceMeters']);
+    final walkingDistanceOut =
+        mergeEmptyOnly
+            ? (d.walkingDistanceMeters ?? walkingDistanceAi)
+            : (walkingDistanceAi ?? d.walkingDistanceMeters);
+    final parkingAi = _parseBool(res['parking']);
+    final parkingOut =
+        mergeEmptyOnly
+            ? (d.parking ? d.parking : (parkingAi ?? d.parking))
+            : (parkingAi ?? d.parking);
     final mainDutiesListOut =
         mergeEmptyOnly
             ? (d.mainDutiesList.isNotEmpty
@@ -1052,6 +1136,10 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
         chairCount: chairCountOut,
         staffCount: staffCountOut,
         subwayStationName: subwayStationNameOut,
+        walkingDistanceMeters: walkingDistanceOut,
+        walkingMinutes: walkingMinutesOut,
+        exitNumber: exitNumberOut,
+        parking: parkingOut,
         subwayLines:
             mergeEmptyOnly
                 ? (d.subwayLines.isNotEmpty
@@ -1149,6 +1237,13 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
     if (current != null && current.trim().isNotEmpty) return current;
     final r = resVal?.trim() ?? '';
     return r.isNotEmpty ? r : current;
+  }
+
+  int? _parseIntLike(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.round();
+    final digits = value?.toString().replaceAll(RegExp(r'[^\d]'), '') ?? '';
+    return digits.isEmpty ? null : int.tryParse(digits);
   }
 
   Future<void> _callAiParsing({
@@ -1965,7 +2060,12 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
     } else if (bv.status == BizVerificationStatus.pendingAuto) {
       msg = '사업자 인증 진행 중입니다…';
     } else if (bv.status == BizVerificationStatus.manualReview) {
-      msg = '사업자 정보를 검토 중입니다. 완료되면 알려 드릴게요.';
+      if (fr == 'hira_mismatch_after_grace' ||
+          fr == 'hira_mismatch_opened_at_unknown') {
+        msg = '국세청 사업자 정보는 확인됐지만, 심평원에서 치과 기관으로 자동 확인되지 않아 검토가 필요합니다.';
+      } else {
+        msg = '사업자 정보를 검토 중입니다. 완료되면 알려 드릴게요.';
+      }
     } else if (bv.status == BizVerificationStatus.rejected) {
       msg = '사업자 인증에 실패했습니다. 등록증을 다시 올려 주세요.';
     } else {
@@ -2136,6 +2236,7 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
       publisherStyleOcrLabelWidth: true,
       replacementMode: _licenseReplaceMode,
       persistedProfile: profile,
+      onOcrResult: (extracted) => _mergeLicenseOcrIntoDraft(extracted, profile),
       onReplaceLicenseWithDialog: _onTapReplaceBusinessLicense,
       onClearBusinessVerification: () => _clearBusinessVerification(profile),
       onReplacementCancel:

@@ -2,7 +2,7 @@ name: chikabooks_app
 description: A new Flutter project.
 publish_to: 'none'
 # 버전 변경 후 Xcode/Archive 전에 반드시: flutter build ios --config-only (로컬 Generated.xcconfig 갱신)
-version: 1.1.4+7
+version: 1.1.5+8
 
 environment:
   sdk: '>=3.7.0 <4.0.0'
@@ -80,6 +80,7 @@ flutter:
     - assets/clinic picture sample/
     - assets/auth/
     - assets/stickers/
+    - assets/stickers/twemoji/
     - packages/animated_emoji/lottie/smile.json
     - packages/animated_emoji/lottie/grin.json
     - packages/animated_emoji/lottie/laughing.json

@@ -55,7 +55,7 @@ class _HomeShellState extends State<HomeShell> {
   };
 
   // 탭 인덱스 → 화면 레이블 맵
-  static const _tabLabels = ['나(캐릭터)', '같이(파트너)', '성장하기', '커리어'];
+  static const _tabLabels = ['나(캐릭터)', '같이(파트너)', '성장', '커리어'];
   static const _tabRoutes = ['/', '/bond', '/growth', '/career'];
 
   // ── 탭 위젯 캐시 (JobPage는 온보딩 상태에 따라 build에서 생성) ──
@@ -389,7 +389,7 @@ class _HomeShellState extends State<HomeShell> {
                     icon: Icons.menu_book,
                     showNew: newMainTabs.contains(2),
                   ),
-                  label: '성장하기',
+                  label: '성장',
                 ),
                 BottomNavigationBarItem(
                   icon: _NavIconWithNewBadge(

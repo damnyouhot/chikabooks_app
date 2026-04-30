@@ -19,11 +19,10 @@ class JobImageUploaderImpl {
     for (int i = 0; i < images.length; i++) {
       final bytes = await images[i].readAsBytes();
       final name = images[i].name;
-      final ext = name.contains('.')
-          ? name.split('.').last.toLowerCase()
-          : 'jpg';
+      final ext =
+          name.contains('.') ? name.split('.').last.toLowerCase() : 'jpg';
       final fileName = '${_uuid.v4()}.$ext';
-      final path = 'jobs/$jobId/images/$fileName';
+      final path = 'jobImages/$jobId/images/$fileName';
       final ref = _storage.ref(path);
 
       final task = ref.putData(

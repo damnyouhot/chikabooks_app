@@ -8,19 +8,37 @@ import 'job_post_tracked_fields.dart';
 /// - workDays 한글 → 영문 코드 변환 (workDaysToCodes)
 /// - benefits 오분류 항목 제거 (역명, 시설 키워드)
 /// - description 줄 중 복지성 한 줄 → benefits로 이동
-/// - subwayStationName이 빈 경우 description에서 추출
+/// - 주소/연락처/교통 필드가 빈 경우 description에서만 보조 추출
 /// - recruitmentStart / closingDate 문자열 → DateTime 파싱
 /// - fieldStatus 보완: 값이 없는 주요 필드는 'missing'으로 강제 설정
 class JobAiExtractNormalizer {
   JobAiExtractNormalizer._();
 
   static const _korDayToKey = {
-    '월': 'mon', '화': 'tue', '수': 'wed',
-    '목': 'thu', '금': 'fri', '토': 'sat', '일': 'sun',
-    '월요일': 'mon', '화요일': 'tue', '수요일': 'wed',
-    '목요일': 'thu', '금요일': 'fri', '토요일': 'sat', '일요일': 'sun',
+    '월': 'mon',
+    '화': 'tue',
+    '수': 'wed',
+    '목': 'thu',
+    '금': 'fri',
+    '토': 'sat',
+    '일': 'sun',
+    '월요일': 'mon',
+    '화요일': 'tue',
+    '수요일': 'wed',
+    '목요일': 'thu',
+    '금요일': 'fri',
+    '토요일': 'sat',
+    '일요일': 'sun',
   };
-  static const _validDayCodes = {'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'};
+  static const _validDayCodes = {
+    'mon',
+    'tue',
+    'wed',
+    'thu',
+    'fri',
+    'sat',
+    'sun',
+  };
 
   /// Cloud Function 원본 맵을 보정한 복사본 반환.
   static Map<String, dynamic> normalize(Map<String, dynamic> raw) {
@@ -31,7 +49,7 @@ class JobAiExtractNormalizer {
     _processDigitalEquipment(m);
     _cleanBenefitsList(m);
     _splitDescriptionLinesIntoBenefits(m);
-    _fillSubwayFromDescriptionIfEmpty(m);
+    _fillLocationContactFromDescriptionIfEmpty(m);
     _parseRecruitmentDates(m);
     _fillFieldStatus(m);
 
@@ -85,7 +103,8 @@ class JobAiExtractNormalizer {
     } else if (rawList is String && rawList.trim().isNotEmpty) {
       // 줄글로 온 경우 분리
       duties.addAll(
-        rawList.split(RegExp(r'[\n\r•\-\*]+'))
+        rawList
+            .split(RegExp(r'[\n\r•\-\*]+'))
             .map((s) => s.trim())
             .where((s) => s.isNotEmpty),
       );
@@ -103,7 +122,13 @@ class JobAiExtractNormalizer {
   // ── specialties 정규화 ────────────────────────────────────────
 
   static const _validSpecialties = [
-    '일반진료', '교정', '임플란트', '소아치과', '치주', '보존', '기타',
+    '일반진료',
+    '교정',
+    '임플란트',
+    '소아치과',
+    '치주',
+    '보존',
+    '기타',
   ];
 
   static void _processSpecialties(Map<String, dynamic> m) {
@@ -155,7 +180,8 @@ class JobAiExtractNormalizer {
     m['hasCT'] = _pickBool(m['hasCT']);
     m['has3DPrinter'] = _pickBool(m['has3DPrinter']);
 
-    if (m['digitalEquipmentRaw'] == null || (m['digitalEquipmentRaw'] as String? ?? '').isEmpty) {
+    if (m['digitalEquipmentRaw'] == null ||
+        (m['digitalEquipmentRaw'] as String? ?? '').isEmpty) {
       final desc = (m['description'] as String?) ?? '';
       final equipMatch = RegExp(
         r'(iTero|Trios|구강\s*스캐너|3D\s*프린터|CT|CBCT|디지털|[Ii][Oo][Ss])',
@@ -171,7 +197,10 @@ class JobAiExtractNormalizer {
 
   static void _cleanBenefitsList(Map<String, dynamic> m) {
     final list = List<String>.from(
-      (m['benefits'] as List?)?.map((e) => e.toString().trim()).where((s) => s.isNotEmpty) ?? [],
+      (m['benefits'] as List?)
+              ?.map((e) => e.toString().trim())
+              .where((s) => s.isNotEmpty) ??
+          [],
     );
     list.removeWhere((b) => _isMisclassifiedBenefit(b));
     m['benefits'] = _dedupeStrings(list);
@@ -192,10 +221,18 @@ class JobAiExtractNormalizer {
     if (desc.isEmpty) return;
 
     final benefits = List<String>.from(
-      (m['benefits'] as List?)?.map((e) => e.toString().trim()).where((s) => s.isNotEmpty) ?? [],
+      (m['benefits'] as List?)
+              ?.map((e) => e.toString().trim())
+              .where((s) => s.isNotEmpty) ??
+          [],
     );
 
-    final lines = desc.split(RegExp(r'[\n\r]+')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+    final lines =
+        desc
+            .split(RegExp(r'[\n\r]+'))
+            .map((s) => s.trim())
+            .where((s) => s.isNotEmpty)
+            .toList();
     if (lines.length <= 1) return;
 
     final kept = <String>[];
@@ -215,15 +252,47 @@ class JobAiExtractNormalizer {
     m['description'] = kept.join('\n\n');
   }
 
-  // ── subwayStationName 보완 ────────────────────────────────────
+  // ── 주소 / 연락처 / 교통 보조 추출 ───────────────────────────────
 
-  static void _fillSubwayFromDescriptionIfEmpty(Map<String, dynamic> m) {
-    final existing = (m['subwayStationName'] as String?)?.trim() ?? '';
-    if (existing.isNotEmpty) return;
-    final desc = (m['description'] as String?) ?? '';
-    final match = RegExp(r'([가-힣]{2,10}역)').firstMatch(desc);
-    if (match != null) {
-      m['subwayStationName'] = match.group(1);
+  static void _fillLocationContactFromDescriptionIfEmpty(
+    Map<String, dynamic> m,
+  ) {
+    final desc = (m['description'] as String?)?.trim() ?? '';
+    if (desc.isEmpty) return;
+
+    if (((m['address'] as String?)?.trim() ?? '').isEmpty) {
+      final address = _extractAddress(desc);
+      if (address != null) m['address'] = address;
+    }
+
+    if (((m['contact'] as String?)?.trim() ?? '').isEmpty) {
+      final contact = _extractContact(desc);
+      if (contact != null) m['contact'] = contact;
+    }
+
+    if (((m['subwayStationName'] as String?)?.trim() ?? '').isEmpty) {
+      final station = _extractStation(desc);
+      if (station != null) m['subwayStationName'] = station;
+    }
+
+    if (((m['exitNumber'] as String?)?.trim() ?? '').isEmpty) {
+      final exitNumber = _extractExitNumber(desc);
+      if (exitNumber != null) m['exitNumber'] = exitNumber;
+    }
+
+    if (m['walkingMinutes'] == null) {
+      final minutes = _extractWalkingMinutes(desc);
+      if (minutes != null) m['walkingMinutes'] = minutes;
+    }
+
+    if (m['walkingDistanceMeters'] == null) {
+      final meters = _extractWalkingDistanceMeters(desc);
+      if (meters != null) m['walkingDistanceMeters'] = meters;
+    }
+
+    if (m['parking'] == null) {
+      final parking = _extractParking(desc);
+      if (parking != null) m['parking'] = parking;
     }
   }
 
@@ -234,7 +303,11 @@ class JobAiExtractNormalizer {
       final raw = m[key];
       if (raw is String && raw.isNotEmpty) {
         // YYYY-MM-DD 또는 YYYY.MM.DD 형태 파싱
-        final normalized = raw.replaceAll(RegExp(r'[./년월일\s]'), '-').replaceAll(RegExp(r'-+'), '-').trim();
+        final normalized =
+            raw
+                .replaceAll(RegExp(r'[./년월일\s]'), '-')
+                .replaceAll(RegExp(r'-+'), '-')
+                .trim();
         try {
           DateTime.parse(normalized); // 유효성 검사
           m[key] = normalized;
@@ -249,7 +322,10 @@ class JobAiExtractNormalizer {
 
   static void _fillFieldStatus(Map<String, dynamic> m) {
     final status = Map<String, String>.from(
-      (m['fieldStatus'] as Map?)?.map((k, v) => MapEntry(k.toString(), v.toString())) ?? {},
+      (m['fieldStatus'] as Map?)?.map(
+            (k, v) => MapEntry(k.toString(), v.toString()),
+          ) ??
+          {},
     );
 
     for (final field in JobPostTrackedFields.aiStatusOrderedKeys) {
@@ -267,6 +343,72 @@ class JobAiExtractNormalizer {
 
   // ── helpers ───────────────────────────────────────────────────
 
+  static String? _extractAddress(String text) {
+    final normalized = text.replaceAll(RegExp(r'\s+'), ' ').trim();
+    final labelMatch = RegExp(
+      r'(?:주소|위치|오시는\s*길|근무지)\s*[:：]?\s*([^.\n\r]+?(?:\d+(?:-\d+)?(?:\s*[가-힣A-Za-z0-9,-]*층)?(?:\s*\([^)]*\))?))',
+    ).firstMatch(normalized);
+    final roadMatch =
+        labelMatch ??
+        RegExp(
+          r'((?:서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)[^.\n\r]{0,45}?(?:로|길|대로)\s*\d+(?:-\d+)?(?:[^.\n\r]{0,24})?)',
+        ).firstMatch(normalized);
+    final value = roadMatch?.group(1)?.trim();
+    if (value == null || value.length < 8) return null;
+    return _stripTrailingNoise(value);
+  }
+
+  static String? _extractContact(String text) {
+    final email = RegExp(
+      r'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}',
+    ).firstMatch(text)?.group(0);
+    final phone = RegExp(
+      r'(?:대표전화|전화|연락처|문의|Tel\.?)?\s*[:：]?\s*((?:0\d{1,2}[-.\s]?\d{3,4}[-.\s]?\d{4})|(?:010[-.\s]?\d{3,4}[-.\s]?\d{4}))',
+      caseSensitive: false,
+    ).firstMatch(text)?.group(1);
+    final cleanedPhone = phone?.replaceAll(RegExp(r'\s+'), '-').trim();
+    if (cleanedPhone != null && cleanedPhone.isNotEmpty && email != null) {
+      return '$cleanedPhone / $email';
+    }
+    return cleanedPhone ?? email;
+  }
+
+  static String? _extractStation(String text) {
+    final match = RegExp(r'([가-힣A-Za-z0-9]{2,14}역)').firstMatch(text);
+    return match?.group(1)?.trim();
+  }
+
+  static String? _extractExitNumber(String text) {
+    final match = RegExp(r'(\d{1,2})\s*번\s*출구').firstMatch(text);
+    return match?.group(1)?.trim();
+  }
+
+  static int? _extractWalkingMinutes(String text) {
+    final match = RegExp(r'도보\s*(\d{1,2})\s*분').firstMatch(text);
+    return match == null ? null : int.tryParse(match.group(1)!);
+  }
+
+  static int? _extractWalkingDistanceMeters(String text) {
+    final match = RegExp(
+      r'(\d{2,4})\s*m(?:\s*거리)?',
+      caseSensitive: false,
+    ).firstMatch(text);
+    return match == null ? null : int.tryParse(match.group(1)!);
+  }
+
+  static bool? _extractParking(String text) {
+    if (RegExp(r'주차\s*(가능|지원|제공|완비)').hasMatch(text)) return true;
+    if (RegExp(r'주차\s*(불가|없음|어려움)').hasMatch(text)) return false;
+    return null;
+  }
+
+  static String _stripTrailingNoise(String value) {
+    return value
+        .replaceFirst(RegExp(r'\s*(대표전화|전화|연락처|문의|Tel\.?).*$'), '')
+        .replaceFirst(RegExp(r'\s*(강남역|[가-힣A-Za-z0-9]{2,14}역).*$'), '')
+        .trim();
+  }
+
   static bool _isLikelyStandaloneBenefitLine(String t) {
     if (t.length > 90) return false;
     if (RegExp(r'역\s*\d|\d+\s*번\s*출구|도보\s*\d').hasMatch(t)) return false;
@@ -276,12 +418,34 @@ class JobAiExtractNormalizer {
   }
 
   static final _benefitKeywords = [
-    '4대보험', '퇴직금', '연차', '식대', '식비', '주차', '야근', '수당', '성과급',
-    '명절', '상여', '교육', '휴가', '인센티브', '복지', '카페', '식사', '호텔',
+    '4대보험',
+    '퇴직금',
+    '연차',
+    '식대',
+    '식비',
+    '주차',
+    '야근',
+    '수당',
+    '성과급',
+    '명절',
+    '상여',
+    '교육',
+    '휴가',
+    '인센티브',
+    '복지',
+    '카페',
+    '식사',
+    '호텔',
   ];
 
   static final _facilityKeywords = [
-    '에어석션', '석션', '스툴', '체어', '장비', '유니트', 'CT',
+    '에어석션',
+    '석션',
+    '스툴',
+    '체어',
+    '장비',
+    '유니트',
+    'CT',
   ];
 
   static String _shortenLabel(String t) {
@@ -292,7 +456,9 @@ class JobAiExtractNormalizer {
 
   static bool _listHasSimilar(List<String> list, String candidate) {
     for (final b in list) {
-      if (b == candidate || b.contains(candidate) || candidate.contains(b)) return true;
+      if (b == candidate || b.contains(candidate) || candidate.contains(b)) {
+        return true;
+      }
     }
     return false;
   }

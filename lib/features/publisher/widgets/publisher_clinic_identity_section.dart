@@ -195,6 +195,7 @@ class _PublisherClinicIdentitySectionState
     required String hint,
     required TextEditingController controller,
     int maxLines = 1,
+    String? helperText,
   }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -207,15 +208,32 @@ class _PublisherClinicIdentitySectionState
           ),
         ),
         Expanded(
-          child: TextFormField(
-            controller: controller,
-            maxLines: maxLines,
-            style: GoogleFonts.notoSansKr(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
-            ),
-            decoration: _decValueOnly(hint),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextFormField(
+                controller: controller,
+                maxLines: maxLines,
+                style: GoogleFonts.notoSansKr(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+                decoration: _decValueOnly(hint),
+              ),
+              if (helperText != null && helperText.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  helperText,
+                  style: GoogleFonts.notoSansKr(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textDisabled,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
       ],
@@ -271,7 +289,11 @@ class _PublisherClinicIdentitySectionState
           if (widget.profile.bizRegImageUrl != null ||
               widget.profile.businessVerification.docUrl != null ||
               (widget.profile.businessVerification.ocrResult != null &&
-                  widget.profile.businessVerification.ocrResult!.isNotEmpty)) ...[
+                  widget
+                      .profile
+                      .businessVerification
+                      .ocrResult!
+                      .isNotEmpty)) ...[
             const SizedBox(height: 8),
             Text(
               '등록증을 바꾸려면 위 단계에서 새 파일을 올려 주세요.',
@@ -294,6 +316,7 @@ class _PublisherClinicIdentitySectionState
               label: '구직자에게 보이는 치과명',
               hint: '비우면 상호와 동일하게 표시됩니다',
               controller: _displayNameCtrl,
+              helperText: '인증 상호와 너무 다르면 검토 과정에서 공고가 반려될 수 있어요.',
             ),
             const SizedBox(height: 12),
             _inlineLabeledField(
@@ -354,6 +377,16 @@ class _PublisherClinicIdentitySectionState
               ),
               decoration: _dec('구직자에게 보이는 치과명', '비우면 상호와 동일하게 표시됩니다'),
             ),
+            const SizedBox(height: 4),
+            Text(
+              '인증 상호와 너무 다르면 검토 과정에서 공고가 반려될 수 있어요.',
+              style: GoogleFonts.notoSansKr(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textDisabled,
+                height: 1.35,
+              ),
+            ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _ownerNameCtrl,
@@ -403,36 +436,36 @@ class _PublisherClinicIdentitySectionState
               height: AppPublisher.ctaHeight,
               width: double.infinity,
               child: ElevatedButton(
-              onPressed: _saving ? null : _save,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.accent,
-                foregroundColor: AppColors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(
-                    AppPublisher.buttonRadius,
+                onPressed: _saving ? null : _save,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: AppColors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(
+                      AppPublisher.buttonRadius,
+                    ),
                   ),
                 ),
+                child:
+                    _saving
+                        ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.white,
+                          ),
+                        )
+                        : Text(
+                          '이 단계 저장',
+                          style: GoogleFonts.notoSansKr(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
               ),
-              child:
-                  _saving
-                      ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: AppColors.white,
-                        ),
-                      )
-                      : Text(
-                        '이 단계 저장',
-                        style: GoogleFonts.notoSansKr(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
             ),
-          ),
         ],
       ),
     );

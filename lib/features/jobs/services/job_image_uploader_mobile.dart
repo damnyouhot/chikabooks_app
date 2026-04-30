@@ -19,11 +19,12 @@ class JobImageUploaderImpl {
 
     for (int i = 0; i < images.length; i++) {
       final file = images[i];
-      final ext = file.name.contains('.')
-          ? file.name.split('.').last.toLowerCase()
-          : 'jpg';
+      final ext =
+          file.name.contains('.')
+              ? file.name.split('.').last.toLowerCase()
+              : 'jpg';
       final fileName = '${_uuid.v4()}.$ext';
-      final path = 'jobs/$jobId/images/$fileName';
+      final path = 'jobImages/$jobId/images/$fileName';
       final ref = _storage.ref(path);
 
       // 업로드 전 압축 (최대 1200px, 품질 80)

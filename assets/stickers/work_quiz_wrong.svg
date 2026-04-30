@@ -1,8 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
-  <rect width="256" height="256" rx="48" fill="#FFE9ED"/>
   <circle cx="128" cy="126" r="60" fill="#FFE08A" stroke="#2B2B2B" stroke-width="8"/>
   <path d="M96 110 L116 130 M116 110 L96 130 M140 110 L160 130 M160 110 L140 130" stroke="#2B2B2B" stroke-width="7" stroke-linecap="round"/>
   <ellipse cx="128" cy="154" rx="18" ry="12" fill="#2B2B2B"/>
   <path d="M64 55 L192 55 M64 55 L192 174 M192 55 L64 174" stroke="#FF3A3A" stroke-width="10" stroke-linecap="round"/>
-  <text x="128" y="226" text-anchor="middle" font-family="sans-serif" font-size="26" font-weight="800" fill="#2B2B2B">$õ ©©</text>
 </svg>

@@ -49,7 +49,7 @@ class BizLicenseVerifySnapshot {
   ) {
     final bv = profile.businessVerification;
     return BizLicenseVerifySnapshot(
-      status: 'verified',
+      status: bv.status.value,
       failReason: bv.failReason,
       checkMethod: bv.checkMethod,
       skipped: false,
@@ -77,7 +77,7 @@ class BizLicenseVerifySnapshot {
     final s = status ?? '';
     final fr = failReason ?? '';
     if (skipped) return '예 (기존 인증 유지)';
-    if (s == 'verified') return '예';
+    if (s == 'verified' || s == 'manual_review') return '예';
     if (s == 'rejected') {
       if (fr == 'business_closed' || fr == 'nts_not_matched') return '아니오';
       if (fr == 'ocr_failed') return '확인 불가';
@@ -87,7 +87,6 @@ class BizLicenseVerifySnapshot {
       return '기존 지점의 사업자번호와 다른 등록증입니다. 기존 정보를 덮어쓰지 않고 별도 인증 시도로 보관했어요.';
     }
     if (s == 'pending_auto') return '확인 중';
-    if (s == 'manual_review') return '확인 불가(수동 검토)';
     return '—';
   }
 
@@ -141,7 +140,14 @@ class BizLicenseVerifySnapshot {
       return '사업자 상태 확인 처리 중입니다.';
     }
     if (s == 'manual_review') {
-      return '추가 검토가 필요할 수 있습니다.';
+      switch (fr) {
+        case 'hira_mismatch_after_grace':
+          return '국세청 사업자 상태는 정상입니다. 다만 치과 의료기관 여부가 심평원 정보와 맞지 않아 운영팀 확인이 필요합니다.';
+        case 'hira_mismatch_opened_at_unknown':
+          return '국세청 사업자 상태는 정상입니다. 다만 개원일 또는 심평원 의료기관 정보를 확인하지 못해 운영팀 확인이 필요합니다.';
+        default:
+          return '국세청 사업자 상태는 확인됐고, 치과 의료기관 정보는 운영팀 검토가 필요합니다.';
+      }
     }
     return '—';
   }

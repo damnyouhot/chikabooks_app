@@ -27,6 +27,34 @@ class WebLoginPage extends StatefulWidget {
 }
 
 class _WebLoginPageState extends State<WebLoginPage> {
+  bool _clinicLoginRedirectPending = false;
+  bool _clinicLoginRedirecting = false;
+
+  void _markClinicLoginStarted() {
+    _clinicLoginRedirectPending = true;
+  }
+
+  void _clearClinicLoginRedirect() {
+    _clinicLoginRedirectPending = false;
+    _clinicLoginRedirecting = false;
+  }
+
+  Future<void> _redirectAfterClinicLogin() async {
+    if (!_clinicLoginRedirectPending || _clinicLoginRedirecting) return;
+    _clinicLoginRedirecting = true;
+    try {
+      final status = await ClinicAuthService.getStatus();
+      if (!mounted) return;
+      final route =
+          status.canPost
+              ? (widget.nextRoute ?? '/post-job/input')
+              : '/publisher/onboarding';
+      context.go(route);
+    } catch (_) {
+      if (mounted) context.go(widget.nextRoute ?? '/post-job/input');
+    }
+  }
+
   Widget _buildClinicSide() {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
@@ -34,9 +62,18 @@ class _WebLoginPageState extends State<WebLoginPage> {
       builder: (context, snapshot) {
         final user = snapshot.data;
         if (user != null) {
+          if (_clinicLoginRedirectPending) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) _redirectAfterClinicLogin();
+            });
+          }
           return _LoggedInClinicCard(user: user, nextRoute: widget.nextRoute);
         }
-        return _ClinicLoginCard(nextRoute: widget.nextRoute);
+        return _ClinicLoginCard(
+          nextRoute: widget.nextRoute,
+          onLoginStarted: _markClinicLoginStarted,
+          onLoginFailed: _clearClinicLoginRedirect,
+        );
       },
     );
   }
@@ -1107,7 +1144,14 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
 // ═══════════════════════════════════════════════════════════════
 class _ClinicLoginCard extends StatefulWidget {
   final String? nextRoute;
-  const _ClinicLoginCard({this.nextRoute});
+  final VoidCallback? onLoginStarted;
+  final VoidCallback? onLoginFailed;
+
+  const _ClinicLoginCard({
+    this.nextRoute,
+    this.onLoginStarted,
+    this.onLoginFailed,
+  });
 
   @override
   State<_ClinicLoginCard> createState() => _ClinicLoginCardState();
@@ -1135,6 +1179,7 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
       _errorMsg = null;
     });
     try {
+      widget.onLoginStarted?.call();
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailCtrl.text.trim(),
         password: _pwCtrl.text,
@@ -1142,19 +1187,11 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
 
       // provider 기록
       await SignInTracker.record('email');
-
-      if (!mounted) return;
-      final status = await ClinicAuthService.getStatus();
-      if (!mounted) return;
-
-      if (status.canPost) {
-        context.go(widget.nextRoute ?? '/post-job/input');
-      } else {
-        context.go('/publisher/onboarding');
-      }
     } on FirebaseAuthException catch (e) {
+      widget.onLoginFailed?.call();
       setState(() => _errorMsg = _mapError(e.code));
     } catch (_) {
+      widget.onLoginFailed?.call();
       setState(() => _errorMsg = '로그인 중 오류가 발생했어요. 다시 시도해주세요.');
     } finally {
       if (mounted) setState(() => _isLoading = false);

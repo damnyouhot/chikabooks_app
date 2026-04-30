@@ -26,6 +26,8 @@ import '../../pages/career/career_resume_shortcuts_row.dart';
 const double _kAbThumbInCListSide = kJobListingAbThumbSide;
 const int _kLevel1Limit = 8;
 const int _kLevel2Limit = 10;
+const int _kLevel1MockCount = 6;
+const int _kLevel2MockCount = 8;
 
 /// 채용 소탭 - 목록 모드
 ///
@@ -147,17 +149,47 @@ class _JobListingsScreenState extends State<JobListingsScreen> {
   Future<void> _loadHighlightedJobs() async {
     final svc = context.read<JobService>();
     final results = await Future.wait([
-      svc.fetchHighlightedJobs(jobLevel: 1, limit: _kLevel1Limit),
-      svc.fetchHighlightedJobs(jobLevel: 2, limit: _kLevel2Limit),
+      svc.fetchHighlightedJobs(
+        jobLevel: 1,
+        limit: _kLevel1Limit - _kLevel1MockCount,
+      ),
+      svc.fetchHighlightedJobs(
+        jobLevel: 2,
+        limit: _kLevel2Limit - _kLevel2MockCount,
+      ),
     ]);
     if (!mounted) return;
     setState(() {
-      _level1Jobs = results[0];
-      _level2Jobs = results[1];
+      _level1Jobs = _withMockBaseline(
+        liveJobs: results[0],
+        mockJobs: mockLevel1Jobs,
+        mockCount: _kLevel1MockCount,
+        totalLimit: _kLevel1Limit,
+      );
+      _level2Jobs = _withMockBaseline(
+        liveJobs: results[1],
+        mockJobs: mockLevel2Jobs,
+        mockCount: _kLevel2MockCount,
+        totalLimit: _kLevel2Limit,
+      );
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _updatePinnedPremiumVisibility();
     });
+  }
+
+  List<Job> _withMockBaseline({
+    required List<Job> liveJobs,
+    required List<Job> mockJobs,
+    required int mockCount,
+    required int totalLimit,
+  }) {
+    final live = List<Job>.of(liveJobs)
+      ..sort((a, b) => b.postedAt.compareTo(a.postedAt));
+    return <Job>[
+      ...live,
+      ...mockJobs.take(mockCount),
+    ].take(totalLimit).toList();
   }
 
   void _onScroll() {

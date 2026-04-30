@@ -47,6 +47,109 @@ function rankLevel(a: HiraMatchLevel, b: HiraMatchLevel): HiraMatchLevel {
   return o[a] >= o[b] ? a : b;
 }
 
+function dedupe(values: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const value of values) {
+    const v = value.replace(/\s+/g, " ").trim();
+    const key = normalizeCompact(v);
+    if (v.length < 2 || seen.has(key)) continue;
+    seen.add(key);
+    out.push(v);
+  }
+  return out;
+}
+
+function buildSearchCandidates(clinicName: string): string[] {
+  const raw = clinicName.replace(/\([^)]*\)/g, " ").trim();
+  const withoutCorpPrefix = raw
+    .replace(/^(의료법인|재단법인|학교법인|사회복지법인)\s*/g, "")
+    .replace(/^[가-힣A-Za-z0-9]+의료재단\s*/g, "")
+    .replace(/^[가-힣A-Za-z0-9]+재단\s*/g, "");
+  const parts = raw.split(/\s+/).filter(Boolean);
+  const lastPart = parts.length > 1 ? parts[parts.length - 1] : "";
+  const suffixTrimmed = withoutCorpPrefix.replace(
+    /(치과병원|치과의원|병원|의원)$/g,
+    ""
+  );
+
+  return dedupe([raw, withoutCorpPrefix, lastPart, suffixTrimmed]);
+}
+
+function hiraUrl(serviceKey: string, q: string): string {
+  return (
+    "https://apis.data.go.kr/B551182/hospInfoServicev2/getHospBasisList" +
+    "?ServiceKey=" +
+    encodeURIComponent(serviceKey) +
+    "&pageNo=1&numOfRows=30" +
+    "&yadmNm=" +
+    encodeURIComponent(q.slice(0, 100))
+  );
+}
+
+async function fetchHiraItems(
+  serviceKey: string,
+  q: string
+): Promise<{
+  items: Record<string, string>[];
+  empty: boolean;
+  error?: HiraMatchResult;
+}> {
+  const resp = await axios.get(hiraUrl(serviceKey, q), {
+    timeout: 25000,
+    responseType: "text",
+  });
+
+  let parsed: any;
+  const raw = resp.data;
+  if (typeof raw === "string" && raw.trim().startsWith("<?xml")) {
+    parsed = await parseStringPromise(raw, {
+      explicitArray: false,
+      trim: true,
+    });
+  } else if (typeof raw === "string") {
+    parsed = JSON.parse(raw);
+  } else {
+    parsed = raw;
+  }
+
+  const {header, body} = getHiraResponseBody(parsed);
+  const resultCode = firstScalar(header?.resultCode);
+  if (resultCode && resultCode !== "00") {
+    const msg = firstScalar(header?.resultMsg) || resultCode;
+    return {
+      items: [],
+      empty: false,
+      error: {
+        matched: null,
+        note: `심평원 API: ${msg}`,
+        level: "none",
+      },
+    };
+  }
+
+  if (!body) {
+    return {
+      items: [],
+      empty: false,
+      error: {
+        matched: null,
+        note: "심평원 응답 본문 없음",
+        level: "none",
+      },
+    };
+  }
+
+  let rawItems = body.items?.item;
+  if (!rawItems || (typeof rawItems === "string" && rawItems.trim() === "")) {
+    return {items: [], empty: true};
+  }
+  if (!Array.isArray(rawItems)) {
+    rawItems = [rawItems];
+  }
+  return {items: rawItems as Record<string, string>[], empty: false};
+}
+
 /** 등급 산출 후에도 안 맞으면 예전 상호·주소 일부 포함 휴리스틱으로 partial 승격 */
 function legacyFuzzyHit(
   q: string,
@@ -96,103 +199,76 @@ export async function matchHiraClinicName(
   }
 
   try {
-    const url =
-      "https://apis.data.go.kr/B551182/hospInfoServicev2/getHospBasisList" +
-      "?ServiceKey=" +
-      encodeURIComponent(serviceKey) +
-      "&pageNo=1&numOfRows=30" +
-      "&yadmNm=" +
-      encodeURIComponent(q.slice(0, 100));
+    const candidates = buildSearchCandidates(q);
+    let searched = 0;
+    let nonDentalCount = 0;
+    let firstEmptyQuery = "";
 
-    const resp = await axios.get(url, {
-      timeout: 25000,
-      responseType: "text",
-    });
+    for (const query of candidates) {
+      searched += 1;
+      const result = await fetchHiraItems(serviceKey, query);
+      if (result.error) return result.error;
+      if (result.empty) {
+        firstEmptyQuery ||= query;
+        continue;
+      }
 
-    let parsed: any;
-    const raw = resp.data;
-    if (typeof raw === "string" && raw.trim().startsWith("<?xml")) {
-      parsed = await parseStringPromise(raw, {
-        explicitArray: false,
-        trim: true,
+      const dental = result.items.filter((it: Record<string, string>) => {
+        const cl = String(it.clCdNm ?? it.clcdnm ?? "");
+        return cl.includes("치과");
       });
-    } else if (typeof raw === "string") {
-      parsed = JSON.parse(raw);
-    } else {
-      parsed = raw;
-    }
+      if (dental.length === 0) {
+        nonDentalCount += result.items.length;
+        continue;
+      }
 
-    const {header, body} = getHiraResponseBody(parsed);
-    const resultCode = firstScalar(header?.resultCode);
-    if (resultCode && resultCode !== "00") {
-      const msg = firstScalar(header?.resultMsg) || resultCode;
+      let best: HiraMatchLevel = "none";
+      for (const it of dental) {
+        const row = {
+          yadmNm: String(it.yadmNm ?? it.yadmnm ?? ""),
+          addr: String(it.addr ?? it.ADDR ?? ""),
+        };
+        const t = tierForRow(query, address, row);
+        best = rankLevel(best, t);
+        if (best === "strict") break;
+      }
+
+      if (best === "none" && legacyFuzzyHit(query, address, dental)) {
+        best = "partial";
+      }
+
+      const matched = best === "strict" || best === "partial";
+      const note =
+        best === "none" ?
+          noteForLevel("none", "no_hit") :
+          noteForLevel(best, "hit");
+
       return {
-        matched: null,
-        note: `심평원 API: ${msg}`,
-        level: "none",
+        matched,
+        note: `${note} (검색어: ${query})`,
+        level: best,
       };
     }
 
-    if (!body) {
-      return {
-        matched: null,
-        note: "심평원 응답 본문 없음",
-        level: "none",
-      };
-    }
-
-    let rawItems = body.items?.item;
-    if (!rawItems || (typeof rawItems === "string" && rawItems.trim() === "")) {
+    if (nonDentalCount > 0) {
       return {
         matched: false,
         note:
-          "심평원 병원목록에 해당 상호로 검색된 항목이 없습니다. " +
-          HIRA_RESULT_DISCLAIMER,
-        level: "none",
-      };
-    }
-    if (!Array.isArray(rawItems)) {
-      rawItems = [rawItems];
-    }
-
-    const dental = rawItems.filter((it: Record<string, string>) => {
-      const cl = String(it.clCdNm ?? it.clcdnm ?? "");
-      return cl.includes("치과");
-    });
-
-    if (dental.length === 0) {
-      return {
-        matched: false,
-        note:
-          "검색 결과에 치과 요양기관(종별)이 없습니다. " +
+          `심평원 병원정보에서 ${nonDentalCount}건 조회됐지만 ` +
+          "치과 요양기관(종별)은 없었습니다. " +
           HIRA_RESULT_DISCLAIMER,
         level: "none",
       };
     }
 
-    let best: HiraMatchLevel = "none";
-    for (const it of dental) {
-      const row = {
-        yadmNm: String(it.yadmNm ?? it.yadmnm ?? ""),
-        addr: String(it.addr ?? it.ADDR ?? ""),
-      };
-      const t = tierForRow(q, address, row);
-      best = rankLevel(best, t);
-      if (best === "strict") break;
-    }
-
-    if (best === "none" && legacyFuzzyHit(q, address, dental)) {
-      best = "partial";
-    }
-
-    const matched = best === "strict" || best === "partial";
-
-    const note =
-      best === "none"
-        ? noteForLevel("none", "no_hit")
-        : noteForLevel(best, "hit");
-
-    return {matched, note, level: best};
+    return {
+      matched: false,
+      note:
+        `심평원 병원목록에 해당 상호로 검색된 항목이 없습니다. ` +
+        `(검색어 ${searched}개${firstEmptyQuery ? `, 예: ${firstEmptyQuery}` : ""}) ` +
+        HIRA_RESULT_DISCLAIMER,
+      level: "none",
+    };
   } catch (e: unknown) {
     return {
       matched: null,

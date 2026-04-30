@@ -2196,6 +2196,46 @@ class JobPostFormState extends State<JobPostForm> {
   }
 
   // ── 섹션 카드 래퍼 ─────────────────────────────────────
+  Widget _buildStep1EmptyDropHint({
+    required bool active,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        height: 110,
+        decoration: BoxDecoration(
+          color: AppColors.accent.withValues(alpha: active ? 0.08 : 0.03),
+          border: Border.all(
+            color: active ? AppColors.accent : AppColors.divider,
+            width: active ? 1.5 : 1,
+          ),
+          borderRadius: BorderRadius.circular(AppPublisher.softRadius),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.cloud_upload_outlined,
+              size: 18,
+              color: active ? AppColors.accent : AppColors.textDisabled,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              active ? '여기에 놓으면 추가됩니다' : '클릭하거나 사진 끌어다 놓기',
+              style: _ft(
+                size: 11,
+                weight: FontWeight.w600,
+                color: active ? AppColors.accent : AppColors.textDisabled,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// step1 웹 에디터: [항목명+설명+추가버튼(좌) | 썸네일(우)] 세 항목 수직 배치
   Widget _buildStep1CompactSections() {
     const labelWidth = 160.0;
@@ -2230,7 +2270,6 @@ class JobPostFormState extends State<JobPostForm> {
       required String desc,
       required Widget button,
       required Widget thumbsArea,
-      required bool hasItems,
     }) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
@@ -2265,43 +2304,7 @@ class JobPostFormState extends State<JobPostForm> {
               ),
             ),
             const SizedBox(width: 16),
-            Expanded(
-              child:
-                  hasItems
-                      ? thumbsArea
-                      : Container(
-                        height: 110,
-                        decoration: BoxDecoration(
-                          color: AppColors.accent.withValues(alpha: 0.03),
-                          border: Border.all(
-                            color: AppColors.divider,
-                            width: 1,
-                          ),
-                          borderRadius: BorderRadius.circular(
-                            AppPublisher.softRadius,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.cloud_upload_outlined,
-                              size: 18,
-                              color: AppColors.textDisabled,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              '클릭하거나 사진 끌어다 놓거나',
-                              style: _ft(
-                                size: 11,
-                                weight: FontWeight.w500,
-                                color: AppColors.textDisabled,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-            ),
+            Expanded(child: thumbsArea),
           ],
         ),
       );
@@ -2318,7 +2321,6 @@ class JobPostFormState extends State<JobPostForm> {
             _data.images.length < 10,
             _pickImages,
           ),
-          hasItems: _data.images.isNotEmpty,
           thumbsArea: _buildInteriorImageSection(
             primaryHint: '',
             secondaryHint: '',
@@ -2334,7 +2336,6 @@ class JobPostFormState extends State<JobPostForm> {
             _data.promotionalImageUrls.length < _kMaxPromoImages,
             _pickPromotionalImages,
           ),
-          hasItems: _data.promotionalImageUrls.isNotEmpty,
           thumbsArea: _buildPromotionalImageSection(hideHintsAndButton: true),
         ),
         const Divider(height: 12, thickness: 1, color: AppColors.divider),
@@ -2346,7 +2347,6 @@ class JobPostFormState extends State<JobPostForm> {
             _data.logoUrl == null || _data.logoUrl!.isEmpty,
             _pickLogo,
           ),
-          hasItems: _data.logoUrl != null && _data.logoUrl!.isNotEmpty,
           thumbsArea: _buildLogoSection(hideHintsAndButton: true),
         ),
       ],
@@ -2548,7 +2548,11 @@ class JobPostFormState extends State<JobPostForm> {
               ),
             ),
             const SizedBox(height: 12),
-          ],
+          ] else if (hideHintsAndButton)
+            _buildStep1EmptyDropHint(
+              active: _promoDropActive,
+              onTap: _pickPromotionalImages,
+            ),
           if (!hideHintsAndButton)
             SizedBox(
               height: _pubWeb ? AppPublisher.ctaHeight : null,
@@ -2703,6 +2707,8 @@ class JobPostFormState extends State<JobPostForm> {
                 ),
               ),
             )
+          else if ((logoUrl == null || logoUrl.isEmpty) && hideHintsAndButton)
+            _buildStep1EmptyDropHint(active: _logoDropActive, onTap: _pickLogo)
           else if ((logoUrl == null || logoUrl.isEmpty) && !hideHintsAndButton)
             SizedBox(
               height: _pubWeb ? AppPublisher.ctaHeight : null,
@@ -2875,7 +2881,11 @@ class JobPostFormState extends State<JobPostForm> {
               ),
             ),
             const SizedBox(height: 12),
-          ],
+          ] else if (hideHintsAndButton)
+            _buildStep1EmptyDropHint(
+              active: _imageDropActive,
+              onTap: _pickImages,
+            ),
           if (!hideHintsAndButton)
             Row(
               children: [
@@ -3014,14 +3024,34 @@ class JobPostFormState extends State<JobPostForm> {
         ),
         const SizedBox(height: 12),
         _wrapStep3Clear(
-          child: _field(
-            controller: _clinicNameCtrl,
-            label: '치과명',
-            hint: '예) 서울미소치과',
-            validator: (v) => (v?.isEmpty ?? true) ? '치과명을 입력해주세요.' : null,
-            fieldKey: 'clinicName',
-            showStep3EmptyBadge: _clinicNameCtrl.text.trim().isEmpty,
-            focusNode: _fClinicName,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _field(
+                controller: _clinicNameCtrl,
+                label: '공고 노출 치과명',
+                hint: '예) 서울미소치과',
+                validator:
+                    (v) => (v?.isEmpty ?? true) ? '공고에 표시할 치과명을 입력해주세요.' : null,
+                fieldKey: 'clinicName',
+                showStep3EmptyBadge: _clinicNameCtrl.text.trim().isEmpty,
+                focusNode: _fClinicName,
+              ),
+              Padding(
+                padding: EdgeInsets.only(
+                  left: _webStep3Inline ? AppPublisher.formInlineLabelWidth : 0,
+                  top: 4,
+                ),
+                child: Text(
+                  '기본값은 인증된 등록증 상호명입니다. 노출명이 인증 상호와 너무 다르면 검토 과정에서 공고가 반려될 수 있어요.',
+                  style: _ft(
+                    size: 11,
+                    weight: FontWeight.w500,
+                    color: AppColors.textDisabled,
+                  ),
+                ),
+              ),
+            ],
           ),
           isEmpty: _clinicNameCtrl.text.trim().isEmpty,
           onMinus: () {

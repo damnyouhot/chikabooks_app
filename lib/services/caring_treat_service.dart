@@ -9,20 +9,20 @@ class CaringTreatService {
   static final _db = FirebaseFirestore.instance;
   static final _auth = FirebaseAuth.instance;
 
-  static const int empathyAmount = 1;
+  static const int empathyAmount = 3;
 
-  /// 퀴즈 문항을 **처음 제출**할 때(풀 때) 1개 — 하루 2문항이면 최대 2
-  static const int quizFirstAnswerAmount = 1;
+  /// 퀴즈 문항을 **처음 제출**할 때(풀 때) 2개 — 하루 2문항이면 최대 4
+  static const int quizFirstAnswerAmount = 2;
   static const int quizCorrectAmount = 1;
 
   /// 글·댓글·답글 작성 시 지급(일일 속닥 합산 상한 내)
-  static const int whisperWriteTreatAmount = 2;
+  static const int whisperWriteTreatAmount = 6;
 
   /// 좋아요·힘내요 등 반응 1회당
-  static const int whisperReactionTreatAmount = 1;
+  static const int whisperReactionTreatAmount = 2;
 
   /// 속닥속닥 관련 먹이(작성+반응) 하루 합산 상한
-  static const int whisperDailyTreatCap = 10;
+  static const int whisperDailyTreatCap = 20;
   static const int feedCost = 3;
 
   static DocumentReference<Map<String, dynamic>>? get _userRef {
@@ -350,7 +350,7 @@ class CaringTreatService {
     return _revokeWhisperGrant('whisper_${safeType}_$contentId');
   }
 
-  /// 속닥속닥 본문·댓글·답글의 좋아요·힘내요 — 반응당 1개(일일 속닥 합산 10개 상한)
+  /// 속닥속닥 본문·댓글·답글의 좋아요·힘내요 — 반응당 2개(일일 속닥 합산 20개 상한)
   ///
   /// [grantKey]는 사용자·대상·반응 종류별로 유일해야 함
   static Future<bool> tryGrantWhisperReaction({

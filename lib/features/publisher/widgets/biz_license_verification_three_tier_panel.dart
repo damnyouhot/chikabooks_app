@@ -52,10 +52,15 @@ class _BizLicenseVerificationThreeTierPanelState
           headerColor: AppColors.accent,
           borderColor: AppColors.accent,
           bgColor: AppColors.accent.withValues(alpha: 0.06),
-          leading: (widget.snapshot.canApplyToProfileAfterNts ||
-                  widget.snapshot.skipped)
-              ? const Icon(Icons.verified, size: 16, color: AppColors.accent)
-              : null,
+          leading:
+              (widget.snapshot.canApplyToProfileAfterNts ||
+                      widget.snapshot.skipped)
+                  ? const Icon(
+                    Icons.verified,
+                    size: 16,
+                    color: AppColors.accent,
+                  )
+                  : null,
           detail: _tier2Detail(),
         ),
         SizedBox(height: AppSpacing.sm),
@@ -102,10 +107,7 @@ class _BizLicenseVerificationThreeTierPanelState
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (leading != null) ...[
-                    leading,
-                    const SizedBox(width: 6),
-                  ],
+                  if (leading != null) ...[leading, const SizedBox(width: 6)],
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -201,49 +203,55 @@ class _BizLicenseVerificationThreeTierPanelState
     };
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: order.expand((key) {
-        final v = widget.ocrResult?[key] ?? '';
-        if (v.isEmpty) return <Widget>[];
-        return [
-          Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(
-                  width: 72,
-                  child: Text(
-                    labels[key] ?? key,
-                    style: GoogleFonts.notoSansKr(
-                      fontSize: 11,
-                      color: AppColors.textSecondary,
+      children:
+          order.expand((key) {
+            final v = widget.ocrResult?[key] ?? '';
+            if (v.isEmpty) return <Widget>[];
+            return [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 72,
+                      child: Text(
+                        labels[key] ?? key,
+                        style: GoogleFonts.notoSansKr(
+                          fontSize: 11,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-                Expanded(
-                  child: Text(
-                    v,
-                    style: GoogleFonts.notoSansKr(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
+                    Expanded(
+                      child: Text(
+                        v,
+                        style: GoogleFonts.notoSansKr(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
-            ),
-          ),
-        ];
-      }).toList(),
+              ),
+            ];
+          }).toList(),
     );
   }
 
   // ── Tier 2: NTS ──────────────────────────────────────────
   List<String> _tier2Summary() {
-    final ok = widget.snapshot.canApplyToProfileAfterNts ||
-        widget.snapshot.skipped;
+    final canPublishByNts =
+        widget.snapshot.canApplyToProfileAfterNts || widget.snapshot.skipped;
+    final normalBusiness = widget.snapshot.lineNormalBusiness.startsWith('예');
     return [
-      ok ? '✓ 인증 완료 — 공고 등록 가능' : '인증 대기 또는 미완료',
+      canPublishByNts
+          ? '✓ 인증 완료 — 공고 등록 가능'
+          : normalBusiness
+          ? '✓ 국세청 사업자 확인 완료'
+          : '인증 대기 또는 미완료',
       '정상 사업자: ${_short(widget.snapshot.lineNormalBusiness)}',
       '조회 결과: ${_short(widget.snapshot.lineQuerySummary)}',
     ];
@@ -380,7 +388,7 @@ class _BizLicenseVerificationThreeTierPanelState
         break;
     }
     if (hiraMatched == true) return '조회됨(구버전)';
-    if (hiraMatched == false) return '불일치 가능';
+    if (hiraMatched == false) return '치과 확인 안 됨';
     return '판정 불가';
   }
 
@@ -399,7 +407,7 @@ class _BizLicenseVerificationThreeTierPanelState
       return '대조 결과(보조): 심평원 목록에서 치과 요양기관으로 조회됨. 공개데이터 기준 참고용입니다.';
     }
     if (hiraMatched == false) {
-      return '대조 결과(보조): 치과 항목 없음·상호·주소 불일치 가능 — 운영 검토 권장';
+      return '대조 결과(보조): 심평원에서 치과 요양기관으로 확인되지 않았습니다. 국세청 사업자 정상 여부와 별개의 치과 기관 확인 단계입니다.';
     }
     return '대조 결과(보조): 키 미설정·API 오류 등으로 자동 판정 불가';
   }

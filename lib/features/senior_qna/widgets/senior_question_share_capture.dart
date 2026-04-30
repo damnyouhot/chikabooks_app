@@ -11,6 +11,7 @@ import '../../../core/theme/app_tokens.dart';
 import '../../../core/utils/share_position_origin.dart';
 import '../../../core/widgets/app_badge.dart';
 import '../models/senior_question.dart';
+import '../services/senior_question_service.dart';
 
 const String _kShareBaseUrl = 'https://chikabooks3rd.web.app';
 
@@ -32,6 +33,8 @@ class SeniorQuestionShareCapture {
     if (overlay == null) {
       throw StateError('Overlay 없음');
     }
+    final previewComments =
+        await SeniorQuestionService.fetchSharePreviewComments(question.id);
 
     final key = GlobalKey();
     late OverlayEntry entry;
@@ -47,7 +50,10 @@ class SeniorQuestionShareCapture {
                 key: key,
                 child: SizedBox(
                   width: _kCardWidth,
-                  child: _SeniorQuestionShareCard(question: question),
+                  child: _SeniorQuestionShareCard(
+                    question: question,
+                    previewComments: previewComments,
+                  ),
                 ),
               ),
             ),
@@ -88,9 +94,13 @@ class SeniorQuestionShareCapture {
 }
 
 class _SeniorQuestionShareCard extends StatelessWidget {
-  const _SeniorQuestionShareCard({required this.question});
+  const _SeniorQuestionShareCard({
+    required this.question,
+    required this.previewComments,
+  });
 
   final SeniorQuestion question;
+  final List<SeniorComment> previewComments;
 
   @override
   Widget build(BuildContext context) {
@@ -165,10 +175,10 @@ class _SeniorQuestionShareCard extends StatelessWidget {
                   ),
                   child: Text(
                     question.body,
-                    maxLines: 8,
+                    maxLines: previewComments.isEmpty ? 8 : 5,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 17,
+                      fontSize: 15.5,
                       fontWeight: FontWeight.w800,
                       color: AppColors.textPrimary,
                       height: 1.42,
@@ -231,6 +241,22 @@ class _SeniorQuestionShareCard extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (previewComments.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.xl,
+                      0,
+                      AppSpacing.xl,
+                      AppSpacing.md,
+                    ),
+                    child: Column(
+                      children: previewComments
+                          .map(
+                            (comment) => _ShareCommentPreview(comment: comment),
+                          )
+                          .toList(growable: false),
+                    ),
+                  ),
                 const Divider(height: 1),
                 Padding(
                   padding: const EdgeInsets.symmetric(
@@ -266,5 +292,67 @@ class _SeniorQuestionShareCard extends StatelessWidget {
 
   String _dateLabel(DateTime dt) {
     return '${dt.year}.${dt.month.toString().padLeft(2, '0')}.${dt.day.toString().padLeft(2, '0')}';
+  }
+}
+
+class _ShareCommentPreview extends StatelessWidget {
+  final SeniorComment comment;
+
+  const _ShareCommentPreview({required this.comment});
+
+  @override
+  Widget build(BuildContext context) {
+    final body = _commentPreviewBody(comment);
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: AppSpacing.xs),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xs,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.white.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.chat_bubble_outline,
+            size: 13,
+            color: AppColors.textDisabled,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: '${comment.displayName} ',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  TextSpan(text: body),
+                ],
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 11,
+                height: 1.35,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _commentPreviewBody(SeniorComment comment) {
+    final body = comment.body.trim();
+    if (body.isNotEmpty) return body;
+    if (comment.stickerId != null) return '스티커를 남겼어요';
+    if (comment.imageUrls.isNotEmpty) return '사진 댓글을 남겼어요';
+    return '댓글을 남겼어요';
   }
 }

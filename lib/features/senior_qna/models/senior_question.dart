@@ -140,6 +140,7 @@ class SeniorReply {
   final int likeCount;
   final int reportCount;
   final bool isHidden;
+  final bool isDeleted;
   final String? hiddenReason;
   final DateTime createdAt;
 
@@ -154,6 +155,7 @@ class SeniorReply {
     required this.likeCount,
     required this.reportCount,
     required this.isHidden,
+    required this.isDeleted,
     required this.hiddenReason,
     required this.createdAt,
   });
@@ -171,6 +173,7 @@ class SeniorReply {
       likeCount: data['likeCount'] as int? ?? 0,
       reportCount: data['reportCount'] as int? ?? 0,
       isHidden: data['isHidden'] as bool? ?? false,
+      isDeleted: data['isDeleted'] as bool? ?? false,
       hiddenReason: data['hiddenReason'] as String?,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );

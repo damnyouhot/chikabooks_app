@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../data/senior_stickers.dart';
+import '../services/senior_sticker_usage_service.dart';
 
 class SeniorStickerView extends StatelessWidget {
   final String stickerId;
@@ -16,31 +17,10 @@ class SeniorStickerView extends StatelessWidget {
   Widget build(BuildContext context) {
     final sticker = seniorStickerById(stickerId);
     if (sticker == null) return const SizedBox.shrink();
-    return Container(
+    return SizedBox(
       width: size + 20,
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: AppColors.white.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.divider.withValues(alpha: 0.35)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _StickerArt(sticker: sticker, size: size),
-          const SizedBox(height: 4),
-          Text(
-            sticker.label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ],
-      ),
+      height: size + 20,
+      child: Center(child: _StickerArt(sticker: sticker, size: size)),
     );
   }
 }
@@ -102,90 +82,120 @@ Future<String?> showSeniorStickerPicker(
   );
 }
 
-class _SeniorStickerPickerSheet extends StatelessWidget {
+class _SeniorStickerPickerSheet extends StatefulWidget {
   final String? selectedId;
 
   const _SeniorStickerPickerSheet({required this.selectedId});
 
   @override
+  State<_SeniorStickerPickerSheet> createState() =>
+      _SeniorStickerPickerSheetState();
+}
+
+class _SeniorStickerPickerSheetState extends State<_SeniorStickerPickerSheet> {
+  late final Future<List<String>> _recentStickerIdsFuture =
+      SeniorStickerUsageService.loadRecentStickerIds();
+
+  @override
   Widget build(BuildContext context) {
     final height = MediaQuery.sizeOf(context).height * 0.7;
-    return SafeArea(
-      top: false,
-      child: SizedBox(
-        height: height,
-        child: DefaultTabController(
-          length: seniorStickerPickerCategories.length,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              AppSpacing.md,
-              AppSpacing.lg,
-              AppSpacing.md,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+    return FutureBuilder<List<String>>(
+      future: _recentStickerIdsFuture,
+      builder: (context, snapshot) {
+        final recentStickers = (snapshot.data ?? const <String>[])
+            .map(seniorStickerById)
+            .whereType<SeniorSticker>()
+            .toList(growable: false);
+        final tabLabels = <String>[
+          '최근',
+          ...seniorStickerPickerGroups.map((group) => group.label),
+        ];
+        final stickerGroups = <List<SeniorSticker>>[
+          recentStickers,
+          ...seniorStickerPickerGroups.map(seniorStickersForPickerGroup),
+        ];
+
+        return SafeArea(
+          top: false,
+          child: SizedBox(
+            height: height,
+            child: DefaultTabController(
+              length: tabLabels.length,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg,
+                  AppSpacing.md,
+                  AppSpacing.lg,
+                  AppSpacing.md,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      '움직이는 스티커',
-                      style: TextStyle(
-                        fontSize: 16,
+                    Row(
+                      children: [
+                        const Text(
+                          '움직이는 스티커',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.close),
+                        ),
+                      ],
+                    ),
+                    TabBar(
+                      isScrollable: true,
+                      tabAlignment: TabAlignment.start,
+                      labelColor: AppColors.cardEmphasis,
+                      unselectedLabelColor: AppColors.textSecondary,
+                      indicatorColor: AppColors.cardEmphasis,
+                      labelStyle: const TextStyle(
+                        fontSize: 12,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
+                      ),
+                      tabs: tabLabels.map((label) => Tab(text: label)).toList(),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Expanded(
+                      child: TabBarView(
+                        children:
+                            stickerGroups
+                                .asMap()
+                                .entries
+                                .map(
+                                  (entry) => _StickerGrid(
+                                    stickers: entry.value,
+                                    selectedId: widget.selectedId,
+                                    emptyMessage:
+                                        entry.key == 0
+                                            ? '아직 사용한 스티커가 없어요.'
+                                            : null,
+                                  ),
+                                )
+                                .toList(),
                       ),
                     ),
-                    const Spacer(),
-                    IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close),
+                    const SizedBox(height: AppSpacing.xs),
+                    const Text(
+                      '사용한 스티커와 상업 이용 가능한 외부/앱 내 스티커를 반복 재생해요.',
+                      style: TextStyle(
+                        fontSize: 11,
+                        height: 1.35,
+                        color: AppColors.textDisabled,
+                      ),
                     ),
                   ],
                 ),
-                TabBar(
-                  isScrollable: true,
-                  tabAlignment: TabAlignment.start,
-                  labelColor: AppColors.cardEmphasis,
-                  unselectedLabelColor: AppColors.textSecondary,
-                  indicatorColor: AppColors.cardEmphasis,
-                  labelStyle: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                  ),
-                  tabs:
-                      seniorStickerPickerCategories
-                          .map((category) => Tab(text: category.label))
-                          .toList(),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Expanded(
-                  child: TabBarView(
-                    children:
-                        seniorStickerPickerCategories
-                            .map(
-                              (category) => _StickerGrid(
-                                stickers: seniorStickersForCategory(category),
-                                selectedId: selectedId,
-                              ),
-                            )
-                            .toList(),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                const Text(
-                  'Noto Animated Emoji와 ChikaBooks 자체 제작 스티커를 앱 내에서 반복 재생해요.',
-                  style: TextStyle(
-                    fontSize: 11,
-                    height: 1.35,
-                    color: AppColors.textDisabled,
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -193,28 +203,51 @@ class _SeniorStickerPickerSheet extends StatelessWidget {
 class _StickerGrid extends StatelessWidget {
   final List<SeniorSticker> stickers;
   final String? selectedId;
+  final String? emptyMessage;
 
-  const _StickerGrid({required this.stickers, required this.selectedId});
+  const _StickerGrid({
+    required this.stickers,
+    required this.selectedId,
+    this.emptyMessage,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final sortedStickers = [...stickers];
+    if (selectedId != null) {
+      sortedStickers.sort((a, b) {
+        if (a.id == selectedId) return -1;
+        if (b.id == selectedId) return 1;
+        return 0;
+      });
+    }
+
+    if (sortedStickers.isEmpty) {
+      return Center(
+        child: Text(
+          emptyMessage ?? '표시할 스티커가 없어요.',
+          style: const TextStyle(fontSize: 13, color: AppColors.textDisabled),
+        ),
+      );
+    }
+
     return GridView.builder(
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-      itemCount: stickers.length,
+      itemCount: sortedStickers.length,
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 4,
-        mainAxisSpacing: AppSpacing.sm,
-        crossAxisSpacing: AppSpacing.sm,
-        childAspectRatio: 1.02,
+        crossAxisCount: 5,
+        mainAxisSpacing: AppSpacing.xs,
+        crossAxisSpacing: AppSpacing.xs,
+        childAspectRatio: 1,
       ),
       itemBuilder: (_, i) {
-        final sticker = stickers[i];
+        final sticker = sortedStickers[i];
         final selected = sticker.id == selectedId;
         return InkWell(
           borderRadius: BorderRadius.circular(AppRadius.lg),
           onTap: () => Navigator.pop(context, sticker.id),
           child: Container(
-            padding: const EdgeInsets.all(5),
+            padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
               color:
                   selected
@@ -228,23 +261,7 @@ class _StickerGrid extends StatelessWidget {
                         : AppColors.divider.withValues(alpha: 0.35),
               ),
             ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _StickerArt(sticker: sticker, size: 36),
-                const SizedBox(height: 3),
-                Text(
-                  sticker.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
+            child: Center(child: _StickerArt(sticker: sticker, size: 34)),
           ),
         );
       },

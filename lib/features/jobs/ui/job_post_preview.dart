@@ -151,7 +151,7 @@ class _JobPostPreviewState extends State<JobPostPreview> {
       if (_hasText(data.clinicName))
         JobDetailInfoRow(
           icon: Icons.storefront_outlined,
-          label: '치과명',
+          label: '공고 노출 치과명',
           value: data.clinicName.trim(),
         ),
       if (_hasText(data.career))
@@ -473,23 +473,21 @@ class _JobPostPreviewState extends State<JobPostPreview> {
           onPointerSignal: (event) {
             if (event is PointerScrollEvent) {
               // 이벤트를 소비해 지도가 가로채지 않도록 처리
-              GestureBinding.instance.pointerSignalResolver.register(
-                event,
-                (e) {
-                  if (e is! PointerScrollEvent) return;
-                  final ctx = context;
-                  if (!ctx.mounted) return;
-                  final scrollable = Scrollable.maybeOf(ctx);
-                  if (scrollable == null) return;
-                  final pos = scrollable.position;
-                  final newOffset =
-                      (pos.pixels + e.scrollDelta.dy).clamp(
-                        pos.minScrollExtent,
-                        pos.maxScrollExtent,
-                      );
-                  pos.jumpTo(newOffset);
-                },
-              );
+              GestureBinding.instance.pointerSignalResolver.register(event, (
+                e,
+              ) {
+                if (e is! PointerScrollEvent) return;
+                final ctx = context;
+                if (!ctx.mounted) return;
+                final scrollable = Scrollable.maybeOf(ctx);
+                if (scrollable == null) return;
+                final pos = scrollable.position;
+                final newOffset = (pos.pixels + e.scrollDelta.dy).clamp(
+                  pos.minScrollExtent,
+                  pos.maxScrollExtent,
+                );
+                pos.jumpTo(newOffset);
+              });
             }
           },
           child: mapChild,

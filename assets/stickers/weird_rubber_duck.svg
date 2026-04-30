@@ -1,8 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
-  <rect width="256" height="256" rx="48" fill="#FFF8D9"/>
   <path d="M72 151 C77 117 105 99 135 113 C135 83 166 68 191 87 C212 103 206 137 181 145 C171 175 137 190 101 181 C82 176 69 166 72 151Z" fill="#FFD84D" stroke="#2B2B2B" stroke-width="8" stroke-linejoin="round"/>
   <circle cx="176" cy="101" r="6" fill="#2B2B2B"/>
   <path d="M195 112 L222 121 L195 132Z" fill="#FF8A3D" stroke="#2B2B2B" stroke-width="6" stroke-linejoin="round"/>
   <path d="M76 190 C103 179 123 201 150 190 C174 180 190 199 211 188" fill="none" stroke="#65B8FF" stroke-width="7" stroke-linecap="round"/>
-  <text x="128" y="226" text-anchor="middle" font-family="sans-serif" font-size="26" font-weight="800" fill="#2B2B2B">$¨ ¡Ù</text>
 </svg>

@@ -31,19 +31,47 @@ enum SeniorStickerCategory {
   cute('귀여움'),
   event('축하'),
   work('일상·도구'),
-  weird('병맛');
+  weird('기타');
 
   final String label;
   const SeniorStickerCategory(this.label);
 }
 
-const seniorStickerPickerCategories = <SeniorStickerCategory>[
-  SeniorStickerCategory.basic,
-  SeniorStickerCategory.emotion,
-  SeniorStickerCategory.cheer,
-  SeniorStickerCategory.reaction,
-  SeniorStickerCategory.work,
-  SeniorStickerCategory.weird,
+class SeniorStickerPickerGroup {
+  final String label;
+  final Set<SeniorStickerCategory> categories;
+
+  const SeniorStickerPickerGroup({
+    required this.label,
+    required this.categories,
+  });
+}
+
+const seniorStickerPickerGroups = <SeniorStickerPickerGroup>[
+  SeniorStickerPickerGroup(
+    label: '감정·반응',
+    categories: {
+      SeniorStickerCategory.basic,
+      SeniorStickerCategory.heart,
+      SeniorStickerCategory.cheer,
+      SeniorStickerCategory.emotion,
+      SeniorStickerCategory.reaction,
+    },
+  ),
+  SeniorStickerPickerGroup(
+    label: '귀여움·축하',
+    categories: {
+      SeniorStickerCategory.cute,
+      SeniorStickerCategory.event,
+    },
+  ),
+  SeniorStickerPickerGroup(
+    label: '일상·기타',
+    categories: {
+      SeniorStickerCategory.work,
+      SeniorStickerCategory.weird,
+    },
+  ),
 ];
 
 const seniorStickerFallbackPrefix = '[스티커] ';
@@ -655,6 +683,286 @@ const seniorStickerPool = <SeniorSticker>[
     assetPath: 'assets/stickers/weird_no_signal.svg',
     sourceLabel: 'ChikaBooks Motion Card Pack',
   ),
+  SeniorSticker(
+    id: 'emotion_glow_awe',
+    label: '눈반짝',
+    category: SeniorStickerCategory.emotion,
+    source: SeniorStickerSource.assetSvg,
+    assetPath: 'assets/stickers/emotion_glow_awe.svg',
+    sourceLabel: 'ChikaBooks Original',
+  ),
+  SeniorSticker(
+    id: 'emotion_soft_hug',
+    label: '포근포옹',
+    category: SeniorStickerCategory.emotion,
+    source: SeniorStickerSource.assetSvg,
+    assetPath: 'assets/stickers/emotion_soft_hug.svg',
+    sourceLabel: 'ChikaBooks Original',
+  ),
+  SeniorSticker(
+    id: 'emotion_teary_glitter',
+    label: '울컥반짝',
+    category: SeniorStickerCategory.emotion,
+    source: SeniorStickerSource.assetSvg,
+    assetPath: 'assets/stickers/emotion_teary_glitter.svg',
+    sourceLabel: 'ChikaBooks Original',
+  ),
+  SeniorSticker(
+    id: 'reaction_peek',
+    label: '몰래봄',
+    category: SeniorStickerCategory.reaction,
+    source: SeniorStickerSource.assetSvg,
+    assetPath: 'assets/stickers/reaction_peek.svg',
+    sourceLabel: 'ChikaBooks Reaction Pack',
+  ),
+  SeniorSticker(
+    id: 'reaction_suspicious',
+    label: '의심중',
+    category: SeniorStickerCategory.reaction,
+    source: SeniorStickerSource.assetSvg,
+    assetPath: 'assets/stickers/reaction_suspicious.svg',
+    sourceLabel: 'ChikaBooks Reaction Pack',
+  ),
+  SeniorSticker(
+    id: 'reaction_zip',
+    label: '입꾹닫',
+    category: SeniorStickerCategory.reaction,
+    source: SeniorStickerSource.assetSvg,
+    assetPath: 'assets/stickers/reaction_zip.svg',
+    sourceLabel: 'ChikaBooks Reaction Pack',
+  ),
+  SeniorSticker(
+    id: 'reaction_scream',
+    label: '비명각',
+    category: SeniorStickerCategory.reaction,
+    source: SeniorStickerSource.assetSvg,
+    assetPath: 'assets/stickers/reaction_scream.svg',
+    sourceLabel: 'ChikaBooks Reaction Pack',
+  ),
+  SeniorSticker(
+    id: 'reaction_sigh',
+    label: '한숨',
+    category: SeniorStickerCategory.reaction,
+    source: SeniorStickerSource.assetSvg,
+    assetPath: 'assets/stickers/reaction_sigh.svg',
+    sourceLabel: 'ChikaBooks Reaction Pack',
+  ),
+  SeniorSticker(
+    id: 'cute_otter_float',
+    label: '수달둥둥',
+    category: SeniorStickerCategory.cute,
+    source: SeniorStickerSource.assetSvg,
+    assetPath: 'assets/stickers/cute_otter_float.svg',
+    sourceLabel: 'ChikaBooks Cute Pack',
+  ),
+  SeniorSticker(
+    id: 'cute_jellyfish_dream',
+    label: '해파리멍',
+    category: SeniorStickerCategory.cute,
+    source: SeniorStickerSource.assetSvg,
+    assetPath: 'assets/stickers/cute_jellyfish_dream.svg',
+    sourceLabel: 'ChikaBooks Cute Pack',
+  ),
+  SeniorSticker(
+    id: 'cute_frog_blank',
+    label: '개구리멍',
+    category: SeniorStickerCategory.cute,
+    source: SeniorStickerSource.assetSvg,
+    assetPath: 'assets/stickers/cute_frog_blank.svg',
+    sourceLabel: 'ChikaBooks Cute Pack',
+  ),
+  SeniorSticker(
+    id: 'cute_octopus_wave',
+    label: '문어인사',
+    category: SeniorStickerCategory.cute,
+    source: SeniorStickerSource.assetSvg,
+    assetPath: 'assets/stickers/cute_octopus_wave.svg',
+    sourceLabel: 'ChikaBooks Cute Pack',
+  ),
+  SeniorSticker(
+    id: 'work_microbe_alert',
+    label: '균주의보',
+    category: SeniorStickerCategory.work,
+    source: SeniorStickerSource.assetSvg,
+    assetPath: 'assets/stickers/work_microbe_alert.svg',
+    sourceLabel: 'ChikaBooks Work Pack',
+  ),
+  SeniorSticker(
+    id: 'work_mask_mode',
+    label: '마스크온',
+    category: SeniorStickerCategory.work,
+    source: SeniorStickerSource.assetSvg,
+    assetPath: 'assets/stickers/work_mask_mode.svg',
+    sourceLabel: 'ChikaBooks Work Pack',
+  ),
+  SeniorSticker(
+    id: 'work_battery_low',
+    label: '방전',
+    category: SeniorStickerCategory.work,
+    source: SeniorStickerSource.assetSvg,
+    assetPath: 'assets/stickers/work_battery_low.svg',
+    sourceLabel: 'ChikaBooks Work Pack',
+  ),
+  SeniorSticker(
+    id: 'work_money_wings',
+    label: '월급순삭',
+    category: SeniorStickerCategory.work,
+    source: SeniorStickerSource.assetSvg,
+    assetPath: 'assets/stickers/work_money_wings.svg',
+    sourceLabel: 'ChikaBooks Work Pack',
+  ),
+  SeniorSticker(
+    id: 'work_pencil_study',
+    label: '필기중',
+    category: SeniorStickerCategory.work,
+    source: SeniorStickerSource.assetSvg,
+    assetPath: 'assets/stickers/work_pencil_study.svg',
+    sourceLabel: 'ChikaBooks Work Pack',
+  ),
+  SeniorSticker(
+    id: 'work_gear_spin',
+    label: '머리회전',
+    category: SeniorStickerCategory.work,
+    source: SeniorStickerSource.assetSvg,
+    assetPath: 'assets/stickers/work_gear_spin.svg',
+    sourceLabel: 'ChikaBooks Work Pack',
+  ),
+  SeniorSticker(
+    id: 'weird_clown_mode',
+    label: '광대모드',
+    category: SeniorStickerCategory.weird,
+    source: SeniorStickerSource.assetSvg,
+    assetPath: 'assets/stickers/weird_clown_mode.svg',
+    sourceLabel: 'ChikaBooks Weird Pack',
+  ),
+  SeniorSticker(
+    id: 'weird_skull_dead',
+    label: '죽겠다',
+    category: SeniorStickerCategory.weird,
+    source: SeniorStickerSource.assetSvg,
+    assetPath: 'assets/stickers/weird_skull_dead.svg',
+    sourceLabel: 'ChikaBooks Weird Pack',
+  ),
+  SeniorSticker(
+    id: 'weird_alien_signal',
+    label: '외계신호',
+    category: SeniorStickerCategory.weird,
+    source: SeniorStickerSource.assetSvg,
+    assetPath: 'assets/stickers/weird_alien_signal.svg',
+    sourceLabel: 'ChikaBooks Weird Pack',
+  ),
+  SeniorSticker(
+    id: 'weird_cockroach_panic',
+    label: '바퀴출몰',
+    category: SeniorStickerCategory.weird,
+    source: SeniorStickerSource.assetSvg,
+    assetPath: 'assets/stickers/weird_cockroach_panic.svg',
+    sourceLabel: 'ChikaBooks Weird Pack',
+  ),
+  SeniorSticker(
+    id: 'weird_worm_loading',
+    label: '꿈틀로딩',
+    category: SeniorStickerCategory.weird,
+    source: SeniorStickerSource.assetSvg,
+    assetPath: 'assets/stickers/weird_worm_loading.svg',
+    sourceLabel: 'ChikaBooks Weird Pack',
+  ),
+  SeniorSticker(
+    id: 'twemoji_clown',
+    label: '광대',
+    category: SeniorStickerCategory.weird,
+    source: SeniorStickerSource.assetSvg,
+    assetPath: 'assets/stickers/twemoji/twemoji_clown.svg',
+    sourceLabel: 'Twemoji CC-BY 4.0',
+  ),
+  SeniorSticker(
+    id: 'twemoji_alien',
+    label: '외계인',
+    category: SeniorStickerCategory.weird,
+    source: SeniorStickerSource.assetSvg,
+    assetPath: 'assets/stickers/twemoji/twemoji_alien.svg',
+    sourceLabel: 'Twemoji CC-BY 4.0',
+  ),
+  SeniorSticker(
+    id: 'twemoji_robot',
+    label: '로봇',
+    category: SeniorStickerCategory.reaction,
+    source: SeniorStickerSource.assetSvg,
+    assetPath: 'assets/stickers/twemoji/twemoji_robot.svg',
+    sourceLabel: 'Twemoji CC-BY 4.0',
+  ),
+  SeniorSticker(
+    id: 'twemoji_ghost',
+    label: '유령',
+    category: SeniorStickerCategory.weird,
+    source: SeniorStickerSource.assetSvg,
+    assetPath: 'assets/stickers/twemoji/twemoji_ghost.svg',
+    sourceLabel: 'Twemoji CC-BY 4.0',
+  ),
+  SeniorSticker(
+    id: 'twemoji_skull',
+    label: '해골',
+    category: SeniorStickerCategory.weird,
+    source: SeniorStickerSource.assetSvg,
+    assetPath: 'assets/stickers/twemoji/twemoji_skull.svg',
+    sourceLabel: 'Twemoji CC-BY 4.0',
+  ),
+  SeniorSticker(
+    id: 'twemoji_unicorn',
+    label: '유니콘',
+    category: SeniorStickerCategory.cute,
+    source: SeniorStickerSource.assetSvg,
+    assetPath: 'assets/stickers/twemoji/twemoji_unicorn.svg',
+    sourceLabel: 'Twemoji CC-BY 4.0',
+  ),
+  SeniorSticker(
+    id: 'twemoji_otter',
+    label: '수달',
+    category: SeniorStickerCategory.cute,
+    source: SeniorStickerSource.assetSvg,
+    assetPath: 'assets/stickers/twemoji/twemoji_otter.svg',
+    sourceLabel: 'Twemoji CC-BY 4.0',
+  ),
+  SeniorSticker(
+    id: 'twemoji_crystal_ball',
+    label: '수정구슬',
+    category: SeniorStickerCategory.reaction,
+    source: SeniorStickerSource.assetSvg,
+    assetPath: 'assets/stickers/twemoji/twemoji_crystal_ball.svg',
+    sourceLabel: 'Twemoji CC-BY 4.0',
+  ),
+  SeniorSticker(
+    id: 'twemoji_gem',
+    label: '보석',
+    category: SeniorStickerCategory.cheer,
+    source: SeniorStickerSource.assetSvg,
+    assetPath: 'assets/stickers/twemoji/twemoji_gem.svg',
+    sourceLabel: 'Twemoji CC-BY 4.0',
+  ),
+  SeniorSticker(
+    id: 'twemoji_flying_saucer',
+    label: '비행접시',
+    category: SeniorStickerCategory.weird,
+    source: SeniorStickerSource.assetSvg,
+    assetPath: 'assets/stickers/twemoji/twemoji_flying_saucer.svg',
+    sourceLabel: 'Twemoji CC-BY 4.0',
+  ),
+  SeniorSticker(
+    id: 'twemoji_syringe',
+    label: '주사기',
+    category: SeniorStickerCategory.work,
+    source: SeniorStickerSource.assetSvg,
+    assetPath: 'assets/stickers/twemoji/twemoji_syringe.svg',
+    sourceLabel: 'Twemoji CC-BY 4.0',
+  ),
+  SeniorSticker(
+    id: 'twemoji_tooth',
+    label: '치아',
+    category: SeniorStickerCategory.work,
+    source: SeniorStickerSource.assetSvg,
+    assetPath: 'assets/stickers/twemoji/twemoji_tooth.svg',
+    sourceLabel: 'Twemoji CC-BY 4.0',
+  ),
 ];
 
 List<SeniorSticker> seniorStickersForCategory(SeniorStickerCategory category) {
@@ -675,6 +983,14 @@ List<SeniorSticker> seniorStickersForCategory(SeniorStickerCategory category) {
   };
   return seniorStickerPool
       .where((sticker) => categories.contains(sticker.category))
+      .toList(growable: false);
+}
+
+List<SeniorSticker> seniorStickersForPickerGroup(
+  SeniorStickerPickerGroup group,
+) {
+  return seniorStickerPool
+      .where((sticker) => group.categories.contains(sticker.category))
       .toList(growable: false);
 }
 

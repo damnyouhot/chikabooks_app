@@ -188,6 +188,13 @@ class SeniorQuestionService {
     return r.success;
   }
 
+  static Stream<bool> watchQuestionReactionSelected({
+    required String questionId,
+    required String type,
+  }) {
+    return _watchReactionSelected(_questions.doc(questionId).collection(type));
+  }
+
   static Stream<List<SeniorComment>> watchComments(String questionId) {
     return _questions
         .doc(questionId)
@@ -201,6 +208,29 @@ class SeniorQuestionService {
                   .where((comment) => !comment.isDeleted)
                   .toList(),
         );
+  }
+
+  static Future<List<SeniorComment>> fetchSharePreviewComments(
+    String questionId, {
+    int limit = 2,
+  }) async {
+    try {
+      final snap =
+          await _questions
+              .doc(questionId)
+              .collection('comments')
+              .orderBy('createdAt')
+              .limit(12)
+              .get();
+      return snap.docs
+          .map(SeniorComment.fromDoc)
+          .where((comment) => !comment.isDeleted && !comment.isHidden)
+          .take(limit)
+          .toList(growable: false);
+    } catch (e) {
+      debugPrint('⚠️ SeniorQuestionService.fetchSharePreviewComments: $e');
+      return const [];
+    }
   }
 
   static Future<bool> addComment({
@@ -283,6 +313,19 @@ class SeniorQuestionService {
     return r.success;
   }
 
+  static Stream<bool> watchCommentLikeSelected({
+    required String questionId,
+    required String commentId,
+  }) {
+    return _watchReactionSelected(
+      _questions
+          .doc(questionId)
+          .collection('comments')
+          .doc(commentId)
+          .collection('likes'),
+    );
+  }
+
   static Stream<List<SeniorReply>> watchReplies({
     required String questionId,
     required String commentId,
@@ -294,7 +337,13 @@ class SeniorQuestionService {
         .collection('replies')
         .orderBy('createdAt')
         .snapshots()
-        .map((snap) => snap.docs.map(SeniorReply.fromDoc).toList());
+        .map(
+          (snap) =>
+              snap.docs
+                  .map(SeniorReply.fromDoc)
+                  .where((reply) => !reply.isDeleted)
+                  .toList(),
+        );
   }
 
   static Future<bool> addReply({
@@ -386,6 +435,22 @@ class SeniorQuestionService {
     return r.success;
   }
 
+  static Stream<bool> watchReplyLikeSelected({
+    required String questionId,
+    required String commentId,
+    required String replyId,
+  }) {
+    return _watchReactionSelected(
+      _questions
+          .doc(questionId)
+          .collection('comments')
+          .doc(commentId)
+          .collection('replies')
+          .doc(replyId)
+          .collection('likes'),
+    );
+  }
+
   static Future<bool> reportQuestion(String questionId) {
     return _reportDocument(_questions.doc(questionId));
   }
@@ -412,6 +477,44 @@ class SeniorQuestionService {
           .collection('replies')
           .doc(replyId),
     );
+  }
+
+  static Future<bool> deleteReply({
+    required String questionId,
+    required String commentId,
+    required String replyId,
+  }) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return false;
+
+    try {
+      final commentRef = _questions
+          .doc(questionId)
+          .collection('comments')
+          .doc(commentId);
+      final ref = commentRef.collection('replies').doc(replyId);
+      final snap = await ref.get();
+      final data = snap.data();
+      if (data == null || data['uid'] != uid) return false;
+      if (data['isDeleted'] == true) return true;
+
+      final batch = _db.batch();
+      batch.update(ref, {
+        'isDeleted': true,
+        'deletedAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      batch.update(commentRef, {'replyCount': FieldValue.increment(-1)});
+      await batch.commit();
+      await CaringTreatService.revokeWhisperWrite(
+        contentType: 'reply',
+        contentId: replyId,
+      );
+      return true;
+    } catch (e) {
+      debugPrint('⚠️ SeniorQuestionService.deleteReply: $e');
+      return false;
+    }
   }
 
   static Future<bool> restoreDocument(DocumentReference ref) async {
@@ -594,6 +697,7 @@ class SeniorQuestionService {
     'likeCount': 0,
     'reportCount': 0,
     'isHidden': false,
+    'isDeleted': false,
     'hiddenReason': null,
     'createdAt': FieldValue.serverTimestamp(),
   };
@@ -628,6 +732,14 @@ class SeniorQuestionService {
       debugPrint('⚠️ SeniorQuestionService._toggleReaction: $e');
       return (success: false, reactionAdded: false);
     }
+  }
+
+  static Stream<bool> _watchReactionSelected(
+    CollectionReference<Map<String, dynamic>> reactionCollection,
+  ) {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return Stream.value(false);
+    return reactionCollection.doc(uid).snapshots().map((snap) => snap.exists);
   }
 
   static Future<bool> _reportDocument(

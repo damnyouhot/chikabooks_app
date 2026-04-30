@@ -1209,37 +1209,22 @@ class _CaringPageState extends State<CaringPage> with TickerProviderStateMixin {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    '공감투표 첫 선택: 1개',
-                    style: TextStyle(fontSize: 12, height: 1.5),
-                  ),
-                  SizedBox(height: 6),
-                  Text(
-                    '오늘의 퀴즈 첫 풀이: 1개\n'
-                    '정답 보너스: 1개\n'
-                    '퀴즈는 하루 최대 4개',
-                    style: TextStyle(fontSize: 12, height: 1.5),
-                  ),
-                  SizedBox(height: 6),
-                  Text(
-                    '속닥속닥 글·댓글·답글 작성: 2개\n'
-                    '좋아요·힘내요: 1개\n'
-                    '속닥 보상은 하루 최대 10개',
-                    style: TextStyle(fontSize: 12, height: 1.5),
-                  ),
-                  SizedBox(height: 6),
-                  Text(
-                    '오늘 단어 선택: 1개\n'
-                    '하루 최대 3개',
-                    style: TextStyle(fontSize: 12, height: 1.5),
-                  ),
-                  SizedBox(height: 12),
-                  Text(
                     '밥주기 1번에는 먹이 3개가 필요해요.',
                     style: TextStyle(
                       fontSize: 12,
                       height: 1.5,
                       fontWeight: FontWeight.w700,
                     ),
+                  ),
+                  SizedBox(height: 12),
+                  Text(
+                    '- 공감투표 첫 선택: 3개\n\n'
+                    '- 오늘의 퀴즈 첫 풀이: 각 2개\n'
+                    '(정답 보너스: 각 1개)\n\n'
+                    '- 속닥속닥 글·댓글·답글 작성: 6개\n'
+                    '(좋아요·힘내요: 2개, 하루 최대 20개)\n\n'
+                    '- 오늘 단어 선택: 각 1개',
+                    style: TextStyle(fontSize: 12, height: 1.5),
                   ),
                 ],
               ),

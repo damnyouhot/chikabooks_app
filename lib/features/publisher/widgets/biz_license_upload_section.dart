@@ -18,6 +18,7 @@ import 'biz_license_verify_snapshot.dart';
 class BizLicenseUploadSection extends StatefulWidget {
   final String profileId;
   final VoidCallback? onCompleted;
+  final ValueChanged<Map<String, String>>? onOcrResult;
 
   final bool publisherStyleOcrLabelWidth;
   final bool replacementMode;
@@ -36,6 +37,7 @@ class BizLicenseUploadSection extends StatefulWidget {
     super.key,
     required this.profileId,
     this.onCompleted,
+    this.onOcrResult,
     this.publisherStyleOcrLabelWidth = false,
     this.replacementMode = false,
     this.onReplacementCancel,
@@ -134,14 +136,18 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
 
   void _maybeSeedFromPersistedProfile() {
     final p = widget.persistedProfile;
-    if (p == null || !p.canPublishJobs || widget.replacementMode) return;
+    if (p == null ||
+        !p.businessVerification.hasStoredData ||
+        widget.replacementMode) {
+      return;
+    }
     if (_verifySnapshot != null || _isUploading) return;
     setState(() {
       _verifySnapshot = BizLicenseVerifySnapshot.fromPersistedClinicProfile(p);
       _ocrResult = _buildOcrMapFromProfile(p);
       _ocrReadFailed = false;
       _ocrEmpty = _ocrResult == null || _ocrResult!.isEmpty;
-      _profileApplied = true;
+      _profileApplied = p.canPublishJobs;
       _hydratedFromProfile = true;
     });
   }
@@ -177,12 +183,14 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
   void _syncHydratedSnapshotIfNeeded() {
     if (!_hydratedFromProfile || widget.replacementMode || _isUploading) return;
     final p = widget.persistedProfile;
-    if (p == null || !p.canPublishJobs) return;
+    if (p == null || !p.businessVerification.hasStoredData) return;
     final next = BizLicenseVerifySnapshot.fromPersistedClinicProfile(p);
     final ocr = _buildOcrMapFromProfile(p);
     final cur = _verifySnapshot;
     if (cur == null) return;
-    if (cur.hiraNote == next.hiraNote &&
+    if (cur.status == next.status &&
+        cur.failReason == next.failReason &&
+        cur.hiraNote == next.hiraNote &&
         cur.checkMethod == next.checkMethod &&
         cur.hiraMatched == next.hiraMatched &&
         cur.hiraMatchLevel == next.hiraMatchLevel) {
@@ -193,6 +201,7 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
       _ocrResult = ocr;
       _ocrReadFailed = false;
       _ocrEmpty = ocr == null || ocr.isEmpty;
+      _profileApplied = p.canPublishJobs;
     });
   }
 
@@ -312,6 +321,9 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
           _ocrEmpty = empty;
           _ocrResult = empty ? null : extracted;
         });
+        if (!empty) {
+          widget.onOcrResult?.call(extracted);
+        }
 
         // 사용자에게 즉시 피드백 — OCR 이 사업자번호를 충분히 읽지 못한 경우.
         if (snapshot.failReason == 'not_business_registration') {
@@ -566,6 +578,9 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
                 ? '기존 지점과 다른 사업자입니다. 기존 병원 정보는 그대로 유지됩니다. 새 지점으로 추가하거나, 정말 교체할 때만 별도 확인 후 진행하세요.'
                 : _ocrReadFailed || _ocrEmpty
                 ? '등록증에서 정보를 읽고, 국세청 사업자 인증이 완료되어야 프로필에 반영할 수 있어요.'
+                : snap.failReason == 'hira_mismatch_after_grace' ||
+                    snap.failReason == 'hira_mismatch_opened_at_unknown'
+                ? '국세청 사업자 정보는 확인됐지만, 심평원에서 치과 기관으로 자동 확인되지 않아 공고 게시 전 검토가 필요해요.'
                 : '국세청 사업자 인증이 완료된 뒤 프로필에 반영할 수 있어요.',
             style: GoogleFonts.notoSansKr(
               fontSize: 11,

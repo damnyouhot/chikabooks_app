@@ -154,11 +154,7 @@ class JobService {
               .map((d) => Job.fromDoc(d))
               .where((j) => j.isListedInApp && j.jobLevel == jobLevel)
               .toList();
-      jobs.sort((a, b) {
-        final priority = b.priorityScore.compareTo(a.priorityScore);
-        if (priority != 0) return priority;
-        return b.postedAt.compareTo(a.postedAt);
-      });
+      jobs.sort((a, b) => b.postedAt.compareTo(a.postedAt));
       return jobs.take(limit).toList();
     } catch (e) {
       debugPrint('⚠️ fetchHighlightedJobs(level=$jobLevel) error: $e');
