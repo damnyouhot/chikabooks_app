@@ -12,6 +12,7 @@ import '../../../services/job_draft_service.dart';
 import '../../../services/transportation_lookup_service.dart';
 import '../../../utils/tag_generator.dart';
 import '../../../models/job.dart';
+import '../../../models/transportation_info.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../utils/job_ai_extract_normalize.dart';
@@ -99,6 +100,7 @@ class JobPostData {
   // 교통편 (자동 + 수동)
   String? subwayStationName;
   List<String> subwayLines;
+  List<TransportationStation> selectedStations;
   int? walkingDistanceMeters;
   int? walkingMinutes;
   String? exitNumber;
@@ -164,6 +166,7 @@ class JobPostData {
     this.closingDate,
     this.subwayStationName,
     List<String>? subwayLines,
+    List<TransportationStation>? selectedStations,
     this.walkingDistanceMeters,
     this.walkingMinutes,
     this.exitNumber,
@@ -186,6 +189,7 @@ class JobPostData {
        applyMethod = applyMethod ?? ['online'],
        requiredDocuments = requiredDocuments ?? [],
        subwayLines = subwayLines ?? [],
+       selectedStations = selectedStations ?? [],
        tags = tags ?? [],
        mainDutiesList = mainDutiesList ?? [];
 
@@ -225,6 +229,7 @@ class JobPostData {
     DateTime? closingDate,
     String? subwayStationName,
     List<String>? subwayLines,
+    List<TransportationStation>? selectedStations,
     int? walkingDistanceMeters,
     int? walkingMinutes,
     String? exitNumber,
@@ -276,6 +281,7 @@ class JobPostData {
       closingDate: closingDate ?? this.closingDate,
       subwayStationName: subwayStationName ?? this.subwayStationName,
       subwayLines: subwayLines ?? List.from(this.subwayLines),
+      selectedStations: selectedStations ?? List.from(this.selectedStations),
       walkingDistanceMeters:
           walkingDistanceMeters ?? this.walkingDistanceMeters,
       walkingMinutes: walkingMinutes ?? this.walkingMinutes,
@@ -331,18 +337,21 @@ class JobPostData {
     if (requiredDocuments.isNotEmpty) 'requiredDocuments': requiredDocuments,
     'isAlwaysHiring': isAlwaysHiring,
     if (closingDate != null) 'closingDate': closingDate!.toIso8601String(),
-    if (subwayStationName != null ||
-        subwayLines.isNotEmpty ||
-        walkingMinutes != null)
-      'transportation': {
-        if (subwayStationName != null) 'subwayStationName': subwayStationName,
-        if (subwayLines.isNotEmpty) 'subwayLines': subwayLines,
-        if (walkingDistanceMeters != null)
-          'walkingDistanceMeters': walkingDistanceMeters,
-        if (walkingMinutes != null) 'walkingMinutes': walkingMinutes,
-        if (exitNumber != null) 'exitNumber': exitNumber,
-        'parking': parking,
-      },
+    'transportation': {
+      if (subwayStationName != null) 'subwayStationName': subwayStationName,
+      if (subwayLines.isNotEmpty) 'subwayLines': subwayLines,
+      if (selectedStations.isNotEmpty)
+        'selectedStations':
+            selectedStations
+                .where((s) => s.hasValue)
+                .map((s) => s.toJson())
+                .toList(),
+      if (walkingDistanceMeters != null)
+        'walkingDistanceMeters': walkingDistanceMeters,
+      if (walkingMinutes != null) 'walkingMinutes': walkingMinutes,
+      if (exitNumber != null) 'exitNumber': exitNumber,
+      'parking': parking,
+    },
     if (lat != null) 'lat': lat,
     if (lng != null) 'lng': lng,
     if (tags.isNotEmpty) 'tags': tags,
@@ -421,6 +430,7 @@ class JobPostData {
   /// Firestore 또는 드래프트 데이터에서 복원
   factory JobPostData.fromMap(Map<String, dynamic> data) {
     final trans = data['transportation'] as Map<String, dynamic>?;
+    final selectedStations = _transportStationsFromMap(trans);
     DateTime? closing;
     if (data['closingDate'] is String) {
       try {
@@ -476,6 +486,7 @@ class JobPostData {
       closingDate: closing,
       subwayStationName: trans?['subwayStationName'] as String?,
       subwayLines: List<String>.from(trans?['subwayLines'] ?? []),
+      selectedStations: selectedStations,
       walkingDistanceMeters: (trans?['walkingDistanceMeters'] as num?)?.toInt(),
       walkingMinutes: (trans?['walkingMinutes'] as num?)?.toInt(),
       exitNumber: trans?['exitNumber'] as String?,
@@ -502,6 +513,35 @@ class JobPostData {
       fieldSources: data['fieldSources'] as Map<String, dynamic>?,
       logoUrl: data['logoUrl'] as String?,
     );
+  }
+
+  static List<TransportationStation> _transportStationsFromMap(
+    Map<String, dynamic>? trans,
+  ) {
+    if (trans == null) return [];
+    final raw = trans['selectedStations'];
+    final stations =
+        raw is List
+            ? raw
+                .whereType<Map>()
+                .map(
+                  (e) => TransportationStation.fromJson(
+                    Map<String, dynamic>.from(e),
+                  ),
+                )
+                .where((s) => s.hasValue)
+                .toList()
+            : <TransportationStation>[];
+    if (stations.isNotEmpty) return stations;
+
+    final legacy = TransportationStation(
+      name: (trans['subwayStationName'] as String? ?? '').trim(),
+      lines: List<String>.from(trans['subwayLines'] ?? []),
+      walkingDistanceMeters: (trans['walkingDistanceMeters'] as num?)?.toInt(),
+      walkingMinutes: (trans['walkingMinutes'] as num?)?.toInt(),
+      exitNumber: trans['exitNumber'] as String?,
+    );
+    return legacy.hasValue ? [legacy] : [];
   }
 }
 
@@ -615,7 +655,7 @@ class JobPostFormState extends State<JobPostForm> {
   bool _isLoadingAi = false;
   bool _isSubmitting = false;
   bool _isLookingUpStation = false;
-  List<NearbyStation> _nearbyStations = [];
+  List<TransportationStation> _nearbyStations = [];
 
   /// AI 파싱 완료 후 fieldStatus 보관 → 배너/뱃지 표시
   Map<String, String>? _aiFieldStatus;
@@ -743,6 +783,9 @@ class JobPostFormState extends State<JobPostForm> {
     }
     if (oldD.chairCount == null && newD.chairCount != null) return true;
     if (oldD.staffCount == null && newD.staffCount != null) return true;
+    if (oldD.selectedStations.isEmpty && newD.selectedStations.isNotEmpty) {
+      return true;
+    }
     return false;
   }
 
@@ -779,6 +822,7 @@ class JobPostFormState extends State<JobPostForm> {
     _staffCountCtrl.text =
         _data.staffCount != null ? '${_data.staffCount}' : '';
     _exitNumberCtrl.text = _data.exitNumber ?? '';
+    _nearbyStations = List<TransportationStation>.from(_data.selectedStations);
     _digitalEquipmentRawCtrl.text = _data.digitalEquipmentRaw ?? '';
     _selectedCareer = JobPostFieldSync.matchCareerToDropdown(
       _data.career.isEmpty ? null : _data.career,
@@ -1045,6 +1089,16 @@ class JobPostFormState extends State<JobPostForm> {
     final chair = int.tryParse(_chairCountCtrl.text.trim());
     final staff = int.tryParse(_staffCountCtrl.text.trim());
     final exit = _exitNumberCtrl.text.trim();
+    if (_nearbyStations.isNotEmpty) {
+      final first = _nearbyStations.first;
+      _nearbyStations[0] = TransportationStation(
+        name: first.name,
+        lines: first.lines,
+        walkingDistanceMeters: first.walkingDistanceMeters,
+        walkingMinutes: first.walkingMinutes,
+        exitNumber: exit.isEmpty ? null : exit,
+      );
+    }
     final payType = (_selectedSalaryPayType ?? '').trim();
     final amountRaw = _salaryAmountCtrl.text.trim().replaceAll(',', '');
     var salaryLine = JobPostData.composeSalaryLine(
@@ -1068,12 +1122,14 @@ class JobPostFormState extends State<JobPostForm> {
       hospitalType: _selectedHospitalType,
       chairCount: chair,
       staffCount: staff,
+      selectedStations: List.from(_nearbyStations),
       exitNumber: exit.isNotEmpty ? exit : null,
       digitalEquipmentRaw:
           _digitalEquipmentRawCtrl.text.trim().isEmpty
               ? null
               : _digitalEquipmentRawCtrl.text.trim(),
     );
+    if (exit.isEmpty) _data.exitNumber = null;
     final roleJoined = JobPostData.joinHireRoles(_data.hireRoles);
     if (roleJoined != _data.role) {
       _data = _data.copyWith(role: roleJoined);
@@ -1307,6 +1363,15 @@ class JobPostFormState extends State<JobPostForm> {
       final res = JobAiExtractNormalizer.normalize(
         Map<String, dynamic>.from(result.data as Map),
       );
+      if (res['_mock'] == true) {
+        if (!mounted) return;
+        setState(() {
+          _uploadProgress.clear();
+          _aiReviewed = false;
+        });
+        _showSnack('샘플 AI 응답은 실제 공고에 반영하지 않았어요. 직접 입력해주세요.');
+        return;
+      }
 
       // 3) 결과를 폼에 반영
       if (!mounted) return;
@@ -1442,9 +1507,25 @@ class JobPostFormState extends State<JobPostForm> {
         }
         final sl = res['subwayLines'] as List?;
         if (sl != null && sl.isNotEmpty) {
+          final lines =
+              sl.map((e) => e.toString()).where((s) => s.isNotEmpty).toList();
           _data = _data.copyWith(
-            subwayLines:
-                sl.map((e) => e.toString()).where((s) => s.isNotEmpty).toList(),
+            subwayLines: lines,
+            selectedStations:
+                sn != null && sn.isNotEmpty
+                    ? [
+                      TransportationStation(
+                        name: sn,
+                        lines: lines,
+                        walkingDistanceMeters: _data.walkingDistanceMeters,
+                        walkingMinutes: _data.walkingMinutes,
+                        exitNumber:
+                            _exitNumberCtrl.text.trim().isEmpty
+                                ? null
+                                : _exitNumberCtrl.text.trim(),
+                      ),
+                    ]
+                    : _data.selectedStations,
           );
         }
 
@@ -4087,6 +4168,15 @@ class JobPostFormState extends State<JobPostForm> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (_nearbyStations.isNotEmpty) ...[
+                    Text(
+                      '공고에 노출할 가까운 역',
+                      style: _ft(
+                        size: 12,
+                        weight: FontWeight.w700,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
                     ..._nearbyStations.asMap().entries.map((entry) {
                       final idx = entry.key;
                       final s = entry.value;
@@ -4155,22 +4245,7 @@ class JobPostFormState extends State<JobPostForm> {
                                   onPressed: () {
                                     setState(() {
                                       _nearbyStations.removeAt(idx);
-                                      if (_nearbyStations.isEmpty) {
-                                        _data.subwayStationName = null;
-                                        _data.subwayLines = [];
-                                        _data.walkingDistanceMeters = null;
-                                        _data.walkingMinutes = null;
-                                      } else {
-                                        final first = _nearbyStations.first;
-                                        _data.subwayStationName = first.name;
-                                        _data.subwayLines = List.from(
-                                          first.lines,
-                                        );
-                                        _data.walkingDistanceMeters =
-                                            first.distanceMeters;
-                                        _data.walkingMinutes =
-                                            first.walkingMinutes;
-                                      }
+                                      _syncTransportationFromStations();
                                     });
                                     _notify();
                                   },
@@ -4185,9 +4260,38 @@ class JobPostFormState extends State<JobPostForm> {
                       );
                     }),
                     const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed:
+                              _isLookingUpStation ? null : _lookupStation,
+                          icon:
+                              _isLookingUpStation
+                                  ? const SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                  : const Icon(Icons.refresh, size: 18),
+                          label: Text(
+                            _isLookingUpStation ? '조회 중...' : '주소로 다시 찾기',
+                          ),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: _addManualStation,
+                          icon: const Icon(Icons.add, size: 18),
+                          label: const Text('역 직접 추가'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
                     _field(
                       controller: _exitNumberCtrl,
-                      label: '출구 번호 (선택)',
+                      label: '대표역 출구 번호 (선택)',
                       hint: '예) 11번 출구',
                       focusNode: _fExitNumber,
                     ),
@@ -4242,6 +4346,7 @@ class JobPostFormState extends State<JobPostForm> {
                                 setState(() {
                                   _data.subwayStationName = null;
                                   _data.subwayLines = [];
+                                  _data.selectedStations = [];
                                   _data.walkingDistanceMeters = null;
                                   _data.walkingMinutes = null;
                                 });
@@ -4258,7 +4363,7 @@ class JobPostFormState extends State<JobPostForm> {
                     const SizedBox(height: 8),
                     _field(
                       controller: _exitNumberCtrl,
-                      label: '출구 번호 (선택)',
+                      label: '대표역 출구 번호 (선택)',
                       hint: '예) 11번 출구',
                       focusNode: _fExitNumber,
                     ),
@@ -4305,6 +4410,12 @@ class JobPostFormState extends State<JobPostForm> {
                       ],
                     ),
                     const SizedBox(height: 4),
+                    OutlinedButton.icon(
+                      onPressed: _addManualStation,
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('역 직접 추가'),
+                    ),
+                    const SizedBox(height: 4),
                     Text(
                       '주소 입력 후 버튼을 누르면 가까운 역을 자동 찾아줍니다.',
                       style: _ft(
@@ -4342,6 +4453,7 @@ class JobPostFormState extends State<JobPostForm> {
               _nearbyStations = [];
               _data.subwayStationName = null;
               _data.subwayLines = [];
+              _data.selectedStations = [];
               _data.walkingDistanceMeters = null;
               _data.walkingMinutes = null;
               _exitNumberCtrl.clear();
@@ -4373,9 +4485,181 @@ class JobPostFormState extends State<JobPostForm> {
     );
   }
 
-  String _nearbyStationLabel(NearbyStation s) {
+  String _nearbyStationLabel(TransportationStation s) {
     final lineStr = s.lines.isEmpty ? '' : ' ${s.lines.join(' · ')}';
-    return '${s.name}$lineStr · ${s.distanceMeters}m';
+    final distance =
+        s.walkingDistanceMeters != null ? ' · ${s.walkingDistanceMeters}m' : '';
+    final minutes =
+        s.walkingMinutes != null ? ' · 도보 ${s.walkingMinutes}분' : '';
+    final exit =
+        s.exitNumber != null && s.exitNumber!.trim().isNotEmpty
+            ? ' · ${s.exitNumber}번 출구'
+            : '';
+    return '${s.name}$lineStr$exit$minutes$distance';
+  }
+
+  TransportationStation _stationFromLookup(NearbyStation s) {
+    return TransportationStation(
+      name: s.name,
+      lines: List.from(s.lines),
+      walkingDistanceMeters: s.distanceMeters,
+      walkingMinutes: s.walkingMinutes,
+    );
+  }
+
+  List<String> _dedupeTransportLines(Iterable<TransportationStation> stations) {
+    final out = <String>[];
+    for (final station in stations) {
+      for (final line in station.lines) {
+        final t = line.trim();
+        if (t.isNotEmpty && !out.contains(t)) out.add(t);
+      }
+    }
+    return out;
+  }
+
+  void _syncTransportationFromStations() {
+    final stations = _nearbyStations.where((s) => s.hasValue).toList();
+    if (stations.isEmpty) {
+      _data.subwayStationName = null;
+      _data.subwayLines = [];
+      _data.selectedStations = [];
+      _data.walkingDistanceMeters = null;
+      _data.walkingMinutes = null;
+      _data.exitNumber = null;
+      _exitNumberCtrl.clear();
+      return;
+    }
+
+    final first = stations.first;
+    final exit = _exitNumberCtrl.text.trim();
+    final firstWithExit =
+        exit.isEmpty
+            ? first
+            : TransportationStation(
+              name: first.name,
+              lines: first.lines,
+              walkingDistanceMeters: first.walkingDistanceMeters,
+              walkingMinutes: first.walkingMinutes,
+              exitNumber: exit,
+            );
+    final synced = [firstWithExit, ...stations.skip(1)];
+    _nearbyStations = synced;
+    _data = _data.copyWith(
+      subwayStationName: firstWithExit.name,
+      subwayLines: _dedupeTransportLines(synced),
+      selectedStations: synced,
+      walkingDistanceMeters: firstWithExit.walkingDistanceMeters,
+      walkingMinutes: firstWithExit.walkingMinutes,
+      exitNumber: exit.isEmpty ? null : exit,
+    );
+    if (exit.isEmpty) _data.exitNumber = null;
+  }
+
+  Future<void> _addManualStation() async {
+    final nameCtrl = TextEditingController();
+    final linesCtrl = TextEditingController();
+    final minutesCtrl = TextEditingController();
+    final distanceCtrl = TextEditingController();
+    final exitCtrl = TextEditingController();
+    final station = await showDialog<TransportationStation>(
+      context: context,
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('역 직접 추가'),
+            content: SizedBox(
+              width: 360,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: nameCtrl,
+                    decoration: const InputDecoration(
+                      labelText: '역명',
+                      hintText: '예) 강남역',
+                    ),
+                  ),
+                  TextField(
+                    controller: linesCtrl,
+                    decoration: const InputDecoration(
+                      labelText: '노선',
+                      hintText: '예) 2호선, 신분당선',
+                    ),
+                  ),
+                  TextField(
+                    controller: minutesCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: '도보 시간(분)',
+                      hintText: '예) 5',
+                    ),
+                  ),
+                  TextField(
+                    controller: distanceCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: '거리(m)',
+                      hintText: '예) 320',
+                    ),
+                  ),
+                  TextField(
+                    controller: exitCtrl,
+                    decoration: const InputDecoration(
+                      labelText: '출구 번호(선택)',
+                      hintText: '예) 11',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('취소'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  final name = nameCtrl.text.trim();
+                  if (name.isEmpty) return;
+                  final lines =
+                      linesCtrl.text
+                          .split(RegExp(r'[,/·\n]+'))
+                          .map((e) => e.trim())
+                          .where((e) => e.isNotEmpty)
+                          .toList();
+                  Navigator.pop(
+                    ctx,
+                    TransportationStation(
+                      name: name.endsWith('역') ? name : '$name역',
+                      lines: lines,
+                      walkingMinutes: int.tryParse(minutesCtrl.text.trim()),
+                      walkingDistanceMeters: int.tryParse(
+                        distanceCtrl.text.trim(),
+                      ),
+                      exitNumber:
+                          exitCtrl.text.trim().isEmpty
+                              ? null
+                              : exitCtrl.text.trim(),
+                    ),
+                  );
+                },
+                child: const Text('추가'),
+              ),
+            ],
+          ),
+    );
+    nameCtrl.dispose();
+    linesCtrl.dispose();
+    minutesCtrl.dispose();
+    distanceCtrl.dispose();
+    exitCtrl.dispose();
+    if (station == null || !mounted) return;
+    setState(() {
+      final exists = _nearbyStations.any((s) => s.name == station.name);
+      if (!exists) _nearbyStations.add(station);
+      _syncTransportationFromStations();
+    });
+    _notify();
   }
 
   /// _nearbyStations 없이 draft 등으로만 역이 있을 때
@@ -4407,17 +4691,10 @@ class JobPostFormState extends State<JobPostForm> {
       }
       if (!mounted) return;
       setState(() {
-        _nearbyStations = List.from(result.stations);
+        _nearbyStations = result.stations.map(_stationFromLookup).toList();
         _data.lat = result.lat;
         _data.lng = result.lng;
-        // 가장 가까운 역을 기본 대표역으로 설정
-        if (_nearbyStations.isNotEmpty) {
-          final first = _nearbyStations.first;
-          _data.subwayStationName = first.name;
-          _data.subwayLines = List.from(first.lines);
-          _data.walkingDistanceMeters = first.distanceMeters;
-          _data.walkingMinutes = first.walkingMinutes;
-        }
+        _syncTransportationFromStations();
       });
       _notify();
       if (mounted) {

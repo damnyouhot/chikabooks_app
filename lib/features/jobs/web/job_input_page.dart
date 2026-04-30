@@ -1175,25 +1175,93 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
     return StreamBuilder<QuerySnapshot>(
       stream:
           FirebaseFirestore.instance
-              .collection('jobs')
-              .where('createdBy', isEqualTo: uid)
-              .orderBy('createdAt', descending: true)
-              .limit(10)
+              .collection('jobDrafts')
+              .where('ownerUid', isEqualTo: uid)
               .snapshots(),
       builder: (context, snap) {
-        final docs = snap.data?.docs ?? [];
-        if (docs.isEmpty) {
-          return _emptyHint('사용된 공고가 없어요.');
-        }
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (var i = 0; i < docs.length; i++)
-              _buildPublishedCard(docs[i], isNewest: i == 0),
-          ],
+        return StreamBuilder<QuerySnapshot>(
+          stream:
+              FirebaseFirestore.instance
+                  .collection('jobs')
+                  .orderBy('createdAt', descending: true)
+                  .limit(120)
+                  .snapshots(),
+          builder: (context, jobsSnap) {
+            final draftDocs = snap.data?.docs ?? [];
+            final jobDocs = jobsSnap.data?.docs ?? [];
+            final publishedJobIds = _publishedJobIdsFromDrafts(draftDocs);
+            final docs = _filterMyPublishedJobs(
+              uid: uid,
+              jobDocs: jobDocs,
+              publishedJobIds: publishedJobIds,
+            );
+
+            if (docs.isEmpty) {
+              if (snap.hasError || jobsSnap.hasError) {
+                return _emptyHint('공고 목록을 불러오지 못했어요. 잠시 후 다시 확인해 주세요.');
+              }
+              if (snap.connectionState == ConnectionState.waiting ||
+                  jobsSnap.connectionState == ConnectionState.waiting) {
+                return _emptyHint('공고 목록을 불러오는 중이에요...');
+              }
+              return _emptyHint('사용된 공고가 없어요.');
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var i = 0; i < docs.length; i++)
+                  _buildPublishedCard(docs[i], isNewest: i == 0),
+              ],
+            );
+          },
         );
       },
     );
+  }
+
+  Set<String> _publishedJobIdsFromDrafts(List<QueryDocumentSnapshot> drafts) {
+    final ids = <String>{};
+    for (final doc in drafts) {
+      final data = doc.data() as Map<String, dynamic>;
+      final id = (data['publishedJobId'] as String?)?.trim();
+      if (id != null && id.isNotEmpty) ids.add(id);
+    }
+    return ids;
+  }
+
+  List<QueryDocumentSnapshot> _filterMyPublishedJobs({
+    required String uid,
+    required List<QueryDocumentSnapshot> jobDocs,
+    required Set<String> publishedJobIds,
+  }) {
+    final docs =
+        jobDocs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          return data['createdBy'] == uid ||
+              data['ownerUid'] == uid ||
+              data['clinicId'] == uid ||
+              publishedJobIds.contains(doc.id);
+        }).toList();
+    docs.sort((a, b) {
+      final at = _publishedSortTime(a);
+      final bt = _publishedSortTime(b);
+      return bt.compareTo(at);
+    });
+    return docs.take(10).toList();
+  }
+
+  DateTime _publishedSortTime(QueryDocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    for (final key in ['createdAt', 'postedAt', 'adStartAt', 'updatedAt']) {
+      final value = data[key];
+      if (value is Timestamp) return value.toDate();
+      if (value is DateTime) return value;
+      if (value is String) {
+        final parsed = DateTime.tryParse(value);
+        if (parsed != null) return parsed;
+      }
+    }
+    return DateTime.fromMillisecondsSinceEpoch(0);
   }
 
   Widget _buildPublishedTimeTexts(DateTime? t, {required bool isNewest}) {

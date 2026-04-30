@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'transportation_info.dart';
+
 /// 공고 임시저장 엔티티
 /// Firestore 경로: `jobDrafts/{draftId}`
 class JobDraft {
@@ -28,8 +30,10 @@ class JobDraft {
   final String? hospitalType;
   final int? chairCount;
   final int? staffCount;
+
   /// 주요 진료 과목
   final List<String> specialties;
+
   /// 디지털 장비 보유
   final bool? hasOralScanner;
   final bool? hasCT;
@@ -44,6 +48,7 @@ class JobDraft {
   final DateTime? closingDate;
   final String? subwayStationName;
   final List<String> subwayLines;
+  final List<TransportationStation> selectedStations;
   final int? walkingDistanceMeters;
   final int? walkingMinutes;
   final String? exitNumber;
@@ -51,6 +56,7 @@ class JobDraft {
   final double? lat;
   final double? lng;
   final List<String> tags;
+
   /// 자동 생성 태그를 사용자가 편집했으면 true — AI 재추출 시 태그 덮어쓰기 방지
   final bool tagsUserEdited;
 
@@ -60,6 +66,7 @@ class JobDraft {
   final String? sourceType;
   final String? rawInputText;
   final List<String> rawImageUrls;
+
   /// 홍보이미지 URL — AI 추출 없이 공고에 직접 노출
   final List<String> promotionalImageUrls;
   final String? clinicProfileId;
@@ -115,6 +122,7 @@ class JobDraft {
     this.closingDate,
     this.subwayStationName,
     this.subwayLines = const [],
+    this.selectedStations = const [],
     this.walkingDistanceMeters,
     this.walkingMinutes,
     this.exitNumber,
@@ -141,9 +149,12 @@ class JobDraft {
 
   factory JobDraft.fromMap(Map<String, dynamic> data, {required String id}) {
     final trans = data['transportation'] as Map<String, dynamic>?;
+    final selectedStations = _transportStationsFromMap(trans);
     DateTime? closing;
     if (data['closingDate'] is String) {
-      try { closing = DateTime.parse(data['closingDate'] as String); } catch (_) {}
+      try {
+        closing = DateTime.parse(data['closingDate'] as String);
+      } catch (_) {}
     } else if (data['closingDate'] is Timestamp) {
       closing = (data['closingDate'] as Timestamp).toDate();
     }
@@ -185,11 +196,15 @@ class JobDraft {
       isAlwaysHiring: (data['isAlwaysHiring'] as bool?) ?? false,
       closingDate: closing,
       subwayStationName: trans?['subwayStationName'] as String?,
-      subwayLines: List<String>.from(trans?['subwayLines'] ?? data['subwayLines'] ?? []),
+      subwayLines: List<String>.from(
+        trans?['subwayLines'] ?? data['subwayLines'] ?? [],
+      ),
+      selectedStations: selectedStations,
       walkingDistanceMeters: (trans?['walkingDistanceMeters'] as num?)?.toInt(),
       walkingMinutes: (trans?['walkingMinutes'] as num?)?.toInt(),
       exitNumber: trans?['exitNumber'] as String?,
-      parking: (trans?['parking'] as bool?) ?? (data['parking'] as bool?) ?? false,
+      parking:
+          (trans?['parking'] as bool?) ?? (data['parking'] as bool?) ?? false,
       lat: (data['lat'] as num?)?.toDouble(),
       lng: (data['lng'] as num?)?.toDouble(),
       tags: List<String>.from(data['tags'] ?? []),
@@ -199,16 +214,27 @@ class JobDraft {
       sourceType: data['sourceType'] as String?,
       rawInputText: data['rawInputText'] as String?,
       rawImageUrls: List<String>.from(data['rawImageUrls'] ?? []),
-      promotionalImageUrls: List<String>.from(data['promotionalImageUrls'] ?? []),
+      promotionalImageUrls: List<String>.from(
+        data['promotionalImageUrls'] ?? [],
+      ),
       clinicProfileId: data['clinicProfileId'] as String?,
       logoUrl: data['logoUrl'] as String?,
       editorStep: data['editorStep'] as String?,
       mainDutiesRaw: data['mainDutiesRaw'] as String?,
       mainDutiesList: List<String>.from(data['mainDutiesList'] ?? []),
-      recruitmentStart: data['recruitmentStart'] is String
-          ? (() { try { return DateTime.parse(data['recruitmentStart'] as String); } catch (_) { return null; } })()
-          : null,
-      fieldStatus: (data['fieldStatus'] as Map?)?.map((k, v) => MapEntry(k.toString(), v.toString())),
+      recruitmentStart:
+          data['recruitmentStart'] is String
+              ? (() {
+                try {
+                  return DateTime.parse(data['recruitmentStart'] as String);
+                } catch (_) {
+                  return null;
+                }
+              })()
+              : null,
+      fieldStatus: (data['fieldStatus'] as Map?)?.map(
+        (k, v) => MapEntry(k.toString(), v.toString()),
+      ),
       fieldSources: data['fieldSources'] as Map<String, dynamic>?,
     );
   }
@@ -218,67 +244,77 @@ class JobDraft {
   }
 
   Map<String, dynamic> toMap() => {
-        'ownerUid': ownerUid,
-        'clinicName': clinicName,
-        'title': title,
-        'role': role,
-        if (hireRoles.isNotEmpty) 'hireRoles': hireRoles,
-        'career': career,
-        if (education.isNotEmpty) 'education': education,
-        'employmentType': employmentType,
-        'workHours': workHours,
-        'salary': salary,
-        if (salaryPayType.isNotEmpty) 'salaryPayType': salaryPayType,
-        if (salaryAmount.isNotEmpty) 'salaryAmount': salaryAmount,
-        'benefits': benefits,
-        'description': description,
-        'address': address,
-        'contact': contact,
-        'imageUrls': imageUrls,
-        if (hospitalType != null) 'hospitalType': hospitalType,
-        if (chairCount != null) 'chairCount': chairCount,
-        if (staffCount != null) 'staffCount': staffCount,
-        if (specialties.isNotEmpty) 'specialties': specialties,
-        if (hasOralScanner != null) 'hasOralScanner': hasOralScanner,
-        if (hasCT != null) 'hasCT': hasCT,
-        if (has3DPrinter != null) 'has3DPrinter': has3DPrinter,
-        if (digitalEquipmentRaw != null) 'digitalEquipmentRaw': digitalEquipmentRaw,
-        if (workDays.isNotEmpty) 'workDays': workDays,
-        'weekendWork': weekendWork,
-        'nightShift': nightShift,
-        if (applyMethod.isNotEmpty) 'applyMethod': applyMethod,
-        if (requiredDocuments.isNotEmpty) 'requiredDocuments': requiredDocuments,
-        'isAlwaysHiring': isAlwaysHiring,
-        if (closingDate != null) 'closingDate': closingDate!.toIso8601String(),
-        if (subwayStationName != null || subwayLines.isNotEmpty || walkingMinutes != null)
-          'transportation': {
-            if (subwayStationName != null) 'subwayStationName': subwayStationName,
-            if (subwayLines.isNotEmpty) 'subwayLines': subwayLines,
-            if (walkingDistanceMeters != null) 'walkingDistanceMeters': walkingDistanceMeters,
-            if (walkingMinutes != null) 'walkingMinutes': walkingMinutes,
-            if (exitNumber != null) 'exitNumber': exitNumber,
-            'parking': parking,
-          },
-        if (lat != null) 'lat': lat,
-        if (lng != null) 'lng': lng,
-        if (tags.isNotEmpty) 'tags': tags,
-        if (tagsUserEdited) 'tagsUserEdited': true,
-        if (currentStep != null) 'currentStep': currentStep,
-        if (aiParseStatus != null) 'aiParseStatus': aiParseStatus,
-        if (sourceType != null) 'sourceType': sourceType,
-        if (rawInputText != null) 'rawInputText': rawInputText,
-        if (rawImageUrls.isNotEmpty) 'rawImageUrls': rawImageUrls,
-        if (promotionalImageUrls.isNotEmpty) 'promotionalImageUrls': promotionalImageUrls,
-        if (clinicProfileId != null) 'clinicProfileId': clinicProfileId,
-        if (logoUrl != null && logoUrl!.isNotEmpty) 'logoUrl': logoUrl,
-        if (editorStep != null) 'editorStep': editorStep,
-        if (mainDutiesRaw != null) 'mainDutiesRaw': mainDutiesRaw,
-        if (mainDutiesList.isNotEmpty) 'mainDutiesList': mainDutiesList,
-        if (recruitmentStart != null) 'recruitmentStart': recruitmentStart!.toIso8601String(),
-        if (fieldStatus != null && fieldStatus!.isNotEmpty) 'fieldStatus': fieldStatus,
-        if (fieldSources != null && fieldSources!.isNotEmpty) 'fieldSources': fieldSources,
-        'updatedAt': FieldValue.serverTimestamp(),
-      };
+    'ownerUid': ownerUid,
+    'clinicName': clinicName,
+    'title': title,
+    'role': role,
+    if (hireRoles.isNotEmpty) 'hireRoles': hireRoles,
+    'career': career,
+    if (education.isNotEmpty) 'education': education,
+    'employmentType': employmentType,
+    'workHours': workHours,
+    'salary': salary,
+    if (salaryPayType.isNotEmpty) 'salaryPayType': salaryPayType,
+    if (salaryAmount.isNotEmpty) 'salaryAmount': salaryAmount,
+    'benefits': benefits,
+    'description': description,
+    'address': address,
+    'contact': contact,
+    'imageUrls': imageUrls,
+    if (hospitalType != null) 'hospitalType': hospitalType,
+    if (chairCount != null) 'chairCount': chairCount,
+    if (staffCount != null) 'staffCount': staffCount,
+    if (specialties.isNotEmpty) 'specialties': specialties,
+    if (hasOralScanner != null) 'hasOralScanner': hasOralScanner,
+    if (hasCT != null) 'hasCT': hasCT,
+    if (has3DPrinter != null) 'has3DPrinter': has3DPrinter,
+    if (digitalEquipmentRaw != null) 'digitalEquipmentRaw': digitalEquipmentRaw,
+    if (workDays.isNotEmpty) 'workDays': workDays,
+    'weekendWork': weekendWork,
+    'nightShift': nightShift,
+    if (applyMethod.isNotEmpty) 'applyMethod': applyMethod,
+    if (requiredDocuments.isNotEmpty) 'requiredDocuments': requiredDocuments,
+    'isAlwaysHiring': isAlwaysHiring,
+    if (closingDate != null) 'closingDate': closingDate!.toIso8601String(),
+    'transportation': {
+      if (subwayStationName != null) 'subwayStationName': subwayStationName,
+      if (subwayLines.isNotEmpty) 'subwayLines': subwayLines,
+      if (selectedStations.isNotEmpty)
+        'selectedStations':
+            selectedStations
+                .where((s) => s.hasValue)
+                .map((s) => s.toJson())
+                .toList(),
+      if (walkingDistanceMeters != null)
+        'walkingDistanceMeters': walkingDistanceMeters,
+      if (walkingMinutes != null) 'walkingMinutes': walkingMinutes,
+      if (exitNumber != null) 'exitNumber': exitNumber,
+      'parking': parking,
+    },
+    if (lat != null) 'lat': lat,
+    if (lng != null) 'lng': lng,
+    if (tags.isNotEmpty) 'tags': tags,
+    if (tagsUserEdited) 'tagsUserEdited': true,
+    if (currentStep != null) 'currentStep': currentStep,
+    if (aiParseStatus != null) 'aiParseStatus': aiParseStatus,
+    if (sourceType != null) 'sourceType': sourceType,
+    if (rawInputText != null) 'rawInputText': rawInputText,
+    if (rawImageUrls.isNotEmpty) 'rawImageUrls': rawImageUrls,
+    if (promotionalImageUrls.isNotEmpty)
+      'promotionalImageUrls': promotionalImageUrls,
+    if (clinicProfileId != null) 'clinicProfileId': clinicProfileId,
+    if (logoUrl != null && logoUrl!.isNotEmpty) 'logoUrl': logoUrl,
+    if (editorStep != null) 'editorStep': editorStep,
+    if (mainDutiesRaw != null) 'mainDutiesRaw': mainDutiesRaw,
+    if (mainDutiesList.isNotEmpty) 'mainDutiesList': mainDutiesList,
+    if (recruitmentStart != null)
+      'recruitmentStart': recruitmentStart!.toIso8601String(),
+    if (fieldStatus != null && fieldStatus!.isNotEmpty)
+      'fieldStatus': fieldStatus,
+    if (fieldSources != null && fieldSources!.isNotEmpty)
+      'fieldSources': fieldSources,
+    'updatedAt': FieldValue.serverTimestamp(),
+  };
 
   /// 표시용 제목 (비어 있으면 기본값)
   String get displayTitle {
@@ -295,5 +331,33 @@ class JobDraft {
       hireRoles.isNotEmpty ||
       description.isNotEmpty ||
       address.isNotEmpty;
-}
 
+  static List<TransportationStation> _transportStationsFromMap(
+    Map<String, dynamic>? trans,
+  ) {
+    if (trans == null) return [];
+    final raw = trans['selectedStations'];
+    final stations =
+        raw is List
+            ? raw
+                .whereType<Map>()
+                .map(
+                  (e) => TransportationStation.fromJson(
+                    Map<String, dynamic>.from(e),
+                  ),
+                )
+                .where((s) => s.hasValue)
+                .toList()
+            : <TransportationStation>[];
+    if (stations.isNotEmpty) return stations;
+
+    final legacy = TransportationStation(
+      name: (trans['subwayStationName'] as String? ?? '').trim(),
+      lines: List<String>.from(trans['subwayLines'] ?? []),
+      walkingDistanceMeters: (trans['walkingDistanceMeters'] as num?)?.toInt(),
+      walkingMinutes: (trans['walkingMinutes'] as num?)?.toInt(),
+      exitNumber: trans['exitNumber'] as String?,
+    );
+    return legacy.hasValue ? [legacy] : [];
+  }
+}

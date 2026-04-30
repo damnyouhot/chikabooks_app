@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../me/providers/me_providers.dart';
 import '../../../core/theme/app_colors.dart';
@@ -16,6 +17,7 @@ import '../../auth/web/web_account_menu_button.dart';
 import '../../../models/clinic_profile.dart'
     show BizVerificationStatus, ClinicProfile;
 import '../../../models/job_draft.dart';
+import '../../../models/transportation_info.dart';
 import '../../../services/job_draft_service.dart';
 import '../../../utils/tag_generator.dart';
 import '../../publisher/services/clinic_profile_service.dart';
@@ -300,7 +302,8 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
             title: const Text('지점을 바꿀까요?'),
             content: Text(
               '"${next.effectiveName}" 으로 전환하면 본문의 치과명·주소·연락처가\n'
-              '새 지점 정보로 바뀝니다. 사진과 본문 내용은 유지돼요.',
+              '새 지점 정보로 바뀝니다. 사진과 본문 내용은 유지돼요.'
+              '${next.canPublishJobs ? '' : '\n\n이 지점은 아직 게시 가능한 인증이 완료되지 않아, 게시 전 등록증 확인이 필요합니다.'}',
             ),
             actions: [
               TextButton(
@@ -316,24 +319,27 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
     );
     if (ok != true || !mounted) return;
 
-    await JobDraftService.saveDraft(
-      draftId: widget.draftId,
-      formData: {'clinicProfileId': next.id},
+    final nextData = _data.copyWith(
+      clinicName: next.effectiveName,
+      address: next.address,
+      contact: next.phone,
     );
-    if (!mounted) return;
-
     setState(() {
       _selectedProfile = next;
       _extraDraftFields = {..._extraDraftFields, 'clinicProfileId': next.id};
-      // 본문 치과명/주소/연락처를 새 지점 기준으로 강제 교체.
-      _data = _data.copyWith(
-        clinicName: next.effectiveName,
-        address: next.address,
-        contact: next.phone,
-      );
+      _data = nextData;
     });
-    // 자식 폼에도 즉시 반영.
     _detailFormKey.currentState?.applyDraftFromParent(_data);
+
+    await JobDraftService.saveDraft(
+      draftId: widget.draftId,
+      formData: {
+        ...nextData.toMap(),
+        ..._extraDraftFields,
+        'clinicProfileId': next.id,
+      },
+    );
+    if (mounted) setState(() => _lastSavedAt = DateTime.now());
   }
 
   /// 드롭다운에서 "+ 새 지점 추가" 를 골랐을 때.
@@ -419,6 +425,53 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('치과 정보를 삭제했습니다.')));
+  }
+
+  Future<void> _openVerificationAppeal(ClinicProfile profile) async {
+    final bv = profile.businessVerification;
+    final subject = Uri.encodeComponent('치카북스 사업자 인증 문의 / 이의제기');
+    final body = Uri.encodeComponent(
+      [
+        '인증 결과 확인을 요청합니다.',
+        '',
+        '프로필 ID: ${profile.id}',
+        '병원명: ${profile.effectiveName}',
+        '사업자번호: ${bv.bizNo.isEmpty ? '(미확인)' : bv.bizNo}',
+        '인증상태: ${bv.status.value}',
+        '실패/검토 사유: ${bv.failReason ?? bv.hiraNote ?? '(미확인)'}',
+        '',
+        '문의 내용:',
+      ].join('\n'),
+    );
+    final uri = Uri.parse(
+      'mailto:support@chikabooks.com?subject=$subject&body=$body',
+    );
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+      return;
+    }
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('인증 문의 / 이의제기'),
+            content: Text(
+              '메일 앱을 열 수 없어요.\n\n'
+              'support@chikabooks.com 으로 아래 정보를 보내주세요.\n\n'
+              '프로필 ID: ${profile.id}\n'
+              '병원명: ${profile.effectiveName}\n'
+              '사업자번호: ${bv.bizNo.isEmpty ? '(미확인)' : bv.bizNo}\n'
+              '인증상태: ${bv.status.value}',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('확인'),
+              ),
+            ],
+          ),
+    );
   }
 
   Future<bool?> _showImpactConfirmDialog({
@@ -718,6 +771,7 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
         closingDate: draft.closingDate,
         subwayStationName: draft.subwayStationName,
         subwayLines: List.from(draft.subwayLines),
+        selectedStations: List.from(draft.selectedStations),
         walkingDistanceMeters: draft.walkingDistanceMeters,
         walkingMinutes: draft.walkingMinutes,
         exitNumber: draft.exitNumber,
@@ -770,6 +824,7 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
     required bool mergeEmptyOnly,
   }) {
     if (!mounted) return;
+    if (_isMockAiResponse(res)) return;
 
     final wd = JobAiExtractNormalizer.workDaysToCodes(res['workDays'] as List?);
     final htKey = JobAiExtractNormalizer.hospitalTypeToKey(
@@ -1043,6 +1098,18 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
         mergeEmptyOnly
             ? (d.parking ? d.parking : (parkingAi ?? d.parking))
             : (parkingAi ?? d.parking);
+    final selectedStationsOut =
+        mergeEmptyOnly && d.selectedStations.isNotEmpty
+            ? d.selectedStations
+            : _mergeAiStations(
+              existing: d.selectedStations,
+              stationName: subwayStationNameOut,
+              lines: newSubwayLines,
+              walkingDistanceMeters: walkingDistanceOut,
+              walkingMinutes: walkingMinutesOut,
+              exitNumber: exitNumberOut,
+              mergeEmptyOnly: mergeEmptyOnly,
+            );
     final mainDutiesListOut =
         mergeEmptyOnly
             ? (d.mainDutiesList.isNotEmpty
@@ -1136,6 +1203,7 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
         chairCount: chairCountOut,
         staffCount: staffCountOut,
         subwayStationName: subwayStationNameOut,
+        selectedStations: selectedStationsOut,
         walkingDistanceMeters: walkingDistanceOut,
         walkingMinutes: walkingMinutesOut,
         exitNumber: exitNumberOut,
@@ -1246,6 +1314,35 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
     return digits.isEmpty ? null : int.tryParse(digits);
   }
 
+  List<TransportationStation> _mergeAiStations({
+    required List<TransportationStation> existing,
+    required String? stationName,
+    required List<String> lines,
+    required int? walkingDistanceMeters,
+    required int? walkingMinutes,
+    required String? exitNumber,
+    required bool mergeEmptyOnly,
+  }) {
+    if (mergeEmptyOnly && existing.isNotEmpty) return existing;
+    final name = stationName?.trim() ?? '';
+    if (name.isEmpty) return existing;
+    return [
+      TransportationStation(
+        name: name,
+        lines: lines,
+        walkingDistanceMeters: walkingDistanceMeters,
+        walkingMinutes: walkingMinutes,
+        exitNumber: exitNumber,
+      ),
+    ];
+  }
+
+  bool _isMockAiResponse(Map<String, dynamic> res) {
+    if (res['_mock'] == true) return true;
+    final message = (res['_message'] ?? '').toString().toLowerCase();
+    return message.contains('mock') || message.contains('샘플');
+  }
+
   Future<void> _callAiParsing({
     required JobDraft draft,
     required String sourceType,
@@ -1274,9 +1371,12 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
         rawText: rawText,
       );
       if (!mounted) return;
-      _applyNormalizedResult(res1, mergeEmptyOnly: false);
+      final res1IsMock = _isMockAiResponse(res1);
+      if (!res1IsMock) {
+        _applyNormalizedResult(res1, mergeEmptyOnly: false);
+      }
 
-      if (runPromoSecondPass) {
+      if (runPromoSecondPass && !res1IsMock) {
         try {
           final res2 = await _fetchParseJobForm(
             imageUrls: promo,
@@ -1284,7 +1384,9 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
             rawText: '',
           );
           if (!mounted) return;
-          _applyNormalizedResult(res2, mergeEmptyOnly: true);
+          if (!_isMockAiResponse(res2)) {
+            _applyNormalizedResult(res2, mergeEmptyOnly: true);
+          }
         } catch (_) {
           /* 1차 결과는 유지 */
         }
@@ -1313,7 +1415,7 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
           ..._data.toMap(),
           ..._extraDraftFields,
           'currentStep': 'ai_generated',
-          'aiParseStatus': 'done',
+          'aiParseStatus': res1IsMock ? 'mock_skipped' : 'done',
         },
       );
       if (mounted) {
@@ -1321,9 +1423,16 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
           _extraDraftFields = {
             ..._extraDraftFields,
             'currentStep': 'ai_generated',
-            'aiParseStatus': 'done',
+            'aiParseStatus': res1IsMock ? 'mock_skipped' : 'done',
           };
         });
+        if (res1IsMock) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('샘플 AI 응답은 실제 공고에 반영하지 않았어요. 직접 입력해주세요.'),
+            ),
+          );
+        }
       }
     } catch (e) {
       await JobDraftService.saveDraft(
@@ -2211,6 +2320,7 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
           onPick: _switchToBranch,
           onCreateNew: _createAndSwitchBranch,
           onDelete: _deleteBranch,
+          onAppeal: _openVerificationAppeal,
           bottomSpacing: 18,
         ),
         _buildLicenseSide(profile),
@@ -2407,6 +2517,7 @@ class _ClinicProfilePickerPanel extends ConsumerWidget {
     required this.onPick,
     required this.onCreateNew,
     required this.onDelete,
+    required this.onAppeal,
     this.bottomSpacing = 0,
   });
 
@@ -2414,6 +2525,7 @@ class _ClinicProfilePickerPanel extends ConsumerWidget {
   final ValueChanged<ClinicProfile> onPick;
   final VoidCallback onCreateNew;
   final ValueChanged<ClinicProfile> onDelete;
+  final ValueChanged<ClinicProfile> onAppeal;
   final double bottomSpacing;
 
   @override
@@ -2492,7 +2604,7 @@ class _ClinicProfilePickerPanel extends ConsumerWidget {
                       _ClinicChoiceChip(
                         profile: p,
                         selected: p.id == selectedId,
-                        enabled: p.canPublishJobs || p.id == selectedId,
+                        enabled: true,
                         onTap: () => onPick(p),
                       ),
                   ],
@@ -2507,7 +2619,11 @@ class _ClinicProfilePickerPanel extends ConsumerWidget {
               ],
               if (selected != null) ...[
                 const SizedBox(height: 12),
-                _SelectedClinicActions(profile: selected, onDelete: onDelete),
+                _SelectedClinicActions(
+                  profile: selected,
+                  onDelete: onDelete,
+                  onAppeal: onAppeal,
+                ),
               ],
             ],
           ),
@@ -2563,43 +2679,92 @@ class _ClinicChoiceChip extends StatelessWidget {
 }
 
 class _SelectedClinicActions extends StatelessWidget {
-  const _SelectedClinicActions({required this.profile, required this.onDelete});
+  const _SelectedClinicActions({
+    required this.profile,
+    required this.onDelete,
+    required this.onAppeal,
+  });
 
   final ClinicProfile profile;
   final ValueChanged<ClinicProfile> onDelete;
+  final ValueChanged<ClinicProfile> onAppeal;
 
   @override
   Widget build(BuildContext context) {
     final name =
         profile.effectiveName.isEmpty ? '이름 없음' : profile.effectiveName;
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
+    final statusText =
+        profile.canPublishJobs
+            ? '현재 선택: $name · 게시 가능'
+            : '현재 선택: $name · 인증 필요';
+    final detailText =
+        profile.canPublishJobs
+            ? '이 병원 정보가 공고의 치과명·주소·연락처에 적용됩니다.'
+            : '이 병원 정보는 공고에 적용할 수 있지만, 게시하려면 등록증 확인을 완료해야 합니다.';
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color:
             profile.canPublishJobs
-                ? '현재 선택: $name · 게시 가능'
-                : '현재 선택: $name · 인증 필요',
+                ? AppColors.success.withValues(alpha: 0.08)
+                : AppColors.warning.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppPublisher.softRadius),
+        border: Border.all(
+          color:
+              profile.canPublishJobs
+                  ? AppColors.success.withValues(alpha: 0.22)
+                  : AppColors.warning.withValues(alpha: 0.30),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            statusText,
             overflow: TextOverflow.ellipsis,
             style: GoogleFonts.notoSansKr(
               fontSize: 12,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w800,
               color:
                   profile.canPublishJobs
                       ? AppColors.success
-                      : AppColors.textSecondary,
+                      : AppColors.textPrimary,
             ),
           ),
-        ),
-        TextButton.icon(
-          onPressed: () => onDelete(profile),
-          icon: const Icon(Icons.delete_outline, size: 16),
-          label: const Text('삭제'),
-          style: TextButton.styleFrom(
-            foregroundColor: AppColors.error,
-            disabledForegroundColor: AppColors.textDisabled,
+          const SizedBox(height: 4),
+          Text(
+            detailText,
+            style: GoogleFonts.notoSansKr(
+              fontSize: 11,
+              height: 1.4,
+              color: AppColors.textSecondary,
+            ),
           ),
-        ),
-      ],
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            alignment: WrapAlignment.end,
+            children: [
+              if (!profile.canPublishJobs)
+                OutlinedButton.icon(
+                  onPressed: () => onAppeal(profile),
+                  icon: const Icon(Icons.support_agent_rounded, size: 16),
+                  label: const Text('문의 / 이의제기'),
+                ),
+              TextButton.icon(
+                onPressed: () => onDelete(profile),
+                icon: const Icon(Icons.delete_outline, size: 16),
+                label: const Text('삭제'),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.error,
+                  disabledForegroundColor: AppColors.textDisabled,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

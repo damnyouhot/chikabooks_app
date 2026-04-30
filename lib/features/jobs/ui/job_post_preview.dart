@@ -119,6 +119,12 @@ class _JobPostPreviewState extends State<JobPostPreview> {
   }
 
   String _transportValue() {
+    final stations =
+        data.selectedStations
+            .where((s) => s.hasValue)
+            .map((s) => s.displayLine)
+            .toList();
+    if (stations.isNotEmpty) return stations.join('\n');
     if (data.subwayStationName == null ||
         data.subwayStationName!.trim().isEmpty) {
       return '';

@@ -297,6 +297,17 @@ class Job {
     final bool nearStation =
         (json['isNearStation'] as bool?) ?? (trans?.isNearStation ?? false);
 
+    final resolvedSubwayLines = List<String>.from(
+      json['subwayLines'] ??
+          (trans != null
+              ? trans.selectedStations
+                  .expand((s) => s.lines)
+                  .where((line) => line.trim().isNotEmpty)
+                  .toSet()
+                  .toList()
+              : const []),
+    );
+
     return Job(
       id: docId ?? (json['id'] as String? ?? ''),
       title: (json['title'] as String?)?.trim() ?? '',
@@ -346,8 +357,8 @@ class Job {
       mainDutiesList: List<String>.from(json['mainDutiesList'] ?? []),
       // 교통편
       transportation: trans,
-      subwayLines: List<String>.from(json['subwayLines'] ?? []),
-      hasParking: (json['hasParking'] as bool?) ?? false,
+      subwayLines: resolvedSubwayLines,
+      hasParking: (json['hasParking'] as bool?) ?? (trans?.parking ?? false),
       // 태그
       tags: List<String>.from(json['tags'] ?? []),
       // 홍보 이미지
