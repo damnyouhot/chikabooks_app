@@ -30,9 +30,6 @@ class BizLicenseUploadSection extends StatefulWidget {
   /// 부모(예: 공고 에디터)에서 확인 다이얼로그 후 `replacementMode` 로 전환
   final Future<void> Function()? onReplaceLicenseWithDialog;
 
-  /// 부모에서 영향 안내 다이얼로그 후 Firestore 인증 스냅샷을 초기화
-  final Future<bool> Function()? onClearBusinessVerification;
-
   const BizLicenseUploadSection({
     super.key,
     required this.profileId,
@@ -43,7 +40,6 @@ class BizLicenseUploadSection extends StatefulWidget {
     this.onReplacementCancel,
     this.persistedProfile,
     this.onReplaceLicenseWithDialog,
-    this.onClearBusinessVerification,
   });
 
   @override
@@ -89,20 +85,14 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
     return snap.canApplyToProfileAfterNts;
   }
 
-  Future<void> _clearPersistedVerification() async {
-    final clear = widget.onClearBusinessVerification;
-    if (clear == null) return;
-    final cleared = await clear();
-    if (!mounted) return;
-    if (!cleared) return;
-    setState(() {
-      _ocrResult = null;
-      _verifySnapshot = null;
-      _ocrReadFailed = false;
-      _ocrEmpty = false;
-      _profileApplied = false;
-      _hydratedFromProfile = false;
-    });
+  void _resetLocalVerificationState() {
+    _verifySnapshot = null;
+    _ocrResult = null;
+    _ocrReadFailed = false;
+    _ocrEmpty = false;
+    _profileApplied = false;
+    _hydratedFromProfile = false;
+    _uploadProgress = 0;
   }
 
   Map<String, String>? _buildOcrMapFromProfile(ClinicProfile p) {
@@ -163,15 +153,18 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
   @override
   void didUpdateWidget(covariant BizLicenseUploadSection oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!oldWidget.replacementMode && widget.replacementMode) {
+    if (oldWidget.profileId != widget.profileId) {
       setState(() {
-        _verifySnapshot = null;
-        _ocrResult = null;
-        _ocrReadFailed = false;
-        _ocrEmpty = false;
-        _profileApplied = false;
-        _hydratedFromProfile = false;
+        _isUploading = false;
+        _resetLocalVerificationState();
       });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _maybeSeedFromPersistedProfile();
+      });
+      return;
+    }
+    if (!oldWidget.replacementMode && widget.replacementMode) {
+      setState(_resetLocalVerificationState);
     } else if (oldWidget.replacementMode && !widget.replacementMode) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _maybeSeedFromPersistedProfile();
@@ -391,6 +384,8 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
       await profileRef.update({
         if (_ocrResult!.containsKey('clinicName'))
           'clinicName': _ocrResult!['clinicName'],
+        if (_ocrResult!.containsKey('clinicName'))
+          'displayName': FieldValue.delete(),
         if (_ocrResult!.containsKey('ownerName'))
           'ownerName': _ocrResult!['ownerName'],
         if (_ocrResult!.containsKey('address'))
@@ -515,25 +510,6 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
               ),
           ],
         ),
-        if (widget.onClearBusinessVerification != null) ...[
-          const SizedBox(height: 8),
-          TextButton.icon(
-            onPressed: _clearPersistedVerification,
-            icon: const Icon(Icons.delete_outline, size: 16),
-            label: Text(
-              '저장된 인증 정보 삭제',
-              style: GoogleFonts.notoSansKr(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            style: TextButton.styleFrom(
-              foregroundColor: AppColors.error,
-              padding: EdgeInsets.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-          ),
-        ],
       ],
     );
   }
@@ -562,7 +538,7 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
         if (_profileApplied) ...[
           const SizedBox(height: 8),
           Text(
-            '프로필에 반영했습니다. 아래 국세청·HIRA 안내는 그대로 유지됩니다.',
+            '프로필에 반영했습니다. 등록증상 상호는 잠금 처리되고, 노출명만 수정할 수 있습니다.',
             style: GoogleFonts.notoSansKr(
               fontSize: 11,
               color: AppColors.accent,
@@ -585,6 +561,17 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
             style: GoogleFonts.notoSansKr(
               fontSize: 11,
               color: AppColors.textDisabled,
+              height: 1.4,
+            ),
+          ),
+        ],
+        if (!_profileApplied && _canApplyToProfile) ...[
+          const SizedBox(height: 8),
+          Text(
+            '인증 상호는 자동 반영 후 수정할 수 없고, 구직자에게 보이는 노출명만 별도로 관리합니다.',
+            style: GoogleFonts.notoSansKr(
+              fontSize: 11,
+              color: AppColors.textSecondary,
               height: 1.4,
             ),
           ),
@@ -621,36 +608,6 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
                   ),
                 ),
               ),
-              if (widget.onClearBusinessVerification != null) ...[
-                const SizedBox(width: 8),
-                Expanded(
-                  child: SizedBox(
-                    height: AppPublisher.ctaHeight,
-                    child: OutlinedButton.icon(
-                      onPressed: _clearPersistedVerification,
-                      icon: const Icon(Icons.delete_outline, size: 16),
-                      label: Text(
-                        '인증 정보 삭제',
-                        style: GoogleFonts.notoSansKr(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.error,
-                        side: BorderSide(
-                          color: AppColors.error.withValues(alpha: 0.55),
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(
-                            AppPublisher.buttonRadius,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
             ],
           ),
           const SizedBox(height: 12),
@@ -692,7 +649,11 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
               ),
             ),
             TextButton(
-              onPressed: _pickAndUpload,
+              onPressed:
+                  widget.replacementMode ||
+                          widget.persistedProfile?.hasStoredVerification != true
+                      ? _pickAndUpload
+                      : widget.onReplaceLicenseWithDialog,
               child: Text(
                 '다른 파일로 올리기',
                 style: GoogleFonts.notoSansKr(

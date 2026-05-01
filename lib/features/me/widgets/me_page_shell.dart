@@ -35,8 +35,7 @@ class MePageShell extends StatefulWidget {
 
   /// 헤더의 [MeBranchSwitcher] 표시 여부.
   ///
-  /// "보기 기준(지점 필터)" 이 의미가 없는 페이지(예: 사업자 인증 — 항상 모든
-  /// 지점을 함께 보여줌)는 true 로 해서 사용자 혼란을 막는다.
+  /// "보기 기준(지점 필터)" 이 의미가 없는 페이지는 true 로 해서 사용자 혼란을 막는다.
   final bool hideBranchSwitcher;
 
   static const double sideMenuWidth = 260;
@@ -288,23 +287,6 @@ class _SideMenuTile extends StatelessWidget {
                   ),
                 ),
               ),
-              if (item.comingSoon)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: AppColors.warning.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Text(
-                    '곧',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.warning,
-                    ),
-                  ),
-                ),
             ],
           ),
         ),
@@ -360,11 +342,6 @@ class _NarrowMenuChip extends StatelessWidget {
               color: active ? AppColors.accent : AppColors.textSecondary),
           const SizedBox(width: 6),
           Text(item.label),
-          if (item.comingSoon) ...[
-            const SizedBox(width: 4),
-            const Text('· 곧',
-                style: TextStyle(fontSize: 10, color: AppColors.warning)),
-          ],
         ],
       ),
       selected: active,
@@ -441,15 +418,11 @@ class _MeMenuItem {
   final IconData icon;
   final String route;
 
-  /// "곧" 배지 노출 여부 (Sprint 2~6에서 채워질 화면)
-  final bool comingSoon;
-
   const _MeMenuItem({
     required this.id,
     required this.label,
     required this.icon,
     required this.route,
-    this.comingSoon = false,
   });
 
   /// 사이드바·상단 칩에 노출되는 순서대로 정의
@@ -465,12 +438,6 @@ class _MeMenuItem {
       label: '병원 정보',
       icon: Icons.local_hospital_outlined,
       route: '/me/clinic',
-    ),
-    _MeMenuItem(
-      id: 'verify',
-      label: '사업자 인증',
-      icon: Icons.verified_outlined,
-      route: '/me/verify',
     ),
     _MeMenuItem(
       id: 'billing',

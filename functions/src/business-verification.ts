@@ -259,11 +259,57 @@ function daysSince(openedAt: Date, now = new Date()): number {
   return Math.max(0, Math.floor(ms / (1000 * 60 * 60 * 24)));
 }
 
+async function upsertProvisionalAdminNotification(args: {
+  db: admin.firestore.Firestore;
+  uid: string;
+  profileId: string;
+  clinicName: string;
+  ownerName: string;
+  address: string;
+  bizNo: string;
+  hira: {matched: boolean | null; note: string; level: HiraMatchLevel};
+  checkMethod?: RunCheckMethod;
+}): Promise<void> {
+  const notificationId = `business_verification_provisional_${args.uid}_${args.profileId}`;
+  const displayName = args.clinicName.trim() || "이름 없음";
+  const ref = args.db.collection("adminNotifications").doc(notificationId);
+  const snap = await ref.get();
+  await ref.set(
+    {
+      type: "business_verification_provisional",
+      status: "unread",
+      title: "조건부 승인 검토",
+      message: `${displayName} 사업자 인증 최종 확인 필요`,
+      uid: args.uid,
+      profileId: args.profileId,
+      clinicName: args.clinicName,
+      ownerName: args.ownerName,
+      address: args.address,
+      bizNo: args.bizNo,
+      hiraMatched: args.hira.matched,
+      hiraMatchLevel: args.hira.level,
+      hiraNote: args.hira.note,
+      checkMethod: args.checkMethod ?? null,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      ...(snap.exists ? {} : {
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      }),
+    },
+    {merge: true}
+  );
+}
+
 async function applyHiraDecision(args: {
+  db: admin.firestore.Firestore;
+  uid: string;
+  profileId: string;
   profileRef: FirebaseFirestore.DocumentReference<FirebaseFirestore.DocumentData>;
   method: "nts" | "mock";
   checkMethod?: RunCheckMethod;
   bizNoRaw: string;
+  clinicName: string;
+  ownerName: string;
+  address: string;
   hira: {matched: boolean | null; note: string; level: HiraMatchLevel};
   openedAtRaw: unknown;
 }): Promise<RunCheckResult> {
@@ -311,6 +357,20 @@ async function applyHiraDecision(args: {
     ] ?? admin.firestore.FieldValue.delete(),
     "updatedAt": admin.firestore.FieldValue.serverTimestamp(),
   });
+
+  if (status === "provisional") {
+    await upsertProvisionalAdminNotification({
+      db: args.db,
+      uid: args.uid,
+      profileId: args.profileId,
+      clinicName: args.clinicName,
+      ownerName: args.ownerName,
+      address: args.address,
+      bizNo: args.bizNoRaw,
+      hira: args.hira,
+      checkMethod: args.checkMethod ?? args.method,
+    });
+  }
 
   return {
     status,
@@ -426,10 +486,16 @@ export async function runCheckBusinessStatus(
       await runHiraSupplement(clinicName, addressStr, hiraServiceKey);
 
     return applyHiraDecision({
+      db,
+      uid,
+      profileId,
       profileRef,
       method: "mock",
       checkMethod: "mock",
       bizNoRaw,
+      clinicName,
+      ownerName,
+      address: addressStr,
       hira: hiraMock,
       openedAtRaw,
     });
@@ -506,10 +572,16 @@ export async function runCheckBusinessStatus(
       hiraServiceKey
     );
     return applyHiraDecision({
+      db,
+      uid,
+      profileId,
       profileRef,
       method: "nts",
       checkMethod: validate.skipped ? "nts" : "nts_validate",
       bizNoRaw,
+      clinicName,
+      ownerName,
+      address: addressStr,
       hira: hiraNts,
       openedAtRaw,
     });

@@ -4,12 +4,13 @@ import 'job.dart';
 ///
 /// [Job.fromJson]으로 정규화한 뒤 드래프트 스키마에 맞게 옮긴다.
 Map<String, dynamic> publishedJobToDraftFormData(Job job) {
-  final salary = job.salaryText.trim().isNotEmpty
-      ? job.salaryText
-      : job.salaryDisplayLine;
+  final salary =
+      job.salaryText.trim().isNotEmpty ? job.salaryText : job.salaryDisplayLine;
 
   final out = <String, dynamic>{
     'title': job.title,
+    if (job.registeredClinicName.trim().isNotEmpty)
+      'registeredClinicName': job.registeredClinicName.trim(),
     'clinicName': job.clinicName,
     'role': job.type,
     'career': job.career,
@@ -55,9 +56,7 @@ Map<String, dynamic> publishedJobToDraftFormData(Job job) {
       'parking': job.hasParking,
     };
   } else if (job.hasParking) {
-    out['transportation'] = {
-      'parking': job.hasParking,
-    };
+    out['transportation'] = {'parking': job.hasParking};
   }
 
   if (job.lat != 0 || job.lng != 0) {

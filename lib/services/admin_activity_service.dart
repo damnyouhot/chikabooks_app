@@ -212,9 +212,7 @@ class AdminActivityService {
       final doc = await _db.collection('users').doc(uid).get();
       _excludedCache = doc.data()?['excludeFromStats'] == true;
       // 첫 로드 시 스냅샷도 함께 캐시
-      if (_snapshotCache == null) {
-        _snapshotCache = _UserSnapshot.fromMap(doc.data() ?? {});
-      }
+      _snapshotCache ??= _UserSnapshot.fromMap(doc.data() ?? {});
       return _excludedCache!;
     } catch (_) {
       return false;
@@ -280,6 +278,8 @@ enum ActivityEventType {
   viewJob('view_job', '구직 탭 진입'),
   viewGrowth('view_growth', '성장 탭 진입'),
   viewBond('view_bond', '교감 탭 진입'),
+  viewTodayWords('view_today_words', '오늘 단어 탭 진입'),
+  viewWhisper('view_whisper', '속닥속닥 탭 진입'),
   viewSettings('view_settings', '설정 진입'),
   viewEmotionRecord('view_emotion_record', '감정기록 화면 진입'),
   viewJobDetail('view_job_detail', '공고 상세 진입'),
@@ -310,10 +310,23 @@ enum ActivityEventType {
   // ── 퀴즈 ──────────────────────────────────────────────────
   quizCompleted('quiz_completed', '퀴즈 풀이 완료'),
 
+  // ── 오늘 단어 ──────────────────────────────────────────────
+  dailyWordKnown('daily_word_known', '오늘 단어 아는 단어'),
+  dailyWordReviewLater('daily_word_review_later', '오늘 단어 다시보기'),
+  dailyWordSaved('daily_word_saved', '오늘 단어 저장'),
+  dailyWordUnsaved('daily_word_unsaved', '오늘 단어 저장 취소'),
+
   // ── 공감투표 ──────────────────────────────────────────────
   pollEmpathize('poll_empathize', '공감투표 공감'),
   pollChangeEmpathy('poll_change_empathy', '공감투표 공감 변경'),
   pollAddOption('poll_add_option', '공감투표 보기 추가'),
+
+  // ── 속닥속닥 ──────────────────────────────────────────────
+  whisperCreateComplete('whisper_create_complete', '속닥속닥 글 작성'),
+  whisperReaction('whisper_reaction', '속닥속닥 반응'),
+  whisperComment('whisper_comment', '속닥속닥 댓글'),
+  whisperReply('whisper_reply', '속닥속닥 답글'),
+  whisperShare('whisper_share', '속닥속닥 공유'),
 
   // ── 기타 ──────────────────────────────────────────────────
   appOpen('app_open', '앱 실행'),

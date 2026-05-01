@@ -217,6 +217,7 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
           return XFile(u, name: name);
         }).toList();
     return JobPostData(
+      registeredClinicName: d.registeredClinicName,
       clinicName: d.clinicName,
       title: d.title,
       role: d.role,
@@ -544,6 +545,7 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
     return Job(
       id: widget.draftId,
       title: d.title,
+      registeredClinicName: d.registeredClinicName,
       clinicName: d.clinicName,
       address: d.address,
       district: _districtFrom(d.address),

@@ -6,11 +6,18 @@ import * as crypto from "crypto";
 import {runCheckBusinessStatus} from "./business-verification";
 export {
   adminListProvisionalProfiles,
+  adminListVerificationReviewHistory,
   adminSetProfileVerification,
+  requestBusinessNameReview,
+  adminListBusinessNameReviewRequests,
+  adminResolveBusinessNameReview,
 } from "./admin-verification";
+export { aggregateAnalyticsDaily } from "./scheduled-analytics";
 export {verifyBusinessLicense} from "./biz-license-verify";
 
-admin.initializeApp();
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
 const db = admin.firestore();
 
 // ========== 소셜 로그인 에러 코드 정의 ==========
@@ -1516,6 +1523,7 @@ export const createJobPosting = functions.https.onCall(
     const jobData = {
       createdBy: uid,
       clinicId,
+      registeredClinicName: String(data.registeredClinicName ?? "").trim(),
       clinicName: String(data.clinicName ?? "").trim(),
       title: String(data.title ?? "").trim(),
       role: String(data.role ?? "").trim(),
@@ -1637,6 +1645,12 @@ export const publishTestJobWithoutPayment = functions.https.onCall(
       profile.clinicName ??
       ""
     ).trim();
+    const registeredClinicName = String(
+      draft.registeredClinicName ??
+      profile.clinicName ??
+      profile.businessVerification?.ocrResult?.clinicName ??
+      ""
+    ).trim();
     const address = String(draft.address ?? profile.address ?? "").trim();
     const phone = String(draft.contact ?? profile.phone ?? "").trim();
 
@@ -1645,6 +1659,7 @@ export const publishTestJobWithoutPayment = functions.https.onCall(
       createdBy: uid,
       clinicId: uid,
       clinicProfileId,
+      registeredClinicName,
       clinicName,
       title: String(draft.title ?? "").trim(),
       role: String(draft.role ?? "").trim(),

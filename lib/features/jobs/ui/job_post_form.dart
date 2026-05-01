@@ -36,6 +36,10 @@ TextStyle _ft({
 
 /// 구인공고 폼 데이터 모델
 class JobPostData {
+  /// 사업자등록증 기준 공식 상호. 인증 정보에서만 채우며 사용자가 편집하지 않는다.
+  String registeredClinicName;
+
+  /// 구직자에게 노출되는 치과명. 비어 있으면 [registeredClinicName]을 기본 표시로 사용한다.
   String clinicName;
   String title;
 
@@ -131,6 +135,7 @@ class JobPostData {
   Map<String, dynamic>? fieldSources;
 
   JobPostData({
+    this.registeredClinicName = '',
     this.clinicName = '',
     this.title = '',
     this.role = '',
@@ -194,6 +199,7 @@ class JobPostData {
        mainDutiesList = mainDutiesList ?? [];
 
   JobPostData copyWith({
+    String? registeredClinicName,
     String? clinicName,
     String? title,
     String? role,
@@ -245,6 +251,7 @@ class JobPostData {
     Map<String, dynamic>? fieldSources,
   }) {
     return JobPostData(
+      registeredClinicName: registeredClinicName ?? this.registeredClinicName,
       clinicName: clinicName ?? this.clinicName,
       title: title ?? this.title,
       role: role ?? this.role,
@@ -304,6 +311,8 @@ class JobPostData {
   }
 
   Map<String, dynamic> toMap() => {
+    if (registeredClinicName.trim().isNotEmpty)
+      'registeredClinicName': registeredClinicName.trim(),
     'clinicName': clinicName,
     'title': title,
     'role': role,
@@ -454,6 +463,10 @@ class JobPostData {
     final hireRoles = JobPostData.parseHireRolesFromData(data);
     final roleLine = JobPostData.joinHireRoles(hireRoles);
     return JobPostData(
+      registeredClinicName:
+          data['registeredClinicName'] as String? ??
+          data['businessRegisteredName'] as String? ??
+          '',
       clinicName: data['clinicName'] as String? ?? '',
       title: data['title'] as String? ?? '',
       role: roleLine,
@@ -655,6 +668,7 @@ class JobPostFormState extends State<JobPostForm> {
   bool _isLoadingAi = false;
   bool _isSubmitting = false;
   bool _isLookingUpStation = false;
+  List<TransportationStation> _stationCandidates = [];
   List<TransportationStation> _nearbyStations = [];
 
   /// AI 파싱 완료 후 fieldStatus 보관 → 배너/뱃지 표시
@@ -823,6 +837,7 @@ class JobPostFormState extends State<JobPostForm> {
         _data.staffCount != null ? '${_data.staffCount}' : '';
     _exitNumberCtrl.text = _data.exitNumber ?? '';
     _nearbyStations = List<TransportationStation>.from(_data.selectedStations);
+    _stationCandidates = List<TransportationStation>.from(_nearbyStations);
     _digitalEquipmentRawCtrl.text = _data.digitalEquipmentRaw ?? '';
     _selectedCareer = JobPostFieldSync.matchCareerToDropdown(
       _data.career.isEmpty ? null : _data.career,
@@ -3104,6 +3119,51 @@ class JobPostFormState extends State<JobPostForm> {
           focusWhenEmpty: _fTitle,
         ),
         const SizedBox(height: 12),
+        if (_data.registeredClinicName.trim().isNotEmpty) ...[
+          Padding(
+            padding: EdgeInsets.only(
+              left: _webStep3Inline ? AppPublisher.formInlineLabelWidth : 0,
+            ),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.webPublisherPageBg,
+                borderRadius: BorderRadius.circular(AppPublisher.buttonRadius),
+                border: Border.all(color: AppColors.divider),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.verified_outlined,
+                    size: 17,
+                    color: AppColors.accent,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '등록증상 상호: ${_data.registeredClinicName.trim()}',
+                      style: _ft(
+                        size: 12,
+                        weight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '수정 불가',
+                    style: _ft(
+                      size: 11,
+                      weight: FontWeight.w700,
+                      color: AppColors.textDisabled,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
         _wrapStep3Clear(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -4167,98 +4227,126 @@ class JobPostFormState extends State<JobPostForm> {
               final transRest = Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (_nearbyStations.isNotEmpty) ...[
-                    Text(
-                      '공고에 노출할 가까운 역',
-                      style: _ft(
-                        size: 12,
-                        weight: FontWeight.w700,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    ..._nearbyStations.asMap().entries.map((entry) {
-                      final idx = entry.key;
-                      final s = entry.value;
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 6),
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 8,
-                            horizontal: 12,
-                          ),
-                          decoration:
-                              _pubWeb
-                                  ? BoxDecoration(
-                                    color:
-                                        idx == 0
-                                            ? AppColors.accent.withOpacity(0.06)
-                                            : AppColors.accent.withOpacity(
-                                              0.02,
-                                            ),
-                                    border: Border(
-                                      bottom: BorderSide(
-                                        color: AppColors.divider,
-                                      ),
-                                    ),
-                                  )
-                                  : BoxDecoration(
-                                    color: AppColors.accent.withOpacity(0.06),
-                                    borderRadius: _rBox,
-                                    border: Border.all(
-                                      color: AppColors.accent.withOpacity(0.2),
-                                    ),
-                                  ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.subway,
-                                size: 16,
-                                color:
-                                    idx == 0
-                                        ? AppColors.accent
-                                        : AppColors.textDisabled,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  _nearbyStationLabel(s),
-                                  style: _ft(
-                                    size: 13,
-                                    weight:
-                                        idx == 0
-                                            ? FontWeight.w600
-                                            : FontWeight.w400,
-                                    color:
-                                        idx == 0
-                                            ? AppColors.textPrimary
-                                            : AppColors.textSecondary,
-                                  ),
-                                ),
-                              ),
-                              SizedBox(
-                                width: 28,
-                                height: 28,
-                                child: IconButton(
-                                  icon: const Icon(Icons.close, size: 14),
-                                  onPressed: () {
-                                    setState(() {
-                                      _nearbyStations.removeAt(idx);
-                                      _syncTransportationFromStations();
-                                    });
-                                    _notify();
-                                  },
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                  color: AppColors.textDisabled,
-                                ),
-                              ),
-                            ],
+                  if (_stationCandidates.isNotEmpty ||
+                      _nearbyStations.isNotEmpty) ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '1km 내 교통편 후보',
+                            style: _ft(
+                              size: 12,
+                              weight: FontWeight.w700,
+                              color: AppColors.textSecondary,
+                            ),
                           ),
                         ),
-                      );
-                    }),
+                        TextButton.icon(
+                          onPressed: _addManualStation,
+                          icon: const Icon(Icons.add, size: 16),
+                          label: const Text('역 추가'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '노출할 역을 선택해 주세요. 선택한 역만 공고에 저장됩니다.',
+                      style: _ft(
+                        size: 11,
+                        weight: FontWeight.w500,
+                        color: AppColors.textDisabled,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ...(_stationCandidates.isNotEmpty
+                            ? _stationCandidates
+                            : _nearbyStations)
+                        .asMap()
+                        .entries
+                        .map((entry) {
+                          final s = entry.value;
+                          final selected = _isStationSelected(s);
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 8,
+                                horizontal: 12,
+                              ),
+                              decoration:
+                                  _pubWeb
+                                      ? BoxDecoration(
+                                        color:
+                                            selected
+                                                ? AppColors.accent.withValues(
+                                                  alpha: 0.06,
+                                                )
+                                                : AppColors.accent.withValues(
+                                                  alpha: 0.02,
+                                                ),
+                                        border: Border(
+                                          bottom: BorderSide(
+                                            color: AppColors.divider,
+                                          ),
+                                        ),
+                                      )
+                                      : BoxDecoration(
+                                        color: AppColors.accent.withValues(
+                                          alpha: 0.06,
+                                        ),
+                                        borderRadius: _rBox,
+                                        border: Border.all(
+                                          color: AppColors.accent.withValues(
+                                            alpha: 0.2,
+                                          ),
+                                        ),
+                                      ),
+                              child: Row(
+                                children: [
+                                  Checkbox(
+                                    value: selected,
+                                    onChanged:
+                                        (v) => _toggleStationCandidate(
+                                          s,
+                                          v == true,
+                                        ),
+                                    activeColor: AppColors.accent,
+                                    visualDensity: VisualDensity.compact,
+                                    materialTapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Icon(
+                                    Icons.subway,
+                                    size: 16,
+                                    color:
+                                        selected
+                                            ? AppColors.accent
+                                            : AppColors.textDisabled,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      _nearbyStationLabel(s),
+                                      style: _ft(
+                                        size: 13,
+                                        weight:
+                                            selected
+                                                ? FontWeight.w600
+                                                : FontWeight.w400,
+                                        color:
+                                            selected
+                                                ? AppColors.textPrimary
+                                                : AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }),
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 8,
@@ -4280,11 +4368,6 @@ class JobPostFormState extends State<JobPostForm> {
                           label: Text(
                             _isLookingUpStation ? '조회 중...' : '주소로 다시 찾기',
                           ),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: _addManualStation,
-                          icon: const Icon(Icons.add, size: 18),
-                          label: const Text('역 직접 추가'),
                         ),
                       ],
                     ),
@@ -4368,6 +4451,12 @@ class JobPostFormState extends State<JobPostForm> {
                       focusNode: _fExitNumber,
                     ),
                     const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: _addManualStation,
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('역 직접 추가'),
+                    ),
+                    const SizedBox(height: 8),
                   ] else ...[
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
@@ -4444,12 +4533,14 @@ class JobPostFormState extends State<JobPostForm> {
             },
           ),
           isEmpty:
+              _stationCandidates.isEmpty &&
               _nearbyStations.isEmpty &&
               (_data.subwayStationName == null ||
                   _data.subwayStationName!.trim().isEmpty) &&
               _exitNumberCtrl.text.trim().isEmpty,
           onMinus: () {
             setState(() {
+              _stationCandidates = [];
               _nearbyStations = [];
               _data.subwayStationName = null;
               _data.subwayLines = [];
@@ -4460,6 +4551,7 @@ class JobPostFormState extends State<JobPostForm> {
             });
             _notify();
           },
+          onPlusWhenEmpty: _addManualStation,
           focusWhenEmpty: _fExitNumber,
         ),
         _wrapStep3Clear(
@@ -4505,6 +4597,28 @@ class JobPostFormState extends State<JobPostForm> {
       walkingDistanceMeters: s.distanceMeters,
       walkingMinutes: s.walkingMinutes,
     );
+  }
+
+  bool _isStationSelected(TransportationStation station) {
+    return _nearbyStations.any((s) => _sameStation(s, station));
+  }
+
+  bool _sameStation(TransportationStation a, TransportationStation b) {
+    return a.name.trim() == b.name.trim() &&
+        a.lines.join('|') == b.lines.join('|');
+  }
+
+  void _toggleStationCandidate(TransportationStation station, bool selected) {
+    setState(() {
+      if (selected) {
+        final exists = _nearbyStations.any((s) => _sameStation(s, station));
+        if (!exists) _nearbyStations.add(station);
+      } else {
+        _nearbyStations.removeWhere((s) => _sameStation(s, station));
+      }
+      _syncTransportationFromStations();
+    });
+    _notify();
   }
 
   List<String> _dedupeTransportLines(Iterable<TransportationStation> stations) {
@@ -4655,8 +4769,14 @@ class JobPostFormState extends State<JobPostForm> {
     exitCtrl.dispose();
     if (station == null || !mounted) return;
     setState(() {
-      final exists = _nearbyStations.any((s) => s.name == station.name);
-      if (!exists) _nearbyStations.add(station);
+      final candidateExists = _stationCandidates.any(
+        (s) => _sameStation(s, station),
+      );
+      if (!candidateExists) _stationCandidates.add(station);
+      final selectedExists = _nearbyStations.any(
+        (s) => _sameStation(s, station),
+      );
+      if (!selectedExists) _nearbyStations.add(station);
       _syncTransportationFromStations();
     });
     _notify();
@@ -4691,14 +4811,27 @@ class JobPostFormState extends State<JobPostForm> {
       }
       if (!mounted) return;
       setState(() {
-        _nearbyStations = result.stations.map(_stationFromLookup).toList();
+        final candidates = result.stations.map(_stationFromLookup).toList();
+        if (candidates.isEmpty &&
+            (result.info.subwayStationName ?? '').trim().isNotEmpty) {
+          candidates.add(
+            TransportationStation(
+              name: result.info.subwayStationName!.trim(),
+              lines: List.from(result.info.subwayLines),
+              walkingDistanceMeters: result.info.walkingDistanceMeters,
+              walkingMinutes: result.info.walkingMinutes,
+            ),
+          );
+        }
+        _stationCandidates = candidates;
+        _nearbyStations = [];
         _data.lat = result.lat;
         _data.lng = result.lng;
         _syncTransportationFromStations();
       });
       _notify();
       if (mounted) {
-        _showSnack('${_nearbyStations.length}개 역 조회 완료');
+        _showSnack('${_stationCandidates.length}개 역 조회 완료. 노출할 역을 선택해 주세요.');
       }
     } catch (e) {
       if (mounted) _showSnack('교통편 조회 실패: $e');

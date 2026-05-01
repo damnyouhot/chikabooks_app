@@ -84,12 +84,13 @@ class _JobManageSectionState extends State<JobManageSection> {
     if (uid == null) return const SizedBox.shrink();
 
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('clinics_accounts')
-          .doc(uid)
-          .collection('clinic_profiles')
-          .orderBy('createdAt', descending: false)
-          .snapshots(),
+      stream:
+          FirebaseFirestore.instance
+              .collection('clinics_accounts')
+              .doc(uid)
+              .collection('clinic_profiles')
+              .orderBy('createdAt', descending: false)
+              .snapshots(),
       builder: (context, snapshot) {
         final docs = snapshot.data?.docs ?? [];
         if (docs.length <= 1) return const SizedBox.shrink();
@@ -98,8 +99,11 @@ class _JobManageSectionState extends State<JobManageSection> {
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Row(
             children: [
-              Icon(Icons.local_hospital_outlined,
-                  size: 16, color: AppColors.textSecondary),
+              Icon(
+                Icons.local_hospital_outlined,
+                size: 16,
+                color: AppColors.textSecondary,
+              ),
               const SizedBox(width: 6),
               Expanded(
                 child: SingleChildScrollView(
@@ -131,7 +135,7 @@ class _JobManageSectionState extends State<JobManageSection> {
         label: Text(label),
         selected: selected,
         onSelected: (_) => _onClinicProfileChanged(profileId),
-        selectedColor: AppColors.accent.withOpacity(0.15),
+        selectedColor: AppColors.accent.withValues(alpha: 0.15),
         checkmarkColor: AppColors.accent,
         labelStyle: GoogleFonts.notoSansKr(
           fontSize: 12,
@@ -141,9 +145,10 @@ class _JobManageSectionState extends State<JobManageSection> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
           side: BorderSide(
-            color: selected
-                ? AppColors.accent.withOpacity(0.4)
-                : AppColors.divider,
+            color:
+                selected
+                    ? AppColors.accent.withValues(alpha: 0.4)
+                    : AppColors.divider,
           ),
         ),
         backgroundColor: AppColors.white,
@@ -164,13 +169,13 @@ class _JobManageSectionState extends State<JobManageSection> {
               width: 72,
               height: 72,
               decoration: BoxDecoration(
-                color: AppColors.accent.withOpacity(0.08),
+                color: AppColors.accent.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Icon(
                 Icons.business_center_rounded,
                 size: 36,
-                color: AppColors.accent.withOpacity(0.6),
+                color: AppColors.accent.withValues(alpha: 0.6),
               ),
             ),
             const SizedBox(height: 20),
@@ -221,7 +226,7 @@ class _JobManageSectionState extends State<JobManageSection> {
                 '계정이 없으신가요? 회원가입',
                 style: GoogleFonts.notoSansKr(
                   fontSize: 13,
-                  color: AppColors.accent.withOpacity(0.8),
+                  color: AppColors.accent.withValues(alpha: 0.8),
                 ),
               ),
             ),
@@ -243,32 +248,37 @@ class _JobManageSectionState extends State<JobManageSection> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
-        children: filters.map((f) {
-          final key = f['key']!;
-          final selected = _filter == key;
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: FilterChip(
-              label: Text(f['label']!),
-              selected: selected,
-              onSelected: (_) => setState(() => _filter = key),
-              selectedColor: AppColors.accent.withOpacity(0.15),
-              checkmarkColor: AppColors.accent,
-              labelStyle: GoogleFonts.notoSansKr(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: selected ? AppColors.accent : AppColors.textSecondary,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-                side: BorderSide(
-                  color: selected ? AppColors.accent.withOpacity(0.4) : AppColors.divider,
+        children:
+            filters.map((f) {
+              final key = f['key']!;
+              final selected = _filter == key;
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: FilterChip(
+                  label: Text(f['label']!),
+                  selected: selected,
+                  onSelected: (_) => setState(() => _filter = key),
+                  selectedColor: AppColors.accent.withValues(alpha: 0.15),
+                  checkmarkColor: AppColors.accent,
+                  labelStyle: GoogleFonts.notoSansKr(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color:
+                        selected ? AppColors.accent : AppColors.textSecondary,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    side: BorderSide(
+                      color:
+                          selected
+                              ? AppColors.accent.withValues(alpha: 0.4)
+                              : AppColors.divider,
+                    ),
+                  ),
+                  backgroundColor: AppColors.white,
                 ),
-              ),
-              backgroundColor: AppColors.white,
-            ),
-          );
-        }).toList(),
+              );
+            }).toList(),
       ),
     );
   }
@@ -296,12 +306,13 @@ class _JobManageSectionState extends State<JobManageSection> {
         final docs = snapshot.data?.docs ?? [];
 
         // 필터 적용
-        final filtered = _filter == 'all'
-            ? docs
-            : docs.where((d) {
-                final data = d.data() as Map<String, dynamic>;
-                return data['status'] == _filter;
-              }).toList();
+        final filtered =
+            _filter == 'all'
+                ? docs
+                : docs.where((d) {
+                  final data = d.data() as Map<String, dynamic>;
+                  return data['status'] == _filter;
+                }).toList();
 
         if (filtered.isEmpty) {
           return _buildEmptyState();
@@ -331,18 +342,12 @@ class _JobManageSectionState extends State<JobManageSection> {
           const SizedBox(height: 16),
           Text(
             '등록된 공고가 없습니다.',
-            style: WebTypo.body(
-              color: AppColors.textSecondary,
-              size: 15,
-            ),
+            style: WebTypo.body(color: AppColors.textSecondary, size: 15),
           ),
           const SizedBox(height: 8),
           Text(
             '\'공고 등록\' 탭에서 새 공고를 등록해보세요.',
-            style: WebTypo.caption(
-              color: AppColors.textDisabled,
-              size: 13,
-            ),
+            style: WebTypo.caption(color: AppColors.textDisabled, size: 13),
           ),
         ],
       ),
@@ -357,115 +362,125 @@ class _JobManageSectionState extends State<JobManageSection> {
     final clinicName = data['clinicName'] as String? ?? '';
     final role = data['role'] as String? ?? '';
     final createdAt = data['createdAt'] as Timestamp?;
-    final dateStr = createdAt != null
-        ? DateFormat('yyyy.MM.dd').format(createdAt.toDate())
-        : '-';
+    final dateStr =
+        createdAt != null
+            ? DateFormat('yyyy.MM.dd').format(createdAt.toDate())
+            : '-';
 
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.divider, width: 0.8),
-      ),
-      padding: const EdgeInsets.all(18),
-      child: Row(
-        children: [
-          // 좌측: 정보
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 상태 뱃지 + 날짜
-                Row(
+    return Material(
+      color: AppColors.white,
+      borderRadius: BorderRadius.circular(14),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => context.push('/publisher/jobs/${doc.id}'),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.divider, width: 0.8),
+          ),
+          padding: const EdgeInsets.all(18),
+          child: Row(
+            children: [
+              // 좌측: 정보
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _statusBadge(status),
-                    const SizedBox(width: 10),
+                    // 상태 뱃지 + 날짜
+                    Row(
+                      children: [
+                        _statusBadge(status),
+                        const SizedBox(width: 10),
+                        Text(
+                          dateStr,
+                          style: GoogleFonts.notoSansKr(
+                            fontSize: 12,
+                            color: AppColors.textDisabled,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    // 제목
                     Text(
-                      dateStr,
+                      title,
                       style: GoogleFonts.notoSansKr(
-                        fontSize: 12,
-                        color: AppColors.textDisabled,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                        letterSpacing: -0.3,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    // 치과명 + 직무
+                    Text(
+                      [clinicName, role].where((s) => s.isNotEmpty).join(' · '),
+                      style: GoogleFonts.notoSansKr(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
-                // 제목
-                Text(
-                  title,
-                  style: GoogleFonts.notoSansKr(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                    letterSpacing: -0.3,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                // 치과명 + 직무
-                Text(
-                  [clinicName, role].where((s) => s.isNotEmpty).join(' · '),
-                  style: GoogleFonts.notoSansKr(
-                    fontSize: 13,
-                    color: AppColors.textSecondary,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          // 우측: 액션 버튼
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _actionButton(
-                icon: Icons.people_outline,
-                label: '지원자',
-                color: AppColors.accent,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => JobApplicantsPage(
-                      jobId: doc.id,
-                      jobTitle: title,
-                    ),
-                  ),
-                ),
               ),
-              const SizedBox(height: 4),
-              if (status == 'active')
-                _actionButton(
-                  icon: Icons.pause_circle_outline,
-                  label: '마감',
-                  color: AppColors.error,
-                  onTap: () => _updateStatus(doc.id, 'closed'),
-                ),
-              if (status == 'closed')
-                _actionButton(
-                  icon: Icons.refresh,
-                  label: '재게시',
-                  color: AppColors.success,
-                  onTap: () => _updateStatus(doc.id, 'pending'),
-                ),
-              if (status == 'pending')
-                _actionButton(
-                  icon: Icons.hourglass_top,
-                  label: '대기중',
-                  color: AppColors.textDisabled,
-                  onTap: null,
-                ),
-              const SizedBox(height: 4),
-              _actionButton(
-                icon: Icons.delete_outline,
-                label: '삭제',
-                color: AppColors.error.withOpacity(0.6),
-                onTap: () => _confirmDelete(doc.id, title),
+              // 우측: 액션 버튼
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _actionButton(
+                    icon: Icons.people_outline,
+                    label: '지원자',
+                    color: AppColors.accent,
+                    onTap:
+                        () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder:
+                                (_) => JobApplicantsPage(
+                                  jobId: doc.id,
+                                  jobTitle: title,
+                                ),
+                          ),
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  if (status == 'active')
+                    _actionButton(
+                      icon: Icons.pause_circle_outline,
+                      label: '마감',
+                      color: AppColors.error,
+                      onTap: () => _updateStatus(doc.id, 'closed'),
+                    ),
+                  if (status == 'closed')
+                    _actionButton(
+                      icon: Icons.refresh,
+                      label: '재게시',
+                      color: AppColors.success,
+                      onTap: () => _updateStatus(doc.id, 'pending'),
+                    ),
+                  if (status == 'pending')
+                    _actionButton(
+                      icon: Icons.hourglass_top,
+                      label: '대기중',
+                      color: AppColors.textDisabled,
+                      onTap: null,
+                    ),
+                  const SizedBox(height: 4),
+                  _actionButton(
+                    icon: Icons.delete_outline,
+                    label: '삭제',
+                    color: AppColors.error.withValues(alpha: 0.6),
+                    onTap: () => _confirmDelete(doc.id, title),
+                  ),
+                ],
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -478,18 +493,18 @@ class _JobManageSectionState extends State<JobManageSection> {
 
     switch (status) {
       case 'active':
-        bg = AppColors.success.withOpacity(0.15);
+        bg = AppColors.success.withValues(alpha: 0.15);
         fg = AppColors.success;
         label = '게시중';
         break;
       case 'closed':
-        bg = AppColors.textDisabled.withOpacity(0.15);
+        bg = AppColors.textDisabled.withValues(alpha: 0.15);
         fg = AppColors.textDisabled;
         label = '마감';
         break;
       case 'pending':
       default:
-        bg = AppColors.accent.withOpacity(0.12);
+        bg = AppColors.accent.withValues(alpha: 0.12);
         fg = AppColors.accent;
         label = '검수중';
         break;
@@ -546,15 +561,14 @@ class _JobManageSectionState extends State<JobManageSection> {
   // ── 상태 변경 ────────────────────────────────────────
   Future<void> _updateStatus(String docId, String newStatus) async {
     try {
-      await FirebaseFirestore.instance
-          .collection('jobs')
-          .doc(docId)
-          .update({'status': newStatus});
+      await FirebaseFirestore.instance.collection('jobs').doc(docId).update({
+        'status': newStatus,
+      });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('상태 변경 실패: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('상태 변경 실패: $e')));
       }
     }
   }
@@ -563,34 +577,32 @@ class _JobManageSectionState extends State<JobManageSection> {
   Future<void> _confirmDelete(String docId, String title) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('공고 삭제'),
-        content: Text('"$title" 공고를 삭제하시겠습니까?\n삭제 후 복구할 수 없습니다.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('취소'),
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('공고 삭제'),
+            content: Text('"$title" 공고를 삭제하시겠습니까?\n삭제 후 복구할 수 없습니다.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('취소'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: TextButton.styleFrom(foregroundColor: AppColors.error),
+                child: const Text('삭제'),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('삭제'),
-          ),
-        ],
-      ),
     );
 
     if (confirmed == true) {
       try {
-        await FirebaseFirestore.instance
-            .collection('jobs')
-            .doc(docId)
-            .delete();
+        await FirebaseFirestore.instance.collection('jobs').doc(docId).delete();
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('삭제 실패: $e')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('삭제 실패: $e')));
         }
       }
     }

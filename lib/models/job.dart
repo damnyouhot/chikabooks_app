@@ -9,6 +9,7 @@ import 'transportation_info.dart';
 class Job {
   final String id;
   final String title;
+  final String registeredClinicName;
   final String clinicName;
   final String address;
   final String district; // 동/구 짧은 표시용 (예: "역삼동 · 강남구")
@@ -108,6 +109,7 @@ class Job {
   Job({
     required this.id,
     required this.title,
+    this.registeredClinicName = '',
     required this.clinicName,
     required this.address,
     this.district = '',
@@ -311,6 +313,10 @@ class Job {
     return Job(
       id: docId ?? (json['id'] as String? ?? ''),
       title: (json['title'] as String?)?.trim() ?? '',
+      registeredClinicName:
+          (json['registeredClinicName'] as String?)?.trim() ??
+          (json['businessRegisteredName'] as String?)?.trim() ??
+          '',
       clinicName: (json['clinicName'] as String?)?.trim() ?? '',
       address: address,
       district: (json['district'] as String?)?.trim() ?? '',

@@ -11,6 +11,7 @@ import '../models/analytics_daily_model.dart';
 /// ──────────────────────────────────────────────────────────────
 class AdminAnalyticsDailyService {
   static final _db = FirebaseFirestore.instance;
+  static const int _schemaVersion = 2;
 
   static const _tabKeys = {
     'view_home',
@@ -177,26 +178,26 @@ class AdminAnalyticsDailyService {
     final noEventUsers = validUserIds.where((uid) => !userEvents.containsKey(uid)).length;
     loginOnly += noEventUsers;
 
-    // segments (중복 가능 · C파트: 교감형 추가)
-    int growth = 0, emotion = 0, career = 0, bond = 0, ghost = 0;
+    // segments (중복 가능): 학습·저장·교감·캐릭터·관망
+    int learning = 0, saving = 0, bond = 0, character = 0, ghost = 0;
     for (final entry in userEvents.entries) {
       final types = entry.value.toSet();
-      final isGrowth =
-          types.any((t) => EventCatalog.segmentGrowthTypes.contains(t));
-      final isEmotion =
-          types.any((t) => EventCatalog.segmentEmotionTypes.contains(t));
-      final isCareer =
-          types.any((t) => EventCatalog.segmentCareerTypes.contains(t));
+      final isLearning =
+          types.any((t) => EventCatalog.segmentLearningTypes.contains(t));
+      final isSaving =
+          types.any((t) => EventCatalog.segmentSavingTypes.contains(t));
       final isBond =
           types.any((t) => EventCatalog.segmentBondTypes.contains(t));
-      if (isGrowth) growth++;
-      if (isEmotion) emotion++;
-      if (isCareer) career++;
+      final isCharacter =
+          types.any((t) => EventCatalog.segmentCharacterTypes.contains(t));
+      if (isLearning) learning++;
+      if (isSaving) saving++;
       if (isBond) bond++;
-      if (!isGrowth &&
-          !isEmotion &&
-          !isCareer &&
+      if (isCharacter) character++;
+      if (!isLearning &&
+          !isSaving &&
           !isBond &&
+          !isCharacter &&
           !types.any((t) => EventCatalog.meaningfulTypes.contains(t))) {
         ghost++;
       }
@@ -208,6 +209,7 @@ class AdminAnalyticsDailyService {
 
     await _db.collection('analytics_daily').doc(dateKey).set({
       'dateKey': dateKey,
+      'schemaVersion': _schemaVersion,
       'generatedAt': FieldValue.serverTimestamp(),
       'totalValidUsers': total,
       'activeUsers': activeUserIds.length,
@@ -221,10 +223,10 @@ class AdminAnalyticsDailyService {
         'fivePlus': fivePlus,
       },
       'segments': {
-        'growth': growth,
-        'emotion': emotion,
-        'career': career,
+        'learning': learning,
+        'saving': saving,
         'bond': bond,
+        'character': character,
         'ghost': ghost,
       },
       'retention': {'d3': 0, 'd7': 0},

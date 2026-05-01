@@ -111,6 +111,8 @@ class _JobInputPageState extends State<JobInputPage> with RouteAware {
     if (profile == null) return const {};
     return {
       'clinicProfileId': profile.id,
+      if (profile.clinicName.trim().isNotEmpty)
+        'registeredClinicName': profile.clinicName.trim(),
       if (profile.effectiveName.trim().isNotEmpty)
         'clinicName': profile.effectiveName.trim(),
       if (profile.address.trim().isNotEmpty) 'address': profile.address.trim(),

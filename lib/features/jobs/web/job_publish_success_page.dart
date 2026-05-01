@@ -23,12 +23,7 @@ class JobPublishSuccessPage extends StatelessWidget {
             Container(
               color: AppColors.white,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-              child: const Row(
-                children: [
-                  Spacer(),
-                  WebAccountMenuButton(),
-                ],
-              ),
+              child: const Row(children: [Spacer(), WebAccountMenuButton()]),
             ),
           Expanded(
             child: Center(
@@ -43,7 +38,7 @@ class JobPublishSuccessPage extends StatelessWidget {
                         width: 80,
                         height: 80,
                         decoration: BoxDecoration(
-                          color: AppColors.accent.withOpacity(0.1),
+                          color: AppColors.accent.withValues(alpha: 0.1),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(
@@ -72,12 +67,11 @@ class JobPublishSuccessPage extends StatelessWidget {
                       ),
                       const SizedBox(height: 36),
 
-                      // 게시된 공고 보기
                       SizedBox(
                         width: double.infinity,
                         height: AppPublisher.ctaHeight,
                         child: ElevatedButton(
-                          onPressed: () => context.go('/post-job'),
+                          onPressed: () => context.go('/publisher/jobs/$jobId'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.accent,
                             foregroundColor: AppColors.white,
@@ -89,7 +83,7 @@ class JobPublishSuccessPage extends StatelessWidget {
                             ),
                           ),
                           child: Text(
-                            '공고 관리 페이지로',
+                            '게시 공고 관리하기',
                             style: GoogleFonts.notoSansKr(
                               fontSize: 15,
                               fontWeight: FontWeight.w700,

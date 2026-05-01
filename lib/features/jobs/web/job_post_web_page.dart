@@ -218,9 +218,9 @@ class _JobPostWebPageState extends State<JobPostWebPage>
                 ),
                 // 사업자 인증 버튼
                 TextButton.icon(
-                  onPressed: () => context.push('/clinic-verify'),
+                  onPressed: () => context.push('/me/clinic'),
                   icon: const Icon(Icons.verified_outlined, size: 16),
-                  label: const Text('사업자 인증'),
+                  label: const Text('병원 정보'),
                   style: TextButton.styleFrom(
                     foregroundColor: AppColors.accent,
                     textStyle: const TextStyle(fontSize: 13),

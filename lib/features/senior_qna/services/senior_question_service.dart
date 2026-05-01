@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../services/user_profile_service.dart';
 import '../../../services/caring_treat_service.dart';
+import '../../../services/admin_activity_service.dart';
 import '../data/senior_stickers.dart';
 import '../models/senior_question.dart';
 import 'senior_question_image_service.dart';
@@ -82,6 +83,17 @@ class SeniorQuestionService {
       await CaringTreatService.tryGrantWhisperWrite(
         contentType: 'question',
         contentId: docRef.id,
+      );
+      AdminActivityService.log(
+        ActivityEventType.whisperCreateComplete,
+        page: 'bond_whisper',
+        targetId: docRef.id,
+        extra: {
+          'whisperCategory': _normalizeCategory(category),
+          'hasImage': imageUrls.isNotEmpty,
+          'hasSticker': normalizedStickerId != null,
+          'isAnonymous': isAnonymous,
+        },
       );
       return docRef.id;
     } catch (e) {
@@ -184,6 +196,15 @@ class SeniorQuestionService {
         return r.success;
       }
       await CaringTreatService.tryGrantWhisperReaction(grantKey: grantKey);
+      AdminActivityService.log(
+        ActivityEventType.whisperReaction,
+        page: 'bond_whisper',
+        targetId: questionId,
+        extra: {
+          'reactionTarget': 'question',
+          'reactionType': type == 'cheers' ? 'cheer' : 'like',
+        },
+      );
     }
     return r.success;
   }
@@ -283,6 +304,17 @@ class SeniorQuestionService {
         contentType: 'comment',
         contentId: commentRef.id,
       );
+      AdminActivityService.log(
+        ActivityEventType.whisperComment,
+        page: 'bond_whisper',
+        targetId: questionId,
+        extra: {
+          'commentId': commentRef.id,
+          'hasImage': imageUrl != null,
+          'hasSticker': normalizedStickerId != null,
+          'isAnonymous': isAnonymous,
+        },
+      );
       return true;
     } catch (e) {
       debugPrint('⚠️ SeniorQuestionService.addComment: $e');
@@ -309,6 +341,16 @@ class SeniorQuestionService {
         return r.success;
       }
       await CaringTreatService.tryGrantWhisperReaction(grantKey: grantKey);
+      AdminActivityService.log(
+        ActivityEventType.whisperReaction,
+        page: 'bond_whisper',
+        targetId: questionId,
+        extra: {
+          'reactionTarget': 'comment',
+          'commentId': commentId,
+          'reactionType': 'like',
+        },
+      );
     }
     return r.success;
   }
@@ -401,6 +443,18 @@ class SeniorQuestionService {
         contentType: 'reply',
         contentId: replyRef.id,
       );
+      AdminActivityService.log(
+        ActivityEventType.whisperReply,
+        page: 'bond_whisper',
+        targetId: questionId,
+        extra: {
+          'commentId': commentId,
+          'replyId': replyRef.id,
+          'hasImage': imageUrl != null,
+          'hasSticker': normalizedStickerId != null,
+          'isAnonymous': isAnonymous,
+        },
+      );
       return true;
     } catch (e) {
       debugPrint('⚠️ SeniorQuestionService.addReply: $e');
@@ -431,6 +485,17 @@ class SeniorQuestionService {
         return r.success;
       }
       await CaringTreatService.tryGrantWhisperReaction(grantKey: grantKey);
+      AdminActivityService.log(
+        ActivityEventType.whisperReaction,
+        page: 'bond_whisper',
+        targetId: questionId,
+        extra: {
+          'reactionTarget': 'reply',
+          'commentId': commentId,
+          'replyId': replyId,
+          'reactionType': 'like',
+        },
+      );
     }
     return r.success;
   }

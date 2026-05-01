@@ -3,6 +3,7 @@ import '../core/theme/app_colors.dart';
 import '../core/theme/app_tokens.dart';
 import '../core/widgets/app_segmented_control.dart';
 import '../features/senior_qna/widgets/senior_question_feed.dart';
+import '../services/admin_activity_service.dart';
 import '../services/content_read_state_service.dart';
 import '../widgets/bond/bond_poll_section.dart';
 import 'settings/settings_page.dart';
@@ -47,6 +48,12 @@ class BondPageState extends State<BondPage>
       _ => null,
     };
     if (key != null) ContentReadStateService.markSeen(key);
+    if (_tabCtrl.index == 1) {
+      AdminActivityService.log(
+        ActivityEventType.viewWhisper,
+        page: 'bond_whisper',
+      );
+    }
   }
 
   @override

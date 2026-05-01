@@ -102,13 +102,13 @@ class BusinessVerification {
       bizNo: data['bizNo'] as String? ?? '',
       docUrl: data['docUrl'] as String?,
       ocrResult: data['ocrResult'] as Map<String, dynamic>?,
-      verifiedAt: (data['verifiedAt'] as Timestamp?)?.toDate(),
+      verifiedAt: _parseFlexibleDate(data['verifiedAt']),
       method: data['method'] as String?,
       failReason: data['failReason'] as String?,
-      lastCheckAt: (data['lastCheckAt'] as Timestamp?)?.toDate(),
+      lastCheckAt: _parseFlexibleDate(data['lastCheckAt']),
       checkMethod: data['checkMethod'] as String?,
       openedAt:
-          (data['openedAt'] as Timestamp?)?.toDate() ??
+          _parseFlexibleDate(data['openedAt']) ??
           _parseOpenedAtFromOcr(data['ocrResult']),
       hiraMatched: data['hiraMatched'] as bool?,
       hiraNote: data['hiraNote'] as String?,
@@ -158,11 +158,25 @@ class BusinessVerification {
       ].any((v) => v != null);
 }
 
+DateTime? _parseFlexibleDate(Object? raw) {
+  if (raw == null) return null;
+  if (raw is Timestamp) return raw.toDate();
+  if (raw is DateTime) return raw;
+  final text = raw.toString().trim();
+  if (text.isEmpty) return null;
+  final direct = DateTime.tryParse(text);
+  if (direct != null) return direct;
+  return _parseYmdText(text);
+}
+
 DateTime? _parseOpenedAtFromOcr(Object? raw) {
   if (raw is! Map) return null;
   final value = raw['openedAt'];
   if (value == null) return null;
-  final text = value.toString().trim();
+  return _parseYmdText(value.toString().trim());
+}
+
+DateTime? _parseYmdText(String text) {
   final match = RegExp(
     r'^(\d{4})[-./년\s]?(\d{1,2})[-./월\s]?(\d{1,2})',
   ).firstMatch(text);

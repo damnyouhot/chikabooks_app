@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_tokens.dart';
@@ -36,6 +37,7 @@ class _PublisherClinicIdentitySectionState
   late final TextEditingController _ownerNameCtrl;
   late final TextEditingController _addressCtrl;
   bool _saving = false;
+  bool _requestingAdminReview = false;
 
   /// 직전에 반영한 OCR 스냅샷(등록증 재업로드·스트림 갱신 감지용)
   late String _lastOcrSignature;
@@ -88,6 +90,7 @@ class _PublisherClinicIdentitySectionState
     _displayNameCtrl = TextEditingController(
       text: _mergedDisplayNameOcrFirst(p),
     );
+    _displayNameCtrl.addListener(_onDisplayNameChanged);
     _ownerNameCtrl = TextEditingController(
       text: _mergedOcrFirst(p, p.ownerName, 'ownerName'),
     );
@@ -96,12 +99,17 @@ class _PublisherClinicIdentitySectionState
     );
   }
 
+  void _onDisplayNameChanged() {
+    if (mounted) setState(() {});
+  }
+
   /// OCR·프로필 스냅샷을 칸에 그대로 반영 (등록증 데이터 우선)
   void _applyOcrFirstFromProfile(ClinicProfile p) {
     final cn = _mergedOcrFirst(p, p.clinicName, 'clinicName');
     if (cn.isNotEmpty) _clinicNameCtrl.text = cn;
     final disp = _mergedDisplayNameOcrFirst(p);
     if (disp.isNotEmpty) _displayNameCtrl.text = disp;
+    _onDisplayNameChanged();
     final ow = _mergedOcrFirst(p, p.ownerName, 'ownerName');
     if (ow.isNotEmpty) _ownerNameCtrl.text = ow;
     final ad = _mergedOcrFirst(p, p.address, 'address');
@@ -126,6 +134,7 @@ class _PublisherClinicIdentitySectionState
 
   @override
   void dispose() {
+    _displayNameCtrl.removeListener(_onDisplayNameChanged);
     _clinicNameCtrl.dispose();
     _displayNameCtrl.dispose();
     _ownerNameCtrl.dispose();
@@ -196,6 +205,7 @@ class _PublisherClinicIdentitySectionState
     required TextEditingController controller,
     int maxLines = 1,
     String? helperText,
+    Widget? trailing,
   }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -211,15 +221,29 @@ class _PublisherClinicIdentitySectionState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              TextFormField(
-                controller: controller,
-                maxLines: maxLines,
-                style: GoogleFonts.notoSansKr(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                ),
-                decoration: _decValueOnly(hint),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: controller,
+                      maxLines: maxLines,
+                      style: GoogleFonts.notoSansKr(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                      decoration: _decValueOnly(hint),
+                    ),
+                  ),
+                  if (trailing != null) ...[
+                    const SizedBox(width: 8),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: trailing,
+                    ),
+                  ],
+                ],
               ),
               if (helperText != null && helperText.isNotEmpty) ...[
                 const SizedBox(height: 4),
@@ -240,12 +264,135 @@ class _PublisherClinicIdentitySectionState
     );
   }
 
+  Widget _inlineReadOnlyValue({
+    required String label,
+    required String value,
+    required String emptyText,
+    Widget? trailing,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: AppPublisher.formInlineLabelWidth,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Text(label, style: _fieldLabelStyle),
+          ),
+        ),
+        Expanded(
+          child: _readOnlyValueSurface(
+            value: value,
+            emptyText: emptyText,
+            trailing: trailing,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _readOnlyValueBlock({
+    required String label,
+    required String value,
+    required String emptyText,
+    Widget? trailing,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: _fieldLabelStyle),
+        const SizedBox(height: 6),
+        _readOnlyValueSurface(
+          value: value,
+          emptyText: emptyText,
+          trailing: trailing,
+        ),
+      ],
+    );
+  }
+
+  Widget _readOnlyValueSurface({
+    required String value,
+    required String emptyText,
+    Widget? trailing,
+  }) {
+    final hasValue = value.trim().isNotEmpty;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.webPublisherPageBg,
+        borderRadius: BorderRadius.circular(AppPublisher.buttonRadius),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.lock_outline_rounded,
+            size: 16,
+            color: hasValue ? AppColors.accent : AppColors.textDisabled,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              hasValue ? value : emptyText,
+              style: GoogleFonts.notoSansKr(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color:
+                    hasValue ? AppColors.textPrimary : AppColors.textDisabled,
+              ),
+            ),
+          ),
+          Text(
+            '수정 불가',
+            style: GoogleFonts.notoSansKr(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textDisabled,
+            ),
+          ),
+          if (trailing != null) ...[const SizedBox(width: 8), trailing],
+        ],
+      ),
+    );
+  }
+
+  Widget _adminReviewButton() {
+    return OutlinedButton.icon(
+      onPressed: _requestingAdminReview ? null : _requestAdminNameReview,
+      icon:
+          _requestingAdminReview
+              ? const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+              : const Icon(Icons.admin_panel_settings_outlined, size: 16),
+      label: const Text('관리자 확인 요청'),
+    );
+  }
+
+  Widget _ocrNameReviewButton() {
+    return TextButton.icon(
+      onPressed:
+          _requestingAdminReview
+              ? null
+              : () => _requestAdminNameReview(registeredNameOcrIssue: true),
+      icon: const Icon(Icons.report_problem_outlined, size: 15),
+      label: const Text('상호 확인 요청'),
+      style: TextButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+    );
+  }
+
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
       await ClinicProfileService.updateProfile(
         widget.profile.id,
-        clinicName: _clinicNameCtrl.text.trim(),
         displayName: _displayNameCtrl.text.trim(),
         ownerName: _ownerNameCtrl.text.trim(),
         address: _addressCtrl.text.trim(),
@@ -253,6 +400,80 @@ class _PublisherClinicIdentitySectionState
       widget.onSaved();
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  bool get _showAdminNameReview {
+    final registered = _clinicNameCtrl.text.trim();
+    final display = _displayNameCtrl.text.trim();
+    if (registered.isEmpty || display.isEmpty) return false;
+    return _compact(registered) != _compact(display);
+  }
+
+  String _compact(String value) =>
+      value.replaceAll(RegExp(r'\s+'), '').toLowerCase();
+
+  Future<void> _requestAdminNameReview({
+    bool registeredNameOcrIssue = false,
+  }) async {
+    final registered = _clinicNameCtrl.text.trim();
+    final display = _displayNameCtrl.text.trim();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder:
+          (ctx) => AlertDialog(
+            title: Text(registeredNameOcrIssue ? 'OCR 상호 확인 요청' : '관리자 확인 요청'),
+            content: Text(
+              registeredNameOcrIssue
+                  ? '등록증 OCR이 상호를 실제와 다르게 읽었다면 관리자에게 확인을 요청할 수 있어요.\n\n'
+                      '현재 등록증상 상호: $registered\n\n'
+                      '운영팀이 등록증 원본과 OCR 결과를 확인해 처리합니다.'
+                  : '등록증상 상호와 노출 치과명이 다릅니다.\n\n'
+                      '등록증상 상호: $registered\n'
+                      '노출 치과명: $display\n\n'
+                      '실제 운영명 또는 간판명으로 쓰는 이름이라면 관리자에게 확인을 요청할 수 있어요. '
+                      '요청 후 운영팀이 대시보드에서 확인하고 승인/반려 기록을 남깁니다.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('취소'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('확인 요청'),
+              ),
+            ],
+          ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _requestingAdminReview = true);
+    try {
+      final fn = FirebaseFunctions.instance.httpsCallable(
+        'requestBusinessNameReview',
+      );
+      await fn.call({
+        'profileId': widget.profile.id,
+        'registeredClinicName': registered,
+        'displayName': display.isEmpty ? registered : display,
+        'reviewReason':
+            registeredNameOcrIssue
+                ? 'registered_name_ocr_error'
+                : 'display_name_mismatch',
+        'ownerName': _ownerNameCtrl.text.trim(),
+        'address': _addressCtrl.text.trim(),
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('관리자 확인 요청을 보냈어요.')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('확인 요청에 실패했어요: $e')));
+    } finally {
+      if (mounted) setState(() => _requestingAdminReview = false);
     }
   }
 
@@ -306,10 +527,14 @@ class _PublisherClinicIdentitySectionState
           ],
           const SizedBox(height: 16),
           if (widget.inlineFieldLabels) ...[
-            _inlineLabeledField(
+            _inlineReadOnlyValue(
               label: '상호(등록증 기준)',
-              hint: '예) 서울○○치과의원',
-              controller: _clinicNameCtrl,
+              value: _clinicNameCtrl.text.trim(),
+              emptyText: '등록증 업로드 후 자동 표시됩니다',
+              trailing:
+                  _clinicNameCtrl.text.trim().isNotEmpty
+                      ? _ocrNameReviewButton()
+                      : null,
             ),
             const SizedBox(height: 12),
             _inlineLabeledField(
@@ -317,6 +542,7 @@ class _PublisherClinicIdentitySectionState
               hint: '비우면 상호와 동일하게 표시됩니다',
               controller: _displayNameCtrl,
               helperText: '인증 상호와 너무 다르면 검토 과정에서 공고가 반려될 수 있어요.',
+              trailing: _showAdminNameReview ? _adminReviewButton() : null,
             ),
             const SizedBox(height: 12),
             _inlineLabeledField(
@@ -358,24 +584,39 @@ class _PublisherClinicIdentitySectionState
               ],
             ),
           ] else ...[
-            TextFormField(
-              controller: _clinicNameCtrl,
-              style: GoogleFonts.notoSansKr(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
-              decoration: _dec('상호(등록증 기준)', '예) 서울○○치과의원'),
+            _readOnlyValueBlock(
+              label: '상호(등록증 기준)',
+              value: _clinicNameCtrl.text.trim(),
+              emptyText: '등록증 업로드 후 자동 표시됩니다',
+              trailing:
+                  _clinicNameCtrl.text.trim().isNotEmpty
+                      ? _ocrNameReviewButton()
+                      : null,
             ),
             const SizedBox(height: 12),
-            TextFormField(
-              controller: _displayNameCtrl,
-              style: GoogleFonts.notoSansKr(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
-              decoration: _dec('구직자에게 보이는 치과명', '비우면 상호와 동일하게 표시됩니다'),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _displayNameCtrl,
+                    onChanged: (_) => _onDisplayNameChanged(),
+                    style: GoogleFonts.notoSansKr(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                    decoration: _dec('구직자에게 보이는 치과명', '비우면 상호와 동일하게 표시됩니다'),
+                  ),
+                ),
+                if (_showAdminNameReview) ...[
+                  const SizedBox(width: 8),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: _adminReviewButton(),
+                  ),
+                ],
+              ],
             ),
             const SizedBox(height: 4),
             Text(

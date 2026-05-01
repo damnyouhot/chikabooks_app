@@ -154,6 +154,12 @@ class _JobPostPreviewState extends State<JobPostPreview> {
     final dutyLine =
         data.mainDutiesList.isNotEmpty ? data.mainDutiesList.join(', ') : '';
     final rows = <Widget>[
+      if (_hasText(data.registeredClinicName))
+        JobDetailInfoRow(
+          icon: Icons.verified_outlined,
+          label: '등록증상 상호',
+          value: data.registeredClinicName.trim(),
+        ),
       if (_hasText(data.clinicName))
         JobDetailInfoRow(
           icon: Icons.storefront_outlined,

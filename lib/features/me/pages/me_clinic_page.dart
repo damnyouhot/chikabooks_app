@@ -143,29 +143,6 @@ class _MeClinicPageState extends ConsumerState<MeClinicPage> {
     ).showSnackBar(const SnackBar(content: Text('병원 정보를 삭제했습니다.')));
   }
 
-  Future<void> _clearBusinessVerification(ClinicProfile profile) async {
-    final ok = await _showImpactConfirmDialog(
-      title: '사업자 인증 정보를 삭제할까요?',
-      message:
-          '"${profile.effectiveName.isEmpty ? '이름 없음' : profile.effectiveName}"의 사업자 인증 정보를 삭제합니다.',
-      detail:
-          '작성 중인 공고와 이미 올린 공고가 이 인증 상태를 참조합니다. '
-          '삭제하면 게시 가능 상태가 해제되고, 게시·수정 전에 사업자등록증을 다시 올려 재인증해야 합니다.',
-      confirmLabel: '인증 삭제',
-    );
-    if (ok != true || !mounted) return;
-
-    final cleared = await ClinicProfileService.clearBusinessVerification(
-      profile.id,
-    );
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(cleared ? '사업자 인증 정보를 삭제했습니다.' : '인증 정보 삭제에 실패했습니다.'),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final asyncProfiles = ref.watch(clinicProfilesProvider);
@@ -198,9 +175,7 @@ class _MeClinicPageState extends ConsumerState<MeClinicPage> {
               else
                 _BranchGrid(
                   profiles: visibleProfiles,
-                  onEdit: (id) => _openEditor(id),
                   onDelete: _deleteBranch,
-                  onClearBusinessVerification: _clearBusinessVerification,
                 ),
             ],
           );
@@ -297,15 +272,11 @@ class _AddBranchButton extends StatelessWidget {
 class _BranchGrid extends ConsumerWidget {
   const _BranchGrid({
     required this.profiles,
-    required this.onEdit,
     required this.onDelete,
-    required this.onClearBusinessVerification,
   });
 
   final List<ClinicProfile> profiles;
-  final void Function(String id) onEdit;
   final ValueChanged<ClinicProfile> onDelete;
-  final ValueChanged<ClinicProfile> onClearBusinessVerification;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -320,17 +291,13 @@ class _BranchGrid extends ConsumerWidget {
                 .map(
                   (p) => _BranchCard(
                     profile: p,
-                    onEdit: () => onEdit(p.id),
                     onDelete: () => onDelete(p),
-                    onClearBusinessVerification:
-                        () => onClearBusinessVerification(p),
                     isActive: highlightActive && p.id == activeBranchId,
                   ),
                 )
                 .toList();
-        // [옵션 A] 지점 1개면 풀폭 1-column. 2개 이상 + wide(>=640) 면 2-column.
-        // 그 외는 1-column.
-        final useTwoColumn = cards.length >= 2 && constraints.maxWidth >= 640;
+        // 넓은 화면에서는 지점이 1개여도 반폭 카드로 보여 카드 크기를 일정하게 유지한다.
+        final useTwoColumn = constraints.maxWidth >= 640;
         if (!useTwoColumn) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -373,16 +340,12 @@ class _BranchGrid extends ConsumerWidget {
 class _BranchCard extends StatelessWidget {
   const _BranchCard({
     required this.profile,
-    required this.onEdit,
     required this.onDelete,
-    required this.onClearBusinessVerification,
     required this.isActive,
   });
 
   final ClinicProfile profile;
-  final VoidCallback onEdit;
   final VoidCallback onDelete;
-  final VoidCallback onClearBusinessVerification;
 
   /// 헤더 "보기 기준" 드롭다운에서 이 지점이 선택돼 있을 때 true.
   /// (다지점 + 특정 지점 선택 상황에서만 true; 1지점/전체합산 모드에선 항상 false)
@@ -502,23 +465,9 @@ class _BranchCard extends StatelessWidget {
             runSpacing: 8,
             children: [
               OutlinedButton.icon(
-                onPressed: onEdit,
-                icon: const Icon(Icons.edit_outlined, size: 16),
-                label: const Text('수정'),
-              ),
-              OutlinedButton.icon(
                 onPressed: onDelete,
                 icon: const Icon(Icons.delete_outline, size: 16),
-                label: const Text('삭제'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.error,
-                  side: BorderSide(color: AppColors.error.withOpacity(0.45)),
-                ),
-              ),
-              OutlinedButton.icon(
-                onPressed: onClearBusinessVerification,
-                icon: const Icon(Icons.gpp_maybe_outlined, size: 16),
-                label: const Text('인증 삭제'),
+                label: const Text('병원 삭제'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.error,
                   side: BorderSide(color: AppColors.error.withOpacity(0.45)),
@@ -526,7 +475,10 @@ class _BranchCard extends StatelessWidget {
               ),
               if (!profile.canPublishJobs)
                 FilledButton.icon(
-                  onPressed: () => context.go('/me/verify'),
+                  onPressed:
+                      () => context.go(
+                        '/clinic-verify?profileId=${Uri.encodeComponent(profile.id)}',
+                      ),
                   icon: const Icon(Icons.verified_outlined, size: 16),
                   label: const Text('인증하기'),
                   style: FilledButton.styleFrom(
@@ -584,12 +536,12 @@ class _VerifyBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final (label, color, icon) = switch (status) {
       BizVerificationStatus.verified => (
-        '인증 완료',
+        '게재 가능, 확인 완료',
         AppColors.success,
         Icons.verified,
       ),
       BizVerificationStatus.provisional => (
-        '조건부 승인',
+        '게재 가능, 관리자 확인 예정',
         AppColors.accent,
         Icons.task_alt_outlined,
       ),

@@ -1,7 +1,7 @@
 /**
  * verifyBusinessLicense
  *
- * 클라이언트(공고 편집기·/me/verify)에서 사업자등록증 이미지를 업로드한 직후
+ * 클라이언트(공고 편집기·/me/clinic)에서 사업자등록증 이미지를 업로드한 직후
  * 호출되는 OCR + 1차 검증 callable.
  *
  * 전 단계(legacy ghost) 와 달리 이 구현은:

@@ -16,11 +16,11 @@ import '../../features/jobs/web/job_input_page.dart';
 import '../../features/jobs/web/job_draft_editor_page.dart';
 import '../../features/jobs/web/job_product_select_page.dart';
 import '../../features/jobs/web/job_publish_success_page.dart';
+import '../../features/jobs/web/published_job_detail_page.dart';
 import '../../features/jobs/web/legal_page.dart';
 import '../../features/jobs/ui/clinic_verify_page.dart';
 import '../../features/me/pages/me_overview_page.dart';
 import '../../features/me/pages/me_clinic_page.dart';
-import '../../features/me/pages/me_verification_page.dart';
 import '../../features/me/pages/me_account_page.dart';
 import '../../features/me/pages/me_billing_page.dart';
 import '../../features/me/pages/me_orders_page.dart';
@@ -139,6 +139,7 @@ final appRouter = GoRouter(
     // 인증 필요 경로 목록
     const guardedPrefixes = [
       '/post-job',
+      '/publisher/jobs',
       '/applicant',
       '/clinic-verify',
       '/me',
@@ -185,7 +186,8 @@ final appRouter = GoRouter(
     // 새 공고 플로우: 치과(`clinics_accounts`) 마스터가 있을 때만 진입.
     // (구글 등 비밀번호 없는 세션으로 /post-job 만 들어왔을 때 자동 생성하면
     // 이메일·비밀번호 치과 로그인과 불일치하는 계정이 생김 → 가입/로그인으로 유도)
-    if (path.startsWith('/post-job') && user != null) {
+    if ((path.startsWith('/post-job') || path.startsWith('/publisher/jobs')) &&
+        user != null) {
       try {
         final status = await ClinicAuthService.getStatus();
         if (!status.exists) {
@@ -265,6 +267,12 @@ final appRouter = GoRouter(
           (_, state) =>
               JobPublishSuccessPage(jobId: state.pathParameters['jobId']!),
     ),
+    GoRoute(
+      path: '/publisher/jobs/:jobId',
+      builder:
+          (_, state) =>
+              PublishedJobDetailPage(jobId: state.pathParameters['jobId']!),
+    ),
 
     // ── 토스페이먼츠 결제 결과 ────────────────────────────
     GoRoute(
@@ -288,6 +296,11 @@ final appRouter = GoRouter(
 
     GoRoute(
       path: '/clinic-verify',
+      redirect:
+          (_, state) =>
+              (state.uri.queryParameters['profileId'] ?? '').trim().isEmpty
+                  ? '/me/clinic'
+                  : null,
       builder:
           (_, state) => ClinicVerifyPage(
             profileId: state.uri.queryParameters['profileId'],
@@ -304,7 +317,7 @@ final appRouter = GoRouter(
     // ── 내 정보(My Page) ─────────────────────────────────────
     GoRoute(path: '/me', builder: (_, __) => const MeOverviewPage()),
     GoRoute(path: '/me/clinic', builder: (_, __) => const MeClinicPage()),
-    GoRoute(path: '/me/verify', builder: (_, __) => const MeVerificationPage()),
+    GoRoute(path: '/me/verify', redirect: (_, __) => '/me/clinic'),
     GoRoute(path: '/me/billing', builder: (_, __) => const MeBillingPage()),
     GoRoute(path: '/me/orders', builder: (_, __) => const MeOrdersPage()),
     GoRoute(

@@ -425,6 +425,14 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    match /adminVerificationRequests/{requestId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /adminNotifications/{notificationId} {
+      allow read, write: if isAdmin();
+    }
+
     // ══════════════════════════════════════════════════
     // 🏥 치과(병원) (Clinics)
     // ══════════════════════════════════════════════════

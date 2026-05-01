@@ -7,6 +7,7 @@ import 'transportation_info.dart';
 class JobDraft {
   final String id;
   final String ownerUid;
+  final String registeredClinicName;
   final String clinicName;
   final String title;
   final String role;
@@ -87,6 +88,7 @@ class JobDraft {
   const JobDraft({
     required this.id,
     required this.ownerUid,
+    this.registeredClinicName = '',
     this.clinicName = '',
     this.title = '',
     this.role = '',
@@ -162,6 +164,10 @@ class JobDraft {
     return JobDraft(
       id: id,
       ownerUid: data['ownerUid'] as String? ?? '',
+      registeredClinicName:
+          data['registeredClinicName'] as String? ??
+          data['businessRegisteredName'] as String? ??
+          '',
       clinicName: data['clinicName'] as String? ?? '',
       title: data['title'] as String? ?? '',
       role: data['role'] as String? ?? '',
@@ -178,8 +184,8 @@ class JobDraft {
       address: data['address'] as String? ?? '',
       contact: data['contact'] as String? ?? '',
       imageUrls: List<String>.from(data['imageUrls'] ?? []),
-      updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
+      updatedAt: _dateValue(data['updatedAt']),
+      createdAt: _dateValue(data['createdAt']),
       hospitalType: data['hospitalType'] as String?,
       chairCount: (data['chairCount'] as num?)?.toInt(),
       staffCount: (data['staffCount'] as num?)?.toInt(),
@@ -222,16 +228,7 @@ class JobDraft {
       editorStep: data['editorStep'] as String?,
       mainDutiesRaw: data['mainDutiesRaw'] as String?,
       mainDutiesList: List<String>.from(data['mainDutiesList'] ?? []),
-      recruitmentStart:
-          data['recruitmentStart'] is String
-              ? (() {
-                try {
-                  return DateTime.parse(data['recruitmentStart'] as String);
-                } catch (_) {
-                  return null;
-                }
-              })()
-              : null,
+      recruitmentStart: _dateValue(data['recruitmentStart']),
       fieldStatus: (data['fieldStatus'] as Map?)?.map(
         (k, v) => MapEntry(k.toString(), v.toString()),
       ),
@@ -245,6 +242,8 @@ class JobDraft {
 
   Map<String, dynamic> toMap() => {
     'ownerUid': ownerUid,
+    if (registeredClinicName.isNotEmpty)
+      'registeredClinicName': registeredClinicName,
     'clinicName': clinicName,
     'title': title,
     'role': role,
@@ -359,5 +358,12 @@ class JobDraft {
       exitNumber: trans['exitNumber'] as String?,
     );
     return legacy.hasValue ? [legacy] : [];
+  }
+
+  static DateTime? _dateValue(Object? value) {
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+    if (value is String) return DateTime.tryParse(value);
+    return null;
   }
 }

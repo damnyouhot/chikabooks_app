@@ -1,7 +1,11 @@
 import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
 
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
 const db = admin.firestore();
+const ANALYTICS_SCHEMA_VERSION = 2;
 
 // ── 정의: lib/core/analytics/event_catalog.dart 와 1:1 일치 ──
 //
@@ -11,56 +15,75 @@ const db = admin.firestore();
 const MEANINGFUL_ACTIONS = new Set([
   // 나 탭
   "tap_character",
+  "wash_character",
   "caring_feed_success",
-  "tap_emotion_start",
-  "tap_emotion_save",
-  "emotion_save_success",
-  // 프로필·커리어·구직
+  // 프로필·커리어
   "tap_profile_save",
-  "tap_job_save",
-  "tap_job_apply",
   "tap_career_edit",
-  "view_job_detail",
   // 성장
   "quiz_completed",
-  // 같이(공감투표)
+  "daily_word_known",
+  "daily_word_review_later",
+  "daily_word_saved",
+  "daily_word_unsaved",
+  // 같이(공감투표·속닥속닥)
   "poll_empathize",
   "poll_change_empathy",
   "poll_add_option",
+  "whisper_create_complete",
+  "whisper_reaction",
+  "whisper_comment",
+  "whisper_reply",
+  "whisper_share",
 ]);
 
 // EventCatalog.dailyFeatureUsageTypes 와 동일
 const FEATURE_KEYS = [
-  "emotion_save_success",
-  "tap_character",
   "caring_feed_success",
-  "view_job_detail",
   "quiz_completed",
+  "daily_word_known",
+  "daily_word_review_later",
+  "daily_word_saved",
+  "poll_empathize",
+  "whisper_create_complete",
+  "whisper_reaction",
+  "whisper_comment",
 ];
 
 const TAB_KEYS = ["view_home", "view_job", "view_growth", "view_bond"];
 
-// kTabConversionRows 와 동일 (view_home → caring_feed_success 로 통일)
+// kTabConversionRows 와 동일
 const CONVERSION_PAIRS: [string, string][] = [
   ["view_home", "caring_feed_success"],
-  ["view_job", "view_job_detail"],
   ["view_growth", "quiz_completed"],
+  ["view_growth", "daily_word_known"],
+  ["view_growth", "daily_word_review_later"],
+  ["view_growth", "daily_word_saved"],
   ["view_bond", "poll_empathize"],
+  ["view_bond", "whisper_create_complete"],
 ];
 
-const GROWTH_EVENTS = new Set(["view_growth"]);
-const EMOTION_EVENTS = new Set(["tap_character", "emotion_save_success"]);
-const CAREER_EVENTS = new Set([
-  "view_job_detail",
-  "tap_job_save",
-  "tap_job_apply",
+const LEARNING_EVENTS = new Set([
+  "quiz_completed",
+  "daily_word_known",
+  "daily_word_review_later",
 ]);
-// kSegmentBondTypes 와 동일 — 기존엔 누락되어 segments.bond 가 항상 0이었음
+const SAVING_EVENTS = new Set(["daily_word_saved", "daily_word_unsaved"]);
+// kSegmentBondTypes 와 동일
 const BOND_EVENTS = new Set([
-  "view_bond",
   "poll_empathize",
   "poll_change_empathy",
   "poll_add_option",
+  "whisper_create_complete",
+  "whisper_reaction",
+  "whisper_comment",
+  "whisper_reply",
+  "whisper_share",
+]);
+const CHARACTER_EVENTS = new Set([
+  "tap_character",
+  "wash_character",
+  "caring_feed_success",
 ]);
 
 /**
@@ -85,7 +108,9 @@ export const aggregateAnalyticsDaily = functions
           .collection("analytics_daily")
           .doc(dateKey)
           .get();
-        if (existing.exists) {
+        const existingVersion =
+          (existing.data()?.schemaVersion as number | undefined) || 0;
+        if (existing.exists && existingVersion >= ANALYTICS_SCHEMA_VERSION) {
           if (offset === 1) {
             console.log(`📊 [AnalyticsDaily] ${dateKey} 이미 존재 → 스킵`);
           }
@@ -199,22 +224,22 @@ async function generateForDate(date: Date): Promise<void> {
   }
   loginOnly += noEventUsers;
 
-  let growth = 0;
-  let emotion = 0;
-  let career = 0;
+  let learning = 0;
+  let saving = 0;
   let bond = 0;
+  let character = 0;
   let ghost = 0;
   for (const [, events] of userEvents) {
     const typeSet = new Set(events);
-    const isGrowth = [...typeSet].some((t) => GROWTH_EVENTS.has(t));
-    const isEmotion = [...typeSet].some((t) => EMOTION_EVENTS.has(t));
-    const isCareer = [...typeSet].some((t) => CAREER_EVENTS.has(t));
+    const isLearning = [...typeSet].some((t) => LEARNING_EVENTS.has(t));
+    const isSaving = [...typeSet].some((t) => SAVING_EVENTS.has(t));
     const isBond = [...typeSet].some((t) => BOND_EVENTS.has(t));
-    if (isGrowth) growth++;
-    if (isEmotion) emotion++;
-    if (isCareer) career++;
+    const isCharacter = [...typeSet].some((t) => CHARACTER_EVENTS.has(t));
+    if (isLearning) learning++;
+    if (isSaving) saving++;
     if (isBond) bond++;
-    if (!isGrowth && !isEmotion && !isCareer && !isBond) {
+    if (isCharacter) character++;
+    if (!isLearning && !isSaving && !isBond && !isCharacter) {
       const hasMeaningful = [...typeSet].some((t) =>
         MEANINGFUL_ACTIONS.has(t)
       );
@@ -229,6 +254,7 @@ async function generateForDate(date: Date): Promise<void> {
     .doc(dateKey)
     .set({
       dateKey,
+      schemaVersion: ANALYTICS_SCHEMA_VERSION,
       generatedAt: admin.firestore.FieldValue.serverTimestamp(),
       totalValidUsers: total,
       activeUsers: activeUserIds.size,
@@ -236,7 +262,7 @@ async function generateForDate(date: Date): Promise<void> {
       tabViews,
       tabConversions,
       depthBuckets: {loginOnly, oneAction, twoToFour, fivePlus},
-      segments: {growth, emotion, career, bond, ghost},
+      segments: {learning, saving, bond, character, ghost},
       retention: {d3: 0, d7: 0},
       eventCounts,
     });

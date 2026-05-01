@@ -14,6 +14,9 @@ import 'career_skill_section.dart';
 import 'career_network_section.dart';
 import 'career_stage_section.dart';
 
+/// 커리어 카드 탭에서 스킬 미리보기로 노출하는 최대 개수 (초과 시 더보기).
+const int _kCareerSkillPreviewMax = 8;
+
 /// 커리어 탭 소탭바 (AppSegmentedControl 전용 헤더)
 ///
 /// 타이틀·인포·설정은 [job_page.dart]의 [_JobPageTitleBar]가 처리하며,
@@ -113,8 +116,9 @@ class CareerTab extends StatelessWidget {
             CareerProfileService.skillMaster
                 .where((m) => skillsMap[m['id']]?['enabled'] == true)
                 .toList();
-        final previewSkills = enabledSkills.take(4).toList();
-        final hasMore = enabledSkills.length > 4;
+        final previewSkills =
+            enabledSkills.take(_kCareerSkillPreviewMax).toList();
+        final hasMore = enabledSkills.length > _kCareerSkillPreviewMax;
 
         return StreamBuilder<List<DentalNetworkEntry>>(
           stream: CareerProfileService.watchNetworkEntries(),
@@ -664,25 +668,37 @@ class _SkillSection extends StatelessWidget {
               ),
             )
           else ...[
-            ...previewSkills.map((m) {
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: CareerSkillCard(
-                  info: CareerSkillInfo(
-                    id: m['id'] as String,
-                    title: m['title'] as String,
-                    icon: iconFromSkillName(m['icon'] as String),
-                  ),
-                ),
-              );
-            }),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                const gap = 10.0;
+                final cellW = (constraints.maxWidth - gap) / 2;
+                return Wrap(
+                  spacing: gap,
+                  runSpacing: gap,
+                  children: previewSkills
+                      .map(
+                        (m) => SizedBox(
+                          width: cellW,
+                          child: CareerSkillCard(
+                            info: CareerSkillInfo(
+                              id: m['id'] as String,
+                              title: m['title'] as String,
+                              icon: iconFromSkillName(m['icon'] as String),
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(),
+                );
+              },
+            ),
             if (hasMore)
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
                   onPressed: () => CareerSkillEditSheet.show(context),
                   child: Text(
-                    '더보기 (${enabledSkills.length - 4}개)',
+                    '더보기 (${enabledSkills.length - _kCareerSkillPreviewMax}개)',
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,

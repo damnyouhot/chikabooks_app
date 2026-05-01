@@ -248,30 +248,30 @@ class AdminBehaviorService {
     Set<String> validUserIds,
     int total,
   ) {
-    int growth = 0;
-    int emotion = 0;
-    int career = 0;
+    int learning = 0;
+    int saving = 0;
     int bond = 0;
+    int character = 0;
     int ghost = 0;
 
     for (final entry in userEvents.entries) {
       final types = entry.value.map((e) => e.type).toSet();
-      final isGrowth =
-          types.any((t) => EventCatalog.segmentGrowthTypes.contains(t));
-      final isEmotion =
-          types.any((t) => EventCatalog.segmentEmotionTypes.contains(t));
-      final isCareer =
-          types.any((t) => EventCatalog.segmentCareerTypes.contains(t));
+      final isLearning =
+          types.any((t) => EventCatalog.segmentLearningTypes.contains(t));
+      final isSaving =
+          types.any((t) => EventCatalog.segmentSavingTypes.contains(t));
       final isBond =
           types.any((t) => EventCatalog.segmentBondTypes.contains(t));
-      if (isGrowth) growth++;
-      if (isEmotion) emotion++;
-      if (isCareer) career++;
+      final isCharacter =
+          types.any((t) => EventCatalog.segmentCharacterTypes.contains(t));
+      if (isLearning) learning++;
+      if (isSaving) saving++;
       if (isBond) bond++;
-      if (!isGrowth &&
-          !isEmotion &&
-          !isCareer &&
+      if (isCharacter) character++;
+      if (!isLearning &&
+          !isSaving &&
           !isBond &&
+          !isCharacter &&
           !types.any((t) => EventCatalog.meaningfulTypes.contains(t))) {
         ghost++;
       }
@@ -283,41 +283,41 @@ class AdminBehaviorService {
         .length;
     ghost += noEventUsers;
 
-    debugPrint('📊 [유저타입] 성장관심=$growth, 감정=$emotion, '
-        '커리어=$career, 교감=$bond, 유령=$ghost(이벤트없음=$noEventUsers), total=$total');
+    debugPrint('📊 [유저타입] 학습=$learning, 저장=$saving, '
+        '교감=$bond, 캐릭터=$character, 관망=$ghost(이벤트없음=$noEventUsers), total=$total');
 
     final segDetails = EventCatalog.behaviorSegmentCardDetails;
     return [
       MetricCard.safe(
-        label: '성장 관심형',
-        count: growth,
+        label: '학습형',
+        count: learning,
         total: total,
         basis: '전체 로그인 사용자',
         detail: segDetails[0],
       ),
       MetricCard.safe(
-        label: '감정형',
-        count: emotion,
+        label: '저장형',
+        count: saving,
         total: total,
         basis: '전체 로그인 사용자',
         detail: segDetails[1],
-      ),
-      MetricCard.safe(
-        label: '커리어형',
-        count: career,
-        total: total,
-        basis: '전체 로그인 사용자',
-        detail: segDetails[2],
       ),
       MetricCard.safe(
         label: '교감형',
         count: bond,
         total: total,
         basis: '전체 로그인 사용자',
+        detail: segDetails[2],
+      ),
+      MetricCard.safe(
+        label: '캐릭터형',
+        count: character,
+        total: total,
+        basis: '전체 로그인 사용자',
         detail: segDetails[3],
       ),
       MetricCard.safe(
-        label: '유령 유저',
+        label: '관망형',
         count: ghost,
         total: total,
         basis: '전체 로그인 사용자',
@@ -353,7 +353,6 @@ class AdminBehaviorService {
       '나 탭',
       '교감 탭',
       '성장 탭',
-      '구직 탭',
       '커리어 탭',
       '기타',
     ];
@@ -370,24 +369,23 @@ class AdminBehaviorService {
   static String _categorizeAction(String type) {
     if (type.startsWith('view_home') ||
         type == 'tap_character' ||
-        type == 'tap_emotion_start' ||
-        type == 'emotion_save_success' ||
+        type == 'wash_character' ||
         type == 'caring_feed_success') {
       return '나 탭';
     }
     if (type.startsWith('view_bond') ||
+        type == 'view_whisper' ||
         type == 'poll_empathize' ||
         type == 'poll_change_empathy' ||
-        type == 'poll_add_option') {
+        type == 'poll_add_option' ||
+        type.startsWith('whisper_')) {
       return '교감 탭';
     }
-    if (type.startsWith('view_growth') || type == 'quiz_completed') {
+    if (type.startsWith('view_growth') ||
+        type == 'view_today_words' ||
+        type == 'quiz_completed' ||
+        type.startsWith('daily_word_')) {
       return '성장 탭';
-    }
-    if (type.startsWith('view_job') ||
-        type == 'tap_job_save' ||
-        type == 'tap_job_apply') {
-      return '구직 탭';
     }
     if (type.startsWith('view_career') || type == 'tap_career_edit') {
       return '커리어 탭';

@@ -97,26 +97,26 @@ class CareerSkillCard extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 32,
-            height: 32,
+            width: 28,
+            height: 28,
             decoration: BoxDecoration(
               color: AppColors.accent.withOpacity(0.10),
               borderRadius: BorderRadius.circular(AppRadius.md),
             ),
-            child: Icon(info.icon, color: AppColors.accent, size: 17),
+            child: Icon(info.icon, color: AppColors.accent, size: 15),
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               info.title,
               style: const TextStyle(
-                fontSize: 14,
+                fontSize: 13,
                 fontWeight: FontWeight.w700,
                 color: AppColors.textPrimary,
               ),
             ),
           ),
-          Icon(Icons.check_circle, size: 18, color: AppColors.accent.withOpacity(0.7)),
+          Icon(Icons.check_circle, size: 17, color: AppColors.accent.withOpacity(0.7)),
         ],
       ),
     );

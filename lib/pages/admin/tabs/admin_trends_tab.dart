@@ -104,7 +104,7 @@ class _AdminTrendsTabState extends State<AdminTrendsTab>
               ...[30, 60, 90].map((d) => Padding(
                     padding: const EdgeInsets.only(right: 6),
                     child: _DayChip(
-                      label: '${d}일',
+                      label: '$d일',
                       selected: _days == d,
                       onTap: () {
                         setState(() => _days = d);
@@ -143,7 +143,7 @@ class _AdminTrendsTabState extends State<AdminTrendsTab>
           else ...[
             // 데이터 수 안내
             Text(
-              '${_data.length}일 / ${_days}일 데이터',
+              '${_data.length}일 / $_days일 데이터',
               style: const TextStyle(
                   fontSize: 11, color: AppColors.textDisabled),
             ),
@@ -167,15 +167,12 @@ class _AdminTrendsTabState extends State<AdminTrendsTab>
                     (d.tabViews['view_home'] ?? 0).toDouble(),
                 '성장 탭': (d) =>
                     (d.tabViews['view_growth'] ?? 0).toDouble(),
-                '구직 탭': (d) =>
-                    (d.tabViews['view_job'] ?? 0).toDouble(),
                 '교감 탭': (d) =>
                     (d.tabViews['view_bond'] ?? 0).toDouble(),
               },
               colors: const [
                 Color(0xFF66BB6A),
                 AppColors.accent,
-                Color(0xFFFFCC00),
                 Color(0xFF42A5F5),
               ],
             ),
@@ -186,23 +183,23 @@ class _AdminTrendsTabState extends State<AdminTrendsTab>
             _MultiLineChart(
               data: _data,
               series: {
-                '감정 기록': (d) =>
-                    (d.featureUsage['emotion_save_success'] ?? 0).toDouble(),
-                '캐릭터': (d) =>
-                    (d.featureUsage['tap_character'] ?? 0).toDouble(),
                 '밥주기': (d) =>
                     (d.featureUsage['caring_feed_success'] ?? 0).toDouble(),
-                '공고 클릭': (d) =>
-                    (d.featureUsage['view_job_detail'] ?? 0).toDouble(),
                 '퀴즈': (d) =>
                     (d.featureUsage['quiz_completed'] ?? 0).toDouble(),
+                '오늘 단어': (d) =>
+                    (d.featureUsage['daily_word_known'] ?? 0).toDouble(),
+                '단어 저장': (d) =>
+                    (d.featureUsage['daily_word_saved'] ?? 0).toDouble(),
+                '속닥속닥': (d) =>
+                    (d.featureUsage['whisper_create_complete'] ?? 0).toDouble(),
               },
               colors: const [
-                Color(0xFFEF5350),
-                Color(0xFF66BB6A),
                 Color(0xFFFF9800),
-                Color(0xFFFFCC00),
                 AppColors.accent,
+                Color(0xFF66BB6A),
+                Color(0xFFFFCC00),
+                Color(0xFF42A5F5),
               ],
             ),
             const SizedBox(height: 24),
@@ -212,22 +209,22 @@ class _AdminTrendsTabState extends State<AdminTrendsTab>
             _MultiLineChart(
               data: _data,
               series: {
-                '성장 관심형': (d) =>
-                    (d.segments['growth'] ?? 0).toDouble(),
-                '감정형': (d) =>
-                    (d.segments['emotion'] ?? 0).toDouble(),
-                '커리어형': (d) =>
-                    (d.segments['career'] ?? 0).toDouble(),
+                '학습형': (d) =>
+                    (d.segments['learning'] ?? 0).toDouble(),
+                '저장형': (d) =>
+                    (d.segments['saving'] ?? 0).toDouble(),
                 '교감형': (d) =>
                     (d.segments['bond'] ?? 0).toDouble(),
-                '유령': (d) =>
+                '캐릭터형': (d) =>
+                    (d.segments['character'] ?? 0).toDouble(),
+                '관망형': (d) =>
                     (d.segments['ghost'] ?? 0).toDouble(),
               },
               colors: const [
                 AppColors.accent,
-                Color(0xFFEF5350),
                 Color(0xFFFFCC00),
                 Color(0xFF42A5F5),
+                Color(0xFF66BB6A),
                 Color(0xFFBDBDBD),
               ],
             ),
@@ -357,7 +354,7 @@ class _TrendChart extends StatelessWidget {
               ),
               belowBarData: BarAreaData(
                 show: true,
-                color: color.withOpacity(0.08),
+                color: color.withValues(alpha: 0.08),
               ),
             ),
           ],

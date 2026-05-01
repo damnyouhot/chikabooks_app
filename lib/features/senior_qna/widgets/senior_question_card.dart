@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_tokens.dart';
+import '../../../services/admin_activity_service.dart';
 import '../data/senior_stickers.dart';
 import '../models/senior_question.dart';
 import '../services/senior_question_image_service.dart';
@@ -578,6 +579,12 @@ class _SeniorQuestionCardState extends State<SeniorQuestionCard> {
   Future<void> _shareQuestion() async {
     try {
       await SeniorQuestionShareCapture.share(context, question: question);
+      AdminActivityService.log(
+        ActivityEventType.whisperShare,
+        page: 'bond_whisper',
+        targetId: question.id,
+        extra: {'whisperCategory': question.category},
+      );
     } catch (e) {
       if (!mounted) return;
       _snack('공유에 실패했어요. $e');

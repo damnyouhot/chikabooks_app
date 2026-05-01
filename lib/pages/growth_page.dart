@@ -6,6 +6,7 @@ import '../models/daily_word.dart';
 import '../models/ebook.dart';
 import '../models/hira_update.dart';
 import '../services/daily_word_service.dart';
+import '../services/admin_activity_service.dart';
 import '../services/content_read_state_service.dart';
 import '../services/ebook_service.dart';
 import '../services/hira_update_service.dart';
@@ -82,6 +83,12 @@ class _GrowthPageState extends State<GrowthPage>
       _ => null,
     };
     if (key != null) ContentReadStateService.markSeen(key);
+    if (_tabCtrl.index == 1) {
+      AdminActivityService.log(
+        ActivityEventType.viewTodayWords,
+        page: 'growth_today_words',
+      );
+    }
   }
 
   @override
@@ -335,6 +342,19 @@ class _TodayWordViewState extends State<_TodayWordView> {
 
     try {
       await DailyWordService.setWordStatus(word: word, status: next);
+      if (next != null) {
+        AdminActivityService.log(
+          next == DailyWordStatus.known
+              ? ActivityEventType.dailyWordKnown
+              : ActivityEventType.dailyWordReviewLater,
+          page: 'growth_today_words',
+          targetId: word.id,
+          extra: {
+            'wordCategory': word.category,
+            'wordEnglish': word.english,
+          },
+        );
+      }
     } catch (e) {
       debugPrint('⚠️ 오늘 단어 상태 저장 실패: $e');
       if (!mounted) return;
@@ -360,6 +380,17 @@ class _TodayWordViewState extends State<_TodayWordView> {
 
     try {
       await DailyWordService.setSavedWord(word: word, isSaved: !wasSaved);
+      AdminActivityService.log(
+        wasSaved
+            ? ActivityEventType.dailyWordUnsaved
+            : ActivityEventType.dailyWordSaved,
+        page: 'growth_today_words',
+        targetId: word.id,
+        extra: {
+          'wordCategory': word.category,
+          'wordEnglish': word.english,
+        },
+      );
     } catch (e) {
       debugPrint('⚠️ 오늘 단어 저장 실패: $e');
       if (!mounted) return;

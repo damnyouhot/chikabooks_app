@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/theme/app_colors.dart';
 import 'tabs/admin_overview_tab.dart';
 import 'tabs/admin_userflow_tab.dart';
@@ -33,7 +34,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     final now = DateTime.now();
     return switch (_period) {
       _Period.today => DateTime(now.year, now.month, now.day),
-      _Period.week  => now.subtract(const Duration(days: 7)),
+      _Period.week => now.subtract(const Duration(days: 7)),
       _Period.month => now.subtract(const Duration(days: 30)),
     };
   }
@@ -87,14 +88,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 dividerColor: Colors.transparent,
                 isScrollable: true,
                 tabAlignment: TabAlignment.start,
-                tabs: const [
-                  Tab(text: 'Overview'),
-                  Tab(text: 'User Flow'),
-                  Tab(text: 'Feature'),
-                  Tab(text: 'Behavior'),
-                  Tab(text: 'Trends'),
-                  Tab(text: 'Billing'),
-                  Tab(text: '인증 검토'),
+                tabs: [
+                  const Tab(text: 'Overview'),
+                  const Tab(text: 'User Flow'),
+                  const Tab(text: 'Feature'),
+                  const Tab(text: 'Behavior'),
+                  const Tab(text: 'Trends'),
+                  const Tab(text: 'Billing'),
+                  const Tab(child: _VerifyTabLabel()),
                 ],
               ),
             ),
@@ -112,6 +113,59 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _VerifyTabLabel extends StatelessWidget {
+  const _VerifyTabLabel();
+
+  static const _verifyNotificationTypes = {
+    'business_name_review',
+    'business_verification_provisional',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream:
+          FirebaseFirestore.instance
+              .collection('adminNotifications')
+              .where('status', isEqualTo: 'unread')
+              .snapshots(),
+      builder: (context, snap) {
+        final count =
+            (snap.data?.docs ?? const [])
+                .where(
+                  (doc) => _verifyNotificationTypes.contains(
+                    doc.data()['type']?.toString(),
+                  ),
+                )
+                .length;
+        if (count == 0) return const Text('인증 검토');
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('인증 검토'),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              decoration: BoxDecoration(
+                color: AppColors.error,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                count > 99 ? '99+' : '$count',
+                style: const TextStyle(
+                  color: AppColors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -137,29 +191,33 @@ class _PeriodChips extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       mainAxisSize: MainAxisSize.min,
-      children: _Period.values.map((p) {
-        final isSelected = p == selected;
-        return GestureDetector(
-          onTap: () => onChanged(p),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            margin: const EdgeInsets.symmetric(horizontal: 2),
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: isSelected ? AppColors.accent : AppColors.surfaceMuted,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              p.label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: isSelected ? AppColors.onAccent : AppColors.textSecondary,
+      children:
+          _Period.values.map((p) {
+            final isSelected = p == selected;
+            return GestureDetector(
+              onTap: () => onChanged(p),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                margin: const EdgeInsets.symmetric(horizontal: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isSelected ? AppColors.accent : AppColors.surfaceMuted,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  p.label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color:
+                        isSelected
+                            ? AppColors.onAccent
+                            : AppColors.textSecondary,
+                  ),
+                ),
               ),
-            ),
-          ),
-        );
-      }).toList(),
+            );
+          }).toList(),
     );
   }
 }

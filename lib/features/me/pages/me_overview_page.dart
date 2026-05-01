@@ -109,7 +109,7 @@ class _GreetingBar extends StatelessWidget {
             )
           else
             InkWell(
-              onTap: () => context.go('/me/verify'),
+              onTap: () => context.go('/me/clinic'),
               borderRadius: BorderRadius.circular(AppRadius.md),
               child: _MiniBadge(
                 icon: Icons.warning_amber_outlined,
@@ -315,7 +315,7 @@ class _TodoPanel extends StatelessWidget {
           title: '사업자 인증 미완료',
           desc: '인증을 완료하면 공고 노출 우선순위가 올라가고 신뢰 배지가 표시돼요.',
           actionLabel: '인증하러 가기',
-          onAction: () => context.go('/me/verify'),
+          onAction: () => context.go('/me/clinic'),
         ),
     ];
 
