@@ -90,6 +90,7 @@ Future<T?> showAppModalBottomSheet<T>({
   required WidgetBuilder builder,
   bool isScrollControlled = false,
   bool useSafeArea = false,
+  bool showDragHandle = false,
   Color? backgroundColor,
   Color? barrierColor,
   ShapeBorder? shape,
@@ -101,6 +102,7 @@ Future<T?> showAppModalBottomSheet<T>({
     context: context,
     isScrollControlled: isScrollControlled,
     useSafeArea: useSafeArea,
+    showDragHandle: showDragHandle,
     backgroundColor: backgroundColor ?? Colors.transparent,
     barrierColor: barrierColor ?? AppColors.black.withValues(alpha: 0.45),
     shape:

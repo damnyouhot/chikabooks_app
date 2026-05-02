@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
 import '../core/widgets/app_confirm_modal.dart';
+import '../core/widgets/app_modal_scaffold.dart';
 import '../models/user_goal.dart';
 import '../models/routine_check.dart';
 import '../services/user_goal_service.dart';
@@ -9,7 +10,7 @@ import 'goal_add_form.dart';
 /// 사용자 목표 허브 (완성형)
 class UserGoalSheet {
   static Future<void> show(BuildContext context) {
-    return showModalBottomSheet(
+    return showAppModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,

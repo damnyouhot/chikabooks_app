@@ -2,8 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
-import '../services/bond_score_service.dart';
-
 /// 신고 사유
 enum ReportReason {
   /// 욕설/비방

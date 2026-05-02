@@ -137,7 +137,7 @@ class _SalaryUpdateCardState extends State<SalaryUpdateCard> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '시행일: ${update.effectiveDate?.month ?? '?'}월 ${update.effectiveDate?.day ?? '?'}일 (${update.ddayString})',
+                    '시행일: ${update.effectiveDate.month}월 ${update.effectiveDate.day}일 (${update.ddayString})',
                     style: const TextStyle(
                       fontSize: 10,
                       color: AppColors.textSecondary,

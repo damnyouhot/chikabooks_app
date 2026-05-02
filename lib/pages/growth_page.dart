@@ -1562,7 +1562,7 @@ class _SavedHiraTile extends StatelessWidget {
     return AppMutedCard(
       padding: const EdgeInsets.all(AppSpacing.lg - 2),
       onTap:
-          () => showModalBottomSheet(
+          () => showAppModalBottomSheet<void>(
             context: context,
             isScrollControlled: true,
             backgroundColor: Colors.transparent,

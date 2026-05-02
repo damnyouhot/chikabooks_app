@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_confirm_modal.dart';
+import '../../core/widgets/app_modal_scaffold.dart';
 import '../../core/widgets/web_site_footer.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../models/feedback_post.dart';
@@ -111,16 +113,27 @@ class _FeedbackDetailPageState extends State<FeedbackDetailPage> {
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setS) => AlertDialog(
-          title: const Text('피드백 수정',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+        builder: (ctx, setS) => AppModalDialog(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                '피드백 수정',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              SizedBox(
+                width: double.maxFinite,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                   // 유형
                   const Text('유형',
                       style: TextStyle(
@@ -252,77 +265,88 @@ class _FeedbackDetailPageState extends State<FeedbackDetailPage> {
                     ),
                   ),
                 ],
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(height: AppSpacing.lg),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.textSecondary,
+                        backgroundColor: AppColors.surfaceMuted,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.md),
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      child: const Text('취소'),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: saving
+                          ? null
+                          : () async {
+                              if (textCtrl.text.trim().isEmpty) return;
+                              setS(() => saving = true);
+                              final ok = await FeedbackService.updatePost(
+                                feedbackId: post.id,
+                                text: textCtrl.text.trim(),
+                                type: type,
+                                priority: priority,
+                                visibility: visibility,
+                              );
+                              if (ctx.mounted) Navigator.pop(ctx);
+                              if (mounted && !ok) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                      content: Text('수정에 실패했어요')),
+                                );
+                              }
+                            },
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.accent,
+                        foregroundColor: AppColors.white,
+                      ),
+                      child: Text(saving ? '저장 중...' : '저장'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('취소'),
-            ),
-            TextButton(
-              onPressed: saving
-                  ? null
-                  : () async {
-                      if (textCtrl.text.trim().isEmpty) return;
-                      setS(() => saving = true);
-                      final ok = await FeedbackService.updatePost(
-                        feedbackId: post.id,
-                        text: textCtrl.text.trim(),
-                        type: type,
-                        priority: priority,
-                        visibility: visibility,
-                      );
-                      if (ctx.mounted) Navigator.pop(ctx);
-                      if (mounted && !ok) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('수정에 실패했어요')),
-                        );
-                      }
-                    },
-              child: const Text('저장',
-                  style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.accent)),
-            ),
-          ],
         ),
       ),
     );
   }
 
-  void _confirmDeletePost(FeedbackPost post) {
-    showDialog(
+  Future<void> _confirmDeletePost(FeedbackPost post) async {
+    final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('피드백 삭제'),
-        content: const Text('이 피드백을 삭제할까요?\n댓글도 함께 삭제됩니다.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('취소'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              final ok = await FeedbackService.deletePost(post.id);
-              if (mounted) {
-                if (ok) {
-                  Navigator.pop(context);
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('삭제에 실패했어요')),
-                  );
-                }
-              }
-            },
-            child: const Text('삭제',
-                style: TextStyle(
-                    fontWeight: FontWeight.w700, color: AppColors.error)),
-          ),
-        ],
+      builder: (_) => const AppConfirmModal(
+        title: '피드백 삭제',
+        message: '이 피드백을 삭제할까요?\n댓글도 함께 삭제됩니다.',
+        confirmLabel: '삭제',
+        destructive: true,
       ),
     );
+    if (confirmed != true || !mounted) return;
+    final ok = await FeedbackService.deletePost(post.id);
+    if (!mounted) return;
+    if (ok) {
+      Navigator.pop(context);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('삭제에 실패했어요')),
+      );
+    }
   }
 
   @override
@@ -776,28 +800,17 @@ class _CommentItem extends StatelessWidget {
     );
   }
 
-  void _confirmDelete(BuildContext context) {
-    showDialog(
+  Future<void> _confirmDelete(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('댓글 삭제'),
-        content: const Text('댓글을 삭제할까요?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('취소'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              onDelete();
-            },
-            child: const Text('삭제',
-                style: TextStyle(color: AppColors.error)),
-          ),
-        ],
+      builder: (_) => const AppConfirmModal(
+        title: '댓글 삭제',
+        message: '댓글을 삭제할까요?',
+        confirmLabel: '삭제',
+        destructive: true,
       ),
     );
+    if (confirmed == true) onDelete();
   }
 
   String _timeAgo(DateTime dt) {

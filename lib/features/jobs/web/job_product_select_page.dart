@@ -40,58 +40,10 @@ extension _ProductClassExt on _ProductClass {
     _ProductClass.c => 'basic',
   };
 
-  int get priceWon => switch (this) {
-    _ProductClass.a => 880000,
-    _ProductClass.b => 440000,
-    _ProductClass.c => 110000,
-  };
-
   String get priceLabel => switch (this) {
     _ProductClass.a => '880,000원',
     _ProductClass.b => '440,000원',
     _ProductClass.c => '110,000원',
-  };
-
-  int get displayDays => switch (this) {
-    _ProductClass.a => 60,
-    _ProductClass.b => 30,
-    _ProductClass.c => 14,
-  };
-
-  String get tagline => switch (this) {
-    _ProductClass.a => '최상위 노출 · 60일 · 프리미엄 배지',
-    _ProductClass.b => '추천 노출 · 30일 · 추천 배지',
-    _ProductClass.c => '기본 노출 · 14일',
-  };
-
-  List<String> get features => switch (this) {
-    _ProductClass.a => [
-      '검색 최상단 고정 노출',
-      '프리미엄 골드 배지 표시',
-      '공고 60일 유지',
-      '지원자 무제한',
-      '공고 수정 무제한',
-    ],
-    _ProductClass.b => ['추천 섹션 우선 노출', '추천 블루 배지 표시', '공고 30일 유지', '지원자 무제한'],
-    _ProductClass.c => ['일반 목록 노출', '공고 14일 유지', '지원자 50명 제한'],
-  };
-
-  Color get badgeColor => switch (this) {
-    _ProductClass.a => const Color(0xFFB8860B), // 골드
-    _ProductClass.b => AppColors.blue,
-    _ProductClass.c => AppColors.textSecondary,
-  };
-
-  Color get badgeBg => switch (this) {
-    _ProductClass.a => const Color(0xFFFFF8E1),
-    _ProductClass.b => const Color(0xFFE8EAF6),
-    _ProductClass.c => const Color(0xFFF0F0F0),
-  };
-
-  Color get cardBorder => switch (this) {
-    _ProductClass.a => const Color(0xFFB8860B),
-    _ProductClass.b => AppColors.blue,
-    _ProductClass.c => AppColors.divider,
   };
 }
 

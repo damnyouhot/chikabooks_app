@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
+import '../../core/widgets/app_modal_scaffold.dart';
 import '../../models/ebook.dart';
 import '../../services/ebook_service.dart';
 import '../../widgets/shimmer_list_tile.dart';
@@ -433,16 +434,14 @@ class _CategoryDropdown extends StatelessWidget {
   }
 
   void _showPicker(BuildContext context) {
-    showModalBottomSheet<void>(
+    showAppModalBottomSheet<void>(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      useSafeArea: true,
+      backgroundColor: AppColors.white,
       builder:
-          (sheetCtx) => SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
+          (sheetCtx) => Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
                 const SizedBox(height: 12),
                 Container(
                   width: 36,
@@ -494,7 +493,6 @@ class _CategoryDropdown extends StatelessWidget {
                 const SizedBox(height: 8),
               ],
             ),
-          ),
     );
   }
 }

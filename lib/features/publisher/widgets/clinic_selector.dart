@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_modal_scaffold.dart';
 import '../../../models/clinic_profile.dart';
 import '../services/clinic_profile_service.dart';
 
@@ -45,8 +46,7 @@ class _SelectorDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+    return AppModalDialog(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420),
         child: Padding(
@@ -189,8 +189,7 @@ class _CreateProfileDialogState extends State<_CreateProfileDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+    return AppModalDialog(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 400),
         child: Padding(

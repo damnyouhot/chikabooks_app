@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../services/career_profile_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
+import '../../core/widgets/app_modal_scaffold.dart';
 import 'career_shared.dart';
 
 // ── 스킬 정보 모델 ─────────────────────────────────────────────
@@ -128,7 +129,7 @@ class CareerSkillEditSheet extends StatefulWidget {
   const CareerSkillEditSheet._();
 
   static Future<void> show(BuildContext context) {
-    return showModalBottomSheet<void>(
+    return showAppModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,

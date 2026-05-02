@@ -3,6 +3,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../core/widgets/app_confirm_modal.dart';
 import '../../core/widgets/app_date_pickers.dart';
+import '../../core/widgets/app_modal_scaffold.dart';
 import '../../services/career_profile_service.dart';
 import '../../models/resume.dart';
 import '../../services/resume_career_sync_service.dart';
@@ -449,7 +450,7 @@ class DentalNetworkEditSheet extends StatelessWidget {
     BuildContext context, {
     DentalNetworkEntry? editing,
   }) {
-    return showModalBottomSheet<void>(
+    return showAppModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -596,7 +597,7 @@ class _DentalNetworkListSheetState extends State<_DentalNetworkListSheet> {
                           ? null
                           : () {
                             Navigator.of(context).pop();
-                            showModalBottomSheet<void>(
+                            showAppModalBottomSheet<void>(
                               context: context,
                               isScrollControlled: true,
                               backgroundColor: Colors.transparent,
@@ -771,7 +772,7 @@ class _DentalNetworkListSheetState extends State<_DentalNetworkListSheet> {
                                 IconButton(
                                   onPressed: () {
                                     Navigator.of(context).pop();
-                                    showModalBottomSheet<void>(
+                                    showAppModalBottomSheet<void>(
                                       context: context,
                                       isScrollControlled: true,
                                       backgroundColor: Colors.transparent,

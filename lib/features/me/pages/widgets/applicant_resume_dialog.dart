@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_tokens.dart' show AppRadius, AppSpacing;
+import '../../../../core/widgets/app_modal_scaffold.dart';
 import '../../../../models/applicant_pool_entry.dart';
 import '../../../../models/resume.dart';
 import '../../../../services/applicant_pool_service.dart';
@@ -23,7 +24,7 @@ class ApplicantResumeDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
+    return AppModalDialog(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 640, maxHeight: 720),
         child: Column(

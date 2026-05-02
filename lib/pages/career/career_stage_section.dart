@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../core/widgets/app_badge.dart';
+import '../../core/widgets/app_modal_scaffold.dart';
 import 'career_shared.dart';
 
 // ── 커리어 단계 규칙 모델 ──────────────────────────────────────
@@ -315,7 +316,7 @@ class _ChecklistItem extends StatelessWidget {
 
 // ── 커리어 단계 안내 시트 (외부에서 호출) ──────────────────────
 void showCareerStageGuideSheet(BuildContext context) {
-  showModalBottomSheet<void>(
+  showAppModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,

@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_tokens.dart';
+import '../../../core/widgets/app_modal_scaffold.dart';
 import '../data/senior_stickers.dart';
 import '../services/senior_sticker_usage_service.dart';
 
@@ -125,13 +126,10 @@ Future<String?> showSeniorStickerPicker(
   BuildContext context, {
   String? selectedId,
 }) {
-  return showModalBottomSheet<String>(
+  return showAppModalBottomSheet<String>(
     context: context,
     isScrollControlled: true,
     backgroundColor: AppColors.white,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
-    ),
     builder: (ctx) => _SeniorStickerPickerSheet(selectedId: selectedId),
   );
 }

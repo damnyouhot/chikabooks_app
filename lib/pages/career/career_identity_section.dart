@@ -8,6 +8,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../core/widgets/app_badge.dart';
 import '../../core/widgets/app_date_pickers.dart';
+import '../../core/widgets/app_modal_scaffold.dart';
 import 'career_shared.dart';
 
 // ── 커리어 아이덴티티 카드 (빈 상태) ────────────────────────────
@@ -280,7 +281,7 @@ class CareerIdentitySheet extends StatefulWidget {
   const CareerIdentitySheet({super.key});
 
   static Future<void> show(BuildContext context) {
-    return showModalBottomSheet<void>(
+    return showAppModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,

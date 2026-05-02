@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
+import '../../core/widgets/app_modal_scaffold.dart';
 import '../../models/resume.dart';
 
 /// 경력이 있는 이력서가 1건 이상이면 항상 시트를 띄워 사용자가 확정하게 함.
@@ -15,7 +16,7 @@ Future<Resume?> showResumePickerForNetworkExport(
 }) async {
   if (resumesWithCareer.isEmpty) return null;
 
-  return showModalBottomSheet<Resume>(
+  return showAppModalBottomSheet<Resume>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
