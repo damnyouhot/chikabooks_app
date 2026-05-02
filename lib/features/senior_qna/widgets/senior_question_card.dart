@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_tokens.dart';
+import '../../../core/widgets/app_confirm_modal.dart';
 import '../../../services/admin_activity_service.dart';
 import '../data/senior_stickers.dart';
 import '../models/senior_question.dart';
@@ -641,86 +642,11 @@ class _SeniorQuestionCardState extends State<SeniorQuestionCard> {
     return showDialog<bool>(
       context: context,
       builder:
-          (ctx) => Dialog(
-            backgroundColor: Colors.transparent,
-            insetPadding: const EdgeInsets.all(AppSpacing.xl),
-            child: Container(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              decoration: BoxDecoration(
-                color: AppColors.appBg,
-                borderRadius: BorderRadius.circular(AppRadius.xl),
-                border: Border.all(
-                  color: AppColors.divider.withValues(alpha: 0.7),
-                ),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    message,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      height: 1.45,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextButton(
-                          onPressed: () => Navigator.pop(ctx, false),
-                          style: TextButton.styleFrom(
-                            foregroundColor: AppColors.textSecondary,
-                            backgroundColor: AppColors.surfaceMuted,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(AppRadius.md),
-                            ),
-                            textStyle: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          child: const Text('취소'),
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        child: TextButton(
-                          onPressed: () => Navigator.pop(ctx, true),
-                          style: TextButton.styleFrom(
-                            foregroundColor: AppColors.onCardEmphasis,
-                            backgroundColor:
-                                destructive
-                                    ? AppColors.cardEmphasis
-                                    : AppColors.cardPrimary,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(AppRadius.md),
-                            ),
-                            textStyle: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          child: Text(confirmLabel),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+          (_) => AppConfirmModal(
+            title: title,
+            message: message,
+            confirmLabel: confirmLabel,
+            destructive: destructive,
           ),
     );
   }
@@ -984,13 +910,11 @@ class _CommentTileState extends State<_CommentTile> {
     final ok = await showDialog<bool>(
       context: context,
       builder:
-          (ctx) => _ConfirmDialog(
+          (_) => const AppConfirmModal(
             title: '댓글 삭제',
             message: '이 댓글을 삭제할까요?\n달린 답글도 함께 보이지 않게 됩니다.',
             confirmLabel: '삭제',
             destructive: true,
-            onCancel: () => Navigator.pop(ctx, false),
-            onConfirm: () => Navigator.pop(ctx, true),
           ),
     );
     if (ok != true) return;
@@ -1010,13 +934,12 @@ class _CommentTileState extends State<_CommentTile> {
     final confirm = await showDialog<bool>(
       context: context,
       builder:
-          (ctx) => _ConfirmDialog(
+          (_) => const AppConfirmModal(
             title: '댓글 신고',
-            message: '이 댓글을 신고할까요?\n신고가 일정 수준 이상 누적되면 자동으로 숨김 처리됩니다.',
+            message:
+                '이 댓글을 신고할까요?\n신고가 일정 수준 이상 누적되면 자동으로 숨김 처리됩니다.',
             confirmLabel: '신고',
             destructive: true,
-            onCancel: () => Navigator.pop(ctx, false),
-            onConfirm: () => Navigator.pop(ctx, true),
           ),
     );
     if (confirm != true) return;
@@ -1156,107 +1079,6 @@ class _CommentEditBox extends StatelessWidget {
   }
 }
 
-class _ConfirmDialog extends StatelessWidget {
-  final String title;
-  final String message;
-  final String confirmLabel;
-  final bool destructive;
-  final VoidCallback onCancel;
-  final VoidCallback onConfirm;
-
-  const _ConfirmDialog({
-    required this.title,
-    required this.message,
-    required this.confirmLabel,
-    required this.destructive,
-    required this.onCancel,
-    required this.onConfirm,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.all(AppSpacing.xl),
-      child: Container(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        decoration: BoxDecoration(
-          color: AppColors.appBg,
-          borderRadius: BorderRadius.circular(AppRadius.xl),
-          border: Border.all(color: AppColors.divider.withValues(alpha: 0.7)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              message,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                height: 1.45,
-                color: AppColors.textSecondary,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            Row(
-              children: [
-                Expanded(
-                  child: TextButton(
-                    onPressed: onCancel,
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.textSecondary,
-                      backgroundColor: AppColors.surfaceMuted,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                      ),
-                      textStyle: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    child: const Text('취소'),
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: TextButton(
-                    onPressed: onConfirm,
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.onCardEmphasis,
-                      backgroundColor:
-                          destructive
-                              ? AppColors.cardEmphasis
-                              : AppColors.cardPrimary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                      ),
-                      textStyle: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    child: Text(confirmLabel),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _ReplyTile extends StatelessWidget {
   final String questionId;
   final String commentId;
@@ -1362,13 +1184,11 @@ class _ReplyTile extends StatelessWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder:
-          (ctx) => _ConfirmDialog(
+          (_) => const AppConfirmModal(
             title: '답글 삭제',
             message: '이 답글을 삭제할까요?',
             confirmLabel: '삭제',
             destructive: true,
-            onCancel: () => Navigator.pop(ctx, false),
-            onConfirm: () => Navigator.pop(ctx, true),
           ),
     );
     if (ok != true) return;
@@ -1387,13 +1207,12 @@ class _ReplyTile extends StatelessWidget {
     final confirm = await showDialog<bool>(
       context: context,
       builder:
-          (ctx) => _ConfirmDialog(
+          (_) => const AppConfirmModal(
             title: '답글 신고',
-            message: '이 답글을 신고할까요?\n신고가 일정 수준 이상 누적되면 자동으로 숨김 처리됩니다.',
+            message:
+                '이 답글을 신고할까요?\n신고가 일정 수준 이상 누적되면 자동으로 숨김 처리됩니다.',
             confirmLabel: '신고',
             destructive: true,
-            onCancel: () => Navigator.pop(ctx, false),
-            onConfirm: () => Navigator.pop(ctx, true),
           ),
     );
     if (confirm != true) return;

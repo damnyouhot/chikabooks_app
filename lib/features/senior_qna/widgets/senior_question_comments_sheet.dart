@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_tokens.dart';
+import '../../../core/widgets/app_confirm_modal.dart';
 import '../data/senior_stickers.dart';
 import '../models/senior_question.dart';
 import '../services/senior_question_image_service.dart';
@@ -326,21 +327,11 @@ class _CommentTile extends StatelessWidget {
     final confirm = await showDialog<bool>(
       context: context,
       builder:
-          (ctx) => AlertDialog(
-            title: const Text('댓글 신고'),
-            content: const Text(
-              '이 댓글을 신고할까요?\n신고가 일정 수준 이상 누적되면 자동으로 숨김 처리됩니다.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('취소'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('신고'),
-              ),
-            ],
+          (_) => const AppConfirmModal(
+            title: '댓글 신고',
+            message:
+                '이 댓글을 신고할까요?\n신고가 일정 수준 이상 누적되면 자동으로 숨김 처리됩니다.',
+            confirmLabel: '신고',
           ),
     );
     if (confirm != true) return;
@@ -477,19 +468,11 @@ class _ReplyTile extends StatelessWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder:
-          (ctx) => AlertDialog(
-            title: const Text('답글 삭제'),
-            content: const Text('이 답글을 삭제할까요?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('취소'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('삭제'),
-              ),
-            ],
+          (_) => const AppConfirmModal(
+            title: '답글 삭제',
+            message: '이 답글을 삭제할까요?',
+            confirmLabel: '삭제',
+            destructive: true,
           ),
     );
     if (ok != true) return;
@@ -508,21 +491,11 @@ class _ReplyTile extends StatelessWidget {
     final confirm = await showDialog<bool>(
       context: context,
       builder:
-          (ctx) => AlertDialog(
-            title: const Text('답글 신고'),
-            content: const Text(
-              '이 답글을 신고할까요?\n신고가 일정 수준 이상 누적되면 자동으로 숨김 처리됩니다.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('취소'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('신고'),
-              ),
-            ],
+          (_) => const AppConfirmModal(
+            title: '답글 신고',
+            message:
+                '이 답글을 신고할까요?\n신고가 일정 수준 이상 누적되면 자동으로 숨김 처리됩니다.',
+            confirmLabel: '신고',
           ),
     );
     if (confirm != true) return;

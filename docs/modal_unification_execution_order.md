@@ -24,6 +24,7 @@
 | 2026-05-02 | Phase F (순서 25–29) | `me_notifications`, `me_orders`, `me_billing`, `me_clinic`, `me_applicants_pool` 및 `edit_pool_meta_dialog`·`notify_past_applicants_dialog`의 `AlertDialog`를 `AppConfirmModal` / `AppModalDialog`로 교체. |
 | 2026-05-02 | Phase G (순서 30–32) | `publisher_pending_page` 문의 `AppModalDialog`, `publisher_clinic_identity_section` 관리자 확인 `AppConfirmModal`. `clinic_selector`는 `AlertDialog` 없음·출판 각진 `Dialog` 톤 유지로 코드 변경 없음(검토 완료). |
 | 2026-05-02 | 순서 24 | `job_post_form` 교통편 추가 `Dialog`를 `AppModalDialog`로 교체. `showDatePicker`는 Phase N 정책 전까지 유지. |
+| 2026-05-02 | Phase H (순서 33–35) | `senior_question_comments_sheet`·`senior_question_card`의 `AlertDialog`/중복 확인 UI를 `AppConfirmModal`로 통일. `Dialog.fullscreen` 이미지 뷰어는 유지. `senior_sticker_widgets`는 `showDialog` 없음(검토 완료). |
 
 ## 1. 인벤토리 스프레드시트 (착수 직후 1일 이내)
 
@@ -103,9 +104,9 @@
 | 30 | G | `lib/features/publisher/pages/publisher_pending_page.dart` | `showDialog` | Med | ✅ |
 | 31 | G | `lib/features/publisher/widgets/publisher_clinic_identity_section.dart` | `showDialog` | Med | ✅ |
 | 32 | G | `lib/features/publisher/widgets/clinic_selector.dart` | `showDialog` | Med | ✅ |
-| 33 | H | `lib/features/senior_qna/widgets/senior_question_comments_sheet.dart` | 시트 + `AlertDialog` | Med | |
-| 34 | H | `lib/features/senior_qna/widgets/senior_question_card.dart` | 이미 일부 게이지 패밀리 — 나머지·풀스크린 검토 | Med | |
-| 35 | H | `lib/features/senior_qna/widgets/senior_sticker_widgets.dart` | 시트 | Low | |
+| 33 | H | `lib/features/senior_qna/widgets/senior_question_comments_sheet.dart` | 시트 + `AlertDialog` | Med | ✅ |
+| 34 | H | `lib/features/senior_qna/widgets/senior_question_card.dart` | 이미 일부 게이지 패밀리 — 나머지·풀스크린 검토 | Med | ✅ |
+| 35 | H | `lib/features/senior_qna/widgets/senior_sticker_widgets.dart` | 시트 | Low | ✅ |
 | 36 | I | `lib/pages/admin/tabs/admin_overview_tab.dart` | `showDialog` 다수 | High | |
 | 37 | I | `lib/pages/admin/tabs/admin_verify_tab.dart` | `showDialog` | High | |
 | 38 | I | `lib/pages/admin/tabs/admin_billing_tab.dart` | `showDialog` | High | |
@@ -177,4 +178,4 @@
 
 ---
 
-이 문서는 저장소 루트 `docs/modal_unification_execution_order.md`에 두었다. 다음 단계는 **Phase H(속닥속닥, 33–35)** 또는 **Phase N**에서 `showDatePicker` 정책 반영 및 `job_post_form` 내 날짜 피커 정리다.
+이 문서는 저장소 루트 `docs/modal_unification_execution_order.md`에 두었다. 다음 단계는 **Phase I(관리자, 36–40)** 또는 **Phase N**(`showDatePicker` 등 시스템 UI 정책)다.
