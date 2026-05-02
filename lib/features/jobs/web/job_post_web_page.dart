@@ -8,6 +8,7 @@ import 'job_manage_section.dart';
 import 'job_analytics_section.dart';
 import 'web_typography.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_confirm_modal.dart';
 import '../../../core/widgets/web_site_footer.dart';
 import '../../../core/theme/app_tokens.dart' show AppPublisher, AppRadius;
 import '../../../models/job_draft.dart';
@@ -108,24 +109,13 @@ class _JobPostWebPageState extends State<JobPostWebPage>
   Future<void> _deleteDraft(String draftId) async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('임시저장 삭제'),
-        content: const Text('이 임시저장을 삭제하시겠습니까?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('취소'),
+      builder:
+          (_) => const AppConfirmModal(
+            title: '임시저장 삭제',
+            message: '이 임시저장을 삭제하시겠습니까?',
+            confirmLabel: '삭제',
+            destructive: true,
           ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.cardEmphasis,
-              foregroundColor: AppColors.onCardEmphasis,
-            ),
-            child: const Text('삭제'),
-          ),
-        ],
-      ),
     );
     if (confirm == true) {
       await JobDraftService.deleteDraft(draftId);

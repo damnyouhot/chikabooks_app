@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_tokens.dart';
+import '../../../core/widgets/app_modal_scaffold.dart';
 import '../../../core/widgets/app_muted_button.dart';
 import '../../../core/widgets/app_primary_button.dart';
 import '../../../models/resume.dart';
@@ -460,37 +461,82 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
 
   void _showTitleDialog() {
     _titleCtrl.text = _resume!.title;
-    showDialog(
+    showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('이력서 제목'),
-        content: TextField(
-          controller: _titleCtrl,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: '예: 기본 이력서, 교정 지원용',
-            border: OutlineInputBorder(),
+      builder:
+          (ctx) => AppModalDialog(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '이력서 제목',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                TextField(
+                  controller: _titleCtrl,
+                  autofocus: true,
+                  decoration: const InputDecoration(
+                    hintText: '예: 기본 이력서, 교정 지원용',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.textSecondary,
+                          backgroundColor: AppColors.surfaceMuted,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                          ),
+                          textStyle: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        child: const Text('취소'),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () {
+                          final t = _titleCtrl.text.trim();
+                          if (t.isNotEmpty) {
+                            _onTitleChanged(t);
+                            ResumeService.updateTitle(widget.resumeId, t);
+                            setState(() {});
+                          }
+                          Navigator.pop(ctx);
+                        },
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.onCardEmphasis,
+                          backgroundColor: AppColors.cardEmphasis,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                          ),
+                          textStyle: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        child: const Text('확인'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('취소'),
-          ),
-          TextButton(
-            onPressed: () {
-              final t = _titleCtrl.text.trim();
-              if (t.isNotEmpty) {
-                _onTitleChanged(t);
-                ResumeService.updateTitle(widget.resumeId, t);
-                setState(() {});
-              }
-              Navigator.pop(ctx);
-            },
-            child: const Text('확인'),
-          ),
-        ],
-      ),
     );
   }
 }

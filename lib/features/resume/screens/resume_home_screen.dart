@@ -15,6 +15,8 @@ import '../../../services/resume_draft_service.dart';
 import '../../../services/resume_file_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_tokens.dart';
+import '../../../core/widgets/app_confirm_modal.dart';
+import '../../../core/widgets/app_modal_scaffold.dart';
 import 'resume_edit_screen.dart';
 import 'ocr_review_screen.dart';
 
@@ -237,18 +239,13 @@ class _WrittenResumeTabState extends State<_WrittenResumeTab> {
   Future<void> _deleteDraft(BuildContext context, ResumeDraft draft) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('임시저장 삭제'),
-        content: Text('"${draft.title}" 임시저장을 삭제할까요?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('취소')),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('삭제'),
+      builder:
+          (_) => AppConfirmModal(
+            title: '임시저장 삭제',
+            message: '"${draft.title}" 임시저장을 삭제할까요?',
+            confirmLabel: '삭제',
+            destructive: true,
           ),
-        ],
-      ),
     );
     if (ok == true) await ResumeDraftService.deleteDraft(draft.id);
   }
@@ -264,18 +261,14 @@ class _WrittenResumeTabState extends State<_WrittenResumeTab> {
   Future<void> _confirmDelete(BuildContext context, Resume resume) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('이력서 삭제'),
-        content: Text('"${resume.title}" 이력서를 삭제할까요?\n삭제하면 복구할 수 없어요.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('취소')),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('삭제'),
+      builder:
+          (_) => AppConfirmModal(
+            title: '이력서 삭제',
+            message:
+                '"${resume.title}" 이력서를 삭제할까요?\n삭제하면 복구할 수 없어요.',
+            confirmLabel: '삭제',
+            destructive: true,
           ),
-        ],
-      ),
     );
     if (ok == true) await ResumeService.deleteResume(resume.id);
   }
@@ -474,24 +467,73 @@ class _UploadedFileTabState extends State<_UploadedFileTab> {
     final ctrl = TextEditingController(text: file.displayName);
     final newName = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('이름 변경'),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: '표시 이름 입력',
-            border: OutlineInputBorder(),
+      builder:
+          (ctx) => AppModalDialog(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '이름 변경',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                TextField(
+                  controller: ctrl,
+                  autofocus: true,
+                  decoration: const InputDecoration(
+                    hintText: '표시 이름 입력',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.textSecondary,
+                          backgroundColor: AppColors.surfaceMuted,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                          ),
+                          textStyle: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        child: const Text('취소'),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () =>
+                            Navigator.pop(ctx, ctrl.text.trim()),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.onCardEmphasis,
+                          backgroundColor: AppColors.cardEmphasis,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                          ),
+                          textStyle: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        child: const Text('확인'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('취소')),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-              child: const Text('확인')),
-        ],
-      ),
     );
     if (newName != null && newName.isNotEmpty) {
       await ResumeFileService.rename(file.id, newName);
@@ -501,20 +543,14 @@ class _UploadedFileTabState extends State<_UploadedFileTab> {
   Future<void> _deleteFile(BuildContext context, ResumeFile file) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('파일 삭제'),
-        content: Text('"${file.displayName}" 파일을 삭제할까요?\n삭제하면 복구할 수 없어요.'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('취소')),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('삭제'),
+      builder:
+          (_) => AppConfirmModal(
+            title: '파일 삭제',
+            message:
+                '"${file.displayName}" 파일을 삭제할까요?\n삭제하면 복구할 수 없어요.',
+            confirmLabel: '삭제',
+            destructive: true,
           ),
-        ],
-      ),
     );
     if (ok == true) await ResumeFileService.deleteFile(file);
   }

@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_tokens.dart';
+import '../../../core/widgets/app_confirm_modal.dart';
 import '../../../core/widgets/web_site_footer.dart';
 import '../../../models/job.dart';
 import '../../../services/job_draft_service.dart';
@@ -400,28 +401,12 @@ class _PublishedJobDetailPageState extends State<PublishedJobDetailPage> {
     final ok = await showDialog<bool>(
       context: context,
       builder:
-          (ctx) => AlertDialog(
-            title: Text(
-              '공고 삭제',
-              style: GoogleFonts.notoSansKr(fontWeight: FontWeight.w800),
-            ),
-            content: Text(
-              '"${title.isEmpty ? '제목 없음' : title}" 공고를 삭제할까요?\n삭제 후에는 복구할 수 없어요.',
-              style: GoogleFonts.notoSansKr(fontSize: 14, height: 1.45),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('취소'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.destructive,
-                ),
-                child: const Text('삭제'),
-              ),
-            ],
+          (_) => AppConfirmModal(
+            title: '공고 삭제',
+            message:
+                '"${title.isEmpty ? '제목 없음' : title}" 공고를 삭제할까요?\n삭제 후에는 복구할 수 없어요.',
+            confirmLabel: '삭제',
+            destructive: true,
           ),
     );
     if (ok != true) return;

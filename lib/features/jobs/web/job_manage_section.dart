@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_confirm_modal.dart';
 import 'job_applicants_page.dart';
 import 'web_typography.dart';
 
@@ -578,20 +579,11 @@ class _JobManageSectionState extends State<JobManageSection> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder:
-          (ctx) => AlertDialog(
-            title: const Text('공고 삭제'),
-            content: Text('"$title" 공고를 삭제하시겠습니까?\n삭제 후 복구할 수 없습니다.'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('취소'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                style: TextButton.styleFrom(foregroundColor: AppColors.error),
-                child: const Text('삭제'),
-              ),
-            ],
+          (_) => AppConfirmModal(
+            title: '공고 삭제',
+            message: '"$title" 공고를 삭제하시겠습니까?\n삭제 후 복구할 수 없습니다.',
+            confirmLabel: '삭제',
+            destructive: true,
           ),
     );
 

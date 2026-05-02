@@ -20,8 +20,7 @@
 | 2026-05-02 | Phase B (순서 3–5) | `bond_poll_section`, `hira_comment_sheet`, `user_goal_sheet`의 `AlertDialog`를 `AppConfirmModal` / `AppModalDialog`로 교체. |
 | 2026-05-02 | Phase C (순서 6–9) | `bond_page`, `diary_timeline_page`, `growth_page`, `job_page`의 `AlertDialog`를 `AppModalDialog` / `AppConfirmModal`로 교체(일기 삭제는 확인 후 본문에서만 삭제). |
 | 2026-05-02 | Phase D (순서 10–15) | `career_tab`·`career_network_section` 삭제 확인을 `AppConfirmModal`로 통일. 11·12·13·15행 파일은 `AlertDialog` 없음(시트·날짜만, 모달 통일 범위 외). |
-
----
+| 2026-05-02 | Phase E (순서 16–23) | 이력서 홈·편집·지원내역, 구인 웹(`job_post_web_page`, `job_input`, `job_draft_editor`, `job_manage_section`, `published_job_detail`)의 `AlertDialog`를 `AppConfirmModal` / `AppModalDialog`로 교체. `job_post_form`(순서 24)은 제외. |
 
 ## 1. 인벤토리 스프레드시트 (착수 직후 1일 이내)
 
@@ -84,14 +83,14 @@
 | 13 | D | `lib/pages/career/career_identity_section.dart` | 시트 + `showDatePicker` | Med | ✅ |
 | 14 | D | `lib/pages/career/career_network_section.dart` | 시트·다이얼로그·날짜 | Med | ✅ |
 | 15 | D | `lib/pages/career/resume_pick_for_network_sheet.dart` | 시트 | Low | ✅ |
-| 16 | E | `lib/features/resume/screens/resume_home_screen.dart` | `showDialog` 다수 | Med | |
-| 17 | E | `lib/features/resume/screens/resume_edit_screen.dart` | `showDialog` | Low | |
-| 18 | E | `lib/features/resume/screens/my_applications_screen.dart` | `showDialog` | Med | |
-| 19 | E | `lib/features/jobs/web/job_post_web_page.dart` | `showDialog` | Med | |
-| 20 | E | `lib/features/jobs/web/job_input_page.dart` | `showDialog` | Med | |
-| 21 | E | `lib/features/jobs/web/job_draft_editor_page.dart` | `showDialog` | Med | |
-| 22 | E | `lib/features/jobs/web/job_manage_section.dart` | `showDialog` | Med | |
-| 23 | E | `lib/features/jobs/web/published_job_detail_page.dart` | `showDialog` | Med | |
+| 16 | E | `lib/features/resume/screens/resume_home_screen.dart` | `showDialog` 다수 | Med | ✅ |
+| 17 | E | `lib/features/resume/screens/resume_edit_screen.dart` | `showDialog` | Low | ✅ |
+| 18 | E | `lib/features/resume/screens/my_applications_screen.dart` | `showDialog` | Med | ✅ |
+| 19 | E | `lib/features/jobs/web/job_post_web_page.dart` | `showDialog` | Med | ✅ |
+| 20 | E | `lib/features/jobs/web/job_input_page.dart` | `showDialog` | Med | ✅ |
+| 21 | E | `lib/features/jobs/web/job_draft_editor_page.dart` | `showDialog` | Med | ✅ |
+| 22 | E | `lib/features/jobs/web/job_manage_section.dart` | `showDialog` | Med | ✅ |
+| 23 | E | `lib/features/jobs/web/published_job_detail_page.dart` | `showDialog` | Med | ✅ |
 | 24 | E | `lib/features/jobs/ui/job_post_form.dart` | `Dialog`+`showDatePicker` | High | |
 | 25 | F | `lib/features/me/pages/me_notifications_page.dart` | `showDialog` | Med | |
 | 26 | F | `lib/features/me/pages/me_orders_page.dart` | `showDialog` | Med | |
@@ -175,4 +174,4 @@
 
 ---
 
-이 문서는 저장소 루트 `docs/modal_unification_execution_order.md`에 두었다. 다음 단계는 **Phase E (이력·구인, 순서 16–23)** 착수다.
+이 문서는 저장소 루트 `docs/modal_unification_execution_order.md`에 두었다. 다음 단계는 **Phase F (나·알림 등, 순서 25–29)** 및 **순서 24 `job_post_form` 단독 PR** 착수다.

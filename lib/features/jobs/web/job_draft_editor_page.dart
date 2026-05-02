@@ -11,6 +11,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../me/providers/me_providers.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_confirm_modal.dart';
+import '../../../core/widgets/app_modal_scaffold.dart';
 import '../../../core/widgets/web_site_footer.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../auth/web/web_account_menu_button.dart';
@@ -298,23 +300,13 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
     final ok = await showDialog<bool>(
       context: context,
       builder:
-          (ctx) => AlertDialog(
-            title: const Text('지점을 바꿀까요?'),
-            content: Text(
-              '"${next.effectiveName}" 으로 전환하면 본문의 치과명·주소·연락처가\n'
-              '새 지점 정보로 바뀝니다. 사진과 본문 내용은 유지돼요.'
-              '${next.canPublishJobs ? '' : '\n\n이 지점은 아직 게시 가능한 인증이 완료되지 않아, 게시 전 등록증 확인이 필요합니다.'}',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('취소'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('전환'),
-              ),
-            ],
+          (_) => AppConfirmModal(
+            title: '지점을 바꿀까요?',
+            message:
+                '"${next.effectiveName}" 으로 전환하면 본문의 치과명·주소·연락처가\n'
+                '새 지점 정보로 바뀝니다. 사진과 본문 내용은 유지돼요.'
+                '${next.canPublishJobs ? '' : '\n\n이 지점은 아직 게시 가능한 인증이 완료되지 않아, 게시 전 등록증 확인이 필요합니다.'}',
+            confirmLabel: '전환',
           ),
     );
     if (ok != true || !mounted) return;
@@ -587,15 +579,46 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
     await showDialog<void>(
       context: context,
       builder:
-          (ctx) => AlertDialog(
-            title: const Text('등록증 정보 반영 결과'),
-            content: Text(lines.join('\n')),
-            actions: [
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('확인'),
-              ),
-            ],
+          (ctx) => AppModalDialog(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '등록증 정보 반영 결과',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.sizeOf(ctx).height * 0.45,
+                  ),
+                  child: SingleChildScrollView(
+                    child: Text(
+                      lines.join('\n'),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        height: 1.45,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('확인'),
+                  ),
+                ),
+              ],
+            ),
           ),
     );
   }
@@ -1951,48 +1974,13 @@ class _JobDraftEditorPageState extends State<JobDraftEditorPage> {
   Future<void> _onTapReplaceBusinessLicense() async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          title: Text(
-            '등록증을 바꿀까요?',
-            style: GoogleFonts.notoSansKr(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
-            ),
+      builder:
+          (_) => AppConfirmModal(
+            title: '등록증을 바꿀까요?',
+            message:
+                '새 파일을 올리면 사업자 정보를 다시 확인합니다. 이전 등록증은 내부 인증 목적으로만 보관되며 외부에 공개되지 않습니다.',
+            confirmLabel: '계속',
           ),
-          content: Text(
-            '새 파일을 올리면 사업자 정보를 다시 확인합니다. 이전 등록증은 내부 인증 목적으로만 보관되며 외부에 공개되지 않습니다.',
-            style: GoogleFonts.notoSansKr(
-              fontSize: 13,
-              height: 1.5,
-              color: AppColors.textSecondary,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text(
-                '취소',
-                style: GoogleFonts.notoSansKr(
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(true),
-              child: Text(
-                '계속',
-                style: GoogleFonts.notoSansKr(
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.accent,
-                ),
-              ),
-            ),
-          ],
-        );
-      },
     );
     if (ok == true && mounted) {
       setState(() => _licenseReplaceMode = true);

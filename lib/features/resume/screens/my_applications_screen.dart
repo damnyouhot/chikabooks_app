@@ -8,6 +8,7 @@ import '../../../services/job_service.dart';
 import '../../../screen/jobs/job_detail_screen.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_tokens.dart';
+import '../../../core/widgets/app_confirm_modal.dart';
 
 /// 내 지원 내역 화면
 ///
@@ -409,27 +410,14 @@ class _ApplicationCardState extends State<_ApplicationCard> {
     // 확인 다이얼로그
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text(
-          '지원 철회',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-        ),
-        content: const Text(
-          '정말 이 공고에 대한 지원을 철회하시겠어요?\n철회 후에는 다시 지원할 수 있어요.',
-          style: TextStyle(fontSize: 13, height: 1.5),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('취소'),
+      builder:
+          (_) => const AppConfirmModal(
+            title: '지원 철회',
+            message:
+                '정말 이 공고에 대한 지원을 철회하시겠어요?\n철회 후에는 다시 지원할 수 있어요.',
+            confirmLabel: '철회하기',
+            destructive: true,
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
-            child: const Text('철회하기'),
-          ),
-        ],
-      ),
     );
 
     if (confirmed != true || !mounted) return;
