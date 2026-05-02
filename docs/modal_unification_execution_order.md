@@ -19,6 +19,7 @@
 | 2026-05-02 | Phase A (순서 1–2) | `app_modal_scaffold.dart`, `app_confirm_modal.dart` 추가. 호출부 이전 없음. |
 | 2026-05-02 | Phase B (순서 3–5) | `bond_poll_section`, `hira_comment_sheet`, `user_goal_sheet`의 `AlertDialog`를 `AppConfirmModal` / `AppModalDialog`로 교체. |
 | 2026-05-02 | Phase C (순서 6–9) | `bond_page`, `diary_timeline_page`, `growth_page`, `job_page`의 `AlertDialog`를 `AppModalDialog` / `AppConfirmModal`로 교체(일기 삭제는 확인 후 본문에서만 삭제). |
+| 2026-05-02 | Phase D (순서 10–15) | `career_tab`·`career_network_section` 삭제 확인을 `AppConfirmModal`로 통일. 11·12·13·15행 파일은 `AlertDialog` 없음(시트·날짜만, 모달 통일 범위 외). |
 
 ---
 
@@ -77,12 +78,12 @@
 | 7 | C | `lib/pages/diary_timeline_page.dart` | `showDialog` | Low | ✅ |
 | 8 | C | `lib/pages/growth_page.dart` | `showDialog` 다수 + 시트 | Med | ✅ |
 | 9 | C | `lib/pages/job_page.dart` | `showDialog` | Med | ✅ |
-| 10 | D | `lib/pages/career/career_tab.dart` | `showDialog` | Low | |
-| 11 | D | `lib/pages/career/career_stage_section.dart` | `showModalBottomSheet` | Low | |
-| 12 | D | `lib/pages/career/career_skill_section.dart` | 시트 | Low | |
-| 13 | D | `lib/pages/career/career_identity_section.dart` | 시트 + `showDatePicker` | Med | |
-| 14 | D | `lib/pages/career/career_network_section.dart` | 시트·다이얼로그·날짜 | Med | |
-| 15 | D | `lib/pages/career/resume_pick_for_network_sheet.dart` | 시트 | Low | |
+| 10 | D | `lib/pages/career/career_tab.dart` | `showDialog` | Low | ✅ |
+| 11 | D | `lib/pages/career/career_stage_section.dart` | `showModalBottomSheet` | Low | ✅ |
+| 12 | D | `lib/pages/career/career_skill_section.dart` | 시트 | Low | ✅ |
+| 13 | D | `lib/pages/career/career_identity_section.dart` | 시트 + `showDatePicker` | Med | ✅ |
+| 14 | D | `lib/pages/career/career_network_section.dart` | 시트·다이얼로그·날짜 | Med | ✅ |
+| 15 | D | `lib/pages/career/resume_pick_for_network_sheet.dart` | 시트 | Low | ✅ |
 | 16 | E | `lib/features/resume/screens/resume_home_screen.dart` | `showDialog` 다수 | Med | |
 | 17 | E | `lib/features/resume/screens/resume_edit_screen.dart` | `showDialog` | Low | |
 | 18 | E | `lib/features/resume/screens/my_applications_screen.dart` | `showDialog` | Med | |
@@ -174,4 +175,4 @@
 
 ---
 
-이 문서는 저장소 루트 `docs/modal_unification_execution_order.md`에 두었다. 다음 단계는 **Phase D (커리어, 순서 10–15)** 착수다.
+이 문서는 저장소 루트 `docs/modal_unification_execution_order.md`에 두었다. 다음 단계는 **Phase E (이력·구인, 순서 16–23)** 착수다.

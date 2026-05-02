@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
+import '../../core/widgets/app_confirm_modal.dart';
 import '../../services/career_profile_service.dart';
 import '../../models/resume.dart';
 import '../../services/resume_career_sync_service.dart';
@@ -203,23 +204,13 @@ class _CareerNetworkCardState extends State<CareerNetworkCard> {
   ) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('삭제하시겠어요?'),
-        content: Text('"${entry.clinicName}" 이력을 삭제합니다.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('취소'),
+      builder:
+          (_) => AppConfirmModal(
+            title: '삭제하시겠어요?',
+            message: '"${entry.clinicName}" 이력을 삭제합니다.',
+            confirmLabel: '삭제',
+            destructive: true,
           ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text(
-              '삭제',
-              style: TextStyle(color: AppColors.error),
-            ),
-          ),
-        ],
-      ),
     );
     if (ok == true) {
       await CareerProfileService.deleteNetworkEntry(entry.id);
@@ -790,34 +781,12 @@ class _DentalNetworkListSheetState extends State<_DentalNetworkListSheet> {
                                     final ok = await showDialog<bool>(
                                       context: context,
                                       builder:
-                                          (ctx) => AlertDialog(
-                                            title: const Text(
-                                              '삭제하시겠어요?',
-                                            ),
-                                            content: Text(
-                                              '"${e.clinicName}" 이력을 삭제합니다.',
-                                            ),
-                                            actions: [
-                                              TextButton(
-                                                onPressed: () =>
-                                                    Navigator.of(
-                                                      ctx,
-                                                    ).pop(false),
-                                                child: const Text('취소'),
-                                              ),
-                                              TextButton(
-                                                onPressed: () =>
-                                                    Navigator.of(
-                                                      ctx,
-                                                    ).pop(true),
-                                                child: const Text(
-                                                  '삭제',
-                                                  style: TextStyle(
-                                                    color: AppColors.error,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
+                                          (_) => AppConfirmModal(
+                                            title: '삭제하시겠어요?',
+                                            message:
+                                                '"${e.clinicName}" 이력을 삭제합니다.',
+                                            confirmLabel: '삭제',
+                                            destructive: true,
                                           ),
                                     );
                                     if (ok == true) {
@@ -855,36 +824,13 @@ class _DentalNetworkListSheetState extends State<_DentalNetworkListSheet> {
                                       final ok = await showDialog<bool>(
                                         context: context,
                                         builder:
-                                            (ctx) => AlertDialog(
-                                              title: const Text(
-                                                '이력서에서 가져온 경력만 삭제',
-                                              ),
-                                              content: const Text(
-                                                '이력서 동기화로 추가된 항목만 모두 삭제합니다. '
-                                                '직접 추가한 치과는 그대로 둡니다.',
-                                              ),
-                                              actions: [
-                                                TextButton(
-                                                  onPressed: () =>
-                                                      Navigator.of(
-                                                        ctx,
-                                                      ).pop(false),
-                                                  child: const Text('취소'),
-                                                ),
-                                                TextButton(
-                                                  onPressed: () =>
-                                                      Navigator.of(
-                                                        ctx,
-                                                      ).pop(true),
-                                                  child: const Text(
-                                                    '전체 삭제',
-                                                    style: TextStyle(
-                                                      color:
-                                                          AppColors.error,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
+                                            (_) => const AppConfirmModal(
+                                              title: '이력서에서 가져온 경력만 삭제',
+                                              message:
+                                                  '이력서 동기화로 추가된 항목만 모두 삭제합니다. '
+                                                  '직접 추가한 치과는 그대로 둡니다.',
+                                              confirmLabel: '전체 삭제',
+                                              destructive: true,
                                             ),
                                       );
                                       if (ok != true || !context.mounted) {

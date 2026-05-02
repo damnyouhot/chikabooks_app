@@ -4,6 +4,7 @@ import '../../features/resume/screens/resume_home_screen.dart';
 import '../../features/resume/screens/my_applications_screen.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
+import '../../core/widgets/app_confirm_modal.dart';
 import '../../core/widgets/app_muted_card.dart';
 import '../../core/widgets/app_segmented_control.dart';
 import '../../core/widgets/app_badge.dart';
@@ -955,22 +956,11 @@ class _NetworkSectionState extends State<_NetworkSection> {
     final ok = await showDialog<bool>(
       context: context,
       builder:
-          (ctx) => AlertDialog(
-            title: const Text('삭제하시겠어요?'),
-            content: Text('"${entry.clinicName}" 이력을 삭제합니다.'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(false),
-                child: const Text('취소'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(true),
-                child: const Text(
-                  '삭제',
-                  style: TextStyle(color: AppColors.error),
-                ),
-              ),
-            ],
+          (_) => AppConfirmModal(
+            title: '삭제하시겠어요?',
+            message: '"${entry.clinicName}" 이력을 삭제합니다.',
+            confirmLabel: '삭제',
+            destructive: true,
           ),
     );
     if (ok == true) {
