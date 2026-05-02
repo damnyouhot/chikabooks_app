@@ -5,6 +5,7 @@ import '../core/theme/app_colors.dart';
 import '../core/theme/app_tokens.dart';
 import '../core/widgets/app_muted_card.dart';
 import '../core/widgets/app_badge.dart';
+import '../core/widgets/app_modal_scaffold.dart';
 import 'hira_update_detail_sheet.dart';
 
 /// HIRA 업데이트 간단 리스트 아이템 (4번째 이후)
@@ -17,10 +18,7 @@ import 'hira_update_detail_sheet.dart';
 class HiraUpdateCompactItem extends StatelessWidget {
   final HiraUpdate update;
 
-  const HiraUpdateCompactItem({
-    super.key,
-    required this.update,
-  });
+  const HiraUpdateCompactItem({super.key, required this.update});
 
   @override
   Widget build(BuildContext context) {
@@ -83,11 +81,10 @@ class HiraUpdateCompactItem extends StatelessWidget {
   String _formatDate(DateTime date) => DateFormat('MM.dd').format(date);
 
   void _showDetail(BuildContext context) {
-    showModalBottomSheet(
+    showAppModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => HiraUpdateDetailSheet(update: update),
+      builder: (_) => HiraUpdateDetailSheet(update: update),
     );
   }
 }

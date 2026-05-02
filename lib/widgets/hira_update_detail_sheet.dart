@@ -4,6 +4,7 @@ import '../core/theme/app_colors.dart';
 import '../core/theme/app_tokens.dart';
 import '../core/widgets/app_muted_button.dart';
 import '../core/widgets/app_badge.dart';
+import '../core/widgets/app_modal_scaffold.dart';
 import '../models/hira_update.dart';
 import '../services/hira_update_service.dart';
 import 'hira_comment_sheet.dart';
@@ -198,11 +199,10 @@ class HiraUpdateDetailSheet extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                       onTap: () {
                         Navigator.pop(context);
-                        showModalBottomSheet(
+                        showAppModalBottomSheet(
                           context: context,
                           isScrollControlled: true,
-                          backgroundColor: Colors.transparent,
-                          builder: (ctx) => HiraCommentSheet(update: update),
+                          builder: (_) => HiraCommentSheet(update: update),
                         );
                       },
                       padding: const EdgeInsets.symmetric(

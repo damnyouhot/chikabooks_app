@@ -8,6 +8,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_tokens.dart';
 import '../core/widgets/app_badge.dart';
+import '../core/widgets/app_modal_scaffold.dart';
 import '../models/hira_update.dart';
 
 /// 심평원 문서를 앱 내 WebView로 표시.
@@ -33,16 +34,16 @@ class HiraWebViewSheet extends StatefulWidget {
     required String title,
     HiraSearchResult? searchContext,
   }) {
-    return showModalBottomSheet(
+    return showAppModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       enableDrag: false,
-      builder: (_) => HiraWebViewSheet(
-        url: url,
-        title: title,
-        searchContext: searchContext,
-      ),
+      builder:
+          (_) => HiraWebViewSheet(
+            url: url,
+            title: title,
+            searchContext: searchContext,
+          ),
     );
   }
 
@@ -54,6 +55,7 @@ class _HiraWebViewSheetState extends State<HiraWebViewSheet> {
   late final WebViewController _ctrl;
   bool _isLoading = true;
   int _loadingProgress = 0;
+
   /// 페이지 분석 후 true면 「첨부파일 있음」 표시
   bool _hasAttachment = false;
 
@@ -145,9 +147,8 @@ a[href="javascript:self.close();"], a[href*="self.close"] {
   Future<void> _detectAttachment() async {
     try {
       final v = await _ctrl.runJavaScriptReturningResult(_attachmentDetectJs);
-      final has = v == true ||
-          v == 1 ||
-          (v is String && v.toLowerCase() == 'true');
+      final has =
+          v == true || v == 1 || (v is String && v.toLowerCase() == 'true');
       if (mounted) setState(() => _hasAttachment = has);
     } catch (_) {
       if (mounted) setState(() => _hasAttachment = false);
@@ -166,24 +167,26 @@ a[href="javascript:self.close();"], a[href*="self.close"] {
   @override
   void initState() {
     super.initState();
-    _ctrl = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onProgress: (p) => setState(() => _loadingProgress = p),
-          onPageStarted: (_) => setState(() {
-            _isLoading = true;
-            _hasAttachment = false;
-          }),
-          onPageFinished: (_) async {
-            await _afterPageLoaded();
-            await _detectAttachment();
-            if (mounted) setState(() => _isLoading = false);
-          },
-          onWebResourceError: (_) => setState(() => _isLoading = false),
-        ),
-      )
-      ..loadRequest(Uri.parse(widget.url));
+    _ctrl =
+        WebViewController()
+          ..setJavaScriptMode(JavaScriptMode.unrestricted)
+          ..setNavigationDelegate(
+            NavigationDelegate(
+              onProgress: (p) => setState(() => _loadingProgress = p),
+              onPageStarted:
+                  (_) => setState(() {
+                    _isLoading = true;
+                    _hasAttachment = false;
+                  }),
+              onPageFinished: (_) async {
+                await _afterPageLoaded();
+                await _detectAttachment();
+                if (mounted) setState(() => _isLoading = false);
+              },
+              onWebResourceError: (_) => setState(() => _isLoading = false),
+            ),
+          )
+          ..loadRequest(Uri.parse(widget.url));
   }
 
   @override
@@ -229,9 +232,8 @@ a[href="javascript:self.close();"], a[href*="self.close"] {
                             children: [
                               AppStatusBadge(
                                 badgeLevel: 'NOTICE',
-                                badgeText: r.category.isNotEmpty
-                                    ? r.category
-                                    : '심평원',
+                                badgeText:
+                                    r.category.isNotEmpty ? r.category : '심평원',
                               ),
                               const SizedBox(width: AppSpacing.sm),
                               Expanded(
@@ -252,7 +254,9 @@ a[href="javascript:self.close();"], a[href*="self.close"] {
                             _formatPostLine(r.date),
                             style: TextStyle(
                               fontSize: 12,
-                              color: AppColors.textPrimary.withValues(alpha: 0.45),
+                              color: AppColors.textPrimary.withValues(
+                                alpha: 0.45,
+                              ),
                             ),
                           ),
                           if (r.reference.isNotEmpty) ...[
@@ -296,14 +300,13 @@ a[href="javascript:self.close();"], a[href*="self.close"] {
                                 runSpacing: AppSpacing.xs,
                                 children: [
                                   Text(
-                                    r != null
-                                        ? '보험인정기준 원문'
-                                        : '공식 원문',
+                                    r != null ? '보험인정기준 원문' : '공식 원문',
                                     style: TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w600,
-                                      color: AppColors.textPrimary
-                                          .withValues(alpha: 0.8),
+                                      color: AppColors.textPrimary.withValues(
+                                        alpha: 0.8,
+                                      ),
                                     ),
                                   ),
                                   if (_hasAttachment)
@@ -371,10 +374,10 @@ a[href="javascript:self.close();"], a[href*="self.close"] {
                           controller: _ctrl,
                           gestureRecognizers:
                               <Factory<OneSequenceGestureRecognizer>>{
-                            Factory<VerticalDragGestureRecognizer>(
-                              () => VerticalDragGestureRecognizer(),
-                            ),
-                          },
+                                Factory<VerticalDragGestureRecognizer>(
+                                  () => VerticalDragGestureRecognizer(),
+                                ),
+                              },
                         ),
                       ),
                     ),

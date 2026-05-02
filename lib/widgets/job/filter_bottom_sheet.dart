@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
+import '../../core/widgets/app_modal_scaffold.dart';
 import '../../models/job.dart';
 import '../../notifiers/job_filter_notifier.dart';
 
@@ -16,10 +17,9 @@ class FilterBottomSheet extends StatefulWidget {
   const FilterBottomSheet({super.key, required this.filter});
 
   static Future<void> show(BuildContext context, JobFilterNotifier filter) {
-    return showModalBottomSheet(
+    return showAppModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (_) => FilterBottomSheet(filter: filter),
     );
   }
@@ -131,10 +131,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                     minimumSize: const Size(48, 32),
                     foregroundColor: AppColors.textSecondary,
                   ),
-                  child: const Text(
-                    '초기화',
-                    style: TextStyle(fontSize: 13),
-                  ),
+                  child: const Text('초기화', style: TextStyle(fontSize: 13)),
                 ),
               ],
             ),
@@ -167,9 +164,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                   const _SectionTitle(title: '직종'),
                   const SizedBox(height: AppSpacing.sm),
                   _ChipGroup(
-                    options: const [
-                      '전체', '치위생사', '간호조무사', '치과의사', '기공사', '기타',
-                    ],
+                    options: const ['전체', '치위생사', '간호조무사', '치과의사', '기공사', '기타'],
                     selected: _positionFilter,
                     onTap: (v) => setState(() => _positionFilter = v),
                   ),
@@ -218,12 +213,16 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                   const SizedBox(height: AppSpacing.sm),
                   _ChipGroup(
                     options: const ['전체', '개인의원', '네트워크', '치과병원', '종합병원/대학병원'],
-                    selected: Job.hospitalTypeLabels[_hospitalType] ?? _hospitalType,
+                    selected:
+                        Job.hospitalTypeLabels[_hospitalType] ?? _hospitalType,
                     onTap: (v) {
-                      final key = Job.hospitalTypeLabels.entries
-                          .firstWhere((e) => e.value == v,
-                              orElse: () => const MapEntry('전체', '전체'))
-                          .key;
+                      final key =
+                          Job.hospitalTypeLabels.entries
+                              .firstWhere(
+                                (e) => e.value == v,
+                                orElse: () => const MapEntry('전체', '전체'),
+                              )
+                              .key;
                       setState(() => _hospitalType = key == '전체' ? '전체' : key);
                     },
                   ),
@@ -235,13 +234,14 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                   _MultiChipGroup(
                     options: Job.workDayLabels,
                     selected: _selectedWorkDays,
-                    onToggle: (code) => setState(() {
-                      if (_selectedWorkDays.contains(code)) {
-                        _selectedWorkDays.remove(code);
-                      } else {
-                        _selectedWorkDays.add(code);
-                      }
-                    }),
+                    onToggle:
+                        (code) => setState(() {
+                          if (_selectedWorkDays.contains(code)) {
+                            _selectedWorkDays.remove(code);
+                          } else {
+                            _selectedWorkDays.add(code);
+                          }
+                        }),
                   ),
                   const SizedBox(height: AppSpacing.xl),
 
@@ -250,18 +250,25 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                   const SizedBox(height: AppSpacing.sm),
                   _MultiChipGroup(
                     options: const {
-                      '1호선': '1호선', '2호선': '2호선', '3호선': '3호선',
-                      '4호선': '4호선', '5호선': '5호선', '6호선': '6호선',
-                      '7호선': '7호선', '8호선': '8호선', '9호선': '9호선',
+                      '1호선': '1호선',
+                      '2호선': '2호선',
+                      '3호선': '3호선',
+                      '4호선': '4호선',
+                      '5호선': '5호선',
+                      '6호선': '6호선',
+                      '7호선': '7호선',
+                      '8호선': '8호선',
+                      '9호선': '9호선',
                     },
                     selected: _selectedSubwayLines,
-                    onToggle: (line) => setState(() {
-                      if (_selectedSubwayLines.contains(line)) {
-                        _selectedSubwayLines.remove(line);
-                      } else {
-                        _selectedSubwayLines.add(line);
-                      }
-                    }),
+                    onToggle:
+                        (line) => setState(() {
+                          if (_selectedSubwayLines.contains(line)) {
+                            _selectedSubwayLines.remove(line);
+                          } else {
+                            _selectedSubwayLines.add(line);
+                          }
+                        }),
                   ),
                   const SizedBox(height: AppSpacing.xl),
 
@@ -270,13 +277,14 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                   const SizedBox(height: AppSpacing.sm),
                   _ConditionsChips(
                     conditions: _conditions,
-                    onToggle: (c) => setState(() {
-                      if (_conditions.contains(c)) {
-                        _conditions.remove(c);
-                      } else {
-                        _conditions.add(c);
-                      }
-                    }),
+                    onToggle:
+                        (c) => setState(() {
+                          if (_conditions.contains(c)) {
+                            _conditions.remove(c);
+                          } else {
+                            _conditions.add(c);
+                          }
+                        }),
                   ),
                   const SizedBox(height: AppSpacing.sm),
                 ],
@@ -294,9 +302,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
             ),
             decoration: const BoxDecoration(
               color: AppColors.white,
-              border: Border(
-                top: BorderSide(color: AppColors.divider),
-              ),
+              border: Border(top: BorderSide(color: AppColors.divider)),
             ),
             child: SizedBox(
               width: double.infinity,
@@ -363,37 +369,39 @@ class _ChipGroup extends StatelessWidget {
     return Wrap(
       spacing: AppSpacing.sm,
       runSpacing: AppSpacing.sm,
-      children: options.map((opt) {
-        final isSelected = opt == selected;
-        return GestureDetector(
-          onTap: () => onTap(opt),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            padding: const EdgeInsets.symmetric(
-              horizontal: 14,
-              vertical: AppSpacing.sm,
-            ),
-            decoration: BoxDecoration(
-              color: isSelected
-                  ? AppColors.segmentSelected
-                  : AppColors.surfaceMuted,
-              borderRadius: BorderRadius.circular(AppRadius.full),
-            ),
-            child: Text(
-              opt,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight:
-                    isSelected ? FontWeight.w700 : FontWeight.w400,
-                color: isSelected
-                    ? AppColors.onSegmentSelected
-                    : AppColors.textSecondary,
-                letterSpacing: -0.2,
+      children:
+          options.map((opt) {
+            final isSelected = opt == selected;
+            return GestureDetector(
+              onTap: () => onTap(opt),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: AppSpacing.sm,
+                ),
+                decoration: BoxDecoration(
+                  color:
+                      isSelected
+                          ? AppColors.segmentSelected
+                          : AppColors.surfaceMuted,
+                  borderRadius: BorderRadius.circular(AppRadius.full),
+                ),
+                child: Text(
+                  opt,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
+                    color:
+                        isSelected
+                            ? AppColors.onSegmentSelected
+                            : AppColors.textSecondary,
+                    letterSpacing: -0.2,
+                  ),
+                ),
               ),
-            ),
-          ),
-        );
-      }).toList(),
+            );
+          }).toList(),
     );
   }
 }
@@ -406,8 +414,16 @@ class _ConditionsChips extends StatelessWidget {
   const _ConditionsChips({required this.conditions, required this.onToggle});
 
   static const _allConditions = [
-    '신입가능', '야간없음', '주4일', '파트타임 가능', '역세권',
-    '즉시지원', '4대보험', '퇴직금', '연차', '식비지원',
+    '신입가능',
+    '야간없음',
+    '주4일',
+    '파트타임 가능',
+    '역세권',
+    '즉시지원',
+    '4대보험',
+    '퇴직금',
+    '연차',
+    '식비지원',
   ];
 
   @override
@@ -415,37 +431,39 @@ class _ConditionsChips extends StatelessWidget {
     return Wrap(
       spacing: AppSpacing.sm,
       runSpacing: AppSpacing.sm,
-      children: _allConditions.map((c) {
-        final isSelected = conditions.contains(c);
-        return GestureDetector(
-          onTap: () => onToggle(c),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: 7,
-            ),
-            decoration: BoxDecoration(
-              color: isSelected
-                  ? AppColors.segmentSelected
-                  : AppColors.surfaceMuted,
-              borderRadius: BorderRadius.circular(AppRadius.full),
-            ),
-            child: Text(
-              c,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight:
-                    isSelected ? FontWeight.w700 : FontWeight.w400,
-                color: isSelected
-                    ? AppColors.onSegmentSelected
-                    : AppColors.textSecondary,
-                letterSpacing: -0.2,
+      children:
+          _allConditions.map((c) {
+            final isSelected = conditions.contains(c);
+            return GestureDetector(
+              onTap: () => onToggle(c),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  color:
+                      isSelected
+                          ? AppColors.segmentSelected
+                          : AppColors.surfaceMuted,
+                  borderRadius: BorderRadius.circular(AppRadius.full),
+                ),
+                child: Text(
+                  c,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
+                    color:
+                        isSelected
+                            ? AppColors.onSegmentSelected
+                            : AppColors.textSecondary,
+                    letterSpacing: -0.2,
+                  ),
+                ),
               ),
-            ),
-          ),
-        );
-      }).toList(),
+            );
+          }).toList(),
     );
   }
 }
@@ -467,36 +485,39 @@ class _MultiChipGroup extends StatelessWidget {
     return Wrap(
       spacing: AppSpacing.sm,
       runSpacing: AppSpacing.sm,
-      children: options.entries.map((e) {
-        final isSelected = selected.contains(e.key);
-        return GestureDetector(
-          onTap: () => onToggle(e.key),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: 7,
-            ),
-            decoration: BoxDecoration(
-              color: isSelected
-                  ? AppColors.segmentSelected
-                  : AppColors.surfaceMuted,
-              borderRadius: BorderRadius.circular(AppRadius.full),
-            ),
-            child: Text(
-              e.value,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
-                color: isSelected
-                    ? AppColors.onSegmentSelected
-                    : AppColors.textSecondary,
-                letterSpacing: -0.2,
+      children:
+          options.entries.map((e) {
+            final isSelected = selected.contains(e.key);
+            return GestureDetector(
+              onTap: () => onToggle(e.key),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  color:
+                      isSelected
+                          ? AppColors.segmentSelected
+                          : AppColors.surfaceMuted,
+                  borderRadius: BorderRadius.circular(AppRadius.full),
+                ),
+                child: Text(
+                  e.value,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
+                    color:
+                        isSelected
+                            ? AppColors.onSegmentSelected
+                            : AppColors.textSecondary,
+                    letterSpacing: -0.2,
+                  ),
+                ),
               ),
-            ),
-          ),
-        );
-      }).toList(),
+            );
+          }).toList(),
     );
   }
 }
@@ -509,9 +530,24 @@ class _RegionDropdown extends StatelessWidget {
   const _RegionDropdown({required this.value, required this.onChanged});
 
   static const _regions = [
-    '전체', '서울', '경기', '인천', '부산', '대구',
-    '광주', '대전', '울산', '세종', '강원',
-    '충북', '충남', '전북', '전남', '경북', '경남', '제주',
+    '전체',
+    '서울',
+    '경기',
+    '인천',
+    '부산',
+    '대구',
+    '광주',
+    '대전',
+    '울산',
+    '세종',
+    '강원',
+    '충북',
+    '충남',
+    '전북',
+    '전남',
+    '경북',
+    '경남',
+    '제주',
   ];
 
   @override
@@ -539,12 +575,15 @@ class _RegionDropdown extends StatelessWidget {
         filled: true,
         fillColor: AppColors.surfaceMuted,
       ),
-      items: _regions
-          .map((r) => DropdownMenuItem(
-                value: r,
-                child: Text(r, style: const TextStyle(fontSize: 13)),
-              ))
-          .toList(),
+      items:
+          _regions
+              .map(
+                (r) => DropdownMenuItem(
+                  value: r,
+                  child: Text(r, style: const TextStyle(fontSize: 13)),
+                ),
+              )
+              .toList(),
       onChanged: (v) {
         if (v != null) onChanged(v);
       },

@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:math';
 
 import '../core/theme/app_colors.dart';
+import '../core/widgets/app_modal_scaffold.dart';
 import '../pages/diary_timeline_page.dart';
 import '../services/diary_image_service.dart';
 
@@ -22,11 +23,10 @@ class DiaryInputSheet extends StatefulWidget {
   const DiaryInputSheet({super.key, required this.onSaved});
 
   static Future<void> show(BuildContext context, Function(String) onSaved) {
-    return showModalBottomSheet(
+    return showAppModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => DiaryInputSheet(onSaved: onSaved),
+      builder: (_) => DiaryInputSheet(onSaved: onSaved),
     );
   }
 

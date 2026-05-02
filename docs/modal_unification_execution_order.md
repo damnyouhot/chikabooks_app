@@ -30,6 +30,7 @@
 | 2026-05-02 | Phase J (순서 41–42) | `sign_in_page` 카카오 웹 안내·이메일 로그인·비밀번호 재설정을 `AppModalDialog`로 통일. `web_account_actions_service` 계정 삭제 확인은 `AppConfirmModal`/`AppModalDialog`, 진행 중 표시는 `AppModalDialog`. `context` 비동기 간격에 `mounted` 가드 보강. |
 | 2026-05-02 | Phase K (순서 43) | `onboarding_popups.dart`의 `Dialog`(흰 카드)를 `AppModalDialog`로 교체. `app_onboarding_overlay.dart`는 `showDialog<void>` + `dialogCtx`로 닫기 통일. |
 | 2026-05-02 | Phase L (순서 44–47) | `ebook_detail_page` 구매 완료 `AppModalDialog`, `pdf_reader_page` 페이지 이동 `AppModalDialog`, `ebook_list_page` 분류 시트 `Navigator.pop(sheetCtx)` 정리. `settings_page` 오픈소스는 `showLicensePage` 유지(시스템·Phase N과 동일 정책). |
+| 2026-05-02 | Phase M (순서 48–55) | `app_modal_scaffold.dart`에 `showAppModalBottomSheet` 추가. 일기·구인 필터·빠른지원·수가·HIRA 웹뷰·업데이트 카드/상세 시트의 `showModalBottomSheet`를 래퍼로 통일(배리어·상단 라운드·clip). |
 
 ## 1. 인벤토리 스프레드시트 (착수 직후 1일 이내)
 
@@ -77,7 +78,7 @@
 
 | 순서 | Phase | 경로 | 주요 API·내용 | 위험 | 상태 |
 |------|-------|------|----------------|------|------|
-| 1 | A | `lib/core/widgets/app_modal_scaffold.dart` | `AppModalCard` / `AppModalDialog` 추가 | Low | ✅ |
+| 1 | A | `lib/core/widgets/app_modal_scaffold.dart` | `AppModalCard` / `AppModalDialog` / `showAppModalBottomSheet` | Low | ✅ |
 | 2 | A | `lib/core/widgets/app_confirm_modal.dart` | `AppConfirmModal` 추가 | Low | ✅ |
 | 3 | B | `lib/widgets/bond/bond_poll_section.dart` | `showDialog`+`AlertDialog` | Low | ✅ |
 | 4 | B | `lib/widgets/hira_comment_sheet.dart` | `showDialog` | Med | ✅ |
@@ -124,14 +125,14 @@
 | 45 | L | `lib/pages/ebook/ebook_list_page.dart` | `showModalBottomSheet` (`sheetCtx` 정리) | Low | ✅ |
 | 46 | L | `lib/pages/ebook/pdf_reader_page.dart` | `AppModalDialog` 페이지 이동 | Low | ✅ |
 | 47 | L | `lib/pages/settings/settings_page.dart` | `showLicensePage` 유지 | Low | ✅ 검토 |
-| 48 | M | `lib/widgets/diary_input_sheet.dart` | 시트 | Low | |
-| 49 | M | `lib/widgets/job/filter_bottom_sheet.dart` | 시트 | Low | |
-| 50 | M | `lib/widgets/job/quick_apply_sheet.dart` | 시트 | Low | |
-| 51 | M | `lib/widgets/fee_lookup_section.dart` | 시트 | Low | |
-| 52 | M | `lib/widgets/hira_web_view_sheet.dart` | 시트 | Low | |
-| 53 | M | `lib/widgets/hira_update_card.dart` | 시트 | Low | |
-| 54 | M | `lib/widgets/hira_update_compact_item.dart` | 시트 | Low | |
-| 55 | M | `lib/widgets/hira_update_detail_sheet.dart` | 시트(중첩 시트 주의) | Med | |
+| 48 | M | `lib/widgets/diary_input_sheet.dart` | `showAppModalBottomSheet` | Low | ✅ |
+| 49 | M | `lib/widgets/job/filter_bottom_sheet.dart` | `showAppModalBottomSheet` | Low | ✅ |
+| 50 | M | `lib/widgets/job/quick_apply_sheet.dart` | `showAppModalBottomSheet` | Low | ✅ |
+| 51 | M | `lib/widgets/fee_lookup_section.dart` | `showAppModalBottomSheet` | Low | ✅ |
+| 52 | M | `lib/widgets/hira_web_view_sheet.dart` | `showAppModalBottomSheet` | Low | ✅ |
+| 53 | M | `lib/widgets/hira_update_card.dart` | `showAppModalBottomSheet` | Low | ✅ |
+| 54 | M | `lib/widgets/hira_update_compact_item.dart` | `showAppModalBottomSheet` | Low | ✅ |
+| 55 | M | `lib/widgets/hira_update_detail_sheet.dart` | `showAppModalBottomSheet`(중첩 시트) | Med | ✅ |
 | 56 | N | *(정책 반영)* `Theme` 또는 래핑 | `showDatePicker` 공통 | 결정 후 | |
 | 57 | N | *(정책 반영)* 라이선스 화면 | `showLicensePage` | 결정 후 | |
 | 58 | 검수 | `lib/pages/caring_page.dart` | 게이지 외 `AlertDialog` 2건(먹이·개념) | Low | |
@@ -185,4 +186,4 @@
 
 ---
 
-이 문서는 저장소 루트 `docs/modal_unification_execution_order.md`에 두었다. 다음 단계는 **Phase M(바텀시트, 순서 48–55)** 이다.
+이 문서는 저장소 루트 `docs/modal_unification_execution_order.md`에 두었다. 다음 단계는 **Phase N(시스템 UI, 순서 56–57)** 및 **검수 순서 58**(`caring_page`)이다.

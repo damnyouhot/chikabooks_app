@@ -7,6 +7,7 @@ import '../core/theme/app_tokens.dart';
 import '../core/widgets/app_muted_card.dart';
 import '../core/widgets/app_muted_button.dart';
 import '../core/widgets/app_badge.dart';
+import '../core/widgets/app_modal_scaffold.dart';
 import 'hira_comment_sheet.dart';
 import 'hira_update_detail_sheet.dart';
 import 'hira_web_view_sheet.dart';
@@ -134,11 +135,10 @@ class HiraUpdateCard extends StatelessWidget {
   }
 
   void _openDetail(BuildContext context) {
-    showModalBottomSheet(
+    showAppModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => HiraUpdateDetailSheet(update: update),
+      builder: (sheetCtx) => HiraUpdateDetailSheet(update: update),
     );
   }
 
@@ -147,11 +147,10 @@ class HiraUpdateCard extends StatelessWidget {
   }
 
   void _openCommentSheet(BuildContext context) {
-    showModalBottomSheet(
+    showAppModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => HiraCommentSheet(update: update),
+      builder: (_) => HiraCommentSheet(update: update),
     );
   }
 

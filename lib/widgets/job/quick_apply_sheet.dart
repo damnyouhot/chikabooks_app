@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
+import '../../core/widgets/app_modal_scaffold.dart';
 import '../../models/job.dart';
 import '../../services/job_service.dart';
 
@@ -18,11 +19,10 @@ class QuickApplySheet extends StatefulWidget {
   const QuickApplySheet({super.key, required this.job});
 
   static Future<dynamic> show(BuildContext context, Job job) {
-    return showModalBottomSheet(
+    return showAppModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => QuickApplySheet(job: job),
+      builder: (_) => QuickApplySheet(job: job),
     );
   }
 

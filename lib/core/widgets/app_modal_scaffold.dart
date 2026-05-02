@@ -80,3 +80,39 @@ class AppModalDialog extends StatelessWidget {
     );
   }
 }
+
+/// 앱 전역 바텀시트 기본값 — [AppModalDialog]와 동일 계열(상단 라운드·배리어).
+///
+/// 기본 [backgroundColor]는 `Colors.transparent`로, 자식이 카드 배경을 직접 그리는
+/// 패턴(`FilterBottomSheet` 등)과 호환된다. 배경을 채우려면 [backgroundColor]를 넘긴다.
+Future<T?> showAppModalBottomSheet<T>({
+  required BuildContext context,
+  required WidgetBuilder builder,
+  bool isScrollControlled = false,
+  bool useSafeArea = false,
+  Color? backgroundColor,
+  Color? barrierColor,
+  ShapeBorder? shape,
+  Clip clipBehavior = Clip.antiAlias,
+  bool enableDrag = true,
+  bool isDismissible = true,
+}) {
+  return showModalBottomSheet<T>(
+    context: context,
+    isScrollControlled: isScrollControlled,
+    useSafeArea: useSafeArea,
+    backgroundColor: backgroundColor ?? Colors.transparent,
+    barrierColor: barrierColor ?? AppColors.black.withValues(alpha: 0.45),
+    shape:
+        shape ??
+        const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppRadius.xl),
+          ),
+        ),
+    clipBehavior: clipBehavior,
+    enableDrag: enableDrag,
+    isDismissible: isDismissible,
+    builder: builder,
+  );
+}

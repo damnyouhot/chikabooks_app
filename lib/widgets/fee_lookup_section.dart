@@ -4,6 +4,7 @@ import '../services/hira_update_service.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_tokens.dart';
 import '../core/widgets/app_muted_card.dart';
+import '../core/widgets/app_modal_scaffold.dart';
 
 class FeeLookupSection extends StatefulWidget {
   /// 현재 검색어로 「제도 변경」 탭으로 이동 후 심층 검색
@@ -617,7 +618,7 @@ class _FeeDetailSheet extends StatelessWidget {
 
   static Future<void> show(BuildContext context, FeeScheduleItem item) {
     final h = MediaQuery.sizeOf(context).height;
-    return showModalBottomSheet<void>(
+    return showAppModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: AppColors.appBg,
