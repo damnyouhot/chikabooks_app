@@ -8,6 +8,9 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart' as kakao;
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_tokens.dart';
+import '../../../core/widgets/app_confirm_modal.dart';
+import '../../../core/widgets/app_modal_scaffold.dart';
 import '../../../features/me/providers/me_providers.dart';
 import '../../../features/me/services/me_session.dart';
 import '../../../services/admin_activity_service.dart';
@@ -134,74 +137,110 @@ class WebAccountActionsService {
     final confirm1 = await showDialog<bool>(
       context: context,
       builder:
-          (ctx) => AlertDialog(
-            title: const Text('⚠️ 계정을 삭제할까요?'),
-            content: const Text(
-              '삭제하면 복구할 수 없어요.\n\n'
-              '• 개인 기록 및 목표\n'
-              '• 파트너 그룹 멤버십\n'
-              '• 작성한 게시물 (익명 처리)\n'
-              '• 프로필 정보\n\n'
-              '모든 데이터가 삭제됩니다.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('취소'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                style: FilledButton.styleFrom(
-                  backgroundColor: Theme.of(ctx).colorScheme.error,
-                ),
-                child: const Text('다음'),
-              ),
-            ],
+          (_) => const AppConfirmModal(
+            title: '계정을 삭제할까요?',
+            message:
+                '삭제하면 복구할 수 없어요.\n\n'
+                '• 개인 기록 및 목표\n'
+                '• 파트너 그룹 멤버십\n'
+                '• 작성한 게시물 (익명 처리)\n'
+                '• 프로필 정보\n\n'
+                '모든 데이터가 삭제됩니다.',
+            confirmLabel: '다음',
+            destructive: true,
           ),
     );
 
     if (confirm1 != true) return;
     if (!context.mounted) return;
 
-    String inputText = '';
+    final confirmCtrl = TextEditingController();
     final confirm2 = await showDialog<bool>(
       context: context,
       builder:
-          (ctx) => AlertDialog(
-            title: const Text('마지막 확인'),
-            content: Column(
+          (dialogCtx) => AppModalDialog(
+            insetPadding: const EdgeInsets.all(AppSpacing.xl),
+            borderOpacity: 0.7,
+            child: Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text('정말로 삭제하려면 아래에 "삭제"라고 입력해주세요.'),
-                const SizedBox(height: 16),
+                const Text(
+                  '마지막 확인',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                const Text(
+                  '정말로 삭제하려면 아래에 "삭제"라고 입력해주세요.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    height: 1.45,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
                 TextField(
-                  onChanged: (v) => inputText = v.trim(),
+                  controller: confirmCtrl,
                   decoration: const InputDecoration(
                     hintText: '삭제',
                     border: OutlineInputBorder(),
                   ),
                   autofocus: true,
                 ),
+                const SizedBox(height: AppSpacing.lg),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(dialogCtx, false),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.textSecondary,
+                          backgroundColor: AppColors.surfaceMuted,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                          ),
+                          textStyle: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        child: const Text('취소'),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed:
+                            () => Navigator.pop(
+                              dialogCtx,
+                              confirmCtrl.text.trim() == '삭제',
+                            ),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.cardEmphasis,
+                          foregroundColor: AppColors.onCardEmphasis,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                          ),
+                          textStyle: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        child: const Text('계정 삭제'),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('취소'),
-              ),
-              FilledButton(
-                onPressed: () {
-                  Navigator.pop(ctx, inputText == '삭제');
-                },
-                style: FilledButton.styleFrom(
-                  backgroundColor: Theme.of(ctx).colorScheme.error,
-                ),
-                child: const Text('계정 삭제'),
-              ),
-            ],
           ),
     );
+    confirmCtrl.dispose();
 
     if (!context.mounted) return;
     if (confirm2 != true) {
@@ -218,19 +257,23 @@ class WebAccountActionsService {
         context: context,
         barrierDismissible: false,
         builder:
-            (_) => const Center(
-              child: Card(
-                child: Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      CircularProgressIndicator(),
-                      SizedBox(height: 16),
-                      Text('계정을 삭제하는 중입니다...'),
-                    ],
+            (_) => AppModalDialog(
+              insetPadding: const EdgeInsets.all(AppSpacing.xl),
+              borderOpacity: 0.7,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircularProgressIndicator(),
+                  SizedBox(height: AppSpacing.lg),
+                  Text(
+                    '계정을 삭제하는 중입니다...',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textSecondary.withValues(alpha: 0.95),
+                    ),
                   ),
-                ),
+                ],
               ),
             ),
       );
@@ -244,7 +287,11 @@ class WebAccountActionsService {
 
       await callable.call();
 
+      if (!context.mounted) return;
+
       await OnboardingService.forceSchedule();
+
+      if (!context.mounted) return;
 
       await _clearSessionCaches(context);
       await _clearAllSocialSessions();
@@ -272,10 +319,12 @@ class WebAccountActionsService {
 
       // 실패해도 로컬 세션은 끊어 사용자가 같은 SNS 토큰으로 즉시
       // 부활하지 않도록 한다(서버에서 일부만 정리됐을 가능성에 대비).
-      try {
-        await _clearSessionCaches(context);
-        await _clearAllSocialSessions();
-      } catch (_) {}
+      if (context.mounted) {
+        try {
+          await _clearSessionCaches(context);
+          await _clearAllSocialSessions();
+        } catch (_) {}
+      }
 
       if (!context.mounted) return;
 

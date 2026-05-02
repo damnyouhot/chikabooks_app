@@ -13,6 +13,8 @@ import '../../services/sign_in_tracker.dart';
 import '../../services/onboarding_service.dart';
 import '../../services/admin_activity_service.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
+import '../../core/widgets/app_modal_scaffold.dart';
 import '../../core/widgets/hygiene_lab_english_title.dart';
 
 /// 다중 소셜 로그인 페이지
@@ -159,24 +161,56 @@ class _SignInPageState extends State<SignInPage> {
     AdminActivityService.log(ActivityEventType.tapLoginKakao, page: 'sign_in');
     // 웹에서는 kakao_flutter_sdk가 정상 동작하지 않아 안내 메시지 표시
     if (kIsWeb) {
-      showDialog(
+      showDialog<void>(
         context: context,
         builder:
-            (_) => AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+            (dialogCtx) => AppModalDialog(
+              insetPadding: const EdgeInsets.all(AppSpacing.xl),
+              borderOpacity: 0.7,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '카카오 로그인 안내',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  const Text(
+                    '카카오 로그인은 현재 모바일 앱에서만 지원돼요.\n\n'
+                    '웹에서는 Google 로그인 또는 이메일 로그인을 이용해주세요.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      height: 1.45,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(dialogCtx),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.textSecondary,
+                        backgroundColor: AppColors.surfaceMuted,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.md),
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      child: const Text('확인'),
+                    ),
+                  ),
+                ],
               ),
-              title: const Text('카카오 로그인 안내'),
-              content: const Text(
-                '카카오 로그인은 현재 모바일 앱에서만 지원돼요.\n\n'
-                '웹에서는 Google 로그인 또는 이메일 로그인을 이용해주세요.',
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('확인'),
-                ),
-              ],
             ),
       );
       return;
@@ -292,178 +326,225 @@ class _SignInPageState extends State<SignInPage> {
     final passwordConfirmController = TextEditingController();
     bool isSignUp = false;
 
-    await showDialog(
+    await showDialog<void>(
       context: context,
       builder:
-          (context) => StatefulBuilder(
+          (_) => StatefulBuilder(
             builder:
-                (context, setDialogState) => AlertDialog(
-                  title: Text(isSignUp ? '이메일 회원가입' : '이메일 로그인'),
-                  content: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        TextField(
-                          controller: emailController,
-                          decoration: const InputDecoration(labelText: '이메일'),
-                          keyboardType: TextInputType.emailAddress,
+                (dialogCtx, setDialogState) => AppModalDialog(
+                  insetPadding: const EdgeInsets.all(AppSpacing.xl),
+                  borderOpacity: 0.7,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        isSignUp ? '이메일 회원가입' : '이메일 로그인',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
                         ),
-                        const SizedBox(height: 8),
-                        TextField(
-                          controller: passwordController,
-                          decoration: InputDecoration(
-                            labelText: '비밀번호',
-                            hintText: isSignUp ? '8~20자, 영문·숫자·특수문자 조합' : null,
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxHeight: MediaQuery.sizeOf(dialogCtx).height * 0.45,
+                        ),
+                        child: SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              TextField(
+                                controller: emailController,
+                                decoration: const InputDecoration(
+                                  labelText: '이메일',
+                                ),
+                                keyboardType: TextInputType.emailAddress,
+                              ),
+                              const SizedBox(height: 8),
+                              TextField(
+                                controller: passwordController,
+                                decoration: InputDecoration(
+                                  labelText: '비밀번호',
+                                  hintText:
+                                      isSignUp
+                                          ? '8~20자, 영문·숫자·특수문자 조합'
+                                          : null,
+                                ),
+                                obscureText: true,
+                              ),
+                              if (isSignUp) ...[
+                                const SizedBox(height: 8),
+                                TextField(
+                                  controller: passwordConfirmController,
+                                  decoration: const InputDecoration(
+                                    labelText: '비밀번호 확인',
+                                  ),
+                                  obscureText: true,
+                                ),
+                              ],
+                            ],
                           ),
-                          obscureText: true,
                         ),
-                        // 회원가입 시에만 비밀번호 확인 필드 표시
-                        if (isSignUp) ...[
-                          const SizedBox(height: 8),
-                          TextField(
-                            controller: passwordConfirmController,
-                            decoration: const InputDecoration(
-                              labelText: '비밀번호 확인',
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      Wrap(
+                        alignment: WrapAlignment.end,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: AppSpacing.sm,
+                        runSpacing: AppSpacing.sm,
+                        children: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(dialogCtx),
+                            child: const Text('취소'),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              setDialogState(() => isSignUp = !isSignUp);
+                            },
+                            child: Text(
+                              isSignUp ? '로그인으로 전환' : '회원가입으로 전환',
                             ),
-                            obscureText: true,
+                          ),
+                          if (!isSignUp)
+                            TextButton(
+                              onPressed: () {
+                                Navigator.pop(dialogCtx);
+                                _showPasswordResetDialog();
+                              },
+                              child: const Text('비밀번호 찾기'),
+                            ),
+                          FilledButton(
+                            onPressed: () async {
+                              final email = emailController.text.trim();
+                              final password = passwordController.text.trim();
+                              final passwordConfirm =
+                                  passwordConfirmController.text.trim();
+
+                              if (email.isEmpty || password.isEmpty) {
+                                ScaffoldMessenger.of(dialogCtx).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('이메일과 비밀번호를 입력하세요'),
+                                  ),
+                                );
+                                return;
+                              }
+
+                              if (isSignUp) {
+                                if (password != passwordConfirm) {
+                                  ScaffoldMessenger.of(dialogCtx).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('비밀번호가 일치하지 않습니다'),
+                                    ),
+                                  );
+                                  return;
+                                }
+
+                                if (password.length < 8 || password.length > 20) {
+                                  ScaffoldMessenger.of(dialogCtx).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('비밀번호는 8~20자여야 합니다'),
+                                    ),
+                                  );
+                                  return;
+                                }
+
+                                final hasLetter = RegExp(
+                                  r'[a-zA-Z]',
+                                ).hasMatch(password);
+                                final hasDigit = RegExp(
+                                  r'[0-9]',
+                                ).hasMatch(password);
+                                final hasSpecial = RegExp(
+                                  r'[!@#$%^&*(),.?":{}|<>]',
+                                ).hasMatch(password);
+
+                                if (!hasLetter || !hasDigit || !hasSpecial) {
+                                  ScaffoldMessenger.of(dialogCtx).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        '비밀번호는 영문, 숫자, 특수문자를 포함해야 합니다',
+                                      ),
+                                    ),
+                                  );
+                                  return;
+                                }
+                              }
+
+                              await OnboardingService.forceSchedule();
+
+                              User? user;
+                              String? authError;
+                              try {
+                                if (isSignUp) {
+                                  user = await EmailAuthService.signUp(
+                                    email: email,
+                                    password: password,
+                                  );
+                                } else {
+                                  user = await EmailAuthService.signIn(
+                                    email: email,
+                                    password: password,
+                                  );
+                                }
+                              } catch (e) {
+                                authError = e.toString().replaceFirst(
+                                  'Exception: ',
+                                  '',
+                                );
+                              }
+
+                              if (dialogCtx.mounted) {
+                                if (user == null) {
+                                  Navigator.pop(dialogCtx);
+                                  ScaffoldMessenger.of(dialogCtx).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        authError ??
+                                            (isSignUp ? '회원가입 실패' : '로그인 실패'),
+                                      ),
+                                    ),
+                                  );
+                                } else {
+                                  await SignInTracker.record('email');
+                                  AdminActivityService.log(
+                                    ActivityEventType.viewSignInPage,
+                                    page: 'sign_in',
+                                  );
+                                  AdminActivityService.log(
+                                    ActivityEventType.loginSuccess,
+                                    page: 'sign_in',
+                                    extra: {
+                                      'provider': 'email',
+                                      'isSignUp': isSignUp,
+                                    },
+                                  );
+                                  if (isSignUp) {
+                                    AdminActivityService.logFunnel(
+                                      FunnelEventType.signupComplete,
+                                      extra: {'provider': 'email'},
+                                    );
+                                  }
+                                  if (dialogCtx.mounted) {
+                                    Navigator.pop(dialogCtx);
+                                  }
+                                }
+                              }
+                            },
+                            style: FilledButton.styleFrom(
+                              backgroundColor: AppColors.cardPrimary,
+                              foregroundColor: AppColors.onCardEmphasis,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(AppRadius.md),
+                              ),
+                            ),
+                            child: Text(isSignUp ? '회원가입' : '로그인'),
                           ),
                         ],
-                      ],
-                    ),
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('취소'),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        setDialogState(() => isSignUp = !isSignUp);
-                      },
-                      child: Text(isSignUp ? '로그인으로 전환' : '회원가입으로 전환'),
-                    ),
-                    if (!isSignUp)
-                      TextButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _showPasswordResetDialog();
-                        },
-                        child: const Text('비밀번호 찾기'),
                       ),
-                    ElevatedButton(
-                      onPressed: () async {
-                        final email = emailController.text.trim();
-                        final password = passwordController.text.trim();
-                        final passwordConfirm =
-                            passwordConfirmController.text.trim();
-
-                        if (email.isEmpty || password.isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('이메일과 비밀번호를 입력하세요')),
-                          );
-                          return;
-                        }
-
-                        // 회원가입 시 비밀번호 검증
-                        if (isSignUp) {
-                          // 비밀번호 확인 일치 여부
-                          if (password != passwordConfirm) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('비밀번호가 일치하지 않습니다')),
-                            );
-                            return;
-                          }
-
-                          // 비밀번호 길이 검증 (8~20자)
-                          if (password.length < 8 || password.length > 20) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('비밀번호는 8~20자여야 합니다'),
-                              ),
-                            );
-                            return;
-                          }
-
-                          // 비밀번호 조합 검증 (영문, 숫자, 특수문자 포함)
-                          final hasLetter = RegExp(
-                            r'[a-zA-Z]',
-                          ).hasMatch(password);
-                          final hasDigit = RegExp(r'[0-9]').hasMatch(password);
-                          final hasSpecial = RegExp(
-                            r'[!@#$%^&*(),.?":{}|<>]',
-                          ).hasMatch(password);
-
-                          if (!hasLetter || !hasDigit || !hasSpecial) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('비밀번호는 영문, 숫자, 특수문자를 포함해야 합니다'),
-                              ),
-                            );
-                            return;
-                          }
-                        }
-
-                        await OnboardingService.forceSchedule();
-
-                        User? user;
-                        String? authError;
-                        try {
-                          if (isSignUp) {
-                            user = await EmailAuthService.signUp(
-                              email: email,
-                              password: password,
-                            );
-                          } else {
-                            user = await EmailAuthService.signIn(
-                              email: email,
-                              password: password,
-                            );
-                          }
-                        } catch (e) {
-                          authError = e.toString().replaceFirst(
-                            'Exception: ',
-                            '',
-                          );
-                        }
-
-                        if (context.mounted) {
-                          if (user == null) {
-                            Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  authError ??
-                                      (isSignUp ? '회원가입 실패' : '로그인 실패'),
-                                ),
-                              ),
-                            );
-                          } else {
-                            await SignInTracker.record('email');
-                            AdminActivityService.log(
-                              ActivityEventType.viewSignInPage,
-                              page: 'sign_in',
-                            );
-                            AdminActivityService.log(
-                              ActivityEventType.loginSuccess,
-                              page: 'sign_in',
-                              extra: {
-                                'provider': 'email',
-                                'isSignUp': isSignUp,
-                              },
-                            );
-                            if (isSignUp) {
-                              AdminActivityService.logFunnel(
-                                FunnelEventType.signupComplete,
-                                extra: {'provider': 'email'},
-                              );
-                            }
-                            if (context.mounted) Navigator.pop(context);
-                          }
-                        }
-                      },
-                      child: Text(isSignUp ? '회원가입' : '로그인'),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
           ),
     );
@@ -475,158 +556,228 @@ class _SignInPageState extends State<SignInPage> {
     bool isSent = false;
     String? errorMsg;
 
-    await showDialog(
+    await showDialog<void>(
       context: context,
       barrierDismissible: !isSending,
       builder:
-          (ctx) => StatefulBuilder(
+          (_) => StatefulBuilder(
             builder:
-                (ctx, setDialogState) => AlertDialog(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  title: Row(
-                    children: const [
-                      Icon(Icons.lock_reset_rounded, size: 22),
-                      SizedBox(width: 8),
-                      Text('비밀번호 설정 링크 보내기'),
-                    ],
-                  ),
-                  content:
-                      isSent
-                          ? Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.mark_email_read_rounded,
-                                size: 48,
-                                color: Colors.green,
+                (dialogCtx, setDialogState) => AppModalDialog(
+                  insetPadding: const EdgeInsets.all(AppSpacing.xl),
+                  borderOpacity: 0.7,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.lock_reset_rounded,
+                            size: 22,
+                            color: AppColors.textPrimary,
+                          ),
+                          const SizedBox(width: 8),
+                          const Expanded(
+                            child: Text(
+                              '비밀번호 설정 링크 보내기',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textPrimary,
                               ),
-                              const SizedBox(height: 12),
-                              Text(
-                                '${emailCtrl.text.trim()}으로\n비밀번호 설정 링크를 보냈어요.',
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  height: 1.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      if (isSent)
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.mark_email_read_rounded,
+                              size: 48,
+                              color: AppColors.success,
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              '${emailCtrl.text.trim()}으로\n비밀번호 설정 링크를 보냈어요.',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                height: 1.5,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '메일함을 확인해주세요.\n스팸함에 있을 수도 있어요.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 12,
+                                height: 1.5,
+                                color: AppColors.textDisabled,
+                              ),
+                            ),
+                          ],
+                        )
+                      else
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              '가입 시 사용한 이메일을 입력하면\n비밀번호 설정 링크를 보내드려요.',
+                              style: TextStyle(
+                                fontSize: 13,
+                                height: 1.5,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            TextField(
+                              controller: emailCtrl,
+                              keyboardType: TextInputType.emailAddress,
+                              decoration: InputDecoration(
+                                labelText: '이메일',
+                                hintText: 'email@example.com',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    AppRadius.md,
+                                  ),
                                 ),
+                                prefixIcon: const Icon(Icons.email_outlined),
                               ),
-                              const SizedBox(height: 8),
-                              const Text(
-                                '메일함을 확인해주세요.\n스팸함에 있을 수도 있어요.',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey,
-                                  height: 1.5,
+                            ),
+                            if (errorMsg != null) ...[
+                              const SizedBox(height: 10),
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: AppColors.error.withValues(alpha: 0.07),
+                                  borderRadius: BorderRadius.circular(
+                                    AppRadius.md,
+                                  ),
+                                ),
+                                child: Text(
+                                  errorMsg!,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.error,
+                                  ),
                                 ),
                               ),
                             ],
-                          )
-                          : Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                '가입 시 사용한 이메일을 입력하면\n비밀번호 설정 링크를 보내드려요.',
-                                style: TextStyle(fontSize: 13, height: 1.5),
+                          ],
+                        ),
+                      const SizedBox(height: AppSpacing.lg),
+                      if (isSent)
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton(
+                            onPressed: () => Navigator.pop(dialogCtx),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: AppColors.cardPrimary,
+                              foregroundColor: AppColors.onCardEmphasis,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(AppRadius.md),
                               ),
-                              const SizedBox(height: 16),
-                              TextField(
-                                controller: emailCtrl,
-                                keyboardType: TextInputType.emailAddress,
-                                decoration: InputDecoration(
-                                  labelText: '이메일',
-                                  hintText: 'email@example.com',
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Text('확인'),
+                          ),
+                        )
+                      else
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextButton(
+                                onPressed:
+                                    isSending
+                                        ? null
+                                        : () => Navigator.pop(dialogCtx),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: AppColors.textSecondary,
+                                  backgroundColor: AppColors.surfaceMuted,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(
+                                      AppRadius.md,
+                                    ),
                                   ),
-                                  prefixIcon: const Icon(Icons.email_outlined),
+                                  textStyle: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w800,
+                                  ),
                                 ),
+                                child: const Text('취소'),
                               ),
-                              if (errorMsg != null) ...[
-                                const SizedBox(height: 10),
-                                Container(
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    color: Colors.red.withOpacity(0.07),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    errorMsg!,
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.red,
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
+                            Expanded(
+                              child: FilledButton(
+                                onPressed:
+                                    isSending
+                                        ? null
+                                        : () async {
+                                          final email = emailCtrl.text.trim();
+                                          if (email.isEmpty ||
+                                              !email.contains('@')) {
+                                            setDialogState(
+                                              () =>
+                                                  errorMsg =
+                                                      '올바른 이메일 주소를 입력해주세요.',
+                                            );
+                                            return;
+                                          }
+                                          setDialogState(() {
+                                            isSending = true;
+                                            errorMsg = null;
+                                          });
+                                          try {
+                                            await FirebaseAuth.instance
+                                                .sendPasswordResetEmail(
+                                                  email: email,
+                                                );
+                                            if (dialogCtx.mounted) {
+                                              setDialogState(
+                                                () => isSent = true,
+                                              );
+                                            }
+                                          } on FirebaseAuthException catch (e) {
+                                            setDialogState(() {
+                                              isSending = false;
+                                              errorMsg =
+                                                  e.code == 'user-not-found'
+                                                      ? '등록되지 않은 이메일이에요.'
+                                                      : '발송 중 오류가 발생했어요. 다시 시도해주세요.';
+                                            });
+                                          }
+                                        },
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: AppColors.cardPrimary,
+                                  foregroundColor: AppColors.onCardEmphasis,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(
+                                      AppRadius.md,
                                     ),
                                   ),
                                 ),
-                              ],
-                            ],
-                          ),
-                  actions:
-                      isSent
-                          ? [
-                            ElevatedButton(
-                              onPressed: () => Navigator.pop(ctx),
-                              child: const Text('확인'),
-                            ),
-                          ]
-                          : [
-                            TextButton(
-                              onPressed:
-                                  isSending ? null : () => Navigator.pop(ctx),
-                              child: const Text('취소'),
-                            ),
-                            ElevatedButton(
-                              onPressed:
-                                  isSending
-                                      ? null
-                                      : () async {
-                                        final email = emailCtrl.text.trim();
-                                        if (email.isEmpty ||
-                                            !email.contains('@')) {
-                                          setDialogState(
-                                            () =>
-                                                errorMsg =
-                                                    '올바른 이메일 주소를 입력해주세요.',
-                                          );
-                                          return;
-                                        }
-                                        setDialogState(() {
-                                          isSending = true;
-                                          errorMsg = null;
-                                        });
-                                        try {
-                                          await FirebaseAuth.instance
-                                              .sendPasswordResetEmail(
-                                                email: email,
-                                              );
-                                          if (ctx.mounted) {
-                                            setDialogState(() => isSent = true);
-                                          }
-                                        } on FirebaseAuthException catch (e) {
-                                          setDialogState(() {
-                                            isSending = false;
-                                            errorMsg =
-                                                e.code == 'user-not-found'
-                                                    ? '등록되지 않은 이메일이에요.'
-                                                    : '발송 중 오류가 발생했어요. 다시 시도해주세요.';
-                                          });
-                                        }
-                                      },
-                              child:
-                                  isSending
-                                      ? const SizedBox(
-                                        width: 18,
-                                        height: 18,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: Colors.white,
-                                        ),
-                                      )
-                                      : const Text('링크 보내기'),
+                                child:
+                                    isSending
+                                        ? const SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: AppColors.onCardEmphasis,
+                                          ),
+                                        )
+                                        : const Text('링크 보내기'),
+                              ),
                             ),
                           ],
+                        ),
+                    ],
+                  ),
                 ),
           ),
     );
