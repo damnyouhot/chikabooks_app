@@ -31,6 +31,8 @@
 | 2026-05-02 | Phase K (순서 43) | `onboarding_popups.dart`의 `Dialog`(흰 카드)를 `AppModalDialog`로 교체. `app_onboarding_overlay.dart`는 `showDialog<void>` + `dialogCtx`로 닫기 통일. |
 | 2026-05-02 | Phase L (순서 44–47) | `ebook_detail_page` 구매 완료 `AppModalDialog`, `pdf_reader_page` 페이지 이동 `AppModalDialog`, `ebook_list_page` 분류 시트 `Navigator.pop(sheetCtx)` 정리. `settings_page` 오픈소스는 `showLicensePage` 유지(시스템·Phase N과 동일 정책). |
 | 2026-05-02 | Phase M (순서 48–55) | `app_modal_scaffold.dart`에 `showAppModalBottomSheet` 추가. 일기·구인 필터·빠른지원·수가·HIRA 웹뷰·업데이트 카드/상세 시트의 `showModalBottomSheet`를 래퍼로 통일(배리어·상단 라운드·clip). |
+| 2026-05-02 | Phase N (순서 56–57) | `app_date_pickers.dart`의 `showAppDatePicker`로 커리어·구인·관리자 전자책 날짜 선택 톤 통일. `showLicensePage`는 Flutter 표준 유지(설정 화면). |
+| 2026-05-02 | 순서 58 | `caring_page` 게이지 안내·먹이 안내·「나」탭 개념을 `AppModalDialog`로 통일. |
 
 ## 1. 인벤토리 스프레드시트 (착수 직후 1일 이내)
 
@@ -133,9 +135,9 @@
 | 53 | M | `lib/widgets/hira_update_card.dart` | `showAppModalBottomSheet` | Low | ✅ |
 | 54 | M | `lib/widgets/hira_update_compact_item.dart` | `showAppModalBottomSheet` | Low | ✅ |
 | 55 | M | `lib/widgets/hira_update_detail_sheet.dart` | `showAppModalBottomSheet`(중첩 시트) | Med | ✅ |
-| 56 | N | *(정책 반영)* `Theme` 또는 래핑 | `showDatePicker` 공통 | 결정 후 | |
-| 57 | N | *(정책 반영)* 라이선스 화면 | `showLicensePage` | 결정 후 | |
-| 58 | 검수 | `lib/pages/caring_page.dart` | 게이지 외 `AlertDialog` 2건(먹이·개념) | Low | |
+| 56 | N | `lib/core/widgets/app_date_pickers.dart` + 호출부 | `showAppDatePicker` | Low | ✅ |
+| 57 | N | `lib/pages/settings/settings_page.dart` 등 | `showLicensePage` 유지 | Low | ✅ 검토 |
+| 58 | 검수 | `lib/pages/caring_page.dart` | `AppModalDialog` | Low | ✅ |
 
 **참고**: `lib/pages/caring_page.dart`는 이미 게이지 패밀리가 있으므로 순서 **후반**에 나머지 `AlertDialog`만 정리하면 충돌이 적다.
 
@@ -181,9 +183,10 @@
 - `lib/features/me/pages/widgets/edit_pool_meta_dialog.dart`
 - `lib/features/me/pages/widgets/notify_past_applicants_dialog.dart` *(해당 시)*
 - `lib/features/onboarding/onboarding_popups.dart` *(온보딩 `showDialog` 자식 — `app_onboarding_overlay`와 함께 다룸)*
+- `lib/core/widgets/app_date_pickers.dart` *(날짜 피커 `showAppDatePicker` — Phase N)*
 
 부모 `me_applicants_pool_page.dart`와 **같은 PR**에서 다루는 것을 권장한다.
 
 ---
 
-이 문서는 저장소 루트 `docs/modal_unification_execution_order.md`에 두었다. 다음 단계는 **Phase N(시스템 UI, 순서 56–57)** 및 **검수 순서 58**(`caring_page`)이다.
+이 문서는 저장소 루트 `docs/modal_unification_execution_order.md`에 두었다. **순서 1–58** 모달 통일 반영이 완료되었다. 이후 추가 화면은 동일 패턴(`AppModalDialog` / `AppConfirmModal` / `showAppModalBottomSheet` / `showAppDatePicker`)을 따른다.

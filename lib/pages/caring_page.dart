@@ -22,6 +22,7 @@ import 'settings/settings_page.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_tokens.dart';
 import '../core/widgets/app_badge.dart';
+import '../core/widgets/app_modal_scaffold.dart';
 import '../services/admin_activity_service.dart';
 import '../data/caring_ments.dart';
 
@@ -1024,83 +1025,74 @@ class _CaringPageState extends State<CaringPage> with TickerProviderStateMixin {
     showDialog<void>(
       context: context,
       builder:
-          (ctx) => Dialog(
-            backgroundColor: Colors.transparent,
+          (dialogCtx) => AppModalDialog(
             insetPadding: const EdgeInsets.symmetric(horizontal: 28),
-            child: Container(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              decoration: BoxDecoration(
-                color: AppColors.appBg,
-                borderRadius: BorderRadius.circular(AppRadius.xl),
-                border: Border.all(color: AppColors.divider),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 38,
-                        height: 38,
-                        decoration: BoxDecoration(
-                          color: color.withValues(alpha: 0.18),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Center(
-                          child: Text(
-                            emoji,
-                            style: const TextStyle(fontSize: 18, height: 1.0),
-                          ),
-                        ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.18),
+                        shape: BoxShape.circle,
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
+                      child: Center(
                         child: Text(
-                          title,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textPrimary,
-                          ),
+                          emoji,
+                          style: const TextStyle(fontSize: 18, height: 1.0),
                         ),
                       ),
-                      IconButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        icon: const Icon(Icons.close_rounded, size: 18),
-                        color: AppColors.textSecondary,
-                        visualDensity: VisualDensity.compact,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  ...lines.map(
-                    (line) => Padding(
-                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.md,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceMuted,
-                          borderRadius: BorderRadius.circular(AppRadius.md),
-                        ),
-                        child: Text(
-                          line,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            height: 1.35,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
-                          ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(dialogCtx),
+                      icon: const Icon(Icons.close_rounded, size: 18),
+                      color: AppColors.textSecondary,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.md),
+                ...lines.map(
+                  (line) => Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceMuted,
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                      ),
+                      child: Text(
+                        line,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          height: 1.35,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
     );
@@ -1350,46 +1342,77 @@ class _CaringPageState extends State<CaringPage> with TickerProviderStateMixin {
   }
 
   void _showTreatGuideDialog(BuildContext context) {
-    showDialog(
+    showDialog<void>(
       context: context,
       builder:
-          (ctx) => AlertDialog(
-            title: const Text(
-              '먹이 얻는 방법',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-            content: const SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '밥주기 1번에는 먹이 3개가 필요해요.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      height: 1.5,
-                      fontWeight: FontWeight.w700,
+          (dialogCtx) => AppModalDialog(
+            insetPadding: const EdgeInsets.all(AppSpacing.xl),
+            borderOpacity: 0.7,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  '먹이 얻는 방법',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.sizeOf(dialogCtx).height * 0.55,
+                  ),
+                  child: const SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '밥주기 1번에는 먹이 3개가 필요해요.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        SizedBox(height: 12),
+                        Text(
+                          '- 공감투표 첫 선택: 3개\n\n'
+                          '- 오늘의 퀴즈 첫 풀이: 각 2개\n'
+                          '(정답 보너스: 각 1개)\n\n'
+                          '- 속닥속닥 글·댓글·답글 작성: 6개\n'
+                          '(좋아요·힘내요: 2개, 하루 최대 20개)\n\n'
+                          '- 오늘 단어 선택: 각 1개',
+                          style: TextStyle(fontSize: 12, height: 1.5),
+                        ),
+                      ],
                     ),
                   ),
-                  SizedBox(height: 12),
-                  Text(
-                    '- 공감투표 첫 선택: 3개\n\n'
-                    '- 오늘의 퀴즈 첫 풀이: 각 2개\n'
-                    '(정답 보너스: 각 1개)\n\n'
-                    '- 속닥속닥 글·댓글·답글 작성: 6개\n'
-                    '(좋아요·힘내요: 2개, 하루 최대 20개)\n\n'
-                    '- 오늘 단어 선택: 각 1개',
-                    style: TextStyle(fontSize: 12, height: 1.5),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(dialogCtx),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.textSecondary,
+                      backgroundColor: AppColors.surfaceMuted,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                      ),
+                      textStyle: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    child: const Text('닫기'),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('닫기'),
-              ),
-            ],
           ),
     );
   }
@@ -1434,134 +1457,189 @@ class _CaringPageState extends State<CaringPage> with TickerProviderStateMixin {
   }
 
   void _showConceptDialog(BuildContext context) {
-    showDialog(
+    showDialog<void>(
       context: context,
       builder:
-          (ctx) => AlertDialog(
-            title: const Text(
-              "'나' 탭에 대해서",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          (dialogCtx) => AppModalDialog(
+            insetPadding: const EdgeInsets.all(AppSpacing.xl),
+            borderOpacity: 0.7,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  "'나' 탭에 대해서",
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.sizeOf(dialogCtx).height * 0.62,
+                  ),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          '캐릭터의 배고픔·기분·에너지·청결도를 살피고 돌보며, 유대와 감정을 쌓는 공간이에요.',
+                          style: TextStyle(fontSize: 13, height: 1.5),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '공감 투표·퀴즈에서 받은 먹이는 캐릭터 점수에 잠깐 반영돼요.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.5,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          '위쪽 게이지로 상태를 볼 수 있어요. 시간이 지나면서도 변하고, 밥·쓰다듬기·씻기기·잠에 따라 달라져요.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.5,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          '🍖 밥주기',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '배고픔을 채워줘요. 이미 배부른데 자주 주면 역효과가 날 수 있어요. 짧은 시간 안에 연속으로 주면 컨디션이 나빠질 수 있고, 너무 잦은 연속 시도 뒤에는 잠시 쉬어야 할 수 있어요.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.5,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          '🐾 쓰다듬기',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '쓰다듬기는 가까이 다가가는 느낌으로 기분이나 유대에 닿을 수 있어요. 한꺼번에 너무 잦으면 쉴 틈이 없어져서 오히려 컨디션이 나빠질 수 있어요. 최근 3시간 내 최대 6회까지만 긍정적으로 받아들여요.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.5,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          '🫧 씻기기',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '캐릭터를 직접 터치하면 씻겨요. 청결도는 자주 조금씩 올릴 수 있고, 기분은 아주 조금 좋아지며 에너지는 아주 조금 줄어요. 청결한 상태를 오래 유지하면 유대가 오르고, 낮은 청결도가 오래 유지되면 유대가 줄어들 수 있어요.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.5,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          '🌙 재우기',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '충분히 재워야 에너지가 회복돼요. 너무 짧게 깨우면 오히려 기분이 나빠지고 힘들어해요.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.5,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          '💕 친밀도(유대)',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '매일 만나고, 밥과 쓰다듬기로 유대가 올라갈 수 있어요. 기분이 낮으면 유대 상승이 줄어들 수 있어요. 오랫동안 들어오지 않으면 유대가 서서히 줄어들 수 있어요.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.5,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          '🔗 상태 연동',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '배고프면 기분이 더 빨리 떨어질 수 있고, 에너지가 낮으면 쓰다듬기 효과와 반응이 줄어들 수 있어요.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.5,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(dialogCtx),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.textSecondary,
+                      backgroundColor: AppColors.surfaceMuted,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                      ),
+                      textStyle: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    child: const Text('닫기'),
+                  ),
+                ),
+              ],
             ),
-            content: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    '캐릭터의 배고픔·기분·에너지·청결도를 살피고 돌보며, 유대와 감정을 쌓는 공간이에요.',
-                    style: TextStyle(fontSize: 13, height: 1.5),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '공감 투표·퀴즈에서 받은 먹이는 캐릭터 점수에 잠깐 반영돼요.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      height: 1.5,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    '위쪽 게이지로 상태를 볼 수 있어요. 시간이 지나면서도 변하고, 밥·쓰다듬기·씻기기·잠에 따라 달라져요.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      height: 1.5,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    '🍖 밥주기',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    '배고픔을 채워줘요. 이미 배부른데 자주 주면 역효과가 날 수 있어요. 짧은 시간 안에 연속으로 주면 컨디션이 나빠질 수 있고, 너무 잦은 연속 시도 뒤에는 잠시 쉬어야 할 수 있어요.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      height: 1.5,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    '🐾 쓰다듬기',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    '쓰다듬기는 가까이 다가가는 느낌으로 기분이나 유대에 닿을 수 있어요. 한꺼번에 너무 잦으면 쉴 틈이 없어져서 오히려 컨디션이 나빠질 수 있어요. 최근 3시간 내 최대 6회까지만 긍정적으로 받아들여요.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      height: 1.5,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    '🫧 씻기기',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    '캐릭터를 직접 터치하면 씻겨요. 청결도는 자주 조금씩 올릴 수 있고, 기분은 아주 조금 좋아지며 에너지는 아주 조금 줄어요. 청결한 상태를 오래 유지하면 유대가 오르고, 낮은 청결도가 오래 유지되면 유대가 줄어들 수 있어요.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      height: 1.5,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    '🌙 재우기',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    '충분히 재워야 에너지가 회복돼요. 너무 짧게 깨우면 오히려 기분이 나빠지고 힘들어해요.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      height: 1.5,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    '💕 친밀도(유대)',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    '매일 만나고, 밥과 쓰다듬기로 유대가 올라갈 수 있어요. 기분이 낮으면 유대 상승이 줄어들 수 있어요. 오랫동안 들어오지 않으면 유대가 서서히 줄어들 수 있어요.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      height: 1.5,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    '🔗 상태 연동',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    '배고프면 기분이 더 빨리 떨어질 수 있고, 에너지가 낮으면 쓰다듬기 효과와 반응이 줄어들 수 있어요.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      height: 1.5,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('닫기'),
-              ),
-            ],
           ),
     );
   }

@@ -16,6 +16,7 @@ import '../../../models/transportation_info.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_modal_scaffold.dart';
+import '../../../core/widgets/app_date_pickers.dart';
 import '../utils/job_ai_extract_normalize.dart';
 import '../utils/job_post_field_sync.dart';
 import '../utils/job_image_attach_helpers.dart';
@@ -5748,7 +5749,7 @@ class JobPostFormState extends State<JobPostForm> {
                     widget.onWebEditorPreviewScrollTo?.call(
                       JobPreviewScrollAnchor.apply,
                     );
-                    final picked = await showDatePicker(
+                    final picked = await showAppDatePicker(
                       context: context,
                       initialDate:
                           _data.closingDate ??
@@ -5830,7 +5831,7 @@ class JobPostFormState extends State<JobPostForm> {
               _notify();
             },
             onPlusWhenEmpty: () async {
-              final picked = await showDatePicker(
+              final picked = await showAppDatePicker(
                 context: context,
                 initialDate: DateTime.now().add(const Duration(days: 14)),
                 firstDate: DateTime.now(),

@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 
 import '../../services/epub_utility.dart';
 import '../../services/storage_service.dart';
+import '../../core/widgets/app_date_pickers.dart';
 
 class AdminEbookCreatePage extends StatefulWidget {
   const AdminEbookCreatePage({super.key});
@@ -67,8 +68,10 @@ class _AdminEbookCreatePageState extends State<AdminEbookCreatePage> {
         _snack('표지 이미지가 없어 URL이 비게 됩니다. 나중에 수정해주세요.');
       }
 
-      final fileUrl =
-          await StorageService.uploadEpub(docId: doc.id, bytes: _epubBytes!);
+      final fileUrl = await StorageService.uploadEpub(
+        docId: doc.id,
+        bytes: _epubBytes!,
+      );
 
       await doc.set({
         'title': _title.trim(),
@@ -107,19 +110,22 @@ class _AdminEbookCreatePageState extends State<AdminEbookCreatePage> {
           children: [
             _field('제목*', onSave: (v) => _title = v, validator: _req),
             _field('저자*', onSave: (v) => _author = v, validator: _req),
-            _field('가격(원)*',
-                keyboard: TextInputType.number,
-                onSave: (v) => _price = int.tryParse(v) ?? 0,
-                validator: (v) => int.tryParse(v) == null ? '숫자' : null),
+            _field(
+              '가격(원)*',
+              keyboard: TextInputType.number,
+              onSave: (v) => _price = int.tryParse(v) ?? 0,
+              validator: (v) => int.tryParse(v) == null ? '숫자' : null,
+            ),
             _field('상품 ID*', onSave: (v) => _productId = v, validator: _req),
             _field('설명', maxLines: 3, onSave: (v) => _description = v),
             ListTile(
               contentPadding: EdgeInsets.zero,
-              title:
-                  Text('출간일: ${DateFormat('yyyy-MM-dd').format(_publishedAt)}'),
+              title: Text(
+                '출간일: ${DateFormat('yyyy-MM-dd').format(_publishedAt)}',
+              ),
               trailing: const Icon(Icons.calendar_today),
               onTap: () async {
-                final d = await showDatePicker(
+                final d = await showAppDatePicker(
                   context: context,
                   initialDate: _publishedAt,
                   firstDate: DateTime(2000),
@@ -161,14 +167,13 @@ class _AdminEbookCreatePageState extends State<AdminEbookCreatePage> {
     TextInputType? keyboard,
     required void Function(String) onSave,
     String? Function(String)? validator,
-  }) =>
-      TextFormField(
-        maxLines: maxLines,
-        keyboardType: keyboard,
-        decoration: InputDecoration(labelText: label),
-        onSaved: (v) => onSave(v!.trim()),
-        validator: validator == null ? null : (v) => validator(v!.trim()),
-      );
+  }) => TextFormField(
+    maxLines: maxLines,
+    keyboardType: keyboard,
+    decoration: InputDecoration(labelText: label),
+    onSaved: (v) => onSave(v!.trim()),
+    validator: validator == null ? null : (v) => validator(v!.trim()),
+  );
 
   String? _req(String v) => v.isEmpty ? '필수 입력' : null;
 

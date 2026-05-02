@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../../models/ebook.dart';
 import '../../services/epub_utility.dart';
 import '../../services/storage_service.dart';
+import '../../core/widgets/app_date_pickers.dart';
 
 class AdminEbookEditPage extends StatefulWidget {
   final Ebook ebook;
@@ -47,14 +48,14 @@ class _AdminEbookEditPageState extends State<AdminEbookEditPage> {
           .collection('ebooks')
           .doc(widget.ebook.id)
           .update({
-        'title': _title.trim(),
-        'author': _author.trim(),
-        'coverUrl': _coverUrl.trim(),
-        'description': _description.trim(),
-        'productId': _productId.trim(),
-        'publishedAt': Timestamp.fromDate(_publishedAt),
-        'price': _price,
-      });
+            'title': _title.trim(),
+            'author': _author.trim(),
+            'coverUrl': _coverUrl.trim(),
+            'description': _description.trim(),
+            'productId': _productId.trim(),
+            'publishedAt': Timestamp.fromDate(_publishedAt),
+            'price': _price,
+          });
       if (!mounted) return;
       _snack('수정이 완료되었습니다.');
       Navigator.pop(context);
@@ -73,8 +74,10 @@ class _AdminEbookEditPageState extends State<AdminEbookEditPage> {
     setState(() => _isLoading = true);
     try {
       final bytes = await file.readAsBytes();
-      final url =
-          await StorageService.uploadEpub(docId: widget.ebook.id, bytes: bytes);
+      final url = await StorageService.uploadEpub(
+        docId: widget.ebook.id,
+        bytes: bytes,
+      );
       await FirebaseFirestore.instance
           .collection('ebooks')
           .doc(widget.ebook.id)
@@ -103,7 +106,9 @@ class _AdminEbookEditPageState extends State<AdminEbookEditPage> {
       }
 
       final newCoverUrl = await StorageService.uploadCoverImage(
-          ebookId: widget.ebook.id, bytes: coverBytes);
+        ebookId: widget.ebook.id,
+        bytes: coverBytes,
+      );
 
       await FirebaseFirestore.instance
           .collection('ebooks')
@@ -139,22 +144,29 @@ class _AdminEbookEditPageState extends State<AdminEbookEditPage> {
                   _field('제목*', _title, (v) => _title = v, _req),
                   _field('저자*', _author, (v) => _author = v, _req),
                   _field(
-                      '가격(원)*',
-                      '$_price',
-                      (v) => _price = int.tryParse(v) ?? 0,
-                      (v) => int.tryParse(v) == null ? '숫자' : null,
-                      keyboard: TextInputType.number),
+                    '가격(원)*',
+                    '$_price',
+                    (v) => _price = int.tryParse(v) ?? 0,
+                    (v) => int.tryParse(v) == null ? '숫자' : null,
+                    keyboard: TextInputType.number,
+                  ),
                   _field('상품 ID*', _productId, (v) => _productId = v, _req),
                   _field('표지 URL*', _coverUrl, (v) => _coverUrl = v, _req),
-                  _field('설명', _description, (v) => _description = v, null,
-                      maxLines: 3),
+                  _field(
+                    '설명',
+                    _description,
+                    (v) => _description = v,
+                    null,
+                    maxLines: 3,
+                  ),
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     title: Text(
-                        '출간일: ${DateFormat('yyyy-MM-dd').format(_publishedAt)}'),
+                      '출간일: ${DateFormat('yyyy-MM-dd').format(_publishedAt)}',
+                    ),
                     trailing: const Icon(Icons.calendar_today),
                     onTap: () async {
-                      final d = await showDatePicker(
+                      final d = await showAppDatePicker(
                         context: context,
                         initialDate: _publishedAt,
                         firstDate: DateTime(2000),
@@ -200,15 +212,14 @@ class _AdminEbookEditPageState extends State<AdminEbookEditPage> {
     String? Function(String)? validator, {
     int maxLines = 1,
     TextInputType? keyboard,
-  }) =>
-      TextFormField(
-        initialValue: init,
-        maxLines: maxLines,
-        keyboardType: keyboard,
-        decoration: InputDecoration(labelText: label),
-        onSaved: (v) => onSave(v!.trim()),
-        validator: validator == null ? null : (v) => validator(v!.trim()),
-      );
+  }) => TextFormField(
+    initialValue: init,
+    maxLines: maxLines,
+    keyboardType: keyboard,
+    decoration: InputDecoration(labelText: label),
+    onSaved: (v) => onSave(v!.trim()),
+    validator: validator == null ? null : (v) => validator(v!.trim()),
+  );
 
   String? _req(String v) => v.isEmpty ? '필수 입력' : null;
 
