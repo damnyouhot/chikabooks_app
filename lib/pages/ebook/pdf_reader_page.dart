@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_tokens.dart';
+import '../../core/widgets/app_modal_scaffold.dart';
 import 'package:pdfx/pdfx.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
@@ -45,8 +47,7 @@ class _PdfReaderPageState extends State<PdfReaderPage> {
     try {
       // 1. 저장된 진행도 불러오기
       int initialPage = 1;
-      final progress =
-          await _ebookService.getReadingProgress(widget.ebook.id);
+      final progress = await _ebookService.getReadingProgress(widget.ebook.id);
       if (progress != null) {
         final savedPage = progress['lastPage'];
         if (savedPage is int && savedPage > 0) initialPage = savedPage;
@@ -112,10 +113,7 @@ class _PdfReaderPageState extends State<PdfReaderPage> {
   void dispose() {
     _saveDebounce?.cancel();
     // 닫힐 때 마지막 페이지 저장
-    _ebookService.saveReadingProgress(
-      widget.ebook.id,
-      lastPage: _currentPage,
-    );
+    _ebookService.saveReadingProgress(widget.ebook.id, lastPage: _currentPage);
     _pdfController?.dispose();
     // 페이지 나갈 때 세로 고정 복원
     SystemChrome.setPreferredOrientations([
@@ -208,31 +206,52 @@ class _PdfReaderPageState extends State<PdfReaderPage> {
       onPageChanged: _onPageChanged,
       builders: PdfViewPinchBuilders<DefaultBuilderOptions>(
         options: const DefaultBuilderOptions(),
-        documentLoaderBuilder: (_) => const Center(
-          child: CircularProgressIndicator(),
-        ),
-        pageLoaderBuilder: (_) => const Center(
-          child: CircularProgressIndicator(),
-        ),
-        errorBuilder: (_, error) => Center(
-          child: Text('오류: $error', style: const TextStyle(color: AppColors.error)),
-        ),
+        documentLoaderBuilder:
+            (_) => const Center(child: CircularProgressIndicator()),
+        pageLoaderBuilder:
+            (_) => const Center(child: CircularProgressIndicator()),
+        errorBuilder:
+            (_, error) => Center(
+              child: Text(
+                '오류: $error',
+                style: const TextStyle(color: AppColors.error),
+              ),
+            ),
       ),
     );
   }
 
   void _showPageJumpDialog() {
-    showDialog(
+    var targetPage = _currentPage;
+    showDialog<void>(
       context: context,
-      builder: (context) {
-        int targetPage = _currentPage;
-        return AlertDialog(
-          title: const Text('페이지 이동'),
-          content: Column(
+      builder: (dialogCtx) {
+        return AppModalDialog(
+          insetPadding: const EdgeInsets.all(AppSpacing.xl),
+          borderOpacity: 0.7,
+          child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('현재: $_currentPage / $_totalPages 페이지'),
-              const SizedBox(height: 16),
+              const Text(
+                '페이지 이동',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                '현재: $_currentPage / $_totalPages 페이지',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  height: 1.45,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
               TextField(
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(
@@ -241,23 +260,53 @@ class _PdfReaderPageState extends State<PdfReaderPage> {
                 ),
                 onChanged: (v) => targetPage = int.tryParse(v) ?? _currentPage,
               ),
+              const SizedBox(height: AppSpacing.lg),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(dialogCtx),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.textSecondary,
+                        backgroundColor: AppColors.surfaceMuted,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.md),
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      child: const Text('취소'),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () {
+                        if (targetPage >= 1 && targetPage <= _totalPages) {
+                          _pdfController?.jumpToPage(targetPage);
+                        }
+                        Navigator.pop(dialogCtx);
+                      },
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.cardPrimary,
+                        foregroundColor: AppColors.onCardEmphasis,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.md),
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      child: const Text('이동'),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('취소'),
-            ),
-            FilledButton(
-              onPressed: () {
-                if (targetPage >= 1 && targetPage <= _totalPages) {
-                  _pdfController?.jumpToPage(targetPage);
-                }
-                Navigator.pop(context);
-              },
-              child: const Text('이동'),
-            ),
-          ],
         );
       },
     );

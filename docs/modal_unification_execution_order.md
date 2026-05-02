@@ -29,6 +29,7 @@
 | 2026-05-02 | 순서 39–40 (검토) | `admin_ebook_create_page`·`admin_ebook_edit_page`는 `showDatePicker`만 있고 `AlertDialog` 없음 — Phase N(시스템 피커 정책)로 이월, 코드 변경 없음. |
 | 2026-05-02 | Phase J (순서 41–42) | `sign_in_page` 카카오 웹 안내·이메일 로그인·비밀번호 재설정을 `AppModalDialog`로 통일. `web_account_actions_service` 계정 삭제 확인은 `AppConfirmModal`/`AppModalDialog`, 진행 중 표시는 `AppModalDialog`. `context` 비동기 간격에 `mounted` 가드 보강. |
 | 2026-05-02 | Phase K (순서 43) | `onboarding_popups.dart`의 `Dialog`(흰 카드)를 `AppModalDialog`로 교체. `app_onboarding_overlay.dart`는 `showDialog<void>` + `dialogCtx`로 닫기 통일. |
+| 2026-05-02 | Phase L (순서 44–47) | `ebook_detail_page` 구매 완료 `AppModalDialog`, `pdf_reader_page` 페이지 이동 `AppModalDialog`, `ebook_list_page` 분류 시트 `Navigator.pop(sheetCtx)` 정리. `settings_page` 오픈소스는 `showLicensePage` 유지(시스템·Phase N과 동일 정책). |
 
 ## 1. 인벤토리 스프레드시트 (착수 직후 1일 이내)
 
@@ -119,10 +120,10 @@
 | 41 | J | `lib/pages/auth/sign_in_page.dart` | `showDialog` | High | ✅ |
 | 42 | J | `lib/features/auth/services/web_account_actions_service.dart` | `showDialog` | High | ✅ |
 | 43 | K | `lib/features/onboarding/app_onboarding_overlay.dart` | `showDialog` + `onboarding_popups.dart` `AppModalDialog` | Med | ✅ |
-| 44 | L | `lib/pages/ebook/ebook_detail_page.dart` | 커스텀 `Dialog` 톤 정렬 | Low | |
-| 45 | L | `lib/pages/ebook/ebook_list_page.dart` | 시트 | Low | |
-| 46 | L | `lib/pages/ebook/pdf_reader_page.dart` | `AlertDialog` | Low | |
-| 47 | L | `lib/pages/settings/settings_page.dart` | `showLicensePage` | Low | |
+| 44 | L | `lib/pages/ebook/ebook_detail_page.dart` | `AppModalDialog` 구매 완료 | Low | ✅ |
+| 45 | L | `lib/pages/ebook/ebook_list_page.dart` | `showModalBottomSheet` (`sheetCtx` 정리) | Low | ✅ |
+| 46 | L | `lib/pages/ebook/pdf_reader_page.dart` | `AppModalDialog` 페이지 이동 | Low | ✅ |
+| 47 | L | `lib/pages/settings/settings_page.dart` | `showLicensePage` 유지 | Low | ✅ 검토 |
 | 48 | M | `lib/widgets/diary_input_sheet.dart` | 시트 | Low | |
 | 49 | M | `lib/widgets/job/filter_bottom_sheet.dart` | 시트 | Low | |
 | 50 | M | `lib/widgets/job/quick_apply_sheet.dart` | 시트 | Low | |
@@ -184,4 +185,4 @@
 
 ---
 
-이 문서는 저장소 루트 `docs/modal_unification_execution_order.md`에 두었다. 다음 단계는 **Phase L(전자책·설정, 순서 44–47)** 이다.
+이 문서는 저장소 루트 `docs/modal_unification_execution_order.md`에 두었다. 다음 단계는 **Phase M(바텀시트, 순서 48–55)** 이다.

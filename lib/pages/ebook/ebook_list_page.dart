@@ -95,7 +95,10 @@ class _EbookListPageState extends State<EbookListPage> {
   /// 첫 페이지 이후 나머지 전자책을 순차 로드 (정렬·필터가 전체 목록을 쓰도록)
   Future<void> _loadRemainingCatalogPages(int gen) async {
     final service = context.read<EbookService>();
-    while (mounted && gen == _catalogLoadGen && _hasMoreCatalog && _pageCursor != null) {
+    while (mounted &&
+        gen == _catalogLoadGen &&
+        _hasMoreCatalog &&
+        _pageCursor != null) {
       final next = await service.fetchEbooksPage(startAfter: _pageCursor);
       if (!mounted || gen != _catalogLoadGen) return;
       setState(() {
@@ -107,9 +110,10 @@ class _EbookListPageState extends State<EbookListPage> {
   }
 
   List<Ebook> _applyFilters(List<Ebook> all) {
-    var filtered = _selectedCategory == '전체'
-        ? List<Ebook>.from(all)
-        : all.where((e) => e.category == _selectedCategory).toList();
+    var filtered =
+        _selectedCategory == '전체'
+            ? List<Ebook>.from(all)
+            : all.where((e) => e.category == _selectedCategory).toList();
 
     switch (_selectedSort) {
       case EbookSort.newest:
@@ -159,8 +163,7 @@ class _EbookListPageState extends State<EbookListPage> {
               allEbooks: all,
               selectedCategory: _selectedCategory,
               selectedSort: _selectedSort,
-              onCategoryChanged: (c) =>
-                  setState(() => _selectedCategory = c),
+              onCategoryChanged: (c) => setState(() => _selectedCategory = c),
               onSortChanged: (s) => setState(() => _selectedSort = s),
             ),
           ),
@@ -168,38 +171,37 @@ class _EbookListPageState extends State<EbookListPage> {
           // ── 전자책 그리드 ──
           filtered.isEmpty
               ? const SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: Center(
-                    child: Text(
-                      '해당 카테고리에 등록된 전자책이 없습니다.',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ),
-                )
-              : SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.lg,
-                    AppSpacing.sm,
-                    AppSpacing.lg,
-                    AppSpacing.lg,
-                  ),
-                  sliver: SliverGrid(
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 20,
-                      crossAxisSpacing: 20,
-                      childAspectRatio: 0.66,
-                    ),
-                    delegate: SliverChildBuilderDelegate(
-                      (context, i) => _EbookGridCard(ebook: filtered[i]),
-                      childCount: filtered.length,
+                hasScrollBody: false,
+                child: Center(
+                  child: Text(
+                    '해당 카테고리에 등록된 전자책이 없습니다.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ),
+              )
+              : SliverPadding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg,
+                  AppSpacing.sm,
+                  AppSpacing.lg,
+                  AppSpacing.lg,
+                ),
+                sliver: SliverGrid(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 20,
+                    crossAxisSpacing: 20,
+                    childAspectRatio: 0.66,
+                  ),
+                  delegate: SliverChildBuilderDelegate(
+                    (context, i) => _EbookGridCard(ebook: filtered[i]),
+                    childCount: filtered.length,
+                  ),
+                ),
+              ),
           if (filtered.isNotEmpty && _hasMoreCatalog)
             SliverToBoxAdapter(
               child: Padding(
@@ -254,9 +256,7 @@ class _FilterBarDelegate extends SliverPersistentHeaderDelegate {
 
   List<String> _visibleCategories() {
     final found = allEbooks.map((e) => e.category).toSet();
-    return _kCategories
-        .where((c) => c == '전체' || found.contains(c))
-        .toList();
+    return _kCategories.where((c) => c == '전체' || found.contains(c)).toList();
   }
 
   @override
@@ -278,93 +278,94 @@ class _FilterBarDelegate extends SliverPersistentHeaderDelegate {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-          // ── 줄 1: 책 분류 드롭다운 ──
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              AppSpacing.sm,
-              AppSpacing.lg,
-              0,
+            // ── 줄 1: 책 분류 드롭다운 ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.sm,
+                AppSpacing.lg,
+                0,
+              ),
+              child: _CategoryDropdown(
+                categories: visibleCats,
+                selected: selectedCategory,
+                onChanged: onCategoryChanged,
+              ),
             ),
-            child: _CategoryDropdown(
-              categories: visibleCats,
-              selected: selectedCategory,
-              onChanged: onCategoryChanged,
+
+            const SizedBox(height: 6),
+
+            // ── 줄 2: 정렬 칩들 (가로 스크롤) ──
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+              child: Row(
+                children:
+                    EbookSort.values.map((sort) {
+                      final isSelected = sort == selectedSort;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: _SortChip(
+                          label: sort.label,
+                          isSelected: isSelected,
+                          onTap: () => onSortChanged(sort),
+                        ),
+                      );
+                    }).toList(),
+              ),
             ),
-          ),
 
-          const SizedBox(height: 6),
+            const SizedBox(height: AppSpacing.sm),
+            const Divider(height: 1, color: AppColors.divider),
 
-          // ── 줄 2: 정렬 칩들 (가로 스크롤) ──
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-            child: Row(
-              children: EbookSort.values.map((sort) {
-                final isSelected = sort == selectedSort;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: _SortChip(
-                    label: sort.label,
-                    isSelected: isSelected,
-                    onTap: () => onSortChanged(sort),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-
-          const SizedBox(height: AppSpacing.sm),
-          const Divider(height: 1, color: AppColors.divider),
-
-          // ── 섹션 타이틀 ──
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.xl,
-              AppSpacing.sm,
-              AppSpacing.xl,
-              AppSpacing.xs,
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                const Text(
-                  '전체 전자책',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    '치과책방 홈페이지에서 구매가 가능합니다',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textSecondary,
-                      height: 1.25,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                if (selectedCategory != '전체') ...[
-                  const SizedBox(width: 6),
-                  Text(
-                    '· $selectedCategory',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: AppColors.textSecondary,
+            // ── 섹션 타이틀 ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.xl,
+                AppSpacing.sm,
+                AppSpacing.xl,
+                AppSpacing.xs,
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const Text(
+                    '전체 전자책',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
                     ),
                   ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      '치과책방 홈페이지에서 구매가 가능합니다',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                        height: 1.25,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (selectedCategory != '전체') ...[
+                    const SizedBox(width: 6),
+                    Text(
+                      '· $selectedCategory',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-        ],
-        ),  // Column
-      ),    // SizedBox
+          ],
+        ), // Column
+      ), // SizedBox
     );
   }
 }
@@ -403,9 +404,8 @@ class _CategoryDropdown extends StatelessWidget {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: isFiltered
-                    ? AppColors.creamWhite
-                    : AppColors.textSecondary,
+                color:
+                    isFiltered ? AppColors.creamWhite : AppColors.textSecondary,
               ),
             ),
             if (isFiltered) ...[
@@ -423,9 +423,8 @@ class _CategoryDropdown extends StatelessWidget {
             Icon(
               Icons.expand_more_rounded,
               size: 15,
-              color: isFiltered
-                  ? AppColors.creamWhite
-                  : AppColors.textSecondary,
+              color:
+                  isFiltered ? AppColors.creamWhite : AppColors.textSecondary,
             ),
           ],
         ),
@@ -434,65 +433,68 @@ class _CategoryDropdown extends StatelessWidget {
   }
 
   void _showPicker(BuildContext context) {
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 12),
-            Container(
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.textDisabled,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              '책 분류',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 4),
-            ...categories.map(
-              (cat) => ListTile(
-                dense: true,
-                title: Text(
-                  cat,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight:
-                        cat == selected ? FontWeight.w700 : FontWeight.w400,
-                    color: cat == selected
-                        ? AppColors.cardPrimary
-                        : AppColors.textPrimary,
+      builder:
+          (sheetCtx) => SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 12),
+                Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.textDisabled,
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                trailing: cat == selected
-                    ? const Icon(
-                        Icons.check_rounded,
-                        color: AppColors.cardPrimary,
-                        size: 18,
-                      )
-                    : null,
-                onTap: () {
-                  Navigator.pop(context);
-                  onChanged(cat);
-                },
-              ),
+                const SizedBox(height: 16),
+                const Text(
+                  '책 분류',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                ...categories.map(
+                  (cat) => ListTile(
+                    dense: true,
+                    title: Text(
+                      cat,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight:
+                            cat == selected ? FontWeight.w700 : FontWeight.w400,
+                        color:
+                            cat == selected
+                                ? AppColors.cardPrimary
+                                : AppColors.textPrimary,
+                      ),
+                    ),
+                    trailing:
+                        cat == selected
+                            ? const Icon(
+                              Icons.check_rounded,
+                              color: AppColors.cardPrimary,
+                              size: 18,
+                            )
+                            : null,
+                    onTap: () {
+                      Navigator.pop(sheetCtx);
+                      onChanged(cat);
+                    },
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
             ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
+          ),
     );
   }
 }
@@ -520,20 +522,19 @@ class _SortChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: isSelected ? AppColors.cardEmphasis : Colors.transparent,
           borderRadius: BorderRadius.circular(AppRadius.full),
-          border: isSelected
-              ? null
-              : Border.all(
-                  color: AppColors.textDisabled.withValues(alpha: 0.45),
-                ),
+          border:
+              isSelected
+                  ? null
+                  : Border.all(
+                    color: AppColors.textDisabled.withValues(alpha: 0.45),
+                  ),
         ),
         child: Text(
           label,
           style: TextStyle(
             fontSize: 12,
             fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
-            color: isSelected
-                ? AppColors.creamWhite
-                : AppColors.textSecondary,
+            color: isSelected ? AppColors.creamWhite : AppColors.textSecondary,
           ),
         ),
       ),
@@ -551,12 +552,13 @@ class _EbookGridCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       borderRadius: BorderRadius.circular(AppRadius.lg),
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => EbookDetailPage(ebook: ebook, hideActions: true),
-        ),
-      ),
+      onTap:
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => EbookDetailPage(ebook: ebook, hideActions: true),
+            ),
+          ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -567,13 +569,14 @@ class _EbookGridCard extends StatelessWidget {
                 ebook.coverUrl,
                 fit: BoxFit.cover,
                 width: double.infinity,
-                errorBuilder: (_, __, ___) => Container(
-                  color: AppColors.disabledBg,
-                  child: const Icon(
-                    Icons.image_not_supported,
-                    color: AppColors.textDisabled,
-                  ),
-                ),
+                errorBuilder:
+                    (_, __, ___) => Container(
+                      color: AppColors.disabledBg,
+                      child: const Icon(
+                        Icons.image_not_supported,
+                        color: AppColors.textDisabled,
+                      ),
+                    ),
               ),
             ),
           ),

@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../core/widgets/app_badge.dart';
+import '../../core/widgets/app_modal_scaffold.dart';
 import '../../models/ebook.dart';
 import '../../services/ebook_service.dart';
 import 'epub_reader_page.dart';
@@ -69,9 +70,10 @@ class _EbookDetailPageState extends State<EbookDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final priceText = ebook.price == 0
-        ? '무료'
-        : '${NumberFormat.decimalPattern().format(ebook.price)}원';
+    final priceText =
+        ebook.price == 0
+            ? '무료'
+            : '${NumberFormat.decimalPattern().format(ebook.price)}원';
 
     return Scaffold(
       backgroundColor: AppColors.appBg,
@@ -94,37 +96,38 @@ class _EbookDetailPageState extends State<EbookDetailPage> {
                   final coverH = coverW * 1.5;
                   return ClipRRect(
                     borderRadius: BorderRadius.circular(AppRadius.xl),
-                child: Image.network(
-                  ebook.coverUrl,
+                    child: Image.network(
+                      ebook.coverUrl,
                       width: coverW,
                       height: coverH,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                        width: coverW,
-                        height: coverH,
-                        color: AppColors.disabledBg,
-                        child: const Icon(
-                          Icons.book,
-                          size: 64,
-                          color: AppColors.textDisabled,
-                  ),
-                ),
+                      fit: BoxFit.cover,
+                      errorBuilder:
+                          (_, __, ___) => Container(
+                            width: coverW,
+                            height: coverH,
+                            color: AppColors.disabledBg,
+                            child: const Icon(
+                              Icons.book,
+                              size: 64,
+                              color: AppColors.textDisabled,
+                            ),
+                          ),
                     ),
                   );
                 },
               ),
             ),
             const SizedBox(height: AppSpacing.xxl),
-            
+
             // 제목
             Text(
               ebook.title,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: AppColors.textPrimary,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(color: AppColors.textPrimary),
             ),
             const SizedBox(height: AppSpacing.sm),
-            
+
             // 저자
             Text(
               '저자: ${ebook.author}',
@@ -138,45 +141,44 @@ class _EbookDetailPageState extends State<EbookDetailPage> {
             // 파일 형식 뱃지 (PDF / EPUB)
             AppBadge(
               label: _isPdf ? 'PDF' : 'EPUB',
-              bgColor: _isPdf
-                  ? AppColors.error.withOpacity(0.1)
-                  : AppColors.accent.withOpacity(0.1),
+              bgColor:
+                  _isPdf
+                      ? AppColors.error.withOpacity(0.1)
+                      : AppColors.accent.withOpacity(0.1),
               textColor: _isPdf ? AppColors.error : AppColors.accent,
             ),
             const SizedBox(height: AppSpacing.lg),
-            
+
             // 설명
             Text(
               ebook.description,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                height: 1.6,
-              ),
+              style: const TextStyle(color: AppColors.textPrimary, height: 1.6),
             ),
             const SizedBox(height: AppSpacing.xxl + 8),
-            
+
             // 구매/읽기 버튼 (hideActions가 true면 숨김 — 3번 탭)
             if (!widget.hideActions) ...[
               SizedBox(
                 width: double.infinity,
-                child: _checkingPurchase
-                    ? const Center(child: CircularProgressIndicator())
-                    : FilledButton(
-                        onPressed: () => _onButtonPressed(context),
-                        child: Text(
-                          _isPurchased
-                              ? '이어서 읽기'
-                              : ebook.price == 0
-                                  ? '바로 읽기'
-                                  : '$priceText • 구매 후 읽기',
+                child:
+                    _checkingPurchase
+                        ? const Center(child: CircularProgressIndicator())
+                        : FilledButton(
+                          onPressed: () => _onButtonPressed(context),
+                          child: Text(
+                            _isPurchased
+                                ? '이어서 읽기'
+                                : ebook.price == 0
+                                ? '바로 읽기'
+                                : '$priceText • 구매 후 읽기',
+                          ),
                         ),
-                      ),
               ),
 
               // 이미 구매한 경우 안내
               if (_isPurchased && ebook.price > 0) ...[
                 const SizedBox(height: AppSpacing.sm),
-                  Text(
+                Text(
                   '✓ 이미 구매한 책입니다.',
                   style: const TextStyle(
                     fontSize: 12,
@@ -185,11 +187,11 @@ class _EbookDetailPageState extends State<EbookDetailPage> {
                   ),
                 ),
               ],
-              
+
               // 무료가 아니고 미구매인 경우 안내 문구
               if (!_isPurchased && ebook.price > 0) ...[
                 const SizedBox(height: AppSpacing.sm),
-                  Text(
+                Text(
                   '* 현재 테스트 모드: 결제 없이 바로 읽을 수 있습니다.',
                   style: const TextStyle(
                     fontSize: 12,
@@ -215,145 +217,133 @@ class _EbookDetailPageState extends State<EbookDetailPage> {
     final ebookService = context.read<EbookService>();
     try {
       await ebookService.purchaseEbook(ebook.id);
-      if (mounted) {
-        setState(() => _isPurchased = true);
-        _showPurchaseCompleteDialog(context);
-      }
+      if (!mounted) return;
+      if (!context.mounted) return;
+      setState(() => _isPurchased = true);
+      _showPurchaseCompleteDialog(context);
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('구매 처리 중 오류가 발생했습니다: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('구매 처리 중 오류가 발생했습니다: $e')));
       }
     }
   }
 
   /// 구매 완료 팝업
   void _showPurchaseCompleteDialog(BuildContext context) {
-    showDialog(
+    showDialog<void>(
       context: context,
-      builder: (ctx) => Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.xl + 4),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.xxl),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // 성공 아이콘: 화면 너비의 18%, 최소64·최대96
-              LayoutBuilder(
-                builder: (ctx, _) {
-                  final iconSize =
-                      (MediaQuery.of(ctx).size.width * 0.18).clamp(64.0, 96.0);
-                  return Container(
-                    width: iconSize,
-                    height: iconSize,
-                decoration: BoxDecoration(
-                      color: AppColors.success.withOpacity(0.1),
-                  shape: BoxShape.circle,
+      builder:
+          (dialogCtx) => AppModalDialog(
+            insetPadding: const EdgeInsets.all(AppSpacing.xl),
+            cardPadding: const EdgeInsets.all(AppSpacing.xxl),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                LayoutBuilder(
+                  builder: (layoutCtx, _) {
+                    final iconSize = (MediaQuery.sizeOf(layoutCtx).width * 0.18)
+                        .clamp(64.0, 96.0);
+                    return Container(
+                      width: iconSize,
+                      height: iconSize,
+                      decoration: BoxDecoration(
+                        color: AppColors.success.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.check_circle,
+                        size: iconSize * 0.625,
+                        color: AppColors.success,
+                      ),
+                    );
+                  },
                 ),
-                child: Icon(
-                  Icons.check_circle,
-                      size: iconSize * 0.625,
-                      color: AppColors.success,
+                const SizedBox(height: AppSpacing.xl),
+                const Text(
+                  '구매 완료! 🎉',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
-                  );
-                },
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              
-              // 제목
-              const Text(
-                '구매 완료! 🎉',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  ebook.title,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              
-              // 책 제목
-              Text(
-                ebook.title,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: AppColors.textSecondary,
+                const SizedBox(height: AppSpacing.lg),
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    color: AppColors.accent.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: 20,
+                        color: AppColors.accent.withValues(alpha: 0.8),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Text(
+                          '구매한 책은 "내 서재"에서 언제든 다시 읽을 수 있어요!',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.accent.withValues(alpha: 0.9),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              
-              // 안내 메시지 카드: AppColors 토큰으로 색상 지정
-              Container(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                decoration: BoxDecoration(
-                  color: AppColors.accent.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(AppRadius.lg),
-                ),
-                child: Row(
+                const SizedBox(height: AppSpacing.xxl),
+                Row(
                   children: [
-                    Icon(
-                      Icons.info_outline,
-                      size: 20,
-                      color: AppColors.accent.withOpacity(0.8),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
                     Expanded(
-                      child: Text(
-                        '구매한 책은 "내 서재"에서 언제든 다시 읽을 수 있어요!',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.accent.withOpacity(0.9),
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.of(dialogCtx).pop();
+                          Navigator.of(context).pop();
+                        },
+                        icon: const Icon(Icons.library_books, size: 18),
+                        label: const Text('내 서재'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: AppSpacing.md,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: () {
+                          Navigator.of(dialogCtx).pop();
+                          _navigateToReader(context);
+                        },
+                        icon: const Icon(Icons.auto_stories, size: 18),
+                        label: const Text('이어서 읽기'),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: AppSpacing.md,
+                          ),
                         ),
                       ),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: AppSpacing.xxl),
-              
-              // 버튼들
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.of(ctx).pop();
-                        Navigator.of(context).pop();
-                      },
-                      icon: const Icon(Icons.library_books, size: 18),
-                      label: const Text('내 서재'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: AppSpacing.md,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: () {
-                        Navigator.of(ctx).pop();
-                        _navigateToReader(context);
-                      },
-                      icon: const Icon(Icons.auto_stories, size: 18),
-                      label: const Text('이어서 읽기'),
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: AppSpacing.md,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ),
     );
   }
 
@@ -362,8 +352,11 @@ class _EbookDetailPageState extends State<EbookDetailPage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) =>
-            _isPdf ? PdfReaderPage(ebook: ebook) : EpubReaderPage(ebook: ebook),
+        builder:
+            (_) =>
+                _isPdf
+                    ? PdfReaderPage(ebook: ebook)
+                    : EpubReaderPage(ebook: ebook),
       ),
     );
   }
