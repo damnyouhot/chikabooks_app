@@ -22,6 +22,7 @@
 | 2026-05-02 | Phase D (순서 10–15) | `career_tab`·`career_network_section` 삭제 확인을 `AppConfirmModal`로 통일. 11·12·13·15행 파일은 `AlertDialog` 없음(시트·날짜만, 모달 통일 범위 외). |
 | 2026-05-02 | Phase E (순서 16–23) | 이력서 홈·편집·지원내역, 구인 웹(`job_post_web_page`, `job_input`, `job_draft_editor`, `job_manage_section`, `published_job_detail`)의 `AlertDialog`를 `AppConfirmModal` / `AppModalDialog`로 교체. `job_post_form`(순서 24)은 제외. |
 | 2026-05-02 | Phase F (순서 25–29) | `me_notifications`, `me_orders`, `me_billing`, `me_clinic`, `me_applicants_pool` 및 `edit_pool_meta_dialog`·`notify_past_applicants_dialog`의 `AlertDialog`를 `AppConfirmModal` / `AppModalDialog`로 교체. |
+| 2026-05-02 | Phase G (순서 30–32) | `publisher_pending_page` 문의 `AppModalDialog`, `publisher_clinic_identity_section` 관리자 확인 `AppConfirmModal`. `clinic_selector`는 `AlertDialog` 없음·출판 각진 `Dialog` 톤 유지로 코드 변경 없음(검토 완료). |
 
 ## 1. 인벤토리 스프레드시트 (착수 직후 1일 이내)
 
@@ -98,9 +99,9 @@
 | 27 | F | `lib/features/me/pages/me_billing_page.dart` | `showDialog` | High | ✅ |
 | 28 | F | `lib/features/me/pages/me_clinic_page.dart` | `showDialog` | Med | ✅ |
 | 29 | F | `lib/features/me/pages/me_applicants_pool_page.dart` | `showDialog` 다수 + 위젯 다이얼로그 연동 | Med | ✅ |
-| 30 | G | `lib/features/publisher/pages/publisher_pending_page.dart` | `showDialog` | Med | |
-| 31 | G | `lib/features/publisher/widgets/publisher_clinic_identity_section.dart` | `showDialog` | Med | |
-| 32 | G | `lib/features/publisher/widgets/clinic_selector.dart` | `showDialog` | Med | |
+| 30 | G | `lib/features/publisher/pages/publisher_pending_page.dart` | `showDialog` | Med | ✅ |
+| 31 | G | `lib/features/publisher/widgets/publisher_clinic_identity_section.dart` | `showDialog` | Med | ✅ |
+| 32 | G | `lib/features/publisher/widgets/clinic_selector.dart` | `showDialog` | Med | ✅ |
 | 33 | H | `lib/features/senior_qna/widgets/senior_question_comments_sheet.dart` | 시트 + `AlertDialog` | Med | |
 | 34 | H | `lib/features/senior_qna/widgets/senior_question_card.dart` | 이미 일부 게이지 패밀리 — 나머지·풀스크린 검토 | Med | |
 | 35 | H | `lib/features/senior_qna/widgets/senior_sticker_widgets.dart` | 시트 | Low | |
@@ -175,4 +176,4 @@
 
 ---
 
-이 문서는 저장소 루트 `docs/modal_unification_execution_order.md`에 두었다. 다음 단계는 **순서 24 `job_post_form` 단독 PR**(고위험) 또는 **Phase G(출판, 30–32)** 착수다.
+이 문서는 저장소 루트 `docs/modal_unification_execution_order.md`에 두었다. 다음 단계는 **순서 24 `job_post_form` 단독 PR**(고위험) 또는 **Phase H(속닥속닥, 33–35)** 착수다.

@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_tokens.dart';
+import '../../../core/widgets/app_modal_scaffold.dart';
 import 'publisher_shared.dart';
 import '../services/clinic_auth_service.dart';
 
@@ -148,27 +150,58 @@ class _PublisherPendingPageState extends State<PublisherPendingPage> {
                 // 문의하기
                 TextButton(
                   onPressed: () {
-                    showDialog(
+                    showDialog<void>(
                       context: context,
                       builder:
-                          (_) => AlertDialog(
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
+                          (dialogCtx) => AppModalDialog(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  '문의하기',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                                const SizedBox(height: AppSpacing.sm),
+                                const Text(
+                                  '검토가 늦어지거나 문제가 있으신가요?\n\n이메일로 문의해주세요:\nsupport@chikabooks.com',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    height: 1.45,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                                const SizedBox(height: AppSpacing.lg),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: TextButton(
+                                    onPressed: () =>
+                                        Navigator.pop(dialogCtx),
+                                    style: TextButton.styleFrom(
+                                      foregroundColor:
+                                          AppColors.textSecondary,
+                                      backgroundColor:
+                                          AppColors.surfaceMuted,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(
+                                          AppRadius.md,
+                                        ),
+                                      ),
+                                      textStyle: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                    child: const Text('닫기'),
+                                  ),
+                                ),
+                              ],
                             ),
-                            title: const Text(
-                              '문의하기',
-                              style: TextStyle(fontSize: 16),
-                            ),
-                            content: const Text(
-                              '검토가 늦어지거나 문제가 있으신가요?\n\n이메일로 문의해주세요:\nsupport@chikabooks.com',
-                              style: TextStyle(fontSize: 13, height: 1.6),
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context),
-                                child: const Text('닫기'),
-                              ),
-                            ],
                           ),
                     );
                   },

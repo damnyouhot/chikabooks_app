@@ -3,6 +3,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_tokens.dart';
+import '../../../core/widgets/app_confirm_modal.dart';
 import '../../../models/clinic_profile.dart';
 import '../services/clinic_profile_service.dart';
 
@@ -421,29 +422,20 @@ class _PublisherClinicIdentitySectionState
     final ok = await showDialog<bool>(
       context: context,
       builder:
-          (ctx) => AlertDialog(
-            title: Text(registeredNameOcrIssue ? 'OCR 상호 확인 요청' : '관리자 확인 요청'),
-            content: Text(
-              registeredNameOcrIssue
-                  ? '등록증 OCR이 상호를 실제와 다르게 읽었다면 관리자에게 확인을 요청할 수 있어요.\n\n'
-                      '현재 등록증상 상호: $registered\n\n'
-                      '운영팀이 등록증 원본과 OCR 결과를 확인해 처리합니다.'
-                  : '등록증상 상호와 노출 치과명이 다릅니다.\n\n'
-                      '등록증상 상호: $registered\n'
-                      '노출 치과명: $display\n\n'
-                      '실제 운영명 또는 간판명으로 쓰는 이름이라면 관리자에게 확인을 요청할 수 있어요. '
-                      '요청 후 운영팀이 대시보드에서 확인하고 승인/반려 기록을 남깁니다.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('취소'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('확인 요청'),
-              ),
-            ],
+          (_) => AppConfirmModal(
+            title:
+                registeredNameOcrIssue ? 'OCR 상호 확인 요청' : '관리자 확인 요청',
+            message:
+                registeredNameOcrIssue
+                    ? '등록증 OCR이 상호를 실제와 다르게 읽었다면 관리자에게 확인을 요청할 수 있어요.\n\n'
+                        '현재 등록증상 상호: $registered\n\n'
+                        '운영팀이 등록증 원본과 OCR 결과를 확인해 처리합니다.'
+                    : '등록증상 상호와 노출 치과명이 다릅니다.\n\n'
+                        '등록증상 상호: $registered\n'
+                        '노출 치과명: $display\n\n'
+                        '실제 운영명 또는 간판명으로 쓰는 이름이라면 관리자에게 확인을 요청할 수 있어요. '
+                        '요청 후 운영팀이 대시보드에서 확인하고 승인/반려 기록을 남깁니다.',
+            confirmLabel: '확인 요청',
           ),
     );
     if (ok != true || !mounted) return;
