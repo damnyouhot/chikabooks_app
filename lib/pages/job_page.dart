@@ -4,6 +4,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_tokens.dart';
+import '../core/widgets/app_modal_scaffold.dart';
 import '../notifiers/job_filter_notifier.dart';
 import '../services/job_service.dart';
 import '../screen/jobs/job_listings_screen.dart';
@@ -128,29 +129,71 @@ class _JobPageState extends State<JobPage> {
         if (!mounted) return;
         final agreed = await showDialog<bool>(
           context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('위치 권한 안내'),
-            content: const Text(
-              '주변 치과 구인 정보를 거리 기준으로 보여드리기 위해 위치 권한이 필요해요.\n'
-              '앱이 화면에 보이는 동안에만 사용하며, 백그라운드에서는 위치를 수집하지 않습니다.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('나중에'),
+          builder:
+              (ctx) => AppModalDialog(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '위치 권한 안내',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    const Text(
+                      '주변 치과 구인 정보를 거리 기준으로 보여드리기 위해 위치 권한이 필요해요.\n'
+                      '앱이 화면에 보이는 동안에만 사용하며, 백그라운드에서는 위치를 수집하지 않습니다.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        height: 1.45,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextButton(
+                            onPressed: () => Navigator.pop(ctx, false),
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.textSecondary,
+                              backgroundColor: AppColors.surfaceMuted,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(AppRadius.md),
+                              ),
+                              textStyle: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            child: const Text('나중에'),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: () => Navigator.pop(ctx, true),
+                            child: const Text('허용하기'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('허용하기'),
-              ),
-            ],
-          ),
         );
         if (agreed != true) return;
         permission = await Geolocator.requestPermission();
       }
       if (permission == LocationPermission.deniedForever ||
-          permission == LocationPermission.denied) return;
+          permission == LocationPermission.denied) {
+        return;
+      }
 
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.medium,
@@ -265,45 +308,130 @@ class _JobPageTitleBar extends StatelessWidget {
   }
 
   void _showInfoDialog(BuildContext context) {
-    showDialog(
+    showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text(
-          '커리어',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-        ),
-        content: const SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('이력서와 구인 공고를 관리하는 공간이에요.', style: TextStyle(fontSize: 13, height: 1.5)),
-              SizedBox(height: 16),
-              Text('📍 채용', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-              SizedBox(height: 8),
-              Text('근처 치과 구인 공고를 목록·지도로 확인해요.', style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
-              SizedBox(height: 16),
-              Text('📄 커리어 카드', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-              SizedBox(height: 8),
-              Text('이력서를 작성하고 관리해요. 완성된 이력서로 바로 지원할 수 있어요.', style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
-              SizedBox(height: 16),
-              Text('🌐 웹에서도 이용 가능', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-              SizedBox(height: 8),
-              Text('PC에서 같은 계정으로 접속해 작업할 수 있어요.\nhttps://chikabooks3rd.web.app', style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
-              SizedBox(height: 16),
-              Text('📎 웹 전용 기능', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-              SizedBox(height: 8),
-              Text('이력서에 자격증·수료증·경력증명서 등 첨부 파일을 추가할 수 있어요.', style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
-            ],
+      builder:
+          (ctx) => AppModalDialog(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '커리어',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.sizeOf(ctx).height * 0.55,
+                  ),
+                  child: const SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '이력서와 구인 공고를 관리하는 공간이에요.',
+                          style: TextStyle(fontSize: 13, height: 1.5),
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          '📍 채용',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          '근처 치과 구인 공고를 목록·지도로 확인해요.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.5,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          '📄 커리어 카드',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          '이력서를 작성하고 관리해요. 완성된 이력서로 바로 지원할 수 있어요.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.5,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          '🌐 웹에서도 이용 가능',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          'PC에서 같은 계정으로 접속해 작업할 수 있어요.\nhttps://chikabooks3rd.web.app',
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.5,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          '📎 웹 전용 기능',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          '이력서에 자격증·수료증·경력증명서 등 첨부 파일을 추가할 수 있어요.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.5,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.textSecondary,
+                      backgroundColor: AppColors.surfaceMuted,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                      ),
+                      textStyle: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    child: const Text('닫기'),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('닫기'),
-          ),
-        ],
-      ),
     );
   }
 }

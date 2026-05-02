@@ -18,6 +18,7 @@
 |------|------|------|
 | 2026-05-02 | Phase A (순서 1–2) | `app_modal_scaffold.dart`, `app_confirm_modal.dart` 추가. 호출부 이전 없음. |
 | 2026-05-02 | Phase B (순서 3–5) | `bond_poll_section`, `hira_comment_sheet`, `user_goal_sheet`의 `AlertDialog`를 `AppConfirmModal` / `AppModalDialog`로 교체. |
+| 2026-05-02 | Phase C (순서 6–9) | `bond_page`, `diary_timeline_page`, `growth_page`, `job_page`의 `AlertDialog`를 `AppModalDialog` / `AppConfirmModal`로 교체(일기 삭제는 확인 후 본문에서만 삭제). |
 
 ---
 
@@ -72,10 +73,10 @@
 | 3 | B | `lib/widgets/bond/bond_poll_section.dart` | `showDialog`+`AlertDialog` | Low | ✅ |
 | 4 | B | `lib/widgets/hira_comment_sheet.dart` | `showDialog` | Med | ✅ |
 | 5 | B | `lib/widgets/user_goal_sheet.dart` | 시트 + 내부 `showDialog` | Med | ✅ |
-| 6 | C | `lib/pages/bond_page.dart` | `showDialog` | Low | |
-| 7 | C | `lib/pages/diary_timeline_page.dart` | `showDialog` | Low | |
-| 8 | C | `lib/pages/growth_page.dart` | `showDialog` 다수 + 시트 | Med | |
-| 9 | C | `lib/pages/job_page.dart` | `showDialog` | Med | |
+| 6 | C | `lib/pages/bond_page.dart` | `showDialog` | Low | ✅ |
+| 7 | C | `lib/pages/diary_timeline_page.dart` | `showDialog` | Low | ✅ |
+| 8 | C | `lib/pages/growth_page.dart` | `showDialog` 다수 + 시트 | Med | ✅ |
+| 9 | C | `lib/pages/job_page.dart` | `showDialog` | Med | ✅ |
 | 10 | D | `lib/pages/career/career_tab.dart` | `showDialog` | Low | |
 | 11 | D | `lib/pages/career/career_stage_section.dart` | `showModalBottomSheet` | Low | |
 | 12 | D | `lib/pages/career/career_skill_section.dart` | 시트 | Low | |
@@ -173,4 +174,4 @@
 
 ---
 
-이 문서는 저장소 루트 `docs/modal_unification_execution_order.md`에 두었다. 다음 단계는 **Phase A 공통 위젯 PR** 착수다.
+이 문서는 저장소 루트 `docs/modal_unification_execution_order.md`에 두었다. 다음 단계는 **Phase D (커리어, 순서 10–15)** 착수다.

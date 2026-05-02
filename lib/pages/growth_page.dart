@@ -17,6 +17,8 @@ import '../core/widgets/app_muted_button.dart';
 import '../core/widgets/app_muted_card.dart';
 import '../core/widgets/app_primary_card.dart';
 import '../core/widgets/app_segmented_control.dart';
+import '../core/widgets/app_confirm_modal.dart';
+import '../core/widgets/app_modal_scaffold.dart';
 import 'ebook/ebook_detail_page.dart';
 import 'quiz_today_page.dart';
 import 'hira_update_page.dart';
@@ -181,102 +183,146 @@ class _GrowthPageState extends State<GrowthPage>
   }
 
   void _showConceptDialog(BuildContext context) {
-    showDialog(
+    showDialog<void>(
       context: context,
       builder:
-          (ctx) => AlertDialog(
-            title: const Text(
-              '성장하기 탭에 대해서',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          (ctx) => AppModalDialog(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '성장하기 탭에 대해서',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.sizeOf(ctx).height * 0.55,
+                  ),
+                  child: const SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '퀴즈, 단어, 보험정보, 책으로 치과 직무를 배우고 기록하는 공간이에요.',
+                          style: TextStyle(fontSize: 13, height: 1.5),
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          '📝 오늘 퀴즈',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          '매일 국시·임상 문제를 풀어요. (스케줄에 따라 하루 2문항)',
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.5,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          '🔤 오늘 단어',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          '하루에 하나씩 치과 실무 단어를 익히는 공간이에요.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.5,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          '📋 보험정보',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          '수가 조회와 HIRA 급여·수가 제도 변경 소식을 확인해요.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.5,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          '📖 하이진랩',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          '하이진랩에 올라온 책들을 볼 수 있는 공간이에요.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.5,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          '📗 내 서재',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          '연동 전자책 스토어에서 구매한 책들을 볼 수 있는 곳이에요.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.5,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.textSecondary,
+                      backgroundColor: AppColors.surfaceMuted,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                      ),
+                      textStyle: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    child: const Text('닫기'),
+                  ),
+                ),
+              ],
             ),
-            content: const SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '퀴즈, 단어, 보험정보, 책으로 치과 직무를 배우고 기록하는 공간이에요.',
-                    style: TextStyle(fontSize: 13, height: 1.5),
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    '📝 오늘 퀴즈',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    '매일 국시·임상 문제를 풀어요. (스케줄에 따라 하루 2문항)',
-                    style: TextStyle(
-                      fontSize: 12,
-                      height: 1.5,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    '🔤 오늘 단어',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    '하루에 하나씩 치과 실무 단어를 익히는 공간이에요.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      height: 1.5,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    '📋 보험정보',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    '수가 조회와 HIRA 급여·수가 제도 변경 소식을 확인해요.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      height: 1.5,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    '📖 하이진랩',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    '하이진랩에 올라온 책들을 볼 수 있는 공간이에요.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      height: 1.5,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    '📗 내 서재',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    '연동 전자책 스토어에서 구매한 책들을 볼 수 있는 곳이에요.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      height: 1.5,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('닫기'),
-              ),
-            ],
           ),
     );
   }
@@ -406,39 +452,13 @@ class _TodayWordViewState extends State<_TodayWordView> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder:
-          (ctx) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppRadius.xl),
-            ),
-            title: const Text(
-              '전체 기록 리셋',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-            ),
-            content: const Text(
-              '아는 단어, 다시보기, 저장한 단어, 오늘 배정 기록이 모두 초기화됩니다.\n\n'
-              '초기화 후에는 전체 단어풀이 다시 노출 대상이 됩니다. 계속할까요?',
-              style: TextStyle(
-                fontSize: 13,
-                height: 1.55,
-                color: AppColors.textSecondary,
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('취소'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text(
-                  '전체 기록 리셋',
-                  style: TextStyle(
-                    color: AppColors.destructive,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
+          (ctx) => const AppConfirmModal(
+            title: '전체 기록 리셋',
+            message:
+                '아는 단어, 다시보기, 저장한 단어, 오늘 배정 기록이 모두 초기화됩니다.\n\n'
+                '초기화 후에는 전체 단어풀이 다시 노출 대상이 됩니다. 계속할까요?',
+            confirmLabel: '전체 기록 리셋',
+            destructive: true,
           ),
     );
 
@@ -1036,26 +1056,52 @@ class _MyBooksTabState extends State<_MyBooksTab> {
         context: context,
         barrierDismissible: false,
         builder:
-            (ctx) => AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+            (ctx) => AppModalDialog(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '구매 이메일 안내',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    "연동 스토어에서 '$aliasEmail' 이메일로\n구매된 기록이 확인되었습니다.\n\n"
+                    '구매 내역은 정상적으로 연결되어 있습니다.\n'
+                    '앞으로는 현재 로그인한 이메일로 이용해 주세요.',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      height: 1.45,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.textSecondary,
+                        backgroundColor: AppColors.surfaceMuted,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.md),
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      child: const Text('확인'),
+                    ),
+                  ),
+                ],
               ),
-              title: const Text(
-                '구매 이메일 안내',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-              ),
-              content: Text(
-                "연동 스토어에서 '$aliasEmail' 이메일로\n구매된 기록이 확인되었습니다.\n\n"
-                '구매 내역은 정상적으로 연결되어 있습니다.\n'
-                '앞으로는 현재 로그인한 이메일로 이용해 주세요.',
-                style: const TextStyle(fontSize: 14, height: 1.6),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('확인'),
-                ),
-              ],
             ),
       );
     } catch (e) {
@@ -1138,28 +1184,54 @@ class _MyBooksTabState extends State<_MyBooksTab> {
         );
       } else {
         // 내역 없음 → 이메일 확인 안내 다이얼로그
-        showDialog(
+        showDialog<void>(
           context: context,
           builder:
-              (_) => AlertDialog(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+              (dialogCtx) => AppModalDialog(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '구매내역을 찾지 못했습니다',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    const Text(
+                      '구매 시 사용한 이메일 주소로\n로그인하셨나요?\n\n'
+                      '구매 시 사용한 이메일 계정으로\n로그인하면 자동으로 연결됩니다.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        height: 1.45,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    SizedBox(
+                      width: double.infinity,
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(dialogCtx),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.textSecondary,
+                          backgroundColor: AppColors.surfaceMuted,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                          ),
+                          textStyle: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        child: const Text('확인'),
+                      ),
+                    ),
+                  ],
                 ),
-                title: const Text(
-                  '구매내역을 찾지 못했습니다',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                ),
-                content: const Text(
-                  '구매 시 사용한 이메일 주소로\n로그인하셨나요?\n\n'
-                  '구매 시 사용한 이메일 계정으로\n로그인하면 자동으로 연결됩니다.',
-                  style: TextStyle(fontSize: 14, height: 1.55),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('확인'),
-                  ),
-                ],
               ),
         );
       }

@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_tokens.dart';
+import '../core/widgets/app_confirm_modal.dart';
 import '../core/widgets/app_muted_card.dart';
 import '../services/diary_image_service.dart';
 
@@ -146,37 +147,33 @@ class _NoteCard extends StatelessWidget {
         return '${date.month}월 ${date.day}일, $weekday요일 ${DateFormat('HH시 mm분').format(date)}';
       } else {
         final yearShort = date.year % 100;
-        return '${yearShort}년 ${date.month}월 ${date.day}일, $weekday요일 ${DateFormat('HH시 mm분').format(date)}';
+        return '$yearShort년 ${date.month}월 ${date.day}일, $weekday요일 ${DateFormat('HH시 mm분').format(date)}';
       }
     }
   }
 
-  void _showDeleteDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('기록 삭제'),
-        content: Text(imageUrls.isNotEmpty
+  Future<void> _showDeleteDialog(BuildContext context) async {
+    final message =
+        imageUrls.isNotEmpty
             ? '이 기록과 첨부된 사진 ${imageUrls.length}장을 함께 삭제합니다.'
-            : '이 기록을 삭제하시겠습니까?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('취소'),
+            : '이 기록을 삭제하시겠습니까?';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder:
+          (ctx) => AppConfirmModal(
+            title: '기록 삭제',
+            message: message,
+            confirmLabel: '삭제',
+            destructive: true,
           ),
-          TextButton(
-            onPressed: () => _deleteNote(context),
-            child: const Text('삭제',
-                style: TextStyle(color: AppColors.error)),
-          ),
-        ],
-      ),
     );
+    if (confirmed == true && context.mounted) {
+      await _deleteNoteAfterConfirm(context);
+    }
   }
 
-  Future<void> _deleteNote(BuildContext context) async {
+  Future<void> _deleteNoteAfterConfirm(BuildContext context) async {
     try {
-      // Storage 이미지 삭제
       if (imageUrls.isNotEmpty) {
         await DiaryImageService.deleteAll(
           uid: uid,
@@ -185,7 +182,6 @@ class _NoteCard extends StatelessWidget {
         );
       }
 
-      // Firestore 문서 삭제
       await FirebaseFirestore.instance
           .collection('users')
           .doc(uid)
@@ -194,14 +190,12 @@ class _NoteCard extends StatelessWidget {
           .delete();
 
       if (context.mounted) {
-        Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('기록이 삭제되었습니다')),
         );
       }
     } catch (e) {
       if (context.mounted) {
-        Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('삭제 실패: $e')),
         );
