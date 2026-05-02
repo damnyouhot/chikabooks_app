@@ -3,7 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_tokens.dart' show AppRadius;
+import '../../../../core/theme/app_tokens.dart' show AppRadius, AppSpacing;
+import '../../../../core/widgets/app_modal_scaffold.dart';
 import '../../../../models/applicant_pool_entry.dart';
 
 class NotifyPastResult {
@@ -39,131 +40,162 @@ class _NotifyPastApplicantsDialogState
   @override
   Widget build(BuildContext context) {
     final uid = FirebaseAuth.instance.currentUser?.uid;
-    return AlertDialog(
-      title: const Text('신규 공고로 재알림 (이메일)'),
-      content: SizedBox(
-        width: 520,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.accent.withValues(alpha: 0.06),
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                  border: Border.all(
-                      color: AppColors.accent.withValues(alpha: 0.2)),
-                ),
-                child: Text(
-                  '${widget.applicants.length}명에게 새 공고 안내 이메일을 보냅니다.\n'
-                  '24시간 내 같은 사람에게 두 번 보낼 수 없도록 서버에서 자동 차단해요.',
-                  style: const TextStyle(
-                      height: 1.5, color: AppColors.textPrimary),
-                ),
+    return AppModalDialog(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            '신규 공고로 재알림 (이메일)',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          SizedBox(
+            width: 520,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                      border: Border.all(
+                          color: AppColors.accent.withValues(alpha: 0.2)),
+                    ),
+                    child: Text(
+                      '${widget.applicants.length}명에게 새 공고 안내 이메일을 보냅니다.\n'
+                      '24시간 내 같은 사람에게 두 번 보낼 수 없도록 서버에서 자동 차단해요.',
+                      style: const TextStyle(
+                          height: 1.5, color: AppColors.textPrimary),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  if (uid == null)
+                    const Text('로그인 정보가 없어요.')
+                  else
+                    StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                      stream: FirebaseFirestore.instance
+                          .collection('jobs')
+                          .where('createdBy', isEqualTo: uid)
+                          .orderBy('createdAt', descending: true)
+                          .limit(40)
+                          .snapshots(),
+                      builder: (context, snap) {
+                        if (snap.connectionState == ConnectionState.waiting) {
+                          return const Padding(
+                            padding: EdgeInsets.all(8),
+                            child: Center(
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2)),
+                          );
+                        }
+                        final docs = snap.data?.docs ?? [];
+                        final published = docs.where((d) {
+                          final s = d.data()['status'] as String? ?? '';
+                          return s == 'published' ||
+                              s == 'pending' ||
+                              s == 'approved';
+                        }).toList();
+                        if (published.isEmpty) {
+                          return Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppColors.warning
+                                  .withValues(alpha: 0.08),
+                              borderRadius:
+                                  BorderRadius.circular(AppRadius.sm),
+                            ),
+                            child: const Text(
+                                '발송할 공고가 없어요. 먼저 새 공고를 발행해 주세요.'),
+                          );
+                        }
+                        return DropdownButtonFormField<String>(
+                          initialValue: _selectedJobId,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: '안내할 공고 선택',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                          items: published
+                              .map((d) => DropdownMenuItem(
+                                    value: d.id,
+                                    child: Text(
+                                      (d.data()['title'] as String?) ?? d.id,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ))
+                              .toList(),
+                          onChanged: (v) =>
+                              setState(() => _selectedJobId = v),
+                        );
+                      },
+                    ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _msgCtrl,
+                    minLines: 3,
+                    maxLines: 6,
+                    decoration: const InputDecoration(
+                      labelText: '추가 메시지 (선택)',
+                      hintText:
+                          '예: 지난번 지원해주신 ○○ 포지션과 비슷한 자리가 새로 열렸어요.',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 14),
-              if (uid == null)
-                const Text('로그인 정보가 없어요.')
-              else
-                StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                  stream: FirebaseFirestore.instance
-                      .collection('jobs')
-                      .where('createdBy', isEqualTo: uid)
-                      .orderBy('createdAt', descending: true)
-                      .limit(40)
-                      .snapshots(),
-                  builder: (context, snap) {
-                    if (snap.connectionState == ConnectionState.waiting) {
-                      return const Padding(
-                        padding: EdgeInsets.all(8),
-                        child: Center(
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2)),
-                      );
-                    }
-                    final docs = snap.data?.docs ?? [];
-                    final published = docs.where((d) {
-                      final s = d.data()['status'] as String? ?? '';
-                      return s == 'published' ||
-                          s == 'pending' ||
-                          s == 'approved';
-                    }).toList();
-                    if (published.isEmpty) {
-                      return Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: AppColors.warning
-                              .withValues(alpha: 0.08),
-                          borderRadius:
-                              BorderRadius.circular(AppRadius.sm),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.textSecondary,
+                  backgroundColor: AppColors.surfaceMuted,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                  ),
+                  textStyle: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                child: const Text('취소'),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              FilledButton.icon(
+                onPressed: _selectedJobId == null
+                    ? null
+                    : () => Navigator.pop(
+                          context,
+                          NotifyPastResult(
+                            jobId: _selectedJobId!,
+                            message: _msgCtrl.text.trim().isEmpty
+                                ? null
+                                : _msgCtrl.text.trim(),
+                          ),
                         ),
-                        child: const Text(
-                            '발송할 공고가 없어요. 먼저 새 공고를 발행해 주세요.'),
-                      );
-                    }
-                    return DropdownButtonFormField<String>(
-                      initialValue: _selectedJobId,
-                      isExpanded: true,
-                      decoration: const InputDecoration(
-                        labelText: '안내할 공고 선택',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                      ),
-                      items: published
-                          .map((d) => DropdownMenuItem(
-                                value: d.id,
-                                child: Text(
-                                  (d.data()['title'] as String?) ?? d.id,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ))
-                          .toList(),
-                      onChanged: (v) =>
-                          setState(() => _selectedJobId = v),
-                    );
-                  },
-                ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _msgCtrl,
-                minLines: 3,
-                maxLines: 6,
-                decoration: const InputDecoration(
-                  labelText: '추가 메시지 (선택)',
-                  hintText:
-                      '예: 지난번 지원해주신 ○○ 포지션과 비슷한 자리가 새로 열렸어요.',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
+                icon: const Icon(Icons.send_outlined, size: 16),
+                label: const Text('이메일 발송 예약'),
+                style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.accent),
               ),
             ],
           ),
-        ),
+        ],
       ),
-      actions: [
-        TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('취소')),
-        FilledButton.icon(
-          onPressed: _selectedJobId == null
-              ? null
-              : () => Navigator.pop(
-                    context,
-                    NotifyPastResult(
-                      jobId: _selectedJobId!,
-                      message: _msgCtrl.text.trim().isEmpty
-                          ? null
-                          : _msgCtrl.text.trim(),
-                    ),
-                  ),
-          icon: const Icon(Icons.send_outlined, size: 16),
-          label: const Text('이메일 발송 예약'),
-          style: FilledButton.styleFrom(
-              backgroundColor: AppColors.accent),
-        ),
-      ],
     );
   }
 }

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_tokens.dart' show AppRadius;
+import '../../../../core/theme/app_tokens.dart' show AppRadius, AppSpacing;
+import '../../../../core/widgets/app_modal_scaffold.dart';
 import '../../../../models/applicant_pool_entry.dart';
 
 class EditPoolMetaResult {
@@ -64,115 +65,146 @@ class _EditPoolMetaDialogState extends State<EditPoolMetaDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('지원자 정보 편집'),
-      content: SizedBox(
-        width: 480,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextField(
-                controller: _nameCtrl,
-                decoration: const InputDecoration(
-                  labelText: '표시 이름 (운영자 메모용)',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: _status,
-                decoration: const InputDecoration(
-                  labelText: '상태',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-                items: kApplicantStatusOrder
-                    .map((s) => DropdownMenuItem(
-                          value: s,
-                          child: Text(kApplicantStatusLabels[s] ?? s),
-                        ))
-                    .toList(),
-                onChanged: (v) => setState(() => _status = v ?? 'new'),
-              ),
-              const SizedBox(height: 12),
-              Row(
+    return AppModalDialog(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            '지원자 정보 편집',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          SizedBox(
+            width: 480,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _tagInputCtrl,
-                      decoration: const InputDecoration(
-                        labelText: '태그 추가 (Enter)',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                      ),
-                      onSubmitted: (_) => _addTag(),
+                  TextField(
+                    controller: _nameCtrl,
+                    decoration: const InputDecoration(
+                      labelText: '표시 이름 (운영자 메모용)',
+                      border: OutlineInputBorder(),
+                      isDense: true,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  OutlinedButton(
-                      onPressed: _addTag, child: const Text('추가')),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: _status,
+                    decoration: const InputDecoration(
+                      labelText: '상태',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    items: kApplicantStatusOrder
+                        .map((s) => DropdownMenuItem(
+                              value: s,
+                              child: Text(kApplicantStatusLabels[s] ?? s),
+                            ))
+                        .toList(),
+                    onChanged: (v) => setState(() => _status = v ?? 'new'),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _tagInputCtrl,
+                          decoration: const InputDecoration(
+                            labelText: '태그 추가 (Enter)',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                          onSubmitted: (_) => _addTag(),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      OutlinedButton(
+                          onPressed: _addTag, child: const Text('추가')),
+                    ],
+                  ),
+                  if (_tags.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: _tags
+                          .map((t) => InputChip(
+                                label: Text('#$t'),
+                                onDeleted: () =>
+                                    setState(() => _tags.remove(t)),
+                                backgroundColor: AppColors.accent
+                                    .withValues(alpha: 0.08),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadius.full),
+                                  side: BorderSide(
+                                      color: AppColors.accent
+                                          .withValues(alpha: 0.3)),
+                                ),
+                              ))
+                          .toList(),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _memoCtrl,
+                    minLines: 3,
+                    maxLines: 6,
+                    decoration: const InputDecoration(
+                      labelText: '메모 (이 지원자에 대한 운영자 노트)',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
                 ],
               ),
-              if (_tags.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: _tags
-                      .map((t) => InputChip(
-                            label: Text('#$t'),
-                            onDeleted: () =>
-                                setState(() => _tags.remove(t)),
-                            backgroundColor: AppColors.accent
-                                .withValues(alpha: 0.08),
-                            shape: RoundedRectangleBorder(
-                              borderRadius:
-                                  BorderRadius.circular(AppRadius.full),
-                              side: BorderSide(
-                                  color: AppColors.accent
-                                      .withValues(alpha: 0.3)),
-                            ),
-                          ))
-                      .toList(),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.textSecondary,
+                  backgroundColor: AppColors.surfaceMuted,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                  ),
+                  textStyle: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
-              ],
-              const SizedBox(height: 12),
-              TextField(
-                controller: _memoCtrl,
-                minLines: 3,
-                maxLines: 6,
-                decoration: const InputDecoration(
-                  labelText: '메모 (이 지원자에 대한 운영자 노트)',
-                  border: OutlineInputBorder(),
-                  isDense: true,
+                child: const Text('취소'),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              FilledButton(
+                onPressed: () => Navigator.pop(
+                  context,
+                  EditPoolMetaResult(
+                    displayName: _nameCtrl.text.trim(),
+                    memo: _memoCtrl.text.trim(),
+                    tags: _tags,
+                    status: _status,
+                  ),
                 ),
+                style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.accent),
+                child: const Text('저장'),
               ),
             ],
           ),
-        ),
+        ],
       ),
-      actions: [
-        TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('취소')),
-        FilledButton(
-          onPressed: () => Navigator.pop(
-            context,
-            EditPoolMetaResult(
-              displayName: _nameCtrl.text.trim(),
-              memo: _memoCtrl.text.trim(),
-              tags: _tags,
-              status: _status,
-            ),
-          ),
-          style: FilledButton.styleFrom(
-              backgroundColor: AppColors.accent),
-          child: const Text('저장'),
-        ),
-      ],
     );
   }
 }

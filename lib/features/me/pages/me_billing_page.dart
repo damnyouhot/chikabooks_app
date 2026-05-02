@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_tokens.dart' show AppRadius, AppSpacing;
+import '../../../core/widgets/app_confirm_modal.dart';
 import '../../../models/wallet.dart';
 import '../../../services/wallet_service.dart';
 import '../../jobs/web/web_typography.dart';
@@ -586,27 +587,14 @@ Future<void> _onPurchase(
 }) async {
   final confirmed = await showDialog<bool>(
     context: context,
-    builder: (ctx) => AlertDialog(
-      title: Text(voucher ? '공고권 충전' : '잔액 충전'),
-      content: const Text(
-        '결제 모듈은 운영팀에서 준비 중입니다. 곧 토스페이먼츠를 통해 결제할 수 있어요.\n\n'
-        '지금은 충전 요청만 접수됩니다 — 운영팀이 영업일 1일 내 처리 후 잔액에 반영해 드립니다.',
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, false),
-          child: const Text('취소'),
+    builder:
+        (_) => AppConfirmModal(
+          title: voucher ? '공고권 충전' : '잔액 충전',
+          message:
+              '결제 모듈은 운영팀에서 준비 중입니다. 곧 토스페이먼츠를 통해 결제할 수 있어요.\n\n'
+              '지금은 충전 요청만 접수됩니다 — 운영팀이 영업일 1일 내 처리 후 잔액에 반영해 드립니다.',
+          confirmLabel: '요청 보내기',
         ),
-        FilledButton(
-          onPressed: () => Navigator.pop(ctx, true),
-          style: FilledButton.styleFrom(
-            backgroundColor: AppColors.accent,
-            foregroundColor: AppColors.white,
-          ),
-          child: const Text('요청 보내기'),
-        ),
-      ],
-    ),
   );
   if (confirmed != true) return;
   if (!context.mounted) return;

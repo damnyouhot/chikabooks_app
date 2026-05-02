@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_tokens.dart' show AppRadius, AppSpacing;
+import '../../../core/widgets/app_confirm_modal.dart';
 import '../../../models/applicant_pool_entry.dart';
 import '../../../services/applicant_pool_service.dart';
 import '../../jobs/web/web_typography.dart';
@@ -230,22 +231,15 @@ class _MeApplicantsPoolPageState extends ConsumerState<MeApplicantsPoolPage> {
   Future<void> _confirmRemove(JoinedApplicant a) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('풀에서 제거'),
-        content: Text(
-            '${a.displayName.isEmpty ? a.applicantUid : a.displayName} 님을 인재풀에서 제거할까요?\n\n'
-            '지원 이력 자체는 그대로 남아있습니다.'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('취소')),
-          FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.error),
-              child: const Text('제거')),
-        ],
-      ),
+      builder:
+          (_) => AppConfirmModal(
+            title: '풀에서 제거',
+            message:
+                '${a.displayName.isEmpty ? a.applicantUid : a.displayName} 님을 인재풀에서 제거할까요?\n\n'
+                '지원 이력 자체는 그대로 남아있습니다.',
+            confirmLabel: '제거',
+            destructive: true,
+          ),
     );
     if (ok != true) return;
     await ApplicantPoolService.removeFromPool(

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_tokens.dart' show AppRadius, AppSpacing;
+import '../../../core/widgets/app_modal_scaffold.dart';
 import '../../../models/job_order.dart';
 import '../../../services/order_service.dart';
 import '../../jobs/web/web_typography.dart';
@@ -368,55 +369,88 @@ class _TaxInvoiceDialogState extends State<_TaxInvoiceDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('세금계산서 발급 요청'),
-      content: SizedBox(
-        width: 480,
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '주문 #${widget.order.id.substring(0, widget.order.id.length.clamp(0, 8).toInt())} · '
-                '${NumberFormat('#,###').format(widget.order.amount)}원',
-                style: WebTypo.caption(
-                    color: AppColors.textSecondary, size: 12),
+    return AppModalDialog(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            '세금계산서 발급 요청',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          SizedBox(
+            width: 480,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '주문 #${widget.order.id.substring(0, widget.order.id.length.clamp(0, 8).toInt())} · '
+                    '${NumberFormat('#,###').format(widget.order.amount)}원',
+                    style: WebTypo.caption(
+                        color: AppColors.textSecondary, size: 12),
+                  ),
+                  const SizedBox(height: 16),
+                  _Field(label: '사업자번호 *', controller: _bizNo, hint: '123-45-67890'),
+                  const SizedBox(height: 12),
+                  _Field(label: '상호 *', controller: _clinicName),
+                  const SizedBox(height: 12),
+                  _Field(label: '대표자명 *', controller: _ownerName),
+                  const SizedBox(height: 12),
+                  _Field(label: '사업장 주소 *', controller: _address),
+                  const SizedBox(height: 12),
+                  _Field(label: '업태', controller: _bizType, hint: '서비스, 의료업 등'),
+                  const SizedBox(height: 12),
+                  _Field(label: '종목', controller: _bizItem, hint: '치과의원'),
+                  const SizedBox(height: 12),
+                  _Field(
+                      label: '수신 이메일 *',
+                      controller: _email,
+                      keyboardType: TextInputType.emailAddress),
+                ],
               ),
-              const SizedBox(height: 16),
-              _Field(label: '사업자번호 *', controller: _bizNo, hint: '123-45-67890'),
-              const SizedBox(height: 12),
-              _Field(label: '상호 *', controller: _clinicName),
-              const SizedBox(height: 12),
-              _Field(label: '대표자명 *', controller: _ownerName),
-              const SizedBox(height: 12),
-              _Field(label: '사업장 주소 *', controller: _address),
-              const SizedBox(height: 12),
-              _Field(label: '업태', controller: _bizType, hint: '서비스, 의료업 등'),
-              const SizedBox(height: 12),
-              _Field(label: '종목', controller: _bizItem, hint: '치과의원'),
-              const SizedBox(height: 12),
-              _Field(
-                  label: '수신 이메일 *',
-                  controller: _email,
-                  keyboardType: TextInputType.emailAddress),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Row(
+            children: [
+              Expanded(
+                child: TextButton(
+                  onPressed: _sending ? null : () => Navigator.of(context).pop(),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.textSecondary,
+                    backgroundColor: AppColors.surfaceMuted,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  child: const Text('취소'),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: FilledButton(
+                  onPressed: _sending ? null : _submit,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: AppColors.white,
+                  ),
+                  child: Text(_sending ? '요청 중...' : '발급 요청'),
+                ),
+              ),
             ],
           ),
-        ),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: _sending ? null : () => Navigator.of(context).pop(),
-          child: const Text('취소'),
-        ),
-        FilledButton(
-          onPressed: _sending ? null : _submit,
-          style: FilledButton.styleFrom(
-            backgroundColor: AppColors.accent,
-            foregroundColor: AppColors.white,
-          ),
-          child: Text(_sending ? '요청 중...' : '발급 요청'),
-        ),
-      ],
     );
   }
 }
@@ -491,70 +525,103 @@ class _CashReceiptDialogState extends State<_CashReceiptDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('현금영수증 발급 요청'),
-      content: SizedBox(
-        width: 420,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '주문 #${widget.order.id.substring(0, widget.order.id.length.clamp(0, 8).toInt())} · '
-              '${NumberFormat('#,###').format(widget.order.amount)}원',
-              style: WebTypo.caption(
-                  color: AppColors.textSecondary, size: 12),
+    return AppModalDialog(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            '현금영수증 발급 요청',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
             ),
-            const SizedBox(height: 16),
-            const Text('발급 유형',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 6),
-            Row(
+          ),
+          const SizedBox(height: AppSpacing.md),
+          SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: RadioListTile<String>(
-                    value: 'business',
-                    groupValue: _type,
-                    title: const Text('지출증빙', style: TextStyle(fontSize: 13)),
-                    contentPadding: EdgeInsets.zero,
-                    onChanged: (v) => setState(() => _type = v ?? 'business'),
-                  ),
+                Text(
+                  '주문 #${widget.order.id.substring(0, widget.order.id.length.clamp(0, 8).toInt())} · '
+                  '${NumberFormat('#,###').format(widget.order.amount)}원',
+                  style: WebTypo.caption(
+                      color: AppColors.textSecondary, size: 12),
                 ),
-                Expanded(
-                  child: RadioListTile<String>(
-                    value: 'income',
-                    groupValue: _type,
-                    title: const Text('소득공제', style: TextStyle(fontSize: 13)),
-                    contentPadding: EdgeInsets.zero,
-                    onChanged: (v) => setState(() => _type = v ?? 'business'),
-                  ),
+                const SizedBox(height: 16),
+                const Text('발급 유형',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Expanded(
+                      child: RadioListTile<String>(
+                        value: 'business',
+                        groupValue: _type,
+                        title: const Text('지출증빙', style: TextStyle(fontSize: 13)),
+                        contentPadding: EdgeInsets.zero,
+                        onChanged: (v) => setState(() => _type = v ?? 'business'),
+                      ),
+                    ),
+                    Expanded(
+                      child: RadioListTile<String>(
+                        value: 'income',
+                        groupValue: _type,
+                        title: const Text('소득공제', style: TextStyle(fontSize: 13)),
+                        contentPadding: EdgeInsets.zero,
+                        onChanged: (v) => setState(() => _type = v ?? 'business'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                _Field(
+                  label: _type == 'business' ? '사업자번호' : '휴대폰번호',
+                  controller: _identifier,
+                  hint: _type == 'business' ? '123-45-67890' : '010-1234-5678',
+                  keyboardType: TextInputType.number,
                 ),
               ],
             ),
-            const SizedBox(height: 4),
-            _Field(
-              label: _type == 'business' ? '사업자번호' : '휴대폰번호',
-              controller: _identifier,
-              hint: _type == 'business' ? '123-45-67890' : '010-1234-5678',
-              keyboardType: TextInputType.number,
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: _sending ? null : () => Navigator.of(context).pop(),
-          child: const Text('취소'),
-        ),
-        FilledButton(
-          onPressed: _sending ? null : _submit,
-          style: FilledButton.styleFrom(
-            backgroundColor: AppColors.accent,
-            foregroundColor: AppColors.white,
           ),
-          child: Text(_sending ? '요청 중...' : '발급 요청'),
-        ),
-      ],
+          const SizedBox(height: AppSpacing.lg),
+          Row(
+            children: [
+              Expanded(
+                child: TextButton(
+                  onPressed: _sending ? null : () => Navigator.of(context).pop(),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.textSecondary,
+                    backgroundColor: AppColors.surfaceMuted,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  child: const Text('취소'),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: FilledButton(
+                  onPressed: _sending ? null : _submit,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: AppColors.white,
+                  ),
+                  child: Text(_sending ? '요청 중...' : '발급 요청'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

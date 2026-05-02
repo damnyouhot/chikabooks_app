@@ -21,6 +21,7 @@
 | 2026-05-02 | Phase C (순서 6–9) | `bond_page`, `diary_timeline_page`, `growth_page`, `job_page`의 `AlertDialog`를 `AppModalDialog` / `AppConfirmModal`로 교체(일기 삭제는 확인 후 본문에서만 삭제). |
 | 2026-05-02 | Phase D (순서 10–15) | `career_tab`·`career_network_section` 삭제 확인을 `AppConfirmModal`로 통일. 11·12·13·15행 파일은 `AlertDialog` 없음(시트·날짜만, 모달 통일 범위 외). |
 | 2026-05-02 | Phase E (순서 16–23) | 이력서 홈·편집·지원내역, 구인 웹(`job_post_web_page`, `job_input`, `job_draft_editor`, `job_manage_section`, `published_job_detail`)의 `AlertDialog`를 `AppConfirmModal` / `AppModalDialog`로 교체. `job_post_form`(순서 24)은 제외. |
+| 2026-05-02 | Phase F (순서 25–29) | `me_notifications`, `me_orders`, `me_billing`, `me_clinic`, `me_applicants_pool` 및 `edit_pool_meta_dialog`·`notify_past_applicants_dialog`의 `AlertDialog`를 `AppConfirmModal` / `AppModalDialog`로 교체. |
 
 ## 1. 인벤토리 스프레드시트 (착수 직후 1일 이내)
 
@@ -92,11 +93,11 @@
 | 22 | E | `lib/features/jobs/web/job_manage_section.dart` | `showDialog` | Med | ✅ |
 | 23 | E | `lib/features/jobs/web/published_job_detail_page.dart` | `showDialog` | Med | ✅ |
 | 24 | E | `lib/features/jobs/ui/job_post_form.dart` | `Dialog`+`showDatePicker` | High | |
-| 25 | F | `lib/features/me/pages/me_notifications_page.dart` | `showDialog` | Med | |
-| 26 | F | `lib/features/me/pages/me_orders_page.dart` | `showDialog` | Med | |
-| 27 | F | `lib/features/me/pages/me_billing_page.dart` | `showDialog` | High | |
-| 28 | F | `lib/features/me/pages/me_clinic_page.dart` | `showDialog` | Med | |
-| 29 | F | `lib/features/me/pages/me_applicants_pool_page.dart` | `showDialog` 다수 + 위젯 다이얼로그 연동 | Med | |
+| 25 | F | `lib/features/me/pages/me_notifications_page.dart` | `showDialog` | Med | ✅ |
+| 26 | F | `lib/features/me/pages/me_orders_page.dart` | `showDialog` | Med | ✅ |
+| 27 | F | `lib/features/me/pages/me_billing_page.dart` | `showDialog` | High | ✅ |
+| 28 | F | `lib/features/me/pages/me_clinic_page.dart` | `showDialog` | Med | ✅ |
+| 29 | F | `lib/features/me/pages/me_applicants_pool_page.dart` | `showDialog` 다수 + 위젯 다이얼로그 연동 | Med | ✅ |
 | 30 | G | `lib/features/publisher/pages/publisher_pending_page.dart` | `showDialog` | Med | |
 | 31 | G | `lib/features/publisher/widgets/publisher_clinic_identity_section.dart` | `showDialog` | Med | |
 | 32 | G | `lib/features/publisher/widgets/clinic_selector.dart` | `showDialog` | Med | |
@@ -174,4 +175,4 @@
 
 ---
 
-이 문서는 저장소 루트 `docs/modal_unification_execution_order.md`에 두었다. 다음 단계는 **Phase F (나·알림 등, 순서 25–29)** 및 **순서 24 `job_post_form` 단독 PR** 착수다.
+이 문서는 저장소 루트 `docs/modal_unification_execution_order.md`에 두었다. 다음 단계는 **순서 24 `job_post_form` 단독 PR**(고위험) 또는 **Phase G(출판, 30–32)** 착수다.

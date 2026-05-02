@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_tokens.dart' show AppRadius, AppSpacing;
+import '../../../core/widgets/app_confirm_modal.dart';
+import '../../../core/widgets/app_modal_scaffold.dart';
 import '../../../models/notification_prefs.dart';
 import '../../../services/notification_prefs_service.dart';
 import '../../jobs/web/web_typography.dart';
@@ -250,19 +252,13 @@ class _RecipientsCard extends StatelessWidget {
   Future<void> _remove(BuildContext context, String id) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('수신자 삭제'),
-        content: const Text('이 수신자에게 알림이 발송되지 않습니다.'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('취소')),
-          TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('삭제',
-                  style: TextStyle(color: AppColors.error))),
-        ],
-      ),
+      builder:
+          (_) => const AppConfirmModal(
+            title: '수신자 삭제',
+            message: '이 수신자에게 알림이 발송되지 않습니다.',
+            confirmLabel: '삭제',
+            destructive: true,
+          ),
     );
     if (ok != true) return;
     try {
@@ -502,93 +498,126 @@ class _RecipientDialogState extends State<_RecipientDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.initial == null ? '수신자 추가' : '수신자 수정'),
-      content: SizedBox(
-        width: 420,
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
+    return AppModalDialog(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            widget.initial == null ? '수신자 추가' : '수신자 수정',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          SizedBox(
+            width: 420,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: _name,
+                    decoration:
+                        const InputDecoration(labelText: '이름 *'),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    initialValue: _role,
+                    items: _roles
+                        .map((r) => DropdownMenuItem(
+                            value: r, child: Text(r)))
+                        .toList(),
+                    decoration:
+                        const InputDecoration(labelText: '역할'),
+                    onChanged: (v) =>
+                        setState(() => _role = v ?? _role),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _email,
+                    decoration:
+                        const InputDecoration(labelText: '이메일'),
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _phone,
+                    decoration: const InputDecoration(
+                        labelText: '휴대폰 (예: 010-1234-5678)'),
+                    keyboardType: TextInputType.phone,
+                  ),
+                  const SizedBox(height: 12),
+                  SwitchListTile.adaptive(
+                    value: _active,
+                    onChanged: (v) => setState(() => _active = v),
+                    title: const Text('활성',
+                        style: TextStyle(fontSize: 13)),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  const SizedBox(height: 4),
+                  const Text('받을 알림 (선택 안하면 전체)',
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary)),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children:
+                        kNotificationEventLabels.entries.map((e) {
+                      final selected = _events.contains(e.key);
+                      return FilterChip(
+                        label: Text(e.value,
+                            style: const TextStyle(fontSize: 11)),
+                        selected: selected,
+                        onSelected: (v) {
+                          setState(() {
+                            if (v) {
+                              _events.add(e.key);
+                            } else {
+                              _events.remove(e.key);
+                            }
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              TextField(
-                controller: _name,
-                decoration:
-                    const InputDecoration(labelText: '이름 *'),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.textSecondary,
+                  backgroundColor: AppColors.surfaceMuted,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                  ),
+                  textStyle: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                child: const Text('취소'),
               ),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                initialValue: _role,
-                items: _roles
-                    .map((r) => DropdownMenuItem(
-                        value: r, child: Text(r)))
-                    .toList(),
-                decoration:
-                    const InputDecoration(labelText: '역할'),
-                onChanged: (v) =>
-                    setState(() => _role = v ?? _role),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _email,
-                decoration:
-                    const InputDecoration(labelText: '이메일'),
-                keyboardType: TextInputType.emailAddress,
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _phone,
-                decoration: const InputDecoration(
-                    labelText: '휴대폰 (예: 010-1234-5678)'),
-                keyboardType: TextInputType.phone,
-              ),
-              const SizedBox(height: 12),
-              SwitchListTile.adaptive(
-                value: _active,
-                onChanged: (v) => setState(() => _active = v),
-                title: const Text('활성',
-                    style: TextStyle(fontSize: 13)),
-                contentPadding: EdgeInsets.zero,
-              ),
-              const SizedBox(height: 4),
-              const Text('받을 알림 (선택 안하면 전체)',
-                  style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textSecondary)),
-              const SizedBox(height: 6),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children:
-                    kNotificationEventLabels.entries.map((e) {
-                  final selected = _events.contains(e.key);
-                  return FilterChip(
-                    label: Text(e.value,
-                        style: const TextStyle(fontSize: 11)),
-                    selected: selected,
-                    onSelected: (v) {
-                      setState(() {
-                        if (v) {
-                          _events.add(e.key);
-                        } else {
-                          _events.remove(e.key);
-                        }
-                      });
-                    },
-                  );
-                }).toList(),
+              const SizedBox(width: AppSpacing.sm),
+              FilledButton(
+                onPressed: _submit,
+                child: const Text('저장'),
               ),
             ],
           ),
-        ),
+        ],
       ),
-      actions: [
-        TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('취소')),
-        ElevatedButton(
-            onPressed: _submit, child: const Text('저장')),
-      ],
     );
   }
 }

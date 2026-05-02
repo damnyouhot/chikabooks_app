@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_tokens.dart' show AppRadius, AppSpacing;
+import '../../../core/widgets/app_modal_scaffold.dart';
 import '../../../models/clinic_profile.dart';
 import '../../jobs/web/web_typography.dart';
 import '../../publisher/services/clinic_profile_service.dart';
@@ -68,14 +69,30 @@ class _MeClinicPageState extends ConsumerState<MeClinicPage> {
       context: context,
       barrierDismissible: false,
       builder:
-          (ctx) => AlertDialog(
-            title: Text(title),
-            content: Column(
+          (ctx) => AppModalDialog(
+            child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(message),
-                const SizedBox(height: 12),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  message,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    height: 1.45,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -95,22 +112,41 @@ class _MeClinicPageState extends ConsumerState<MeClinicPage> {
                     ),
                   ),
                 ),
+                const SizedBox(height: AppSpacing.lg),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.textSecondary,
+                          backgroundColor: AppColors.surfaceMuted,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                          ),
+                          textStyle: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        child: const Text('취소'),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.error,
+                          foregroundColor: AppColors.white,
+                        ),
+                        child: Text(confirmLabel),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('취소'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.error,
-                  foregroundColor: AppColors.white,
-                ),
-                child: Text(confirmLabel),
-              ),
-            ],
           ),
     );
   }
@@ -767,64 +803,97 @@ class _EditBranchDialogState extends State<_EditBranchDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.isNew ? '새 지점 정보 입력' : '지점 정보 수정'),
-      content: SizedBox(
-        width: 480,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return AppModalDialog(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            widget.isNew ? '새 지점 정보 입력' : '지점 정보 수정',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          SizedBox(
+            width: 480,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _Field(
+                    label: '노출명 (구직자에게 보일 이름)',
+                    controller: _displayName,
+                    hint: '예: 미소가득 치과 강남점',
+                  ),
+                  const SizedBox(height: 12),
+                  _Field(
+                    label: '공식 상호 (사업자등록증 기준)',
+                    controller: _clinicName,
+                    hint: '예: 의료법인 미소가득의료재단 미소가득치과의원',
+                  ),
+                  const SizedBox(height: 12),
+                  _Field(label: '주소', controller: _address, hint: '서울특별시 강남구 ...'),
+                  const SizedBox(height: 12),
+                  _Field(label: '대표자명', controller: _ownerName),
+                  const SizedBox(height: 12),
+                  _Field(
+                    label: '대표 연락처',
+                    controller: _phone,
+                    hint: '02-1234-5678',
+                    keyboardType: TextInputType.phone,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '※ 노출명과 공식 상호를 분리해서 관리할 수 있습니다.\n'
+                    '   노출명만 비워두면 공식 상호로 표시됩니다.',
+                    style: WebTypo.caption(
+                      color: AppColors.textSecondary,
+                      size: 11.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Row(
             children: [
-              _Field(
-                label: '노출명 (구직자에게 보일 이름)',
-                controller: _displayName,
-                hint: '예: 미소가득 치과 강남점',
+              Expanded(
+                child: TextButton(
+                  onPressed: _saving ? null : () => Navigator.of(context).pop(),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.textSecondary,
+                    backgroundColor: AppColors.surfaceMuted,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  child: const Text('취소'),
+                ),
               ),
-              const SizedBox(height: 12),
-              _Field(
-                label: '공식 상호 (사업자등록증 기준)',
-                controller: _clinicName,
-                hint: '예: 의료법인 미소가득의료재단 미소가득치과의원',
-              ),
-              const SizedBox(height: 12),
-              _Field(label: '주소', controller: _address, hint: '서울특별시 강남구 ...'),
-              const SizedBox(height: 12),
-              _Field(label: '대표자명', controller: _ownerName),
-              const SizedBox(height: 12),
-              _Field(
-                label: '대표 연락처',
-                controller: _phone,
-                hint: '02-1234-5678',
-                keyboardType: TextInputType.phone,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '※ 노출명과 공식 상호를 분리해서 관리할 수 있습니다.\n'
-                '   노출명만 비워두면 공식 상호로 표시됩니다.',
-                style: WebTypo.caption(
-                  color: AppColors.textSecondary,
-                  size: 11.5,
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: FilledButton(
+                  onPressed: _saving ? null : _save,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: AppColors.white,
+                  ),
+                  child: Text(_saving ? '저장 중...' : '저장'),
                 ),
               ),
             ],
           ),
-        ),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: _saving ? null : () => Navigator.of(context).pop(),
-          child: const Text('취소'),
-        ),
-        FilledButton(
-          onPressed: _saving ? null : _save,
-          style: FilledButton.styleFrom(
-            backgroundColor: AppColors.accent,
-            foregroundColor: AppColors.white,
-          ),
-          child: Text(_saving ? '저장 중...' : '저장'),
-        ),
-      ],
     );
   }
 }
