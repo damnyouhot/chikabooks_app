@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
+import '../../core/widgets/app_modal_scaffold.dart';
 import '../../services/funnel_onboarding_service.dart';
 import '../../services/onboarding_workplace_service.dart';
 
@@ -28,14 +29,46 @@ class _OnboardingNicknamePopupState extends State<OnboardingNicknamePopup> {
 
   // 설정 화면과 동일한 랜덤 닉네임 목록 (대표 20개)
   static const _suggestions = [
-    '스케일링중독자', '치은여왕', '어금니의비밀', '멸균요정', '핸드피스마스터',
-    '버티는치위생', '야근의전설', '인상채득러버', '치경거울요정', '소독실의숨결',
-    '핀셋천재', '레진수호자', '기구정리장인', '체어위의철학자', '치은선지킴이',
-    '석션장인', '물분사요정', '진료실탐험가', '멘탈마취전문', '스케일링왕자',
-    '칫솔들고철학', '레진빛광채', '초음파의속삭임', '교합의운명', '기구트레이요정',
-    '진료실생존자', '차트의그림자', '스케일링한숨', '치과의밤바람', '멘탈스케일링',
-    '실습의추억', '소독실은나의것', '치은빛노을', '체어사이드고수', '석션한모금',
-    '근무표전사', '점심은없다', '퇴근을꿈꾸는자', '치위생감성', '사랑니헌터',
+    '스케일링중독자',
+    '치은여왕',
+    '어금니의비밀',
+    '멸균요정',
+    '핸드피스마스터',
+    '버티는치위생',
+    '야근의전설',
+    '인상채득러버',
+    '치경거울요정',
+    '소독실의숨결',
+    '핀셋천재',
+    '레진수호자',
+    '기구정리장인',
+    '체어위의철학자',
+    '치은선지킴이',
+    '석션장인',
+    '물분사요정',
+    '진료실탐험가',
+    '멘탈마취전문',
+    '스케일링왕자',
+    '칫솔들고철학',
+    '레진빛광채',
+    '초음파의속삭임',
+    '교합의운명',
+    '기구트레이요정',
+    '진료실생존자',
+    '차트의그림자',
+    '스케일링한숨',
+    '치과의밤바람',
+    '멘탈스케일링',
+    '실습의추억',
+    '소독실은나의것',
+    '치은빛노을',
+    '체어사이드고수',
+    '석션한모금',
+    '근무표전사',
+    '점심은없다',
+    '퇴근을꿈꾸는자',
+    '치위생감성',
+    '사랑니헌터',
   ];
 
   void _randomNickname() {
@@ -53,126 +86,122 @@ class _OnboardingNicknamePopupState extends State<OnboardingNicknamePopup> {
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: AppColors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.xl),
+    return AppModalDialog(
+      insetPadding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.xxl,
       ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.lg,
-          AppSpacing.xl,
-          AppSpacing.lg,
-          AppSpacing.lg,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '나의 닉네임은',
-              style: GoogleFonts.notoSansKr(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textPrimary,
-              ),
+      cardPadding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.xl,
+        AppSpacing.lg,
+        AppSpacing.lg,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '나의 닉네임은',
+            style: GoogleFonts.notoSansKr(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
             ),
-            const SizedBox(height: 4),
-            Text(
-              '언제든 바꿀 수 있어',
-              style: GoogleFonts.notoSansKr(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textSecondary,
-              ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '언제든 바꿀 수 있어',
+            style: GoogleFonts.notoSansKr(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textSecondary,
             ),
-            const SizedBox(height: AppSpacing.md + 8),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _ctrl,
-                    autofocus: true,
-                    maxLength: 12,
-                    onChanged: (v) =>
-                        setState(() => _canSubmit = v.trim().isNotEmpty),
-                    decoration: InputDecoration(
-                      hintText: '닉네임 입력',
-                      counterText: '',
-                      filled: true,
-                      fillColor: AppColors.surfaceMuted,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.lg,
-                        vertical: AppSpacing.md + 2,
+          ),
+          const SizedBox(height: AppSpacing.md + 8),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _ctrl,
+                  autofocus: true,
+                  maxLength: 12,
+                  onChanged:
+                      (v) => setState(() => _canSubmit = v.trim().isNotEmpty),
+                  decoration: InputDecoration(
+                    hintText: '닉네임 입력',
+                    counterText: '',
+                    filled: true,
+                    fillColor: AppColors.surfaceMuted,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.lg,
+                      vertical: AppSpacing.md + 2,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                      borderSide: const BorderSide(
+                        color: AppColors.divider,
+                        width: 0.8,
                       ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                        borderSide: const BorderSide(
-                          color: AppColors.divider,
-                          width: 0.8,
-                        ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                      borderSide: const BorderSide(
+                        color: AppColors.accent,
+                        width: 1.4,
                       ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                        borderSide: const BorderSide(
-                          color: AppColors.accent,
-                          width: 1.4,
-                        ),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                        borderSide: const BorderSide(
-                          color: AppColors.divider,
-                          width: 0.8,
-                        ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                      borderSide: const BorderSide(
+                        color: AppColors.divider,
+                        width: 0.8,
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: AppSpacing.sm),
-                Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceMuted,
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                  ),
-                  child: IconButton(
-                    onPressed: _randomNickname,
-                    icon: const Text('🎲', style: TextStyle(fontSize: 18)),
-                    tooltip: '랜덤 닉네임',
-                  ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Container(
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceMuted,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                 ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed:
-                    _canSubmit
-                        ? () => widget.onDone(_ctrl.text.trim())
-                        : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.accent,
-                  foregroundColor: AppColors.onAccent,
-                  disabledBackgroundColor: AppColors.disabledBg,
-                  disabledForegroundColor: AppColors.disabledText,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppRadius.lg),
-                  ),
+                child: IconButton(
+                  onPressed: _randomNickname,
+                  icon: const Text('🎲', style: TextStyle(fontSize: 18)),
+                  tooltip: '랜덤 닉네임',
                 ),
-                child: Text(
-                  '확인',
-                  style: GoogleFonts.notoSansKr(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                  ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed:
+                  _canSubmit ? () => widget.onDone(_ctrl.text.trim()) : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.accent,
+                foregroundColor: AppColors.onAccent,
+                disabledBackgroundColor: AppColors.disabledBg,
+                disabledForegroundColor: AppColors.disabledText,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                ),
+              ),
+              child: Text(
+                '확인',
+                style: GoogleFonts.notoSansKr(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -333,15 +362,12 @@ class _OnboardingWorkplacePopupState extends State<OnboardingWorkplacePopup> {
       MediaQuery.sizeOf(context).width - AppSpacing.lg * 2,
     );
 
-    return Dialog(
-      backgroundColor: AppColors.white,
+    return AppModalDialog(
       insetPadding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.lg,
         vertical: AppSpacing.xxl,
       ),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.xl),
-      ),
+      cardPadding: EdgeInsets.zero,
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: maxW,
@@ -479,20 +505,20 @@ class _OnboardingWorkplacePopupState extends State<OnboardingWorkplacePopup> {
                   child:
                       _saving
                           ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.2,
-                                color: AppColors.onAccent,
-                              ),
-                            )
-                          : Text(
-                              '확인',
-                              style: GoogleFonts.notoSansKr(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
-                              ),
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.2,
+                              color: AppColors.onAccent,
                             ),
+                          )
+                          : Text(
+                            '확인',
+                            style: GoogleFonts.notoSansKr(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
                 ),
               ),
             ],

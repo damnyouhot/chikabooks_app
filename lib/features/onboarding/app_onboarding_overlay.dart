@@ -13,14 +13,14 @@ const _kText = Color(0xFF3D3535);
 const Map<AppOnboardingStepId, String> kStepDialogue = {
   AppOnboardingStepId.step1a: '안녕!\n\n난 여기서 언제나 너와 함께할 저니라고 해.',
   AppOnboardingStepId.step1b: '넌 이름이 뭐야?',
-  AppOnboardingStepId.step3:  '나는 멍멍 치과에서\n1년차로 일하고 있어.\n\n넌?',
-  AppOnboardingStepId.step5:  '아래 커리어 탭을 눌러봐!',
+  AppOnboardingStepId.step3: '나는 멍멍 치과에서\n1년차로 일하고 있어.\n\n넌?',
+  AppOnboardingStepId.step5: '아래 커리어 탭을 눌러봐!',
   AppOnboardingStepId.step6a:
       '여기서 너의 커리어를 관리해봐.\n기존 이력서를 AI가 자동입력도 해주고\n바로 공고에 지원도 가능해!',
   AppOnboardingStepId.step5b: '아래 성장하기 탭도 눌러봐!',
   AppOnboardingStepId.step7a:
       '여기서 자기 계발도 할 수 있어\n나랑 같이 퀴즈, 제도들,\n책으로 공부 하면서 성장해 나가자!',
-  AppOnboardingStepId.step8:  '아래 첫 번째 탭으로 가볼까?',
+  AppOnboardingStepId.step8: '아래 첫 번째 탭으로 가볼까?',
   AppOnboardingStepId.step9a: '난 항상 여기 있을건데\n혹시 나 밥도 주고 사랑도 줄 수 있어?',
   AppOnboardingStepId.step9b: '하루 몇번이면 충분해.',
   AppOnboardingStepId.step9c: '앞으로 잘 지내자.',
@@ -121,14 +121,14 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
   }
 
   void _showNicknamePopup() {
-    showDialog(
+    showDialog<void>(
       context: context,
       barrierDismissible: false,
       barrierColor: AppColors.black.withOpacity(0.4),
       builder:
-          (_) => OnboardingNicknamePopup(
+          (dialogCtx) => OnboardingNicknamePopup(
             onDone: (nickname) async {
-              Navigator.of(context).pop();
+              Navigator.of(dialogCtx).pop();
               _nickname = nickname;
 
               // users/{uid} 닉네임 저장
@@ -148,14 +148,14 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
   }
 
   void _showWorkplacePopup() {
-    showDialog(
+    showDialog<void>(
       context: context,
       barrierDismissible: false,
       barrierColor: AppColors.black.withOpacity(0.4),
       builder:
-          (_) => OnboardingWorkplacePopup(
+          (dialogCtx) => OnboardingWorkplacePopup(
             onDone: (status, placeName) {
-              Navigator.of(context).pop();
+              Navigator.of(dialogCtx).pop();
               widget.controller.advance();
             },
           ),
@@ -188,7 +188,8 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
     final step = widget.controller.current;
 
     // 팝업 step은 오버레이를 투명하게 (팝업이 위에 표시됨)
-    if (step == AppOnboardingStepId.step2 || step == AppOnboardingStepId.step4) {
+    if (step == AppOnboardingStepId.step2 ||
+        step == AppOnboardingStepId.step4) {
       return const SizedBox.shrink();
     }
 
@@ -204,13 +205,25 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
 
     // spotlight steps
     if (step == AppOnboardingStepId.step5) {
-      return _buildSpotlightOverlay(context, targetTabIdx: 3, hint: '아래 커리어 탭을 눌러볼까?');
+      return _buildSpotlightOverlay(
+        context,
+        targetTabIdx: 3,
+        hint: '아래 커리어 탭을 눌러볼까?',
+      );
     }
     if (step == AppOnboardingStepId.step5b) {
-      return _buildSpotlightOverlay(context, targetTabIdx: 2, hint: '아래 성장하기 탭도 눌러볼까?');
+      return _buildSpotlightOverlay(
+        context,
+        targetTabIdx: 2,
+        hint: '아래 성장하기 탭도 눌러볼까?',
+      );
     }
     if (step == AppOnboardingStepId.step8) {
-      return _buildSpotlightOverlay(context, targetTabIdx: 0, hint: '아래 첫 번째 탭으로 가볼까?');
+      return _buildSpotlightOverlay(
+        context,
+        targetTabIdx: 0,
+        hint: '아래 첫 번째 탭으로 가볼까?',
+      );
     }
 
     return _buildTextOverlay(context, step);
@@ -295,7 +308,11 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
           child: FadeTransition(
             opacity: _fadeCtrl,
             child: IgnorePointer(
-              child: _DialogueBubble(text: hint, showTouchHint: false, isAlert: true),
+              child: _DialogueBubble(
+                text: hint,
+                showTouchHint: false,
+                isAlert: true,
+              ),
             ),
           ),
         ),
@@ -308,9 +325,7 @@ class _AppOnboardingOverlayState extends State<AppOnboardingOverlay>
           height: 40,
           child: FadeTransition(
             opacity: _fadeCtrl,
-            child: const IgnorePointer(
-              child: _BouncingArrow(),
-            ),
+            child: const IgnorePointer(child: _BouncingArrow()),
           ),
         ),
       ],
@@ -336,11 +351,10 @@ class _DialogueBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bgColor    = isAlert ? AppColors.lime  : AppColors.white;
-    final textColor  = isAlert ? AppColors.appBg : _kText;
-    final hintColor  = isAlert
-        ? AppColors.appBg.withOpacity(0.65)
-        : _kText.withOpacity(0.4);
+    final bgColor = isAlert ? AppColors.lime : AppColors.white;
+    final textColor = isAlert ? AppColors.appBg : _kText;
+    final hintColor =
+        isAlert ? AppColors.appBg.withOpacity(0.65) : _kText.withOpacity(0.4);
 
     return Container(
       width: double.infinity,
@@ -375,10 +389,7 @@ class _DialogueBubble extends StatelessWidget {
               children: [
                 Text(
                   '화면을 터치하면 다음으로 넘어가요',
-                  style: GoogleFonts.notoSansKr(
-                    fontSize: 11,
-                    color: hintColor,
-                  ),
+                  style: GoogleFonts.notoSansKr(fontSize: 11, color: hintColor),
                 ),
                 const SizedBox(width: 4),
                 Icon(Icons.touch_app_outlined, size: 13, color: hintColor),
@@ -413,9 +424,10 @@ class _BouncingArrowState extends State<_BouncingArrow>
       vsync: this,
       duration: const Duration(milliseconds: 600),
     )..repeat(reverse: true);
-    _anim = Tween<double>(begin: 0, end: 8).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
-    );
+    _anim = Tween<double>(
+      begin: 0,
+      end: 8,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
   }
 
   @override
@@ -428,17 +440,17 @@ class _BouncingArrowState extends State<_BouncingArrow>
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _anim,
-      builder: (_, __) => Transform.translate(
-        offset: Offset(0, _anim.value),
-        child: const Center(
-          child: Icon(
-            Icons.keyboard_arrow_down_rounded,
-            color: AppColors.lime, // 주황색 (#FF7A00)
-            size: 32,
+      builder:
+          (_, __) => Transform.translate(
+            offset: Offset(0, _anim.value),
+            child: const Center(
+              child: Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: AppColors.lime, // 주황색 (#FF7A00)
+                size: 32,
+              ),
+            ),
           ),
-        ),
-      ),
     );
   }
 }
-
