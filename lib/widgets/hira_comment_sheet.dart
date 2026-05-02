@@ -5,6 +5,8 @@ import '../models/hira_update.dart';
 import '../services/hira_comment_service.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_tokens.dart';
+import '../core/widgets/app_confirm_modal.dart';
+import '../core/widgets/app_modal_scaffold.dart';
 
 /// HIRA 댓글 BottomSheet
 class HiraCommentSheet extends StatefulWidget {
@@ -254,22 +256,11 @@ class _CommentItem extends StatelessWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder:
-          (context) => AlertDialog(
-            title: const Text('댓글 삭제'),
-            content: const Text('댓글을 삭제하시겠습니까?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('취소'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text(
-                  '삭제',
-                  style: TextStyle(color: AppColors.error),
-                ),
-              ),
-            ],
+          (context) => const AppConfirmModal(
+            title: '댓글 삭제',
+            message: '댓글을 삭제하시겠습니까?',
+            confirmLabel: '삭제',
+            destructive: true,
           ),
     );
 
@@ -443,45 +434,59 @@ class _CommentItem extends StatelessWidget {
   }
 
   void _showEmojiPicker(BuildContext context, String? myEmoji) {
-    showDialog(
+    showDialog<void>(
       context: context,
       builder:
-          (ctx) => AlertDialog(
-            title: const Text('이모지 선택', style: TextStyle(fontSize: 14)),
-            content: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children:
-                  _emojiList.map((emoji) {
-                    final isSelected = myEmoji == emoji;
-                    return GestureDetector(
-                      onTap: () {
-                        HiraCommentService.toggleCommentReaction(
-                          updateId,
-                          comment.id,
-                          emoji,
-                        );
-                        Navigator.pop(ctx);
-                      },
-                      child: Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color:
-                              isSelected
-                                  ? AppColors.accent.withOpacity(0.4)
-                                  : AppColors.surfaceMuted,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Center(
-                          child: Text(
-                            emoji,
-                            style: const TextStyle(fontSize: 20),
+          (ctx) => AppModalDialog(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '이모지 선택',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children:
+                      _emojiList.map((emoji) {
+                        final isSelected = myEmoji == emoji;
+                        return GestureDetector(
+                          onTap: () {
+                            HiraCommentService.toggleCommentReaction(
+                              updateId,
+                              comment.id,
+                              emoji,
+                            );
+                            Navigator.pop(ctx);
+                          },
+                          child: Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color:
+                                  isSelected
+                                      ? AppColors.accent.withOpacity(0.4)
+                                      : AppColors.surfaceMuted,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Center(
+                              child: Text(
+                                emoji,
+                                style: const TextStyle(fontSize: 20),
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
+                        );
+                      }).toList(),
+                ),
+              ],
             ),
           ),
     );

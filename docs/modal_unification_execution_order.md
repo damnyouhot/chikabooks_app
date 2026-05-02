@@ -16,7 +16,8 @@
 
 | 날짜 | 단계 | 내용 |
 |------|------|------|
-| 2026-05-02 | Phase A (순서 1–2) | `lib/core/widgets/app_modal_scaffold.dart` (`AppModalCard`, `AppModalDialog`), `app_confirm_modal.dart` (`AppConfirmModal`) 추가. 호출부 이전 없음. |
+| 2026-05-02 | Phase A (순서 1–2) | `app_modal_scaffold.dart`, `app_confirm_modal.dart` 추가. 호출부 이전 없음. |
+| 2026-05-02 | Phase B (순서 3–5) | `bond_poll_section`, `hira_comment_sheet`, `user_goal_sheet`의 `AlertDialog`를 `AppConfirmModal` / `AppModalDialog`로 교체. |
 
 ---
 
@@ -68,9 +69,9 @@
 |------|-------|------|----------------|------|------|
 | 1 | A | `lib/core/widgets/app_modal_scaffold.dart` | `AppModalCard` / `AppModalDialog` 추가 | Low | ✅ |
 | 2 | A | `lib/core/widgets/app_confirm_modal.dart` | `AppConfirmModal` 추가 | Low | ✅ |
-| 3 | B | `lib/widgets/bond/bond_poll_section.dart` | `showDialog`+`AlertDialog` | Low | |
-| 4 | B | `lib/widgets/hira_comment_sheet.dart` | `showDialog` | Med | |
-| 5 | B | `lib/widgets/user_goal_sheet.dart` | 시트 + 내부 `showDialog` | Med | |
+| 3 | B | `lib/widgets/bond/bond_poll_section.dart` | `showDialog`+`AlertDialog` | Low | ✅ |
+| 4 | B | `lib/widgets/hira_comment_sheet.dart` | `showDialog` | Med | ✅ |
+| 5 | B | `lib/widgets/user_goal_sheet.dart` | 시트 + 내부 `showDialog` | Med | ✅ |
 | 6 | C | `lib/pages/bond_page.dart` | `showDialog` | Low | |
 | 7 | C | `lib/pages/diary_timeline_page.dart` | `showDialog` | Low | |
 | 8 | C | `lib/pages/growth_page.dart` | `showDialog` 다수 + 시트 | Med | |

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
+import '../core/widgets/app_confirm_modal.dart';
 import '../models/user_goal.dart';
 import '../models/routine_check.dart';
 import '../services/user_goal_service.dart';
@@ -35,10 +36,10 @@ class _UserGoalSheetContentState extends State<_UserGoalSheetContent>
   UserGoals? _goals;
   RoutineCheck? _todayCheck;
   bool _loading = true;
-  
+
   // 탭 컨트롤러
   late TabController _tabController;
-  int _currentTab = 0;  // 0: 루틴, 1: 프로젝트
+  int _currentTab = 0; // 0: 루틴, 1: 프로젝트
 
   // 주간 체크 횟수 캐시 (goalId -> count)
   final Map<String, int> _weeklyCheckCounts = {};
@@ -62,7 +63,7 @@ class _UserGoalSheetContentState extends State<_UserGoalSheetContent>
   Future<void> _loadData() async {
     final goals = await UserGoalService.loadGoals();
     final todayCheck = await UserGoalService.loadTodayCheck();
-    
+
     // 루틴별 주간 체크 횟수 로드
     for (var goal in goals.routines) {
       final count = await UserGoalService.getWeeklyCheckCount(goal.id);
@@ -108,18 +109,23 @@ class _UserGoalSheetContentState extends State<_UserGoalSheetContent>
           const SizedBox(height: 8),
 
           // 상태 요약
-          if (!_loading && _goals != null && _goals!.items.isNotEmpty) _buildSummary(),
-          if (!_loading && _goals != null && _goals!.items.isNotEmpty) const SizedBox(height: 16),
+          if (!_loading && _goals != null && _goals!.items.isNotEmpty)
+            _buildSummary(),
+          if (!_loading && _goals != null && _goals!.items.isNotEmpty)
+            const SizedBox(height: 16),
 
           // 탭
-          if (!_loading && _goals != null && _goals!.items.isNotEmpty) _buildTabs(),
-          if (!_loading && _goals != null && _goals!.items.isNotEmpty) const SizedBox(height: 16),
+          if (!_loading && _goals != null && _goals!.items.isNotEmpty)
+            _buildTabs(),
+          if (!_loading && _goals != null && _goals!.items.isNotEmpty)
+            const SizedBox(height: 16),
 
           // 내용
           Flexible(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator())
-                : _buildContent(),
+            child:
+                _loading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _buildContent(),
           ),
 
           const SizedBox(height: 20),
@@ -148,10 +154,7 @@ class _UserGoalSheetContentState extends State<_UserGoalSheetContent>
               const SizedBox(height: 4),
               Text(
                 '최대 3개 · 루틴/프로젝트 · 주/월/연',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: _kText.withOpacity(0.5),
-                ),
+                style: TextStyle(fontSize: 11, color: _kText.withOpacity(0.5)),
               ),
             ],
           ),
@@ -187,20 +190,14 @@ class _UserGoalSheetContentState extends State<_UserGoalSheetContent>
             )
           else if (_goals != null)
             Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 6,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: _kShadow2.withOpacity(0.3),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
                 '3/3',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: _kText.withOpacity(0.5),
-                ),
+                style: TextStyle(fontSize: 12, color: _kText.withOpacity(0.5)),
               ),
             ),
         ],
@@ -211,7 +208,7 @@ class _UserGoalSheetContentState extends State<_UserGoalSheetContent>
   /// 상태 요약 (오늘 체크, 이번 주 진행, 칭호)
   Widget _buildSummary() {
     final routines = _goals!.routines;
-    
+
     // 오늘 체크한 루틴 개수
     int todayChecked = 0;
     if (_todayCheck != null) {
@@ -241,10 +238,7 @@ class _UserGoalSheetContentState extends State<_UserGoalSheetContent>
         decoration: BoxDecoration(
           color: _kAccent.withOpacity(0.1),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: _kAccent.withOpacity(0.3),
-            width: 0.5,
-          ),
+          border: Border.all(color: _kAccent.withOpacity(0.3), width: 0.5),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -254,21 +248,13 @@ class _UserGoalSheetContentState extends State<_UserGoalSheetContent>
               label: '오늘 체크',
               value: '$todayChecked/${routines.length}',
             ),
-            Container(
-              width: 1,
-              height: 20,
-              color: _kShadow2.withOpacity(0.5),
-            ),
+            Container(width: 1, height: 20, color: _kShadow2.withOpacity(0.5)),
             _buildSummaryItem(
               icon: '📊',
               label: '이번 주',
               value: '$weeklyTotal회',
             ),
-            Container(
-              width: 1,
-              height: 20,
-              color: _kShadow2.withOpacity(0.5),
-            ),
+            Container(width: 1, height: 20, color: _kShadow2.withOpacity(0.5)),
             _buildSummaryItem(
               icon: '🏅',
               label: title,
@@ -294,10 +280,7 @@ class _UserGoalSheetContentState extends State<_UserGoalSheetContent>
         const SizedBox(height: 4),
         Text(
           label,
-          style: TextStyle(
-            fontSize: 11,
-            color: _kText.withOpacity(0.6),
-          ),
+          style: TextStyle(fontSize: 11, color: _kText.withOpacity(0.6)),
         ),
         if (!isTitle) ...[
           const SizedBox(height: 2),
@@ -414,10 +397,7 @@ class _UserGoalSheetContentState extends State<_UserGoalSheetContent>
           children: [
             Text(
               _currentTab == 0 ? '루틴이 없어요' : '프로젝트가 없어요',
-              style: TextStyle(
-                fontSize: 15,
-                color: _kText.withOpacity(0.5),
-              ),
+              style: TextStyle(fontSize: 15, color: _kText.withOpacity(0.5)),
             ),
             const SizedBox(height: 12),
             TextButton.icon(
@@ -468,10 +448,7 @@ class _UserGoalSheetContentState extends State<_UserGoalSheetContent>
             const SizedBox(height: 8),
             Text(
               '작고 하찮은 게 오래 가요.',
-              style: TextStyle(
-                fontSize: 14,
-                color: _kText.withOpacity(0.6),
-              ),
+              style: TextStyle(fontSize: 14, color: _kText.withOpacity(0.6)),
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
@@ -505,9 +482,10 @@ class _UserGoalSheetContentState extends State<_UserGoalSheetContent>
         color: isCheckedToday ? _kSuccess.withOpacity(0.1) : AppColors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isCheckedToday
-              ? _kSuccess.withOpacity(0.4)
-              : _kShadow2.withOpacity(0.4),
+          color:
+              isCheckedToday
+                  ? _kSuccess.withOpacity(0.4)
+                  : _kShadow2.withOpacity(0.4),
           width: 0.5,
         ),
         boxShadow: [
@@ -565,7 +543,7 @@ class _UserGoalSheetContentState extends State<_UserGoalSheetContent>
               ),
             ],
           ),
-          
+
           const SizedBox(height: 16),
 
           // 오늘 체크 버튼 (가장 중요)
@@ -574,14 +552,16 @@ class _UserGoalSheetContentState extends State<_UserGoalSheetContent>
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 12),
               decoration: BoxDecoration(
-                color: isCheckedToday
-                    ? _kSuccess.withOpacity(0.2)
-                    : _kAccent.withOpacity(0.1),
+                color:
+                    isCheckedToday
+                        ? _kSuccess.withOpacity(0.2)
+                        : _kAccent.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: isCheckedToday
-                      ? _kSuccess.withOpacity(0.5)
-                      : _kAccent.withOpacity(0.3),
+                  color:
+                      isCheckedToday
+                          ? _kSuccess.withOpacity(0.5)
+                          : _kAccent.withOpacity(0.3),
                   width: 1,
                 ),
               ),
@@ -601,7 +581,8 @@ class _UserGoalSheetContentState extends State<_UserGoalSheetContent>
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: isCheckedToday ? _kSuccess : _kText.withOpacity(0.7),
+                      color:
+                          isCheckedToday ? _kSuccess : _kText.withOpacity(0.7),
                     ),
                   ),
                 ],
@@ -664,9 +645,10 @@ class _UserGoalSheetContentState extends State<_UserGoalSheetContent>
         color: goal.isDone ? _kSuccess.withOpacity(0.1) : AppColors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: goal.isDone
-              ? _kSuccess.withOpacity(0.4)
-              : _kShadow2.withOpacity(0.4),
+          color:
+              goal.isDone
+                  ? _kSuccess.withOpacity(0.4)
+                  : _kShadow2.withOpacity(0.4),
           width: 0.5,
         ),
         boxShadow: [
@@ -693,9 +675,8 @@ class _UserGoalSheetContentState extends State<_UserGoalSheetContent>
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                         color: _kText,
-                        decoration: goal.isDone
-                            ? TextDecoration.lineThrough
-                            : null,
+                        decoration:
+                            goal.isDone ? TextDecoration.lineThrough : null,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -723,7 +704,7 @@ class _UserGoalSheetContentState extends State<_UserGoalSheetContent>
               ),
             ],
           ),
-          
+
           const SizedBox(height: 12),
 
           // 마감 안내
@@ -762,14 +743,16 @@ class _UserGoalSheetContentState extends State<_UserGoalSheetContent>
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 12),
               decoration: BoxDecoration(
-                color: goal.isDone
-                    ? _kSuccess.withOpacity(0.2)
-                    : _kAccent.withOpacity(0.1),
+                color:
+                    goal.isDone
+                        ? _kSuccess.withOpacity(0.2)
+                        : _kAccent.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: goal.isDone
-                      ? _kSuccess.withOpacity(0.5)
-                      : _kAccent.withOpacity(0.3),
+                  color:
+                      goal.isDone
+                          ? _kSuccess.withOpacity(0.5)
+                          : _kAccent.withOpacity(0.3),
                   width: 1,
                 ),
               ),
@@ -824,11 +807,11 @@ class _UserGoalSheetContentState extends State<_UserGoalSheetContent>
   /// 루틴 체크 토글
   Future<void> _toggleRoutineCheck(UserGoal goal) async {
     await UserGoalService.toggleRoutineCheck(goal.id);
-    
+
     // 데이터 리로드
     final todayCheck = await UserGoalService.loadTodayCheck();
     final weeklyCount = await UserGoalService.getWeeklyCheckCount(goal.id);
-    
+
     if (mounted) {
       setState(() {
         _todayCheck = todayCheck;
@@ -853,7 +836,7 @@ class _UserGoalSheetContentState extends State<_UserGoalSheetContent>
       isDone: !goal.isDone,
       doneAt: !goal.isDone ? DateTime.now() : null,
     );
-    
+
     await UserGoalService.updateGoal(updated);
     await _loadData();
 
@@ -872,23 +855,13 @@ class _UserGoalSheetContentState extends State<_UserGoalSheetContent>
   Future<void> _deleteGoal(UserGoal goal) async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          title: const Text('목표 삭제'),
-          content: const Text('삭제할까요?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('취소'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              style: TextButton.styleFrom(foregroundColor: AppColors.error),
-              child: const Text('삭제'),
-            ),
-          ],
-        );
-      },
+      builder:
+          (ctx) => const AppConfirmModal(
+            title: '목표 삭제',
+            message: '삭제할까요?',
+            confirmLabel: '삭제',
+            destructive: true,
+          ),
     );
 
     if (confirm == true) {
@@ -911,12 +884,13 @@ class _UserGoalSheetContentState extends State<_UserGoalSheetContent>
 
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => GoalAddForm(
-          onAdded: () {
-            _loadData();
-            Navigator.pop(context);
-          },
-        ),
+        builder:
+            (_) => GoalAddForm(
+              onAdded: () {
+                _loadData();
+                Navigator.pop(context);
+              },
+            ),
         fullscreenDialog: true,
       ),
     );

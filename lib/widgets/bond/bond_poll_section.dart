@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'poll_share_capture.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
+import '../../core/widgets/app_confirm_modal.dart';
+import '../../core/widgets/app_modal_scaffold.dart';
 import '../../core/widgets/app_muted_card.dart';
 import '../../core/widgets/app_badge.dart';
 import '../../models/poll.dart';
@@ -329,141 +331,179 @@ class BondPollSectionState extends State<BondPollSection> {
     _showDeleteOptionDialog(option);
   }
 
-  void _showDeleteOptionDialog(PollOption option) {
-    showDialog(
+  Future<void> _showDeleteOptionDialog(PollOption option) async {
+    final ok = await showDialog<bool>(
       context: context,
       builder:
-          (ctx) => AlertDialog(
-            title: const Text(
-              '보기 삭제',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-            content: Text(
-              '"${option.content}" 보기를 삭제할까요?',
-              style: const TextStyle(fontSize: 14),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('취소'),
-              ),
-              TextButton(
-                onPressed: () async {
-                  Navigator.pop(ctx);
-                  // 낙관적 UI: 즉시 화면에서 제거
-                  setState(() {
-                    _options =
-                        _options.where((o) => o.id != option.id).toList();
-                  });
-                  final result = await EmpathyPollService.deleteMyOption(
-                    _activePoll!.id,
-                    option.id,
-                  );
-                  if (!mounted) return;
-                  if (!result.success) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(result.error ?? '삭제에 실패했습니다.')),
-                    );
-                  }
-                },
-                child: const Text(
-                  '삭제',
-                  style: TextStyle(color: AppColors.error),
-                ),
-              ),
-            ],
+          (ctx) => AppConfirmModal(
+            title: '보기 삭제',
+            message: '"${option.content}" 보기를 삭제할까요?',
+            confirmLabel: '삭제',
+            destructive: true,
           ),
     );
+    if (ok != true || !mounted) return;
+    setState(() {
+      _options = _options.where((o) => o.id != option.id).toList();
+    });
+    final result = await EmpathyPollService.deleteMyOption(
+      _activePoll!.id,
+      option.id,
+    );
+    if (!mounted) return;
+    if (!result.success) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(result.error ?? '삭제에 실패했습니다.')));
+    }
   }
 
   void _showReportDialog(PollOption option) {
-    final keys = EmpathyPollService.pollReportReasonLabels.keys.toList();
-    var selected = keys.first;
-    showDialog(
+    var selected = EmpathyPollService.pollReportReasonLabels.keys.first;
+    showDialog<void>(
       context: context,
       builder:
           (ctx) => StatefulBuilder(
-            builder:
-                (ctx, setSt) => AlertDialog(
-                  title: const Text(
-                    '보기 신고',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
-                  content: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '신고 사유를 선택해주세요.',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '"${option.content}"',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        ...EmpathyPollService.pollReportReasonLabels.entries.map(
-                          (e) => RadioListTile<String>(
-                            title: Text(
-                              e.value,
-                              style: const TextStyle(fontSize: 14),
+            builder: (ctx, setSt) {
+              return AppModalDialog(
+                insetPadding: const EdgeInsets.all(AppSpacing.xl),
+                borderOpacity: 0.7,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '보기 신고',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: MediaQuery.sizeOf(ctx).height * 0.5,
+                      ),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '신고 사유를 선택해주세요.',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                height: 1.45,
+                                color: AppColors.textSecondary,
+                              ),
                             ),
-                            value: e.key,
-                            // TODO: Flutter RadioGroup migration after minimum SDK policy is set.
-                            // ignore: deprecated_member_use
-                            groupValue: selected,
-                            // ignore: deprecated_member_use
-                            onChanged: (v) {
-                              if (v != null) setSt(() => selected = v);
+                            const SizedBox(height: AppSpacing.sm),
+                            Text(
+                              '"${option.content}"',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                height: 1.45,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.md),
+                            ...EmpathyPollService.pollReportReasonLabels.entries
+                                .map(
+                                  (e) => RadioListTile<String>(
+                                    title: Text(
+                                      e.value,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    value: e.key,
+                                    // TODO: Flutter RadioGroup migration after minimum SDK policy is set.
+                                    // ignore: deprecated_member_use
+                                    groupValue: selected,
+                                    // ignore: deprecated_member_use
+                                    onChanged: (v) {
+                                      if (v != null) setSt(() => selected = v);
+                                    },
+                                    dense: true,
+                                    contentPadding: EdgeInsets.zero,
+                                    visualDensity: VisualDensity.compact,
+                                  ),
+                                ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.textSecondary,
+                              backgroundColor: AppColors.surfaceMuted,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(
+                                  AppRadius.md,
+                                ),
+                              ),
+                              textStyle: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            child: const Text('취소'),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: TextButton(
+                            onPressed: () async {
+                              final reason = selected;
+                              Navigator.pop(ctx);
+                              final result =
+                                  await EmpathyPollService.reportOption(
+                                    _activePoll!.id,
+                                    option.id,
+                                    reasonKey: reason,
+                                  );
+                              if (!mounted) return;
+                              final msg =
+                                  !result.success
+                                      ? (result.error ?? '오류')
+                                      : result.reachedRemovalThreshold
+                                      ? '누적 신고로 해당 보기가 삭제되었습니다.'
+                                      : '신고가 접수되었습니다.';
+                              ScaffoldMessenger.of(
+                                context,
+                              ).showSnackBar(SnackBar(content: Text(msg)));
                             },
-                            dense: true,
-                            contentPadding: EdgeInsets.zero,
-                            visualDensity: VisualDensity.compact,
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.onCardEmphasis,
+                              backgroundColor: AppColors.cardEmphasis,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(
+                                  AppRadius.md,
+                                ),
+                              ),
+                              textStyle: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            child: const Text('신고'),
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: const Text('취소'),
-                    ),
-                    TextButton(
-                      onPressed: () async {
-                        final reason = selected;
-                        Navigator.pop(ctx);
-                        final result = await EmpathyPollService.reportOption(
-                          _activePoll!.id,
-                          option.id,
-                          reasonKey: reason,
-                        );
-                        if (!mounted) return;
-                        final msg =
-                            !result.success
-                                ? (result.error ?? '오류')
-                                : result.reachedRemovalThreshold
-                                ? '누적 신고로 해당 보기가 삭제되었습니다.'
-                                : '신고가 접수되었습니다.';
-                        ScaffoldMessenger.of(
-                          context,
-                        ).showSnackBar(SnackBar(content: Text(msg)));
-                      },
-                      child: const Text(
-                        '신고',
-                        style: TextStyle(color: AppColors.error),
-                      ),
-                    ),
                   ],
                 ),
+              );
+            },
           ),
     );
   }
