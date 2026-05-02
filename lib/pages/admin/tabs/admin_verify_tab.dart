@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_tokens.dart';
+import '../../../core/widgets/app_modal_scaffold.dart';
 
 /// 운영자 — 조건부 승인(provisional) 프로필 검토
 ///
@@ -168,21 +170,33 @@ class _AdminVerifyTabState extends State<AdminVerifyTab> {
     return showDialog<String>(
       context: context,
       builder:
-          (ctx) => AlertDialog(
-            title: Text(
-              isOcrIssue
-                  ? (approved ? 'OCR 상호 확인 완료' : 'OCR 상호 반려')
-                  : (approved ? '노출명 승인' : '노출명 반려'),
-            ),
-            content: Column(
+          (dialogCtx) => AppModalDialog(
+            insetPadding: const EdgeInsets.all(AppSpacing.xl),
+            borderOpacity: 0.7,
+            child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  displayName,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  isOcrIssue
+                      ? (approved ? 'OCR 상호 확인 완료' : 'OCR 상호 반려')
+                      : (approved ? '노출명 승인' : '노출명 반려'),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  displayName,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
                 TextField(
                   controller: ctrl,
                   decoration: InputDecoration(
@@ -191,18 +205,51 @@ class _AdminVerifyTabState extends State<AdminVerifyTab> {
                   ),
                   maxLines: 3,
                 ),
+                const SizedBox(height: AppSpacing.lg),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(dialogCtx),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.textSecondary,
+                          backgroundColor: AppColors.surfaceMuted,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                          ),
+                          textStyle: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        child: const Text('취소'),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed:
+                            () => Navigator.pop(dialogCtx, ctrl.text.trim()),
+                        style: FilledButton.styleFrom(
+                          backgroundColor:
+                              approved
+                                  ? AppColors.success
+                                  : AppColors.error,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                          ),
+                          textStyle: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        child: Text(approved ? '승인' : '반려'),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('취소'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-                child: Text(approved ? '승인' : '반려'),
-              ),
-            ],
           ),
     );
   }
@@ -247,17 +294,31 @@ class _AdminVerifyTabState extends State<AdminVerifyTab> {
     return showDialog<String>(
       context: context,
       builder:
-          (ctx) => AlertDialog(
-            title: Text(isApprove ? '승인 확정' : '거절 처리'),
-            content: Column(
+          (dialogCtx) => AppModalDialog(
+            insetPadding: const EdgeInsets.all(AppSpacing.xl),
+            borderOpacity: 0.7,
+            child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  clinicName,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  isApprove ? '승인 확정' : '거절 처리',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  clinicName,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
                 TextField(
                   controller: ctrl,
                   decoration: InputDecoration(
@@ -270,22 +331,51 @@ class _AdminVerifyTabState extends State<AdminVerifyTab> {
                   ),
                   maxLines: 3,
                 ),
+                const SizedBox(height: AppSpacing.lg),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(dialogCtx),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.textSecondary,
+                          backgroundColor: AppColors.surfaceMuted,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                          ),
+                          textStyle: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        child: const Text('취소'),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed:
+                            () => Navigator.pop(dialogCtx, ctrl.text.trim()),
+                        style: FilledButton.styleFrom(
+                          backgroundColor:
+                              isApprove
+                                  ? AppColors.success
+                                  : AppColors.error,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                          ),
+                          textStyle: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        child: Text(isApprove ? '승인' : '거절'),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('취소'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-                style: FilledButton.styleFrom(
-                  backgroundColor:
-                      isApprove ? AppColors.success : AppColors.error,
-                ),
-                child: Text(isApprove ? '승인' : '거절'),
-              ),
-            ],
           ),
     );
   }

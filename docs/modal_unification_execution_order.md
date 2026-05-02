@@ -25,6 +25,8 @@
 | 2026-05-02 | Phase G (순서 30–32) | `publisher_pending_page` 문의 `AppModalDialog`, `publisher_clinic_identity_section` 관리자 확인 `AppConfirmModal`. `clinic_selector`는 `AlertDialog` 없음·출판 각진 `Dialog` 톤 유지로 코드 변경 없음(검토 완료). |
 | 2026-05-02 | 순서 24 | `job_post_form` 교통편 추가 `Dialog`를 `AppModalDialog`로 교체. `showDatePicker`는 Phase N 정책 전까지 유지. |
 | 2026-05-02 | Phase H (순서 33–35) | `senior_question_comments_sheet`·`senior_question_card`의 `AlertDialog`/중복 확인 UI를 `AppConfirmModal`로 통일. `Dialog.fullscreen` 이미지 뷰어는 유지. `senior_sticker_widgets`는 `showDialog` 없음(검토 완료). |
+| 2026-05-02 | Phase I (순서 36–38) | `admin_overview_tab`·`admin_verify_tab`·`admin_billing_tab`의 `AlertDialog`를 `AppConfirmModal` / `AppModalDialog`로 교체. `Navigator.pop`은 다이얼로그 `builder`의 `dialogCtx`로 통일. |
+| 2026-05-02 | 순서 39–40 (검토) | `admin_ebook_create_page`·`admin_ebook_edit_page`는 `showDatePicker`만 있고 `AlertDialog` 없음 — 모달 통일 범위는 **Phase N**(시스템 피커 정책)로 이월, 코드 변경 없음. |
 
 ## 1. 인벤토리 스프레드시트 (착수 직후 1일 이내)
 
@@ -107,11 +109,11 @@
 | 33 | H | `lib/features/senior_qna/widgets/senior_question_comments_sheet.dart` | 시트 + `AlertDialog` | Med | ✅ |
 | 34 | H | `lib/features/senior_qna/widgets/senior_question_card.dart` | 이미 일부 게이지 패밀리 — 나머지·풀스크린 검토 | Med | ✅ |
 | 35 | H | `lib/features/senior_qna/widgets/senior_sticker_widgets.dart` | 시트 | Low | ✅ |
-| 36 | I | `lib/pages/admin/tabs/admin_overview_tab.dart` | `showDialog` 다수 | High | |
-| 37 | I | `lib/pages/admin/tabs/admin_verify_tab.dart` | `showDialog` | High | |
-| 38 | I | `lib/pages/admin/tabs/admin_billing_tab.dart` | `showDialog` | High | |
-| 39 | I | `lib/pages/admin/admin_ebook_create_page.dart` | `showDatePicker` | Med | |
-| 40 | I | `lib/pages/admin/admin_ebook_edit_page.dart` | `showDatePicker` | Med | |
+| 36 | I | `lib/pages/admin/tabs/admin_overview_tab.dart` | `showDialog` 다수 | High | ✅ |
+| 37 | I | `lib/pages/admin/tabs/admin_verify_tab.dart` | `showDialog` | High | ✅ |
+| 38 | I | `lib/pages/admin/tabs/admin_billing_tab.dart` | `showDialog` | High | ✅ |
+| 39 | I | `lib/pages/admin/admin_ebook_create_page.dart` | `showDatePicker`만(다이얼로그 없음) | Med | ✅ 검토 |
+| 40 | I | `lib/pages/admin/admin_ebook_edit_page.dart` | `showDatePicker`만(다이얼로그 없음) | Med | ✅ 검토 |
 | 41 | J | `lib/pages/auth/sign_in_page.dart` | `showDialog` | High | |
 | 42 | J | `lib/features/auth/services/web_account_actions_service.dart` | `showDialog` | High | |
 | 43 | K | `lib/features/onboarding/app_onboarding_overlay.dart` | `showDialog` | Med | |
@@ -148,7 +150,8 @@
 | `modal-F-me` | 25–29 | 나 |
 | `modal-G-publisher` | 30–32 | 출판 |
 | `modal-H-senior-qna` | 33–35 | 속닥속닥 |
-| `modal-I-admin` | 36–40 | 관리자 + 날짜 |
+| `modal-I-admin` | 36–38 | 관리자 탭 다이얼로그(오버뷰·검증·결제) |
+| `modal-I-admin-ebook-pickers` | 39–40 | *(검토만)* 전자책 관리 `showDatePicker` — Phase N 정책 시 재검토 |
 | `modal-J-auth` | 41–42 | 인증·계정 |
 | `modal-K-onboarding` | 43 | 온보딩 |
 | `modal-L-ebook-settings` | 44–47 | 전자책·설정 |
@@ -178,4 +181,4 @@
 
 ---
 
-이 문서는 저장소 루트 `docs/modal_unification_execution_order.md`에 두었다. 다음 단계는 **Phase I(관리자, 36–40)** 또는 **Phase N**(`showDatePicker` 등 시스템 UI 정책)다.
+이 문서는 저장소 루트 `docs/modal_unification_execution_order.md`에 두었다. 다음 단계는 **Phase J(인증·웹 계정, 순서 41–42)** 이다.

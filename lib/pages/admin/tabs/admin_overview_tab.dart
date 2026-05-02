@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_tokens.dart';
+import '../../../core/widgets/app_confirm_modal.dart';
+import '../../../core/widgets/app_modal_scaffold.dart';
 import '../../../models/admin_dashboard_models.dart';
 import '../../../models/daily_word.dart';
 import '../../../models/quiz_pool_item.dart';
@@ -201,22 +204,12 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
     final ok = await showDialog<bool>(
       context: context,
       builder:
-          (ctx) => AlertDialog(
-            title: const Text('오늘 퀴즈 스케줄 다시 만들기'),
-            content: Text(
-              '날짜 $today 의 quiz_schedule을 덮어씁니다.\n'
-              '모든 사용자의 오늘 퀴즈가 새로 선정된 문항으로 바뀝니다. 진행할까요?',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('취소'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('덮어쓰기'),
-              ),
-            ],
+          (_) => AppConfirmModal(
+            title: '오늘 퀴즈 스케줄 다시 만들기',
+            message:
+                '날짜 $today 의 quiz_schedule을 덮어씁니다.\n'
+                '모든 사용자의 오늘 퀴즈가 새로 선정된 문항으로 바뀝니다. 진행할까요?',
+            confirmLabel: '덮어쓰기',
           ),
     );
     if (ok != true || !mounted) return;
@@ -289,123 +282,159 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
       await showDialog<void>(
         context: context,
         builder:
-            (ctx) => AlertDialog(
-              title: const Text('예상 다음 문제 (시뮬)'),
-              content: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      disclaimer,
-                      style: TextStyle(
-                        fontSize: 12,
-                        height: 1.35,
-                        color: AppColors.textSecondary.withValues(alpha: 0.95),
-                      ),
+            (dialogCtx) => AppModalDialog(
+              insetPadding: const EdgeInsets.all(AppSpacing.xl),
+              borderOpacity: 0.7,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '예상 다음 문제 (시뮬)',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
                     ),
-                    const SizedBox(height: 10),
-                    Text(
-                      '가정 사이클: $cycle · 이 선정까지 사이클 초기화 경로: ${wasReset ? "예" : "아니오"} · '
-                      '가정 usedQuizIds 길이: $usedN',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        height: 1.35,
-                        color: AppColors.textSecondary,
-                      ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.sizeOf(dialogCtx).height * 0.55,
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      packLine('임상 패크', clinId, clinLoose),
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textDisabled,
-                      ),
-                    ),
-                    Text(
-                      packLine('국시 패크', natId, natLoose),
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textDisabled,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      '이번 호출에서 뽑힌 문항',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    ...itemsRaw.map((raw) {
-                      if (raw is! Map) {
-                        return const SizedBox.shrink();
-                      }
-                      final e = Map<String, dynamic>.from(raw);
-                      final qt = e['questionType'] as String? ?? '';
-                      final id = e['id'] as String? ?? '';
-                      final q = e['questionPreview'] as String? ?? '';
-                      final book = e['sourceBook'] as String? ?? '';
-                      final fn = e['sourceFileName'] as String? ?? '';
-                      final pack = e['packId'] as String? ?? '';
-                      final typeKo =
-                          qt == 'national_exam'
-                              ? '국시'
-                              : (qt == 'clinical' ? '임상' : qt);
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '$typeKo · $id',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.accent,
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            disclaimer,
+                            style: TextStyle(
+                              fontSize: 12,
+                              height: 1.35,
+                              color: AppColors.textSecondary.withValues(
+                                alpha: 0.95,
                               ),
                             ),
-                            const SizedBox(height: 2),
-                            Text(
-                              q,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                height: 1.35,
-                                color: AppColors.textPrimary,
-                              ),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            '가정 사이클: $cycle · 이 선정까지 사이클 초기화 경로: ${wasReset ? "예" : "아니오"} · '
+                            '가정 usedQuizIds 길이: $usedN',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              height: 1.35,
+                              color: AppColors.textSecondary,
                             ),
-                            if (book.isNotEmpty ||
-                                fn.isNotEmpty ||
-                                pack.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 4),
-                                child: Text(
-                                  [
-                                    if (book.isNotEmpty) book,
-                                    if (fn.isNotEmpty) fn,
-                                    if (pack.isNotEmpty) 'pack: $pack',
-                                  ].join(' · '),
-                                  style: const TextStyle(
-                                    fontSize: 10,
-                                    color: AppColors.textDisabled,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            packLine('임상 패크', clinId, clinLoose),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textDisabled,
+                            ),
+                          ),
+                          Text(
+                            packLine('국시 패크', natId, natLoose),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textDisabled,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            '이번 호출에서 뽑힌 문항',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          ...itemsRaw.map((raw) {
+                            if (raw is! Map) {
+                              return const SizedBox.shrink();
+                            }
+                            final e = Map<String, dynamic>.from(raw);
+                            final qt = e['questionType'] as String? ?? '';
+                            final id = e['id'] as String? ?? '';
+                            final q = e['questionPreview'] as String? ?? '';
+                            final book = e['sourceBook'] as String? ?? '';
+                            final fn = e['sourceFileName'] as String? ?? '';
+                            final pack = e['packId'] as String? ?? '';
+                            final typeKo =
+                                qt == 'national_exam'
+                                    ? '국시'
+                                    : (qt == 'clinical' ? '임상' : qt);
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '$typeKo · $id',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.accent,
+                                    ),
                                   ),
-                                ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    q,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      height: 1.35,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                  if (book.isNotEmpty ||
+                                      fn.isNotEmpty ||
+                                      pack.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 4),
+                                      child: Text(
+                                        [
+                                          if (book.isNotEmpty) book,
+                                          if (fn.isNotEmpty) fn,
+                                          if (pack.isNotEmpty) 'pack: $pack',
+                                        ].join(' · '),
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          color: AppColors.textDisabled,
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
-                          ],
+                            );
+                          }),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(dialogCtx),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.textSecondary,
+                        backgroundColor: AppColors.surfaceMuted,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                         ),
-                      );
-                    }),
-                  ],
-                ),
+                        textStyle: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      child: const Text('닫기'),
+                    ),
+                  ),
+                ],
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('닫기'),
-                ),
-              ],
             ),
       );
     } catch (e) {
@@ -432,24 +461,14 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
     final ok = await showDialog<bool>(
       context: context,
       builder:
-          (ctx) => AlertDialog(
-            title: const Text('오늘 단어 다음턴으로 넘기기'),
-            content: Text(
-              '현재 운영 기준 오늘 단어 ${currentWords.length}개를 전역 제외 처리합니다.\n\n'
-              '$wordList\n\n'
-              '이 단어들은 앞으로 오늘 단어 후보에서 빠지고, 기존 사용자별 오늘 배정 문서에 포함되어 있으면 다음 로드 때 새 단어로 재생성됩니다.\n'
-              '원본 단어풀과 사용자별 아는 단어/저장 기록은 삭제하지 않습니다.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('취소'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('다음턴으로 넘기기'),
-              ),
-            ],
+          (_) => AppConfirmModal(
+            title: '오늘 단어 다음턴으로 넘기기',
+            message:
+                '현재 운영 기준 오늘 단어 ${currentWords.length}개를 전역 제외 처리합니다.\n\n'
+                '$wordList\n\n'
+                '이 단어들은 앞으로 오늘 단어 후보에서 빠지고, 기존 사용자별 오늘 배정 문서에 포함되어 있으면 다음 로드 때 새 단어로 재생성됩니다.\n'
+                '원본 단어풀과 사용자별 아는 단어/저장 기록은 삭제하지 않습니다.',
+            confirmLabel: '다음턴으로 넘기기',
           ),
     );
     if (ok != true || !mounted) return;
@@ -480,23 +499,14 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
       final ok = await showDialog<bool>(
         context: context,
         builder:
-            (ctx) => AlertDialog(
-              title: Text('$typeKo 문항 삭제'),
-              content: Text(
-                '현재 $typeKo 문항을 quiz_pool에서 영구 삭제하고,\n'
-                '같은 타입의 다음 문항으로 자동 교체합니다.\n\n'
-                '사용자 풀이 기록·quiz_meta·전역 통계는 변경되지 않습니다.',
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx, false),
-                  child: const Text('취소'),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx, true),
-                  child: const Text('제거'),
-                ),
-              ],
+            (_) => AppConfirmModal(
+              title: '$typeKo 문항 삭제',
+              message:
+                  '현재 $typeKo 문항을 quiz_pool에서 영구 삭제하고,\n'
+                  '같은 타입의 다음 문항으로 자동 교체합니다.\n\n'
+                  '사용자 풀이 기록·quiz_meta·전역 통계는 변경되지 않습니다.',
+              confirmLabel: '제거',
+              destructive: true,
             ),
       );
       if (ok != true || !mounted) return;
@@ -544,22 +554,12 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
     final ok = await showDialog<bool>(
       context: context,
       builder:
-          (ctx) => AlertDialog(
-            title: const Text('다음 공감투표로 넘기기'),
-            content: const Text(
-              '현재 진행 중인 투표를 종료(순위 확정)하고, '
-              'displayOrder 기준 다음 미종료 투표를 지금 시작합니다.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('취소'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('진행'),
-              ),
-            ],
+          (_) => const AppConfirmModal(
+            title: '다음 공감투표로 넘기기',
+            message:
+                '현재 진행 중인 투표를 종료(순위 확정)하고, '
+                'displayOrder 기준 다음 미종료 투표를 지금 시작합니다.',
+            confirmLabel: '진행',
           ),
     );
     if (ok != true || !mounted) return;
@@ -597,24 +597,14 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
     final step1 = await showDialog<bool>(
       context: context,
       builder:
-          (ctx) => AlertDialog(
-            title: const Text('현재 투표 완전 삭제'),
-            content: Text(
-              '투표 $pollId 및 보기·공감·댓글 등 하위 데이터가 영구 삭제됩니다.\n'
-              '삭제 후 다음 대기 투표가 자동으로 활성화됩니다.\n\n'
-              '계속할까요?',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('취소'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                style: TextButton.styleFrom(foregroundColor: AppColors.error),
-                child: const Text('다음'),
-              ),
-            ],
+          (_) => AppConfirmModal(
+            title: '현재 투표 완전 삭제',
+            message:
+                '투표 $pollId 및 보기·공감·댓글 등 하위 데이터가 영구 삭제됩니다.\n'
+                '삭제 후 다음 대기 투표가 자동으로 활성화됩니다.\n\n'
+                '계속할까요?',
+            confirmLabel: '다음',
+            destructive: true,
           ),
     );
     if (step1 != true || !mounted) return;
@@ -623,17 +613,32 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
     final step2 = await showDialog<bool>(
       context: context,
       builder:
-          (ctx) => AlertDialog(
-            title: const Text('문서 ID 확인'),
-            content: Column(
+          (dialogCtx) => AppModalDialog(
+            insetPadding: const EdgeInsets.all(AppSpacing.xl),
+            borderOpacity: 0.7,
+            child: Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                const Text(
+                  '문서 ID 확인',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
                 Text(
                   '삭제할 문서 ID를 정확히 입력하세요.\n대상: $pollId',
-                  style: const TextStyle(fontSize: 13),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    height: 1.45,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.sm),
                 TextField(
                   controller: ctrl,
                   decoration: const InputDecoration(
@@ -643,19 +648,48 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
                   ),
                   autocorrect: false,
                 ),
+                const SizedBox(height: AppSpacing.lg),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(dialogCtx, false),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.textSecondary,
+                          backgroundColor: AppColors.surfaceMuted,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                          ),
+                          textStyle: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        child: const Text('취소'),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(dialogCtx, true),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.onCardEmphasis,
+                          backgroundColor: AppColors.cardEmphasis,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                          ),
+                          textStyle: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        child: const Text('삭제 실행'),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('취소'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                style: TextButton.styleFrom(foregroundColor: AppColors.error),
-                child: const Text('삭제 실행'),
-              ),
-            ],
           ),
     );
     final typed = ctrl.text.trim();

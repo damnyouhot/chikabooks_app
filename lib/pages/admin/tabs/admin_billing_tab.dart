@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_tokens.dart';
+import '../../../core/widgets/app_confirm_modal.dart';
+import '../../../core/widgets/app_modal_scaffold.dart';
 import '../../../services/admin_billing_service.dart';
 import '../widgets/admin_common_widgets.dart';
 
@@ -174,21 +177,16 @@ class _PaymentTileState extends State<_PaymentTile> {
   Future<void> _apply() async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('입금 확인 후 잔액에 반영'),
-        content: Text(
-            '${widget.row.kind} / ${widget.row.packageId} '
-            '/ ${widget.row.amount.toString()}원\n'
-            '진짜 입금이 확인되었나요? 적용 후 즉시 사용자 잔액에 반영됩니다.'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('취소')),
-          ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('반영')),
-        ],
-      ),
+      builder:
+          (_) => AppConfirmModal(
+            title: '입금 확인 후 잔액에 반영',
+            message:
+                '${widget.row.kind} / ${widget.row.packageId} '
+                '/ ${widget.row.amount.toString()}원\n'
+                '진짜 입금이 확인되었나요? 적용 후 즉시 사용자 잔액에 반영됩니다.',
+            confirmLabel: '반영',
+            destructive: true,
+          ),
     );
     if (ok != true || !mounted) return;
     setState(() => _busy = true);
@@ -326,32 +324,79 @@ class _TaxTileState extends State<_TaxTile> {
     final note = TextEditingController();
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('발급 완료 마킹'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: extId,
-              decoration: const InputDecoration(
-                  labelText: '외부 발급 ID (선택)'),
+      builder:
+          (dialogCtx) => AppModalDialog(
+            insetPadding: const EdgeInsets.all(AppSpacing.xl),
+            borderOpacity: 0.7,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  '발급 완료 마킹',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                TextField(
+                  controller: extId,
+                  decoration: const InputDecoration(
+                    labelText: '외부 발급 ID (선택)',
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                TextField(
+                  controller: note,
+                  decoration: const InputDecoration(
+                    labelText: '메모 (선택)',
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(dialogCtx, false),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.textSecondary,
+                          backgroundColor: AppColors.surfaceMuted,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                          ),
+                          textStyle: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        child: const Text('취소'),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () => Navigator.pop(dialogCtx, true),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.cardPrimary,
+                          foregroundColor: AppColors.onCardEmphasis,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                          ),
+                          textStyle: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        child: const Text('완료'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            TextField(
-              controller: note,
-              decoration: const InputDecoration(
-                  labelText: '메모 (선택)'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('취소')),
-          ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('완료')),
-        ],
-      ),
+          ),
     );
     if (ok != true || !mounted) return;
     setState(() => _busy = true);
@@ -492,32 +537,79 @@ class _CashTileState extends State<_CashTile> {
     final note = TextEditingController();
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('발급 완료 마킹'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: extId,
-              decoration: const InputDecoration(
-                  labelText: '외부 발급 ID (선택)'),
+      builder:
+          (dialogCtx) => AppModalDialog(
+            insetPadding: const EdgeInsets.all(AppSpacing.xl),
+            borderOpacity: 0.7,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  '발급 완료 마킹',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                TextField(
+                  controller: extId,
+                  decoration: const InputDecoration(
+                    labelText: '외부 발급 ID (선택)',
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                TextField(
+                  controller: note,
+                  decoration: const InputDecoration(
+                    labelText: '메모 (선택)',
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(dialogCtx, false),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.textSecondary,
+                          backgroundColor: AppColors.surfaceMuted,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                          ),
+                          textStyle: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        child: const Text('취소'),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () => Navigator.pop(dialogCtx, true),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.cardPrimary,
+                          foregroundColor: AppColors.onCardEmphasis,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                          ),
+                          textStyle: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        child: const Text('완료'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            TextField(
-              controller: note,
-              decoration:
-                  const InputDecoration(labelText: '메모 (선택)'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('취소')),
-          ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('완료')),
-        ],
-      ),
+          ),
     );
     if (ok != true || !mounted) return;
     setState(() => _busy = true);
