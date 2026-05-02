@@ -272,7 +272,7 @@ class _SeniorQuestionShareCard extends StatelessWidget {
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        '치카 북스에서 이야기 나누기',
+                        '하이진랩에서 이야기 나누기',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -351,7 +351,7 @@ class _ShareCommentPreview extends StatelessWidget {
   String _commentPreviewBody(SeniorComment comment) {
     final body = comment.body.trim();
     if (body.isNotEmpty) return body;
-    if (comment.stickerId != null) return '스티커를 남겼어요';
+    if (comment.stickerIds.isNotEmpty) return '스티커를 남겼어요';
     if (comment.imageUrls.isNotEmpty) return '사진 댓글을 남겼어요';
     return '댓글을 남겼어요';
   }

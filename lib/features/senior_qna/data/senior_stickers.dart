@@ -27,6 +27,7 @@ enum SeniorStickerCategory {
   heart('마음'),
   cheer('응원'),
   emotion('감정'),
+  negative('부정감정'),
   reaction('반응'),
   cute('귀여움'),
   event('축하'),
@@ -49,32 +50,34 @@ class SeniorStickerPickerGroup {
 
 const seniorStickerPickerGroups = <SeniorStickerPickerGroup>[
   SeniorStickerPickerGroup(
-    label: '감정·반응',
+    label: '긍정',
     categories: {
       SeniorStickerCategory.basic,
       SeniorStickerCategory.heart,
       SeniorStickerCategory.cheer,
       SeniorStickerCategory.emotion,
-      SeniorStickerCategory.reaction,
     },
+  ),
+  SeniorStickerPickerGroup(
+    label: '부정감정',
+    categories: {SeniorStickerCategory.negative},
+  ),
+  SeniorStickerPickerGroup(
+    label: '반응',
+    categories: {SeniorStickerCategory.reaction},
   ),
   SeniorStickerPickerGroup(
     label: '귀여움·축하',
-    categories: {
-      SeniorStickerCategory.cute,
-      SeniorStickerCategory.event,
-    },
+    categories: {SeniorStickerCategory.cute, SeniorStickerCategory.event},
   ),
   SeniorStickerPickerGroup(
     label: '일상·기타',
-    categories: {
-      SeniorStickerCategory.work,
-      SeniorStickerCategory.weird,
-    },
+    categories: {SeniorStickerCategory.work, SeniorStickerCategory.weird},
   ),
 ];
 
 const seniorStickerFallbackPrefix = '[스티커] ';
+const maxSeniorStickersPerEntry = 5;
 
 String seniorStickerFallbackBody(String stickerId) {
   final label = seniorStickerById(stickerId)?.label ?? '스티커';
@@ -84,6 +87,21 @@ String seniorStickerFallbackBody(String stickerId) {
 bool isSeniorStickerFallbackBody(String body, String? stickerId) {
   if (stickerId == null) return false;
   return body.trim() == seniorStickerFallbackBody(stickerId);
+}
+
+String seniorStickerFallbackBodyForIds(List<String> stickerIds) {
+  if (stickerIds.isEmpty) return seniorStickerFallbackBody('');
+  final firstLabel = seniorStickerById(stickerIds.first)?.label ?? '스티커';
+  if (stickerIds.length == 1) return '$seniorStickerFallbackPrefix$firstLabel';
+  return '$seniorStickerFallbackPrefix$firstLabel 외 ${stickerIds.length - 1}개';
+}
+
+bool isSeniorStickerFallbackBodyForIds(String body, List<String> stickerIds) {
+  if (stickerIds.isEmpty) return false;
+  final trimmed = body.trim();
+  return trimmed == seniorStickerFallbackBodyForIds(stickerIds) ||
+      (stickerIds.length == 1 &&
+          trimmed == seniorStickerFallbackBody(stickerIds.first));
 }
 
 const seniorStickerPool = <SeniorSticker>[
@@ -132,7 +150,7 @@ const seniorStickerPool = <SeniorSticker>[
   SeniorSticker(
     id: 'basic_crying',
     label: '눈물',
-    category: SeniorStickerCategory.basic,
+    category: SeniorStickerCategory.negative,
     emoji: AnimatedEmojis.loudlyCrying,
   ),
 
@@ -297,13 +315,13 @@ const seniorStickerPool = <SeniorSticker>[
   SeniorSticker(
     id: 'holding_back_tears',
     label: '울컥',
-    category: SeniorStickerCategory.emotion,
+    category: SeniorStickerCategory.negative,
     emoji: AnimatedEmojis.holdingBackTears,
   ),
   SeniorSticker(
     id: 'crying',
     label: '슬퍼요',
-    category: SeniorStickerCategory.emotion,
+    category: SeniorStickerCategory.negative,
     emoji: AnimatedEmojis.loudlyCrying,
   ),
   SeniorSticker(
@@ -315,20 +333,440 @@ const seniorStickerPool = <SeniorSticker>[
   SeniorSticker(
     id: 'pleading',
     label: '부탁해요',
-    category: SeniorStickerCategory.emotion,
+    category: SeniorStickerCategory.negative,
     emoji: AnimatedEmojis.pleading,
   ),
   SeniorSticker(
     id: 'worried',
     label: '걱정돼요',
-    category: SeniorStickerCategory.emotion,
+    category: SeniorStickerCategory.negative,
     emoji: AnimatedEmojis.worried,
   ),
   SeniorSticker(
     id: 'sweat',
     label: '식은땀',
-    category: SeniorStickerCategory.emotion,
+    category: SeniorStickerCategory.negative,
     emoji: AnimatedEmojis.sweat,
+  ),
+  SeniorSticker(
+    id: 'sad',
+    label: '시무룩',
+    category: SeniorStickerCategory.negative,
+    emoji: AnimatedEmojis.sad,
+  ),
+  SeniorSticker(
+    id: 'cry',
+    label: '눈물찔끔',
+    category: SeniorStickerCategory.negative,
+    emoji: AnimatedEmojis.cry,
+  ),
+  SeniorSticker(
+    id: 'frown',
+    label: '속상해요',
+    category: SeniorStickerCategory.negative,
+    emoji: AnimatedEmojis.frown,
+  ),
+  SeniorSticker(
+    id: 'pensive',
+    label: '우울',
+    category: SeniorStickerCategory.negative,
+    emoji: AnimatedEmojis.pensive,
+  ),
+  SeniorSticker(
+    id: 'angry',
+    label: '화나요',
+    category: SeniorStickerCategory.negative,
+    emoji: AnimatedEmojis.angry,
+  ),
+  SeniorSticker(
+    id: 'rage',
+    label: '분노',
+    category: SeniorStickerCategory.negative,
+    emoji: AnimatedEmojis.rage,
+  ),
+  SeniorSticker(
+    id: 'triumph',
+    label: '씩씩',
+    category: SeniorStickerCategory.negative,
+    emoji: AnimatedEmojis.triumph,
+  ),
+  SeniorSticker(
+    id: 'unamused',
+    label: '못마땅',
+    category: SeniorStickerCategory.negative,
+    emoji: AnimatedEmojis.unamused,
+  ),
+  SeniorSticker(
+    id: 'expressionless',
+    label: '무표정',
+    category: SeniorStickerCategory.negative,
+    emoji: AnimatedEmojis.expressionless,
+  ),
+  SeniorSticker(
+    id: 'neutral_face',
+    label: '할말없음',
+    category: SeniorStickerCategory.negative,
+    emoji: AnimatedEmojis.neutralFace,
+  ),
+  SeniorSticker(
+    id: 'grimacing',
+    label: '난감',
+    category: SeniorStickerCategory.negative,
+    emoji: AnimatedEmojis.grimacing,
+  ),
+  SeniorSticker(
+    id: 'anxious_with_sweat',
+    label: '불안',
+    category: SeniorStickerCategory.negative,
+    emoji: AnimatedEmojis.anxiousWithSweat,
+  ),
+  SeniorSticker(
+    id: 'weary',
+    label: '지쳤어요',
+    category: SeniorStickerCategory.negative,
+    emoji: AnimatedEmojis.weary,
+  ),
+  SeniorSticker(
+    id: 'woozy',
+    label: '어질어질',
+    category: SeniorStickerCategory.negative,
+    emoji: AnimatedEmojis.woozy,
+  ),
+  SeniorSticker(
+    id: 'screaming',
+    label: '공포',
+    category: SeniorStickerCategory.negative,
+    emoji: AnimatedEmojis.screaming,
+  ),
+  SeniorSticker(
+    id: 'hot_face',
+    label: '열받음',
+    category: SeniorStickerCategory.negative,
+    emoji: AnimatedEmojis.hotFace,
+  ),
+  SeniorSticker(
+    id: 'cold_face',
+    label: '얼어붙음',
+    category: SeniorStickerCategory.negative,
+    emoji: AnimatedEmojis.coldFace,
+  ),
+  SeniorSticker(
+    id: 'vomit',
+    label: '토할듯',
+    category: SeniorStickerCategory.negative,
+    emoji: AnimatedEmojis.vomit,
+  ),
+  SeniorSticker(
+    id: 'mask',
+    label: '아파요',
+    category: SeniorStickerCategory.negative,
+    emoji: AnimatedEmojis.mask,
+  ),
+  SeniorSticker(
+    id: 'skull',
+    label: '끝났다',
+    category: SeniorStickerCategory.negative,
+    emoji: AnimatedEmojis.skull,
+  ),
+  SeniorSticker(
+    id: 'smile_with_big_eyes',
+    label: '큰눈웃음',
+    category: SeniorStickerCategory.emotion,
+    emoji: AnimatedEmojis.smileWithBigEyes,
+  ),
+  SeniorSticker(
+    id: 'grinning',
+    label: '싱글벙글',
+    category: SeniorStickerCategory.emotion,
+    emoji: AnimatedEmojis.grinning,
+  ),
+  SeniorSticker(
+    id: 'grin_sweat',
+    label: '땀웃음',
+    category: SeniorStickerCategory.emotion,
+    emoji: AnimatedEmojis.grinSweat,
+  ),
+  SeniorSticker(
+    id: 'wink',
+    label: '윙크',
+    category: SeniorStickerCategory.emotion,
+    emoji: AnimatedEmojis.wink,
+  ),
+  SeniorSticker(
+    id: 'kissing',
+    label: '쪽',
+    category: SeniorStickerCategory.heart,
+    emoji: AnimatedEmojis.kissing,
+  ),
+  SeniorSticker(
+    id: 'kissing_heart',
+    label: '하트뽀뽀',
+    category: SeniorStickerCategory.heart,
+    emoji: AnimatedEmojis.kissingHeart,
+  ),
+  SeniorSticker(
+    id: 'star_struck',
+    label: '별눈',
+    category: SeniorStickerCategory.emotion,
+    emoji: AnimatedEmojis.starStruck,
+  ),
+  SeniorSticker(
+    id: 'partying_face',
+    label: '파티얼굴',
+    category: SeniorStickerCategory.event,
+    emoji: AnimatedEmojis.partyingFace,
+  ),
+  SeniorSticker(
+    id: 'upside_down_face',
+    label: '거꾸로',
+    category: SeniorStickerCategory.reaction,
+    emoji: AnimatedEmojis.upsideDownFace,
+  ),
+  SeniorSticker(
+    id: 'slightly_happy',
+    label: '은은미소',
+    category: SeniorStickerCategory.emotion,
+    emoji: AnimatedEmojis.slightlyHappy,
+  ),
+  SeniorSticker(
+    id: 'blush',
+    label: '볼빨개짐',
+    category: SeniorStickerCategory.emotion,
+    emoji: AnimatedEmojis.blush,
+  ),
+  SeniorSticker(
+    id: 'smirk',
+    label: '흐뭇',
+    category: SeniorStickerCategory.reaction,
+    emoji: AnimatedEmojis.smirk,
+  ),
+  SeniorSticker(
+    id: 'drool',
+    label: '침줄줄',
+    category: SeniorStickerCategory.reaction,
+    emoji: AnimatedEmojis.drool,
+  ),
+  SeniorSticker(
+    id: 'yum',
+    label: '맛있다',
+    category: SeniorStickerCategory.emotion,
+    emoji: AnimatedEmojis.yum,
+  ),
+  SeniorSticker(
+    id: 'stuck_out_tongue',
+    label: '메롱',
+    category: SeniorStickerCategory.reaction,
+    emoji: AnimatedEmojis.stuckOutTongue,
+  ),
+  SeniorSticker(
+    id: 'squinting_tongue',
+    label: '찡긋메롱',
+    category: SeniorStickerCategory.reaction,
+    emoji: AnimatedEmojis.squintingTongue,
+  ),
+  SeniorSticker(
+    id: 'winky_tongue',
+    label: '윙크메롱',
+    category: SeniorStickerCategory.reaction,
+    emoji: AnimatedEmojis.winkyTongue,
+  ),
+  SeniorSticker(
+    id: 'zany_face',
+    label: '헤롱장난',
+    category: SeniorStickerCategory.weird,
+    emoji: AnimatedEmojis.zanyFace,
+  ),
+  SeniorSticker(
+    id: 'mouth_none',
+    label: '입없음',
+    category: SeniorStickerCategory.reaction,
+    emoji: AnimatedEmojis.mouthNone,
+  ),
+  SeniorSticker(
+    id: 'face_in_clouds',
+    label: '멍구름',
+    category: SeniorStickerCategory.reaction,
+    emoji: AnimatedEmojis.faceInClouds,
+  ),
+  SeniorSticker(
+    id: 'dotted_line_face',
+    label: '투명인간',
+    category: SeniorStickerCategory.weird,
+    emoji: AnimatedEmojis.dottedLineFace,
+  ),
+  SeniorSticker(
+    id: 'zipper_face',
+    label: '지퍼입',
+    category: SeniorStickerCategory.reaction,
+    emoji: AnimatedEmojis.zipperFace,
+  ),
+  SeniorSticker(
+    id: 'hug_face',
+    label: '안아줘요',
+    category: SeniorStickerCategory.heart,
+    emoji: AnimatedEmojis.hugFace,
+  ),
+  SeniorSticker(
+    id: 'peeking',
+    label: '훔쳐보기',
+    category: SeniorStickerCategory.reaction,
+    emoji: AnimatedEmojis.peeking,
+  ),
+  SeniorSticker(
+    id: 'raised_eyebrow',
+    label: '한쪽눈썹',
+    category: SeniorStickerCategory.reaction,
+    emoji: AnimatedEmojis.raisedEyebrow,
+  ),
+  SeniorSticker(
+    id: 'rolling_eyes',
+    label: '눈굴림',
+    category: SeniorStickerCategory.negative,
+    emoji: AnimatedEmojis.rollingEyes,
+  ),
+  SeniorSticker(
+    id: 'exhale',
+    label: '후우',
+    category: SeniorStickerCategory.negative,
+    emoji: AnimatedEmojis.exhale,
+  ),
+  SeniorSticker(
+    id: 'cursing',
+    label: '욕나옴',
+    category: SeniorStickerCategory.negative,
+    emoji: AnimatedEmojis.cursing,
+  ),
+  SeniorSticker(
+    id: 'concerned',
+    label: '걱정땀',
+    category: SeniorStickerCategory.negative,
+    emoji: AnimatedEmojis.concerned,
+  ),
+  SeniorSticker(
+    id: 'big_frown',
+    label: '대실망',
+    category: SeniorStickerCategory.negative,
+    emoji: AnimatedEmojis.bigFrown,
+  ),
+  SeniorSticker(
+    id: 'diagonal_mouth',
+    label: '애매해요',
+    category: SeniorStickerCategory.negative,
+    emoji: AnimatedEmojis.diagonalMouth,
+  ),
+  SeniorSticker(
+    id: 'slightly_frowning',
+    label: '살짝찡긋',
+    category: SeniorStickerCategory.negative,
+    emoji: AnimatedEmojis.slightlyFrowning,
+  ),
+  SeniorSticker(
+    id: 'scared',
+    label: '무서워요',
+    category: SeniorStickerCategory.negative,
+    emoji: AnimatedEmojis.scared,
+  ),
+  SeniorSticker(
+    id: 'anguished',
+    label: '괴로움',
+    category: SeniorStickerCategory.negative,
+    emoji: AnimatedEmojis.anguished,
+  ),
+  SeniorSticker(
+    id: 'gasp',
+    label: '헉',
+    category: SeniorStickerCategory.reaction,
+    emoji: AnimatedEmojis.gasp,
+  ),
+  SeniorSticker(
+    id: 'mouth_open',
+    label: '입벌림',
+    category: SeniorStickerCategory.reaction,
+    emoji: AnimatedEmojis.mouthOpen,
+  ),
+  SeniorSticker(
+    id: 'astonished',
+    label: '경악',
+    category: SeniorStickerCategory.reaction,
+    emoji: AnimatedEmojis.astonished,
+  ),
+  SeniorSticker(
+    id: 'flushed',
+    label: '당황홍조',
+    category: SeniorStickerCategory.reaction,
+    emoji: AnimatedEmojis.flushed,
+  ),
+  SeniorSticker(
+    id: 'scrunched_mouth',
+    label: '입찌그러짐',
+    category: SeniorStickerCategory.negative,
+    emoji: AnimatedEmojis.scrunchedMouth,
+  ),
+  SeniorSticker(
+    id: 'scrunched_eyes',
+    label: '눈찌그러짐',
+    category: SeniorStickerCategory.negative,
+    emoji: AnimatedEmojis.scrunchedEyes,
+  ),
+  SeniorSticker(
+    id: 'distraught',
+    label: '괴로워죽음',
+    category: SeniorStickerCategory.negative,
+    emoji: AnimatedEmojis.distraught,
+  ),
+  SeniorSticker(
+    id: 'x_eyes',
+    label: 'X눈',
+    category: SeniorStickerCategory.weird,
+    emoji: AnimatedEmojis.xEyes,
+  ),
+  SeniorSticker(
+    id: 'dizzy_face',
+    label: '어지러운얼굴',
+    category: SeniorStickerCategory.negative,
+    emoji: AnimatedEmojis.dizzyFace,
+  ),
+  SeniorSticker(
+    id: 'shaking_face',
+    label: '덜덜',
+    category: SeniorStickerCategory.negative,
+    emoji: AnimatedEmojis.shakingFace,
+  ),
+  SeniorSticker(
+    id: 'sick',
+    label: '메스꺼움',
+    category: SeniorStickerCategory.negative,
+    emoji: AnimatedEmojis.sick,
+  ),
+  SeniorSticker(
+    id: 'sneeze',
+    label: '재채기',
+    category: SeniorStickerCategory.negative,
+    emoji: AnimatedEmojis.sneeze,
+  ),
+  SeniorSticker(
+    id: 'thermometer_face',
+    label: '열나요',
+    category: SeniorStickerCategory.negative,
+    emoji: AnimatedEmojis.thermometerFace,
+  ),
+  SeniorSticker(
+    id: 'bandage_face',
+    label: '다쳤어요',
+    category: SeniorStickerCategory.negative,
+    emoji: AnimatedEmojis.bandageFace,
+  ),
+  SeniorSticker(
+    id: 'liar',
+    label: '거짓말코',
+    category: SeniorStickerCategory.reaction,
+    emoji: AnimatedEmojis.liar,
+  ),
+  SeniorSticker(
+    id: 'halo',
+    label: '천사',
+    category: SeniorStickerCategory.emotion,
+    emoji: AnimatedEmojis.halo,
   ),
 
   SeniorSticker(
@@ -962,6 +1400,306 @@ const seniorStickerPool = <SeniorSticker>[
     source: SeniorStickerSource.assetSvg,
     assetPath: 'assets/stickers/twemoji/twemoji_tooth.svg',
     sourceLabel: 'Twemoji CC-BY 4.0',
+  ),
+  SeniorSticker(
+    id: 'nature_fallen_leaf',
+    label: '낙엽',
+    category: SeniorStickerCategory.work,
+    emoji: AnimatedEmojis.fallenLeaf,
+  ),
+  SeniorSticker(
+    id: 'nature_plant',
+    label: '새싹',
+    category: SeniorStickerCategory.work,
+    emoji: AnimatedEmojis.plant,
+  ),
+  SeniorSticker(
+    id: 'nature_leaves',
+    label: '잎사귀',
+    category: SeniorStickerCategory.work,
+    emoji: AnimatedEmojis.leaves,
+  ),
+  SeniorSticker(
+    id: 'nature_luck',
+    label: '행운',
+    category: SeniorStickerCategory.cheer,
+    emoji: AnimatedEmojis.luck,
+  ),
+  SeniorSticker(
+    id: 'nature_snowflake',
+    label: '눈송이',
+    category: SeniorStickerCategory.work,
+    emoji: AnimatedEmojis.snowflake,
+  ),
+  SeniorSticker(
+    id: 'nature_volcano',
+    label: '화산',
+    category: SeniorStickerCategory.weird,
+    emoji: AnimatedEmojis.volcano,
+  ),
+  SeniorSticker(
+    id: 'nature_sunrise',
+    label: '해돋이',
+    category: SeniorStickerCategory.work,
+    emoji: AnimatedEmojis.sunrise,
+  ),
+  SeniorSticker(
+    id: 'nature_bubbles',
+    label: '방울',
+    category: SeniorStickerCategory.work,
+    emoji: AnimatedEmojis.bubbles,
+  ),
+  SeniorSticker(
+    id: 'nature_ocean',
+    label: '파도',
+    category: SeniorStickerCategory.work,
+    emoji: AnimatedEmojis.ocean,
+  ),
+  SeniorSticker(
+    id: 'nature_wind_face',
+    label: '바람',
+    category: SeniorStickerCategory.work,
+    emoji: AnimatedEmojis.windFace,
+  ),
+  SeniorSticker(
+    id: 'nature_tornado',
+    label: '토네이도',
+    category: SeniorStickerCategory.weird,
+    emoji: AnimatedEmojis.tornado,
+  ),
+  SeniorSticker(
+    id: 'nature_electricity',
+    label: '번개',
+    category: SeniorStickerCategory.reaction,
+    emoji: AnimatedEmojis.electricity,
+  ),
+  SeniorSticker(
+    id: 'nature_droplet',
+    label: '물방울',
+    category: SeniorStickerCategory.work,
+    emoji: AnimatedEmojis.droplet,
+  ),
+  SeniorSticker(
+    id: 'nature_rain_cloud',
+    label: '비구름',
+    category: SeniorStickerCategory.work,
+    emoji: AnimatedEmojis.rainCloud,
+  ),
+  SeniorSticker(
+    id: 'nature_cloud_lightning',
+    label: '먹구름',
+    category: SeniorStickerCategory.reaction,
+    emoji: AnimatedEmojis.cloudWithLightning,
+  ),
+  SeniorSticker(
+    id: 'space_comet',
+    label: '혜성',
+    category: SeniorStickerCategory.weird,
+    emoji: AnimatedEmojis.comet,
+  ),
+  SeniorSticker(
+    id: 'space_globe_asia',
+    label: '지구',
+    category: SeniorStickerCategory.work,
+    emoji: AnimatedEmojis.globeShowingAsiaAustralia,
+  ),
+  SeniorSticker(
+    id: 'animal_cow_face',
+    label: '소',
+    category: SeniorStickerCategory.cute,
+    emoji: AnimatedEmojis.cowFace,
+  ),
+  SeniorSticker(
+    id: 'animal_lizard',
+    label: '도마뱀',
+    category: SeniorStickerCategory.weird,
+    emoji: AnimatedEmojis.lizard,
+  ),
+  SeniorSticker(
+    id: 'animal_dragon',
+    label: '용',
+    category: SeniorStickerCategory.weird,
+    emoji: AnimatedEmojis.dragon,
+  ),
+  SeniorSticker(
+    id: 'animal_t_rex',
+    label: '티라노',
+    category: SeniorStickerCategory.weird,
+    emoji: AnimatedEmojis.tRex,
+  ),
+  SeniorSticker(
+    id: 'animal_dinosaur',
+    label: '공룡',
+    category: SeniorStickerCategory.weird,
+    emoji: AnimatedEmojis.dinosaur,
+  ),
+  SeniorSticker(
+    id: 'animal_turtle',
+    label: '거북이',
+    category: SeniorStickerCategory.cute,
+    emoji: AnimatedEmojis.turtle,
+  ),
+  SeniorSticker(
+    id: 'animal_crocodile',
+    label: '악어',
+    category: SeniorStickerCategory.weird,
+    emoji: AnimatedEmojis.crocodile,
+  ),
+  SeniorSticker(
+    id: 'animal_snake',
+    label: '뱀',
+    category: SeniorStickerCategory.weird,
+    emoji: AnimatedEmojis.snake,
+  ),
+  SeniorSticker(
+    id: 'animal_frog',
+    label: '개구리',
+    category: SeniorStickerCategory.cute,
+    emoji: AnimatedEmojis.frog,
+  ),
+  SeniorSticker(
+    id: 'animal_rabbit',
+    label: '토끼',
+    category: SeniorStickerCategory.cute,
+    emoji: AnimatedEmojis.rabbit,
+  ),
+  SeniorSticker(
+    id: 'animal_rat',
+    label: '쥐',
+    category: SeniorStickerCategory.weird,
+    emoji: AnimatedEmojis.rat,
+  ),
+  SeniorSticker(
+    id: 'animal_pig',
+    label: '돼지',
+    category: SeniorStickerCategory.cute,
+    emoji: AnimatedEmojis.pig,
+  ),
+  SeniorSticker(
+    id: 'animal_donkey',
+    label: '당나귀',
+    category: SeniorStickerCategory.cute,
+    emoji: AnimatedEmojis.donkey,
+  ),
+  SeniorSticker(
+    id: 'animal_kangaroo',
+    label: '캥거루',
+    category: SeniorStickerCategory.cute,
+    emoji: AnimatedEmojis.kangaroo,
+  ),
+  SeniorSticker(
+    id: 'animal_tiger',
+    label: '호랑이',
+    category: SeniorStickerCategory.cute,
+    emoji: AnimatedEmojis.tiger,
+  ),
+  SeniorSticker(
+    id: 'animal_monkey',
+    label: '원숭이',
+    category: SeniorStickerCategory.cute,
+    emoji: AnimatedEmojis.monkey,
+  ),
+  SeniorSticker(
+    id: 'animal_gorilla',
+    label: '고릴라',
+    category: SeniorStickerCategory.weird,
+    emoji: AnimatedEmojis.gorilla,
+  ),
+  SeniorSticker(
+    id: 'animal_otter',
+    label: '수달',
+    category: SeniorStickerCategory.cute,
+    emoji: AnimatedEmojis.otter,
+  ),
+  SeniorSticker(
+    id: 'animal_bat',
+    label: '박쥐',
+    category: SeniorStickerCategory.weird,
+    emoji: AnimatedEmojis.bat,
+  ),
+  SeniorSticker(
+    id: 'animal_black_bird',
+    label: '까마귀',
+    category: SeniorStickerCategory.weird,
+    emoji: AnimatedEmojis.blackBird,
+  ),
+  SeniorSticker(
+    id: 'animal_rooster',
+    label: '수탉',
+    category: SeniorStickerCategory.cute,
+    emoji: AnimatedEmojis.rooster,
+  ),
+  SeniorSticker(
+    id: 'animal_hatching_chick',
+    label: '부화중',
+    category: SeniorStickerCategory.cute,
+    emoji: AnimatedEmojis.hatchingChick,
+  ),
+  SeniorSticker(
+    id: 'animal_goose',
+    label: '거위',
+    category: SeniorStickerCategory.cute,
+    emoji: AnimatedEmojis.goose,
+  ),
+  SeniorSticker(
+    id: 'animal_peacock',
+    label: '공작',
+    category: SeniorStickerCategory.cute,
+    emoji: AnimatedEmojis.peacock,
+  ),
+  SeniorSticker(
+    id: 'animal_seal',
+    label: '물범',
+    category: SeniorStickerCategory.cute,
+    emoji: AnimatedEmojis.seal,
+  ),
+  SeniorSticker(
+    id: 'animal_shark',
+    label: '상어',
+    category: SeniorStickerCategory.weird,
+    emoji: AnimatedEmojis.shark,
+  ),
+  SeniorSticker(
+    id: 'animal_dolphin',
+    label: '돌고래',
+    category: SeniorStickerCategory.cute,
+    emoji: AnimatedEmojis.dolphin,
+  ),
+  SeniorSticker(
+    id: 'animal_whale',
+    label: '고래',
+    category: SeniorStickerCategory.cute,
+    emoji: AnimatedEmojis.whale,
+  ),
+  SeniorSticker(
+    id: 'animal_blowfish',
+    label: '복어',
+    category: SeniorStickerCategory.weird,
+    emoji: AnimatedEmojis.blowfish,
+  ),
+  SeniorSticker(
+    id: 'animal_crab',
+    label: '게',
+    category: SeniorStickerCategory.cute,
+    emoji: AnimatedEmojis.crab,
+  ),
+  SeniorSticker(
+    id: 'animal_octopus',
+    label: '문어',
+    category: SeniorStickerCategory.weird,
+    emoji: AnimatedEmojis.octopus,
+  ),
+  SeniorSticker(
+    id: 'animal_jellyfish',
+    label: '해파리',
+    category: SeniorStickerCategory.weird,
+    emoji: AnimatedEmojis.jellyfish,
+  ),
+  SeniorSticker(
+    id: 'animal_cockroach',
+    label: '바퀴',
+    category: SeniorStickerCategory.weird,
+    emoji: AnimatedEmojis.cockroach,
   ),
 ];
 

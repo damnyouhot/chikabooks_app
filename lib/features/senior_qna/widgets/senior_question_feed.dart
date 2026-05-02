@@ -20,7 +20,7 @@ class SeniorQuestionFeed extends StatefulWidget {
 class _SeniorQuestionFeedState extends State<SeniorQuestionFeed> {
   final _bodyCtrl = TextEditingController();
   final List<XFile> _images = [];
-  String? _stickerId;
+  final List<String> _stickerIds = [];
   bool _isAdmin = false;
   bool _isAnonymous = false;
   String? _category;
@@ -56,9 +56,16 @@ class _SeniorQuestionFeedState extends State<SeniorQuestionFeed> {
   }
 
   Future<void> _pickSticker() async {
-    final id = await showSeniorStickerPicker(context, selectedId: _stickerId);
+    if (_stickerIds.length >= SeniorQuestionService.maxStickerCount) {
+      _snack('스티커는 최대 ${SeniorQuestionService.maxStickerCount}개까지 첨부할 수 있어요.');
+      return;
+    }
+    final id = await showSeniorStickerPicker(
+      context,
+      selectedId: _stickerIds.isEmpty ? null : _stickerIds.last,
+    );
     if (!mounted || id == null) return;
-    setState(() => _stickerId = id);
+    setState(() => _stickerIds.add(id));
   }
 
   Future<void> _submit() async {
@@ -76,7 +83,7 @@ class _SeniorQuestionFeedState extends State<SeniorQuestionFeed> {
       category: category,
       isAnonymous: _isAnonymous,
       images: _images,
-      stickerId: _stickerId,
+      stickerIds: _stickerIds,
     );
     if (!mounted) return;
     setState(() => _posting = false);
@@ -87,7 +94,7 @@ class _SeniorQuestionFeedState extends State<SeniorQuestionFeed> {
     _bodyCtrl.clear();
     _images.clear();
     setState(() {
-      _stickerId = null;
+      _stickerIds.clear();
       _isAnonymous = false;
       _category = null;
     });
@@ -118,7 +125,7 @@ class _SeniorQuestionFeedState extends State<SeniorQuestionFeed> {
               _Composer(
                 controller: _bodyCtrl,
                 images: _images,
-                stickerId: _stickerId,
+                stickerIds: _stickerIds,
                 category: _category,
                 isAnonymous: _isAnonymous,
                 posting: _posting,
@@ -127,7 +134,8 @@ class _SeniorQuestionFeedState extends State<SeniorQuestionFeed> {
                 onPickImages: _pickImages,
                 onRemoveImage: (i) => setState(() => _images.removeAt(i)),
                 onPickSticker: _pickSticker,
-                onRemoveSticker: () => setState(() => _stickerId = null),
+                onRemoveStickerAt:
+                    (i) => setState(() => _stickerIds.removeAt(i)),
                 onSubmit: _submit,
               ),
               const SizedBox(height: AppSpacing.md),
@@ -157,7 +165,7 @@ class _SeniorQuestionFeedState extends State<SeniorQuestionFeed> {
 class _Composer extends StatelessWidget {
   final TextEditingController controller;
   final List<XFile> images;
-  final String? stickerId;
+  final List<String> stickerIds;
   final String? category;
   final bool isAnonymous;
   final bool posting;
@@ -166,13 +174,13 @@ class _Composer extends StatelessWidget {
   final VoidCallback onPickImages;
   final ValueChanged<int> onRemoveImage;
   final VoidCallback onPickSticker;
-  final VoidCallback onRemoveSticker;
+  final ValueChanged<int> onRemoveStickerAt;
   final VoidCallback onSubmit;
 
   const _Composer({
     required this.controller,
     required this.images,
-    required this.stickerId,
+    required this.stickerIds,
     required this.category,
     required this.isAnonymous,
     required this.posting,
@@ -181,7 +189,7 @@ class _Composer extends StatelessWidget {
     required this.onPickImages,
     required this.onRemoveImage,
     required this.onPickSticker,
-    required this.onRemoveSticker,
+    required this.onRemoveStickerAt,
     required this.onSubmit,
   });
 
@@ -264,9 +272,12 @@ class _Composer extends StatelessWidget {
               ),
             ),
           ],
-          if (stickerId != null) ...[
+          if (stickerIds.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.sm),
-            SeniorStickerChip(stickerId: stickerId!, onRemove: onRemoveSticker),
+            SeniorStickerChipList(
+              stickerIds: stickerIds,
+              onRemoveAt: onRemoveStickerAt,
+            ),
           ],
           const SizedBox(height: AppSpacing.xs),
           Row(
@@ -280,7 +291,8 @@ class _Composer extends StatelessWidget {
               const SizedBox(width: AppSpacing.sm),
               _ComposerAction(
                 icon: Icons.emoji_emotions_outlined,
-                label: stickerId == null ? '스티커' : '스티커 변경',
+                label:
+                    '스티커 ${stickerIds.length}/${SeniorQuestionService.maxStickerCount}',
                 onTap: posting ? null : onPickSticker,
               ),
               const SizedBox(width: AppSpacing.sm),
@@ -320,7 +332,7 @@ class _Composer extends StatelessWidget {
                           height: 16,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                        : const Text('올리기'),
+                        : const Text('등록'),
               ),
             ],
           ),

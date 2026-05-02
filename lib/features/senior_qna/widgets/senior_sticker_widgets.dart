@@ -11,16 +11,42 @@ class SeniorStickerView extends StatelessWidget {
   final String stickerId;
   final double size;
 
-  const SeniorStickerView({super.key, required this.stickerId, this.size = 67});
+  const SeniorStickerView({super.key, required this.stickerId, this.size = 30});
 
   @override
   Widget build(BuildContext context) {
     final sticker = seniorStickerById(stickerId);
     if (sticker == null) return const SizedBox.shrink();
     return SizedBox(
-      width: size + 20,
-      height: size + 20,
+      width: size + 8,
+      height: size + 8,
       child: Center(child: _StickerArt(sticker: sticker, size: size)),
+    );
+  }
+}
+
+class SeniorStickerStrip extends StatelessWidget {
+  final List<String> stickerIds;
+  final double size;
+
+  const SeniorStickerStrip({
+    super.key,
+    required this.stickerIds,
+    this.size = 28,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final validIds =
+        stickerIds.where((id) => seniorStickerById(id) != null).toList();
+    if (validIds.isEmpty) return const SizedBox.shrink();
+    return Wrap(
+      spacing: 2,
+      runSpacing: 2,
+      children:
+          validIds
+              .map((id) => SeniorStickerView(stickerId: id, size: size))
+              .toList(),
     );
   }
 }
@@ -39,27 +65,55 @@ class SeniorStickerChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final sticker = seniorStickerById(stickerId);
     if (sticker == null) return const SizedBox.shrink();
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        SeniorStickerView(stickerId: sticker.id, size: 24),
+        if (onRemove != null)
+          Positioned(
+            top: -2,
+            right: -2,
+            child: GestureDetector(
+              onTap: onRemove,
+              child: Container(
+                width: 16,
+                height: 16,
+                decoration: const BoxDecoration(
+                  color: Colors.black54,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close, color: Colors.white, size: 10),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class SeniorStickerChipList extends StatelessWidget {
+  final List<String> stickerIds;
+  final ValueChanged<int>? onRemoveAt;
+
+  const SeniorStickerChipList({
+    super.key,
+    required this.stickerIds,
+    required this.onRemoveAt,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (stickerIds.isEmpty) return const SizedBox.shrink();
     return Align(
       alignment: Alignment.centerLeft,
-      child: Stack(
+      child: Wrap(
+        spacing: 4,
+        runSpacing: 4,
         children: [
-          SeniorStickerView(stickerId: sticker.id, size: 50),
-          if (onRemove != null)
-            Positioned(
-              top: 4,
-              right: 4,
-              child: GestureDetector(
-                onTap: onRemove,
-                child: Container(
-                  width: 22,
-                  height: 22,
-                  decoration: const BoxDecoration(
-                    color: Colors.black54,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.close, color: Colors.white, size: 13),
-                ),
-              ),
+          for (var i = 0; i < stickerIds.length; i++)
+            SeniorStickerChip(
+              stickerId: stickerIds[i],
+              onRemove: onRemoveAt == null ? null : () => onRemoveAt!(i),
             ),
         ],
       ),
@@ -235,7 +289,7 @@ class _StickerGrid extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
       itemCount: sortedStickers.length,
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 5,
+        crossAxisCount: 6,
         mainAxisSpacing: AppSpacing.xs,
         crossAxisSpacing: AppSpacing.xs,
         childAspectRatio: 1,
@@ -245,9 +299,12 @@ class _StickerGrid extends StatelessWidget {
         final selected = sticker.id == selectedId;
         return InkWell(
           borderRadius: BorderRadius.circular(AppRadius.lg),
-          onTap: () => Navigator.pop(context, sticker.id),
+          onTap: () async {
+            await SeniorStickerUsageService.recordSticker(sticker.id);
+            if (context.mounted) Navigator.pop(context, sticker.id);
+          },
           child: Container(
-            padding: const EdgeInsets.all(4),
+            padding: const EdgeInsets.all(2),
             decoration: BoxDecoration(
               color:
                   selected
@@ -261,7 +318,7 @@ class _StickerGrid extends StatelessWidget {
                         : AppColors.divider.withValues(alpha: 0.35),
               ),
             ),
-            child: Center(child: _StickerArt(sticker: sticker, size: 34)),
+            child: Center(child: _StickerArt(sticker: sticker, size: 24)),
           ),
         );
       },

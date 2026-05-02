@@ -221,7 +221,7 @@ class _QuizShareCard extends StatelessWidget {
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        '치카 북스에서 정답 확인하기',
+                        '하이진랩에서 정답 확인하기',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,

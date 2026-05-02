@@ -11,6 +11,7 @@ import '../../publisher/services/clinic_auth_service.dart';
 import '../../publisher/pages/publisher_shared.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_tokens.dart';
+import '../../../core/widgets/hygiene_lab_english_title.dart';
 
 const _kNaver = Color(0xFF03C75A); // 네이버 브랜드 그린 — 의도적 유지
 
@@ -131,7 +132,7 @@ class _WebLoginPageState extends State<WebLoginPage> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        '© 치카북스',
+                        '© 하이진랩',
                         style: TextStyle(
                           fontSize: 12,
                           color: AppColors.textDisabled,
@@ -155,35 +156,24 @@ class _WebLoginPageState extends State<WebLoginPage> {
   Widget _buildLogo() {
     return Column(
       children: [
-        Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            color: AppColors.accent,
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: const Icon(
-            Icons.local_hospital_outlined,
-            size: 28,
-            color: AppColors.white,
-          ),
-        ),
-        const SizedBox(height: 14),
+        const HygieneLabEnglishTitle(fontSize: 34.8, letterSpacing: 0.21),
+        const SizedBox(height: 2),
         Text(
-          '치카북스',
-          style: GoogleFonts.notoSansKr(
-            fontSize: 24,
-            fontWeight: FontWeight.w800,
+          '하이진랩',
+          style: const TextStyle(
+            fontSize: 20,
             color: AppColors.textPrimary,
-            letterSpacing: -0.5,
+            fontWeight: FontWeight.w900,
+            fontFamily: 'Apple SD Gothic Neo',
           ),
         ),
-        const SizedBox(height: AppSpacing.sm),
+        const SizedBox(height: 10),
         Text(
-          '치과 커뮤니티 & 구인구직 플랫폼',
-          style: GoogleFonts.notoSansKr(
-            fontSize: 13,
-            color: AppColors.textSecondary,
+          '치과인의 커리어 연구소',
+          style: TextStyle(
+            fontSize: 16.9,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textSecondary.withValues(alpha: 0.9),
           ),
         ),
       ],

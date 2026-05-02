@@ -23,6 +23,7 @@ class BizLicenseUploadSection extends StatefulWidget {
   final bool publisherStyleOcrLabelWidth;
   final bool replacementMode;
   final VoidCallback? onReplacementCancel;
+  final bool newProfileUploadMode;
 
   /// 인증 완료 후에도 Firestore 기준 3단 스냅샷을 복원할 때 전달
   final ClinicProfile? persistedProfile;
@@ -38,6 +39,7 @@ class BizLicenseUploadSection extends StatefulWidget {
     this.publisherStyleOcrLabelWidth = false,
     this.replacementMode = false,
     this.onReplacementCancel,
+    this.newProfileUploadMode = false,
     this.persistedProfile,
     this.onReplaceLicenseWithDialog,
   });
@@ -411,18 +413,112 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
 
   @override
   Widget build(BuildContext context) {
+    final showingResult = _verifySnapshot != null && !_isUploading;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.accent.withValues(alpha: 0.04),
-        border: Border(left: BorderSide(color: AppColors.accent, width: 3)),
+        color:
+            showingResult
+                ? AppColors.white
+                : AppColors.accent.withValues(alpha: 0.04),
+        border:
+            showingResult
+                ? Border.all(color: AppColors.divider.withValues(alpha: 0.75))
+                : Border(left: BorderSide(color: AppColors.accent, width: 3)),
+        borderRadius:
+            showingResult
+                ? BorderRadius.circular(AppPublisher.buttonRadius)
+                : null,
       ),
       child:
-          _verifySnapshot != null && !_isUploading
+          showingResult
               ? _buildResultPanel()
               : _isUploading
               ? _buildProgress()
+              : widget.newProfileUploadMode
+              ? _buildNewProfilePrompt()
               : _buildPrompt(),
+    );
+  }
+
+  Widget _buildNewProfilePrompt() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 520;
+        final button = SizedBox(
+          height: AppPublisher.ctaHeight,
+          child: ElevatedButton.icon(
+            onPressed: _pickAndUpload,
+            icon: const Icon(Icons.upload_file, size: 16),
+            label: Text(
+              '등록증 업로드',
+              style: GoogleFonts.notoSansKr(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.accent,
+              foregroundColor: AppColors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppPublisher.buttonRadius),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+            ),
+          ),
+        );
+        final content = Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(
+              Icons.upload_file_rounded,
+              size: 18,
+              color: AppColors.accent,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '새 병원 등록증 업로드 중',
+                    style: GoogleFonts.notoSansKr(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '기존 인증 치과를 선택하지 않으면 업로드 결과가 새 병원으로 저장됩니다.',
+                    style: GoogleFonts.notoSansKr(
+                      fontSize: 12,
+                      height: 1.4,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+
+        if (compact) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [content, const SizedBox(height: 12), button],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: content),
+            const SizedBox(width: 12),
+            button,
+          ],
+        );
+      },
     );
   }
 
@@ -522,9 +618,9 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
         Text(
           '인증 결과 요약',
           style: GoogleFonts.notoSansKr(
-            fontSize: 13,
-            fontWeight: FontWeight.w800,
-            color: AppColors.textPrimary,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textSecondary,
           ),
         ),
         const SizedBox(height: 10),
@@ -577,41 +673,6 @@ class _BizLicenseUploadSectionState extends State<BizLicenseUploadSection> {
           ),
         ],
         const SizedBox(height: 14),
-        if (widget.onReplaceLicenseWithDialog != null &&
-            widget.persistedProfile?.canPublishJobs == true &&
-            !widget.replacementMode) ...[
-          Row(
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: AppPublisher.ctaHeight,
-                  child: OutlinedButton(
-                    onPressed: () async {
-                      await widget.onReplaceLicenseWithDialog!.call();
-                    },
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.accent,
-                      side: const BorderSide(color: AppColors.accent),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(
-                          AppPublisher.buttonRadius,
-                        ),
-                      ),
-                    ),
-                    child: Text(
-                      '등록증 다시 올리기',
-                      style: GoogleFonts.notoSansKr(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-        ],
         Wrap(
           spacing: 8,
           runSpacing: 8,

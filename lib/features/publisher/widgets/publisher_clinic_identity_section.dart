@@ -106,14 +106,14 @@ class _PublisherClinicIdentitySectionState
   /// OCR·프로필 스냅샷을 칸에 그대로 반영 (등록증 데이터 우선)
   void _applyOcrFirstFromProfile(ClinicProfile p) {
     final cn = _mergedOcrFirst(p, p.clinicName, 'clinicName');
-    if (cn.isNotEmpty) _clinicNameCtrl.text = cn;
+    _clinicNameCtrl.text = cn;
     final disp = _mergedDisplayNameOcrFirst(p);
-    if (disp.isNotEmpty) _displayNameCtrl.text = disp;
+    _displayNameCtrl.text = disp;
     _onDisplayNameChanged();
     final ow = _mergedOcrFirst(p, p.ownerName, 'ownerName');
-    if (ow.isNotEmpty) _ownerNameCtrl.text = ow;
+    _ownerNameCtrl.text = ow;
     final ad = _mergedOcrFirst(p, p.address, 'address');
-    if (ad.isNotEmpty) _addressCtrl.text = ad;
+    _addressCtrl.text = ad;
   }
 
   @override
@@ -464,9 +464,9 @@ class _PublisherClinicIdentitySectionState
         'address': _addressCtrl.text.trim(),
       });
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('관리자 확인 요청을 보냈어요.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('관리자 확인 요청을 보냈어요. 처리 결과 알림은 준비 중입니다.')),
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(

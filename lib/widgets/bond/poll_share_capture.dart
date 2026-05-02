@@ -235,7 +235,7 @@ class _PollShareCard extends StatelessWidget {
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        isPastStyle ? '치카 북스' : '치카 북스에서 투표하기',
+                        isPastStyle ? '하이진랩' : '하이진랩에서 투표하기',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,

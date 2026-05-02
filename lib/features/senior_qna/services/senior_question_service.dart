@@ -20,6 +20,7 @@ class SeniorQuestionService {
   static const int reportHideThreshold = 5;
   static const int maxBodyLength = 3000;
   static const int maxCommentLength = 500;
+  static const int maxStickerCount = maxSeniorStickersPerEntry;
   static const int maxNicknameLength = 30;
   static const List<String> categories = ['관계', '커리어', '마음', '기타'];
 
@@ -46,13 +47,19 @@ class SeniorQuestionService {
     required bool isAnonymous,
     List<XFile> images = const [],
     String? stickerId,
+    List<String> stickerIds = const [],
   }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return null;
     final trimmed = body.trim();
     if (trimmed.isEmpty || trimmed.length > maxBodyLength) return null;
     if (!categories.contains(category)) return null;
-    final normalizedStickerId = _normalizeStickerId(stickerId);
+    final normalizedStickerIds = _normalizeStickerIds([
+      ...stickerIds,
+      if (stickerId != null) stickerId,
+    ]);
+    final normalizedStickerId =
+        normalizedStickerIds.isEmpty ? null : normalizedStickerIds.first;
 
     try {
       final docRef = _questions.doc();
@@ -70,6 +77,7 @@ class SeniorQuestionService {
         'body': trimmed,
         'imageUrls': imageUrls,
         'stickerId': normalizedStickerId,
+        'stickerIds': normalizedStickerIds,
         'likeCount': 0,
         'cheerCount': 0,
         'commentCount': 0,
@@ -91,7 +99,8 @@ class SeniorQuestionService {
         extra: {
           'whisperCategory': _normalizeCategory(category),
           'hasImage': imageUrls.isNotEmpty,
-          'hasSticker': normalizedStickerId != null,
+          'hasSticker': normalizedStickerIds.isNotEmpty,
+          'stickerCount': normalizedStickerIds.length,
           'isAnonymous': isAnonymous,
         },
       );
@@ -110,13 +119,19 @@ class SeniorQuestionService {
     bool removeImages = false,
     XFile? replacementImage,
     String? stickerId,
+    List<String> stickerIds = const [],
   }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return false;
     final trimmed = body.trim();
     if (trimmed.isEmpty || trimmed.length > maxBodyLength) return false;
     if (!categories.contains(category)) return false;
-    final normalizedStickerId = _normalizeStickerId(stickerId);
+    final normalizedStickerIds = _normalizeStickerIds([
+      ...stickerIds,
+      if (stickerId != null) stickerId,
+    ]);
+    final normalizedStickerId =
+        normalizedStickerIds.isEmpty ? null : normalizedStickerIds.first;
 
     try {
       final ref = _questions.doc(questionId);
@@ -130,6 +145,7 @@ class SeniorQuestionService {
         'isAnonymous': isAnonymous,
         'authorNickname': await _nicknameForWrite(isAnonymous),
         'stickerId': normalizedStickerId,
+        'stickerIds': normalizedStickerIds,
         'updatedAt': FieldValue.serverTimestamp(),
       };
       if (replacementImage != null) {
@@ -260,13 +276,17 @@ class SeniorQuestionService {
     required bool isAnonymous,
     XFile? image,
     String? stickerId,
+    List<String> stickerIds = const [],
   }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return false;
     final trimmed = body.trim();
     if (trimmed.length > maxCommentLength) return false;
-    final normalizedStickerId = _normalizeStickerId(stickerId);
-    if (trimmed.isEmpty && image == null && normalizedStickerId == null) {
+    final normalizedStickerIds = _normalizeStickerIds([
+      ...stickerIds,
+      if (stickerId != null) stickerId,
+    ]);
+    if (trimmed.isEmpty && image == null && normalizedStickerIds.isEmpty) {
       return false;
     }
 
@@ -282,10 +302,10 @@ class SeniorQuestionService {
                 commentId: commentRef.id,
                 file: image,
               );
-      if (trimmed.isEmpty && imageUrl == null && normalizedStickerId == null) {
+      if (trimmed.isEmpty && imageUrl == null && normalizedStickerIds.isEmpty) {
         return false;
       }
-      final storedBody = _bodyForStorage(trimmed, normalizedStickerId);
+      final storedBody = _bodyForStorage(trimmed, normalizedStickerIds);
       final batch = _db.batch();
       batch.set(
         commentRef,
@@ -295,7 +315,7 @@ class SeniorQuestionService {
           isAnonymous,
           storedBody,
           imageUrl == null ? const [] : [imageUrl],
-          normalizedStickerId,
+          normalizedStickerIds,
         ),
       );
       batch.update(questionRef, {'commentCount': FieldValue.increment(1)});
@@ -311,7 +331,8 @@ class SeniorQuestionService {
         extra: {
           'commentId': commentRef.id,
           'hasImage': imageUrl != null,
-          'hasSticker': normalizedStickerId != null,
+          'hasSticker': normalizedStickerIds.isNotEmpty,
+          'stickerCount': normalizedStickerIds.length,
           'isAnonymous': isAnonymous,
         },
       );
@@ -395,13 +416,17 @@ class SeniorQuestionService {
     required bool isAnonymous,
     XFile? image,
     String? stickerId,
+    List<String> stickerIds = const [],
   }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return false;
     final trimmed = body.trim();
     if (trimmed.length > maxCommentLength) return false;
-    final normalizedStickerId = _normalizeStickerId(stickerId);
-    if (trimmed.isEmpty && image == null && normalizedStickerId == null) {
+    final normalizedStickerIds = _normalizeStickerIds([
+      ...stickerIds,
+      if (stickerId != null) stickerId,
+    ]);
+    if (trimmed.isEmpty && image == null && normalizedStickerIds.isEmpty) {
       return false;
     }
 
@@ -421,10 +446,10 @@ class SeniorQuestionService {
                 replyId: replyRef.id,
                 file: image,
               );
-      if (trimmed.isEmpty && imageUrl == null && normalizedStickerId == null) {
+      if (trimmed.isEmpty && imageUrl == null && normalizedStickerIds.isEmpty) {
         return false;
       }
-      final storedBody = _bodyForStorage(trimmed, normalizedStickerId);
+      final storedBody = _bodyForStorage(trimmed, normalizedStickerIds);
       final batch = _db.batch();
       batch.set(
         replyRef,
@@ -434,7 +459,7 @@ class SeniorQuestionService {
           isAnonymous,
           storedBody,
           imageUrl == null ? const [] : [imageUrl],
-          normalizedStickerId,
+          normalizedStickerIds,
         ),
       );
       batch.update(commentRef, {'replyCount': FieldValue.increment(1)});
@@ -451,7 +476,8 @@ class SeniorQuestionService {
           'commentId': commentId,
           'replyId': replyRef.id,
           'hasImage': imageUrl != null,
-          'hasSticker': normalizedStickerId != null,
+          'hasSticker': normalizedStickerIds.isNotEmpty,
+          'stickerCount': normalizedStickerIds.length,
           'isAnonymous': isAnonymous,
         },
       );
@@ -631,9 +657,20 @@ class SeniorQuestionService {
     return v.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
   }
 
-  static String _bodyForStorage(String trimmed, String? stickerId) {
-    if (trimmed.isNotEmpty || stickerId == null) return trimmed;
-    return seniorStickerFallbackBody(stickerId);
+  static List<String> _normalizeStickerIds(List<String> rawIds) {
+    final ids = <String>[];
+    for (final raw in rawIds) {
+      final normalized = _normalizeStickerId(raw);
+      if (normalized == null) continue;
+      ids.add(normalized);
+      if (ids.length >= maxStickerCount) break;
+    }
+    return ids;
+  }
+
+  static String _bodyForStorage(String trimmed, List<String> stickerIds) {
+    if (trimmed.isNotEmpty || stickerIds.isEmpty) return trimmed;
+    return seniorStickerFallbackBodyForIds(stickerIds);
   }
 
   static Map<String, dynamic> _commentMap(
@@ -642,14 +679,15 @@ class SeniorQuestionService {
     bool isAnonymous,
     String body,
     List<String> imageUrls,
-    String? stickerId,
+    List<String> stickerIds,
   ) => {
     'uid': uid,
     'authorNickname': nickname,
     'isAnonymous': isAnonymous,
     'body': body,
     'imageUrls': imageUrls,
-    'stickerId': stickerId,
+    'stickerId': stickerIds.isEmpty ? null : stickerIds.first,
+    'stickerIds': stickerIds,
     'likeCount': 0,
     'replyCount': 0,
     'reportCount': 0,
@@ -751,14 +789,15 @@ class SeniorQuestionService {
     bool isAnonymous,
     String body,
     List<String> imageUrls,
-    String? stickerId,
+    List<String> stickerIds,
   ) => {
     'uid': uid,
     'authorNickname': nickname,
     'isAnonymous': isAnonymous,
     'body': body,
     'imageUrls': imageUrls,
-    'stickerId': stickerId,
+    'stickerId': stickerIds.isEmpty ? null : stickerIds.first,
+    'stickerIds': stickerIds,
     'likeCount': 0,
     'reportCount': 0,
     'isHidden': false,

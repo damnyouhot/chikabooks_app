@@ -30,9 +30,9 @@ class _SeniorQuestionCardState extends State<SeniorQuestionCard> {
   final _commentCtrl = TextEditingController();
   late final TextEditingController _editCtrl;
   XFile? _commentImage;
-  String? _commentStickerId;
+  final List<String> _commentStickerIds = [];
   XFile? _editReplacementImage;
-  String? _editStickerId;
+  List<String> _editStickerIds = [];
   String? _replyToCommentId;
   String? _replyToName;
   bool _isEditing = false;
@@ -62,7 +62,7 @@ class _SeniorQuestionCardState extends State<SeniorQuestionCard> {
       _editCategory = _categoryOrDefault(question.category);
       _editReplacementImage = null;
       _editRemoveImages = false;
-      _editStickerId = question.stickerId;
+      _editStickerIds = [...question.stickerIds];
     }
   }
 
@@ -75,7 +75,7 @@ class _SeniorQuestionCardState extends State<SeniorQuestionCard> {
 
   Future<void> _submitComment() async {
     final body = _commentCtrl.text.trim();
-    if ((body.isEmpty && _commentImage == null && _commentStickerId == null) ||
+    if ((body.isEmpty && _commentImage == null && _commentStickerIds.isEmpty) ||
         _submittingComment) {
       return;
     }
@@ -89,7 +89,7 @@ class _SeniorQuestionCardState extends State<SeniorQuestionCard> {
               body: body,
               isAnonymous: _commentAnonymous,
               image: _commentImage,
-              stickerId: _commentStickerId,
+              stickerIds: _commentStickerIds,
             )
             : await SeniorQuestionService.addReply(
               questionId: question.id,
@@ -97,7 +97,7 @@ class _SeniorQuestionCardState extends State<SeniorQuestionCard> {
               body: body,
               isAnonymous: _commentAnonymous,
               image: _commentImage,
-              stickerId: _commentStickerId,
+              stickerIds: _commentStickerIds,
             );
     if (!mounted) return;
     setState(() {
@@ -105,7 +105,7 @@ class _SeniorQuestionCardState extends State<SeniorQuestionCard> {
       if (ok) {
         _commentCtrl.clear();
         _commentImage = null;
-        _commentStickerId = null;
+        _commentStickerIds.clear();
         _replyToCommentId = null;
         _replyToName = null;
         _commentAnonymous = false;
@@ -122,21 +122,29 @@ class _SeniorQuestionCardState extends State<SeniorQuestionCard> {
   }
 
   Future<void> _pickCommentSticker() async {
+    if (_commentStickerIds.length >= SeniorQuestionService.maxStickerCount) {
+      _snack('스티커는 최대 ${SeniorQuestionService.maxStickerCount}개까지 첨부할 수 있어요.');
+      return;
+    }
     final id = await showSeniorStickerPicker(
       context,
-      selectedId: _commentStickerId,
+      selectedId: _commentStickerIds.isEmpty ? null : _commentStickerIds.last,
     );
     if (!mounted || id == null) return;
-    setState(() => _commentStickerId = id);
+    setState(() => _commentStickerIds.add(id));
   }
 
   Future<void> _pickEditSticker() async {
+    if (_editStickerIds.length >= SeniorQuestionService.maxStickerCount) {
+      _snack('스티커는 최대 ${SeniorQuestionService.maxStickerCount}개까지 첨부할 수 있어요.');
+      return;
+    }
     final id = await showSeniorStickerPicker(
       context,
-      selectedId: _editStickerId,
+      selectedId: _editStickerIds.isEmpty ? null : _editStickerIds.last,
     );
     if (!mounted || id == null) return;
-    setState(() => _editStickerId = id);
+    setState(() => _editStickerIds.add(id));
   }
 
   Future<void> _pickEditReplacementImage() async {
@@ -247,7 +255,7 @@ class _SeniorQuestionCardState extends State<SeniorQuestionCard> {
                 currentImageUrls: question.imageUrls,
                 replacementImage: _editReplacementImage,
                 removeImages: _editRemoveImages,
-                stickerId: _editStickerId,
+                stickerIds: _editStickerIds,
                 onCategoryChanged: (v) => setState(() => _editCategory = v),
                 onAnonymousChanged: (v) => setState(() => _editAnonymous = v),
                 onPickImage: _pickEditReplacementImage,
@@ -259,12 +267,17 @@ class _SeniorQuestionCardState extends State<SeniorQuestionCard> {
                 onRemoveReplacement:
                     () => setState(() => _editReplacementImage = null),
                 onPickSticker: _pickEditSticker,
-                onRemoveSticker: () => setState(() => _editStickerId = null),
+                onRemoveStickerAt:
+                    (i) => setState(() => _editStickerIds.removeAt(i)),
                 onCancel: _cancelEditing,
                 onSave: _saveEditing,
               ),
             )
-          else
+          else ...[
+            if (!hiddenForUser && question.stickerIds.isNotEmpty) ...[
+              SeniorStickerStrip(stickerIds: question.stickerIds, size: 28),
+              const SizedBox(height: 3),
+            ],
             SizedBox(
               width: double.infinity,
               child: _QuestionBodyWithMeta(
@@ -274,6 +287,7 @@ class _SeniorQuestionCardState extends State<SeniorQuestionCard> {
                 muted: hiddenForUser,
               ),
             ),
+          ],
           if (!hiddenForUser && question.isHidden && widget.isAdmin) ...[
             const SizedBox(height: AppSpacing.sm),
             const _AdminHiddenBanner(),
@@ -283,10 +297,6 @@ class _SeniorQuestionCardState extends State<SeniorQuestionCard> {
               question.imageUrls.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.sm),
             _ImageGrid(urls: question.imageUrls),
-          ],
-          if (!hiddenForUser && !_isEditing && question.stickerId != null) ...[
-            const SizedBox(height: AppSpacing.sm),
-            SeniorStickerView(stickerId: question.stickerId!, size: 62),
           ],
           const SizedBox(height: AppSpacing.sm),
           Row(
@@ -368,11 +378,12 @@ class _SeniorQuestionCardState extends State<SeniorQuestionCard> {
                     _replyToName = null;
                   }),
               image: _commentImage,
-              stickerId: _commentStickerId,
+              stickerIds: _commentStickerIds,
               onPickImage: !_submittingComment ? _pickCommentImage : null,
               onRemoveImage: () => setState(() => _commentImage = null),
               onPickSticker: !_submittingComment ? _pickCommentSticker : null,
-              onRemoveSticker: () => setState(() => _commentStickerId = null),
+              onRemoveStickerAt:
+                  (i) => setState(() => _commentStickerIds.removeAt(i)),
               onSubmit: _submitComment,
             ),
             Align(
@@ -518,7 +529,7 @@ class _SeniorQuestionCardState extends State<SeniorQuestionCard> {
       _editCategory = _categoryOrDefault(question.category);
       _editReplacementImage = null;
       _editRemoveImages = false;
-      _editStickerId = question.stickerId;
+      _editStickerIds = [...question.stickerIds];
       _isEditing = true;
     });
   }
@@ -531,7 +542,7 @@ class _SeniorQuestionCardState extends State<SeniorQuestionCard> {
       _editCategory = _categoryOrDefault(question.category);
       _editReplacementImage = null;
       _editRemoveImages = false;
-      _editStickerId = question.stickerId;
+      _editStickerIds = [...question.stickerIds];
       _isEditing = false;
     });
   }
@@ -550,7 +561,7 @@ class _SeniorQuestionCardState extends State<SeniorQuestionCard> {
       isAnonymous: _editAnonymous,
       removeImages: _editRemoveImages,
       replacementImage: _editReplacementImage,
-      stickerId: _editStickerId,
+      stickerIds: _editStickerIds,
     );
     if (!mounted) return;
     if (ok) {
@@ -818,7 +829,7 @@ class _CommentTileState extends State<_CommentTile> {
               name: comment.displayName,
               body: hiddenForUser ? '신고 누적으로 숨김 처리된 댓글입니다.' : comment.body,
               imageUrls: hiddenForUser ? const [] : comment.imageUrls,
-              stickerId: hiddenForUser ? null : comment.stickerId,
+              stickerIds: hiddenForUser ? const [] : comment.stickerIds,
               isHiddenForAdmin: comment.isHidden && isAdmin,
               actions: Wrap(
                 alignment: WrapAlignment.end,
@@ -852,34 +863,45 @@ class _CommentTileState extends State<_CommentTile> {
                   ),
                   _TinyAction(label: '신고', onTap: () => _report(context)),
                   if (isAuthor)
-                    PopupMenuButton<String>(
-                      color: AppColors.appBg,
-                      elevation: 4,
-                      position: PopupMenuPosition.under,
-                      offset: const Offset(0, 4),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.md),
+                    SizedBox(
+                      width: 24,
+                      height: 18,
+                      child: PopupMenuButton<String>(
+                        color: AppColors.appBg,
+                        elevation: 4,
+                        position: PopupMenuPosition.under,
+                        offset: const Offset(0, 4),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                          minWidth: 24,
+                          minHeight: 18,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.md),
+                        ),
+                        icon: const Icon(
+                          Icons.more_horiz,
+                          size: 16,
+                          color: AppColors.textSecondary,
+                        ),
+                        onSelected: (value) {
+                          if (value == 'edit') {
+                            setState(() => _isEditing = true);
+                          }
+                          if (value == 'delete') _confirmDelete(context);
+                        },
+                        itemBuilder:
+                            (_) => const [
+                              PopupMenuItem(
+                                value: 'edit',
+                                child: _MenuItemText('수정'),
+                              ),
+                              PopupMenuItem(
+                                value: 'delete',
+                                child: _MenuItemText('삭제', destructive: true),
+                              ),
+                            ],
                       ),
-                      icon: const Icon(
-                        Icons.more_horiz,
-                        size: 17,
-                        color: AppColors.textSecondary,
-                      ),
-                      onSelected: (value) {
-                        if (value == 'edit') setState(() => _isEditing = true);
-                        if (value == 'delete') _confirmDelete(context);
-                      },
-                      itemBuilder:
-                          (_) => const [
-                            PopupMenuItem(
-                              value: 'edit',
-                              child: _MenuItemText('수정'),
-                            ),
-                            PopupMenuItem(
-                              value: 'delete',
-                              child: _MenuItemText('삭제', destructive: true),
-                            ),
-                          ],
                     ),
                   if (comment.isHidden && isAdmin)
                     _TinyAction(label: '복구', onTap: () => _restore(context)),
@@ -1262,7 +1284,7 @@ class _ReplyTile extends StatelessWidget {
             name: reply.displayName,
             body: hiddenForUser ? '신고 누적으로 숨김 처리된 답글입니다.' : reply.body,
             imageUrls: hiddenForUser ? const [] : reply.imageUrls,
-            stickerId: hiddenForUser ? null : reply.stickerId,
+            stickerIds: hiddenForUser ? const [] : reply.stickerIds,
             isHiddenForAdmin: reply.isHidden && isAdmin,
             compact: true,
             actions: Wrap(
@@ -1293,29 +1315,38 @@ class _ReplyTile extends StatelessWidget {
                 ),
                 _TinyAction(label: '신고', onTap: () => _report(context)),
                 if (isAuthor)
-                  PopupMenuButton<String>(
-                    color: AppColors.appBg,
-                    elevation: 4,
-                    position: PopupMenuPosition.under,
-                    offset: const Offset(0, 4),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadius.md),
+                  SizedBox(
+                    width: 24,
+                    height: 18,
+                    child: PopupMenuButton<String>(
+                      color: AppColors.appBg,
+                      elevation: 4,
+                      position: PopupMenuPosition.under,
+                      offset: const Offset(0, 4),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 24,
+                        minHeight: 18,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                      ),
+                      icon: const Icon(
+                        Icons.more_horiz,
+                        size: 16,
+                        color: AppColors.textSecondary,
+                      ),
+                      onSelected: (value) {
+                        if (value == 'delete') _confirmDelete(context);
+                      },
+                      itemBuilder:
+                          (_) => const [
+                            PopupMenuItem(
+                              value: 'delete',
+                              child: _MenuItemText('삭제', destructive: true),
+                            ),
+                          ],
                     ),
-                    icon: const Icon(
-                      Icons.more_horiz,
-                      size: 17,
-                      color: AppColors.textSecondary,
-                    ),
-                    onSelected: (value) {
-                      if (value == 'delete') _confirmDelete(context);
-                    },
-                    itemBuilder:
-                        (_) => const [
-                          PopupMenuItem(
-                            value: 'delete',
-                            child: _MenuItemText('삭제', destructive: true),
-                          ),
-                        ],
                   ),
                 if (reply.isHidden && isAdmin)
                   _TinyAction(label: '복구', onTap: () => _restore(context)),
@@ -1394,13 +1425,13 @@ class _InlineCommentInput extends StatelessWidget {
   final bool anonymous;
   final bool submitting;
   final XFile? image;
-  final String? stickerId;
+  final List<String> stickerIds;
   final ValueChanged<bool> onAnonymousChanged;
   final VoidCallback onCancelReply;
   final VoidCallback? onPickImage;
   final VoidCallback? onRemoveImage;
   final VoidCallback? onPickSticker;
-  final VoidCallback? onRemoveSticker;
+  final ValueChanged<int>? onRemoveStickerAt;
   final VoidCallback onSubmit;
 
   const _InlineCommentInput({
@@ -1409,13 +1440,13 @@ class _InlineCommentInput extends StatelessWidget {
     required this.anonymous,
     required this.submitting,
     required this.image,
-    required this.stickerId,
+    required this.stickerIds,
     required this.onAnonymousChanged,
     required this.onCancelReply,
     required this.onPickImage,
     required this.onRemoveImage,
     required this.onPickSticker,
-    required this.onRemoveSticker,
+    required this.onRemoveStickerAt,
     required this.onSubmit,
   });
 
@@ -1479,28 +1510,18 @@ class _InlineCommentInput extends StatelessWidget {
                   ),
                 ),
               ),
-              IconButton(
-                onPressed: submitting ? null : onSubmit,
-                icon:
-                    submitting
-                        ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                        : const Icon(Icons.send_rounded, size: 18),
-                color: AppColors.accent,
-                visualDensity: VisualDensity.compact,
-              ),
             ],
           ),
           if (image != null) ...[
             const SizedBox(height: AppSpacing.xs),
             _CommentImagePreview(file: image!, onRemove: onRemoveImage),
           ],
-          if (stickerId != null) ...[
+          if (stickerIds.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.xs),
-            SeniorStickerChip(stickerId: stickerId!, onRemove: onRemoveSticker),
+            SeniorStickerChipList(
+              stickerIds: stickerIds,
+              onRemoveAt: onRemoveStickerAt,
+            ),
           ],
           Row(
             children: [
@@ -1520,13 +1541,13 @@ class _InlineCommentInput extends StatelessWidget {
               IconButton(
                 onPressed: submitting ? null : onPickSticker,
                 icon: Icon(
-                  stickerId == null
+                  stickerIds.isEmpty
                       ? Icons.emoji_emotions_outlined
                       : Icons.emoji_emotions,
                   size: 18,
                 ),
                 color:
-                    stickerId == null
+                    stickerIds.isEmpty
                         ? AppColors.textSecondary
                         : AppColors.cardEmphasis,
                 visualDensity: VisualDensity.compact,
@@ -1549,6 +1570,27 @@ class _InlineCommentInput extends StatelessWidget {
                     color: AppColors.textSecondary,
                   ),
                 ),
+              ),
+              const Spacer(),
+              TextButton(
+                onPressed: submitting ? null : onSubmit,
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.accent,
+                  visualDensity: VisualDensity.compact,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  textStyle: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                child:
+                    submitting
+                        ? const SizedBox(
+                          width: 15,
+                          height: 15,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                        : const Text('등록'),
               ),
             ],
           ),
@@ -1817,14 +1859,14 @@ class _InlineEditBox extends StatelessWidget {
   final List<String> currentImageUrls;
   final XFile? replacementImage;
   final bool removeImages;
-  final String? stickerId;
+  final List<String> stickerIds;
   final ValueChanged<String> onCategoryChanged;
   final ValueChanged<bool> onAnonymousChanged;
   final VoidCallback onPickImage;
   final VoidCallback onRemoveCurrentImages;
   final VoidCallback onRemoveReplacement;
   final VoidCallback onPickSticker;
-  final VoidCallback onRemoveSticker;
+  final ValueChanged<int> onRemoveStickerAt;
   final VoidCallback onCancel;
   final VoidCallback onSave;
 
@@ -1835,14 +1877,14 @@ class _InlineEditBox extends StatelessWidget {
     required this.currentImageUrls,
     required this.replacementImage,
     required this.removeImages,
-    required this.stickerId,
+    required this.stickerIds,
     required this.onCategoryChanged,
     required this.onAnonymousChanged,
     required this.onPickImage,
     required this.onRemoveCurrentImages,
     required this.onRemoveReplacement,
     required this.onPickSticker,
-    required this.onRemoveSticker,
+    required this.onRemoveStickerAt,
     required this.onCancel,
     required this.onSave,
   });
@@ -1894,14 +1936,19 @@ class _InlineEditBox extends StatelessWidget {
             onRemoveCurrentImages: onRemoveCurrentImages,
             onRemoveReplacement: onRemoveReplacement,
           ),
-          if (stickerId != null) ...[
+          if (stickerIds.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.xs),
-            SeniorStickerChip(stickerId: stickerId!, onRemove: onRemoveSticker),
+            SeniorStickerChipList(
+              stickerIds: stickerIds,
+              onRemoveAt: onRemoveStickerAt,
+            ),
           ],
           TextButton.icon(
             onPressed: onPickSticker,
             icon: const Icon(Icons.emoji_emotions_outlined, size: 16),
-            label: Text(stickerId == null ? '스티커 추가' : '스티커 변경'),
+            label: Text(
+              '스티커 ${stickerIds.length}/${SeniorQuestionService.maxStickerCount}',
+            ),
           ),
           Row(
             children: [
@@ -2067,7 +2114,7 @@ class _Bubble extends StatelessWidget {
   final String name;
   final String body;
   final List<String> imageUrls;
-  final String? stickerId;
+  final List<String> stickerIds;
   final bool isHiddenForAdmin;
   final bool compact;
   final Widget? actions;
@@ -2076,7 +2123,7 @@ class _Bubble extends StatelessWidget {
     required this.name,
     required this.body,
     required this.imageUrls,
-    required this.stickerId,
+    required this.stickerIds,
     required this.isHiddenForAdmin,
     this.compact = false,
     this.actions,
@@ -2085,15 +2132,18 @@ class _Bubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final visibleBody =
-        isSeniorStickerFallbackBody(body, stickerId) ? '' : body;
-    final basePadding = compact ? AppSpacing.sm : AppSpacing.md;
-    final bottomPadding = actions == null ? basePadding : (compact ? 2.0 : 4.0);
+        isSeniorStickerFallbackBodyForIds(body, stickerIds) ? '' : body;
+    final hasStickers = stickerIds.isNotEmpty;
+    const horizontalPadding = 6.0;
+    final verticalPadding = compact ? 4.0 : 6.0;
+    final bottomPadding =
+        actions == null ? verticalPadding : (compact ? 6.0 : 8.0);
     return Container(
       width: double.infinity,
       padding: EdgeInsets.fromLTRB(
-        basePadding,
-        basePadding,
-        basePadding,
+        horizontalPadding,
+        verticalPadding,
+        horizontalPadding,
         bottomPadding,
       ),
       decoration: BoxDecoration(
@@ -2125,8 +2175,12 @@ class _Bubble extends StatelessWidget {
               ],
             ],
           ),
+          if (hasStickers) ...[
+            const SizedBox(height: 2),
+            SeniorStickerStrip(stickerIds: stickerIds, size: compact ? 23 : 28),
+          ],
           if (visibleBody.isNotEmpty) ...[
-            const SizedBox(height: 3),
+            SizedBox(height: hasStickers ? 1 : 2),
             Text(
               visibleBody,
               style: TextStyle(
@@ -2139,22 +2193,16 @@ class _Bubble extends StatelessWidget {
           ],
           if (imageUrls.isNotEmpty) ...[
             SizedBox(
-              height: visibleBody.isEmpty ? AppSpacing.xs : AppSpacing.sm,
+              height: visibleBody.isEmpty && !hasStickers ? AppSpacing.xs : 4,
             ),
             _CommentImage(url: imageUrls.first),
           ],
-          if (stickerId != null) ...[
-            SizedBox(
-              height:
-                  visibleBody.isEmpty && imageUrls.isEmpty
-                      ? AppSpacing.xs
-                      : AppSpacing.sm,
-            ),
-            SeniorStickerView(stickerId: stickerId!, size: compact ? 50 : 62),
-          ],
           if (actions != null) ...[
-            SizedBox(height: compact ? AppSpacing.xs : AppSpacing.sm),
-            Align(alignment: Alignment.centerRight, child: actions!),
+            const SizedBox(height: 2),
+            SizedBox(
+              width: double.infinity,
+              child: Align(alignment: Alignment.centerRight, child: actions!),
+            ),
           ],
         ],
       ),
@@ -2212,8 +2260,9 @@ class _TinyAction extends StatelessWidget {
       style: TextButton.styleFrom(
         visualDensity: VisualDensity.compact,
         foregroundColor: AppColors.textSecondary,
-        padding: const EdgeInsets.symmetric(horizontal: 6),
-        minimumSize: const Size(0, 24),
+        padding: const EdgeInsets.symmetric(horizontal: 3),
+        minimumSize: const Size(0, 26),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

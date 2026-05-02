@@ -7,8 +7,10 @@ class PollOption {
   final String id;
   final String content;
   final String? authorUid;
+
   /// 사용자 추가 보기 작성 시점 닉네임(비정규화). 구문서는 null.
   final String? authorNickname;
+  final String? stickerId;
   final bool isSystem;
   final DateTime createdAt;
   final int empathyCount;
@@ -20,6 +22,7 @@ class PollOption {
     required this.content,
     this.authorUid,
     this.authorNickname,
+    this.stickerId,
     required this.isSystem,
     required this.createdAt,
     this.empathyCount = 0,
@@ -34,6 +37,7 @@ class PollOption {
       content: m['content'] as String? ?? '',
       authorUid: m['authorUid'] as String?,
       authorNickname: m['authorNickname'] as String?,
+      stickerId: m['stickerId'] as String?,
       isSystem: m['isSystem'] as bool? ?? true,
       createdAt: (m['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       empathyCount: (m['empathyCount'] as int?) ?? 0,
@@ -51,13 +55,14 @@ class PollOption {
   }
 
   Map<String, dynamic> toMap() => {
-        'content': content,
-        'authorUid': authorUid,
-        if (authorNickname != null) 'authorNickname': authorNickname,
-        'isSystem': isSystem,
-        'createdAt': Timestamp.fromDate(createdAt),
-        'empathyCount': empathyCount,
-        'reportCount': reportCount,
-        'isHidden': isHidden,
-      };
+    'content': content,
+    'authorUid': authorUid,
+    if (authorNickname != null) 'authorNickname': authorNickname,
+    if (stickerId != null) 'stickerId': stickerId,
+    'isSystem': isSystem,
+    'createdAt': Timestamp.fromDate(createdAt),
+    'empathyCount': empathyCount,
+    'reportCount': reportCount,
+    'isHidden': isHidden,
+  };
 }

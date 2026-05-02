@@ -4244,7 +4244,7 @@ class JobPostFormState extends State<JobPostForm> {
                         TextButton.icon(
                           onPressed: _addManualStation,
                           icon: const Icon(Icons.add, size: 16),
-                          label: const Text('역 추가'),
+                          label: const Text('교통편 추가'),
                         ),
                       ],
                     ),
@@ -4454,7 +4454,7 @@ class JobPostFormState extends State<JobPostForm> {
                     OutlinedButton.icon(
                       onPressed: _addManualStation,
                       icon: const Icon(Icons.add, size: 18),
-                      label: const Text('역 직접 추가'),
+                      label: const Text('교통편 추가'),
                     ),
                     const SizedBox(height: 8),
                   ] else ...[
@@ -4502,7 +4502,7 @@ class JobPostFormState extends State<JobPostForm> {
                     OutlinedButton.icon(
                       onPressed: _addManualStation,
                       icon: const Icon(Icons.add, size: 18),
-                      label: const Text('역 직접 추가'),
+                      label: const Text('교통편 추가'),
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -4671,102 +4671,183 @@ class JobPostFormState extends State<JobPostForm> {
   }
 
   Future<void> _addManualStation() async {
-    final nameCtrl = TextEditingController();
-    final linesCtrl = TextEditingController();
+    final transportCtrl = TextEditingController();
     final minutesCtrl = TextEditingController();
     final distanceCtrl = TextEditingController();
-    final exitCtrl = TextEditingController();
+    InputDecoration dialogFieldDecoration(String label, String hint) {
+      return InputDecoration(
+        labelText: label,
+        hintText: hint,
+        filled: true,
+        fillColor:
+            _pubWeb ? AppColors.webPublisherPageBg : AppColors.surfaceMuted,
+        labelStyle: _ft(
+          size: 12,
+          weight: FontWeight.w600,
+          color: AppColors.textSecondary,
+        ),
+        hintStyle: _ft(
+          size: 12,
+          weight: FontWeight.w400,
+          color: AppColors.textDisabled,
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 12,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: _rBtn,
+          borderSide: BorderSide(color: AppColors.divider),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: _rBtn,
+          borderSide: const BorderSide(color: AppColors.accent, width: 1.2),
+        ),
+      );
+    }
+
     final station = await showDialog<TransportationStation>(
       context: context,
       builder:
-          (ctx) => AlertDialog(
-            title: const Text('역 직접 추가'),
-            content: SizedBox(
-              width: 360,
+          (ctx) => Dialog(
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 24,
+              vertical: 24,
+            ),
+            backgroundColor: Colors.transparent,
+            child: Container(
+              width: 420,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                borderRadius: BorderRadius.circular(
+                  _pubWeb ? AppPublisher.buttonRadius : 18,
+                ),
+                border: Border.all(color: AppColors.divider),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 24,
+                    offset: const Offset(0, 12),
+                  ),
+                ],
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  TextField(
-                    controller: nameCtrl,
-                    decoration: const InputDecoration(
-                      labelText: '역명',
-                      hintText: '예) 강남역',
+                  Row(
+                    children: [
+                      Container(
+                        width: 34,
+                        height: 34,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: AppColors.accent.withValues(alpha: 0.1),
+                          borderRadius: _rChip,
+                        ),
+                        child: const Icon(
+                          Icons.directions_transit_filled_rounded,
+                          size: 18,
+                          color: AppColors.accent,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          '교통편 추가',
+                          style: _ft(
+                            size: 16,
+                            weight: FontWeight.w800,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '공고에 노출할 대표 교통편만 간단히 입력해 주세요.',
+                    style: _ft(
+                      size: 12,
+                      weight: FontWeight.w400,
+                      color: AppColors.textSecondary,
                     ),
                   ),
+                  const SizedBox(height: 16),
                   TextField(
-                    controller: linesCtrl,
-                    decoration: const InputDecoration(
-                      labelText: '노선',
-                      hintText: '예) 2호선, 신분당선',
+                    controller: transportCtrl,
+                    decoration: dialogFieldDecoration(
+                      '지하철역 또는 버스 번호',
+                      '예) 강남역 또는 143번',
                     ),
                   ),
-                  TextField(
-                    controller: minutesCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: '도보 시간(분)',
-                      hintText: '예) 5',
-                    ),
-                  ),
+                  const SizedBox(height: 10),
                   TextField(
                     controller: distanceCtrl,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: '거리(m)',
-                      hintText: '예) 320',
-                    ),
+                    decoration: dialogFieldDecoration('거리(m)', '예) 320'),
                   ),
+                  const SizedBox(height: 10),
                   TextField(
-                    controller: exitCtrl,
-                    decoration: const InputDecoration(
-                      labelText: '출구 번호(선택)',
-                      hintText: '예) 11',
-                    ),
+                    controller: minutesCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: dialogFieldDecoration('도보(분)', '예) 5'),
+                  ),
+                  const SizedBox(height: 18),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.textSecondary,
+                          shape: RoundedRectangleBorder(borderRadius: _rBtn),
+                        ),
+                        child: const Text('취소'),
+                      ),
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        height: _pubWeb ? AppPublisher.ctaHeight : 42,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            final transport = transportCtrl.text.trim();
+                            if (transport.isEmpty) return;
+                            Navigator.pop(
+                              ctx,
+                              TransportationStation(
+                                name: transport,
+                                lines: const [],
+                                walkingDistanceMeters: int.tryParse(
+                                  distanceCtrl.text.trim(),
+                                ),
+                                walkingMinutes: int.tryParse(
+                                  minutesCtrl.text.trim(),
+                                ),
+                              ),
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.accent,
+                            foregroundColor: AppColors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: _rBtn),
+                            padding: const EdgeInsets.symmetric(horizontal: 18),
+                            textStyle: _ft(size: 13, weight: FontWeight.w700),
+                          ),
+                          child: const Text('추가'),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('취소'),
-              ),
-              FilledButton(
-                onPressed: () {
-                  final name = nameCtrl.text.trim();
-                  if (name.isEmpty) return;
-                  final lines =
-                      linesCtrl.text
-                          .split(RegExp(r'[,/·\n]+'))
-                          .map((e) => e.trim())
-                          .where((e) => e.isNotEmpty)
-                          .toList();
-                  Navigator.pop(
-                    ctx,
-                    TransportationStation(
-                      name: name.endsWith('역') ? name : '$name역',
-                      lines: lines,
-                      walkingMinutes: int.tryParse(minutesCtrl.text.trim()),
-                      walkingDistanceMeters: int.tryParse(
-                        distanceCtrl.text.trim(),
-                      ),
-                      exitNumber:
-                          exitCtrl.text.trim().isEmpty
-                              ? null
-                              : exitCtrl.text.trim(),
-                    ),
-                  );
-                },
-                child: const Text('추가'),
-              ),
-            ],
           ),
     );
-    nameCtrl.dispose();
-    linesCtrl.dispose();
+    transportCtrl.dispose();
     minutesCtrl.dispose();
     distanceCtrl.dispose();
-    exitCtrl.dispose();
     if (station == null || !mounted) return;
     setState(() {
       final candidateExists = _stationCandidates.any(
@@ -5897,55 +5978,6 @@ class JobPostFormState extends State<JobPostForm> {
     );
   }
 
-  // ── AI 상태 배너 ─────────────────────────────────────────────
-
-  /// AI 추출 완료 후 상단에 표시되는 요약 배너.
-  /// conflict·missing 필드가 있을 때만 경고 톤, 없으면 성공 톤.
-  Widget _buildAiStatusBanner() {
-    final status = _aiFieldStatus;
-    if (status == null || status.isEmpty) return const SizedBox.shrink();
-
-    final bgColor = AppColors.accent.withValues(alpha: 0.08);
-    final borderColor = AppColors.accent.withValues(alpha: 0.28);
-    const iconColor = AppColors.accent;
-    const icon = Icons.check_circle_outline_rounded;
-    const message = '아래 추출 결과를 하나씩 확인해주세요.';
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(AppPublisher.softRadius),
-        border: Border.all(color: borderColor),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: iconColor),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              message,
-              style: _ft(
-                size: 13,
-                weight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
-            ),
-          ),
-          GestureDetector(
-            onTap: () => setState(() => _aiFieldStatus = null),
-            child: Icon(
-              Icons.close_rounded,
-              size: 16,
-              color: AppColors.textSecondary.withValues(alpha: 0.75),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   // ── 필드 상태 뱃지 ───────────────────────────────────────────
 
   /// fieldKey에 해당하는 AI 상태 뱃지 반환.
@@ -5962,7 +5994,6 @@ class JobPostFormState extends State<JobPostForm> {
     const fg = AppColors.error;
 
     return Container(
-      margin: const EdgeInsets.only(left: 6),
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
         color: bg,
@@ -5979,7 +6010,6 @@ class JobPostFormState extends State<JobPostForm> {
   /// Step3에서 값이 비었을 때 붙이는 빨간 뱃지(미입력).
   Widget _emptyAttentionRedBadge() {
     return Container(
-      margin: const EdgeInsets.only(left: 6),
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
         color: AppColors.error.withValues(alpha: 0.10),
@@ -6006,8 +6036,10 @@ class JobPostFormState extends State<JobPostForm> {
     bool showEmptyBadge = false,
   }) {
     final aiBadgeShown = _hasAiBadge(badgeFieldKey);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
+    return Wrap(
+      spacing: 6,
+      runSpacing: 3,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         Text(
           label,
@@ -6031,8 +6063,10 @@ class JobPostFormState extends State<JobPostForm> {
     bool showEmptyBadge = false,
   }) {
     final aiBadgeShown = _hasAiBadge(fieldKey);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
+    return Wrap(
+      spacing: 6,
+      runSpacing: 3,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         Text(
           label,
@@ -6100,77 +6134,6 @@ class JobPostFormState extends State<JobPostForm> {
             ),
           ),
           sw,
-        ],
-      ),
-    );
-  }
-
-  /// 웹 편집기: 임시저장만 (게시는 상단 「게시 단계로」)
-  Widget _buildWebEditorSubmitFooter() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(
-            height: AppPublisher.ctaHeight,
-            child: OutlinedButton.icon(
-              onPressed: _isSavingDraft ? null : _manualSaveDraft,
-              icon:
-                  _isSavingDraft
-                      ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                      : const Icon(Icons.save_outlined, size: 18),
-              label: Text(
-                '임시저장',
-                style: _ft(
-                  size: 14,
-                  weight: FontWeight.w600,
-                  color: AppColors.accent,
-                ),
-              ),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.accent,
-                side: const BorderSide(color: AppColors.accent),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(
-                    AppPublisher.buttonRadius,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          if (_lastSavedAt != null || _draftId != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Center(
-                child: Text(
-                  _lastSavedAt != null
-                      ? '마지막 저장: ${_lastSavedAt!.hour.toString().padLeft(2, '0')}:${_lastSavedAt!.minute.toString().padLeft(2, '0')}'
-                      : '임시저장됨',
-                  style: _ft(
-                    size: 11,
-                    weight: FontWeight.w500,
-                    color: AppColors.textDisabled,
-                  ),
-                ),
-              ),
-            ),
-          const SizedBox(height: 12),
-          Center(
-            child: Text(
-              '게시는 상단의 「게시 단계로」에서 진행할 수 있어요.',
-              textAlign: TextAlign.center,
-              style: _ft(
-                size: 12,
-                weight: FontWeight.w500,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ),
         ],
       ),
     );

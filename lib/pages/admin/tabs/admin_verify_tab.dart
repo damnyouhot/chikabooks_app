@@ -86,6 +86,14 @@ class _AdminVerifyTabState extends State<AdminVerifyTab> {
           (historyData['items'] as List)
               .map((e) => Map<String, dynamic>.from(e as Map))
               .toList();
+      final partialErrors =
+          (historyData['partialErrors'] as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const <String>[];
+      if (partialErrors.isNotEmpty) {
+        historyError = '일부 처리 이력만 불러왔어요: ${partialErrors.join(', ')}';
+      }
     } catch (e) {
       historyError = _errorText(e);
     }
@@ -335,10 +343,7 @@ class _AdminVerifyTabState extends State<AdminVerifyTab> {
       for (final warning in queueWarnings)
         _QueueWarningCard(warning: warning, onRetry: _load),
       if (_nameRequests.isNotEmpty) ...[
-        _SectionHeader(
-          title: '상호 확인 대기',
-          subtitle: '${_nameRequests.length}건',
-        ),
+        _SectionHeader(title: '상호 확인 대기', subtitle: '${_nameRequests.length}건'),
         for (final item in _nameRequests)
           _NameReviewCard(
             item: item,

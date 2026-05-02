@@ -39,9 +39,7 @@ class _BizLicenseVerificationThreeTierPanelState
           index: 0,
           summaryLines: _tier1Summary(),
           headerLabel: '1. 등록증 OCR 정보',
-          headerColor: AppColors.textPrimary,
-          borderColor: AppColors.divider,
-          bgColor: AppColors.white,
+          state: _tier1State(),
           detail: _tier1Detail(),
         ),
         SizedBox(height: AppSpacing.sm),
@@ -49,18 +47,7 @@ class _BizLicenseVerificationThreeTierPanelState
           index: 1,
           summaryLines: _tier2Summary(),
           headerLabel: '2. 국세청 사업자 인증',
-          headerColor: AppColors.accent,
-          borderColor: AppColors.accent,
-          bgColor: AppColors.accent.withValues(alpha: 0.06),
-          leading:
-              (widget.snapshot.canApplyToProfileAfterNts ||
-                      widget.snapshot.skipped)
-                  ? const Icon(
-                    Icons.verified,
-                    size: 16,
-                    color: AppColors.accent,
-                  )
-                  : null,
+          state: _tier2State(),
           detail: _tier2Detail(),
         ),
         SizedBox(height: AppSpacing.sm),
@@ -68,9 +55,7 @@ class _BizLicenseVerificationThreeTierPanelState
           index: 2,
           summaryLines: _tier3Summary(),
           headerLabel: '3. HIRA 의료기관 대조',
-          headerColor: AppColors.textSecondary,
-          borderColor: AppColors.divider,
-          bgColor: AppColors.divider.withValues(alpha: 0.2),
+          state: _tier3State(),
           detail: _tier3Detail(),
         ),
       ],
@@ -82,18 +67,17 @@ class _BizLicenseVerificationThreeTierPanelState
     required int index,
     required List<String> summaryLines,
     required String headerLabel,
-    required Color headerColor,
-    required Color borderColor,
-    required Color bgColor,
-    Widget? leading,
+    required _TierState state,
     required Widget detail,
   }) {
     final expanded = _expanded[index];
+    final stateColor = _tierStateColor(state);
+    final borderColor = stateColor.withValues(alpha: 0.28);
     return Container(
       decoration: BoxDecoration(
-        color: bgColor,
+        color: stateColor.withValues(alpha: 0.055),
         borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: borderColor, width: expanded ? 1.5 : 1),
+        border: Border.all(color: borderColor, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -107,7 +91,8 @@ class _BizLicenseVerificationThreeTierPanelState
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (leading != null) ...[leading, const SizedBox(width: 6)],
+                  Icon(_tierStateIcon(state), size: 16, color: stateColor),
+                  const SizedBox(width: 7),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -117,7 +102,7 @@ class _BizLicenseVerificationThreeTierPanelState
                           style: GoogleFonts.notoSansKr(
                             fontSize: 12,
                             fontWeight: FontWeight.w800,
-                            color: headerColor,
+                            color: stateColor,
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -128,7 +113,7 @@ class _BizLicenseVerificationThreeTierPanelState
                               line,
                               style: GoogleFonts.notoSansKr(
                                 fontSize: 11,
-                                color: AppColors.textSecondary,
+                                color: stateColor,
                                 height: 1.4,
                               ),
                             ),
@@ -150,7 +135,7 @@ class _BizLicenseVerificationThreeTierPanelState
           ),
           // ── 상세 내용(확장 시) ──
           if (expanded) ...[
-            Divider(height: 1, color: borderColor),
+            Divider(height: 1, color: borderColor.withValues(alpha: 0.7)),
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
               child: detail,
@@ -162,6 +147,12 @@ class _BizLicenseVerificationThreeTierPanelState
   }
 
   // ── Tier 1: OCR ──────────────────────────────────────────
+  _TierState _tier1State() {
+    if (widget.ocrReadFailed || widget.ocrEmpty) return _TierState.error;
+    final r = widget.ocrResult ?? {};
+    return r.isNotEmpty ? _TierState.success : _TierState.neutral;
+  }
+
   List<String> _tier1Summary() {
     if (widget.ocrReadFailed) return ['등록증 읽기 실패 — 선명한 이미지로 다시 올려주세요'];
     if (widget.ocrEmpty) return ['추출된 항목 없음 — 다른 파일로 재시도 필요'];
@@ -242,6 +233,17 @@ class _BizLicenseVerificationThreeTierPanelState
   }
 
   // ── Tier 2: NTS ──────────────────────────────────────────
+  _TierState _tier2State() {
+    if (widget.snapshot.canApplyToProfileAfterNts || widget.snapshot.skipped) {
+      return _TierState.success;
+    }
+    if ((widget.snapshot.failReason ?? '').isNotEmpty ||
+        widget.snapshot.isDifferentBusiness) {
+      return _TierState.error;
+    }
+    return _TierState.neutral;
+  }
+
   List<String> _tier2Summary() {
     final canPublishByNts =
         widget.snapshot.canApplyToProfileAfterNts || widget.snapshot.skipped;
@@ -324,6 +326,14 @@ class _BizLicenseVerificationThreeTierPanelState
   }
 
   // ── Tier 3: HIRA ─────────────────────────────────────────
+  _TierState _tier3State() {
+    final lv = widget.snapshot.hiraMatchLevel?.toLowerCase();
+    final hm = widget.snapshot.hiraMatched;
+    if (lv == 'strict' || hm == true) return _TierState.success;
+    if (lv == 'none' || hm == false) return _TierState.error;
+    return _TierState.neutral;
+  }
+
   List<String> _tier3Summary() {
     final lv = widget.snapshot.hiraMatchLevel?.toLowerCase();
     final hm = widget.snapshot.hiraMatched;
@@ -420,5 +430,29 @@ class _BizLicenseVerificationThreeTierPanelState
   String _truncate(String v, int max) {
     if (v.isEmpty) return '-';
     return v.length > max ? '${v.substring(0, max)}…' : v;
+  }
+}
+
+enum _TierState { success, error, neutral }
+
+Color _tierStateColor(_TierState state) {
+  switch (state) {
+    case _TierState.success:
+      return AppColors.textSecondary;
+    case _TierState.error:
+      return AppColors.error;
+    case _TierState.neutral:
+      return AppColors.textSecondary;
+  }
+}
+
+IconData _tierStateIcon(_TierState state) {
+  switch (state) {
+    case _TierState.success:
+      return Icons.check_circle_rounded;
+    case _TierState.error:
+      return Icons.error_rounded;
+    case _TierState.neutral:
+      return Icons.info_outline_rounded;
   }
 }

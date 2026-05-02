@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../models/poll.dart';
 import '../models/poll_comment.dart';
 import '../models/poll_option.dart';
+import '../features/senior_qna/data/senior_stickers.dart';
 import 'user_profile_service.dart';
 
 /// 공감투표 서비스
@@ -36,8 +37,9 @@ class EmpathyPollService {
   static CollectionReference<Map<String, dynamic>> _votesRef(String pollId) =>
       _pollDoc(pollId).collection('votes');
 
-  static CollectionReference<Map<String, dynamic>> _pollCommentsRef(String pollId) =>
-      _pollDoc(pollId).collection('pollComments');
+  static CollectionReference<Map<String, dynamic>> _pollCommentsRef(
+    String pollId,
+  ) => _pollDoc(pollId).collection('pollComments');
 
   /// 종료 투표 한마디 댓글 최대 길이
   static const int maxPollCommentLength = 300;
@@ -55,11 +57,12 @@ class EmpathyPollService {
       final now = DateTime.now();
       final nowTs = Timestamp.fromDate(now);
       // 아직 종료되지 않은 투표 후보만 가져온 뒤, 클라이언트에서 진행 중 + displayOrder로 고른다.
-      final snap = await _pollsRef
-          .where('endsAt', isGreaterThan: nowTs)
-          .orderBy('endsAt')
-          .limit(500)
-          .get();
+      final snap =
+          await _pollsRef
+              .where('endsAt', isGreaterThan: nowTs)
+              .orderBy('endsAt')
+              .limit(500)
+              .get();
 
       if (snap.docs.isEmpty) return null;
 
@@ -88,10 +91,11 @@ class EmpathyPollService {
   /// 특정 투표의 보기 목록 (isHidden=false만, empathyCount 내림차순)
   static Future<List<PollOption>> getOptions(String pollId) async {
     try {
-      final snap = await _optionsRef(pollId)
-          .where('isHidden', isEqualTo: false)
-          .orderBy('empathyCount', descending: true)
-          .get();
+      final snap =
+          await _optionsRef(pollId)
+              .where('isHidden', isEqualTo: false)
+              .orderBy('empathyCount', descending: true)
+              .get();
 
       return snap.docs.map((d) => PollOption.fromDoc(d)).toList();
     } catch (e) {
@@ -147,12 +151,15 @@ class EmpathyPollService {
   }
 
   /// 투표의 전체 보기 (공유 이미지용, 공감 수 내림차순)
-  static Future<List<PollOption>> getOptionsOrderedForPoll(String pollId) async {
+  static Future<List<PollOption>> getOptionsOrderedForPoll(
+    String pollId,
+  ) async {
     try {
-      final snap = await _optionsRef(pollId)
-          .where('isHidden', isEqualTo: false)
-          .orderBy('empathyCount', descending: true)
-          .get();
+      final snap =
+          await _optionsRef(pollId)
+              .where('isHidden', isEqualTo: false)
+              .orderBy('empathyCount', descending: true)
+              .get();
 
       return snap.docs.map((d) => PollOption.fromDoc(d)).toList();
     } catch (e) {
@@ -162,13 +169,17 @@ class EmpathyPollService {
   }
 
   /// 종료된 투표의 상위 N개 보기 (메달용)
-  static Future<List<PollOption>> getTopOptions(String pollId, {int top = 3}) async {
+  static Future<List<PollOption>> getTopOptions(
+    String pollId, {
+    int top = 3,
+  }) async {
     try {
-      final snap = await _optionsRef(pollId)
-          .where('isHidden', isEqualTo: false)
-          .orderBy('empathyCount', descending: true)
-          .limit(top)
-          .get();
+      final snap =
+          await _optionsRef(pollId)
+              .where('isHidden', isEqualTo: false)
+              .orderBy('empathyCount', descending: true)
+              .limit(top)
+              .get();
 
       return snap.docs.map((d) => PollOption.fromDoc(d)).toList();
     } catch (e) {
@@ -240,12 +251,8 @@ class EmpathyPollService {
             'votedAt': now,
             'updatedAt': now,
           });
-          tx.update(newOptionRef, {
-            'empathyCount': FieldValue.increment(1),
-          });
-          tx.update(pollRef, {
-            'totalEmpathyCount': FieldValue.increment(1),
-          });
+          tx.update(newOptionRef, {'empathyCount': FieldValue.increment(1)});
+          tx.update(pollRef, {'totalEmpathyCount': FieldValue.increment(1)});
           return EmpathyResult.ok(isChange: false);
         }
 
@@ -257,16 +264,9 @@ class EmpathyPollService {
 
         // 공감 변경
         final oldOptionRef = _optionsRef(pollId).doc(currentOptionId);
-        tx.update(oldOptionRef, {
-          'empathyCount': FieldValue.increment(-1),
-        });
-        tx.update(newOptionRef, {
-          'empathyCount': FieldValue.increment(1),
-        });
-        tx.update(voteRef, {
-          'optionId': optionId,
-          'updatedAt': now,
-        });
+        tx.update(oldOptionRef, {'empathyCount': FieldValue.increment(-1)});
+        tx.update(newOptionRef, {'empathyCount': FieldValue.increment(1)});
+        tx.update(voteRef, {'optionId': optionId, 'updatedAt': now});
         // totalEmpathyCount는 변경하지 않음
         return EmpathyResult.ok(isChange: true);
       });
@@ -291,6 +291,7 @@ class EmpathyPollService {
     String pollId,
     String content, {
     bool hideAuthorNickname = false,
+    String? stickerId,
   }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return AddOptionResult.fail('로그인이 필요합니다.');
@@ -300,6 +301,8 @@ class EmpathyPollService {
     if (trimmed.length > maxOptionLength) {
       return AddOptionResult.fail('$maxOptionLength자 이내로 작성해주세요.');
     }
+    final normalizedStickerId =
+        seniorStickerById(stickerId) == null ? null : stickerId?.trim();
 
     try {
       // 투표 상태 확인
@@ -311,13 +314,12 @@ class EmpathyPollService {
       }
 
       // 유저가 이 투표에 추가한 보기 수 확인
-      final myOptions = await _optionsRef(pollId)
-          .where('authorUid', isEqualTo: uid)
-          .get();
+      final myOptions =
+          await _optionsRef(pollId).where('authorUid', isEqualTo: uid).get();
 
       if (myOptions.docs.length >= maxUserOptionsPerPoll) {
         return AddOptionResult.fail(
-          '보기는 투표당 최대 ${maxUserOptionsPerPoll}개까지 추가할 수 있습니다.',
+          '보기는 투표당 최대 $maxUserOptionsPerPoll개까지 추가할 수 있습니다.',
         );
       }
 
@@ -334,6 +336,7 @@ class EmpathyPollService {
         'content': trimmed,
         'authorUid': uid,
         'authorNickname': nickname,
+        if (normalizedStickerId != null) 'stickerId': normalizedStickerId,
         'isSystem': false,
         'createdAt': FieldValue.serverTimestamp(),
         'empathyCount': 0,
@@ -361,7 +364,10 @@ class EmpathyPollService {
   }
 
   /// 종료된 투표에만 댓글 작성 가능
-  static Future<PollCommentResult> addPollComment(String pollId, String text) async {
+  static Future<PollCommentResult> addPollComment(
+    String pollId,
+    String text,
+  ) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return PollCommentResult.fail('로그인이 필요합니다.');
 
@@ -407,12 +413,17 @@ class EmpathyPollService {
     'other': '기타',
   };
 
-  static final Set<String> _allowedReportReasons = pollReportReasonLabels.keys.toSet();
+  static final Set<String> _allowedReportReasons =
+      pollReportReasonLabels.keys.toSet();
 
-  static Future<void> _invokePurgeAfterReports(String pollId, String optionId) async {
+  static Future<void> _invokePurgeAfterReports(
+    String pollId,
+    String optionId,
+  ) async {
     try {
-      final callable = FirebaseFunctions.instanceFor(region: _functionsRegion)
-          .httpsCallable('purgePollOptionAfterReports');
+      final callable = FirebaseFunctions.instanceFor(
+        region: _functionsRegion,
+      ).httpsCallable('purgePollOptionAfterReports');
       await callable.call(<String, dynamic>{
         'pollId': pollId,
         'optionId': optionId,
@@ -465,11 +476,11 @@ class EmpathyPollService {
         });
 
         final newCount = option.reportCount + 1;
-        tx.update(optionRef, {
-          'reportCount': FieldValue.increment(1),
-        });
+        tx.update(optionRef, {'reportCount': FieldValue.increment(1)});
 
-        return ReportResult.ok(reachedRemovalThreshold: newCount >= reportDeleteThreshold);
+        return ReportResult.ok(
+          reachedRemovalThreshold: newCount >= reportDeleteThreshold,
+        );
       });
 
       if (result.success && result.reachedRemovalThreshold) {
@@ -514,8 +525,9 @@ class EmpathyPollService {
 
       if (option.empathyCount > 0) {
         try {
-          final callable = FirebaseFunctions.instanceFor(region: _functionsRegion)
-              .httpsCallable('authorDeletePollOptionWithVote');
+          final callable = FirebaseFunctions.instanceFor(
+            region: _functionsRegion,
+          ).httpsCallable('authorDeletePollOptionWithVote');
           await callable.call(<String, dynamic>{
             'pollId': pollId,
             'optionId': optionId,
@@ -551,7 +563,11 @@ class EmpathyResult {
   final bool isChange;
   final String? error;
 
-  const EmpathyResult._({required this.success, this.isChange = false, this.error});
+  const EmpathyResult._({
+    required this.success,
+    this.isChange = false,
+    this.error,
+  });
   factory EmpathyResult.ok({required bool isChange}) =>
       EmpathyResult._(success: true, isChange: isChange);
   factory EmpathyResult.fail(String msg) =>
@@ -582,6 +598,7 @@ class PollCommentResult {
 
 class ReportResult {
   final bool success;
+
   /// 신고 직후 누적이 5건 이상이면 true (이어서 Functions로 보기 삭제 시도)
   final bool reachedRemovalThreshold;
   final String? error;
@@ -592,7 +609,10 @@ class ReportResult {
     this.error,
   });
   factory ReportResult.ok({bool reachedRemovalThreshold = false}) =>
-      ReportResult._(success: true, reachedRemovalThreshold: reachedRemovalThreshold);
+      ReportResult._(
+        success: true,
+        reachedRemovalThreshold: reachedRemovalThreshold,
+      );
   factory ReportResult.fail(String msg) =>
       ReportResult._(success: false, error: msg);
 }
@@ -602,8 +622,7 @@ class DeleteOptionResult {
   final String? error;
 
   const DeleteOptionResult._({required this.success, this.error});
-  factory DeleteOptionResult.ok() =>
-      const DeleteOptionResult._(success: true);
+  factory DeleteOptionResult.ok() => const DeleteOptionResult._(success: true);
   factory DeleteOptionResult.fail(String msg) =>
       DeleteOptionResult._(success: false, error: msg);
 }

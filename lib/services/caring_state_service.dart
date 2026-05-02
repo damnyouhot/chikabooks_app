@@ -10,7 +10,7 @@ import '../config/reward_constants.dart';
 /// hunger / mood / energy / bond / cleanliness 5개 상태 + 시간 경과 시스템.
 /// users/{uid} 문서의 caringState 필드를 사용.
 ///
-/// **수면·깨우기 ([wake]):** 짧은 수면(≤30분)은 기분 벌점만. 그 외는 에너지 회복(최대 8h분).
+/// **수면·깨우기 ([wake]):** 짧은 수면(≤30분)은 기분 벌점만. 그 외는 에너지 회복(시간당 +6, 최대 8h분).
 /// 12시간 이상은 기분 패널티·고정 멘트(액션 서비스). 장시간 수면 bond는 [_applyTimeDecay]에서만 처리.
 /// 수면 중 시간 감쇠는 배고픔만.
 ///
@@ -36,13 +36,13 @@ class CaringStateService {
   static const double cleanlinessDecayPerHourSleeping = 8.0;
 
   /// 시간 감소 하한 캡 (이 아래로는 떨어지지 않음)
-  static const double hungerFloor = 20.0;
+  static const double hungerFloor = 5.0;
   static const double moodFloor = 15.0;
-  static const double energyFloor = 25.0;
+  static const double energyFloor = 5.0;
   static const double cleanlinessFloor = 0.0;
 
   /// 수면 — energy 시간당 회복량, 최대 반영 시간
-  static const double sleepEnergyPerHour = 12.5;
+  static const double sleepEnergyPerHour = 6.0;
   static const double sleepMaxHours = 8.0;
   static const double sleepMoodBonus = 5.0;
 
@@ -184,7 +184,7 @@ class CaringStateService {
         debugPrint('✅ 일일 첫 접속 bond +2');
       } else if (dailyVisitCount == 3 || dailyVisitCount == 5) {
         bond = min(100, bond + 1);
-        debugPrint('✅ 일일 ${dailyVisitCount}회 접속 bond +1');
+        debugPrint('✅ 일일 $dailyVisitCount회 접속 bond +1');
       }
     }
 

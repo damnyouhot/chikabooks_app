@@ -18,7 +18,7 @@ import '../services/funnel_onboarding_service.dart';
 ///
 /// ── 핵심 정책 ────────────────────────────────
 /// 밥주기:
-///   1회차(정상): hunger+25, mood+8, bond+1 (mood<30이면 bond 절반)
+///   1회차(정상): hunger+25, mood+6, bond+1 (mood<30이면 bond 절반)
 ///   2회차(10분내 연속): hunger+15, mood-3, energy-8
 ///   3회차: 1시간 쿨타임 차단
 ///   과식(hunger≥85, 우선): hunger+5, mood-2, energy-3
@@ -28,7 +28,7 @@ import '../services/funnel_onboarding_service.dart';
 /// 터치 (최근 3시간 슬라이딩 윈도우 내 횟수):
 ///   1~3회: mood+5, bond+1
 ///   4~6회: mood+1, bond+0
-///   7회+: mood-1
+///   7회+: 변화 없음
 ///   energy<30 → mood 보상 절반(내림), mood<30 → bond 절반(내림)
 /// 씻기기:
 ///   캐릭터 직접 터치. cleanliness+2, mood+0.1, energy-0.2
@@ -36,7 +36,7 @@ import '../services/funnel_onboarding_service.dart';
 ///   bond는 즉시 상승하지 않고 청결 유지 시간으로 정산
 /// 재우기:
 ///   ≤30분 깨우기: energy+0, mood-5
-///   >30분 & <12시간: energy+h*12.5(최대 8h), mood+5
+///   >30분 & <12시간: energy+h*6(최대 8h), mood+5
 ///   ≥12시간: energy 회복 동일, mood-2, mood+5 없음, 일일 bond+1 없음(감쇠 시). 수면 중 bond는 감쇠에서만.
 /// ──────────────────────────────────────────────
 class CaringActionService {
@@ -156,7 +156,7 @@ class CaringActionService {
         bondDelta = 0;
       } else {
         hungerDelta = 25;
-        moodDelta = 8;
+        moodDelta = 6;
         energyDelta = 0;
         bondDelta = 1;
       }

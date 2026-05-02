@@ -9,6 +9,7 @@ class SeniorQuestion {
   final String body;
   final List<String> imageUrls;
   final String? stickerId;
+  final List<String> stickerIds;
   final int likeCount;
   final int cheerCount;
   final int commentCount;
@@ -28,6 +29,7 @@ class SeniorQuestion {
     required this.body,
     required this.imageUrls,
     required this.stickerId,
+    required this.stickerIds,
     required this.likeCount,
     required this.cheerCount,
     required this.commentCount,
@@ -49,7 +51,8 @@ class SeniorQuestion {
       isAnonymous: data['isAnonymous'] as bool? ?? false,
       body: data['body'] as String? ?? '',
       imageUrls: List<String>.from(data['imageUrls'] as List? ?? const []),
-      stickerId: data['stickerId'] as String?,
+      stickerId: _firstStickerId(data),
+      stickerIds: _stickerIdsFromData(data),
       likeCount: data['likeCount'] as int? ?? 0,
       cheerCount: data['cheerCount'] as int? ?? 0,
       commentCount: data['commentCount'] as int? ?? 0,
@@ -77,6 +80,7 @@ class SeniorComment {
   final String body;
   final List<String> imageUrls;
   final String? stickerId;
+  final List<String> stickerIds;
   final int likeCount;
   final int replyCount;
   final int reportCount;
@@ -93,6 +97,7 @@ class SeniorComment {
     required this.body,
     required this.imageUrls,
     required this.stickerId,
+    required this.stickerIds,
     required this.likeCount,
     required this.replyCount,
     required this.reportCount,
@@ -111,7 +116,8 @@ class SeniorComment {
       isAnonymous: data['isAnonymous'] as bool? ?? false,
       body: data['body'] as String? ?? '',
       imageUrls: List<String>.from(data['imageUrls'] as List? ?? const []),
-      stickerId: data['stickerId'] as String?,
+      stickerId: _firstStickerId(data),
+      stickerIds: _stickerIdsFromData(data),
       likeCount: data['likeCount'] as int? ?? 0,
       replyCount: data['replyCount'] as int? ?? 0,
       reportCount: data['reportCount'] as int? ?? 0,
@@ -137,6 +143,7 @@ class SeniorReply {
   final String body;
   final List<String> imageUrls;
   final String? stickerId;
+  final List<String> stickerIds;
   final int likeCount;
   final int reportCount;
   final bool isHidden;
@@ -152,6 +159,7 @@ class SeniorReply {
     required this.body,
     required this.imageUrls,
     required this.stickerId,
+    required this.stickerIds,
     required this.likeCount,
     required this.reportCount,
     required this.isHidden,
@@ -169,7 +177,8 @@ class SeniorReply {
       isAnonymous: data['isAnonymous'] as bool? ?? false,
       body: data['body'] as String? ?? '',
       imageUrls: List<String>.from(data['imageUrls'] as List? ?? const []),
-      stickerId: data['stickerId'] as String?,
+      stickerId: _firstStickerId(data),
+      stickerIds: _stickerIdsFromData(data),
       likeCount: data['likeCount'] as int? ?? 0,
       reportCount: data['reportCount'] as int? ?? 0,
       isHidden: data['isHidden'] as bool? ?? false,
@@ -184,4 +193,23 @@ class SeniorReply {
     final nickname = authorNickname.trim();
     return nickname.isEmpty ? '익명' : nickname;
   }
+}
+
+List<String> _stickerIdsFromData(Map<String, dynamic> data) {
+  final stickerIds =
+      (data['stickerIds'] as List?)
+          ?.whereType<String>()
+          .map((id) => id.trim())
+          .where((id) => id.isNotEmpty)
+          .toList(growable: false) ??
+      const <String>[];
+  if (stickerIds.isNotEmpty) return stickerIds;
+  final legacyStickerId = (data['stickerId'] as String?)?.trim();
+  if (legacyStickerId == null || legacyStickerId.isEmpty) return const [];
+  return [legacyStickerId];
+}
+
+String? _firstStickerId(Map<String, dynamic> data) {
+  final ids = _stickerIdsFromData(data);
+  return ids.isEmpty ? null : ids.first;
 }

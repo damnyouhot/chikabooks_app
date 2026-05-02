@@ -15,6 +15,7 @@ import '../../services/empathy_poll_service.dart';
 import '../../services/caring_treat_service.dart';
 import '../../services/funnel_onboarding_service.dart';
 import '../caring/floating_treat_burst.dart';
+import '../../features/senior_qna/widgets/senior_sticker_widgets.dart';
 
 /// 공감투표 섹션 — 오늘의 투표 + 지난 투표 피드
 class BondPollSection extends StatefulWidget {
@@ -38,6 +39,7 @@ class BondPollSectionState extends State<BondPollSection> {
   final _addOptionController = TextEditingController();
   bool _addingOption = false;
   bool _hideAuthorNicknameWhenAdding = false;
+  String? _addOptionStickerId;
 
   // ── 지난 투표 (lazy + pagination) ──
   final List<Poll> _closedPolls = [];
@@ -272,17 +274,20 @@ class BondPollSectionState extends State<BondPollSection> {
     if (text.isEmpty) return;
 
     final hideNickname = _hideAuthorNicknameWhenAdding;
+    final stickerId = _addOptionStickerId;
     setState(() => _addingOption = true);
     final result = await EmpathyPollService.addOption(
       _activePoll!.id,
       text,
       hideAuthorNickname: hideNickname,
+      stickerId: stickerId,
     );
     if (!mounted) return;
     setState(() {
       _addingOption = false;
       if (result.success) {
         _hideAuthorNicknameWhenAdding = false;
+        _addOptionStickerId = null;
       }
     });
 
@@ -299,6 +304,15 @@ class BondPollSectionState extends State<BondPollSection> {
         context,
       ).showSnackBar(SnackBar(content: Text(result.error ?? '오류가 발생했습니다.')));
     }
+  }
+
+  Future<void> _pickAddOptionSticker() async {
+    final picked = await showSeniorStickerPicker(
+      context,
+      selectedId: _addOptionStickerId,
+    );
+    if (!mounted || picked == null) return;
+    setState(() => _addOptionStickerId = picked);
   }
 
   void _onPollOptionDeletePressed(
@@ -684,6 +698,32 @@ class BondPollSectionState extends State<BondPollSection> {
               onSubmitted: (_) => _submitAddOption(),
             ),
           ),
+          if (_addOptionStickerId != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 2),
+              child: SeniorStickerChip(
+                stickerId: _addOptionStickerId!,
+                onRemove:
+                    _addingOption
+                        ? null
+                        : () => setState(() => _addOptionStickerId = null),
+              ),
+            ),
+          IconButton(
+            icon: Icon(
+              Icons.add_reaction_outlined,
+              size: 20,
+              color:
+                  _addingOption
+                      ? AppColors.textDisabled
+                      : AppColors.textSecondary,
+            ),
+            tooltip: '이모지',
+            onPressed: _addingOption ? null : _pickAddOptionSticker,
+            padding: EdgeInsets.zero,
+            visualDensity: VisualDensity.compact,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 40),
+          ),
           Padding(
             padding: const EdgeInsets.only(right: 4),
             child: Row(
@@ -851,6 +891,14 @@ class BondPollSectionState extends State<BondPollSection> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    if (option.stickerId != null)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 2),
+                        child: SeniorStickerView(
+                          stickerId: option.stickerId!,
+                          size: 21,
+                        ),
+                      ),
                     // 삭제 — 작성자만 노출
                     if (isAuthor)
                       IconButton(
@@ -872,7 +920,7 @@ class BondPollSectionState extends State<BondPollSection> {
                         padding: EdgeInsets.zero,
                         visualDensity: VisualDensity.compact,
                         constraints: const BoxConstraints(
-                          minWidth: 28,
+                          minWidth: 24,
                           minHeight: 28,
                         ),
                       ),
@@ -888,7 +936,7 @@ class BondPollSectionState extends State<BondPollSection> {
                       padding: EdgeInsets.zero,
                       visualDensity: VisualDensity.compact,
                       constraints: const BoxConstraints(
-                        minWidth: 28,
+                        minWidth: 24,
                         minHeight: 28,
                       ),
                     ),

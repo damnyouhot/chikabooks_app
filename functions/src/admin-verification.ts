@@ -43,6 +43,11 @@ interface AdminVerificationHistoryItem {
   updatedAt: number | null;
 }
 
+/**
+ * Converts Firestore timestamps into millis for callable responses.
+ * @param {unknown} value Firestore timestamp-like value.
+ * @return {number | null} Milliseconds when available.
+ */
 function timestampToMillis(value: unknown): number | null {
   if (
     value &&
@@ -53,6 +58,11 @@ function timestampToMillis(value: unknown): number | null {
   return null;
 }
 
+/**
+ * Ensures the callable requester has admin privileges.
+ * @param {functions.https.CallableContext} context Callable request context.
+ * @return {Promise<string>} Admin uid.
+ */
 async function requireAdmin(
   context: functions.https.CallableContext
 ): Promise<string> {
@@ -72,6 +82,12 @@ async function requireAdmin(
   return context.auth.uid;
 }
 
+/**
+ * Creates or updates an admin notification document.
+ * @param {string} notificationId Notification document id.
+ * @param {Record<string, unknown>} data Notification payload.
+ * @return {Promise<void>} Resolves when the document is written.
+ */
 async function upsertAdminNotification(
   notificationId: string,
   data: Record<string, unknown>
@@ -90,6 +106,12 @@ async function upsertAdminNotification(
   );
 }
 
+/**
+ * Marks an admin notification as resolved when the linked review is handled.
+ * @param {string} notificationId Notification document id.
+ * @param {string} adminUid Admin uid resolving the notification.
+ * @return {Promise<void>} Resolves when the document is updated.
+ */
 async function resolveAdminNotification(
   notificationId: string,
   adminUid: string
@@ -129,27 +151,32 @@ export const adminListProvisionalProfiles = functions.https.onCall(
       const lastCheckAtRaw = bv["lastCheckAt"] as
         | admin.firestore.Timestamp
         | undefined;
-      const lastCheckAt = lastCheckAtRaw && typeof lastCheckAtRaw.toMillis === "function"
-        ? lastCheckAtRaw.toMillis()
-        : null;
+      const lastCheckAt =
+        lastCheckAtRaw && typeof lastCheckAtRaw.toMillis === "function" ?
+          lastCheckAtRaw.toMillis() :
+          null;
       items.push({
         uid,
         profileId: doc.id,
-        clinicName: String((data as Record<string, unknown>).clinicName ?? ""),
-        displayName: String((data as Record<string, unknown>).displayName ?? ""),
+        clinicName: String(
+          (data as Record<string, unknown>).clinicName ?? ""
+        ),
+        displayName: String(
+          (data as Record<string, unknown>).displayName ?? ""
+        ),
         address: String((data as Record<string, unknown>).address ?? ""),
         ownerName: String((data as Record<string, unknown>).ownerName ?? ""),
         bizNo: String(bv["bizNo"] ?? ""),
-        bizRegImageUrl: (data as Record<string, unknown>).bizRegImageUrl
-          ? String((data as Record<string, unknown>).bizRegImageUrl)
-          : null,
+        bizRegImageUrl: (data as Record<string, unknown>).bizRegImageUrl ?
+          String((data as Record<string, unknown>).bizRegImageUrl) :
+          null,
         hiraMatched:
-          typeof bv["hiraMatched"] === "boolean"
-            ? (bv["hiraMatched"] as boolean)
-            : null,
-        hiraMatchLevel: bv["hiraMatchLevel"]
-          ? String(bv["hiraMatchLevel"])
-          : null,
+          typeof bv["hiraMatched"] === "boolean" ?
+            (bv["hiraMatched"] as boolean) :
+            null,
+        hiraMatchLevel: bv["hiraMatchLevel"] ?
+          String(bv["hiraMatchLevel"]) :
+          null,
         hiraNote: bv["hiraNote"] ? String(bv["hiraNote"]) : null,
         checkMethod: bv["checkMethod"] ? String(bv["checkMethod"]) : null,
         lastCheckAt,
@@ -165,76 +192,95 @@ export const adminListVerificationReviewHistory = functions.https.onCall(
     await requireAdmin(context);
     const db = getDb();
     const items: AdminVerificationHistoryItem[] = [];
+    const errors: string[] = [];
 
-    const profileSnap = await db
-      .collectionGroup("clinic_profiles")
-      .where(
-        "businessVerification.adminReviewedAt",
-        ">",
-        admin.firestore.Timestamp.fromMillis(0)
-      )
-      .orderBy("businessVerification.adminReviewedAt", "desc")
-      .limit(100)
-      .get();
+    try {
+      const profileSnap = await db
+        .collectionGroup("clinic_profiles")
+        .where(
+          "businessVerification.adminReviewedAt",
+          ">",
+          admin.firestore.Timestamp.fromMillis(0)
+        )
+        .orderBy("businessVerification.adminReviewedAt", "desc")
+        .limit(100)
+        .get();
 
-    for (const doc of profileSnap.docs) {
-      const data = doc.data() ?? {};
-      const bv = (data as Record<string, unknown>).businessVerification as
-        | Record<string, unknown>
-        | undefined ?? {};
-      const parent = doc.ref.parent.parent;
-      const uid = parent?.id ?? "";
-      items.push({
-        id: `profile_${uid}_${doc.id}`,
-        type: "profile_verification",
-        status: String(bv["status"] ?? ""),
-        uid,
-        profileId: doc.id,
-        clinicName: String((data as Record<string, unknown>).clinicName ?? ""),
-        displayName: String((data as Record<string, unknown>).displayName ?? ""),
-        ownerName: String((data as Record<string, unknown>).ownerName ?? ""),
-        address: String((data as Record<string, unknown>).address ?? ""),
-        bizNo: String(bv["bizNo"] ?? ""),
-        adminNote: bv["adminNote"] ? String(bv["adminNote"]) : null,
-        reviewedBy: bv["adminReviewedBy"] ?
-          String(bv["adminReviewedBy"]) :
-          null,
-        reviewedAt: timestampToMillis(bv["adminReviewedAt"]),
-        updatedAt: timestampToMillis((data as Record<string, unknown>).updatedAt),
-      });
+      for (const doc of profileSnap.docs) {
+        const data = doc.data() ?? {};
+        const bv = (data as Record<string, unknown>).businessVerification as
+          | Record<string, unknown>
+          | undefined ?? {};
+        const parent = doc.ref.parent.parent;
+        const uid = parent?.id ?? "";
+        items.push({
+          id: `profile_${uid}_${doc.id}`,
+          type: "profile_verification",
+          status: String(bv["status"] ?? ""),
+          uid,
+          profileId: doc.id,
+          clinicName: String(
+            (data as Record<string, unknown>).clinicName ?? ""
+          ),
+          displayName: String(
+            (data as Record<string, unknown>).displayName ?? ""
+          ),
+          ownerName: String((data as Record<string, unknown>).ownerName ?? ""),
+          address: String((data as Record<string, unknown>).address ?? ""),
+          bizNo: String(bv["bizNo"] ?? ""),
+          adminNote: bv["adminNote"] ? String(bv["adminNote"]) : null,
+          reviewedBy: bv["adminReviewedBy"] ?
+            String(bv["adminReviewedBy"]) :
+            null,
+          reviewedAt: timestampToMillis(bv["adminReviewedAt"]),
+          updatedAt: timestampToMillis(
+            (data as Record<string, unknown>).updatedAt
+          ),
+        });
+      }
+    } catch (err) {
+      console.error(
+        "adminListVerificationReviewHistory profile query failed",
+        err
+      );
+      errors.push("profile_verification");
     }
 
-    const requestSnaps = await Promise.all(
-      ["approved", "rejected"].map((status) =>
-        db
+    for (const status of ["approved", "rejected"]) {
+      try {
+        const snap = await db
           .collection("adminVerificationRequests")
           .where("type", "==", "business_name_review")
           .where("status", "==", status)
           .orderBy("updatedAt", "desc")
           .limit(50)
-          .get()
-      )
-    );
+          .get();
 
-    for (const snap of requestSnaps) {
-      for (const doc of snap.docs) {
-        const data = doc.data() ?? {};
-        items.push({
-          id: `name_${doc.id}`,
-          type: "business_name_review",
-          status: String(data.status ?? ""),
-          uid: String(data.uid ?? ""),
-          profileId: String(data.profileId ?? ""),
-          clinicName: String(data.registeredClinicName ?? ""),
-          displayName: String(data.displayName ?? ""),
-          ownerName: String(data.ownerName ?? ""),
-          address: String(data.address ?? ""),
-          bizNo: "",
-          adminNote: data.adminNote ? String(data.adminNote) : null,
-          reviewedBy: data.reviewedBy ? String(data.reviewedBy) : null,
-          reviewedAt: timestampToMillis(data.reviewedAt),
-          updatedAt: timestampToMillis(data.updatedAt),
-        });
+        for (const doc of snap.docs) {
+          const data = doc.data() ?? {};
+          items.push({
+            id: `name_${doc.id}`,
+            type: "business_name_review",
+            status: String(data.status ?? ""),
+            uid: String(data.uid ?? ""),
+            profileId: String(data.profileId ?? ""),
+            clinicName: String(data.registeredClinicName ?? ""),
+            displayName: String(data.displayName ?? ""),
+            ownerName: String(data.ownerName ?? ""),
+            address: String(data.address ?? ""),
+            bizNo: "",
+            adminNote: data.adminNote ? String(data.adminNote) : null,
+            reviewedBy: data.reviewedBy ? String(data.reviewedBy) : null,
+            reviewedAt: timestampToMillis(data.reviewedAt),
+            updatedAt: timestampToMillis(data.updatedAt),
+          });
+        }
+      } catch (err) {
+        console.error(
+          `adminListVerificationReviewHistory name query failed: ${status}`,
+          err
+        );
+        errors.push(`business_name_review_${status}`);
       }
     }
 
@@ -244,7 +290,7 @@ export const adminListVerificationReviewHistory = functions.https.onCall(
       return right - left;
     });
 
-    return {items: items.slice(0, 100)};
+    return {items: items.slice(0, 100), partialErrors: errors};
   }
 );
 
@@ -495,7 +541,10 @@ export const adminResolveBusinessNameReview = functions.https.onCall(
       },
       {merge: true}
     );
-    await resolveAdminNotification(`business_name_review_${requestId}`, adminUid);
+    await resolveAdminNotification(
+      `business_name_review_${requestId}`,
+      adminUid
+    );
     await getDb().collection("activityLogs").add({
       userId: adminUid,
       type: "admin_business_name_review_resolve",

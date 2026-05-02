@@ -20,6 +20,7 @@ import '../widgets/speech_overlay.dart';
 import '../pages/ebook/ebook_detail_page.dart';
 import 'settings/settings_page.dart';
 import '../core/theme/app_colors.dart';
+import '../core/theme/app_tokens.dart';
 import '../core/widgets/app_badge.dart';
 import '../services/admin_activity_service.dart';
 import '../data/caring_ments.dart';
@@ -925,29 +926,183 @@ class _CaringPageState extends State<CaringPage> with TickerProviderStateMixin {
             emoji: '🍖',
             value: _caringState.hungerInt,
             color: AppColors.lime,
+            onTap:
+                () => _showGaugeInfo(
+                  emoji: '🍖',
+                  title: '배고픔',
+                  color: AppColors.lime,
+                  lines: const [
+                    '· 마지막 활동 후 약 3분 미만이면 시간 감소 없음',
+                    '· 깨어 있든 자든 시간당 −8',
+                    '· 밥(보통) +25 / 10분 안 2회차 +15(3회째는 1시간 쿨)',
+                    '· 배부름(85↑) 밥은 +5(과식 분기)',
+                  ],
+                ),
           ),
           _CircleGauge(
             emoji: '🫧',
             value: _caringState.cleanlinessInt,
             color: const Color(0xFF4FC3F7),
+            onTap:
+                () => _showGaugeInfo(
+                  emoji: '🫧',
+                  title: '청결',
+                  color: const Color(0xFF4FC3F7),
+                  lines: const [
+                    '· 약 3분 미만이면 시간 감소 없음',
+                    '· 깨어 −10·자는 중 −8(시간당)',
+                    '· 씻기기: 85 미만 +2, 85↑ +1, 100이면 +0 / 기분 +0.1·에너지 소폭 감소',
+                    '· 70↑ 잘 유지 시 유대 보상, 50 미만 오래 가면 유대 주기적 감소',
+                  ],
+                ),
           ),
           _CircleGauge(
             emoji: '😊',
             value: _caringState.moodInt,
             color: const Color(0xFFFFD54F),
+            onTap:
+                () => _showGaugeInfo(
+                  emoji: '😊',
+                  title: '기분',
+                  color: const Color(0xFFFFD54F),
+                  lines: const [
+                    '· 깨어 있을 때만 시간 감소(잠 중엔 없음) — 시간당 −6, 배고픔 30 미만이면 −7',
+                    '· 밥: 보통 +6 / 10분 내 연속 −3 / 과식 −2',
+                    '· 쓰다듬기(최근 3시간): 1~3회 +5, 4~6회 +1, 7회+ 변화 없음(에너지 30 미만이면 보상 절반)',
+                    '· 수면 깨우기: 짧게 −5, 적당히 +5, 12시간↑ −2 등',
+                    '· 최저 15',
+                  ],
+                ),
           ),
           _CircleGauge(
             emoji: '⚡',
             value: _caringState.energyInt,
             color: const Color(0xFF81C784),
+            onTap:
+                () => _showGaugeInfo(
+                  emoji: '⚡',
+                  title: '에너지',
+                  color: const Color(0xFF81C784),
+                  lines: const [
+                    '· 깨어 있을 때만 시간당 −4(수면 중 시간 감소 없음)',
+                    '· 잠 깸: 수면(최대 8h 반영)×시간당 +6, 상한 100 / 30분 이하 깨우면 변화 없음',
+                    '· 밥 연속 −8, 과식 −3 / 씻기기 시 −0.2 또는 −0.1',
+                    '· 최저 5',
+                  ],
+                ),
           ),
           _CircleGauge(
             emoji: '💕',
             value: _caringState.bondInt,
             color: const Color(0xFFF48FB1),
+            onTap:
+                () => _showGaugeInfo(
+                  emoji: '💕',
+                  title: '유대',
+                  color: const Color(0xFFF48FB1),
+                  lines: const [
+                    '· 오늘 1번째 +2, 3·5번째 각 +1',
+                    '· 밥(보통) +1(기분 30 미만이면 +0) / 쓰다듬기 +1은 같은 날 최대 3번(1~3회차 구간)',
+                    '· 청결 70↑ 유지 시 시간마다 +1(구간·일일 상한 있음)',
+                    '· 미접속 누적: 하루당 −2(한 번 정산 최대 −6)',
+                    '· 밥 8시간마다 −1, 깨어 있음 20시간마다 −1, 연속 수면 12시간마다 −2',
+                    '· 청결 50 미만 3시간마다 −1 / 배고픔 30 미만 3시간마다 −2 / 에너지 25 미만 5시간마다 −2',
+                  ],
+                ),
           ),
         ],
       ),
+    );
+  }
+
+  void _showGaugeInfo({
+    required String emoji,
+    required String title,
+    required Color color,
+    required List<String> lines,
+  }) {
+    showDialog<void>(
+      context: context,
+      builder:
+          (ctx) => Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: const EdgeInsets.symmetric(horizontal: 28),
+            child: Container(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              decoration: BoxDecoration(
+                color: AppColors.appBg,
+                borderRadius: BorderRadius.circular(AppRadius.xl),
+                border: Border.all(color: AppColors.divider),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.18),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: Text(
+                            emoji,
+                            style: const TextStyle(fontSize: 18, height: 1.0),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        icon: const Icon(Icons.close_rounded, size: 18),
+                        color: AppColors.textSecondary,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  ...lines.map(
+                    (line) => Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.md,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceMuted,
+                          borderRadius: BorderRadius.circular(AppRadius.md),
+                        ),
+                        child: Text(
+                          line,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            height: 1.35,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
     );
   }
 
@@ -1421,11 +1576,13 @@ class _CircleGauge extends StatelessWidget {
     required this.emoji,
     required this.value,
     required this.color,
+    required this.onTap,
   });
 
   final String emoji;
   final int value;
   final Color color;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -1437,29 +1594,33 @@ class _CircleGauge extends StatelessWidget {
         final displayVal = animValue.round();
         final ratio = (animValue / 100).clamp(0.0, 1.0);
 
-        return SizedBox(
-          width: 52,
-          height: 52,
-          child: CustomPaint(
-            painter: _CircleGaugePainter(ratio: ratio, color: color),
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    emoji,
-                    style: const TextStyle(fontSize: 14, height: 1.0),
-                  ),
-                  Text(
-                    '$displayVal',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                      height: 1.2,
+        return GestureDetector(
+          onTap: onTap,
+          behavior: HitTestBehavior.opaque,
+          child: SizedBox(
+            width: 52,
+            height: 52,
+            child: CustomPaint(
+              painter: _CircleGaugePainter(ratio: ratio, color: color),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      emoji,
+                      style: const TextStyle(fontSize: 14, height: 1.0),
                     ),
-                  ),
-                ],
+                    Text(
+                      '$displayVal',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                        height: 1.2,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
