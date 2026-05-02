@@ -15,6 +15,7 @@ import '../../../models/job.dart';
 import '../../../models/transportation_info.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_tokens.dart';
+import '../../../core/widgets/app_modal_scaffold.dart';
 import '../utils/job_ai_extract_normalize.dart';
 import '../utils/job_post_field_sync.dart';
 import '../utils/job_image_attach_helpers.dart';
@@ -4709,29 +4710,14 @@ class JobPostFormState extends State<JobPostForm> {
     final station = await showDialog<TransportationStation>(
       context: context,
       builder:
-          (ctx) => Dialog(
+          (ctx) => AppModalDialog(
             insetPadding: const EdgeInsets.symmetric(
               horizontal: 24,
               vertical: 24,
             ),
-            backgroundColor: Colors.transparent,
-            child: Container(
+            cardPadding: const EdgeInsets.all(20),
+            child: SizedBox(
               width: 420,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppColors.white,
-                borderRadius: BorderRadius.circular(
-                  _pubWeb ? AppPublisher.buttonRadius : 18,
-                ),
-                border: Border.all(color: AppColors.divider),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 24,
-                    offset: const Offset(0, 12),
-                  ),
-                ],
-              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,

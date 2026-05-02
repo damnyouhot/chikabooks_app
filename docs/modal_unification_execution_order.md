@@ -23,6 +23,7 @@
 | 2026-05-02 | Phase E (순서 16–23) | 이력서 홈·편집·지원내역, 구인 웹(`job_post_web_page`, `job_input`, `job_draft_editor`, `job_manage_section`, `published_job_detail`)의 `AlertDialog`를 `AppConfirmModal` / `AppModalDialog`로 교체. `job_post_form`(순서 24)은 제외. |
 | 2026-05-02 | Phase F (순서 25–29) | `me_notifications`, `me_orders`, `me_billing`, `me_clinic`, `me_applicants_pool` 및 `edit_pool_meta_dialog`·`notify_past_applicants_dialog`의 `AlertDialog`를 `AppConfirmModal` / `AppModalDialog`로 교체. |
 | 2026-05-02 | Phase G (순서 30–32) | `publisher_pending_page` 문의 `AppModalDialog`, `publisher_clinic_identity_section` 관리자 확인 `AppConfirmModal`. `clinic_selector`는 `AlertDialog` 없음·출판 각진 `Dialog` 톤 유지로 코드 변경 없음(검토 완료). |
+| 2026-05-02 | 순서 24 | `job_post_form` 교통편 추가 `Dialog`를 `AppModalDialog`로 교체. `showDatePicker`는 Phase N 정책 전까지 유지. |
 
 ## 1. 인벤토리 스프레드시트 (착수 직후 1일 이내)
 
@@ -93,7 +94,7 @@
 | 21 | E | `lib/features/jobs/web/job_draft_editor_page.dart` | `showDialog` | Med | ✅ |
 | 22 | E | `lib/features/jobs/web/job_manage_section.dart` | `showDialog` | Med | ✅ |
 | 23 | E | `lib/features/jobs/web/published_job_detail_page.dart` | `showDialog` | Med | ✅ |
-| 24 | E | `lib/features/jobs/ui/job_post_form.dart` | `Dialog`+`showDatePicker` | High | |
+| 24 | E | `lib/features/jobs/ui/job_post_form.dart` | `Dialog`+`showDatePicker` | High | ✅ |
 | 25 | F | `lib/features/me/pages/me_notifications_page.dart` | `showDialog` | Med | ✅ |
 | 26 | F | `lib/features/me/pages/me_orders_page.dart` | `showDialog` | Med | ✅ |
 | 27 | F | `lib/features/me/pages/me_billing_page.dart` | `showDialog` | High | ✅ |
@@ -176,4 +177,4 @@
 
 ---
 
-이 문서는 저장소 루트 `docs/modal_unification_execution_order.md`에 두었다. 다음 단계는 **순서 24 `job_post_form` 단독 PR**(고위험) 또는 **Phase H(속닥속닥, 33–35)** 착수다.
+이 문서는 저장소 루트 `docs/modal_unification_execution_order.md`에 두었다. 다음 단계는 **Phase H(속닥속닥, 33–35)** 또는 **Phase N**에서 `showDatePicker` 정책 반영 및 `job_post_form` 내 날짜 피커 정리다.
