@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'job_manage_section.dart';
 import 'job_analytics_section.dart';
 import 'web_typography.dart';
+import 'campaign/campaign_inbox_button.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/web_site_footer.dart';
 import '../../../core/theme/app_tokens.dart' show AppPublisher, AppRadius;
@@ -127,6 +128,18 @@ class _JobPostWebPageState extends State<JobPostWebPage>
                     textStyle: const TextStyle(fontSize: 13),
                   ),
                 ),
+                // 광고 대시보드 진입
+                TextButton.icon(
+                  onPressed: () => context.push('/post-job/campaigns'),
+                  icon: const Icon(Icons.campaign_outlined, size: 16),
+                  label: const Text('광고 대시보드'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.accent,
+                    textStyle: const TextStyle(fontSize: 13),
+                  ),
+                ),
+                // 인박스 종
+                const CampaignInboxButton(),
                 if (kIsWeb) ...[
                   const SizedBox(width: 4),
                   const WebAccountMenuButton(),

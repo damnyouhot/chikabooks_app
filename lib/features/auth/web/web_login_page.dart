@@ -1,4 +1,5 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -9,11 +10,22 @@ import '../../../services/email_auth_service.dart';
 import '../../../services/sign_in_tracker.dart';
 import '../../publisher/services/clinic_auth_service.dart';
 import '../../publisher/pages/publisher_shared.dart';
+import '../services/web_account_actions_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/hygiene_lab_english_title.dart';
 
 const _kNaver = Color(0xFF03C75A); // 네이버 브랜드 그린 — 의도적 유지
+
+/// 로그인 페이지에서 두 카드(좌:지원자 / 우:치과)를 어떻게 그릴지 결정하는 역할 상태.
+///
+/// - [guest]      : 로그인 안 됨 → 양쪽 모두 로그인 카드.
+/// - [loading]    : 로그인됐지만 아직 역할(clinic 계정 여부) 판별 중.
+/// - [applicant]  : `clinics_accounts/{uid}` 미존재 → 좌측에 "지원자로 로그인됨"
+///                  카드, 우측엔 "치과 계정으로 사용하려면 로그아웃" 안내.
+/// - [clinic]     : `clinics_accounts/{uid}` 존재 → 우측에 "치과로 로그인됨"
+///                  카드, 좌측엔 "지원자로 사용하려면 로그아웃" 안내.
+enum _LoginRole { guest, loading, applicant, clinic }
 
 /// 통합 로그인 페이지 (/login)
 ///
@@ -28,8 +40,62 @@ class WebLoginPage extends StatefulWidget {
 }
 
 class _WebLoginPageState extends State<WebLoginPage> {
+  // ── 치과 로그인 폼 → 로그인 성공 후 자동 라우팅용 ──
   bool _clinicLoginRedirectPending = false;
   bool _clinicLoginRedirecting = false;
+
+  // ── 현재 로그인 역할 추적 ──
+  _LoginRole _role = _LoginRole.loading;
+  StreamSubscription<User?>? _authSub;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = FirebaseAuth.instance.currentUser;
+    _role = initial == null ? _LoginRole.guest : _LoginRole.loading;
+    if (initial != null) {
+      _resolveRole(initial);
+    }
+    _authSub = FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (!mounted) return;
+      if (user == null) {
+        setState(() => _role = _LoginRole.guest);
+      } else {
+        setState(() => _role = _LoginRole.loading);
+        _resolveRole(user);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _authSub?.cancel();
+    super.dispose();
+  }
+
+  /// `clinics_accounts/{uid}` 존재 여부로 역할 확정.
+  Future<void> _resolveRole(User user) async {
+    try {
+      final isClinic = await ClinicAuthService.isClinicAccount(user.uid);
+      if (!mounted) return;
+      setState(
+        () => _role = isClinic ? _LoginRole.clinic : _LoginRole.applicant,
+      );
+      // 치과 폼에서 로그인을 갓 트리거했고, 실제 치과 계정으로 확인되면
+      // 즉시 새 공고 플로우(또는 nextRoute)로 이동시킨다.
+      if (isClinic && _clinicLoginRedirectPending && !_clinicLoginRedirecting) {
+        _clinicLoginRedirecting = true;
+        if (mounted) {
+          context.go(widget.nextRoute ?? '/post-job/input');
+        }
+      }
+    } catch (_) {
+      // Firestore 일시 오류 시: 로그인은 유지하되 안전한 기본값(applicant)으로
+      // 폴백한다. (clinics_accounts 권한/네트워크 문제로 무한 로딩 방지)
+      if (!mounted) return;
+      setState(() => _role = _LoginRole.applicant);
+    }
+  }
 
   void _markClinicLoginStarted() {
     _clinicLoginRedirectPending = true;
@@ -40,43 +106,56 @@ class _WebLoginPageState extends State<WebLoginPage> {
     _clinicLoginRedirecting = false;
   }
 
-  Future<void> _redirectAfterClinicLogin() async {
-    if (!_clinicLoginRedirectPending || _clinicLoginRedirecting) return;
-    _clinicLoginRedirecting = true;
-    try {
-      final status = await ClinicAuthService.getStatus();
-      if (!mounted) return;
-      final route =
-          status.canPost
-              ? (widget.nextRoute ?? '/post-job/input')
-              : '/publisher/onboarding';
-      context.go(route);
-    } catch (_) {
-      if (mounted) context.go(widget.nextRoute ?? '/post-job/input');
+  // ── 좌측(지원자) 영역 — 역할에 따라 다른 카드 ──
+  Widget _buildApplicantSide() {
+    switch (_role) {
+      case _LoginRole.guest:
+      case _LoginRole.loading:
+        return _ApplicantLoginCard(nextRoute: widget.nextRoute);
+      case _LoginRole.applicant:
+        return _LoggedInApplicantCard(
+          user: FirebaseAuth.instance.currentUser!,
+          nextRoute: widget.nextRoute,
+        );
+      case _LoginRole.clinic:
+        return const _OtherRoleNoticeCard(
+          title: '지원자(치과위생사)',
+          subtitle: '이력서 작성 · 공고 지원',
+          message:
+              '현재 치과(공고 등록) 계정으로 로그인되어 있어요.\n'
+              '지원자로 사용하려면 로그아웃 후 다시 로그인해 주세요.',
+          icon: Icons.person_outline_rounded,
+          accent: AppColors.success,
+        );
     }
   }
 
+  // ── 우측(치과) 영역 — 역할에 따라 다른 카드 ──
   Widget _buildClinicSide() {
-    return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.authStateChanges(),
-      initialData: FirebaseAuth.instance.currentUser,
-      builder: (context, snapshot) {
-        final user = snapshot.data;
-        if (user != null) {
-          if (_clinicLoginRedirectPending) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) _redirectAfterClinicLogin();
-            });
-          }
-          return _LoggedInClinicCard(user: user, nextRoute: widget.nextRoute);
-        }
+    switch (_role) {
+      case _LoginRole.guest:
+      case _LoginRole.loading:
         return _ClinicLoginCard(
           nextRoute: widget.nextRoute,
           onLoginStarted: _markClinicLoginStarted,
           onLoginFailed: _clearClinicLoginRedirect,
         );
-      },
-    );
+      case _LoginRole.clinic:
+        return _LoggedInClinicCard(
+          user: FirebaseAuth.instance.currentUser!,
+          nextRoute: widget.nextRoute,
+        );
+      case _LoginRole.applicant:
+        return const _OtherRoleNoticeCard(
+          title: '치과 (공고자)',
+          subtitle: '공고 등록 · 지원자 관리',
+          message:
+              '현재 지원자 계정으로 로그인되어 있어요.\n'
+              '치과 계정으로 사용하려면 로그아웃 후 다시 로그인해 주세요.',
+          icon: Icons.business_center_rounded,
+          accent: AppColors.accent,
+        );
+    }
   }
 
   @override
@@ -102,7 +181,7 @@ class _WebLoginPageState extends State<WebLoginPage> {
                     if (constraints.maxWidth < 620) {
                       return Column(
                         children: [
-                          _ApplicantLoginCard(nextRoute: widget.nextRoute),
+                          _buildApplicantSide(),
                           const SizedBox(height: 20),
                           _buildClinicSide(),
                         ],
@@ -111,11 +190,7 @@ class _WebLoginPageState extends State<WebLoginPage> {
                     return Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: _ApplicantLoginCard(
-                            nextRoute: widget.nextRoute,
-                          ),
-                        ),
+                        Expanded(child: _buildApplicantSide()),
                         const SizedBox(width: 24),
                         Expanded(child: _buildClinicSide()),
                       ],
@@ -337,10 +412,9 @@ class _LoggedInClinicCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           TextButton(
-            onPressed: () async {
-              await FirebaseAuth.instance.signOut();
-              if (context.mounted) context.go('/login');
-            },
+            // 카카오·구글·네이버 SDK 세션까지 모두 끊은 뒤 hard reload.
+            // (Firebase 만 signOut 하면 SNS SDK 토큰이 남아 자동 재로그인됨)
+            onPressed: () => WebAccountActionsService.confirmLogout(context),
             child: Text(
               '다른 계정으로 로그인',
               style: GoogleFonts.notoSansKr(
@@ -402,32 +476,45 @@ class _ApplicantLoginCardState extends State<_ApplicantLoginCard> {
 
   // ── 로그인 후 공통 라우팅 ──────────────────────────────────
   Future<void> _handlePostLogin(String provider) async {
+    // 1) 치과(공고자) 전용 계정으로 SNS 로그인 시도하면 차단.
+    //    `clinics_accounts/{uid}`가 존재하면 즉시 signOut + 안내 메시지를 띄운다.
+    //    (관리자 화이트리스트 이메일은 통과)
+    final blockMsg =
+        await ClinicAuthService.blockClinicAccountFromApplicantLogin();
+    if (!mounted) return;
+    if (blockMsg != null) {
+      _showError(blockMsg);
+      return;
+    }
+
     await SignInTracker.record(provider);
     if (!mounted) return;
 
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
-    try {
-      final doc =
-          await FirebaseFirestore.instance.collection('users').doc(uid).get();
-      final role = doc.data()?['role'] as String?;
-      if (!mounted) return;
+    // 2) 차단 통과 시점에서 이미 지원자 계정 확정 → 공고 보드(`/`) 로 이동.
+    //    Phase 1 부터 `/` 가 등급별 공고 보드(JobBoardPage)이므로 자연스러운
+    //    랜딩지가 된다. 단, nextRoute 가 지원자에게 안전한 경로면 그쪽 우선.
+    final next = widget.nextRoute;
+    final safeNext =
+        (next != null && _isApplicantSafePath(next)) ? next : '/';
+    context.go(safeNext);
+  }
 
-      if (role == 'clinic') {
-        final status = await ClinicAuthService.getStatus();
-        if (!mounted) return;
-        context.go(
-          status.canPost
-              ? (widget.nextRoute ?? '/post-job/input')
-              : '/publisher/onboarding',
-        );
-      } else {
-        context.go(widget.nextRoute ?? '/applicant/resumes');
-      }
-    } catch (_) {
-      if (mounted) context.go(widget.nextRoute ?? '/applicant/resumes');
+  /// 지원자(일반) 계정이 진입해도 안전한 경로 여부.
+  ///
+  /// 치과 전용 경로(`/post-job`, `/publisher/...`, `/me/clinic` …)는 가드에서
+  /// publisher 회원가입으로 튕기므로 제외한다. `/me` 자체와 지원자 전용 서브
+  /// 페이지(`/me/applications`, `/me/resumes`)는 허용한다.
+  bool _isApplicantSafePath(String path) {
+    if (path.startsWith('/post-job')) return false;
+    if (path.startsWith('/publisher')) return false;
+    if (path.startsWith('/me')) {
+      const meAllowed = <String>{'/me', '/me/applications', '/me/resumes'};
+      return meAllowed.any((p) => path == p || path.startsWith('$p/'));
     }
+    return path.startsWith('/');
   }
 
   // ── 카카오 ─────────────────────────────────────────────────
@@ -1421,6 +1508,286 @@ class _ClinicLoginCardState extends State<_ClinicLoginCard> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 지원자(치과위생사)로 이미 로그인된 상태일 때 좌측에 표시되는 카드.
+// 치과 카드(_LoggedInClinicCard)와 시각적 균형을 맞추되, 진입 CTA는
+// 지원자 대시보드(`/me`)로 보낸다.
+// ═══════════════════════════════════════════════════════════════
+class _LoggedInApplicantCard extends StatelessWidget {
+  const _LoggedInApplicantCard({required this.user, this.nextRoute});
+
+  final User user;
+  final String? nextRoute;
+
+  @override
+  Widget build(BuildContext context) {
+    final email = user.email?.trim();
+    final displayName = user.displayName?.trim();
+    final title =
+        displayName != null && displayName.isNotEmpty
+            ? displayName
+            : email != null && email.isNotEmpty
+            ? email
+            : '로그인된 계정';
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        border: Border.all(color: AppColors.divider),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.divider.withValues(alpha: 0.25),
+            blurRadius: 30,
+            offset: const Offset(0, 20),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppColors.success.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.verified_user_outlined,
+                  color: AppColors.success,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '현재 로그인됨',
+                      style: GoogleFonts.notoSansKr(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      '지원자 (치과위생사)',
+                      style: GoogleFonts.notoSansKr(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.success.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppColors.success.withValues(alpha: 0.12),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.notoSansKr(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                if (email != null && email.isNotEmpty && email != title) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    email,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.notoSansKr(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed:
+                  () => context.go(nextRoute ?? '/me'),
+              icon: const Icon(Icons.dashboard_outlined, size: 18),
+              label: Text(
+                '내 정보로 이동',
+                style: GoogleFonts.notoSansKr(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.success,
+                foregroundColor: AppColors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            // 모든 SNS SDK 세션까지 정리 후 hard reload (자동 재로그인 방지)
+            onPressed: () => WebAccountActionsService.confirmLogout(context),
+            child: Text(
+              '다른 계정으로 로그인',
+              style: GoogleFonts.notoSansKr(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 다른 역할로 로그인되어 있을 때 반대편에 표시하는 안내 카드.
+// 예) 치과로 로그인된 상태에서 좌측(지원자) 카드 영역.
+// 사용자가 헷갈리지 않도록 "현재 어느 역할인지" + "변경 방법"만 간결히 노출.
+// ═══════════════════════════════════════════════════════════════
+class _OtherRoleNoticeCard extends StatelessWidget {
+  const _OtherRoleNoticeCard({
+    required this.title,
+    required this.subtitle,
+    required this.message,
+    required this.icon,
+    required this.accent,
+  });
+
+  final String title;
+  final String subtitle;
+  final String message;
+  final IconData icon;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceMuted,
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  icon,
+                  color: accent.withValues(alpha: 0.55),
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: GoogleFonts.notoSansKr(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: GoogleFonts.notoSansKr(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.divider),
+            ),
+            child: Text(
+              message,
+              style: GoogleFonts.notoSansKr(
+                fontSize: 13,
+                height: 1.55,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              // 카카오/구글/네이버 SDK 세션까지 모두 정리 + hard reload.
+              onPressed: () => WebAccountActionsService.confirmLogout(context),
+              icon: const Icon(Icons.logout, size: 16),
+              label: Text(
+                '로그아웃하고 다른 계정으로 로그인',
+                style: GoogleFonts.notoSansKr(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.textSecondary,
+                side: const BorderSide(color: AppColors.divider),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

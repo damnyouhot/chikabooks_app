@@ -40,8 +40,17 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
         orderId: widget.orderId,
         paymentKey: widget.paymentKey,
       );
-      if (mounted && result.success) {
-        context.go('/post-job/success/${result.jobId}');
+      if (!mounted || !result.success) return;
+      // 신규 게시는 게시 완료 페이지로, 연장/등급변경/자동연장은 캠페인 대시보드로 복귀.
+      switch (result.purpose) {
+        case 'extend':
+        case 'upgrade':
+        case 'auto_renew':
+          context.go('/post-job/campaigns');
+          break;
+        case 'create':
+        default:
+          context.go('/post-job/success/${result.jobId}');
       }
     } catch (e) {
       if (mounted) {

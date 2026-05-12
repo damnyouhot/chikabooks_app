@@ -32,8 +32,8 @@ class CaringStateService {
   static const double hungerDecayPerHour = 8.0;
   static const double moodDecayPerHour = 6.0;
   static const double energyDecayPerHour = 4.0;
-  static const double cleanlinessDecayPerHourAwake = 10.0;
-  static const double cleanlinessDecayPerHourSleeping = 8.0;
+  static const double cleanlinessDecayPerHourAwake = 5.0;
+  static const double cleanlinessDecayPerHourSleeping = 4.0;
 
   /// 시간 감소 하한 캡 (이 아래로는 떨어지지 않음)
   static const double hungerFloor = 5.0;

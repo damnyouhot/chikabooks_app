@@ -1,24 +1,38 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../../core/theme/app_colors.dart';
-import 'tabs/admin_overview_tab.dart';
-import 'tabs/admin_userflow_tab.dart';
-import 'tabs/admin_feature_tab.dart';
+import '../../services/admin_billing_service.dart';
 import 'tabs/admin_behavior_tab.dart';
-import 'tabs/admin_trends_tab.dart';
 import 'tabs/admin_billing_tab.dart';
+import 'tabs/admin_content_ops_tab.dart';
+import 'tabs/admin_feature_tab.dart';
+import 'tabs/admin_moderation_tab.dart';
+import 'tabs/admin_overview_tab.dart';
+import 'tabs/admin_publisher_tab.dart';
+import 'tabs/admin_trends_tab.dart';
+import 'tabs/admin_user_tab.dart';
+import 'tabs/admin_userflow_tab.dart';
 import 'tabs/admin_verify_tab.dart';
 
 /// 관리자 전용 운영 대시보드
 ///
-/// 5탭 구조:
-///   - Overview     : 핵심 KPI + 연차 분포
-///   - User Flow    : 가입 퍼널 + 전환율
-///   - Feature      : 기능 클릭 TOP + 오류 리스트
-///   - Behavior     : 행동 분석 (7개 지표, direct calculation)
-///   - Trends       : 일별 추세 차트 (analytics_daily 기반)
+/// ── 탭 구성 (운영 우선 → 분석 순) ─────────────────────────────
+///   1. Overview      : 핵심 KPI (읽기 전용)
+///   2. Content Ops   : 공감투표 · 퀴즈 · 오늘 단어 · 오늘 문제 슬롯
+///   3. Publisher     : 공고자 / 주문 / 공고권 KPI
+///   4. Moderation    : 신고 누적·자동 숨김 게시물 검토 (P1.A)
+///   5. Users         : 사용자 검색·상세·플래그 토글 (P1.B)
+///   6. Billing       : 충전 · 세금계산서 · 현금영수증 큐 (미처리 배지)
+///   7. 인증 검토     : 사업자 인증 / 상호 확인 큐 (미처리 배지)
+///   8. User Flow     : 온보딩 퍼널
+///   9. Feature       : 기능 반응 + 오류 모니터
+///   10. Behavior     : 7개 행동 지표
+///   11. Trends       : 일별 추세 차트
 ///
-/// 상단 기간 필터(오늘 / 최근 7일 / 최근 30일)가 모든 탭에 공통 적용됨
+/// 상단 기간 필터(오늘/7일/30일)는 Overview · Publisher · UserFlow · Feature ·
+/// Behavior 5개 탭에만 적용됩니다. Trends 는 자체 기간 칩을, Content Ops /
+/// Moderation / Users / Billing / Verify 는 기간 개념이 없습니다.
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
 
@@ -27,7 +41,6 @@ class AdminDashboardPage extends StatefulWidget {
 }
 
 class _AdminDashboardPageState extends State<AdminDashboardPage> {
-  // ── 기간 필터 ──────────────────────────────────────────────────
   _Period _period = _Period.today;
 
   DateTime get _since {
@@ -42,7 +55,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 7,
+      length: 11,
       child: Scaffold(
         backgroundColor: AppColors.appBg,
         appBar: AppBar(
@@ -56,7 +69,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               color: AppColors.textPrimary,
             ),
           ),
-          // ── 기간 선택 칩 ────────────────────────────────────────
           actions: [
             _PeriodChips(
               selected: _period,
@@ -88,14 +100,18 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 dividerColor: Colors.transparent,
                 isScrollable: true,
                 tabAlignment: TabAlignment.start,
-                tabs: [
-                  const Tab(text: 'Overview'),
-                  const Tab(text: 'User Flow'),
-                  const Tab(text: 'Feature'),
-                  const Tab(text: 'Behavior'),
-                  const Tab(text: 'Trends'),
-                  const Tab(text: 'Billing'),
-                  const Tab(child: _VerifyTabLabel()),
+                tabs: const [
+                  Tab(text: 'Overview'),
+                  Tab(text: 'Content Ops'),
+                  Tab(text: 'Publisher'),
+                  Tab(text: 'Moderation'),
+                  Tab(text: 'Users'),
+                  Tab(child: _BillingTabLabel()),
+                  Tab(child: _VerifyTabLabel()),
+                  Tab(text: 'User Flow'),
+                  Tab(text: 'Feature'),
+                  Tab(text: 'Behavior'),
+                  Tab(text: 'Trends'),
                 ],
               ),
             ),
@@ -104,12 +120,16 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         body: TabBarView(
           children: [
             AdminOverviewTab(since: _since, period: _period.label),
+            const AdminContentOpsTab(),
+            AdminPublisherTab(since: _since),
+            const AdminModerationTab(),
+            const AdminUserTab(),
+            const AdminBillingTab(),
+            const AdminVerifyTab(),
             AdminUserFlowTab(since: _since),
             AdminFeatureTab(since: _since),
             AdminBehaviorTab(since: _since),
             const AdminTrendsTab(),
-            const AdminBillingTab(),
-            const AdminVerifyTab(),
           ],
         ),
       ),
@@ -117,6 +137,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
 }
 
+// ─── 인증 검토 탭 라벨 (미처리 카운트 배지) ──────────────────
 class _VerifyTabLabel extends StatelessWidget {
   const _VerifyTabLabel();
 
@@ -142,35 +163,66 @@ class _VerifyTabLabel extends StatelessWidget {
                   ),
                 )
                 .length;
-        if (count == 0) return const Text('인증 검토');
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('인증 검토'),
-            const SizedBox(width: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-              decoration: BoxDecoration(
-                color: AppColors.error,
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Text(
-                count > 99 ? '99+' : '$count',
-                style: const TextStyle(
-                  color: AppColors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          ],
-        );
+        return _TabLabelWithBadge(text: '인증 검토', count: count);
       },
     );
   }
 }
 
-// ─── 기간 enum ─────────────────────────────────────────────────
+/// Billing 탭 — 충전·세금계산서·현금영수증 큐 합계를 라벨에 배지로 표시.
+///
+/// `AdminBillingService.watchCounts()` 가 세 큐의 미처리 건수를 한 번에 반환하므로
+/// 합산하여 운영자에게 「현재 처리할 게 몇 건 있는지」를 탭 전환 없이 노출한다.
+class _BillingTabLabel extends StatelessWidget {
+  const _BillingTabLabel();
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<({int payment, int tax, int cash})>(
+      stream: AdminBillingService.watchCounts(),
+      builder: (context, snap) {
+        final c = snap.data;
+        final count = c == null ? 0 : (c.payment + c.tax + c.cash);
+        return _TabLabelWithBadge(text: 'Billing', count: count);
+      },
+    );
+  }
+}
+
+/// 미처리 카운트가 있을 때 라벨 오른쪽에 빨간 배지를 표시하는 공통 위젯.
+class _TabLabelWithBadge extends StatelessWidget {
+  final String text;
+  final int count;
+  const _TabLabelWithBadge({required this.text, required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    if (count == 0) return Text(text);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(text),
+        const SizedBox(width: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+          decoration: BoxDecoration(
+            color: AppColors.error,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            count > 99 ? '99+' : '$count',
+            style: const TextStyle(
+              color: AppColors.white,
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 enum _Period {
   today('오늘'),
   week('7일'),
@@ -180,7 +232,6 @@ enum _Period {
   const _Period(this.label);
 }
 
-// ─── 기간 선택 칩 위젯 ────────────────────────────────────────
 class _PeriodChips extends StatelessWidget {
   final _Period selected;
   final ValueChanged<_Period> onChanged;

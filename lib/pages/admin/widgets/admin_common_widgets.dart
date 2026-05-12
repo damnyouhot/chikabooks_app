@@ -320,13 +320,13 @@ class AdminErrorTile extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: isFatal
-            ? AppColors.error.withOpacity(0.06)
+            ? AppColors.error.withValues(alpha: 0.06)
             : AppColors.surfaceMuted,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: isFatal
-              ? AppColors.error.withOpacity(0.35)
-              : AppColors.error.withOpacity(0.15),
+              ? AppColors.error.withValues(alpha: 0.35)
+              : AppColors.error.withValues(alpha: 0.15),
         ),
       ),
       child: Column(

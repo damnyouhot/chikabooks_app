@@ -89,6 +89,14 @@ class Voucher {
   /// 'system' (자동 발급) 또는 관리자 uid (수동 발급)
   final String issuedBy;
 
+  /// 사용 가능한 등급 키 목록 (`productCatalog/{tierKey}`).
+  ///
+  /// 발급 시점에 박혀, 정책(`appConfig/billingPolicy.voucherEligibleTiers`)이 변경되어도
+  /// 이미 발급된 권은 자기 [eligibleTiers]를 따른다.
+  ///
+  /// 비어있거나 null 인 레거시 문서는 [allowsAnyTier]로 폴백한다(서버 측 검증이 최종 권위).
+  final List<String> eligibleTiers;
+
   const Voucher({
     required this.id,
     required this.ownerUid,
@@ -99,6 +107,7 @@ class Voucher {
     this.expiresAt,
     this.usedAt,
     this.issuedBy = 'system',
+    this.eligibleTiers = const ['basic'],
   });
 
   factory Voucher.fromMap(Map<String, dynamic> data, {required String id}) {
@@ -112,8 +121,28 @@ class Voucher {
       expiresAt: (data['expiresAt'] as Timestamp?)?.toDate(),
       usedAt: (data['usedAt'] as Timestamp?)?.toDate(),
       issuedBy: data['issuedBy'] as String? ?? 'system',
+      eligibleTiers: _parseEligibleTiers(data['eligibleTiers']),
     );
   }
+
+  static List<String> _parseEligibleTiers(dynamic raw) {
+    if (raw is List) {
+      final tiers = raw
+          .where((v) => v is String && v.trim().isNotEmpty)
+          .map((v) => (v as String).trim())
+          .toList();
+      if (tiers.isNotEmpty) return tiers;
+    }
+    // 레거시 문서: eligibleTiers 누락 → C 전용으로 안전하게 폴백
+    return const ['basic'];
+  }
+
+  /// 레거시 문서 폴백 판정 — 명시적 `['basic']` 디폴트가 있으므로 v1 에서는 항상 false.
+  bool get allowsAnyTier => false;
+
+  /// 주어진 등급 키에 사용 가능한지 (서버 검증이 최종 권위, 클라는 UI 가이드용).
+  bool isEligibleForTier(String tierKey) =>
+      eligibleTiers.contains(tierKey.trim().toLowerCase());
 
   factory Voucher.fromDoc(DocumentSnapshot doc) {
     return Voucher.fromMap(doc.data() as Map<String, dynamic>, id: doc.id);

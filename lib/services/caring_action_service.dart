@@ -31,8 +31,8 @@ import '../services/funnel_onboarding_service.dart';
 ///   7회+: 변화 없음
 ///   energy<30 → mood 보상 절반(내림), mood<30 → bond 절반(내림)
 /// 씻기기:
-///   캐릭터 직접 터치. cleanliness+2, mood+0.1, energy-0.2
-///   cleanliness≥85면 cleanliness+1, energy-0.1 / 100이면 cleanliness+0, energy-0.1
+///   캐릭터 직접 터치. cleanliness+3, mood+0.1, energy-0.2
+///   cleanliness≥85면 cleanliness+2, energy-0.1 / 100이면 cleanliness+0, energy-0.1
 ///   bond는 즉시 상승하지 않고 청결 유지 시간으로 정산
 /// 재우기:
 ///   ≤30분 깨우기: energy+0, mood-5
@@ -320,8 +320,8 @@ class CaringActionService {
           before >= 100
               ? 0.0
               : before >= 85
-              ? 1.0
-              : 2.0;
+              ? 2.0
+              : 3.0;
       final energyDelta = before >= 85 ? -0.1 : -0.2;
       final after = (before + cleanDelta).clamp(0.0, 100.0);
 

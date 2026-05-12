@@ -82,11 +82,15 @@ class OrderService {
 
   /// 주문 생성 요청 → 서버가 Order 문서를 만들고 orderId 반환
   ///
-  /// 서버에서 Draft 유효성·계정 상태·사업자 인증 등을 검증한 뒤
-  /// 공고권 적용 시 amount=0 처리까지 수행.
+  /// 서버에서 Draft 유효성·계정 상태·사업자 인증·등급별 가격(`productCatalog`)·
+  /// 공고권 등급 적용 가능 여부를 검증한 뒤 공고권 적용 시 amount=0 처리까지 수행.
+  ///
+  /// [tierKey] 는 `productCatalog/{tierKey}` 의 키 ("premium"|"standard"|"basic").
+  /// 미지정 시 서버는 draft.productTier 또는 'standard' 로 폴백한다.
   static Future<CreateOrderResult> createOrder({
     required String draftId,
     required String clinicProfileId,
+    String? tierKey,
     String? voucherId,
     Map<String, dynamic>? consents,
   }) async {
@@ -95,6 +99,7 @@ class OrderService {
       final result = await callable.call({
         'draftId': draftId,
         'clinicProfileId': clinicProfileId,
+        if (tierKey != null) 'tierKey': tierKey,
         if (voucherId != null) 'voucherId': voucherId,
         if (consents != null) 'consents': consents,
       });
@@ -103,6 +108,8 @@ class OrderService {
         orderId: data['orderId'] as String,
         amount: (data['amount'] as num?)?.toInt() ?? 0,
         requiresPayment: data['requiresPayment'] as bool? ?? true,
+        tierKey: data['tierKey'] as String?,
+        priceId: data['priceId'] as String?,
       );
     } catch (e) {
       debugPrint('⚠️ OrderService.createOrder: $e');
@@ -129,7 +136,9 @@ class OrderService {
       final data = Map<String, dynamic>.from(result.data as Map);
       return ConfirmPaymentResult(
         jobId: data['jobId'] as String,
+        campaignId: data['campaignId'] as String?,
         success: data['success'] as bool? ?? true,
+        purpose: (data['purpose'] as String?) ?? 'create',
       );
     } catch (e) {
       debugPrint('⚠️ OrderService.confirmPayment: $e');
@@ -153,7 +162,9 @@ class OrderService {
       final data = Map<String, dynamic>.from(result.data as Map);
       return ConfirmPaymentResult(
         jobId: data['jobId'] as String,
+        campaignId: data['campaignId'] as String?,
         success: data['success'] as bool? ?? true,
+        purpose: 'create',
       );
     } catch (e) {
       debugPrint('⚠️ OrderService.publishTestJobWithoutPayment: $e');
@@ -170,17 +181,38 @@ class CreateOrderResult {
   /// false면 공고권 전용 → confirmPayment만 호출하면 됨
   final bool requiresPayment;
 
+  /// 결제 시점 등급 키 ("premium"|"standard"|"basic"). 서버가 결정한 최종 값.
+  final String? tierKey;
+
+  /// 결제 시점 활성 가격 ID. 가격 변동 시에도 이 주문은 이 priceId 의 amount 로 영구 보존.
+  final String? priceId;
+
   const CreateOrderResult({
     required this.orderId,
     required this.amount,
     required this.requiresPayment,
+    this.tierKey,
+    this.priceId,
   });
 }
 
 /// confirmPayment Callable 응답
 class ConfirmPaymentResult {
   final String jobId;
+
+  /// 결제 확정 후 생성된 캠페인 ID (M2 이후 반환).
+  /// 레거시 응답에는 없을 수 있어 nullable.
+  final String? campaignId;
   final bool success;
 
-  const ConfirmPaymentResult({required this.jobId, required this.success});
+  /// 'create' | 'extend' | 'upgrade' | 'auto_renew' (서버 분기 결과).
+  /// 클라이언트 라우팅 분기에 사용.
+  final String purpose;
+
+  const ConfirmPaymentResult({
+    required this.jobId,
+    this.campaignId,
+    required this.success,
+    this.purpose = 'create',
+  });
 }

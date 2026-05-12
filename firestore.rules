@@ -93,6 +93,19 @@ service cloud.firestore {
         allow read: if request.auth != null && request.auth.uid == uid;
         allow write: if request.auth != null && request.auth.uid == uid;
       }
+
+      // ── 🔔 광고 캠페인 인박스 (clinicInbox) ──
+      //   - 만료 임박 / 자동연장 성공·실패 / 환불 등 알림이 적재됨.
+      //   - 본인만 읽기 / 'read' 토글만 클라이언트가 가능, 서버만 추가/삭제.
+      //   - 보안 룰: 클라가 read 외 다른 필드를 변경하지 못하도록 diff 가드.
+      match /clinicInbox/{noticeId} {
+        allow read: if request.auth != null && request.auth.uid == uid;
+        allow create, delete: if false;
+        allow update: if request.auth != null
+          && request.auth.uid == uid
+          && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['read', 'updatedAt']);
+      }
     }
 
     // ══════════════════════════════════════════════════
@@ -434,6 +447,17 @@ service cloud.firestore {
     }
 
     // ══════════════════════════════════════════════════
+    // 🛡️ 어드민 액션 감사 로그 (adminAuditLog)
+    //   - 모든 어드민 callable 의 시도/성공/실패 이력
+    //   - 클라이언트 쓰기 금지(Cloud Functions 서버만 적재)
+    //   - 운영자만 읽기
+    // ══════════════════════════════════════════════════
+    match /adminAuditLog/{entryId} {
+      allow read: if isAdmin();
+      allow write: if false; // 서버만
+    }
+
+    // ══════════════════════════════════════════════════
     // 🏥 치과(병원) (Clinics)
     // ══════════════════════════════════════════════════
     match /clinics/{clinicId} {
@@ -586,6 +610,72 @@ service cloud.firestore {
     }
 
     // ══════════════════════════════════════════════════
+    // 🎟️ 공고권 (Vouchers) — 본인 공고권만 읽기, 쓰기는 서버만
+    //   - 발급/사용/만료 처리는 Cloud Functions 에서만 수행
+    // ══════════════════════════════════════════════════
+    match /vouchers/{voucherId} {
+      allow read: if request.auth != null &&
+        resource.data.ownerUid == request.auth.uid;
+      allow create, update, delete: if false;
+    }
+
+    // ══════════════════════════════════════════════════
+    // 📣 광고 캠페인 (Campaigns) — 본인 캠페인만 읽기, 쓰기는 서버만
+    //   - createOrder/confirmPayment, pauseCampaign 등 Callable 경유
+    //   - auditLog 는 본인만 읽기 (감사용)
+    // ══════════════════════════════════════════════════
+    match /campaigns/{campaignId} {
+      allow read: if request.auth != null &&
+        resource.data.ownerUid == request.auth.uid;
+      allow create, update, delete: if false;
+
+      match /auditLog/{eventId} {
+        allow read: if request.auth != null &&
+          get(/databases/$(database)/documents/campaigns/$(campaignId))
+            .data.ownerUid == request.auth.uid;
+        allow write: if false;
+      }
+    }
+
+    // ══════════════════════════════════════════════════
+    // 💰 빌링 이벤트 (BillingEvents) — 결제·환불·공고권 이력 통합
+    //   - 본인 이벤트만 읽기, 쓰기는 서버만
+    // ══════════════════════════════════════════════════
+    match /billingEvents/{eventId} {
+      allow read: if request.auth != null &&
+        resource.data.ownerUid == request.auth.uid;
+      allow write: if false;
+    }
+
+    // ══════════════════════════════════════════════════
+    // 🛒 상품 카탈로그 (ProductCatalog) — 모두 읽기, 관리자만 쓰기
+    //   - 가격(prices/*) 변경만으로 가격 정책 갱신 가능
+    // ══════════════════════════════════════════════════
+    match /productCatalog/{tierKey} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+
+      match /prices/{priceId} {
+        allow read: if request.auth != null;
+        allow write: if isAdmin();
+      }
+    }
+
+    // ══════════════════════════════════════════════════
+    // ⚙️ 앱 정책 (AppConfig) — 모두 읽기, 관리자만 쓰기
+    //   - billingPolicy: 일시정지 세이브율, 자동연장 리드일 등
+    //   - history 서브컬렉션은 관리자만
+    // ══════════════════════════════════════════════════
+    match /appConfig/{docId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+
+      match /history/{snapshotId} {
+        allow read, write: if isAdmin();
+      }
+    }
+
+    // ══════════════════════════════════════════════════
     // 🧾 세금계산서 / 현금영수증 발급 요청
     //   - 클라이언트는 직접 쓰지 않고, requestTaxInvoice / requestCashReceipt
     //     Callable을 통해서만 적재 (서버에서 ownerUid 강제)
@@ -620,7 +710,39 @@ service cloud.firestore {
     //   - 결제/공고 권한 판단의 1차 기준이라 외부 공개 금지
     // ══════════════════════════════════════════════════
     match /clinics_accounts/{uid}/clinic_profiles/{profileId} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+      allow read: if request.auth != null && request.auth.uid == uid;
+
+      // 생성: 본인이고, businessVerification 은 (없거나) status가 'none' 또는 'pending' 만 허용
+      //  - 클라이언트가 임의로 'verified' 박는 것 차단
+      //  - 보호 필드를 클라가 직접 박지 못하게: status / approvedAt / verifiedAt / hira* / nts* / ocrResult
+      allow create: if request.auth != null
+        && request.auth.uid == uid
+        && (
+          !request.resource.data.keys().hasAny(['businessVerification']) ||
+          (
+            request.resource.data.businessVerification is map &&
+            (
+              !('status' in request.resource.data.businessVerification) ||
+              request.resource.data.businessVerification.status in ['none', 'pending']
+            ) &&
+            !request.resource.data.businessVerification.keys().hasAny([
+              'approvedAt', 'verifiedAt', 'rejectedAt',
+              'hiraStatus', 'hiraVerifiedAt',
+              'ntsStatus', 'ntsVerifiedAt',
+              'ocrResult', 'reviewerUid', 'reviewerNote'
+            ])
+          )
+        );
+
+      // 수정: 본인이고, businessVerification 키 자체를 변경 불가 (서버 Callable 만 변경)
+      //  - 마이그레이션에서 'profilesMigrated' 같은 외부 보조 키만 root doc에 적용됨.
+      allow update: if request.auth != null
+        && request.auth.uid == uid
+        && !request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(['businessVerification']);
+
+      // 삭제: 본인 (캠페인 보유 여부는 클라이언트에서 1차 가드, 서버 Callable 권장)
+      allow delete: if request.auth != null && request.auth.uid == uid;
     }
 
     // 사업자 인증 시도 기록 — 확정 프로필과 분리된 임시/실패/다른 사업자 시도.
@@ -657,6 +779,22 @@ service cloud.firestore {
     match /notifyQueue/{itemId} {
       allow read: if request.auth != null
         && resource.data.ownerUid == request.auth.uid;
+      allow write: if false;
+    }
+
+    // ══════════════════════════════════════════════════
+    // 💳 빌링키 — 자동결제용 토스 billingKey (서버 전용 / 절대 클라 노출 금지)
+    //   - 카드번호는 토스가 보관, 우리는 발급된 billingKey 만 보관.
+    //   - 클라이언트는 메타데이터(`users/{uid}/billingMeta/profile`) 만 읽는다.
+    //   - 등록/해지는 registerBillingKey / deleteBillingKey Callable 만 가능.
+    // ══════════════════════════════════════════════════
+    match /billingKeys/{uid} {
+      allow read, write: if false;
+    }
+
+    // 빌링 메타데이터 — 카드사명, 마지막 4자리, 등록일 (UI 노출용)
+    match /users/{uid}/billingMeta/{docId} {
+      allow read: if request.auth != null && request.auth.uid == uid;
       allow write: if false;
     }
 

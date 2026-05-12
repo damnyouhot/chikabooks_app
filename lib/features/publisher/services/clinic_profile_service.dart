@@ -289,7 +289,9 @@ class ClinicProfileService {
         return false;
       }
 
-      // 첫 번째 프로필 생성
+      // 첫 번째 프로필 생성 (룰: 클라가 'verified' 박을 수 없음)
+      // 기존 master 도큐먼트에 clinicVerified=true 였더라도, 새 프로필은 'none' 으로
+      // 시작하고 추후 submitClinicVerification Callable 을 통해 다시 검증한다.
       final profileData = {
         'clinicName': clinicName,
         'displayName': clinicName,
@@ -297,7 +299,7 @@ class ClinicProfileService {
         'ownerName': ownerName,
         'phone': phone,
         'businessVerification': {
-          'status': clinicVerified ? 'verified' : 'none',
+          'status': clinicVerified ? 'pending' : 'none',
           'bizNo': bizNo,
         },
         'createdAt': FieldValue.serverTimestamp(),

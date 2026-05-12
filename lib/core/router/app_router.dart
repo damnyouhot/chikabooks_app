@@ -17,8 +17,14 @@ import '../../features/jobs/web/job_draft_editor_page.dart';
 import '../../features/jobs/web/job_product_select_page.dart';
 import '../../features/jobs/web/job_publish_success_page.dart';
 import '../../features/jobs/web/published_job_detail_page.dart';
+import '../../features/jobs/web/campaign_dashboard_page.dart';
 import '../../features/jobs/web/legal_page.dart';
 import '../../features/jobs/ui/clinic_verify_page.dart';
+import '../../features/applicant/web/pages/applicant_applications_page.dart';
+import '../../features/applicant/web/pages/applicant_dashboard_page.dart';
+import '../../features/applicant/web/pages/applicant_job_detail_page.dart';
+import '../../features/applicant/web/pages/apply_confirm_web_page.dart';
+import '../../features/applicant/web/pages/job_board_page.dart';
 import '../../features/me/pages/me_overview_page.dart';
 import '../../features/me/pages/me_clinic_page.dart';
 import '../../features/me/pages/me_account_page.dart';
@@ -29,6 +35,9 @@ import '../../features/me/pages/me_notifications_page.dart';
 import '../../features/auth/web/web_login_page.dart';
 import '../../features/auth/web/set_password_page.dart';
 import '../../features/payment/payment_result_page.dart';
+import '../../features/payment/billing_key_register_page.dart';
+import '../../features/payment/billing_key_success_page.dart';
+import '../../features/payment/billing_key_fail_page.dart';
 import '../../features/feedback/feedback_list_page.dart';
 import '../../features/feedback/feedback_write_page.dart';
 import '../../features/feedback/feedback_detail_page.dart';
@@ -117,10 +126,19 @@ final appRouter = GoRouter(
     final user = FirebaseAuth.instance.currentUser;
     final path = state.uri.path;
 
-    // ── 웹 전용: 루트(/) 진입 시 항상 웹 플로우로 보냄 ──────────
-    // 모바일 HomeShell·앱 온보딩이 웹에 노출되는 것을 차단한다.
-    if (kIsWeb && path == '/') {
-      return '/login';
+    // 웹의 첫 화면(`/`)은 JobBoardPage(공고 보드) 로 누구나 들어올 수 있다.
+    // 비로그인 사용자가 카드를 클릭하는 시점에 인라인 로그인 모달이 떠서
+    // 로그인 → 상세로 이어가게 한다.
+    //
+    // 단, 로그인한 클리닉(공고자) 계정이 `/` 로 진입하면 지원자용 셸이 노출되어
+    // 어색하므로 자기 대시보드(`/me`)로 보낸다. 비로그인·지원자는 그대로 통과.
+    if (kIsWeb && path == '/' && user != null) {
+      try {
+        final isClinic = await ClinicAuthService.isClinicAccount();
+        if (isClinic) return '/me';
+      } catch (_) {
+        // 판별 실패 시에는 통과시켜 보드를 보여 준다.
+      }
     }
 
     // /login 은 비로그인 전용이지만, 로그인된 상태에서도 페이지 자체에서
@@ -143,29 +161,47 @@ final appRouter = GoRouter(
       '/applicant',
       '/clinic-verify',
       '/me',
+      // `/jobs/` (with trailing slash) — `/jobs/:id`, `/jobs/:id/apply` 만 가드.
+      // 모바일 레거시 `/jobs` (트레일링 슬래시 없음)는 가드하지 않음.
+      '/jobs/',
     ];
     final needsAuth = guardedPrefixes.any((p) => path.startsWith(p));
     if (needsAuth && user == null) {
       return '/login?next=${Uri.encodeComponent(path)}';
     }
 
-    // /me 진입 시에도 치과 마스터(`clinics_accounts`)가 있어야 함
+    // /me 진입 시 역할 분기:
+    //  - 치과 계정 → 기존 /me 화면(공고/광고 관리) + 치과 전용 서브페이지
+    //    (`/me/clinic`, `/me/billing` …) 진입 가능. 지원자 전용 서브페이지
+    //    (`/me/applications`, `/me/resumes`)에 들어오면 자기 대시보드로 되돌림.
+    //  - 지원자 계정 → 자기 대시보드(`/me`) + 지원자 전용 서브페이지 진입 가능.
+    //    치과 전용 서브페이지에 들어오면 자기 대시보드로 되돌림.
     if (path.startsWith('/me') && user != null) {
+      const meClinicOnly = <String>[
+        '/me/clinic',
+        '/me/billing',
+        '/me/orders',
+        '/me/applicants',
+        '/me/notifications',
+        '/me/account',
+      ];
+      const meApplicantOnly = <String>[
+        '/me/applications',
+        '/me/resumes',
+      ];
       try {
-        final status = await ClinicAuthService.getStatus();
-        if (!status.exists) {
-          final returnTo =
-              state.uri.path +
-              (state.uri.hasQuery ? '?${state.uri.query}' : '');
-          return '/publisher/signup?next=${Uri.encodeComponent(returnTo)}';
+        final isClinic = await ClinicAuthService.isClinicAccount();
+        bool matches(List<String> set) =>
+            set.any((p) => path == p || path.startsWith('$p/'));
+        final isClinicOnlyPath = matches(meClinicOnly);
+        final isApplicantOnlyPath = matches(meApplicantOnly);
+        if (!isClinic && isClinicOnlyPath) return '/me';
+        if (isClinic && isApplicantOnlyPath) return '/me';
+        if (isClinic) {
+          await ClinicProfileService.migrateIfNeeded();
         }
-        await ClinicProfileService.migrateIfNeeded();
       } catch (_) {
-        // /me 는 가입 안내가 우선이지만, Firestore 일시 오류로 무한 대기되지 않도록
-        // 가입 페이지로 보내 사용자에게 재시도 기회를 준다.
-        final returnTo =
-            state.uri.path + (state.uri.hasQuery ? '?${state.uri.query}' : '');
-        return '/publisher/signup?next=${Uri.encodeComponent(returnTo)}';
+        // Firestore 일시 오류로 무한 대기되지 않도록 패스루
       }
     }
 
@@ -217,7 +253,14 @@ final appRouter = GoRouter(
   },
 
   routes: [
-    GoRoute(path: '/', builder: (_, __) => const AuthGate()),
+    // ── 첫 화면 ─────────────────────────────────────────────
+    // 웹: 공개 공고 보드 (비로그인도 둘러보기 가능, 카드 클릭 시 인라인 로그인)
+    // 모바일: 기존 AuthGate (BottomNav 셸)
+    GoRoute(
+      path: '/',
+      builder: (_, __) =>
+          kIsWeb ? const JobBoardPage() : const AuthGate(),
+    ),
     GoRoute(
       path: '/bond',
       builder: (_, __) => const AuthGate(initialTabIndex: 1),
@@ -225,6 +268,18 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/growth',
       builder: (_, __) => const AuthGate(initialTabIndex: 2),
+    ),
+
+    // ── 지원자(일반계정) 공고 상세 / 지원하기 ──────────────────
+    GoRoute(
+      path: '/jobs/:id',
+      builder: (_, state) =>
+          ApplicantJobDetailPage(jobId: state.pathParameters['id']!),
+    ),
+    GoRoute(
+      path: '/jobs/:id/apply',
+      builder: (_, state) =>
+          ApplyConfirmWebPage(jobId: state.pathParameters['id']!),
     ),
 
     // ── 새 공고 플로우 ──────────────────────────────────────
@@ -274,6 +329,12 @@ final appRouter = GoRouter(
               PublishedJobDetailPage(jobId: state.pathParameters['jobId']!),
     ),
 
+    // ── 광고 캠페인 대시보드 (M7) ─────────────────────────
+    GoRoute(
+      path: '/post-job/campaigns',
+      builder: (_, __) => const CampaignDashboardPage(),
+    ),
+
     // ── 토스페이먼츠 결제 결과 ────────────────────────────
     GoRoute(
       path: '/post-job/payment/success',
@@ -292,6 +353,28 @@ final appRouter = GoRouter(
             message: state.uri.queryParameters['message'] ?? '',
             orderId: state.uri.queryParameters['orderId'] ?? '',
           ),
+    ),
+
+    // ── 자동결제 카드(빌링키) 등록 흐름 (M6) ───────────────
+    GoRoute(
+      path: '/post-job/payment/billing/register',
+      builder: (_, state) => BillingKeyRegisterPage(
+        next: state.uri.queryParameters['next'],
+      ),
+    ),
+    GoRoute(
+      path: '/post-job/payment/billing/success',
+      builder: (_, state) => BillingKeySuccessPage(
+        authKey: state.uri.queryParameters['authKey'] ?? '',
+        customerKey: state.uri.queryParameters['customerKey'] ?? '',
+      ),
+    ),
+    GoRoute(
+      path: '/post-job/payment/billing/fail',
+      builder: (_, state) => BillingKeyFailPage(
+        code: state.uri.queryParameters['code'] ?? '',
+        message: state.uri.queryParameters['message'] ?? '',
+      ),
     ),
 
     GoRoute(
@@ -315,7 +398,8 @@ final appRouter = GoRouter(
     GoRoute(path: '/admin', builder: (_, __) => const AdminDashboardPage()),
 
     // ── 내 정보(My Page) ─────────────────────────────────────
-    GoRoute(path: '/me', builder: (_, __) => const MeOverviewPage()),
+    // /me 는 역할 분기: 치과 → MeOverviewPage(공고/광고 관리), 지원자 → ApplicantDashboardPage
+    GoRoute(path: '/me', builder: (_, __) => const _MeRoleRouter()),
     GoRoute(path: '/me/clinic', builder: (_, __) => const MeClinicPage()),
     GoRoute(path: '/me/verify', redirect: (_, __) => '/me/clinic'),
     GoRoute(path: '/me/billing', builder: (_, __) => const MeBillingPage()),
@@ -329,6 +413,25 @@ final appRouter = GoRouter(
       builder: (_, __) => const MeNotificationsPage(),
     ),
     GoRoute(path: '/me/account', builder: (_, __) => const MeAccountPage()),
+
+    // ── 지원자 전용 /me 서브페이지 ────────────────────────────
+    GoRoute(
+      path: '/me/applications',
+      builder: (_, __) => const ApplicantApplicationsPage(),
+    ),
+    GoRoute(
+      path: '/me/resumes',
+      builder: (_, __) => const ResumeHomeScreen(),
+    ),
+    GoRoute(
+      path: '/me/resumes/edit/:resumeId',
+      builder: (_, state) =>
+          ResumeEditScreen(resumeId: state.pathParameters['resumeId']!),
+    ),
+    GoRoute(
+      path: '/me/resumes/import',
+      builder: (_, __) => const OcrReviewScreen(),
+    ),
 
     // ── 피드백 게시판 ────────────────────────────────────────
     GoRoute(path: '/feedback', builder: (_, __) => const FeedbackListPage()),
@@ -423,3 +526,49 @@ final appRouter = GoRouter(
     GoRoute(path: '/publisher/done', redirect: (_, __) => '/post-job/input'),
   ],
 );
+
+/// `/me` 역할 분기 위젯.
+///
+/// 라우터 redirect 단계에서는 비동기 [ClinicAuthService.isClinicAccount] 결과로
+/// 페이지를 가르지 않는다(loading state 가 길어지면 화면이 비어 보이므로).
+/// 대신 빌더에서 한 번만 결과를 fetch 하여 분기한다.
+class _MeRoleRouter extends StatefulWidget {
+  const _MeRoleRouter();
+
+  @override
+  State<_MeRoleRouter> createState() => _MeRoleRouterState();
+}
+
+class _MeRoleRouterState extends State<_MeRoleRouter> {
+  bool? _isClinic;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolve();
+  }
+
+  Future<void> _resolve() async {
+    try {
+      final isClinic = await ClinicAuthService.isClinicAccount();
+      if (!mounted) return;
+      setState(() => _isClinic = isClinic);
+    } catch (_) {
+      if (!mounted) return;
+      // 판별 불가 시 일반 사용자가 더 많으므로 지원자 대시보드로 fallback
+      setState(() => _isClinic = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isClinic == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    return _isClinic!
+        ? const MeOverviewPage()
+        : const ApplicantDashboardPage();
+  }
+}

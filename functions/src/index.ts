@@ -15,6 +15,47 @@ export {
 export { aggregateAnalyticsDaily } from "./scheduled-analytics";
 export {verifyBusinessLicense} from "./biz-license-verify";
 
+// ── 어드민 모더레이션 (P1.A) ──────────────────────────────────
+export {
+  adminListReportedPosts,
+  adminGetReportedItem,
+  adminResolveReportedPost,
+} from "./admin/moderation";
+
+// ── 어드민 사용자 검색·상세 (P1.B) ────────────────────────────
+export {
+  adminSearchUsers,
+  adminGetUserDetail,
+  adminToggleUserFlag,
+} from "./admin/users";
+
+// ── 광고 주문/결제 (M1) ────────────────────────────────────────
+export { createOrder, confirmPayment } from "./ads/orders";
+// ── 광고 마이그레이션 (M2 — 일회성 백필) ───────────────────────
+export { migrateExistingJobsToCampaigns } from "./ads/migrate";
+// ── 캠페인 운영 액션 (M4) ───────────────────────────────────────
+export {
+  pauseCampaign,
+  resumeCampaign,
+  closeCampaign,
+  deleteCampaign,
+  setAutoRenew,
+  createExtendOrder,
+  createUpgradeOrder,
+} from "./ads/campaignActions";
+export { cancelAndRefund } from "./ads/cancelRefund";
+// ── 캠페인 라이프사이클 스케줄러 (M5) ────────────────────────────
+export {
+  expireCampaigns,
+  adEndingReminder,
+  runAutoRenewals,
+} from "./ads/scheduler";
+// ── 빌링키(자동결제 카드) 등록/해지 (M6) ─────────────────────────
+export {
+  registerBillingKey,
+  deleteBillingKey,
+} from "./ads/billingKeys";
+
 if (!admin.apps.length) {
   admin.initializeApp();
 }
@@ -1426,6 +1467,21 @@ export {
   adminDeletePoll,
 } from "./poll-close";
 
+// ========== 공감투표 자연 증가 봇 ==========
+// 30분마다 진행 중 투표 1건의 totalEmpathyCount / option.empathyCount 만 직접 증가.
+// activityLogs 는 기록하지 않아 대시보드 통계에 영향 없음.
+// 익명 보기(isSystem=false) 가 있으면 90~98% 가 익명 보기로, 길이가 길수록 가중치↑.
+// adminBoostPollEmpathy 는 운영자가 즉시 N명 부어줄 때 사용 (어드민 onCall).
+export {
+  tickFakePollEmpathy,
+  adminBoostPollEmpathy,
+} from "./poll-empathy-bot";
+
+// ========== 속닥속닥(선배 Q&A) 반응 수 자연 증가 봇 ==========
+// activityLogs 미기록 → 대시보드 whisper_reaction 통계는 실유저만 반영.
+// seniorQuestions / comments / replies 의 likeCount·cheerCount 만 increment.
+export { tickWhisperReactionBot } from "./whisper-reaction-bot";
+
 // ========== 구인공고: 이미지 → 폼 자동채우기 (AI Vision) ==========
 /**
  * parseJobImagesToForm
@@ -1552,6 +1608,11 @@ const TEST_PUBLISHER_EMAILS = new Set([
   "doug@douglasfilm.com",
 ]);
 
+/**
+ * 등급 키 정규화 — 신규 흐름은 ads/catalog.ts 의 normalizeTierKey 를 사용한다.
+ * publishTestJobWithoutPayment 가 카탈로그 fetch 전에도 jobLevel/일수를 결정해야 하는
+ * 폴백 경로를 위해 동일한 매핑을 inline 으로 유지한다.
+ */
 function resolveJobLevel(productTier: unknown): number {
   const tier = String(productTier ?? "").trim().toLowerCase();
   switch (tier) {
@@ -1568,6 +1629,7 @@ function resolveJobLevel(productTier: unknown): number {
   }
 }
 
+/** @deprecated ads/catalog.ts:getProductCatalog().exposureDays 사용 권장. 폴백 전용. */
 function displayDaysForTier(productTier: unknown): number {
   const tier = String(productTier ?? "").trim().toLowerCase();
   if (tier === "premium") return 60;
@@ -1635,9 +1697,45 @@ export const publishTestJobWithoutPayment = functions.https.onCall(
     const profile = profileSnap.exists ? profileSnap.data() ?? {} : {};
 
     const productTier = draft.productTier ?? "standard";
+
+    // 카탈로그(`productCatalog/{tierKey}`) 우선 — 가격·정책 시드 후엔 코드 빌드 없이 갱신됨.
+    // 카탈로그 미존재(시드 전)/오류 시 displayDaysForTier 폴백.
+    let exposureDays = displayDaysForTier(productTier);
+    let priorityScore =
+      resolveJobLevel(productTier) === 1 ? 100 : 50;
+    let policySnapshot: Record<string, unknown> = {};
+    let activePriceId: string | null = null;
+    try {
+      const {
+        getProductCatalog,
+        getBillingPolicy,
+        normalizeTierKey,
+      } = await import("./ads/catalog.js");
+      const tierKey = normalizeTierKey(productTier);
+      const [catalog, policy] = await Promise.all([
+        getProductCatalog(tierKey),
+        getBillingPolicy(),
+      ]);
+      exposureDays = catalog.exposureDays;
+      priorityScore = catalog.matchPriority;
+      activePriceId = catalog.activePriceId;
+      policySnapshot = {
+        pauseSaveRate: policy.pauseSaveRate,
+        pauseMinDaysToAllow: policy.pauseMinDaysToAllow,
+        pauseMaxCountPerCampaign: policy.pauseMaxCountPerCampaign,
+        autoRenewLeadDays: policy.autoRenewLeadDays,
+        refundWindowDays: policy.refundWindowDays,
+        policyVersion: policy.policyVersion,
+      };
+    } catch (e) {
+      functions.logger.warn("publishTestJobWithoutPayment: catalog fallback", {
+        err: String(e),
+      });
+    }
+
     const now = admin.firestore.Timestamp.now();
     const adEndAt = admin.firestore.Timestamp.fromMillis(
-      now.toMillis() + displayDaysForTier(productTier) * 24 * 60 * 60 * 1000
+      now.toMillis() + exposureDays * 24 * 60 * 60 * 1000
     );
     const clinicName = String(
       draft.clinicName ??
@@ -1654,7 +1752,11 @@ export const publishTestJobWithoutPayment = functions.https.onCall(
     const address = String(draft.address ?? profile.address ?? "").trim();
     const phone = String(draft.contact ?? profile.phone ?? "").trim();
 
-    const jobData = {
+    // 트랜잭션으로 jobs + campaigns 동시 생성 (M2: 캠페인 도입)
+    const jobRef = db.collection("jobs").doc();
+    const campaignRef = db.collection("campaigns").doc();
+
+    const jobData: FirebaseFirestore.DocumentData = {
       ownerUid: uid,
       createdBy: uid,
       clinicId: uid,
@@ -1695,8 +1797,10 @@ export const publishTestJobWithoutPayment = functions.https.onCall(
       mainDutiesList: stringList(draft.mainDutiesList),
       productTier,
       productLabel: draft.productLabel ?? "테스트 공고",
+      tierKey: productTier,
       jobLevel: resolveJobLevel(productTier),
-      priorityScore: resolveJobLevel(productTier) === 1 ? 100 : 50,
+      priorityScore,
+      campaignId: campaignRef.id,
       status: "active",
       paymentStatus: "test_bypassed",
       testBypass: true,
@@ -1707,21 +1811,71 @@ export const publishTestJobWithoutPayment = functions.https.onCall(
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
 
-    const jobRef = await db.collection("jobs").add(jobData);
-    await draftRef.update({
+    const campaignData = {
+      ownerUid: uid,
+      clinicProfileId,
+      jobId: jobRef.id,
+      orderId: null,
+      tierKey: productTier,
+      priceId: activePriceId,
+      amountPaid: 0,
+      voucherId: null,
+      lifecycleStatus: "active",
+      adStartAt: now,
+      adEndAt,
+      originalEndAt: adEndAt,
+      pause: {
+        count: 0,
+        totalDaysOnPause: 0,
+        totalDaysCredited: 0,
+        currentPausedAt: null,
+      },
+      pauseHistory: [],
+      autoRenew: {
+        enabled: false,
+        consentVersion: null,
+        enabledAt: null,
+        discountRateSnapshot: 0.10,
+        nextChargeAt: null,
+        lastChargeStatus: "none",
+        failedReason: null,
+      },
+      extensionHistory: [],
+      policySnapshot,
+      notificationsSent: { national: 0, regional: 0, openRate: 0 },
+      testBypass: true,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    const batch = db.batch();
+    batch.set(jobRef, jobData);
+    batch.set(campaignRef, campaignData);
+    batch.update(draftRef, {
       currentStep: "published",
       publishedJobId: jobRef.id,
+      campaignId: campaignRef.id,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
+    batch.set(campaignRef.collection("auditLog").doc(), {
+      type: "created",
+      actor: uid,
+      before: null,
+      after: { tierKey: productTier, adEndAt, amountPaid: 0 },
+      note: "테스트 무결제 게시",
+      at: now,
+    });
+    await batch.commit();
 
     functions.logger.info("publishTestJobWithoutPayment", {
       uid,
       email,
       draftId,
       jobId: jobRef.id,
+      campaignId: campaignRef.id,
     });
 
-    return {jobId: jobRef.id, success: true};
+    return {jobId: jobRef.id, campaignId: campaignRef.id, success: true};
   }
 );
 

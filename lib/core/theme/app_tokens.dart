@@ -100,3 +100,70 @@ class AppPublisher {
   /// 웹 공고 미리보기 [JobPostPreview] 블록 사이 [Divider] 높이(세로 여백)
   static const double previewSectionDividerHeight = 28.0;
 }
+
+/// 웹 일반계정(지원자) 플로우 — 공고 보드/상세, /me 사이드바 셸 공통 규격
+///
+/// 단일 소스 원칙: 헤더 높이·사이드바 폭·카드 라운드 등 일반계정 영역 전반에서
+/// 사용하는 값은 모두 여기에서 정의한다. 같은 값을 위젯마다 하드코딩하지 않는다.
+class AppApplicant {
+  AppApplicant._();
+
+  // ── 글로벌 셸 ─────────────────────────────────────────────────
+  /// 상단 글로벌 헤더 높이 (로고/검색바/알림/프로필 버튼)
+  static const double topBarHeight = 64.0;
+
+  /// 좌측 사이드바 펼침 폭
+  static const double sideNavWidth = 240.0;
+
+  /// 좌측 사이드바 접힘 폭 (아이콘만)
+  static const double sideNavCollapsedWidth = 72.0;
+
+  /// 사이드바 / 본문 분기 브레이크포인트 (이 미만은 사이드바 숨김 + 햄버거 메뉴)
+  static const double sideNavBreakpoint = 960.0;
+
+  /// 본문 좌우 최대 너비 (가독성을 위한 컨텐츠 폭 제한)
+  static const double contentMaxWidth = 1200.0;
+
+  /// 본문 좌우 패딩 (브레이크포인트 이상에서)
+  static const double contentHPadding = 32.0;
+
+  /// 본문 좌우 패딩 (모바일/좁은 폭)
+  static const double contentHPaddingNarrow = 16.0;
+
+  // ── 카드 / 모듈 ────────────────────────────────────────────────
+  /// 공고 카드 / 대시보드 카드 공통 라운드
+  static const double cardRadius = 14.0;
+
+  /// 공고 카드 그림자 blur
+  static const double cardShadowBlur = 18.0;
+
+  /// 등급별 섹션 사이 세로 간격
+  static const double sectionSpacing = 40.0;
+
+  /// 섹션 헤더 ↔ 본문(카드 그리드) 간격
+  static const double sectionHeaderGap = 16.0;
+
+  // ── 등급 배지 ─────────────────────────────────────────────────
+  /// 프리미엄(레벨 1) 카드 강조 라운드
+  static const double premiumCardRadius = 18.0;
+
+  /// 추천(레벨 2) 그리드 카드 라운드
+  static const double recommendedCardRadius = 14.0;
+
+  /// 일반(레벨 3) 리스트 카드 라운드 — 행 형태라 작게
+  static const double standardCardRadius = 10.0;
+
+  // ── 공고 카드 그리드 ───────────────────────────────────────────
+  /// 추천 카드 그리드 최소 카드 폭 (이 폭으로 칸 수 자동 계산)
+  static const double recommendedMinCardWidth = 280.0;
+
+  /// 추천 카드 그리드 카드 간 가로/세로 간격
+  static const double recommendedCardGap = 16.0;
+
+  // ── 사이드바 항목 ─────────────────────────────────────────────
+  /// 사이드바 메뉴 항목 높이
+  static const double sideNavItemHeight = 44.0;
+
+  /// 사이드바 섹션(공고/같이/성장/내정보) 사이 간격
+  static const double sideNavSectionGap = 18.0;
+}

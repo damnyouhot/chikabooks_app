@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -164,12 +166,56 @@ class ClinicAuthService {
         );
   }
 
+  // ── 클리닉 여부 메모리 캐시 ─────────────────────────────────
+  // GoRouter redirect 가 `/me/*` 진입마다 isClinicAccount 를 호출하므로
+  // 같은 uid 에 대한 Firestore get 비용을 캐시로 줄인다.
+  // - 다른 uid 로 로그인되면 자동으로 무효화 (authStateChanges 리스너).
+  // - 외부에서 강제 무효화 필요 시 [invalidateClinicCache] 호출.
+  static String? _clinicCacheUid;
+  static bool? _clinicCacheResult;
+  static StreamSubscription<User?>? _clinicCacheAuthSub;
+
+  static void _ensureClinicCacheListener() {
+    _clinicCacheAuthSub ??= FirebaseAuth.instance.authStateChanges().listen((u) {
+      if (u?.uid != _clinicCacheUid) {
+        _clinicCacheUid = null;
+        _clinicCacheResult = null;
+      }
+    });
+  }
+
+  /// 캐시 강제 무효화 (로그아웃·계정 전환 등 명시적 트리거 후 호출).
+  static void invalidateClinicCache() {
+    _clinicCacheUid = null;
+    _clinicCacheResult = null;
+  }
+
   /// 공고자 계정 존재 여부 (uid 기준)
-  static Future<bool> isClinicAccount([String? uid]) async {
+  ///
+  /// 같은 uid 에 대해 처음 호출 시 Firestore 1회 fetch, 이후엔 메모리 캐시.
+  /// uid 가 바뀌면 자동 무효화. [forceRefresh] 가 true 면 캐시를 무시하고
+  /// 다시 fetch.
+  static Future<bool> isClinicAccount([
+    String? uid,
+    bool forceRefresh = false,
+  ]) async {
     final targetUid = uid ?? _uid;
-    if (targetUid == null) return false;
+    if (targetUid == null) {
+      _clinicCacheUid = null;
+      _clinicCacheResult = null;
+      return false;
+    }
+    _ensureClinicCacheListener();
+    if (!forceRefresh &&
+        _clinicCacheUid == targetUid &&
+        _clinicCacheResult != null) {
+      return _clinicCacheResult!;
+    }
     final doc = await _db.collection(_collection).doc(targetUid).get();
-    return doc.exists;
+    final exists = doc.exists;
+    _clinicCacheUid = targetUid;
+    _clinicCacheResult = exists;
+    return exists;
   }
 
   // ── 중복 역할 가입 차단 ────────────────────────────────

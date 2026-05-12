@@ -5,7 +5,18 @@ if (!admin.apps.length) {
   admin.initializeApp();
 }
 const db = admin.firestore();
-const ANALYTICS_SCHEMA_VERSION = 2;
+// v3 (2026-05 +): signups, publisherSignups, revenueDaily, errorCount 추가
+// 클라이언트 모델 [DailySummary] 는 누락 필드를 0/빈값으로 안전 처리하므로
+// v2 로 적재된 과거 문서와 차트에서 자연스럽게 혼용 가능하다.
+const ANALYTICS_SCHEMA_VERSION = 3;
+
+const PAID_BILLING_TYPES = new Set([
+  "order_paid",
+  "order_paid_extend",
+  "order_paid_upgrade",
+  "auto_renewed",
+]);
+const REFUND_BILLING_TYPES = new Set(["order_refunded"]);
 
 // ── 정의: lib/core/analytics/event_catalog.dart 와 1:1 일치 ──
 //
@@ -248,7 +259,98 @@ async function generateForDate(date: Date): Promise<void> {
   }
   ghost += noEventUsers;
 
-  // Step 5: Firestore 저장
+  // ── Step 5: v3 신규 필드 ──────────────────────────────────────
+  // 각 신규 필드는 개별 try/catch 로 감싸 한 쿼리가 실패해도 다른 필드는
+  // 정상 적재된다. partialFailures 는 문서에 함께 남겨 운영자가 확인 가능.
+  const partialFailures: string[] = [];
+
+  let signups = 0;
+  try {
+    const sSnap = await db
+      .collection("users")
+      .where("excludeFromStats", "==", false)
+      .where("createdAt", ">=", admin.firestore.Timestamp.fromDate(dayStart))
+      .where("createdAt", "<", admin.firestore.Timestamp.fromDate(dayEnd))
+      .count()
+      .get();
+    signups = sSnap.data().count ?? 0;
+  } catch (err) {
+    console.error(`❌ [AnalyticsDaily] ${dateKey} signups failed`, err);
+    partialFailures.push("signups");
+  }
+
+  let publisherSignups = 0;
+  try {
+    const pSnap = await db
+      .collectionGroup("clinic_profiles")
+      .where("createdAt", ">=", admin.firestore.Timestamp.fromDate(dayStart))
+      .where("createdAt", "<", admin.firestore.Timestamp.fromDate(dayEnd))
+      .count()
+      .get();
+    publisherSignups = pSnap.data().count ?? 0;
+  } catch (err) {
+    console.error(
+      `❌ [AnalyticsDaily] ${dateKey} publisherSignups failed`,
+      err,
+    );
+    partialFailures.push("publisherSignups");
+  }
+
+  const revenueDaily: {
+    paidCount: number;
+    paidAmountKrw: number;
+    refundCount: number;
+    refundAmountKrw: number;
+    byProductTier: Record<string, number>;
+  } = {
+    paidCount: 0,
+    paidAmountKrw: 0,
+    refundCount: 0,
+    refundAmountKrw: 0,
+    byProductTier: {},
+  };
+  try {
+    const billingSnap = await db
+      .collection("billingEvents")
+      .where("happenedAt", ">=", admin.firestore.Timestamp.fromDate(dayStart))
+      .where("happenedAt", "<", admin.firestore.Timestamp.fromDate(dayEnd))
+      .get();
+    for (const doc of billingSnap.docs) {
+      const d = doc.data();
+      const t = typeof d.type === "string" ? d.type : "";
+      const amount = Number(d.amount) || 0;
+      const tier =
+        typeof d.tierKey === "string" && d.tierKey ? d.tierKey : "unknown";
+      if (PAID_BILLING_TYPES.has(t) && amount > 0) {
+        revenueDaily.paidCount += 1;
+        revenueDaily.paidAmountKrw += amount;
+        revenueDaily.byProductTier[tier] =
+          (revenueDaily.byProductTier[tier] || 0) + amount;
+      } else if (REFUND_BILLING_TYPES.has(t)) {
+        revenueDaily.refundCount += 1;
+        revenueDaily.refundAmountKrw += Math.abs(amount);
+      }
+    }
+  } catch (err) {
+    console.error(`❌ [AnalyticsDaily] ${dateKey} revenueDaily failed`, err);
+    partialFailures.push("revenueDaily");
+  }
+
+  let errorCount = 0;
+  try {
+    const eSnap = await db
+      .collection("appErrors")
+      .where("timestamp", ">=", admin.firestore.Timestamp.fromDate(dayStart))
+      .where("timestamp", "<", admin.firestore.Timestamp.fromDate(dayEnd))
+      .count()
+      .get();
+    errorCount = eSnap.data().count ?? 0;
+  } catch (err) {
+    console.error(`❌ [AnalyticsDaily] ${dateKey} errorCount failed`, err);
+    partialFailures.push("errorCount");
+  }
+
+  // ── Step 6: Firestore 저장 ────────────────────────────────────
   await db
     .collection("analytics_daily")
     .doc(dateKey)
@@ -265,12 +367,21 @@ async function generateForDate(date: Date): Promise<void> {
       segments: {learning, saving, bond, character, ghost},
       retention: {d3: 0, d7: 0},
       eventCounts,
+      // v3 신규 필드
+      signups,
+      publisherSignups,
+      revenueDaily,
+      errorCount,
+      partialFailures,
     });
 
   console.log(
     `📊 [AnalyticsDaily] ${dateKey}: ` +
       `total=${total}, active=${activeUserIds.size}, ` +
-      `logs=${logsSnap.docs.length}`
+      `logs=${logsSnap.docs.length}, ` +
+      `signups=${signups}, paid=${revenueDaily.paidCount}, ` +
+      `errors=${errorCount}` +
+      (partialFailures.length > 0 ? ` ⚠️ partial=${partialFailures.join(",")}` : "")
   );
 }
 

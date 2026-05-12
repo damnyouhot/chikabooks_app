@@ -21,7 +21,7 @@ class ResumeOcrPrompt extends StatelessWidget {
         AppPrimaryButton(
           label: '사진으로 입력하기',
           onPressed:
-              () => GoRouter.of(context).push('/applicant/resumes/import'),
+              () => GoRouter.of(context).push('/me/resumes/import'),
           padding: const EdgeInsets.symmetric(vertical: 13),
         ),
         const SizedBox(height: AppSpacing.lg),

@@ -106,9 +106,9 @@ class _InfoBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.accent.withOpacity(0.08),
+        color: AppColors.accent.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.accent.withOpacity(0.2)),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
@@ -240,7 +240,7 @@ class _FunnelRow extends StatelessWidget {
               minHeight: 8,
               backgroundColor: AppColors.disabledBg,
               valueColor: AlwaysStoppedAnimation(
-                isFirst ? AppColors.accent : AppColors.accent.withOpacity(0.55),
+                isFirst ? AppColors.accent : AppColors.accent.withValues(alpha: 0.55),
               ),
             ),
           ),
@@ -269,8 +269,8 @@ class _DropArrow extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
           decoration: BoxDecoration(
             color: isGood
-                ? AppColors.accent.withOpacity(0.12)
-                : AppColors.error.withOpacity(0.10),
+                ? AppColors.accent.withValues(alpha: 0.12)
+                : AppColors.error.withValues(alpha: 0.10),
             borderRadius: BorderRadius.circular(99),
           ),
           child: Text(

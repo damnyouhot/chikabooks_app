@@ -9,6 +9,22 @@ import '../models/analytics_daily_model.dart';
 /// 1. fetchRange: 기간 내 일별 집계 문서 읽기 (차트용)
 /// 2. backfill: 누락된 날짜의 집계를 activityLogs에서 생성
 /// ──────────────────────────────────────────────────────────────
+///
+/// ── 스키마 v3 와의 관계 ──────────────────────────────────────
+/// 서버 [scheduled-analytics.ts] 는 v3 (signups · publisherSignups ·
+/// revenueDaily · errorCount) 를 적재한다.
+/// 그러나 클라이언트는 보안 규칙상
+/// - billingEvents (본인 것만 읽기)
+/// - 다른 사용자의 users.createdAt
+/// - clinic_profiles 본인 외
+/// 를 직접 읽을 수 없어, 같은 정확도의 v3 필드를 만들 수 없다.
+///
+/// 따라서 클라이언트 백필은 의도적으로 [_schemaVersion] = 2 로 유지한다.
+/// 운영자가 "백필" 버튼을 눌러도 v2 필드만 채워지고, 다음 새벽 1시
+/// 서버 스케줄이 동일 문서를 v3 (schemaVersion 3) 로 덮어써서 신규 필드가
+/// 자동 보정된다. DailySummary.fromFirestore 가 누락 필드를 0/empty 로
+/// 안전 처리하므로 그 사이 차트도 끊기지 않는다.
+/// ──────────────────────────────────────────────────────────────
 class AdminAnalyticsDailyService {
   static final _db = FirebaseFirestore.instance;
   static const int _schemaVersion = 2;

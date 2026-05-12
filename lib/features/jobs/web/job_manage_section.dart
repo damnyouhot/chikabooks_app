@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_confirm_modal.dart';
+import '../../../services/campaign_action_service.dart';
 import 'job_applicants_page.dart';
 import 'web_typography.dart';
 
@@ -559,29 +560,64 @@ class _JobManageSectionState extends State<JobManageSection> {
     );
   }
 
-  // ── 상태 변경 ────────────────────────────────────────
+  // ── 상태 변경 (Callable 경유) ──────────────────────────
+  // jobs 직접 쓰기는 보안 룰로 차단됨. CampaignActionService 호출.
   Future<void> _updateStatus(String docId, String newStatus) async {
+    final messenger = ScaffoldMessenger.of(context);
     try {
-      await FirebaseFirestore.instance.collection('jobs').doc(docId).update({
-        'status': newStatus,
-      });
+      final cid = await CampaignActionService.resolveCampaignIdFromJob(docId);
+      if (cid == null) {
+        if (mounted) {
+          messenger.showSnackBar(
+            const SnackBar(content: Text('캠페인 정보를 찾을 수 없습니다.')),
+          );
+        }
+        return;
+      }
+      switch (newStatus) {
+        case 'closed':
+          await CampaignActionService.close(campaignId: cid, reason: '사용자 마감');
+          break;
+        case 'pending':
+          // 재게시는 신규 결제 흐름이 필요해 본 화면에선 처리하지 않는다.
+          // (마감된 공고는 새 캠페인으로 다시 작성하도록 유도)
+          if (mounted) {
+            messenger.showSnackBar(
+              const SnackBar(
+                content: Text('재게시는 새 공고로 다시 작성해 주세요. (정책 변경)'),
+              ),
+            );
+          }
+          return;
+        case 'active':
+          await CampaignActionService.resume(campaignId: cid);
+          break;
+        default:
+          if (mounted) {
+            messenger.showSnackBar(
+              SnackBar(content: Text('지원하지 않는 상태: $newStatus')),
+            );
+          }
+          return;
+      }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('상태 변경 실패: $e')));
+        messenger.showSnackBar(SnackBar(content: Text('상태 변경 실패: $e')));
       }
     }
   }
 
-  // ── 삭제 확인 ────────────────────────────────────────
+  // ── 삭제 확인 (Callable 경유, soft delete) ─────────────
   Future<void> _confirmDelete(String docId, String title) async {
+    final messenger = ScaffoldMessenger.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder:
           (_) => AppConfirmModal(
             title: '공고 삭제',
-            message: '"$title" 공고를 삭제하시겠습니까?\n삭제 후 복구할 수 없습니다.',
+            message:
+                '"$title" 공고를 삭제하시겠습니까?\n'
+                '회계·감사 추적을 위해 캠페인은 종료 상태로 보관되며 검색에서는 제외됩니다.',
             confirmLabel: '삭제',
             destructive: true,
           ),
@@ -589,12 +625,21 @@ class _JobManageSectionState extends State<JobManageSection> {
 
     if (confirmed == true) {
       try {
-        await FirebaseFirestore.instance.collection('jobs').doc(docId).delete();
+        final cid = await CampaignActionService.resolveCampaignIdFromJob(
+          docId,
+        );
+        if (cid == null) {
+          if (mounted) {
+            messenger.showSnackBar(
+              const SnackBar(content: Text('캠페인 정보를 찾을 수 없습니다.')),
+            );
+          }
+          return;
+        }
+        await CampaignActionService.deleteCampaign(campaignId: cid);
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('삭제 실패: $e')));
+          messenger.showSnackBar(SnackBar(content: Text('삭제 실패: $e')));
         }
       }
     }

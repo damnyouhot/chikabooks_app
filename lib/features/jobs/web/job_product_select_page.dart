@@ -288,6 +288,7 @@ class _JobProductSelectPageState extends State<JobProductSelectPage> {
       final orderResult = await OrderService.createOrder(
         draftId: widget.draftId,
         clinicProfileId: pid,
+        tierKey: _selected.tierKey,
         voucherId: voucherId,
         consents: consentPayload,
       );

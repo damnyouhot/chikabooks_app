@@ -18,6 +18,7 @@ import '../../../services/app_error_logger.dart';
 import '../../../services/naver_auth_service.dart';
 import '../../../services/onboarding_service.dart';
 import '../../../services/user_profile_service.dart';
+import '../../publisher/services/clinic_auth_service.dart';
 import 'logout_reload.dart';
 
 /// 웹 이력서·공고 플로우 및 설정 등에서 공유하는 로그아웃·계정 삭제 로직.
@@ -32,6 +33,8 @@ class WebAccountActionsService {
     AdminActivityService.clearCache();
     AppErrorLogger.clearCache();
     UserProfileService.clearCache();
+    // 라우터 redirect/대시보드 분기에서 사용하는 클리닉 여부 캐시도 함께 무효화.
+    ClinicAuthService.invalidateClinicCache();
 
     // /me 영역 세션 ValueNotifier 강제 리셋 (이전 사용자의 활성 지점 잔존 방지).
     MeSession.activeBranchId.value = null;

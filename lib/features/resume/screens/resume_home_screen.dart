@@ -275,7 +275,9 @@ class _WrittenResumeTabState extends State<_WrittenResumeTab> {
 
   void _openOcr(BuildContext context) {
     if (kIsWeb) {
-      context.push('/applicant/resumes/import');
+      // Phase 1 부터 일반계정 이력서 영역의 표준 경로는 `/me/resumes/...`
+      // (`/applicant/resumes/...` 는 하위 호환용 별칭으로 라우터에 남아 있다.)
+      context.push('/me/resumes/import');
     } else {
       Navigator.push(context,
           MaterialPageRoute(builder: (_) => const OcrReviewScreen()));
@@ -284,7 +286,7 @@ class _WrittenResumeTabState extends State<_WrittenResumeTab> {
 
   void _navigateToEdit(BuildContext context, String resumeId) {
     if (kIsWeb) {
-      context.push('/applicant/resumes/edit/$resumeId');
+      context.push('/me/resumes/edit/$resumeId');
     } else {
       Navigator.push(context,
           MaterialPageRoute(builder: (_) => ResumeEditScreen(resumeId: resumeId)));

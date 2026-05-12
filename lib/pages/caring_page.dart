@@ -951,8 +951,8 @@ class _CaringPageState extends State<CaringPage> with TickerProviderStateMixin {
                   color: const Color(0xFF4FC3F7),
                   lines: const [
                     '· 약 3분 미만이면 시간 감소 없음',
-                    '· 깨어 −10·자는 중 −8(시간당)',
-                    '· 씻기기: 85 미만 +2, 85↑ +1, 100이면 +0 / 기분 +0.1·에너지 소폭 감소',
+                    '· 깨어 −5·자는 중 −4(시간당)',
+                    '· 씻기기: 85 미만 +3, 85↑ +2, 100이면 +0 / 기분 +0.1·에너지 소폭 감소',
                     '· 70↑ 잘 유지 시 유대 보상, 50 미만 오래 가면 유대 주기적 감소',
                   ],
                 ),

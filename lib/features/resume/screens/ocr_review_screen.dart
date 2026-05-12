@@ -777,7 +777,7 @@ class _OcrReviewScreenState extends State<OcrReviewScreen> {
             FilledButton(
               onPressed: () {
                 if (kIsWeb) {
-                  context.go('/applicant/resumes');
+                  context.go('/me/resumes');
                 } else {
                   Navigator.pop(context, true);
                 }
