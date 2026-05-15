@@ -7,6 +7,7 @@ class PollComment {
     required this.text,
     required this.uid,
     required this.createdAt,
+    this.nickname = '',
     this.likeCount = 0,
     this.replyCount = 0,
     this.stickerIds = const [],
@@ -16,6 +17,8 @@ class PollComment {
   final String text;
   final String uid;
   final DateTime createdAt;
+  /// 빈 문자열이면 익명 작성
+  final String nickname;
   final int likeCount;
   final int replyCount;
   final List<String> stickerIds;
@@ -27,6 +30,7 @@ class PollComment {
       text: (d['text'] as String?) ?? '',
       uid: (d['uid'] as String?) ?? '',
       createdAt: (d['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      nickname: (d['nickname'] as String?) ?? '',
       likeCount: (d['likeCount'] as int?) ?? 0,
       replyCount: (d['replyCount'] as int?) ?? 0,
       stickerIds: List<String>.from(d['stickerIds'] as List? ?? []),

@@ -392,6 +392,7 @@ class EmpathyPollService {
     String pollId,
     String text, {
     List<String> stickerIds = const [],
+    bool isAnonymous = false,
   }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return PollCommentResult.fail('로그인이 필요합니다.');
@@ -409,6 +410,15 @@ class EmpathyPollService {
       return PollCommentResult.fail('$maxPollCommentLength자 이내로 작성해주세요.');
     }
 
+    var nickname = '';
+    if (!isAnonymous) {
+      final profile = await UserProfileService.getMyProfile();
+      nickname = (profile?.nickname.trim() ?? '').substring(
+        0,
+        ((profile?.nickname.trim() ?? '').length).clamp(0, maxAuthorNicknameLength),
+      );
+    }
+
     try {
       final pollSnap = await _pollDoc(pollId).get();
       if (!pollSnap.exists) return PollCommentResult.fail('투표를 찾을 수 없습니다.');
@@ -420,6 +430,7 @@ class EmpathyPollService {
       await _pollCommentsRef(pollId).add({
         'text': trimmed,
         'uid': uid,
+        'nickname': nickname,
         'createdAt': FieldValue.serverTimestamp(),
         'likeCount': 0,
         'replyCount': 0,
@@ -494,6 +505,7 @@ class EmpathyPollService {
     String commentId,
     String text, {
     List<String> stickerIds = const [],
+    bool isAnonymous = false,
   }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return PollCommentResult.fail('로그인이 필요합니다.');
@@ -511,6 +523,15 @@ class EmpathyPollService {
       return PollCommentResult.fail('$maxPollCommentLength자 이내로 작성해주세요.');
     }
 
+    var nickname = '';
+    if (!isAnonymous) {
+      final profile = await UserProfileService.getMyProfile();
+      nickname = (profile?.nickname.trim() ?? '').substring(
+        0,
+        ((profile?.nickname.trim() ?? '').length).clamp(0, maxAuthorNicknameLength),
+      );
+    }
+
     try {
       final commentRef = _pollCommentRef(pollId, commentId);
       final replyRef = _pollCommentRepliesRef(pollId, commentId).doc();
@@ -518,6 +539,7 @@ class EmpathyPollService {
       batch.set(replyRef, {
         'text': trimmed,
         'uid': uid,
+        'nickname': nickname,
         'createdAt': FieldValue.serverTimestamp(),
         'likeCount': 0,
         if (normalizedStickerIds.isNotEmpty) 'stickerIds': normalizedStickerIds,

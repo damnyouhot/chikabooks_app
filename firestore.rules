@@ -811,7 +811,9 @@ service cloud.firestore {
       allow create: if request.auth != null &&
         request.resource.data.uid == request.auth.uid &&
         request.resource.data.text is string &&
-        request.resource.data.text.size() <= 300;
+        request.resource.data.text.size() <= 300 &&
+        request.resource.data.nickname is string &&
+        request.resource.data.nickname.size() <= 20;
       allow update: if request.auth != null &&
         request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['likeCount', 'replyCount']);
@@ -835,7 +837,9 @@ service cloud.firestore {
         allow create: if request.auth != null &&
           request.resource.data.uid == request.auth.uid &&
           request.resource.data.text is string &&
-          request.resource.data.text.size() <= 300;
+          request.resource.data.text.size() <= 300 &&
+          request.resource.data.nickname is string &&
+          request.resource.data.nickname.size() <= 20;
         allow update: if request.auth != null &&
           request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['likeCount']);

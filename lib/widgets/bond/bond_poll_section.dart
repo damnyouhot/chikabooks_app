@@ -62,6 +62,8 @@ class BondPollSectionState extends State<BondPollSection> {
   final Map<String, String?> _replyingToCommentId = {};
   /// pollId → 현재 입력 중인 스티커 목록
   final Map<String, List<String>> _commentStickerIds = {};
+  /// pollId → 익명 여부 (true면 익명)
+  final Map<String, bool> _commentIsAnonymous = {};
 
   @override
   void initState() {
@@ -577,6 +579,12 @@ class BondPollSectionState extends State<BondPollSection> {
       0,
       (sum, o) => sum + o.empathyCount,
     );
+    // poll.totalEmpathyCount 는 Poll 로드 시 Firestore에서 즉시 가져옴.
+    // _options 스트림이 아직 미수신인 경우에도 정확한 전체 참여자 수를 표시.
+    final displayTotal =
+        totalEmpathy > poll.totalEmpathyCount
+            ? totalEmpathy
+            : poll.totalEmpathyCount;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -682,21 +690,20 @@ class BondPollSectionState extends State<BondPollSection> {
                 padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
                 child: _buildInlineAddOption(),
               ),
-              // 참여 현황
-              if (totalEmpathy > 0)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 14),
-                  child: Center(
-                    child: Text(
-                      '$totalEmpathy명 참여',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textDisabled,
-                      ),
+              // 참여 현황 — 투표 전에도 항상 표시 (poll.totalEmpathyCount 우선)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 14),
+                child: Center(
+                  child: Text(
+                    '$displayTotal명 참여',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textDisabled,
                     ),
                   ),
                 ),
+              ),
             ],
           ),
         ),
@@ -1348,6 +1355,18 @@ class BondPollSectionState extends State<BondPollSection> {
                 const SizedBox(height: 4),
                 Row(
                   children: [
+                    // 닉네임 or 익명
+                    Text(
+                      c.nickname.isNotEmpty ? c.nickname : '익명',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: c.nickname.isNotEmpty
+                            ? AppColors.textSecondary
+                            : AppColors.textDisabled,
+                      ),
+                    ),
+                    const SizedBox(width: 5),
                     Text(
                       timeStr,
                       style: const TextStyle(
@@ -1575,6 +1594,18 @@ class BondPollSectionState extends State<BondPollSection> {
             const SizedBox(height: 3),
             Row(
               children: [
+                // 닉네임 or 익명
+                Text(
+                  r.nickname.isNotEmpty ? r.nickname : '익명',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: r.nickname.isNotEmpty
+                        ? AppColors.textSecondary
+                        : AppColors.textDisabled,
+                  ),
+                ),
+                const SizedBox(width: 5),
                 Text(
                   timeStr,
                   style: const TextStyle(
@@ -1721,6 +1752,7 @@ class BondPollSectionState extends State<BondPollSection> {
     final replyingToId = _replyingToCommentId[pollId];
     final isReplyMode = replyingToId != null;
     final stickerIds = _commentStickerIds[pollId] ?? [];
+    final isAnonymous = _commentIsAnonymous[pollId] ?? false;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1884,6 +1916,57 @@ class BondPollSectionState extends State<BondPollSection> {
                       ),
                 ],
               ),
+              // 익명 체크박스
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 0, 12, 6),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: Checkbox(
+                        value: isAnonymous,
+                        onChanged: busy
+                            ? null
+                            : (v) => setState(
+                              () =>
+                                  _commentIsAnonymous[pollId] = v ?? false,
+                            ),
+                        materialTapTargetSize:
+                            MaterialTapTargetSize.shrinkWrap,
+                        visualDensity: VisualDensity.compact,
+                        activeColor: AppColors.accent,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                        side: BorderSide(
+                          color: AppColors.textDisabled.withValues(alpha: 0.5),
+                          width: 1.2,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    GestureDetector(
+                      onTap: busy
+                          ? null
+                          : () => setState(
+                            () => _commentIsAnonymous[pollId] =
+                                !isAnonymous,
+                          ),
+                      child: Text(
+                        '익명으로 남기기',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: isAnonymous
+                              ? AppColors.accent
+                              : AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -1918,6 +2001,7 @@ class BondPollSectionState extends State<BondPollSection> {
 
     setState(() => _submittingClosedComment[pollId] = true);
 
+    final isAnonymous = _commentIsAnonymous[pollId] ?? false;
     final replyingTo = _replyingToCommentId[pollId];
     final PollCommentResult result;
     if (replyingTo != null) {
@@ -1926,12 +2010,14 @@ class BondPollSectionState extends State<BondPollSection> {
         replyingTo,
         text,
         stickerIds: stickerIds,
+        isAnonymous: isAnonymous,
       );
     } else {
       result = await EmpathyPollService.addPollComment(
         pollId,
         text,
         stickerIds: stickerIds,
+        isAnonymous: isAnonymous,
       );
     }
 
