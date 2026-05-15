@@ -1161,6 +1161,16 @@ class BondPollSectionState extends State<BondPollSection> {
                   bgColor: AppColors.cardPrimary,
                   textColor: AppColors.onCardPrimary,
                 ),
+                const SizedBox(width: 6),
+                // 댓글 있을 때 NEW 뱃지
+                StreamBuilder<List<PollComment>>(
+                  stream: EmpathyPollService.pollCommentsStream(poll.id),
+                  builder: (_, snap) {
+                    final hasComments = (snap.data?.isNotEmpty) ?? false;
+                    if (!hasComments) return const SizedBox.shrink();
+                    return const _PollCommentNewBadge();
+                  },
+                ),
                 const Spacer(),
                 Text(
                   '$totalEmpathy명 참여',
@@ -1742,17 +1752,6 @@ class BondPollSectionState extends State<BondPollSection> {
               ],
             ),
           ),
-        // 선택된 스티커 미리보기
-        if (stickerIds.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: SeniorStickerChipList(
-              stickerIds: stickerIds,
-              onRemoveAt: (i) => setState(() {
-                _commentStickerIds.putIfAbsent(pollId, () => []).removeAt(i);
-              }),
-            ),
-          ),
         Container(
           decoration: BoxDecoration(
             border: Border.all(
@@ -1762,7 +1761,52 @@ class BondPollSectionState extends State<BondPollSection> {
             borderRadius: BorderRadius.circular(AppRadius.md),
           ),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // 선택된 스티커 미리보기 (입력창 내부 상단)
+              if (stickerIds.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: [
+                      for (int i = 0; i < stickerIds.length; i++)
+                        GestureDetector(
+                          onTap: () => setState(
+                            () => _commentStickerIds[pollId]!.removeAt(i),
+                          ),
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              SeniorStickerView(
+                                stickerId: stickerIds[i],
+                                size: 36,
+                              ),
+                              Positioned(
+                                top: -4,
+                                right: -4,
+                                child: Container(
+                                  width: 14,
+                                  height: 14,
+                                  decoration: const BoxDecoration(
+                                    color: AppColors.textSecondary,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.close,
+                                    size: 10,
+                                    color: AppColors.white,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              // 텍스트 + 이모지 버튼 + 등록 버튼 Row
               Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -1796,9 +1840,29 @@ class BondPollSectionState extends State<BondPollSection> {
                       onSubmitted: (_) => _submitClosedPollComment(pollId),
                     ),
                   ),
+                  // 이모지 버튼 (등록 버튼 왼쪽)
+                  IconButton(
+                    onPressed: busy ? null : () => _pickCommentSticker(pollId),
+                    icon: Icon(
+                      stickerIds.isEmpty
+                          ? Icons.emoji_emotions_outlined
+                          : Icons.emoji_emotions,
+                      size: 20,
+                    ),
+                    color: stickerIds.isEmpty
+                        ? AppColors.textSecondary
+                        : AppColors.cardEmphasis,
+                    tooltip: '스티커',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 36,
+                      minHeight: 40,
+                    ),
+                  ),
+                  // 등록 버튼
                   busy
                       ? const Padding(
-                        padding: EdgeInsets.only(right: 12, bottom: 8),
+                        padding: EdgeInsets.only(right: 12, bottom: 10),
                         child: SizedBox(
                           width: 18,
                           height: 18,
@@ -1819,33 +1883,6 @@ class BondPollSectionState extends State<BondPollSection> {
                         ),
                       ),
                 ],
-              ),
-              // 스티커 버튼 툴바
-              Padding(
-                padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
-                child: Row(
-                  children: [
-                    IconButton(
-                      onPressed: busy ? null : () => _pickCommentSticker(pollId),
-                      icon: Icon(
-                        stickerIds.isEmpty
-                            ? Icons.emoji_emotions_outlined
-                            : Icons.emoji_emotions,
-                        size: 18,
-                      ),
-                      color: stickerIds.isEmpty
-                          ? AppColors.textSecondary
-                          : AppColors.cardEmphasis,
-                      visualDensity: VisualDensity.compact,
-                      tooltip: '스티커',
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(
-                        minWidth: 32,
-                        minHeight: 32,
-                      ),
-                    ),
-                  ],
-                ),
               ),
             ],
           ),
@@ -2180,6 +2217,62 @@ class _TinyPollAction extends StatelessWidget {
             style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─── 지난 투표 댓글 있을 때 NEW 뱃지 ─────────────────────────────
+
+class _PollCommentNewBadge extends StatefulWidget {
+  const _PollCommentNewBadge();
+
+  @override
+  State<_PollCommentNewBadge> createState() => _PollCommentNewBadgeState();
+}
+
+class _PollCommentNewBadgeState extends State<_PollCommentNewBadge>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _opacity;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 850),
+    )..repeat(reverse: true);
+    _opacity = Tween<double>(begin: 0.45, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _opacity,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFD84D),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: const Text(
+          'NEW',
+          style: TextStyle(
+            fontSize: 8,
+            fontWeight: FontWeight.w800,
+            color: AppColors.blue,
+            letterSpacing: 0.2,
+          ),
+        ),
       ),
     );
   }
