@@ -390,13 +390,21 @@ class EmpathyPollService {
   /// 종료된 투표에만 댓글 작성 가능
   static Future<PollCommentResult> addPollComment(
     String pollId,
-    String text,
-  ) async {
+    String text, {
+    List<String> stickerIds = const [],
+  }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return PollCommentResult.fail('로그인이 필요합니다.');
 
     final trimmed = text.trim();
-    if (trimmed.isEmpty) return PollCommentResult.fail('내용을 입력해주세요.');
+    final normalizedStickerIds =
+        stickerIds
+            .where((id) => seniorStickerById(id) != null)
+            .take(5)
+            .toList();
+    if (trimmed.isEmpty && normalizedStickerIds.isEmpty) {
+      return PollCommentResult.fail('내용을 입력해주세요.');
+    }
     if (trimmed.length > maxPollCommentLength) {
       return PollCommentResult.fail('$maxPollCommentLength자 이내로 작성해주세요.');
     }
@@ -415,6 +423,7 @@ class EmpathyPollService {
         'createdAt': FieldValue.serverTimestamp(),
         'likeCount': 0,
         'replyCount': 0,
+        if (normalizedStickerIds.isNotEmpty) 'stickerIds': normalizedStickerIds,
       });
       return PollCommentResult.ok();
     } catch (e) {
@@ -483,13 +492,21 @@ class EmpathyPollService {
   static Future<PollCommentResult> addPollCommentReply(
     String pollId,
     String commentId,
-    String text,
-  ) async {
+    String text, {
+    List<String> stickerIds = const [],
+  }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return PollCommentResult.fail('로그인이 필요합니다.');
 
     final trimmed = text.trim();
-    if (trimmed.isEmpty) return PollCommentResult.fail('내용을 입력해주세요.');
+    final normalizedStickerIds =
+        stickerIds
+            .where((id) => seniorStickerById(id) != null)
+            .take(5)
+            .toList();
+    if (trimmed.isEmpty && normalizedStickerIds.isEmpty) {
+      return PollCommentResult.fail('내용을 입력해주세요.');
+    }
     if (trimmed.length > maxPollCommentLength) {
       return PollCommentResult.fail('$maxPollCommentLength자 이내로 작성해주세요.');
     }
@@ -503,6 +520,7 @@ class EmpathyPollService {
         'uid': uid,
         'createdAt': FieldValue.serverTimestamp(),
         'likeCount': 0,
+        if (normalizedStickerIds.isNotEmpty) 'stickerIds': normalizedStickerIds,
       });
       batch.update(commentRef, {'replyCount': FieldValue.increment(1)});
       await batch.commit();
@@ -555,6 +573,108 @@ class EmpathyPollService {
         .doc(uid)
         .snapshots()
         .map((s) => s.exists);
+  }
+
+  // ─── 댓글·대댓글 삭제 ─────────────────────────────────────
+
+  /// 본인 댓글 삭제 (likeCount·replyCount 연쇄 정리는 서버 부하 방지를 위해 생략)
+  static Future<bool> deletePollComment(
+    String pollId,
+    String commentId,
+  ) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return false;
+    try {
+      final ref = _pollCommentRef(pollId, commentId);
+      final snap = await ref.get();
+      if (!snap.exists) return false;
+      if ((snap.data()?['uid'] as String?) != uid) return false;
+      await ref.delete();
+      return true;
+    } catch (e) {
+      debugPrint('⚠️ EmpathyPollService.deletePollComment: $e');
+      return false;
+    }
+  }
+
+  /// 본인 대댓글 삭제
+  static Future<bool> deletePollCommentReply(
+    String pollId,
+    String commentId,
+    String replyId,
+  ) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return false;
+    try {
+      final replyRef = _pollCommentRepliesRef(pollId, commentId).doc(replyId);
+      final snap = await replyRef.get();
+      if (!snap.exists) return false;
+      if ((snap.data()?['uid'] as String?) != uid) return false;
+      final batch = _db.batch();
+      batch.delete(replyRef);
+      batch.update(
+        _pollCommentRef(pollId, commentId),
+        {'replyCount': FieldValue.increment(-1)},
+      );
+      await batch.commit();
+      return true;
+    } catch (e) {
+      debugPrint('⚠️ EmpathyPollService.deletePollCommentReply: $e');
+      return false;
+    }
+  }
+
+  // ─── 댓글·대댓글 신고 ─────────────────────────────────────
+
+  /// 댓글 신고 (uid당 1회, 중복 시 false 반환)
+  static Future<bool> reportPollComment(
+    String pollId,
+    String commentId,
+  ) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return false;
+    try {
+      final reportRef = _pollCommentRef(
+        pollId,
+        commentId,
+      ).collection('reports').doc(uid);
+      final snap = await reportRef.get();
+      if (snap.exists) return false;
+      await reportRef.set({
+        'uid': uid,
+        'reportedAt': FieldValue.serverTimestamp(),
+      });
+      return true;
+    } catch (e) {
+      debugPrint('⚠️ EmpathyPollService.reportPollComment: $e');
+      return false;
+    }
+  }
+
+  /// 대댓글 신고 (uid당 1회, 중복 시 false 반환)
+  static Future<bool> reportPollCommentReply(
+    String pollId,
+    String commentId,
+    String replyId,
+  ) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return false;
+    try {
+      final reportRef = _pollCommentRepliesRef(pollId, commentId)
+          .doc(replyId)
+          .collection('reports')
+          .doc(uid);
+      final snap = await reportRef.get();
+      if (snap.exists) return false;
+      await reportRef.set({
+        'uid': uid,
+        'reportedAt': FieldValue.serverTimestamp(),
+      });
+      return true;
+    } catch (e) {
+      debugPrint('⚠️ EmpathyPollService.reportPollCommentReply: $e');
+      return false;
+    }
   }
 
   // ═══════════════════════════════════════════════════════════

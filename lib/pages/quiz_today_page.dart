@@ -7,6 +7,7 @@ import '../core/widgets/app_badge.dart';
 import '../core/widgets/app_muted_card.dart';
 import '../core/widgets/app_primary_card.dart';
 import '../core/widgets/glass_card.dart';
+import '../models/quiz_pool_item.dart';
 import '../models/quiz_schedule.dart';
 import '../services/caring_treat_service.dart';
 import '../services/quiz_accuracy_stats.dart';
@@ -1294,16 +1295,32 @@ class _QuizCardState extends State<_QuizCard> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              AppBadge(
-                label: 'Q${widget.index}',
-                bgColor:
-                    widget.glassMode
-                        ? AppColors.white.withValues(alpha: 0.20)
-                        : AppColors.pollBadgeBg,
-                textColor:
-                    widget.glassMode
-                        ? AppColors.white
-                        : AppColors.pollBadgeText,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  AppBadge(
+                    label: 'Q${widget.index}',
+                    bgColor:
+                        widget.glassMode
+                            ? AppColors.white.withValues(alpha: 0.20)
+                            : AppColors.pollBadgeBg,
+                    textColor:
+                        widget.glassMode
+                            ? AppColors.white
+                            : AppColors.pollBadgeText,
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    QuizPoolItem.badgeLabelForType(widget.questionType),
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: widget.glassMode
+                          ? AppColors.white.withValues(alpha: 0.75)
+                          : AppColors.textSecondary,
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(width: 10),
               Expanded(

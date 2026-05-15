@@ -18,6 +18,7 @@ import '../../services/empathy_poll_service.dart';
 import '../../services/caring_treat_service.dart';
 import '../../services/funnel_onboarding_service.dart';
 import '../caring/floating_treat_burst.dart';
+import '../../features/senior_qna/data/senior_stickers.dart';
 import '../../features/senior_qna/widgets/senior_sticker_widgets.dart';
 
 /// 공감투표 섹션 — 오늘의 투표 + 지난 투표 피드
@@ -59,6 +60,8 @@ class BondPollSectionState extends State<BondPollSection> {
   final Map<String, bool> _submittingClosedComment = {};
   /// pollId → 현재 답글 대상 commentId (null이면 일반 댓글 모드)
   final Map<String, String?> _replyingToCommentId = {};
+  /// pollId → 현재 입력 중인 스티커 목록
+  final Map<String, List<String>> _commentStickerIds = {};
 
   @override
   void initState() {
@@ -1277,8 +1280,19 @@ class BondPollSectionState extends State<BondPollSection> {
   }
 
   Widget _buildClosedCommentTile(String pollId, PollComment c) {
+    final myUid = FirebaseAuth.instance.currentUser?.uid;
+    final isAuthor = myUid != null && c.uid == myUid;
     final timeStr =
         '${c.createdAt.month}/${c.createdAt.day} ${c.createdAt.hour.toString().padLeft(2, '0')}:${c.createdAt.minute.toString().padLeft(2, '0')}';
+    final hasStickers = c.stickerIds.isNotEmpty;
+    final expectedFallback = hasStickers
+        ? seniorStickerFallbackBodyForIds(c.stickerIds)
+        : null;
+    final visibleText = (expectedFallback != null &&
+            c.text.trim() == expectedFallback.trim())
+        ? ''
+        : c.text;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Column(
@@ -1295,15 +1309,32 @@ class BondPollSectionState extends State<BondPollSection> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  c.text,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    height: 1.35,
-                    color: AppColors.textPrimary,
+                // 스티커 + 텍스트
+                if (hasStickers || visibleText.isNotEmpty)
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        for (final id in c.stickerIds)
+                          WidgetSpan(
+                            alignment: PlaceholderAlignment.middle,
+                            child: Padding(
+                              padding: const EdgeInsets.only(right: 2),
+                              child: SeniorStickerView(stickerId: id, size: 28),
+                            ),
+                          ),
+                        if (visibleText.isNotEmpty)
+                          TextSpan(
+                            text: hasStickers ? ' $visibleText' : visibleText,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              height: 1.35,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
                 const SizedBox(height: 4),
                 Row(
                   children: [
@@ -1327,12 +1358,10 @@ class BondPollSectionState extends State<BondPollSection> {
                           icon: liked
                               ? Icons.favorite
                               : Icons.favorite_border,
-                          iconColor:
-                              liked
-                                  ? AppColors.error
-                                  : AppColors.textSecondary,
-                          label:
-                              c.likeCount > 0 ? '${c.likeCount}' : '좋아요',
+                          iconColor: liked
+                              ? AppColors.error
+                              : AppColors.textSecondary,
+                          label: c.likeCount > 0 ? '${c.likeCount}' : '좋아요',
                           onTap: () =>
                               EmpathyPollService.togglePollCommentLike(
                                 pollId,
@@ -1345,9 +1374,7 @@ class BondPollSectionState extends State<BondPollSection> {
                     // 답글
                     _TinyPollAction(
                       icon: Icons.reply,
-                      label: c.replyCount > 0
-                          ? '답글 ${c.replyCount}'
-                          : '답글',
+                      label: c.replyCount > 0 ? '답글 ${c.replyCount}' : '답글',
                       onTap: () {
                         setState(() {
                           if (_replyingToCommentId[pollId] == c.id) {
@@ -1355,10 +1382,59 @@ class BondPollSectionState extends State<BondPollSection> {
                           } else {
                             _replyingToCommentId[pollId] = c.id;
                             _commentControllerFor(pollId).clear();
+                            _commentStickerIds[pollId]?.clear();
                           }
                         });
                       },
                     ),
+                    // 신고 / 삭제 메뉴
+                    if (isAuthor)
+                      SizedBox(
+                        width: 24,
+                        height: 20,
+                        child: PopupMenuButton<String>(
+                          color: AppColors.appBg,
+                          elevation: 4,
+                          position: PopupMenuPosition.under,
+                          offset: const Offset(0, 4),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 24,
+                            minHeight: 20,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                          ),
+                          icon: const Icon(
+                            Icons.more_horiz,
+                            size: 16,
+                            color: AppColors.textSecondary,
+                          ),
+                          onSelected: (v) {
+                            if (v == 'delete') {
+                              _confirmDeleteComment(pollId, c.id);
+                            }
+                          },
+                          itemBuilder: (_) => const [
+                            PopupMenuItem(
+                              value: 'delete',
+                              child: Text(
+                                '삭제',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.error,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      _TinyPollAction(
+                        label: '신고',
+                        onTap: () => _reportComment(context, pollId, c.id),
+                      ),
                   ],
                 ),
               ],
@@ -1374,9 +1450,7 @@ class BondPollSectionState extends State<BondPollSection> {
                 padding: const EdgeInsets.only(left: AppSpacing.xl, top: 4),
                 child: Column(
                   children: replies
-                      .map(
-                        (r) => _buildReplyTile(pollId, c.id, r),
-                      )
+                      .map((r) => _buildReplyTile(pollId, c.id, r))
                       .toList(),
                 ),
               );
@@ -1387,13 +1461,70 @@ class BondPollSectionState extends State<BondPollSection> {
     );
   }
 
+  Future<void> _confirmDeleteComment(
+    String pollId,
+    String commentId,
+  ) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => const AppConfirmModal(
+        title: '댓글 삭제',
+        message: '이 댓글을 삭제할까요?',
+        confirmLabel: '삭제',
+        destructive: true,
+      ),
+    );
+    if (confirm != true || !mounted) return;
+    final ok = await EmpathyPollService.deletePollComment(pollId, commentId);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(ok ? '댓글을 삭제했어요.' : '삭제에 실패했어요.'),
+      ),
+    );
+  }
+
+  Future<void> _reportComment(
+    BuildContext ctx,
+    String pollId,
+    String commentId,
+  ) async {
+    final confirm = await showDialog<bool>(
+      context: ctx,
+      builder: (_) => const AppConfirmModal(
+        title: '댓글 신고',
+        message: '이 댓글을 신고할까요?\n신고가 누적되면 운영팀이 검토합니다.',
+        confirmLabel: '신고',
+      ),
+    );
+    if (confirm != true) return;
+    final ok = await EmpathyPollService.reportPollComment(pollId, commentId);
+    if (!ctx.mounted) return;
+    ScaffoldMessenger.of(ctx).showSnackBar(
+      SnackBar(
+        content: Text(ok ? '신고가 접수되었어요.' : '이미 신고했거나 처리에 실패했어요.'),
+      ),
+    );
+  }
+
   Widget _buildReplyTile(
     String pollId,
     String commentId,
     PollCommentReply r,
   ) {
+    final myUid = FirebaseAuth.instance.currentUser?.uid;
+    final isAuthor = myUid != null && r.uid == myUid;
     final timeStr =
         '${r.createdAt.month}/${r.createdAt.day} ${r.createdAt.hour.toString().padLeft(2, '0')}:${r.createdAt.minute.toString().padLeft(2, '0')}';
+    final hasStickers = r.stickerIds.isNotEmpty;
+    final expectedFallback = hasStickers
+        ? seniorStickerFallbackBodyForIds(r.stickerIds)
+        : null;
+    final visibleText = (expectedFallback != null &&
+            r.text.trim() == expectedFallback.trim())
+        ? ''
+        : r.text;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Container(
@@ -1406,15 +1537,31 @@ class BondPollSectionState extends State<BondPollSection> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              r.text,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                height: 1.35,
-                color: AppColors.textPrimary,
+            if (hasStickers || visibleText.isNotEmpty)
+              Text.rich(
+                TextSpan(
+                  children: [
+                    for (final id in r.stickerIds)
+                      WidgetSpan(
+                        alignment: PlaceholderAlignment.middle,
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 2),
+                          child: SeniorStickerView(stickerId: id, size: 23),
+                        ),
+                      ),
+                    if (visibleText.isNotEmpty)
+                      TextSpan(
+                        text: hasStickers ? ' $visibleText' : visibleText,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          height: 1.35,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                  ],
+                ),
               ),
-            ),
             const SizedBox(height: 3),
             Row(
               children: [
@@ -1449,10 +1596,111 @@ class BondPollSectionState extends State<BondPollSection> {
                     );
                   },
                 ),
+                if (isAuthor)
+                  SizedBox(
+                    width: 24,
+                    height: 20,
+                    child: PopupMenuButton<String>(
+                      color: AppColors.appBg,
+                      elevation: 4,
+                      position: PopupMenuPosition.under,
+                      offset: const Offset(0, 4),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 24,
+                        minHeight: 20,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                      ),
+                      icon: const Icon(
+                        Icons.more_horiz,
+                        size: 16,
+                        color: AppColors.textSecondary,
+                      ),
+                      onSelected: (v) {
+                        if (v == 'delete') {
+                          _confirmDeleteReply(pollId, commentId, r.id);
+                        }
+                      },
+                      itemBuilder: (_) => const [
+                        PopupMenuItem(
+                          value: 'delete',
+                          child: Text(
+                            '삭제',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.error,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  _TinyPollAction(
+                    label: '신고',
+                    onTap: () => _reportReply(context, pollId, commentId, r.id),
+                  ),
               ],
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Future<void> _confirmDeleteReply(
+    String pollId,
+    String commentId,
+    String replyId,
+  ) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => const AppConfirmModal(
+        title: '답글 삭제',
+        message: '이 답글을 삭제할까요?',
+        confirmLabel: '삭제',
+        destructive: true,
+      ),
+    );
+    if (confirm != true || !mounted) return;
+    final ok = await EmpathyPollService.deletePollCommentReply(
+      pollId,
+      commentId,
+      replyId,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(ok ? '답글을 삭제했어요.' : '삭제에 실패했어요.')),
+    );
+  }
+
+  Future<void> _reportReply(
+    BuildContext ctx,
+    String pollId,
+    String commentId,
+    String replyId,
+  ) async {
+    final confirm = await showDialog<bool>(
+      context: ctx,
+      builder: (_) => const AppConfirmModal(
+        title: '답글 신고',
+        message: '이 답글을 신고할까요?\n신고가 누적되면 운영팀이 검토합니다.',
+        confirmLabel: '신고',
+      ),
+    );
+    if (confirm != true) return;
+    final ok = await EmpathyPollService.reportPollCommentReply(
+      pollId,
+      commentId,
+      replyId,
+    );
+    if (!ctx.mounted) return;
+    ScaffoldMessenger.of(ctx).showSnackBar(
+      SnackBar(
+        content: Text(ok ? '신고가 접수되었어요.' : '이미 신고했거나 처리에 실패했어요.'),
       ),
     );
   }
@@ -1462,6 +1710,7 @@ class BondPollSectionState extends State<BondPollSection> {
     final ctrl = _commentControllerFor(pollId);
     final replyingToId = _replyingToCommentId[pollId];
     final isReplyMode = replyingToId != null;
+    final stickerIds = _commentStickerIds[pollId] ?? [];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1471,11 +1720,7 @@ class BondPollSectionState extends State<BondPollSection> {
             padding: const EdgeInsets.only(bottom: 4),
             child: Row(
               children: [
-                const Icon(
-                  Icons.reply,
-                  size: 13,
-                  color: AppColors.accent,
-                ),
+                const Icon(Icons.reply, size: 13, color: AppColors.accent),
                 const SizedBox(width: 4),
                 const Text(
                   '답글 작성 중',
@@ -1497,6 +1742,17 @@ class BondPollSectionState extends State<BondPollSection> {
               ],
             ),
           ),
+        // 선택된 스티커 미리보기
+        if (stickerIds.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: SeniorStickerChipList(
+              stickerIds: stickerIds,
+              onRemoveAt: (i) => setState(() {
+                _commentStickerIds.putIfAbsent(pollId, () => []).removeAt(i);
+              }),
+            ),
+          ),
         Container(
           decoration: BoxDecoration(
             border: Border.all(
@@ -1505,60 +1761,92 @@ class BondPollSectionState extends State<BondPollSection> {
             ),
             borderRadius: BorderRadius.circular(AppRadius.md),
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          child: Column(
             children: [
-              Expanded(
-                child: TextField(
-                  controller: ctrl,
-                  onTapOutside:
-                      (_) => FocusManager.instance.primaryFocus?.unfocus(),
-                  maxLength: EmpathyPollService.maxPollCommentLength,
-                  maxLines: 2,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: isReplyMode ? '답글을 입력하세요' : '종료된 투표에 한마디 남기기',
-                    hintStyle: TextStyle(
-                      fontSize: 13,
-                      color: AppColors.textDisabled,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: ctrl,
+                      onTapOutside:
+                          (_) => FocusManager.instance.primaryFocus?.unfocus(),
+                      maxLength: EmpathyPollService.maxPollCommentLength,
+                      maxLines: 2,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                      decoration: InputDecoration(
+                        hintText:
+                            isReplyMode ? '답글을 입력하세요' : '종료된 투표에 한마디 남기기',
+                        hintStyle: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textDisabled,
+                        ),
+                        counterText: '',
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.lg,
+                          vertical: 10,
+                        ),
+                        isDense: true,
+                      ),
+                      onSubmitted: (_) => _submitClosedPollComment(pollId),
                     ),
-                    counterText: '',
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.lg,
-                      vertical: 10,
-                    ),
-                    isDense: true,
                   ),
-                  onSubmitted: (_) => _submitClosedPollComment(pollId),
+                  busy
+                      ? const Padding(
+                        padding: EdgeInsets.only(right: 12, bottom: 8),
+                        child: SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                      : IconButton(
+                        icon: Icon(
+                          Icons.edit_note_rounded,
+                          size: 22,
+                          color: AppColors.accent,
+                        ),
+                        onPressed: () => _submitClosedPollComment(pollId),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                          minWidth: 40,
+                          minHeight: 40,
+                        ),
+                      ),
+                ],
+              ),
+              // 스티커 버튼 툴바
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+                child: Row(
+                  children: [
+                    IconButton(
+                      onPressed: busy ? null : () => _pickCommentSticker(pollId),
+                      icon: Icon(
+                        stickerIds.isEmpty
+                            ? Icons.emoji_emotions_outlined
+                            : Icons.emoji_emotions,
+                        size: 18,
+                      ),
+                      color: stickerIds.isEmpty
+                          ? AppColors.textSecondary
+                          : AppColors.cardEmphasis,
+                      visualDensity: VisualDensity.compact,
+                      tooltip: '스티커',
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 32,
+                        minHeight: 32,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              busy
-                  ? const Padding(
-                    padding: EdgeInsets.only(right: 12, bottom: 8),
-                    child: SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  )
-                  : IconButton(
-                    icon: Icon(
-                      Icons.edit_note_rounded,
-                      size: 22,
-                      color: AppColors.accent,
-                    ),
-                    onPressed: () => _submitClosedPollComment(pollId),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(
-                      minWidth: 40,
-                      minHeight: 40,
-                    ),
-                  ),
             ],
           ),
         ),
@@ -1566,11 +1854,30 @@ class BondPollSectionState extends State<BondPollSection> {
     );
   }
 
+  Future<void> _pickCommentSticker(String pollId) async {
+    final list = _commentStickerIds.putIfAbsent(pollId, () => []);
+    if (list.length >= 5) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('스티커는 최대 5개까지 첨부할 수 있어요.')),
+      );
+      return;
+    }
+    final id = await showSeniorStickerPicker(
+      context,
+      selectedId: list.isEmpty ? null : list.last,
+    );
+    if (!mounted || id == null) return;
+    setState(() => list.add(id));
+  }
+
   Future<void> _submitClosedPollComment(String pollId) async {
     if (_submittingClosedComment[pollId] == true) return;
     final ctrl = _commentControllerFor(pollId);
     final text = ctrl.text.trim();
-    if (text.isEmpty) return;
+    final stickerIds = List<String>.from(
+      _commentStickerIds[pollId] ?? [],
+    );
+    if (text.isEmpty && stickerIds.isEmpty) return;
 
     setState(() => _submittingClosedComment[pollId] = true);
 
@@ -1581,15 +1888,23 @@ class BondPollSectionState extends State<BondPollSection> {
         pollId,
         replyingTo,
         text,
+        stickerIds: stickerIds,
       );
     } else {
-      result = await EmpathyPollService.addPollComment(pollId, text);
+      result = await EmpathyPollService.addPollComment(
+        pollId,
+        text,
+        stickerIds: stickerIds,
+      );
     }
 
     if (!mounted) return;
     setState(() {
       _submittingClosedComment[pollId] = false;
-      if (result.success) _replyingToCommentId[pollId] = null;
+      if (result.success) {
+        _replyingToCommentId[pollId] = null;
+        _commentStickerIds[pollId]?.clear();
+      }
     });
 
     if (result.success) {

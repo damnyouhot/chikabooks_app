@@ -8,6 +8,7 @@ class PollCommentReply {
     required this.uid,
     required this.createdAt,
     this.likeCount = 0,
+    this.stickerIds = const [],
   });
 
   final String id;
@@ -15,6 +16,7 @@ class PollCommentReply {
   final String uid;
   final DateTime createdAt;
   final int likeCount;
+  final List<String> stickerIds;
 
   factory PollCommentReply.fromDoc(
     DocumentSnapshot<Map<String, dynamic>> doc,
@@ -26,6 +28,7 @@ class PollCommentReply {
       uid: (d['uid'] as String?) ?? '',
       createdAt: (d['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       likeCount: (d['likeCount'] as int?) ?? 0,
+      stickerIds: List<String>.from(d['stickerIds'] as List? ?? []),
     );
   }
 }
