@@ -9,6 +9,7 @@ import '../core/widgets/app_primary_card.dart';
 import '../core/widgets/glass_card.dart';
 import '../models/quiz_schedule.dart';
 import '../services/caring_treat_service.dart';
+import '../services/quiz_accuracy_stats.dart';
 import '../services/quiz_pool_service.dart';
 import '../widgets/quiz/quiz_share_capture.dart';
 
@@ -33,10 +34,17 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
   int _totalWrong = 0;
   int _weekCorrect = 0;
   int _weekWrong = 0;
-  int _totalUsers = 1;
-  int _myRank = 1;
+  int _totalUsersAll = 1;
+  int _totalUsersWeek = 1;
+  /// 정답률 분포 기준 `상위 %` (낮을수록 상위권). 풀이 없으면 null.
+  double? _topPctAll;
+  double? _topPctWeek;
   bool _statsLoaded = false;
-  Map<String, int> _scoreDistribution = {};
+  Map<String, int> _accuracyDistributionAll = {};
+  Map<String, int> _accuracyDistributionWeek = {};
+  Map<String, int> _legacyScoreDistributionAll = {};
+  bool _rankAllByAccuracy = false;
+  bool _rankWeekByAccuracy = false;
 
   // ── 오늘 스케줄 & 유저 기록 ──
   QuizSchedule? _todaySchedule;
@@ -50,6 +58,98 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
 
   // ── 지난 퀴즈 펼치기 여부 ──
   bool _recentExpanded = false;
+
+  static Map<String, int> _intDistributionFromFirestore(
+    Map<String, dynamic>? raw,
+  ) {
+    if (raw == null || raw.isEmpty) return {};
+    final out = <String, int>{};
+    for (final e in raw.entries) {
+      out[e.key] = (e.value as num?)?.toInt() ?? 0;
+    }
+    return out;
+  }
+
+  /// 참가자 수의 단일 진실은 **분포 합**.
+  /// 서버에 적힌 `totalParticipants*`와 어긋나도 항상 분포 합을 우선해
+  /// `(나보다 위인 사람 수 + 1) > totalUsers` 같은 모순을 차단한다.
+  static int _participantCountForRank(
+    Map<String, int> dist,
+    int? explicitTotal,
+  ) {
+    final sum = dist.values.fold<int>(0, (a, b) => a + b);
+    if (sum > 0) return sum;
+    if (explicitTotal != null && explicitTotal > 0) return explicitTotal;
+    return 1;
+  }
+
+  static int _peopleAboveAccuracyPct(Map<String, int> dist, int myPct) {
+    var n = 0;
+    for (final e in dist.entries) {
+      final k = int.tryParse(e.key) ?? -999;
+      if (k > myPct) n += e.value;
+    }
+    return n;
+  }
+
+  static int _peopleAboveLegacyCorrectCount(
+    Map<String, int> dist,
+    int myCorrect,
+  ) {
+    var n = 0;
+    for (final e in dist.entries) {
+      final k = int.tryParse(e.key) ?? -999;
+      if (k > myCorrect) n += e.value;
+    }
+    return n;
+  }
+
+  /// 통산: 정답률(또는 레거시 맞춘 개수) 분포에서의 **순위 비율** → `상위 %`(낮을수록 상위).
+  static double? _topPctAllTime({
+    required bool hasAttempts,
+    required int totalUsers,
+    required Map<String, int> accDist,
+    required bool useAccuracyRanking,
+    required Map<String, int> legacyDist,
+    required int correct,
+    required int wrong,
+  }) {
+    if (!hasAttempts || totalUsers < 1) return null;
+    if (useAccuracyRanking && accDist.isNotEmpty) {
+      final p = QuizAccuracyStats.accuracyPercent(correct, wrong)!;
+      final r =
+          (_peopleAboveAccuracyPct(accDist, p) + 1).clamp(1, totalUsers);
+      return (r / totalUsers * 100).clamp(1.0, 100.0);
+    }
+    if (!useAccuracyRanking && legacyDist.isNotEmpty) {
+      final r =
+          (_peopleAboveLegacyCorrectCount(legacyDist, correct) + 1).clamp(
+            1,
+            totalUsers,
+          );
+      return (r / totalUsers * 100).clamp(1.0, 100.0);
+    }
+    return 100.0;
+  }
+
+  /// 이번 주: 주간 정답률 분포 기준 `상위 %`.
+  static double? _topPctThisWeek({
+    required bool hasAttempts,
+    required int totalUsers,
+    required Map<String, int> accDistWeek,
+    required bool useWeekAccuracy,
+    required int weekCorrect,
+    required int weekWrong,
+  }) {
+    if (!hasAttempts || totalUsers < 1) return null;
+    if (useWeekAccuracy && accDistWeek.isNotEmpty) {
+      final p = QuizAccuracyStats.accuracyPercent(weekCorrect, weekWrong)!;
+      final r =
+          (_peopleAboveAccuracyPct(accDistWeek, p) + 1).clamp(1, totalUsers);
+      return (r / totalUsers * 100).clamp(1.0, 100.0);
+    }
+    return (1 / totalUsers * 100).clamp(1.0, 100.0);
+  }
 
   @override
   void initState() {
@@ -69,7 +169,7 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
         return;
       }
 
-      // 유저 개인 통계 + 글로벌 집계 병렬 로드 (서버 우선 → 최신 순위 보장)
+      final weekKey = QuizPoolService.currentWeekKey;
       final results = await Future.wait([
         FirebaseFirestore.instance
             .collection('users')
@@ -81,82 +181,126 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
             .collection('quiz_global')
             .doc('stats')
             .get(const GetOptions(source: Source.server)),
+        FirebaseFirestore.instance
+            .collection('quiz_global')
+            .doc('weekly_$weekKey')
+            .get(const GetOptions(source: Source.server)),
       ]);
 
       final userDoc = results[0];
       final globalDoc = results[1];
+      final weeklyDoc = results[2];
       if (!mounted) return;
 
-      // 글로벌 집계에서 참여자 수 · 점수 분포 추출
-      int totalParticipants = 1;
-      Map<String, dynamic> distribution = {};
-      if (globalDoc.exists) {
-        final gData = globalDoc.data() ?? {};
-        totalParticipants = (gData['totalParticipants'] as num?)?.toInt() ?? 1;
-        if (totalParticipants < 1) totalParticipants = 1;
-        distribution = Map<String, dynamic>.from(
-          gData['scoreDistribution'] as Map<String, dynamic>? ?? {},
-        );
-        debugPrint(
-          '📊 [LoadStats] global exists: participants=$totalParticipants, dist=$distribution',
-        );
-      } else {
-        debugPrint('📊 [LoadStats] quiz_global/stats 문서 없음');
-      }
+      final gData = globalDoc.data() ?? {};
+      final accDistAll = _intDistributionFromFirestore(
+        gData['accuracyDistribution'] as Map<String, dynamic>?,
+      );
+      final totalParticipantsAccuracy =
+          (gData['totalParticipantsAccuracy'] as num?)?.toInt();
 
-      if (userDoc.exists) {
-        final data = userDoc.data() ?? {};
+      final legacyDist = _intDistributionFromFirestore(
+        gData['scoreDistribution'] as Map<String, dynamic>?,
+      );
+      final totalParticipantsLegacy =
+          (gData['totalParticipants'] as num?)?.toInt();
 
-        // 이번 주 월요일 dateKey (KST 기준)
-        final nowKst = DateTime.now().toUtc().add(const Duration(hours: 9));
-        final monday = nowKst.subtract(Duration(days: nowKst.weekday - 1));
-        final thisWeekKey =
-            '${monday.year}-${monday.month.toString().padLeft(2, '0')}-${monday.day.toString().padLeft(2, '0')}';
-        final storedWeekKey = data['weekKey'] as String?;
-        final isSameWeek = storedWeekKey == thisWeekKey;
+      final wData = weeklyDoc.data() ?? {};
+      final accDistWeek = _intDistributionFromFirestore(
+        wData['accuracyDistribution'] as Map<String, dynamic>?,
+      );
+      final totalParticipantsWeekly =
+          (wData['totalParticipantsWeekly'] as num?)?.toInt();
 
-        final totalCorrect = (data['totalCorrect'] as num?)?.toInt() ?? 0;
+      final rankAllByAccuracy = accDistAll.isNotEmpty;
+      final rankWeekByAccuracy = accDistWeek.isNotEmpty;
 
-        // 순위 계산: 내 totalCorrect보다 높은 사람 수 + 1
-        int peopleAboveMe = 0;
-        for (final entry in distribution.entries) {
-          final score = int.tryParse(entry.key) ?? 0;
-          if (score > totalCorrect) {
-            peopleAboveMe += (entry.value as num?)?.toInt() ?? 0;
-          }
-        }
+      final totalUsersAll = _participantCountForRank(
+        rankAllByAccuracy ? accDistAll : legacyDist,
+        rankAllByAccuracy ? totalParticipantsAccuracy : totalParticipantsLegacy,
+      );
+      final totalUsersWeek = _participantCountForRank(
+        accDistWeek,
+        totalParticipantsWeekly,
+      );
 
-        debugPrint(
-          '📊 [LoadStats] myTotalCorrect=$totalCorrect, '
-          'peopleAboveMe=$peopleAboveMe, '
-          'rank=${peopleAboveMe + 1}/$totalParticipants',
-        );
-
+      if (!userDoc.exists) {
         setState(() {
-          _totalCorrect = totalCorrect;
-          _totalWrong = (data['totalWrong'] as num?)?.toInt() ?? 0;
-          _weekCorrect =
-              isSameWeek ? ((data['weekCorrect'] as num?)?.toInt() ?? 0) : 0;
-          _weekWrong =
-              isSameWeek ? ((data['weekWrong'] as num?)?.toInt() ?? 0) : 0;
-          _myRank = peopleAboveMe + 1;
-          _totalUsers = totalParticipants;
-          _scoreDistribution = distribution.map(
-            (k, v) => MapEntry(k, (v as num).toInt()),
-          );
+          _totalCorrect = 0;
+          _totalWrong = 0;
+          _weekCorrect = 0;
+          _weekWrong = 0;
+          _topPctAll = null;
+          _topPctWeek = null;
+          _totalUsersAll = totalUsersAll;
+          _totalUsersWeek = totalUsersWeek;
+          _accuracyDistributionAll = accDistAll;
+          _accuracyDistributionWeek = accDistWeek;
+          _legacyScoreDistributionAll = legacyDist;
+          _rankAllByAccuracy = rankAllByAccuracy;
+          _rankWeekByAccuracy = rankWeekByAccuracy;
           _statsLoaded = true;
         });
-      } else {
-        // 퀴즈 미참여자: 점수 0 → 모든 참여자보다 아래
-        setState(() {
-          _myRank = totalParticipants;
-          _totalUsers = totalParticipants;
-          _statsLoaded = true;
-        });
+        return;
       }
+
+      final data = userDoc.data() ?? {};
+      final storedWeekKey = data['weekKey'] as String?;
+      final isSameWeek = storedWeekKey == weekKey;
+
+      final totalCorrect = (data['totalCorrect'] as num?)?.toInt() ?? 0;
+      final totalWrong = (data['totalWrong'] as num?)?.toInt() ?? 0;
+      final weekCorrect =
+          isSameWeek ? ((data['weekCorrect'] as num?)?.toInt() ?? 0) : 0;
+      final weekWrong =
+          isSameWeek ? ((data['weekWrong'] as num?)?.toInt() ?? 0) : 0;
+
+      final allAttempts = totalCorrect + totalWrong;
+      final weekAttempts = weekCorrect + weekWrong;
+
+      final topPctAll = _topPctAllTime(
+        hasAttempts: allAttempts > 0,
+        totalUsers: totalUsersAll,
+        accDist: accDistAll,
+        useAccuracyRanking: rankAllByAccuracy,
+        legacyDist: legacyDist,
+        correct: totalCorrect,
+        wrong: totalWrong,
+      );
+      final topPctWeek = _topPctThisWeek(
+        hasAttempts: weekAttempts > 0,
+        totalUsers: totalUsersWeek,
+        accDistWeek: accDistWeek,
+        useWeekAccuracy: rankWeekByAccuracy,
+        weekCorrect: weekCorrect,
+        weekWrong: weekWrong,
+      );
+
+      setState(() {
+        _totalCorrect = totalCorrect;
+        _totalWrong = totalWrong;
+        _weekCorrect = weekCorrect;
+        _weekWrong = weekWrong;
+        _topPctAll = topPctAll;
+        _topPctWeek = topPctWeek;
+        _totalUsersAll = totalUsersAll;
+        _totalUsersWeek = totalUsersWeek;
+        _accuracyDistributionAll = accDistAll;
+        _accuracyDistributionWeek = accDistWeek;
+        _legacyScoreDistributionAll = legacyDist;
+        _rankAllByAccuracy = rankAllByAccuracy;
+        _rankWeekByAccuracy = rankWeekByAccuracy;
+        _statsLoaded = true;
+      });
     } catch (e) {
       debugPrint('⚠️ 퀴즈 성적 로드 실패: $e');
-      if (mounted) setState(() => _statsLoaded = true);
+      if (mounted) {
+        setState(() {
+          _statsLoaded = true;
+          _topPctAll = null;
+          _topPctWeek = null;
+        });
+      }
     }
   }
 
@@ -209,7 +353,10 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
     required bool isCorrect,
     required List<String> allIds,
   }) {
-    final prevTotalCorrect = _totalCorrect;
+    final prevAllC = _totalCorrect;
+    final prevAllW = _totalWrong;
+    final prevWeekC = _weekCorrect;
+    final prevWeekW = _weekWrong;
 
     setState(() {
       if (isCorrect) {
@@ -232,27 +379,87 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
         rewardGranted: prev?.rewardGranted ?? false,
       );
 
-      // 로컬 순위 즉시 반영 (서버 왕복 대기 없이)
-      if (isCorrect && _scoreDistribution.isNotEmpty) {
-        final oldKey = prevTotalCorrect.toString();
-        final newKey = _totalCorrect.toString();
-        final oldCount = (_scoreDistribution[oldKey] ?? 0) - 1;
-        if (oldCount > 0) {
-          _scoreDistribution[oldKey] = oldCount;
-        } else {
-          _scoreDistribution.remove(oldKey);
-        }
-        _scoreDistribution[newKey] = (_scoreDistribution[newKey] ?? 0) + 1;
+      var dAllPart = 0;
+      var dWeekPart = 0;
 
-        int peopleAboveMe = 0;
-        for (final entry in _scoreDistribution.entries) {
-          final score = int.tryParse(entry.key) ?? 0;
-          if (score > _totalCorrect) {
-            peopleAboveMe += entry.value;
-          }
-        }
-        _myRank = peopleAboveMe + 1;
+      if (_rankAllByAccuracy && _accuracyDistributionAll.isNotEmpty) {
+        final map = Map<String, dynamic>.from(
+          _accuracyDistributionAll.map((k, v) => MapEntry(k, v)),
+        );
+        final oldPct = QuizAccuracyStats.accuracyPercent(prevAllC, prevAllW);
+        final newPct =
+            QuizAccuracyStats.accuracyPercent(_totalCorrect, _totalWrong)!;
+        final firstReg = prevAllC + prevAllW == 0;
+        QuizAccuracyStats.applyBucketMove(
+          dist: map,
+          oldPct: oldPct,
+          newPct: newPct,
+          firstReg: firstReg,
+          onParticipantDelta: (d) => dAllPart += d,
+        );
+        _accuracyDistributionAll = map.map(
+          (k, v) => MapEntry(k, (v as num).toInt()),
+        );
+        _totalUsersAll = (_totalUsersAll + dAllPart).clamp(1, 2000000000);
       }
+
+      if (_rankWeekByAccuracy && _accuracyDistributionWeek.isNotEmpty) {
+        final map = Map<String, dynamic>.from(
+          _accuracyDistributionWeek.map((k, v) => MapEntry(k, v)),
+        );
+        final oldWPct = QuizAccuracyStats.accuracyPercent(prevWeekC, prevWeekW);
+        final newWPct =
+            QuizAccuracyStats.accuracyPercent(_weekCorrect, _weekWrong)!;
+        final firstWeek = prevWeekC + prevWeekW == 0;
+        QuizAccuracyStats.applyBucketMove(
+          dist: map,
+          oldPct: oldWPct,
+          newPct: newWPct,
+          firstReg: firstWeek,
+          onParticipantDelta: (d) => dWeekPart += d,
+        );
+        _accuracyDistributionWeek = map.map(
+          (k, v) => MapEntry(k, (v as num).toInt()),
+        );
+        _totalUsersWeek = (_totalUsersWeek + dWeekPart).clamp(1, 2000000000);
+      }
+
+      if (isCorrect &&
+          !_rankAllByAccuracy &&
+          _legacyScoreDistributionAll.isNotEmpty) {
+        final oldKey = prevAllC.toString();
+        final newKey = _totalCorrect.toString();
+        final dist = Map<String, int>.from(_legacyScoreDistributionAll);
+        final oldCount = (dist[oldKey] ?? 0) - 1;
+        if (oldCount > 0) {
+          dist[oldKey] = oldCount;
+        } else {
+          dist.remove(oldKey);
+        }
+        dist[newKey] = (dist[newKey] ?? 0) + 1;
+        _legacyScoreDistributionAll = dist;
+      }
+
+      final allAttempts = _totalCorrect + _totalWrong;
+      final weekAttempts = _weekCorrect + _weekWrong;
+
+      _topPctAll = _topPctAllTime(
+        hasAttempts: allAttempts > 0,
+        totalUsers: _totalUsersAll,
+        accDist: _accuracyDistributionAll,
+        useAccuracyRanking: _rankAllByAccuracy,
+        legacyDist: _legacyScoreDistributionAll,
+        correct: _totalCorrect,
+        wrong: _totalWrong,
+      );
+      _topPctWeek = _topPctThisWeek(
+        hasAttempts: weekAttempts > 0,
+        totalUsers: _totalUsersWeek,
+        accDistWeek: _accuracyDistributionWeek,
+        useWeekAccuracy: _rankWeekByAccuracy,
+        weekCorrect: _weekCorrect,
+        weekWrong: _weekWrong,
+      );
     });
 
     // Firestore 저장 → 서버 동기화 (백업) + 먹이 지급
@@ -347,8 +554,8 @@ class _QuizTodayPageState extends State<QuizTodayPage> {
         totalWrong: _totalWrong,
         weekCorrect: _weekCorrect,
         weekWrong: _weekWrong,
-        myRank: _myRank,
-        totalUsers: _totalUsers,
+        topPctAll: _topPctAll,
+        topPctWeek: _topPctWeek,
         isLoaded: _statsLoaded,
         glassMode: kQuizGlassMode,
       ),
@@ -461,8 +668,8 @@ class _QuizStatsCard extends StatelessWidget {
   final int totalWrong;
   final int weekCorrect;
   final int weekWrong;
-  final int myRank;
-  final int totalUsers;
+  final double? topPctAll;
+  final double? topPctWeek;
   final bool isLoaded;
   final bool glassMode;
 
@@ -471,20 +678,18 @@ class _QuizStatsCard extends StatelessWidget {
     required this.totalWrong,
     required this.weekCorrect,
     required this.weekWrong,
-    required this.myRank,
-    required this.totalUsers,
+    required this.topPctAll,
+    required this.topPctWeek,
     required this.isLoaded,
     this.glassMode = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final totalTotal = totalCorrect + totalWrong;
+    final allTotal = totalCorrect + totalWrong;
     final weekTotal = weekCorrect + weekWrong;
-    final totalRate = totalTotal > 0 ? (totalCorrect / totalTotal * 100) : 0.0;
+    final totalRate = allTotal > 0 ? (totalCorrect / allTotal * 100) : 0.0;
     final weekRate = weekTotal > 0 ? (weekCorrect / weekTotal * 100) : 0.0;
-    final topPercent =
-        totalUsers > 0 ? (myRank / totalUsers * 100).clamp(1.0, 100.0) : 100.0;
 
     final dividerColor =
         glassMode
@@ -504,55 +709,27 @@ class _QuizStatsCard extends StatelessWidget {
             )
             : IntrinsicHeight(
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(
                     child: _statColumn(
-                      '이번 주',
-                      weekCorrect,
-                      weekWrong,
-                      weekRate,
+                      label: '이번 주',
+                      correct: weekCorrect,
+                      wrong: weekWrong,
+                      rate: weekRate,
+                      topPct: topPctWeek,
+                      glassMode: glassMode,
                     ),
                   ),
                   VerticalDivider(width: 1, thickness: 1, color: dividerColor),
                   Expanded(
                     child: _statColumn(
-                      '통산',
-                      totalCorrect,
-                      totalWrong,
-                      totalRate,
-                    ),
-                  ),
-                  VerticalDivider(width: 1, thickness: 1, color: dividerColor),
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          '순위',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color:
-                                glassMode
-                                    ? AppColors.white.withValues(alpha: 0.6)
-                                    : AppColors.onCardPrimary.withValues(
-                                      alpha: 0.7,
-                                    ),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          '상위 ${topPercent.toStringAsFixed(1)}%',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color:
-                                glassMode
-                                    ? AppColors.white
-                                    : AppColors.creamWhite,
-                          ),
-                        ),
-                      ],
+                      label: '통산',
+                      correct: totalCorrect,
+                      wrong: totalWrong,
+                      rate: totalRate,
+                      topPct: topPctAll,
+                      glassMode: glassMode,
                     ),
                   ),
                 ],
@@ -572,7 +749,14 @@ class _QuizStatsCard extends StatelessWidget {
     );
   }
 
-  Widget _statColumn(String label, int correct, int wrong, double rate) {
+  Widget _statColumn({
+    required String label,
+    required int correct,
+    required int wrong,
+    required double rate,
+    required double? topPct,
+    required bool glassMode,
+  }) {
     final labelColor =
         glassMode
             ? AppColors.white.withValues(alpha: 0.6)
@@ -582,8 +766,14 @@ class _QuizStatsCard extends StatelessWidget {
         glassMode
             ? AppColors.white.withValues(alpha: 0.4)
             : AppColors.onCardPrimary.withValues(alpha: 0.55);
+    final topLineColor =
+        glassMode
+            ? AppColors.white.withValues(alpha: 0.88)
+            : AppColors.creamWhite;
 
     return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Text(
           label,
@@ -609,6 +799,17 @@ class _QuizStatsCard extends StatelessWidget {
             fontSize: 10,
             fontWeight: FontWeight.w500,
             color: subColor,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          topPct == null ? '—' : '상위 ${topPct.toStringAsFixed(1)}%',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: topLineColor,
+            height: 1.25,
           ),
         ),
       ],

@@ -160,30 +160,46 @@ async function main() {
   );
 
   console.log("\n[2/3] quiz_global/stats 기록 중...");
-  await db
-    .collection("quiz_global")
-    .doc("stats")
-    .set(
-      {
-        totalParticipantsAccuracy,
-        accuracyDistribution,
-        lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      },
-      { merge: true }
-    );
+  // ⚠️ set({merge:true}) 로 nested map 을 쓰면 기존 key 가 그대로 남아 좀비 버킷이
+  // 누적된다. 분포 맵은 update() 로 통째 교체하고, 레거시 필드는 명시적으로 제거한다.
+  const statsRef = db.collection("quiz_global").doc("stats");
+  const statsSnap = await statsRef.get();
+  const statsPayload = {
+    totalParticipantsAccuracy,
+    accuracyDistribution,
+    // 레거시 분포·참가자 수가 남아 있으면 미사용/혼동 방지 차원에서 정리
+    scoreDistribution: admin.firestore.FieldValue.delete(),
+    totalParticipants: admin.firestore.FieldValue.delete(),
+    lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+  if (statsSnap.exists) {
+    await statsRef.update(statsPayload);
+  } else {
+    await statsRef.set({
+      totalParticipantsAccuracy,
+      accuracyDistribution,
+      lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  }
   console.log(`  ✅ totalParticipantsAccuracy = ${totalParticipantsAccuracy}`);
 
   console.log("\n[3/3] quiz_global/weekly_* 기록 중...");
-  await db
-    .collection("quiz_global")
-    .doc(`weekly_${weekKey}`)
-    .set({
-      weekKey,
-      totalParticipantsWeekly,
-      accuracyDistribution: weeklyDistribution,
-      lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-  console.log(`  ✅ weekly_${weekKey} totalParticipantsWeekly = ${totalParticipantsWeekly}`);
+  const weeklyRef = db.collection("quiz_global").doc(`weekly_${weekKey}`);
+  const weeklySnap = await weeklyRef.get();
+  const weeklyPayload = {
+    weekKey,
+    totalParticipantsWeekly,
+    accuracyDistribution: weeklyDistribution,
+    lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+  if (weeklySnap.exists) {
+    await weeklyRef.update(weeklyPayload);
+  } else {
+    await weeklyRef.set(weeklyPayload);
+  }
+  console.log(
+    `  ✅ weekly_${weekKey} totalParticipantsWeekly = ${totalParticipantsWeekly}`
+  );
 
   console.log("\n========================================");
   console.log(" ✅ 재계산 완료");

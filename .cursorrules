@@ -42,3 +42,15 @@ Your goal is to write clean, maintainable, and production-ready code.
 - **Web job publisher surfaces** (`/post-job/input`, draft editor, login card): prefer `AppPublisher` + `AppColors` together so CTAs and panels stay aligned.
 - Figma or external design files are not in-repo; when implementing UI, match existing token usage in nearby screens or ask for a link/frame name if specs are unclear.
 - **Build verification (required)**: If a single task updates **both** design token sources — `lib/core/theme/app_colors.dart` **and** `lib/core/theme/app_tokens.dart` — you **must** run `flutter build web --release` after applying those changes and confirm it succeeds before considering the work done. Same requirement when a UI change intentionally depends on edits in both files in one pass.
+
+# Web hosting build & deploy (MANDATORY — applies to every agent/chat)
+- The marker file `.chika_web_login.env` exists at the project root **on Douglas's machine**. While that file is present, the deployed bundle on `chikabooks3rd.web.app` is required to ship with the temporary auto-login dart-defines (search keyword: `CHIKA_WEB_AUTO_LOGIN`).
+- **Never** run `flutter build web` (release or debug) followed by `firebase deploy --only hosting` directly. Doing so produces a bundle without the dart-defines and breaks auto-login (clicking any nav menu kicks the user back to `/login`).
+- The **only** sanctioned way to build and deploy web hosting while `.chika_web_login.env` exists is:
+  ```
+  ./tools/build_web_hosting_with_auto_login.sh           # build only
+  ./tools/build_web_hosting_with_auto_login.sh --deploy  # build + firebase deploy --only hosting
+  ```
+  This wrapper injects the required `--dart-define` values from `.chika_web_login.env`.
+- A predeploy guard at `tools/verify_web_auto_login_bundle.sh` is wired into `firebase.json` (`hosting.predeploy`). It will hard-fail the deploy if `build/web/main.dart.js` is missing the auto-login defines, so do not try to bypass it (do not edit `firebase.json` to remove the guard, do not use `--force`, do not delete `.chika_web_login.env` to silence it). If you ever need to disable the auto-login intentionally, ask Douglas first.
+- If you genuinely need to ship a hosting build without auto-login (e.g. final rollback), Douglas must explicitly request it. The full rollback procedure is: remove the `[CHIKA_WEB_AUTO_LOGIN: BEGIN/END]` blocks across the repo (search for that exact tag) **and** delete `.chika_web_login.env`. Only then is a plain `flutter build web --release && firebase deploy --only hosting` allowed.

@@ -1,18 +1,22 @@
 import '../models/job.dart';
 import '../models/transportation_info.dart';
 
-/// `assets/clinic picture sample/` 샘플 이미지 (파일명 정렬). L1/L2 목업 글당 1장.
+/// `assets/clinic_pictures/` 샘플 이미지 (파일명 정렬). L1/L2 목업 글당 1장.
+///
+/// 주의: 폴더명에 공백이 들어가면 일부 브라우저/CDN 환경에서 percent-encoding
+/// 처리가 일관되지 않아 자산 fetch 가 404 로 떨어질 수 있다. 안전하게 ASCII
+/// snake_case 로 유지한다.
 const kClinicPictureSampleAssets = <String>[
-  'assets/clinic picture sample/Gemini_Generated_Image_20w5tk20w5tk20w5.png',
-  'assets/clinic picture sample/Gemini_Generated_Image_3153lj3153lj3153.png',
-  'assets/clinic picture sample/Gemini_Generated_Image_3xnqzv3xnqzv3xnq.png',
-  'assets/clinic picture sample/Gemini_Generated_Image_5j05xf5j05xf5j05.png',
-  'assets/clinic picture sample/Gemini_Generated_Image_7xgf4b7xgf4b7xgf.png',
-  'assets/clinic picture sample/Gemini_Generated_Image_9vzan69vzan69vza.png',
-  'assets/clinic picture sample/Gemini_Generated_Image_nnr4tmnnr4tmnnr4.png',
-  'assets/clinic picture sample/Gemini_Generated_Image_qftaltqftaltqfta.png',
-  'assets/clinic picture sample/Gemini_Generated_Image_tzngjvtzngjvtzng.png',
-  'assets/clinic picture sample/Gemini_Generated_Image_z7qwtwz7qwtwz7qw.png',
+  'assets/clinic_pictures/Gemini_Generated_Image_20w5tk20w5tk20w5.png',
+  'assets/clinic_pictures/Gemini_Generated_Image_3153lj3153lj3153.png',
+  'assets/clinic_pictures/Gemini_Generated_Image_3xnqzv3xnqzv3xnq.png',
+  'assets/clinic_pictures/Gemini_Generated_Image_5j05xf5j05xf5j05.png',
+  'assets/clinic_pictures/Gemini_Generated_Image_7xgf4b7xgf4b7xgf.png',
+  'assets/clinic_pictures/Gemini_Generated_Image_9vzan69vzan69vza.png',
+  'assets/clinic_pictures/Gemini_Generated_Image_nnr4tmnnr4tmnnr4.png',
+  'assets/clinic_pictures/Gemini_Generated_Image_qftaltqftaltqfta.png',
+  'assets/clinic_pictures/Gemini_Generated_Image_tzngjvtzngjvtzng.png',
+  'assets/clinic_pictures/Gemini_Generated_Image_z7qwtwz7qwtwz7qw.png',
 ];
 
 /// 레벨1/2/3 공고 Mock 데이터

@@ -57,6 +57,86 @@ int _computeStageIndex({
   return idx;
 }
 
+/// 외부 컴팩트 위젯에서 사용할 수 있는 현재 단계 요약 정보.
+/// `_kStageRules` / `_computeStageIndex` 가 private 이므로 헬퍼로 노출한다.
+class CareerStageSummary {
+  final int index;
+  final int totalStages;
+  final String currentName;
+  final String? nextName;
+  final bool isMax;
+  final double progress;
+  final bool monthsDone;
+  final bool clinicsDone;
+  final bool monthsRequired;
+  final bool clinicsRequired;
+  final int? nextMinMonths;
+  final int? nextMinClinics;
+  final int totalCareerMonths;
+  final int totalClinics;
+
+  const CareerStageSummary({
+    required this.index,
+    required this.totalStages,
+    required this.currentName,
+    required this.nextName,
+    required this.isMax,
+    required this.progress,
+    required this.monthsDone,
+    required this.clinicsDone,
+    required this.monthsRequired,
+    required this.clinicsRequired,
+    required this.nextMinMonths,
+    required this.nextMinClinics,
+    required this.totalCareerMonths,
+    required this.totalClinics,
+  });
+}
+
+CareerStageSummary computeCareerStageSummary({
+  required int totalCareerMonths,
+  required int totalClinics,
+}) {
+  final idx = _computeStageIndex(
+    totalMonths: totalCareerMonths,
+    totalClinics: totalClinics,
+  );
+  final cur = _kStageRules[idx];
+  final isMax = idx == _kStageRules.length - 1;
+  final next = isMax ? null : _kStageRules[idx + 1];
+
+  bool monthsRequired = false;
+  bool clinicsRequired = false;
+  double progress = 1.0;
+
+  if (!isMax) {
+    monthsRequired = next!.minMonths > cur.minMonths;
+    clinicsRequired = next.minClinics > cur.minClinics;
+    int done = 0;
+    if (totalCareerMonths >= next.minMonths) done++;
+    if (totalClinics >= next.minClinics) done++;
+    final total = [monthsRequired, clinicsRequired].where((v) => v).length;
+    progress = total == 0 ? 1.0 : done / total;
+  }
+
+  return CareerStageSummary(
+    index: idx,
+    totalStages: _kStageRules.length,
+    currentName: cur.name,
+    nextName: next?.name,
+    isMax: isMax,
+    progress: progress,
+    monthsDone: next == null ? true : totalCareerMonths >= next.minMonths,
+    clinicsDone: next == null ? true : totalClinics >= next.minClinics,
+    monthsRequired: monthsRequired,
+    clinicsRequired: clinicsRequired,
+    nextMinMonths: next?.minMonths,
+    nextMinClinics: next?.minClinics,
+    totalCareerMonths: totalCareerMonths,
+    totalClinics: totalClinics,
+  );
+}
+
 // ── 커리어 단계 카드 ───────────────────────────────────────────
 /// Gray(AppMutedCard) 배경 위에서 렌더되는 위젯.
 /// 이전에 사용하던 CareerCard(Blue) 래퍼는 제거되었으며,
@@ -310,6 +390,158 @@ class _ChecklistItem extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// CareerStageMiniStrip — 파란(Primary) 카드 배경에 얹는 컴팩트 단계 스트립
+//
+// 기존 [CareerStageCard] 전체 정보를 보존하면서 면적을 1/3 수준으로
+// 압축한 변형. 상단 커리어 카드 안에 삽입해 "한눈에 보기" 용도로 사용.
+// ══════════════════════════════════════════════════════════════
+class CareerStageMiniStrip extends StatelessWidget {
+  final int totalCareerMonths;
+  final int totalClinics;
+
+  /// 행 전체를 탭하면 안내 시트가 열리도록 할지 (헤더 배지로도 동일 기능 제공).
+  final bool tapToOpenGuide;
+
+  const CareerStageMiniStrip({
+    super.key,
+    required this.totalCareerMonths,
+    required this.totalClinics,
+    this.tapToOpenGuide = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final s = computeCareerStageSummary(
+      totalCareerMonths: totalCareerMonths,
+      totalClinics: totalClinics,
+    );
+
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 얇은 진행바
+        ClipRRect(
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+          child: LinearProgressIndicator(
+            value: s.progress,
+            minHeight: 4,
+            backgroundColor: AppColors.onCardPrimary.withOpacity(0.18),
+            valueColor: const AlwaysStoppedAnimation<Color>(
+              AppColors.onCardPrimary,
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        // 다음 목표 라벨 + 미니 칩들
+        if (s.isMax)
+          Text(
+            '최고 단계에 도달했어요',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: AppColors.onCardPrimary.withOpacity(0.85),
+            ),
+          )
+        else if (s.index == 0 && totalCareerMonths == 0 && totalClinics == 0)
+          Text(
+            '커리어를 채우면 단계가 자동으로 올라가요',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppColors.onCardPrimary.withOpacity(0.7),
+            ),
+          )
+        else ...[
+          Text(
+            '다음 단계(${s.nextName})까지',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: AppColors.onCardPrimary.withOpacity(0.7),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              if (s.monthsRequired)
+                _MiniRequirementChip(
+                  done: s.monthsDone,
+                  doneLabel: '경력 ${formatCareerMonths(s.nextMinMonths!)}',
+                  pendingLabel:
+                      '경력 ${formatCareerMonths(s.totalCareerMonths)} '
+                      '/ ${formatCareerMonths(s.nextMinMonths!)}',
+                ),
+              if (s.clinicsRequired)
+                _MiniRequirementChip(
+                  done: s.clinicsDone,
+                  doneLabel: '치과 ${s.nextMinClinics}곳',
+                  pendingLabel:
+                      '치과 ${s.totalClinics} / ${s.nextMinClinics}곳',
+                ),
+            ],
+          ),
+        ],
+      ],
+    );
+
+    if (!tapToOpenGuide) return content;
+
+    return InkWell(
+      onTap: () => showCareerStageGuideSheet(context),
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: content,
+      ),
+    );
+  }
+}
+
+/// 미니 스트립용 요구사항 칩. 파란 카드 배경 위에서 onCardPrimary 톤만 사용.
+class _MiniRequirementChip extends StatelessWidget {
+  final bool done;
+  final String doneLabel;
+  final String pendingLabel;
+  const _MiniRequirementChip({
+    required this.done,
+    required this.doneLabel,
+    required this.pendingLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.onCardPrimary.withOpacity(done ? 0.22 : 0.1),
+        borderRadius: BorderRadius.circular(AppRadius.full),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            done ? Icons.check_circle : Icons.radio_button_unchecked,
+            size: 12,
+            color: AppColors.onCardPrimary.withOpacity(done ? 1 : 0.6),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            done ? doneLabel : pendingLabel,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: AppColors.onCardPrimary.withOpacity(done ? 1 : 0.85),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -11,6 +11,7 @@ import '../../../../services/admin_activity_service.dart';
 import '../../../../services/job_service.dart';
 import '../../../../services/job_stats_service.dart';
 import '../widgets/applicant_web_shell.dart';
+import '../widgets/job_image.dart';
 
 /// 웹 일반계정용 공고 상세 페이지.
 ///
@@ -183,19 +184,7 @@ class _JobMainContent extends StatelessWidget {
           if (image != null)
             AspectRatio(
               aspectRatio: 21 / 9,
-              child: Image.network(
-                image,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
-                  color: AppColors.surfaceMuted,
-                  alignment: Alignment.center,
-                  child: const Icon(
-                    Icons.business_rounded,
-                    size: 56,
-                    color: AppColors.textDisabled,
-                  ),
-                ),
-              ),
+              child: JobThumbImage(src: image, iconSize: 56),
             ),
 
           Padding(
@@ -584,32 +573,7 @@ class _ApplyCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          OutlinedButton.icon(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('찜 기능은 곧 제공될 예정이에요.'),
-                  duration: Duration(seconds: 2),
-                ),
-              );
-            },
-            icon: const Icon(Icons.bookmark_border_rounded, size: 18),
-            label: Text(
-              '찜하기',
-              style: GoogleFonts.notoSansKr(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.textSecondary,
-              side: const BorderSide(color: AppColors.divider),
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppRadius.md),
-              ),
-            ),
-          ),
+          _BookmarkToggleButton(jobId: job.id),
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.all(12),
@@ -660,6 +624,75 @@ class _ApplyCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// 공고 상세 우측 카드의 "찜하기" 토글 버튼.
+///
+/// 비로그인 상태에서 누르면 로그인 페이지로 유도하고, 로그인 상태에서는
+/// `users/{uid}.bookmarkedJobs` 배열에 jobId 를 add/remove 한다.
+/// `JobService.watchBookmarkedJobIds()` 스트림을 구독하여 실시간으로 ON/OFF 상태가 갱신된다.
+class _BookmarkToggleButton extends StatelessWidget {
+  const _BookmarkToggleButton({required this.jobId});
+  final String jobId;
+
+  @override
+  Widget build(BuildContext context) {
+    final svc = JobService();
+    return StreamBuilder<List<String>>(
+      stream: svc.watchBookmarkedJobIds(),
+      builder: (context, snap) {
+        final ids = snap.data ?? const <String>[];
+        final saved = ids.contains(jobId);
+        final color = saved ? AppColors.accent : AppColors.textSecondary;
+        return OutlinedButton.icon(
+          onPressed: () async {
+            try {
+              if (saved) {
+                await svc.unbookmarkJob(jobId);
+              } else {
+                await svc.bookmarkJob(jobId);
+              }
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(saved ? '찜을 해제했어요.' : '찜한 공고에 저장했어요.'),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            } catch (e) {
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('처리 중 오류가 발생했어요. ($e)')),
+              );
+            }
+          },
+          icon: Icon(
+            saved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+            size: 18,
+          ),
+          label: Text(
+            saved ? '찜 해제' : '찜하기',
+            style: GoogleFonts.notoSansKr(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: color,
+            side: BorderSide(
+              color: saved
+                  ? AppColors.accent.withValues(alpha: 0.4)
+                  : AppColors.divider,
+            ),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadius.md),
+            ),
+          ),
+        );
+      },
     );
   }
 }

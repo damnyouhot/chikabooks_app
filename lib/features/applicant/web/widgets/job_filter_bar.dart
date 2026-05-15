@@ -122,6 +122,13 @@ class _JobFilterBarState extends State<JobFilterBar> {
           const SizedBox(height: 12),
 
           // ── 칩 + 드롭다운 행 ──
+          //
+          // 주의: [Wrap] 안에는 [Spacer] / [Expanded] / [Flexible] 을 절대
+          // 넣지 않는다. [Spacer] 는 부모가 [Flex](Row/Column)일 때만 동작하며,
+          // [Wrap] 안에 두면 release 빌드에서 layout 재귀 → `StackOverflowError`
+          // 가 발생해 `JobFilterBar` 위젯 자체가 회색 [ErrorWidget] 으로
+          // 그려진다(2026-05 회귀 사례). 정렬 칩의 우측 정렬이 필요하면
+          // [Wrap] 을 [Row] 로 바꾸거나 별도 영역으로 분리할 것.
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -148,7 +155,6 @@ class _JobFilterBarState extends State<JobFilterBar> {
                 onChanged: (v) =>
                     filter.setCareerFilter(v ?? '전체'),
               ),
-              const Spacer(),
               _Dropdown(
                 label: '정렬',
                 value: filter.sortBy,

@@ -307,6 +307,21 @@ class QuizPoolService {
           onParticipantDelta: (d) => totalParticipantsAccuracy += d,
         );
 
+        // SSOT: totalParticipantsAccuracy ≡ sum(accuracyDistribution).
+        // 어떤 경로(팬텀·legacy 마이그레이션 등)로 두 값이 어긋나도
+        // 트랜잭션 종료 직전 분포 합으로 덮어써 분포·참가자 수를 단일 진실로 묶는다.
+        final accDistSum = accDist.values.fold<int>(
+          0,
+          (a, v) => a + ((v as num?)?.toInt() ?? 0),
+        );
+        if (accDistSum != totalParticipantsAccuracy) {
+          debugPrint(
+            '🛠️ [Global accuracy] participant drift fix: '
+            '$totalParticipantsAccuracy → $accDistSum',
+          );
+          totalParticipantsAccuracy = accDistSum;
+        }
+
         final weeklyData = weeklySnap.data() ?? <String, dynamic>{};
         final wDist = Map<String, dynamic>.from(
           weeklyData['accuracyDistribution'] as Map<String, dynamic>? ?? {},
@@ -340,23 +355,50 @@ class QuizPoolService {
           onParticipantDelta: (d) => totalParticipantsWeekly += d,
         );
 
+        // SSOT: totalParticipantsWeekly ≡ sum(accuracyDistribution).
+        final wDistSum = wDist.values.fold<int>(
+          0,
+          (a, v) => a + ((v as num?)?.toInt() ?? 0),
+        );
+        if (wDistSum != totalParticipantsWeekly) {
+          debugPrint(
+            '🛠️ [Weekly accuracy] participant drift fix: '
+            '$totalParticipantsWeekly → $wDistSum',
+          );
+          totalParticipantsWeekly = wDistSum;
+        }
+
         debugPrint(
           '📊 [Global accuracy] all=$accDist p=$totalParticipantsAccuracy '
           'weekly=$wDist wp=$totalParticipantsWeekly',
         );
 
-        tx.set(globalRef, {
+        // ⚠️ 분포 맵은 반드시 **통째로 교체** (set merge:true 는 nested map 키를
+        // 병합해서 `dist.remove`로 사라진 키가 좀비처럼 남는다 → 좀비 버킷 누적이
+        // "참가자 수 vs 분포 합" 모순의 근본 원인이었음).
+        // doc 존재 여부에 따라 update/set 를 갈라 쓴다.
+        final globalPayload = <String, dynamic>{
           'totalParticipantsAccuracy': totalParticipantsAccuracy,
           'accuracyDistribution': accDist,
           'lastUpdatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
+        };
+        if (globalSnap.exists) {
+          tx.update(globalRef, globalPayload);
+        } else {
+          tx.set(globalRef, globalPayload);
+        }
 
-        tx.set(weeklyRef, {
+        final weeklyPayload = <String, dynamic>{
           'weekKey': weekKey,
           'totalParticipantsWeekly': totalParticipantsWeekly,
           'accuracyDistribution': wDist,
           'lastUpdatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
+        };
+        if (weeklySnap.exists) {
+          tx.update(weeklyRef, weeklyPayload);
+        } else {
+          tx.set(weeklyRef, weeklyPayload);
+        }
         return true;
       });
       return QuizAnswerSaveResult(

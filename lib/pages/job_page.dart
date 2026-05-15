@@ -13,7 +13,7 @@ import 'career/career_tab.dart';
 import 'career/career_skill_section.dart';
 import 'settings/settings_page.dart';
 
-/// [careerSkillAutoHintToken]이 증가할 때마다(동일 세션 1회 등) 커리어 카드 탭으로 전환 후 스킬 편집 시트를 연다.
+/// [careerSkillAutoHintToken]이 증가할 때마다(동일 세션 1회 등) 커리어 관리 소탭으로 전환 후 스킬 편집 시트를 연다.
 class _CareerSkillAutoHintScope extends StatefulWidget {
   final int token;
   final Widget child;
@@ -65,9 +65,9 @@ class _CareerSkillAutoHintScopeState extends State<_CareerSkillAutoHintScope> {
 /// 커리어(도전하기) 탭 - 탭4
 ///
 /// - 소탭 0: 채용 · 지원 (JobListingsScreen ↔ JobMapScreen)
-/// - 소탭 1: 커리어 카드 (CareerTab)
+/// - 소탭 1: 커리어 관리 (CareerTab)
 ///
-/// [isOnboardingActive] 온보딩 진행 중이면 커리어 카드(소탭1)로 바로 열림
+/// [isOnboardingActive] 온보딩 진행 중이면 커리어 관리(소탭1)로 바로 열림
 ///
 /// [careerSkillAutoHintToken]은 홈에서 커리어 탭 3회 진입 시 1회 증가 → 스킬 시트 자동 오픈
 class JobPage extends StatefulWidget {
@@ -214,7 +214,7 @@ class _JobPageState extends State<JobPage> {
       body: SafeArea(
         child: DefaultTabController(
           length: 2,
-          // 탭4(커리어) 진입 시: 온보딩 중이면 소탭1(커리어카드)로 바로 시작
+          // 탭4(커리어) 진입 시: 온보딩 중이면 소탭1(커리어 관리)로 바로 시작
           initialIndex: widget.isOnboardingActive ? 1 : 0,
           child: _CareerSkillAutoHintScope(
             token: widget.careerSkillAutoHintToken,
@@ -223,7 +223,7 @@ class _JobPageState extends State<JobPage> {
               children: [
                 // ── 상단 인포/설정 (두 소탭 모두 항상 표시) ──
                 const _JobPageTitleBar(),
-                // ── 공통 소탭바 (채용 · 지원 / 커리어 카드) ──
+                // ── 공통 소탭바 (채용 · 지원 / 커리어 관리) ──
                 const CareerTabHeader(),
                 // 소탭 본문
                 Expanded(
@@ -357,7 +357,7 @@ class _JobPageTitleBar extends StatelessWidget {
                         ),
                         SizedBox(height: 16),
                         Text(
-                          '📄 커리어 카드',
+                          '📄 커리어 관리',
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,

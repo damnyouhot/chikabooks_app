@@ -584,18 +584,32 @@ class _Bubble extends StatelessWidget {
               ],
             ],
           ),
-          if (hasStickers) ...[
+          if (hasStickers || visibleBody.isNotEmpty) ...[
             const SizedBox(height: 2),
-            SeniorStickerStrip(stickerIds: stickerIds, size: compact ? 23 : 28),
-          ],
-          if (visibleBody.isNotEmpty) ...[
-            SizedBox(height: hasStickers ? 1 : 2),
-            Text(
-              visibleBody,
-              style: TextStyle(
-                fontSize: compact ? 12 : 13,
-                height: 1.45,
-                color: AppColors.textPrimary,
+            Text.rich(
+              TextSpan(
+                children: [
+                  for (final id in stickerIds)
+                    WidgetSpan(
+                      alignment: PlaceholderAlignment.middle,
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 2),
+                        child: SeniorStickerView(
+                          stickerId: id,
+                          size: compact ? 23 : 28,
+                        ),
+                      ),
+                    ),
+                  if (visibleBody.isNotEmpty)
+                    TextSpan(
+                      text: hasStickers ? ' $visibleBody' : visibleBody,
+                      style: TextStyle(
+                        fontSize: compact ? 12 : 13,
+                        height: 1.45,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                ],
               ),
             ),
           ],

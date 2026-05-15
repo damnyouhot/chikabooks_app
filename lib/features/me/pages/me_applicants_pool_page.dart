@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_tokens.dart' show AppRadius, AppSpacing;
 import '../../../core/widgets/app_confirm_modal.dart';
 import '../../../models/applicant_pool_entry.dart';
 import '../../../services/applicant_pool_service.dart';
+import '../../../services/message_service.dart';
 import '../../jobs/web/web_typography.dart';
 import '../providers/me_providers.dart';
 import '../widgets/me_page_shell.dart';
@@ -127,6 +129,7 @@ class _MeApplicantsPoolPageState extends ConsumerState<MeApplicantsPoolPage> {
                       onToggleFavorite: () => _toggleFavorite(a),
                       onEditMeta: () => _openEditMeta(a),
                       onViewResume: () => _openResume(a),
+                      onSendMessage: () => _openMessage(a),
                       onRemoveFromPool: a.isInPool
                           ? () => _confirmRemove(a)
                           : null,
@@ -226,6 +229,23 @@ class _MeApplicantsPoolPageState extends ConsumerState<MeApplicantsPoolPage> {
         resumeId: resumeId,
       ),
     );
+  }
+
+  Future<void> _openMessage(JoinedApplicant a) async {
+    try {
+      // 가장 최근 지원의 jobId 를 시작 컨텍스트로 같이 저장.
+      final jobId = a.applications.isNotEmpty
+          ? a.applications.first.jobId
+          : null;
+      final tid = await MessageService.ensureThread(
+        otherUid: a.applicantUid,
+        jobId: jobId,
+      );
+      if (!mounted) return;
+      context.push('/me/messages?tid=$tid');
+    } catch (e) {
+      _snack('메시지 시작 실패: $e');
+    }
   }
 
   Future<void> _confirmRemove(JoinedApplicant a) async {
@@ -641,6 +661,7 @@ class _ApplicantCard extends StatelessWidget {
     required this.onToggleFavorite,
     required this.onEditMeta,
     required this.onViewResume,
+    required this.onSendMessage,
     required this.onRemoveFromPool,
     this.branchLabel,
   });
@@ -651,6 +672,7 @@ class _ApplicantCard extends StatelessWidget {
   final VoidCallback onToggleFavorite;
   final VoidCallback onEditMeta;
   final VoidCallback onViewResume;
+  final VoidCallback onSendMessage;
   final VoidCallback? onRemoveFromPool;
 
   /// 합산 모드에서만 전달되는 지점 표시 라벨 (단일 지점 모드에서는 null).
@@ -735,11 +757,14 @@ class _ApplicantCard extends StatelessWidget {
                 onSelected: (v) {
                   if (v == 'edit') onEditMeta();
                   if (v == 'resume') onViewResume();
+                  if (v == 'message') onSendMessage();
                   if (v == 'remove') onRemoveFromPool?.call();
                 },
                 itemBuilder: (_) => [
                   const PopupMenuItem(value: 'edit', child: Text('메모/태그/상태')),
                   const PopupMenuItem(value: 'resume', child: Text('이력서 보기')),
+                  const PopupMenuItem(
+                      value: 'message', child: Text('메시지 보내기')),
                   if (onRemoveFromPool != null)
                     const PopupMenuItem(
                         value: 'remove', child: Text('풀에서 제거')),

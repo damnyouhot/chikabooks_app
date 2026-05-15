@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../../models/job.dart';
+import 'job_image.dart';
 
 /// 공고 보드 섹션 헤더 (제목 + 부제 + 액션)
 class JobBoardSectionHeader extends StatelessWidget {
@@ -82,7 +83,17 @@ class JobBoardSectionHeader extends StatelessWidget {
   }
 }
 
-/// 프리미엄(레벨 1) 가로 스크롤 캐러셀
+/// 프리미엄(레벨 1) 카드 그리드.
+///
+/// `RecommendedJobGrid` 와 동일한 `LayoutBuilder + Wrap` 패턴으로 통일해
+/// 모든 환경(웹 release/canvaskit/skwasm 포함)에서 layout 측정 안정성을
+/// 보장한다.
+///
+/// 이전에는 가로 스크롤 캐러셀(`SingleChildScrollView` + `IntrinsicHeight` +
+/// `Row` + `Material/Ink(boxShadow)`) 였으나, 해당 조합이 web release 에서
+/// intrinsic height 측정을 잘못 부풀려 카드 영역이 거대한 회색 빈 박스로
+/// 그려지는 사례가 보고됐다. 그리드 패턴은 children intrinsic 측정에
+/// 의존하지 않으므로 동일 증상이 재발하지 않는다.
 class PremiumJobCarousel extends StatelessWidget {
   const PremiumJobCarousel({
     super.key,
@@ -97,17 +108,31 @@ class PremiumJobCarousel extends StatelessWidget {
   Widget build(BuildContext context) {
     if (jobs.isEmpty) return const SizedBox.shrink();
 
-    return SizedBox(
-      height: 220,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: jobs.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 14),
-        itemBuilder: (_, i) => _PremiumCard(
-          job: jobs[i],
-          onTap: () => onJobTap(jobs[i]),
-        ),
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const gap = AppApplicant.premiumCardGap;
+        const minCardWidth = AppApplicant.premiumMinCardWidth;
+        // 본문 폭에 따라 1~3 열로 자동 분할. jobs 갯수보다 큰 cols 는 의미 없음.
+        final cols = (constraints.maxWidth / (minCardWidth + gap))
+            .floor()
+            .clamp(1, jobs.length < 3 ? jobs.length : 3);
+        final cardWidth =
+            (constraints.maxWidth - gap * (cols - 1)) / cols;
+        return Wrap(
+          spacing: gap,
+          runSpacing: gap,
+          children: [
+            for (final job in jobs)
+              SizedBox(
+                width: cardWidth,
+                child: _PremiumCard(
+                  job: job,
+                  onTap: () => onJobTap(job),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }
@@ -125,117 +150,102 @@ class _PremiumCard extends StatelessWidget {
             ? job.promotionalImageUrls.first
             : null);
 
-    return SizedBox(
-      width: 320,
-      child: Material(
-        color: AppColors.white,
+    // 카드 width 는 부모([PremiumJobCarousel]의 [LayoutBuilder] + [Wrap])에서
+    // 본문 폭에 비례해 결정한다. 이미지 영역은 카드 width 기준 16:9 비율을
+    // 유지하기 위해 [AspectRatio] 를 사용 — IntrinsicHeight 부모가 없으므로
+    // AspectRatio 가 안정적으로 동작한다.
+    return Material(
+      color: AppColors.white,
+      borderRadius:
+          BorderRadius.circular(AppApplicant.premiumCardRadius),
+      child: InkWell(
+        onTap: onTap,
         borderRadius:
             BorderRadius.circular(AppApplicant.premiumCardRadius),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius:
-              BorderRadius.circular(AppApplicant.premiumCardRadius),
-          child: Ink(
-            decoration: BoxDecoration(
-              borderRadius:
-                  BorderRadius.circular(AppApplicant.premiumCardRadius),
-              border: Border.all(color: AppColors.divider),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.divider.withValues(alpha: 0.4),
-                  blurRadius: AppApplicant.cardShadowBlur,
-                  offset: const Offset(0, 6),
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius:
+                BorderRadius.circular(AppApplicant.premiumCardRadius),
+            border: Border.all(color: AppColors.divider),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.divider.withValues(alpha: 0.4),
+                blurRadius: AppApplicant.cardShadowBlur,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // ── 이미지 ──
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(AppApplicant.premiumCardRadius),
                 ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // ── 이미지 ──
-                ClipRRect(
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(AppApplicant.premiumCardRadius),
-                  ),
-                  child: AspectRatio(
-                    aspectRatio: 16 / 9,
-                    child: image != null
-                        ? Image.network(
-                            image,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                _imagePlaceholder(),
-                          )
-                        : _imagePlaceholder(),
-                  ),
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: image != null
+                      ? JobThumbImage(src: image)
+                      : JobThumbImage.placeholder(),
                 ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          _PremiumBadge(),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              job.displayClinicName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.notoSansKr(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textSecondary,
-                              ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        _PremiumBadge(),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            job.displayClinicName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.notoSansKr(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textSecondary,
                             ),
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        job.displayTitle,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.notoSansKr(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
-                          height: 1.35,
                         ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      job.displayTitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.notoSansKr(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                        height: 1.35,
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        '${_districtOrAddress(job)} · ${job.salaryDisplayLine}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.notoSansKr(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.accent,
-                        ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '${_districtOrAddress(job)} · ${job.salaryDisplayLine}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.notoSansKr(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.accent,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _imagePlaceholder() {
-    return Container(
-      color: AppColors.surfaceMuted,
-      alignment: Alignment.center,
-      child: Icon(
-        Icons.business_rounded,
-        size: 44,
-        color: AppColors.textDisabled,
-      ),
-    );
-  }
 }
 
 class _PremiumBadge extends StatelessWidget {

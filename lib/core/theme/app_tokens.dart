@@ -160,6 +160,15 @@ class AppApplicant {
   /// 추천 카드 그리드 카드 간 가로/세로 간격
   static const double recommendedCardGap = 16.0;
 
+  /// 프리미엄(레벨 1) 카드 그리드 최소 카드 폭.
+  ///
+  /// 추천 카드보다 살짝 큰 폭을 두어 시각적 위계를 만든다.
+  /// 본문 폭(`contentMaxWidth - sideNav`)에 따라 1~3열로 자동 분할된다.
+  static const double premiumMinCardWidth = 320.0;
+
+  /// 프리미엄 카드 그리드 카드 간 가로/세로 간격
+  static const double premiumCardGap = 14.0;
+
   // ── 사이드바 항목 ─────────────────────────────────────────────
   /// 사이드바 메뉴 항목 높이
   static const double sideNavItemHeight = 44.0;

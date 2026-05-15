@@ -360,13 +360,11 @@ class _SeniorQuestionCardState extends State<SeniorQuestionCard> {
               ),
             ],
           ),
-          if (!_commentsExpanded && question.commentCount > 0) ...[
-            const SizedBox(height: AppSpacing.xs),
-            _buildCommentPreview(),
-          ],
-          if (_commentsExpanded) ...[
+          if (question.commentCount > 0 || _commentsExpanded) ...[
             const SizedBox(height: AppSpacing.sm),
             _buildComments(),
+          ],
+          if (_commentsExpanded) ...[
             _InlineCommentInput(
               controller: _commentCtrl,
               replyToName: _replyToName,
@@ -439,6 +437,7 @@ class _SeniorQuestionCardState extends State<SeniorQuestionCard> {
           );
         }
         if (comments.isEmpty) {
+          if (!_commentsExpanded) return const SizedBox.shrink();
           return const Padding(
             padding: EdgeInsets.only(bottom: AppSpacing.sm),
             child: Text(
@@ -459,7 +458,6 @@ class _SeniorQuestionCardState extends State<SeniorQuestionCard> {
                       questionId: question.id,
                       comment: comment,
                       isAdmin: widget.isAdmin,
-                      showReplies: true,
                       onReply:
                           () => setState(() {
                             _replyToCommentId = comment.id;
@@ -475,53 +473,6 @@ class _SeniorQuestionCardState extends State<SeniorQuestionCard> {
     );
   }
 
-  Widget _buildCommentPreview() {
-    return StreamBuilder<List<SeniorComment>>(
-      stream: SeniorQuestionService.watchComments(question.id),
-      builder: (_, snap) {
-        final comments = snap.data ?? [];
-        if (comments.isEmpty) return const SizedBox.shrink();
-        final moreCount = comments.length - 1;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _CommentTile(
-              questionId: question.id,
-              comment: comments.first,
-              isAdmin: widget.isAdmin,
-              showReplies: false,
-              onReply:
-                  () => setState(() {
-                    _replyToCommentId = comments.first.id;
-                    _replyToName = comments.first.displayName;
-                    _commentImage = null;
-                    _commentsExpanded = true;
-                  }),
-            ),
-            if (moreCount > 0)
-              InkWell(
-                onTap: () => setState(() => _commentsExpanded = true),
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.xs,
-                    vertical: AppSpacing.xs,
-                  ),
-                  child: Text(
-                    '댓글 $moreCount개 더 보기',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        );
-      },
-    );
-  }
 
   void _startEditing() {
     setState(() {
@@ -662,14 +613,12 @@ class _CommentTile extends StatefulWidget {
   final String questionId;
   final SeniorComment comment;
   final bool isAdmin;
-  final bool showReplies;
   final VoidCallback onReply;
 
   const _CommentTile({
     required this.questionId,
     required this.comment,
     required this.isAdmin,
-    required this.showReplies,
     required this.onReply,
   });
 
@@ -684,6 +633,7 @@ class _CommentTileState extends State<_CommentTile> {
   bool _editAnonymous = false;
   bool _editRemoveImages = false;
   bool _saving = false;
+  bool _repliesExpanded = false;
 
   String get questionId => widget.questionId;
   SeniorComment get comment => widget.comment;
@@ -785,7 +735,15 @@ class _CommentTileState extends State<_CommentTile> {
                   ),
                   _TinyAction(
                     label: '답글 ${comment.replyCount}',
-                    onTap: widget.onReply,
+                    onTap: () {
+                      if (comment.replyCount > 0) {
+                        final willExpand = !_repliesExpanded;
+                        setState(() => _repliesExpanded = willExpand);
+                        if (willExpand) widget.onReply();
+                      } else {
+                        widget.onReply();
+                      }
+                    },
                   ),
                   _TinyAction(label: '신고', onTap: () => _report(context)),
                   if (isAuthor)
@@ -834,7 +792,7 @@ class _CommentTileState extends State<_CommentTile> {
                 ],
               ),
             ),
-          if (widget.showReplies)
+          if (_repliesExpanded)
             StreamBuilder<List<SeniorReply>>(
               stream: SeniorQuestionService.watchReplies(
                 questionId: questionId,
@@ -1994,19 +1952,33 @@ class _Bubble extends StatelessWidget {
               ],
             ],
           ),
-          if (hasStickers) ...[
+          if (hasStickers || visibleBody.isNotEmpty) ...[
             const SizedBox(height: 2),
-            SeniorStickerStrip(stickerIds: stickerIds, size: compact ? 23 : 28),
-          ],
-          if (visibleBody.isNotEmpty) ...[
-            SizedBox(height: hasStickers ? 1 : 2),
-            Text(
-              visibleBody,
-              style: TextStyle(
-                fontSize: compact ? 12 : 13,
-                fontWeight: FontWeight.w700,
-                height: 1.45,
-                color: AppColors.textPrimary,
+            Text.rich(
+              TextSpan(
+                children: [
+                  for (final id in stickerIds)
+                    WidgetSpan(
+                      alignment: PlaceholderAlignment.middle,
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 2),
+                        child: SeniorStickerView(
+                          stickerId: id,
+                          size: compact ? 23 : 28,
+                        ),
+                      ),
+                    ),
+                  if (visibleBody.isNotEmpty)
+                    TextSpan(
+                      text: hasStickers ? ' $visibleBody' : visibleBody,
+                      style: TextStyle(
+                        fontSize: compact ? 12 : 13,
+                        fontWeight: FontWeight.w700,
+                        height: 1.45,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                ],
               ),
             ),
           ],

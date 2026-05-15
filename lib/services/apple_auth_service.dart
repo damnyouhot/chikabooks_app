@@ -92,6 +92,14 @@ class AppleAuthService {
       );
 
       return (u, emailFromApple);
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'account-exists-with-different-credential') {
+        rethrow;
+      }
+      debugPrint(
+        '⚠️ Apple 로그인 FirebaseAuthException: ${e.code} ${e.message}',
+      );
+      return null;
     } catch (e) {
       if (e.toString().contains('AuthorizationErrorCode.canceled')) {
         debugPrint('ℹ️ Apple 로그인 취소');

@@ -231,16 +231,6 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "jobId",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "campaigns",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
           "fieldPath": "lifecycleStatus",
           "order": "ASCENDING"
         },
@@ -269,16 +259,6 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "dedupeKey",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "clinicInbox",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
           "fieldPath": "read",
           "order": "ASCENDING"
         },
@@ -298,6 +278,20 @@
         },
         {
           "fieldPath": "happenedAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "messageThreads",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "participants",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "updatedAt",
           "order": "DESCENDING"
         }
       ]

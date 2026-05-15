@@ -1,8 +1,8 @@
 import 'dart:io' show File;
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:pdfx/pdfx.dart';
@@ -17,6 +17,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_confirm_modal.dart';
 import '../../../core/widgets/app_modal_scaffold.dart';
+import '../../applicant/web/widgets/applicant_web_shell.dart';
 import 'resume_edit_screen.dart';
 import 'ocr_review_screen.dart';
 
@@ -46,6 +47,47 @@ class _ResumeHomeScreenState extends State<ResumeHomeScreen>
 
   @override
   Widget build(BuildContext context) {
+    final tabBar = TabBar(
+      controller: _tabController,
+      labelColor: AppColors.accent,
+      unselectedLabelColor: AppColors.textSecondary,
+      indicatorColor: AppColors.accent,
+      labelStyle: const TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w700,
+      ),
+      tabs: const [
+        Tab(text: '작성형 이력서'),
+        Tab(text: '업로드 파일'),
+      ],
+    );
+
+    final tabView = TabBarView(
+      controller: _tabController,
+      children: [
+        _WrittenResumeTab(),
+        _UploadedFileTab(),
+      ],
+    );
+
+    // 웹: ApplicantWebShell 로 좌측 사이드바 + 폭 제한 레이아웃을 유지하고,
+    // 페이지 자체는 AppBar 없이 일반 applicant 화면들과 동일한 헤더 패턴을 사용한다.
+    // (로그아웃은 사이드바/탑바에서 제공되므로 별도 액션은 두지 않는다.)
+    if (kIsWeb) {
+      return ApplicantWebShell(
+        scrollable: false, // 내부 TabBarView 가 스크롤을 직접 처리
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const _ResumePageHeader(),
+            const SizedBox(height: 12),
+            tabBar,
+            Expanded(child: tabView),
+          ],
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppColors.appBg,
       appBar: AppBar(
@@ -62,40 +104,41 @@ class _ResumeHomeScreenState extends State<ResumeHomeScreen>
         ),
         centerTitle: false,
         iconTheme: const IconThemeData(color: AppColors.textPrimary),
-        actions: [
-          if (kIsWeb)
-            TextButton.icon(
-              icon: Icon(Icons.logout, size: 16, color: AppColors.textSecondary),
-              label: Text(
-                '로그아웃',
-                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-              ),
-              onPressed: () async {
-                await FirebaseAuth.instance.signOut();
-                if (context.mounted) context.go('/login');
-              },
-            ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: AppColors.accent,
-          unselectedLabelColor: AppColors.textSecondary,
-          indicatorColor: AppColors.accent,
-          labelStyle: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-          ),
-          tabs: const [
-            Tab(text: '작성형 이력서'),
-            Tab(text: '업로드 파일'),
-          ],
-        ),
+        bottom: tabBar,
       ),
-      body: TabBarView(
-        controller: _tabController,
+      body: tabView,
+    );
+  }
+}
+
+class _ResumePageHeader extends StatelessWidget {
+  const _ResumePageHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _WrittenResumeTab(),
-          _UploadedFileTab(),
+          Text(
+            '내 이력서',
+            style: GoogleFonts.notoSansKr(
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              color: AppColors.textPrimary,
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '작성형 이력서를 만들거나 PDF·DOCX 파일을 업로드해 두세요. 공고 지원 시 바로 사용할 수 있어요.',
+            style: GoogleFonts.notoSansKr(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textSecondary,
+            ),
+          ),
         ],
       ),
     );

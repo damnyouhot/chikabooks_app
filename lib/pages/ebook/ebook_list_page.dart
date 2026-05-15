@@ -190,9 +190,13 @@ class _EbookListPageState extends State<EbookListPage> {
                   AppSpacing.lg,
                   AppSpacing.lg,
                 ),
+                // 카드 한 장의 가로 길이를 240 이하로 유지하여 폭에 따라 자동으로
+                // 컬럼이 늘어나도록 한다. (모바일 ~360 → 2열, 태블릿 ~720 → 3열,
+                // 와이드 웹 ~1200 → 5열). 사용자가 요청한 "웹에서 5열" 효과.
                 sliver: SliverGrid(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
+                  gridDelegate:
+                      const SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: 240,
                     mainAxisSpacing: 20,
                     crossAxisSpacing: 20,
                     childAspectRatio: 0.66,
@@ -550,11 +554,14 @@ class _EbookGridCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       borderRadius: BorderRadius.circular(AppRadius.lg),
+      // 책 카드 → 상세 페이지로 이동하고, 상세에서 "바로 읽기 / 이어서 읽기" 버튼을
+      // 그대로 노출(`hideActions: false`). 버튼을 누르면 EbookDetailPage 가
+      // PdfReaderPage / EpubReaderPage 로 push 하여 책을 읽을 수 있다.
       onTap:
           () => Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => EbookDetailPage(ebook: ebook, hideActions: true),
+              builder: (_) => EbookDetailPage(ebook: ebook),
             ),
           ),
       child: Column(

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../../services/apple_auth_service.dart';
+import '../../services/app_firebase_account_linking.dart';
 import '../../services/email_auth_service.dart';
 import '../../services/kakao_auth_service.dart';
 import '../../services/naver_auth_service.dart';
@@ -16,6 +17,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../core/widgets/app_modal_scaffold.dart';
 import '../../core/widgets/hygiene_lab_english_title.dart';
+import '../../widgets/auth/link_account_password_dialog.dart';
 
 /// 다중 소셜 로그인 페이지
 /// Google / Apple / Kakao / Naver / Email 지원
@@ -76,38 +78,58 @@ class _SignInPageState extends State<SignInPage> {
       );
 
       await OnboardingService.forceSchedule();
-      await FirebaseAuth.instance.signInWithCredential(credential);
-      debugPrint('✅ Firebase Auth signInWithCredential 성공');
+      final first =
+          await AppFirebaseAccountLinking.signInWithOAuthCredential(credential);
 
-      await Future.delayed(const Duration(milliseconds: 200));
-
-      final currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser == null) {
-        debugPrint('❌ Firebase Auth currentUser가 여전히 null (비정상)');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Google 로그인 실패. 다시 시도해주세요.')),
-          );
+      if (first.needsMerge) {
+        if (!mounted) return;
+        final pw = await showLinkAccountPasswordDialog(
+          context,
+          email: first.mergeEmail!,
+        );
+        if (!mounted) return;
+        if (pw == null || pw.isEmpty) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('비밀번호를 입력해야 계정을 연결할 수 있어요.'),
+              ),
+            );
+          }
+          return;
         }
-        return;
+        try {
+          await AppFirebaseAccountLinking.signInWithEmailPasswordAndLinkOAuth(
+            email: first.mergeEmail!,
+            password: pw,
+            pendingOAuthCredential: first.pendingOAuthCredential!,
+          );
+        } on FirebaseAuthException catch (e) {
+          await FirebaseAuth.instance.signOut();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(_mapFirebaseAuthForSignIn(e))),
+            );
+          }
+          return;
+        }
       }
 
-      debugPrint('✅ Google 로그인 성공: ${currentUser.uid} (${currentUser.email})');
-
-      await SignInTracker.record('google');
-      AdminActivityService.log(
-        ActivityEventType.viewSignInPage,
-        page: 'sign_in',
+      await _finalizeMobileSocialLogin(
+        provider: 'google',
+        emailForTracker: googleUser.email,
       );
-      AdminActivityService.log(
-        ActivityEventType.loginSuccess,
-        page: 'sign_in',
-        extra: {'provider': 'google'},
+      debugPrint(
+        '✅ Google 로그인 성공: ${FirebaseAuth.instance.currentUser?.uid} '
+        '(${FirebaseAuth.instance.currentUser?.email})',
       );
-      AdminActivityService.logFunnel(
-        FunnelEventType.signupComplete,
-        extra: {'provider': 'google'},
-      );
+    } on FirebaseAuthException catch (e) {
+      debugPrint('❌ Google 로그인 FirebaseAuthException: ${e.code}');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_mapFirebaseAuthForSignIn(e))),
+        );
+      }
     } catch (e) {
       debugPrint('❌ Google 로그인 에러: $e');
       if (mounted) {
@@ -128,27 +150,73 @@ class _SignInPageState extends State<SignInPage> {
     try {
       await OnboardingService.forceSchedule();
 
-      final appleRes = await AppleAuthService.signInWithApple();
-      if (appleRes == null && mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Apple 로그인 실패')));
-      } else if (appleRes != null) {
-        final (user, appleIdEmail) = appleRes;
-
-        await SignInTracker.record('apple', email: appleIdEmail ?? user.email);
-        AdminActivityService.log(
-          ActivityEventType.viewSignInPage,
-          page: 'sign_in',
-        );
-        AdminActivityService.log(
-          ActivityEventType.loginSuccess,
-          page: 'sign_in',
-          extra: {'provider': 'apple'},
-        );
-        AdminActivityService.logFunnel(
-          FunnelEventType.signupComplete,
-          extra: {'provider': 'apple'},
+      try {
+        final appleRes = await AppleAuthService.signInWithApple();
+        if (appleRes == null && mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Apple 로그인 실패')));
+          return;
+        }
+        if (appleRes != null) {
+          final (user, appleIdEmail) = appleRes;
+          await _finalizeMobileSocialLogin(
+            provider: 'apple',
+            emailForTracker: appleIdEmail ?? user.email,
+          );
+        }
+      } on FirebaseAuthException catch (e) {
+        if (e.code != 'account-exists-with-different-credential') {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(_mapFirebaseAuthForSignIn(e))),
+            );
+          }
+          return;
+        }
+        final em = e.email?.trim();
+        final pending = e.credential;
+        if (em == null || em.isEmpty || pending == null) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('계정 연결에 필요한 정보가 없어요. 다시 시도해 주세요.'),
+              ),
+            );
+          }
+          return;
+        }
+        if (!mounted) return;
+        final pw = await showLinkAccountPasswordDialog(context, email: em);
+        if (!mounted) return;
+        if (pw == null || pw.isEmpty) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('비밀번호를 입력해야 계정을 연결할 수 있어요.'),
+              ),
+            );
+          }
+          return;
+        }
+        try {
+          await AppFirebaseAccountLinking.signInWithEmailPasswordAndLinkOAuth(
+            email: em,
+            password: pw,
+            pendingOAuthCredential: pending,
+          );
+        } on FirebaseAuthException catch (e2) {
+          await FirebaseAuth.instance.signOut();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(_mapFirebaseAuthForSignIn(e2))),
+            );
+          }
+          return;
+        }
+        await _finalizeMobileSocialLogin(
+          provider: 'apple',
+          emailForTracker: FirebaseAuth.instance.currentUser?.email,
         );
       }
     } finally {
@@ -1025,6 +1093,52 @@ class _SignInPageState extends State<SignInPage> {
             ),
           ),
       ],
+    );
+  }
+
+  String _mapFirebaseAuthForSignIn(FirebaseAuthException e) {
+    return switch (e.code) {
+      'wrong-password' => '비밀번호가 일치하지 않아요.',
+      'invalid-credential' => '이메일 또는 비밀번호를 확인해 주세요.',
+      'user-not-found' => '등록되지 않은 이메일이에요.',
+      'credential-already-in-use' =>
+        e.message ?? '이 SNS 계정은 다른 이메일에 연결되어 있어요.',
+      'too-many-requests' => '잠시 후 다시 시도해 주세요.',
+      _ => e.message ?? '로그인에 실패했어요. (${e.code})',
+    };
+  }
+
+  /// Google / Apple 로그인(또는 계정 연결) 성공 후 공통 기록.
+  Future<void> _finalizeMobileSocialLogin({
+    required String provider,
+    String? emailForTracker,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 200));
+    if (!mounted) return;
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$provider 로그인 후 세션을 확인하지 못했어요.')),
+      );
+      return;
+    }
+
+    await SignInTracker.record(
+      provider,
+      email: emailForTracker ?? currentUser.email,
+    );
+    AdminActivityService.log(
+      ActivityEventType.viewSignInPage,
+      page: 'sign_in',
+    );
+    AdminActivityService.log(
+      ActivityEventType.loginSuccess,
+      page: 'sign_in',
+      extra: {'provider': provider},
+    );
+    AdminActivityService.logFunnel(
+      FunnelEventType.signupComplete,
+      extra: {'provider': provider},
     );
   }
 }

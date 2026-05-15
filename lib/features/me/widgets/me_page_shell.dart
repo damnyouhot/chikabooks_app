@@ -458,6 +458,12 @@ class _MeMenuItem {
       route: '/me/applicants',
     ),
     _MeMenuItem(
+      id: 'messages',
+      label: '메시지',
+      icon: Icons.chat_bubble_outline_rounded,
+      route: '/me/messages',
+    ),
+    _MeMenuItem(
       id: 'notifications',
       label: '알림 설정',
       icon: Icons.notifications_outlined,

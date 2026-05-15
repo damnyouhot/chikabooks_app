@@ -204,7 +204,7 @@ class _GrowthPageState extends State<GrowthPage>
                   constraints: BoxConstraints(
                     maxHeight: MediaQuery.sizeOf(ctx).height * 0.55,
                   ),
-                  child: const SingleChildScrollView(
+                  child: SingleChildScrollView(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
@@ -224,6 +224,15 @@ class _GrowthPageState extends State<GrowthPage>
                         SizedBox(height: 8),
                         Text(
                           '매일 국시·임상 문제를 풀어요. (스케줄에 따라 하루 2문항)',
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.5,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          '순위·상위 %는 이번 주·통산 각각 정답률 기준이에요.',
                           style: TextStyle(
                             fontSize: 12,
                             height: 1.5,

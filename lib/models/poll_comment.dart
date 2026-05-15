@@ -7,12 +7,16 @@ class PollComment {
     required this.text,
     required this.uid,
     required this.createdAt,
+    this.likeCount = 0,
+    this.replyCount = 0,
   });
 
   final String id;
   final String text;
   final String uid;
   final DateTime createdAt;
+  final int likeCount;
+  final int replyCount;
 
   factory PollComment.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final d = doc.data() ?? {};
@@ -21,6 +25,8 @@ class PollComment {
       text: (d['text'] as String?) ?? '',
       uid: (d['uid'] as String?) ?? '',
       createdAt: (d['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      likeCount: (d['likeCount'] as int?) ?? 0,
+      replyCount: (d['replyCount'] as int?) ?? 0,
     );
   }
 }

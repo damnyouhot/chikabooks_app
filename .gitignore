@@ -72,3 +72,7 @@ key.properties
 **/service-account*.json
 # macOS 등에서 잘못 저장된 이중 경로/특수 파일명 (**/ 패턴에 안 걸릴 수 있음)
 functions/functions:serviceAccountKey.json
+
+# 5. 웹 자동 로그인용 로컬 env (비밀번호 — 절대 커밋 금지)
+# [CHIKA_WEB_AUTO_LOGIN] 임시 기능 원복 시 이 두 줄도 함께 삭제
+.chika_web_login.env

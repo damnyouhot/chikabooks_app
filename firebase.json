@@ -23,6 +23,9 @@
   ],
   "hosting": {
     "public": "build/web",
+    "predeploy": [
+      "bash tools/verify_web_auto_login_bundle.sh"
+    ],
     "ignore": [
       "firebase.json",
       "**/.*",

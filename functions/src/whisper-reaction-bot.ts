@@ -20,8 +20,11 @@ const REGION = "us-central1";
 //   → whisper_reaction 통계는 실제 유저가 앱에서 반응할 때만 기록된다.
 //
 // 정책 (사용자 확정)
-//   - 본문 한 편당: 좋아요·힘내요 각각 같은 일간 곡선(첫날 끝 7 → 매일 +2 → 상한 70)을 기준으로 하되,
+//   - 본문 한 편당: 좋아요·힘내요 각각 같은 일간 곡선(첫날 끝 3 → 매일 +1 → 상한 70)을 기준으로 하되,
 //     서로 꼭 같을 필요 없음 — 글·KST일별 해시 비율 + 매 틱 독립 소량 지터로 목표를 달리 잡는다.
+//   - 70 까지 도달 속도는 이전 대비 약 1/2 로 감속(첫날 7→3, 일일 +2→+1).
+//   - 기존에 이미 목표보다 높은 글은 deficit ≤ 0 이라 봇이 더 올리지 않으며,
+//     봇은 절대 감소시키지 않는다(이미 쌓인 수치는 그대로 유지).
 //   - KST 하루 안에서는 투표 봇과 같은 시간대 가중치로 천천히 올라가고,
 //     그날 자정 직전에는 그날 목표치에 도달하도록 deficit 기반 포아송.
 //   - 70 도달 후에는 60~80 구간에서만 아주 작은 증가(진동, poll 의 band 와 유사).
@@ -38,8 +41,10 @@ const HOURLY_WEIGHTS_KST: number[] = [
 
 const PLATEAU = 70;
 const BAND = 10;
-const RAMP_START = 7;
-const RAMP_STEP = 2;
+// 첫날 끝 목표 = RAMP_START, 이후 매일 +RAMP_STEP 씩 증가하여 PLATEAU 에서 멈춘다.
+// 현재 정책: 첫날 3 → 매일 +1 → 상한 70 (이전 7/+2 대비 약 1/2 속도)
+const RAMP_START = 3;
+const RAMP_STEP = 1;
 
 /** 본문 대비 댓글 좋아요 목표 비율 */
 const COMMENT_LIKE_RATIO = 0.35;
@@ -136,8 +141,9 @@ function bodyExpectedAxes(
   dayIndex: number,
   phi: number,
   kstDayKey: string,
-): { expLike: number; expCheer: number } {
+): { expLike: number; expCheer: number; eodLike: number; eodCheer: number } {
   const base = linearExpectedNow(dayIndex, phi);
+  const eodBase = endOfDayTarget(dayIndex);
   const likeAxis = 0.82 + 0.36 * hash01(`${questionId}|like|${kstDayKey}`);
   const cheerAxis = 0.82 + 0.36 * hash01(`${questionId}|cheer|${kstDayKey}`);
   const jL = 0.88 + 0.24 * Math.random();
@@ -145,6 +151,8 @@ function bodyExpectedAxes(
   return {
     expLike: Math.min(PLATEAU, base * likeAxis * jL),
     expCheer: Math.min(PLATEAU, base * cheerAxis * jC),
+    eodLike: Math.min(PLATEAU, eodBase * likeAxis * jL),
+    eodCheer: Math.min(PLATEAU, eodBase * cheerAxis * jC),
   };
 }
 
@@ -175,31 +183,44 @@ function poissonSample(lambda: number): number {
 }
 
 /**
- * deficit = 기대값 − 현재값. 남은 30분 슬롯에 나눠 포아송 강도 산출.
+ * 남은 EOD 목표를 남은 시간 가중치 비율로 분배해 포아송 강도 산출.
+ *
+ * 구 공식(deficit/remSlots × hourW × 8)은 오전 소가중치 시간대에
+ * lambda가 극단적으로 작아지는 결함이 있었음.
+ * 신 공식: remaining × (이번 틱 가중치 / 자정까지 남은 가중치 합)
+ * → 목표 잔량을 남은 시간 분포에 정확히 비례 배분, 자정에 수렴.
  */
 function plannedAdds(
   current: number,
   expectedFloat: number,
-  phi: number,
-  hourW: number,
+  eodTarget: number,
+  hour: number,
+  minFrac: number,
   enablePlateauJitter: boolean,
 ): number {
   const deficit = expectedFloat - current;
   if (deficit > 0.001) {
-    const remSlots = Math.max(1, Math.ceil((1 - phi) * 48));
-    let lambda = (deficit / remSlots) * hourW * 8;
+    const remaining = Math.max(0, eodTarget - current);
+    const hourW = HOURLY_WEIGHTS_KST[hour] ?? 0.04;
+
+    let remainingWeight = hourW * (1 - minFrac);
+    for (let h = hour + 1; h < 24; h++) {
+      remainingWeight += HOURLY_WEIGHTS_KST[h] ?? 0;
+    }
+    remainingWeight = Math.max(0.001, remainingWeight);
+
+    const tickWeight = hourW / 2;
+    let lambda = remaining * (tickWeight / remainingWeight);
     lambda *= bandScaleCounter(current);
     lambda = Math.min(lambda, 3.2);
+
     let raw = poissonSample(lambda);
     const ceiling = enablePlateauJitter ? HARD_CEILING : Math.ceil(expectedFloat) + 5;
     raw = Math.min(raw, Math.ceil(deficit), Math.max(0, ceiling - current));
     return Math.max(0, raw);
   }
-  if (
-    enablePlateauJitter &&
-    current >= PLATEAU &&
-    current < HARD_CEILING
-  ) {
+  if (enablePlateauJitter && current >= PLATEAU && current < HARD_CEILING) {
+    const hourW = HOURLY_WEIGHTS_KST[hour] ?? 0.04;
     const p = 0.035 * bandScaleCounter(current) * Math.max(0.15, hourW);
     return Math.random() < p ? 1 : 0;
   }
@@ -217,8 +238,8 @@ export const tickWhisperReactionBot = functions
   .onRun(async () => {
     const nowMs = Date.now();
     const hour = kstHour(nowMs);
-    const hourW = HOURLY_WEIGHTS_KST[hour] ?? 0.04;
     const phi = fracKstDayElapsed(nowMs);
+    const minFrac = Math.max(0, Math.min(1, phi * 24 - hour)); // 현재 시간 내 분 비율
     const { y, m, d } = kstYmdParts(nowMs);
     const kstDayKey = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 
@@ -249,7 +270,7 @@ export const tickWhisperReactionBot = functions
 
       qProcessed++;
 
-      const { expLike, expCheer } = bodyExpectedAxes(
+      const { expLike, expCheer, eodLike, eodCheer } = bodyExpectedAxes(
         qDoc.id,
         dayIdx,
         phi,
@@ -259,8 +280,8 @@ export const tickWhisperReactionBot = functions
       const like0 = (qDoc.data().likeCount as number) ?? 0;
       const cheer0 = (qDoc.data().cheerCount as number) ?? 0;
 
-      const addL = plannedAdds(like0, expLike, phi, hourW, true);
-      const addC = plannedAdds(cheer0, expCheer, phi, hourW, true);
+      const addL = plannedAdds(like0, expLike, eodLike, hour, minFrac, true);
+      const addC = plannedAdds(cheer0, expCheer, eodCheer, hour, minFrac, true);
 
       const batch = db.batch();
       let ops = 0;
@@ -296,8 +317,9 @@ export const tickWhisperReactionBot = functions
         if (!cCreated) continue;
         const cDay = kstCalendarDayIndex(cCreated, nowMs);
         const expCL = linearExpectedNow(cDay, phi) * COMMENT_LIKE_RATIO;
+        const eodCL = endOfDayTarget(cDay) * COMMENT_LIKE_RATIO;
         const cl0 = (cd.likeCount as number) ?? 0;
-        const addCL = plannedAdds(cl0, expCL, phi, hourW, false);
+        const addCL = plannedAdds(cl0, expCL, eodCL, hour, minFrac, false);
         if (addCL > 0) {
           subBatch.update(cDoc.ref, { likeCount: admin.firestore.FieldValue.increment(addCL) });
           commentLike += addCL;
@@ -317,8 +339,9 @@ export const tickWhisperReactionBot = functions
           if (!rCreated) continue;
           const rDay = kstCalendarDayIndex(rCreated, nowMs);
           const expRL = linearExpectedNow(rDay, phi) * REPLY_LIKE_RATIO;
+          const eodRL = endOfDayTarget(rDay) * REPLY_LIKE_RATIO;
           const rl0 = (rd.likeCount as number) ?? 0;
-          const addRL = plannedAdds(rl0, expRL, phi, hourW, false);
+          const addRL = plannedAdds(rl0, expRL, eodRL, hour, minFrac, false);
           if (addRL > 0) {
             subBatch.update(rDoc.ref, { likeCount: admin.firestore.FieldValue.increment(addRL) });
             replyLike += addRL;

@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_tokens.dart';
+import '../../../../data/mock_jobs.dart';
 import '../../../../models/job.dart';
 import '../../../../notifiers/job_filter_notifier.dart';
 import '../../../../services/job_service.dart';
@@ -37,6 +38,9 @@ class _JobBoardPageState extends State<JobBoardPage> {
   bool _level3Loading = false;
   bool _level3HasMore = true;
   DocumentSnapshot? _level3LastDoc;
+  // Firestore 결과가 0건이면 일반(레벨3) 영역에 mock 데이터를 fallback 으로 노출.
+  // mock 데이터 사용 중에는 무한 스크롤(추가 페이지 요청)을 비활성화한다.
+  bool _useMockLevel3 = false;
 
   // 필터 노티파이어 — 변경되면 level3 재로딩
   JobFilterNotifier? _filter;
@@ -44,6 +48,11 @@ class _JobBoardPageState extends State<JobBoardPage> {
   static const int _kPremiumLimit = 8;
   static const int _kRecommendedLimit = 9;
   static const int _kStandardPageSize = 20;
+  // Firestore 가 비어있을 때 채워 넣을 mock 갯수.
+  // 모바일 [JobListingsScreen] 과 동일한 비율로 맞춰 UX 일관성을 유지한다.
+  static const int _kPremiumMockCount = 6;
+  static const int _kRecommendedMockCount = 8;
+  static const int _kStandardMockCount = 30;
 
   @override
   void initState() {
@@ -72,31 +81,73 @@ class _JobBoardPageState extends State<JobBoardPage> {
   Future<void> _loadHighlighted() async {
     final svc = context.read<JobService>();
     try {
+      // Live 공고를 먼저 받아오되, mock 갯수만큼은 항상 자리를 비워서
+      // Firestore 가 부족할 때도 보드가 비지 않도록 한다.
       final results = await Future.wait([
-        svc.fetchHighlightedJobs(jobLevel: 1, limit: _kPremiumLimit),
-        svc.fetchHighlightedJobs(jobLevel: 2, limit: _kRecommendedLimit),
+        svc.fetchHighlightedJobs(
+          jobLevel: 1,
+          limit: _kPremiumLimit - _kPremiumMockCount,
+        ),
+        svc.fetchHighlightedJobs(
+          jobLevel: 2,
+          limit: _kRecommendedLimit - _kRecommendedMockCount,
+        ),
       ]);
       if (!mounted) return;
       setState(() {
-        _level1 = results[0];
-        _level2 = results[1];
+        _level1 = _withMockBaseline(
+          liveJobs: results[0],
+          mockJobs: mockLevel1Jobs,
+          mockCount: _kPremiumMockCount,
+          totalLimit: _kPremiumLimit,
+        );
+        _level2 = _withMockBaseline(
+          liveJobs: results[1],
+          mockJobs: mockLevel2Jobs,
+          mockCount: _kRecommendedMockCount,
+          totalLimit: _kRecommendedLimit,
+        );
         _highlightedLoading = false;
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _highlightedLoading = false);
+      // 네트워크 오류 등으로 Firestore 조회가 실패해도 mock 으로 대체해
+      // 사용자가 빈 화면을 마주치지 않도록 한다.
+      setState(() {
+        _level1 = mockLevel1Jobs.take(_kPremiumLimit).toList();
+        _level2 = mockLevel2Jobs.take(_kRecommendedLimit).toList();
+        _highlightedLoading = false;
+      });
     }
+  }
+
+  /// Firestore live 공고와 mock 공고를 합쳐 일정 갯수를 보장한다.
+  /// (모바일 `JobListingsScreen._withMockBaseline` 과 동일 규칙)
+  List<Job> _withMockBaseline({
+    required List<Job> liveJobs,
+    required List<Job> mockJobs,
+    required int mockCount,
+    required int totalLimit,
+  }) {
+    final live = List<Job>.of(liveJobs)
+      ..sort((a, b) => b.postedAt.compareTo(a.postedAt));
+    return <Job>[
+      ...live,
+      ...mockJobs.take(mockCount),
+    ].take(totalLimit).toList();
   }
 
   Future<void> _loadLevel3({bool reset = false}) async {
     if (_level3Loading) return;
-    if (!reset && !_level3HasMore) return;
+    // mock fallback 으로 채워둔 상태에선 추가 페이징을 시도하지 않는다.
+    if (!reset && (!_level3HasMore || _useMockLevel3)) return;
 
     if (reset) {
       setState(() {
         _level3 = [];
         _level3LastDoc = null;
         _level3HasMore = true;
+        _useMockLevel3 = false;
       });
     }
     setState(() => _level3Loading = true);
@@ -110,6 +161,21 @@ class _JobBoardPageState extends State<JobBoardPage> {
       );
       if (!mounted) return;
 
+      // 첫 페이지 결과가 비었고 누적된 데이터도 없으면 mock 으로 fallback
+      // (filter 가 걸려 0건일 수도 있으니 reset 일 때만 mock 으로 대체한다.)
+      if (reset && result.jobs.isEmpty && _level3.isEmpty) {
+        setState(() {
+          _level3 = _applyClientSideFilter(
+            generateMockLevel3Jobs(count: _kStandardMockCount),
+          );
+          _level3LastDoc = null;
+          _level3HasMore = false;
+          _useMockLevel3 = true;
+          _level3Loading = false;
+        });
+        return;
+      }
+
       setState(() {
         _level3.addAll(_applyClientSideFilter(result.jobs));
         _level3LastDoc = result.lastDoc;
@@ -118,7 +184,19 @@ class _JobBoardPageState extends State<JobBoardPage> {
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _level3Loading = false);
+      // 네트워크 오류 — 첫 로딩이면 mock 으로 대체해 빈 화면을 피한다.
+      if (reset && _level3.isEmpty) {
+        setState(() {
+          _level3 = _applyClientSideFilter(
+            generateMockLevel3Jobs(count: _kStandardMockCount),
+          );
+          _level3HasMore = false;
+          _useMockLevel3 = true;
+          _level3Loading = false;
+        });
+      } else {
+        setState(() => _level3Loading = false);
+      }
     }
   }
 

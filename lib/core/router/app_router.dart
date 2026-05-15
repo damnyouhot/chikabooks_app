@@ -20,17 +20,25 @@ import '../../features/jobs/web/published_job_detail_page.dart';
 import '../../features/jobs/web/campaign_dashboard_page.dart';
 import '../../features/jobs/web/legal_page.dart';
 import '../../features/jobs/ui/clinic_verify_page.dart';
+import '../../features/applicant/web/pages/applicant_account_page.dart';
 import '../../features/applicant/web/pages/applicant_applications_page.dart';
+import '../../features/applicant/web/pages/applicant_bookmarks_page.dart';
+import '../../features/applicant/web/pages/applicant_career_page.dart';
+import '../../features/applicant/web/pages/applicant_messages_page.dart';
+import '../../features/applicant/web/pages/applicant_polls_page.dart';
+import '../../features/applicant/web/pages/applicant_senior_qna_page.dart';
 import '../../features/applicant/web/pages/applicant_dashboard_page.dart';
 import '../../features/applicant/web/pages/applicant_job_detail_page.dart';
 import '../../features/applicant/web/pages/apply_confirm_web_page.dart';
 import '../../features/applicant/web/pages/job_board_page.dart';
+import '../../features/applicant/web/widgets/applicant_web_shell.dart';
 import '../../features/me/pages/me_overview_page.dart';
 import '../../features/me/pages/me_clinic_page.dart';
 import '../../features/me/pages/me_account_page.dart';
 import '../../features/me/pages/me_billing_page.dart';
 import '../../features/me/pages/me_orders_page.dart';
 import '../../features/me/pages/me_applicants_pool_page.dart';
+import '../../features/me/pages/me_messages_page.dart';
 import '../../features/me/pages/me_notifications_page.dart';
 import '../../features/auth/web/web_login_page.dart';
 import '../../features/auth/web/set_password_page.dart';
@@ -126,20 +134,14 @@ final appRouter = GoRouter(
     final user = FirebaseAuth.instance.currentUser;
     final path = state.uri.path;
 
-    // 웹의 첫 화면(`/`)은 JobBoardPage(공고 보드) 로 누구나 들어올 수 있다.
+    // 웹의 첫 화면(`/`)은 JobBoardPage(공고 보드)로 누구나 들어올 수 있다.
     // 비로그인 사용자가 카드를 클릭하는 시점에 인라인 로그인 모달이 떠서
     // 로그인 → 상세로 이어가게 한다.
     //
-    // 단, 로그인한 클리닉(공고자) 계정이 `/` 로 진입하면 지원자용 셸이 노출되어
-    // 어색하므로 자기 대시보드(`/me`)로 보낸다. 비로그인·지원자는 그대로 통과.
-    if (kIsWeb && path == '/' && user != null) {
-      try {
-        final isClinic = await ClinicAuthService.isClinicAccount();
-        if (isClinic) return '/me';
-      } catch (_) {
-        // 판별 실패 시에는 통과시켜 보드를 보여 준다.
-      }
-    }
+    // 클리닉(공고자) 계정도 `/`에 자유롭게 머무를 수 있다 — 자기 공고 외에
+    // 다른 치과의 공고를 둘러보거나 시장 동향을 살피는 용도로 활용 가능.
+    // 자기 대시보드(공고 관리)로 가려면 상단 프로필 메뉴 또는 사이드바의
+    // "내 정보 / 대시보드" CTA로 명시적으로 이동한다.
 
     // /login 은 비로그인 전용이지만, 로그인된 상태에서도 페이지 자체에서
     // "현재 로그인됨" 카드를 보여주므로 자동 리다이렉트하지 않는다.
@@ -183,11 +185,12 @@ final appRouter = GoRouter(
         '/me/orders',
         '/me/applicants',
         '/me/notifications',
-        '/me/account',
       ];
       const meApplicantOnly = <String>[
         '/me/applications',
         '/me/resumes',
+        '/me/bookmarks',
+        '/me/profile',
       ];
       try {
         final isClinic = await ClinicAuthService.isClinicAccount();
@@ -264,6 +267,14 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/bond',
       builder: (_, __) => const AuthGate(initialTabIndex: 1),
+    ),
+    GoRoute(
+      path: '/bond/polls',
+      builder: (_, __) => const ApplicantPollsPage(),
+    ),
+    GoRoute(
+      path: '/bond/qna',
+      builder: (_, __) => const ApplicantSeniorQnaPage(),
     ),
     GoRoute(
       path: '/growth',
@@ -390,9 +401,33 @@ final appRouter = GoRouter(
           ),
     ),
     GoRoute(path: '/jobs', builder: (_, __) => const JobPage()),
-    GoRoute(path: '/policy', builder: (_, __) => const HiraUpdatePage()),
-    GoRoute(path: '/books', builder: (_, __) => const EbookListPage()),
-    GoRoute(path: '/quiz', builder: (_, __) => const QuizTodayPage()),
+    // 일반 사용자가 사이드바에서 진입하는 콘텐츠 페이지들은 ApplicantWebShell 로
+    // 감싸서 좌측 사이드바 + 폭 제한 레이아웃을 유지한다 (공고 보드와 일관).
+    GoRoute(
+      path: '/policy',
+      // HiraUpdatePage 내부에서 Expanded(child: TabBarView(...)) 를 사용하므로
+      // 부모가 bounded height 이어야 한다. ApplicantWebShell 의 SingleChildScrollView
+      // (scrollable: true) 안에 들어가면 unbounded vertical 이 되어 layout 이
+      // 무너지고 release 빌드에서는 본문이 그려지지 않으므로 false 를 사용.
+      builder: (_, __) => const _ApplicantShellWrap(
+        scrollable: false,
+        child: HiraUpdatePage(),
+      ),
+    ),
+    GoRoute(
+      path: '/books',
+      builder: (_, __) => const _ApplicantShellWrap(
+        scrollable: false,
+        child: EbookListPage(),
+      ),
+    ),
+    GoRoute(
+      path: '/quiz',
+      builder: (_, __) => const _ApplicantShellWrap(
+        scrollable: false,
+        child: QuizTodayPage(),
+      ),
+    ),
 
     // ── 관리자 대시보드 ──────────────────────────────────────
     GoRoute(path: '/admin', builder: (_, __) => const AdminDashboardPage()),
@@ -412,12 +447,31 @@ final appRouter = GoRouter(
       path: '/me/notifications',
       builder: (_, __) => const MeNotificationsPage(),
     ),
-    GoRoute(path: '/me/account', builder: (_, __) => const MeAccountPage()),
+    GoRoute(path: '/me/account', builder: (_, __) => const _AccountRoleRouter()),
+
+    // ── 양 역할 공용 /me 서브페이지 ────────────────────────────
+    // /me/messages: 치과 ↔ 지원자 1:1 대화. 역할별로 다른 셸을 입혀야 해서
+    // _MessagesRoleRouter 가 분기한다.
+    GoRoute(
+      path: '/me/messages',
+      builder: (_, state) {
+        final tid = state.uri.queryParameters['tid'];
+        return _MessagesRoleRouter(initialThreadId: tid);
+      },
+    ),
 
     // ── 지원자 전용 /me 서브페이지 ────────────────────────────
     GoRoute(
       path: '/me/applications',
       builder: (_, __) => const ApplicantApplicationsPage(),
+    ),
+    GoRoute(
+      path: '/me/bookmarks',
+      builder: (_, __) => const ApplicantBookmarksPage(),
+    ),
+    GoRoute(
+      path: '/me/profile',
+      builder: (_, __) => const ApplicantCareerPage(),
     ),
     GoRoute(
       path: '/me/resumes',
@@ -527,6 +581,28 @@ final appRouter = GoRouter(
   ],
 );
 
+/// 일반 사용자가 사이드바에서 진입하는 콘텐츠 페이지(`/quiz`, `/policy`, `/books` 등)를
+/// [ApplicantWebShell] 로 감싸 좌측 사이드바 + 폭 제한 레이아웃을 적용하는 래퍼.
+///
+/// 페이지 자체가 [ListView]/[CustomScrollView] 를 갖고 있으면 [scrollable]: false 로
+/// 두어 이중 스크롤을 방지한다.
+class _ApplicantShellWrap extends StatelessWidget {
+  const _ApplicantShellWrap({
+    required this.child,
+    this.scrollable = true,
+  });
+  final Widget child;
+  final bool scrollable;
+
+  @override
+  Widget build(BuildContext context) {
+    return ApplicantWebShell(
+      scrollable: scrollable,
+      body: child,
+    );
+  }
+}
+
 /// `/me` 역할 분기 위젯.
 ///
 /// 라우터 redirect 단계에서는 비동기 [ClinicAuthService.isClinicAccount] 결과로
@@ -570,5 +646,95 @@ class _MeRoleRouterState extends State<_MeRoleRouter> {
     return _isClinic!
         ? const MeOverviewPage()
         : const ApplicantDashboardPage();
+  }
+}
+
+/// `/me/account` 진입 시 역할에 따라 분기.
+///
+/// - 치과 계정 → 기존 [MeAccountPage] (멤버 초대 등 치과 전용 옵션 포함)
+/// - 일반(지원자) 계정 → [ApplicantAccountPage] (`ApplicantWebShell` 셸 적용)
+class _AccountRoleRouter extends StatefulWidget {
+  const _AccountRoleRouter();
+
+  @override
+  State<_AccountRoleRouter> createState() => _AccountRoleRouterState();
+}
+
+class _AccountRoleRouterState extends State<_AccountRoleRouter> {
+  bool? _isClinic;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolve();
+  }
+
+  Future<void> _resolve() async {
+    try {
+      final isClinic = await ClinicAuthService.isClinicAccount();
+      if (!mounted) return;
+      setState(() => _isClinic = isClinic);
+    } catch (_) {
+      if (!mounted) return;
+      // 판별 불가 시 일반 사용자가 더 많으므로 지원자 화면으로 fallback
+      setState(() => _isClinic = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isClinic == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    return _isClinic!
+        ? const MeAccountPage()
+        : const ApplicantAccountPage();
+  }
+}
+
+/// `/me/messages` — 역할별 1:1 대화 페이지.
+///
+/// - 치과 계정 → [MeMessagesPage] (MePageShell)
+/// - 일반(지원자) 계정 → [ApplicantMessagesPage] (ApplicantWebShell)
+class _MessagesRoleRouter extends StatefulWidget {
+  const _MessagesRoleRouter({this.initialThreadId});
+  final String? initialThreadId;
+
+  @override
+  State<_MessagesRoleRouter> createState() => _MessagesRoleRouterState();
+}
+
+class _MessagesRoleRouterState extends State<_MessagesRoleRouter> {
+  bool? _isClinic;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolve();
+  }
+
+  Future<void> _resolve() async {
+    try {
+      final isClinic = await ClinicAuthService.isClinicAccount();
+      if (!mounted) return;
+      setState(() => _isClinic = isClinic);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isClinic = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isClinic == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    return _isClinic!
+        ? MeMessagesPage(initialThreadId: widget.initialThreadId)
+        : const ApplicantMessagesPage();
   }
 }

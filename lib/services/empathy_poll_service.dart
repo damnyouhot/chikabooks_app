@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/poll.dart';
 import '../models/poll_comment.dart';
+import '../models/poll_comment_reply.dart';
 import '../models/poll_option.dart';
 import '../features/senior_qna/data/senior_stickers.dart';
 import 'user_profile_service.dart';
@@ -40,6 +41,29 @@ class EmpathyPollService {
   static CollectionReference<Map<String, dynamic>> _pollCommentsRef(
     String pollId,
   ) => _pollDoc(pollId).collection('pollComments');
+
+  static DocumentReference<Map<String, dynamic>> _pollCommentRef(
+    String pollId,
+    String commentId,
+  ) => _pollCommentsRef(pollId).doc(commentId);
+
+  static CollectionReference<Map<String, dynamic>> _pollCommentRepliesRef(
+    String pollId,
+    String commentId,
+  ) => _pollCommentRef(pollId, commentId).collection('replies');
+
+  static CollectionReference<Map<String, dynamic>> _pollCommentLikesRef(
+    String pollId,
+    String commentId,
+  ) => _pollCommentRef(pollId, commentId).collection('likes');
+
+  static CollectionReference<Map<String, dynamic>> _pollCommentReplyLikesRef(
+    String pollId,
+    String commentId,
+    String replyId,
+  ) => _pollCommentRepliesRef(pollId, commentId).doc(replyId).collection(
+    'likes',
+  );
 
   /// 종료 투표 한마디 댓글 최대 길이
   static const int maxPollCommentLength = 300;
@@ -389,12 +413,148 @@ class EmpathyPollService {
         'text': trimmed,
         'uid': uid,
         'createdAt': FieldValue.serverTimestamp(),
+        'likeCount': 0,
+        'replyCount': 0,
       });
       return PollCommentResult.ok();
     } catch (e) {
       debugPrint('⚠️ EmpathyPollService.addPollComment: $e');
       return PollCommentResult.fail('댓글 등록 중 오류가 발생했습니다.');
     }
+  }
+
+  // ─── 댓글 좋아요 ───────────────────────────────────────────
+
+  /// 댓글 좋아요 토글 (있으면 취소, 없으면 추가)
+  static Future<void> togglePollCommentLike(
+    String pollId,
+    String commentId,
+  ) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+    try {
+      final likeRef = _pollCommentLikesRef(pollId, commentId).doc(uid);
+      final commentRef = _pollCommentRef(pollId, commentId);
+      await _db.runTransaction((tx) async {
+        final snap = await tx.get(likeRef);
+        if (snap.exists) {
+          tx.delete(likeRef);
+          tx.update(commentRef, {'likeCount': FieldValue.increment(-1)});
+        } else {
+          tx.set(likeRef, {
+            'uid': uid,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+          tx.update(commentRef, {'likeCount': FieldValue.increment(1)});
+        }
+      });
+    } catch (e) {
+      debugPrint('⚠️ EmpathyPollService.togglePollCommentLike: $e');
+    }
+  }
+
+  /// 내가 이 댓글에 좋아요를 눌렀는지 실시간 스트림
+  static Stream<bool> watchPollCommentLikeSelected(
+    String pollId,
+    String commentId,
+  ) {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return Stream.value(false);
+    return _pollCommentLikesRef(pollId, commentId)
+        .doc(uid)
+        .snapshots()
+        .map((s) => s.exists);
+  }
+
+  // ─── 대댓글 ────────────────────────────────────────────────
+
+  /// 댓글의 대댓글 스트림 (오래된 순)
+  static Stream<List<PollCommentReply>> pollCommentRepliesStream(
+    String pollId,
+    String commentId,
+  ) {
+    return _pollCommentRepliesRef(pollId, commentId)
+        .orderBy('createdAt', descending: false)
+        .snapshots()
+        .map((s) => s.docs.map(PollCommentReply.fromDoc).toList());
+  }
+
+  /// 대댓글 작성 (종료된 투표에만)
+  static Future<PollCommentResult> addPollCommentReply(
+    String pollId,
+    String commentId,
+    String text,
+  ) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return PollCommentResult.fail('로그인이 필요합니다.');
+
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return PollCommentResult.fail('내용을 입력해주세요.');
+    if (trimmed.length > maxPollCommentLength) {
+      return PollCommentResult.fail('$maxPollCommentLength자 이내로 작성해주세요.');
+    }
+
+    try {
+      final commentRef = _pollCommentRef(pollId, commentId);
+      final replyRef = _pollCommentRepliesRef(pollId, commentId).doc();
+      final batch = _db.batch();
+      batch.set(replyRef, {
+        'text': trimmed,
+        'uid': uid,
+        'createdAt': FieldValue.serverTimestamp(),
+        'likeCount': 0,
+      });
+      batch.update(commentRef, {'replyCount': FieldValue.increment(1)});
+      await batch.commit();
+      return PollCommentResult.ok();
+    } catch (e) {
+      debugPrint('⚠️ EmpathyPollService.addPollCommentReply: $e');
+      return PollCommentResult.fail('답글 등록 중 오류가 발생했습니다.');
+    }
+  }
+
+  /// 대댓글 좋아요 토글
+  static Future<void> togglePollCommentReplyLike(
+    String pollId,
+    String commentId,
+    String replyId,
+  ) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+    try {
+      final likeRef = _pollCommentReplyLikesRef(pollId, commentId, replyId)
+          .doc(uid);
+      final replyRef = _pollCommentRepliesRef(pollId, commentId).doc(replyId);
+      await _db.runTransaction((tx) async {
+        final snap = await tx.get(likeRef);
+        if (snap.exists) {
+          tx.delete(likeRef);
+          tx.update(replyRef, {'likeCount': FieldValue.increment(-1)});
+        } else {
+          tx.set(likeRef, {
+            'uid': uid,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+          tx.update(replyRef, {'likeCount': FieldValue.increment(1)});
+        }
+      });
+    } catch (e) {
+      debugPrint('⚠️ EmpathyPollService.togglePollCommentReplyLike: $e');
+    }
+  }
+
+  /// 내가 이 대댓글에 좋아요를 눌렀는지 실시간 스트림
+  static Stream<bool> watchPollCommentReplyLikeSelected(
+    String pollId,
+    String commentId,
+    String replyId,
+  ) {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return Stream.value(false);
+    return _pollCommentReplyLikesRef(pollId, commentId, replyId)
+        .doc(uid)
+        .snapshots()
+        .map((s) => s.exists);
   }
 
   // ═══════════════════════════════════════════════════════════

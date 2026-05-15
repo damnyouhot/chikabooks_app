@@ -23,6 +23,16 @@ import {logAdminAction} from "./adminAuditLog";
 
 const getDb = (): admin.firestore.Firestore => admin.firestore();
 
+/**
+ * 모든 어드민 콜러블의 배포 리전.
+ *
+ * ⚠️ 클라이언트(`FirebaseFunctions.instanceFor(region: 'asia-northeast3')`) 와
+ *    반드시 동일해야 한다. 다르면 NOT_FOUND 가 발생한다.
+ *
+ * 다른 신규 콜러블(ads/*) 도 동일 리전을 사용한다.
+ */
+const ADMIN_REGION = "asia-northeast3";
+
 export interface AdminGuardOptions<TIn> {
   /** 콜러블 이름 (감사 로그 actionName 으로 그대로 들어감) */
   name: string;
@@ -77,72 +87,84 @@ export async function requireAdminUid(
 /**
  * 신규 어드민 callable 을 만들 때 사용하는 표준 래퍼.
  *
- * @template TIn  callable 입력 타입
- * @template TOut callable 반환 타입
- * @param {AdminGuardOptions<TIn>} options 가드/감사 로그 메타
- * @param {(input: TIn, ctx: AdminContext) => Promise<TOut>} handler 본체
- * @return {functions.HttpsFunction & functions.Runnable<unknown>} v1 onCall 함수
+ * - 모든 어드민 콜러블은 `ADMIN_REGION` (asia-northeast3) 에 deploy 된다.
+ *   클라이언트는 `FirebaseFunctions.instanceFor(region: 'asia-northeast3')`
+ *   으로 호출하므로 리전이 다르면 NOT_FOUND 발생.
+ * - 핸들러 호출 전·후로 어드민 권한 검증과 감사 로그를 자동 처리한다.
+ *
+ * @param {AdminGuardOptions} options 가드/감사 로그 메타
+ * @param {Function} handler 핸들러 본체
+ * @return {functions.HttpsFunction} v1 onCall 함수
  */
 export function adminCallable<TIn, TOut>(
   options: AdminGuardOptions<TIn>,
   handler: (input: TIn, ctx: AdminContext) => Promise<TOut>,
 ): functions.HttpsFunction & functions.Runnable<unknown> {
-  return functions.https.onCall(async (rawData, context) => {
-    const start = Date.now();
-    let adminCtx: AdminContext;
-    try {
-      adminCtx = await requireAdminUid(context);
-    } catch (e) {
+  return functions
+    .region(ADMIN_REGION)
+    .https.onCall(async (rawData, context) => {
+      const start = Date.now();
+      let adminCtx: AdminContext;
+      try {
+        adminCtx = await requireAdminUid(context);
+      } catch (e) {
       // 인증 실패도 감사 로그에 남기되, 실패 사실 본체는 throw 한다.
-      const auth = context.auth;
-      await logAdminAction({
-        actorUid: auth?.uid ?? "anonymous",
-        actorEmail: (auth?.token?.email as string | undefined) ?? null,
-        actionName: options.name,
-        args: safeLogArgs(options.logArgs, rawData as TIn),
-        target: safeResolveTarget(options.resolveTarget, rawData as TIn),
-        destructive: options.destructive === true,
-        success: false,
-        error: errorMessage(e),
-        elapsedMs: Date.now() - start,
-      });
-      throw e;
-    }
+        const auth = context.auth;
+        await logAdminAction({
+          actorUid: auth?.uid ?? "anonymous",
+          actorEmail: (auth?.token?.email as string | undefined) ?? null,
+          actionName: options.name,
+          args: safeLogArgs(options.logArgs, rawData as TIn),
+          target: safeResolveTarget(options.resolveTarget, rawData as TIn),
+          destructive: options.destructive === true,
+          success: false,
+          error: errorMessage(e),
+          elapsedMs: Date.now() - start,
+        });
+        throw e;
+      }
 
-    const input = rawData as TIn;
-    const args = safeLogArgs(options.logArgs, input);
-    const target = safeResolveTarget(options.resolveTarget, input);
+      const input = rawData as TIn;
+      const args = safeLogArgs(options.logArgs, input);
+      const target = safeResolveTarget(options.resolveTarget, input);
 
-    try {
-      const result = await handler(input, adminCtx);
-      await logAdminAction({
-        actorUid: adminCtx.uid,
-        actorEmail: adminCtx.email,
-        actionName: options.name,
-        args,
-        target,
-        destructive: options.destructive === true,
-        success: true,
-        elapsedMs: Date.now() - start,
-      });
-      return result;
-    } catch (e) {
-      await logAdminAction({
-        actorUid: adminCtx.uid,
-        actorEmail: adminCtx.email,
-        actionName: options.name,
-        args,
-        target,
-        destructive: options.destructive === true,
-        success: false,
-        error: errorMessage(e),
-        elapsedMs: Date.now() - start,
-      });
-      throw e;
-    }
-  });
+      try {
+        const result = await handler(input, adminCtx);
+        await logAdminAction({
+          actorUid: adminCtx.uid,
+          actorEmail: adminCtx.email,
+          actionName: options.name,
+          args,
+          target,
+          destructive: options.destructive === true,
+          success: true,
+          elapsedMs: Date.now() - start,
+        });
+        return result;
+      } catch (e) {
+        await logAdminAction({
+          actorUid: adminCtx.uid,
+          actorEmail: adminCtx.email,
+          actionName: options.name,
+          args,
+          target,
+          destructive: options.destructive === true,
+          success: false,
+          error: errorMessage(e),
+          elapsedMs: Date.now() - start,
+        });
+        throw e;
+      }
+    });
 }
 
+/**
+ * `logArgs` 콜백이 throw 하더라도 감사 로그가 깨지지 않도록 안전하게 호출.
+ *
+ * @param {Function|undefined} fn 인자 직렬화 함수
+ * @param {*} input 콜러블 원본 입력
+ * @return {Record<string, unknown>} 직렬화된 인자(예외 시 빈 객체)
+ */
 function safeLogArgs<TIn>(
   fn: ((input: TIn) => Record<string, unknown>) | undefined,
   input: TIn,
@@ -157,6 +179,13 @@ function safeLogArgs<TIn>(
   }
 }
 
+/**
+ * `resolveTarget` 콜백을 안전하게 호출. 실패 시 null.
+ *
+ * @param {Function|undefined} fn 타겟 식별자 추출 함수
+ * @param {*} input 콜러블 원본 입력
+ * @return {string|null} 타겟 식별자 또는 null
+ */
 function safeResolveTarget<TIn>(
   fn: ((input: TIn) => string | null | undefined) | undefined,
   input: TIn,
@@ -171,6 +200,12 @@ function safeResolveTarget<TIn>(
   }
 }
 
+/**
+ * 임의의 에러 값에서 사람이 읽을 수 있는 메시지를 추출.
+ *
+ * @param {unknown} e 에러 값
+ * @return {string} 메시지 문자열
+ */
 function errorMessage(e: unknown): string {
   if (e instanceof Error) return e.message;
   if (typeof e === "string") return e;

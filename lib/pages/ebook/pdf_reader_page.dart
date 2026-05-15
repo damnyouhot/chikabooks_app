@@ -1,6 +1,7 @@
 // lib/pages/ebook/pdf_reader_page.dart
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/theme/app_colors.dart';
@@ -34,12 +35,16 @@ class _PdfReaderPageState extends State<PdfReaderPage> {
   void initState() {
     super.initState();
     // PDF 리더: 가로/세로 모두 허용 (가로형 책 지원)
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
-    ]);
+    // 단, 웹에는 SystemChrome.setPreferredOrientations 가 의미 없을 뿐 아니라
+    // 일부 환경에서 노이즈를 만들 수 있어 모바일 한정으로만 호출한다.
+    if (!kIsWeb) {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+    }
     _loadPdf();
   }
 
@@ -53,7 +58,28 @@ class _PdfReaderPageState extends State<PdfReaderPage> {
         if (savedPage is int && savedPage > 0) initialPage = savedPage;
       }
 
-      // 2. PDF 파일 다운로드
+      // 2. PDF 바이트 확보
+      //    웹: dart:io / path_provider 가 동작하지 않으므로 메모리 바이트로 직접 연다.
+      //    모바일: 로컬 캐시 파일에 저장한 뒤 file 경로로 연다.
+      if (kIsWeb) {
+        final response = await http.get(Uri.parse(widget.ebook.fileUrl));
+        if (response.statusCode != 200) {
+          throw Exception('PDF 다운로드 실패: ${response.statusCode}');
+        }
+        final bytes = response.bodyBytes;
+        _pdfController = PdfControllerPinch(
+          document: PdfDocument.openData(bytes),
+          initialPage: initialPage,
+        );
+        final document = await PdfDocument.openData(bytes);
+        setState(() {
+          _totalPages = document.pagesCount;
+          _currentPage = initialPage;
+          _isLoading = false;
+        });
+        return;
+      }
+
       final dir = await getApplicationDocumentsDirectory();
       final file = File('${dir.path}/${widget.ebook.id}.pdf');
 
@@ -115,11 +141,13 @@ class _PdfReaderPageState extends State<PdfReaderPage> {
     // 닫힐 때 마지막 페이지 저장
     _ebookService.saveReadingProgress(widget.ebook.id, lastPage: _currentPage);
     _pdfController?.dispose();
-    // 페이지 나갈 때 세로 고정 복원
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]);
+    // 페이지 나갈 때 세로 고정 복원 (모바일 한정)
+    if (!kIsWeb) {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+      ]);
+    }
     super.dispose();
   }
 
@@ -154,7 +182,20 @@ class _PdfReaderPageState extends State<PdfReaderPage> {
           ),
         ],
       ),
-      body: _buildBody(),
+      // 와이드 모니터(≥1200)에서는 PDF 표시 영역을 화면의 50% 로 좁혀
+      // 한 줄이 너무 길어지지 않도록 한다. 모바일/태블릿(<1200)에서는 영향 없음.
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final inner = _buildBody();
+          if (constraints.maxWidth < 1200) return inner;
+          return Center(
+            child: SizedBox(
+              width: constraints.maxWidth * 0.5,
+              child: inner,
+            ),
+          );
+        },
+      ),
     );
   }
 

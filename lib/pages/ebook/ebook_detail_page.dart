@@ -1,4 +1,5 @@
 // lib/pages/ebook/ebook_detail_page.dart
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -75,14 +76,9 @@ class _EbookDetailPageState extends State<EbookDetailPage> {
             ? '무료'
             : '${NumberFormat.decimalPattern().format(ebook.price)}원';
 
-    return Scaffold(
-      backgroundColor: AppColors.appBg,
-      appBar: AppBar(
-        title: Text(ebook.title),
-        backgroundColor: AppColors.appBg,
-        elevation: 0,
-      ),
-      body: SingleChildScrollView(
+    // 와이드 모니터(≥1200)에서는 본문 폭을 화면의 50% 로 좁혀 가독성을 높인다.
+    // 모바일/태블릿(<1200)에서는 영향 없음.
+    final body = SingleChildScrollView(
         padding: const EdgeInsets.all(AppSpacing.xxl),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -202,6 +198,26 @@ class _EbookDetailPageState extends State<EbookDetailPage> {
             ],
           ],
         ),
+      );
+
+    return Scaffold(
+      backgroundColor: AppColors.appBg,
+      appBar: AppBar(
+        title: Text(ebook.title),
+        backgroundColor: AppColors.appBg,
+        elevation: 0,
+      ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final wide = constraints.maxWidth >= 1200;
+          if (!wide) return body;
+          return Center(
+            child: SizedBox(
+              width: constraints.maxWidth * 0.5,
+              child: body,
+            ),
+          );
+        },
       ),
     );
   }
@@ -349,6 +365,12 @@ class _EbookDetailPageState extends State<EbookDetailPage> {
 
   /// 리더 페이지로 이동
   void _navigateToReader(BuildContext context) {
+    // 웹에서는 EPUB 뷰어(`epub_view`)가 동작하지 않으므로 안내 다이얼로그만 노출.
+    // PDF 는 PdfReaderPage 가 kIsWeb 분기로 메모리에서 직접 열어 정상 동작한다.
+    if (kIsWeb && !_isPdf) {
+      _showEpubMobileOnlyDialog(context);
+      return;
+    }
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -357,6 +379,53 @@ class _EbookDetailPageState extends State<EbookDetailPage> {
                 _isPdf
                     ? PdfReaderPage(ebook: ebook)
                     : EpubReaderPage(ebook: ebook),
+      ),
+    );
+  }
+
+  void _showEpubMobileOnlyDialog(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogCtx) => AppModalDialog(
+        insetPadding: const EdgeInsets.all(AppSpacing.xl),
+        cardPadding: const EdgeInsets.all(AppSpacing.xxl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.phone_iphone_rounded,
+              size: 44,
+              color: AppColors.accent,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            const Text(
+              '모바일 앱에서 읽어주세요',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            const Text(
+              'EPUB 형식 책은 현재 웹 뷰어에서 지원되지 않아요.\n모바일 앱(안드로이드/iOS)에서 동일한 책을 그대로 이어 읽을 수 있어요.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () => Navigator.of(dialogCtx).pop(),
+                child: const Text('확인'),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

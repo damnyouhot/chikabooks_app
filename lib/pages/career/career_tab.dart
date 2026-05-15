@@ -1,5 +1,7 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../services/career_profile_service.dart';
+import '../../features/messages/mobile/messages_page.dart';
 import '../../features/resume/screens/resume_home_screen.dart';
 import '../../features/resume/screens/my_applications_screen.dart';
 import '../../core/theme/app_colors.dart';
@@ -8,7 +10,9 @@ import '../../core/widgets/app_confirm_modal.dart';
 import '../../core/widgets/app_muted_card.dart';
 import '../../core/widgets/app_segmented_control.dart';
 import '../../core/widgets/app_badge.dart';
+import '../../models/message_thread.dart';
 import '../../services/content_read_state_service.dart';
+import '../../services/message_service.dart';
 import 'career_shared.dart';
 import 'career_identity_section.dart';
 import 'career_skill_section.dart';
@@ -21,7 +25,7 @@ const int _kCareerSkillPreviewMax = 8;
 /// 커리어 탭 소탭바 (AppSegmentedControl 전용 헤더)
 ///
 /// 타이틀·인포·설정은 [job_page.dart]의 [_JobPageTitleBar]가 처리하며,
-/// 이 위젯은 소탭('공고 보기' / '커리어 카드')만 렌더링합니다.
+/// 이 위젯은 소탭('공고 보기' / '커리어 관리')만 렌더링합니다.
 class CareerTabHeader extends StatefulWidget {
   const CareerTabHeader({super.key});
 
@@ -73,7 +77,7 @@ class _CareerTabHeaderState extends State<CareerTabHeader> {
       builder: (context, snapshot) {
         return AppSegmentedControl(
           controller: DefaultTabController.of(context),
-          labels: const ['공고 보기', '커리어 카드'],
+          labels: const ['공고 보기', '커리어 관리'],
           newIndices: snapshot.data ?? const {},
           margin: const EdgeInsets.symmetric(
             horizontal: AppSpacing.xl,
@@ -146,10 +150,12 @@ class CareerTab extends StatelessWidget {
               children: [
                 // ══════════════════════════════════════════
                 // 1. 최상위 커리어 카드 (Blue — AppPrimaryCard)
+                //    단계 정보까지 흡수해 "한눈에 보기" 카드로 동작.
                 // ══════════════════════════════════════════
                 _TopCareerCard(
                   identity: identity,
                   totalCareerMonths: totalCareerMonths,
+                  totalClinics: entries.length,
                   autoMonths: autoMonths,
                 ),
                 const SizedBox(height: AppSpacing.lg),
@@ -172,13 +178,10 @@ class CareerTab extends StatelessWidget {
                 const SizedBox(height: AppSpacing.lg),
 
                 // ══════════════════════════════════════════
-                // 4. 커리어 단계 카드 + 치과 네트워크 통합 (Gray)
+                // 4. 치과 네트워크 카드 (Gray)
+                //    단계 영역은 상단 커리어 카드로 흡수됨.
                 // ══════════════════════════════════════════
-                _StageAndNetworkCard(
-                  totalCareerMonths: totalCareerMonths,
-                  totalClinics: entries.length,
-                  entries: entries,
-                ),
+                _NetworkCard(entries: entries),
               ],
             );
           },
@@ -217,38 +220,56 @@ class CareerTab extends StatelessWidget {
 class _TopCareerCard extends StatelessWidget {
   final Map<String, dynamic>? identity;
   final int totalCareerMonths;
+  final int totalClinics;
   final int autoMonths;
 
   const _TopCareerCard({
     required this.identity,
     required this.totalCareerMonths,
+    required this.totalClinics,
     required this.autoMonths,
   });
 
   @override
   Widget build(BuildContext context) {
-    // CareerCard(= AppPrimaryCard)를 그대로 활용하고 헤더 타이틀만 추가
+    final stage = computeCareerStageSummary(
+      totalCareerMonths: totalCareerMonths,
+      totalClinics: totalClinics,
+    );
+
     return CareerCard(
       padding: EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── 섹션 라벨 ──
+          // ── 섹션 라벨 + 단계 배지 ──
           Padding(
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.lg,
               AppSpacing.md,
-              AppSpacing.lg,
+              AppSpacing.md,
               0,
             ),
-            child: Text(
-              '커리어 카드',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: AppColors.onCardPrimary.withOpacity(0.55),
-                letterSpacing: 0.5,
-              ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Text(
+                    '커리어 카드',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.onCardPrimary.withOpacity(0.55),
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+                _StageHeaderBadge(
+                  name: stage.currentName,
+                  index: stage.index,
+                  total: stage.totalStages,
+                ),
+              ],
             ),
           ),
           // ── 기존 Identity 카드 내용 ──
@@ -260,10 +281,58 @@ class _TopCareerCard extends StatelessWidget {
                     : _IdentityFilledInner(
                       identity: identity!,
                       totalCareerMonths: totalCareerMonths,
+                      totalClinics: totalClinics,
                       autoMonths: autoMonths,
                     ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 상단 커리어 카드 헤더 우측의 단계 배지.
+/// 탭하면 `showCareerStageGuideSheet` 가 열린다.
+class _StageHeaderBadge extends StatelessWidget {
+  final String name;
+  final int index;
+  final int total;
+  const _StageHeaderBadge({
+    required this.name,
+    required this.index,
+    required this.total,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () => showCareerStageGuideSheet(context),
+      borderRadius: BorderRadius.circular(AppRadius.full),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: AppColors.onCardPrimary.withOpacity(0.18),
+          borderRadius: BorderRadius.circular(AppRadius.full),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '$name · ${index + 1}/$total',
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: AppColors.onCardPrimary,
+              ),
+            ),
+            const SizedBox(width: 3),
+            Icon(
+              Icons.chevron_right,
+              size: 14,
+              color: AppColors.onCardPrimary.withOpacity(0.85),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -368,11 +437,13 @@ class _PlaceholderRow extends StatelessWidget {
 class _IdentityFilledInner extends StatelessWidget {
   final Map<String, dynamic> identity;
   final int totalCareerMonths;
+  final int totalClinics;
   final int autoMonths;
 
   const _IdentityFilledInner({
     required this.identity,
     required this.totalCareerMonths,
+    required this.totalClinics,
     required this.autoMonths,
   });
 
@@ -519,13 +590,25 @@ class _IdentityFilledInner extends StatelessWidget {
                 ),
             ],
           ),
+        // ── 단계 진척 스트립 (하단 단계 카드에서 흡수) ──
+        const SizedBox(height: 14),
+        Divider(
+          color: AppColors.onCardPrimary.withOpacity(0.15),
+          height: 1,
+          thickness: 1,
+        ),
+        const SizedBox(height: 12),
+        CareerStageMiniStrip(
+          totalCareerMonths: totalCareerMonths,
+          totalClinics: totalClinics,
+        ),
       ],
     );
   }
 }
 
 // ══════════════════════════════════════════════════════════════
-// 2. 이력서 + 지원내역 바로가기 — 가로 반반, Gray(Muted) 배경
+// 2. 이력서 + 지원내역 + 메시지 바로가기 — 가로 1/3씩, Gray(Muted) 배경
 // ══════════════════════════════════════════════════════════════
 class _ShortcutRow extends StatelessWidget {
   @override
@@ -538,7 +621,6 @@ class _ShortcutRow extends StatelessWidget {
             child: _ShortcutCard(
               icon: Icons.description_outlined,
               label: '내 이력서',
-              description: '이력서 작성 및 지원',
               onTap:
                   () => Navigator.push(
                     context,
@@ -551,12 +633,26 @@ class _ShortcutRow extends StatelessWidget {
             child: _ShortcutCard(
               icon: Icons.work_outline,
               label: '지원 내역',
-              description: '지원 공고 현황 확인',
               onTap:
                   () => Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (_) => const MyApplicationsScreen(),
+                    ),
+                  ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: _ShortcutCard(
+              icon: Icons.chat_bubble_outline_rounded,
+              label: '메시지',
+              showUnreadBadge: true,
+              onTap:
+                  () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const MobileMessagesPage(),
                     ),
                   ),
             ),
@@ -570,14 +666,17 @@ class _ShortcutRow extends StatelessWidget {
 class _ShortcutCard extends StatelessWidget {
   final IconData icon;
   final String label;
-  final String description;
   final VoidCallback onTap;
+
+  /// 라벨 우상단에 미읽음 메시지 합산 배지를 띄울지 여부.
+  /// `MessageService.watchMyThreads()` 의 unread 합 > 0 이면 빨간 점이 표시된다.
+  final bool showUnreadBadge;
 
   const _ShortcutCard({
     required this.icon,
     required this.label,
-    required this.description,
     required this.onTap,
+    this.showUnreadBadge = false,
   });
 
   @override
@@ -588,14 +687,25 @@ class _ShortcutCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: AppColors.accent.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(AppRadius.md),
-            ),
-            child: Icon(icon, color: AppColors.accent, size: 18),
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                ),
+                child: Icon(icon, color: AppColors.accent, size: 18),
+              ),
+              if (showUnreadBadge)
+                Positioned(
+                  top: -2,
+                  right: -2,
+                  child: _MessagesUnreadDot(),
+                ),
+            ],
           ),
           const SizedBox(height: 10),
           Text(
@@ -606,16 +716,51 @@ class _ShortcutCard extends StatelessWidget {
               color: AppColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 2),
-          Text(
-            description,
-            style: const TextStyle(
-              fontSize: 11,
-              color: AppColors.textSecondary,
-            ),
-          ),
         ],
       ),
+    );
+  }
+}
+
+/// 메시지 카드 우상단의 미읽음 배지.
+///
+/// `MessageService.watchMyThreads()` 결과를 들여다보고 본인의 미읽음 합이
+/// 0 보다 크면 작은 빨간 점(숫자 99+ 까지)을 띄운다.
+class _MessagesUnreadDot extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final myUid = FirebaseAuth.instance.currentUser?.uid;
+    if (myUid == null) return const SizedBox.shrink();
+    return StreamBuilder<List<MessageThread>>(
+      stream: MessageService.watchMyThreads(),
+      builder: (context, snap) {
+        final threads = snap.data ?? const <MessageThread>[];
+        final total = threads.fold<int>(
+          0,
+          (sum, t) => sum + t.unreadFor(myUid),
+        );
+        if (total <= 0) return const SizedBox.shrink();
+        final label = total > 99 ? '99+' : '$total';
+        return Container(
+          constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+          decoration: BoxDecoration(
+            color: AppColors.cardEmphasis,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: AppColors.appBg, width: 1.5),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              color: AppColors.onCardEmphasis,
+              height: 1.0,
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -768,58 +913,19 @@ class _SkillEmptyState extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════════
-// 4. 커리어 단계 + 치과 네트워크 통합 카드 — Gray(Muted) 배경
+// 4. 치과 네트워크 단독 카드 — Gray(Muted) 배경
+//    단계 영역은 상단 [_TopCareerCard] 로 흡수되었음.
 // ══════════════════════════════════════════════════════════════
-class _StageAndNetworkCard extends StatelessWidget {
-  final int totalCareerMonths;
-  final int totalClinics;
+class _NetworkCard extends StatelessWidget {
   final List<DentalNetworkEntry> entries;
 
-  const _StageAndNetworkCard({
-    required this.totalCareerMonths,
-    required this.totalClinics,
-    required this.entries,
-  });
+  const _NetworkCard({required this.entries});
 
   @override
   Widget build(BuildContext context) {
     return AppMutedCard(
       padding: const EdgeInsets.all(AppSpacing.lg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const CareerSectionTitle('커리어 단계'),
-          const SizedBox(height: 12),
-          _StageContent(
-            totalCareerMonths: totalCareerMonths,
-            totalClinics: totalClinics,
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          // ── 구분선 ──
-          const Divider(color: AppColors.divider, height: 1),
-          const SizedBox(height: AppSpacing.lg),
-          // ── 치과 네트워크 ──
-          _NetworkSection(entries: entries),
-        ],
-      ),
-    );
-  }
-}
-
-class _StageContent extends StatelessWidget {
-  final int totalCareerMonths;
-  final int totalClinics;
-
-  const _StageContent({
-    required this.totalCareerMonths,
-    required this.totalClinics,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return CareerStageCard(
-      totalCareerMonths: totalCareerMonths,
-      totalClinics: totalClinics,
+      child: _NetworkSection(entries: entries),
     );
   }
 }
