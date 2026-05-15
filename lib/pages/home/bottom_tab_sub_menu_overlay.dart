@@ -46,6 +46,7 @@ class BottomTabSubMenuOverlay extends StatefulWidget {
     required this.mode,
     required this.bottomNavHeight,
     this.pointerGlobalPosition,
+    this.defaultSelectedIndex = -1,
     this.onHoveredSubIndexChanged,
     this.onDismissed,
   });
@@ -64,6 +65,12 @@ class BottomTabSubMenuOverlay extends StatefulWidget {
 
   /// 손가락의 글로벌 좌표 ([SubMenuMode.interactive] 일 때만 의미 있음)
   final Offset? pointerGlobalPosition;
+
+  /// "손을 지금 떼면 가게 될 소탭" 의 [SubTab.index]. (-1 = 없음)
+  /// 현재는 해당 메인탭이 마지막으로 보고 있던 소탭. hover 가 있을 땐 hover 가
+  /// 우선 보이고, hover 가 없는 짧은 페이드 힌트 / interactive 진입 직후 등에
+  /// 옅은 음영으로 표시되어 사용자가 결과를 미리 알 수 있게 한다.
+  final int defaultSelectedIndex;
 
   /// 손가락 위치가 어느 소탭 위로 갔는지 상위에 알려줌
   /// (선택 없음 = -1). HomeShell 은 이 값을 받아 손 뗄 때 이동.
@@ -261,6 +268,7 @@ class _BottomTabSubMenuOverlayState extends State<BottomTabSubMenuOverlay>
                     ? _lastReportedHover
                     : -1,
             showHoverGuide: widget.mode == SubMenuMode.interactive,
+            defaultSelectedIndex: widget.defaultSelectedIndex,
             newIndicesStream: _newIndicesStream,
           ),
         ),
@@ -275,6 +283,7 @@ class _SubMenuPanel extends StatelessWidget {
     required this.tabs,
     required this.hoveredIndex,
     required this.showHoverGuide,
+    required this.defaultSelectedIndex,
     required this.newIndicesStream,
   });
 
@@ -282,6 +291,9 @@ class _SubMenuPanel extends StatelessWidget {
   final List<SubTab> tabs;
   final int hoveredIndex;
   final bool showHoverGuide;
+
+  /// "지금 손 떼면 갈 곳" 표시용 인덱스. hover 가 없을 때만 보임 (-1 = 없음).
+  final int defaultSelectedIndex;
 
   /// 상위 State 가 보관해 주는 안정적인 스트림 인스턴스.
   /// setState 반복에도 동일 인스턴스가 들어와 StreamBuilder 재구독이 없음.
@@ -326,11 +338,18 @@ class _SubMenuPanel extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               for (final t in displayedTabs)
-                _SubMenuItem(
-                  tab: t,
-                  hovered: showHoverGuide && hoveredIndex == t.index,
-                  showNew: newIndices.contains(t.index),
-                ),
+                () {
+                  // 우선순위: hover > selected. hover 가 있으면 selected 표시는 숨김.
+                  final isHovered = showHoverGuide && hoveredIndex == t.index;
+                  final isSelected =
+                      !isHovered && t.index == defaultSelectedIndex;
+                  return _SubMenuItem(
+                    tab: t,
+                    hovered: isHovered,
+                    selected: isSelected,
+                    showNew: newIndices.contains(t.index),
+                  );
+                }(),
             ],
           );
         },
@@ -343,22 +362,49 @@ class _SubMenuItem extends StatelessWidget {
   const _SubMenuItem({
     required this.tab,
     required this.hovered,
+    required this.selected,
     required this.showNew,
   });
 
   final SubTab tab;
+
+  /// 손가락이 지금 이 항목 위에 있음 — 진한 파랑 필.
   final bool hovered;
+
+  /// "지금 떼면 갈 곳" — 옅은 음영(selected). hover 와 동시에 true 일 일은 없음
+  /// (상위 [_SubMenuPanel] 에서 우선순위 처리).
+  final bool selected;
+
   final bool showNew;
 
   @override
   Widget build(BuildContext context) {
-    final bg = hovered ? AppColors.cardPrimary : Colors.transparent;
-    final fg = hovered ? AppColors.onCardPrimary : AppColors.textPrimary;
+    // 시각 단계:
+    //   기본 : 투명 bg / w700 / textPrimary
+    //   selected : surfaceMuted bg / w800 / textPrimary  (옅은 음영)
+    //   hovered  : cardPrimary bg / w800 / onCardPrimary (진한 파랑)
+    final Color bg;
+    final Color fg;
+    final FontWeight weight;
+    if (hovered) {
+      bg = AppColors.cardPrimary;
+      fg = AppColors.onCardPrimary;
+      weight = FontWeight.w800;
+    } else if (selected) {
+      bg = AppColors.surfaceMuted;
+      fg = AppColors.textPrimary;
+      weight = FontWeight.w800;
+    } else {
+      bg = Colors.transparent;
+      fg = AppColors.textPrimary;
+      weight = FontWeight.w700;
+    }
 
     return AnimatedScale(
       duration: const Duration(milliseconds: 140),
       curve: Curves.easeOutCubic,
       // 세로 배치에서는 위/아래 아이템이 흔들려 보일 수 있어 호버 확대 비율을 살짝 줄임.
+      // selected 상태는 크기 변화 없이 음영만 줘서 시각 잡음을 최소화한다.
       scale: hovered ? 1.03 : 1.0,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
@@ -385,7 +431,7 @@ class _SubMenuItem extends StatelessWidget {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 15,
-                fontWeight: hovered ? FontWeight.w800 : FontWeight.w700,
+                fontWeight: weight,
                 color: fg,
                 letterSpacing: -0.1,
               ),

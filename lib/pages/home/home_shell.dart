@@ -106,6 +106,11 @@ class _HomeShellState extends State<HomeShell> {
   /// 현재 손가락이 호버 중인 소탭 인덱스 (interactive 모드, -1 = 없음)
   int _hoveredSubIndex = -1;
 
+  /// 메인탭별 "현재 활성 소탭" 인덱스. 떠오르는 메뉴에서 "지금 떼면 갈 곳"을
+  /// 음영으로 표시하는 데 사용. 각 페이지가 [onSubTabChanged] 로 알려 줌.
+  /// 기본 0 (각 페이지의 initialIndex 와 같지 않은 경우엔 첫 보고로 곧바로 보정됨).
+  final Map<int, int> _currentSubFor = <int, int>{1: 0, 2: 0, 3: 0};
+
   /// 떠오르는 메뉴 학습 카운트 (SharedPreferences) — 일정 횟수 후 페이드 힌트 축소
   int _subMenuHintShownCount = 0;
 
@@ -129,10 +134,14 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void initState() {
     super.initState();
-    _bondPage = BondPage(key: _bondKey);
+    _bondPage = BondPage(
+      key: _bondKey,
+      onSubTabChanged: (idx) => _onSubTabChanged(1, idx),
+    );
     _growthPage = GrowthPage(
       subTabNotifier: _growthSubTabNotifier,
       hiraTabRequestNotifier: _hiraTabRequest,
+      onSubTabChanged: (idx) => _onSubTabChanged(2, idx),
     );
 
     _mainNavNewStream = ContentReadStateService.watchNewIndices(
@@ -576,6 +585,15 @@ class _HomeShellState extends State<HomeShell> {
     setState(() => _hoveredSubIndex = idx);
   }
 
+  /// 메인탭의 현재 활성 소탭이 바뀌었다는 페이지의 보고를 [_currentSubFor] 에 반영.
+  /// 떠오르는 메뉴가 열려 있는 동안 보고가 와도 안전하게 갱신되어 음영이 따라간다.
+  void _onSubTabChanged(int mainTab, int subIdx) {
+    if (!mounted) return;
+    if (subIdx < 0) return;
+    if (_currentSubFor[mainTab] == subIdx) return;
+    setState(() => _currentSubFor[mainTab] = subIdx);
+  }
+
   // ─────────────────────────────────────────────────────────
   // Build
   // ─────────────────────────────────────────────────────────
@@ -612,6 +630,7 @@ class _HomeShellState extends State<HomeShell> {
         isOnboardingActive: _onboardingActive,
         careerSkillAutoHintToken: _careerSkillAutoHintToken,
         subTabRequestNotifier: _jobSubTabNotifier,
+        onSubTabChanged: (idx) => _onSubTabChanged(3, idx),
       ),
     ];
     final bottomNavHeight = 72.0 + MediaQuery.of(context).viewPadding.bottom;
@@ -630,6 +649,8 @@ class _HomeShellState extends State<HomeShell> {
               mode: _subMenuMode,
               bottomNavHeight: bottomNavHeight,
               pointerGlobalPosition: _pointerGlobal,
+              // "지금 떼면 갈 곳" 음영 표시용 — 호버가 없을 때만 보임.
+              defaultSelectedIndex: _currentSubFor[_subMenuForTab] ?? -1,
               onHoveredSubIndexChanged: _onOverlayHoveredSubChanged,
               onDismissed: () {
                 if (!mounted) return;

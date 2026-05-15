@@ -37,10 +37,15 @@ class GrowthPage extends StatefulWidget {
   /// 보험정보(HiraUpdatePage) 내부 소탭: 0=수가 조회, 1=제도 변경
   final ValueNotifier<int>? hiraTabRequestNotifier;
 
+  /// 현재 소탭 인덱스가 바뀔 때마다 호출. (외부 요청·내부 스와이프 모두 포함)
+  /// [HomeShell] 이 소탭 메뉴에서 "지금 떼면 갈 곳" 음영 표시용으로 사용한다.
+  final ValueChanged<int>? onSubTabChanged;
+
   const GrowthPage({
     super.key,
     this.subTabNotifier,
     this.hiraTabRequestNotifier,
+    this.onSubTabChanged,
   });
 
   @override
@@ -79,6 +84,7 @@ class _GrowthPageState extends State<GrowthPage>
   void _markCurrentTabSeen() {
     if (!mounted || _lastMarkedTabIndex == _tabCtrl.index) return;
     _lastMarkedTabIndex = _tabCtrl.index;
+    widget.onSubTabChanged?.call(_tabCtrl.index);
     final key = switch (_tabCtrl.index) {
       0 => ContentReadKeys.todayQuiz,
       1 => ContentReadKeys.todayWords,

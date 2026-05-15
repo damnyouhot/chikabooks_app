@@ -65,13 +65,18 @@ class _CareerSkillAutoHintScopeState extends State<_CareerSkillAutoHintScope> {
 /// 외부([HomeShell] 의 떠오르는 소탭 메뉴 등)에서 보내오는 소탭 요청을 받아
 /// [DefaultTabController] 에 반영한다. [_CareerSkillAutoHintScope] 와 동일한
 /// 패턴으로 [DefaultTabController] 자식 트리 안에 두어야 한다.
+///
+/// 추가로 [onCurrentChanged] 가 주어지면, 외부 요청 / 사용자 스와이프 / 탭바
+/// 어디서 일어났든 **소탭 인덱스가 실제로 바뀌어 정착했을 때** 한 번씩 보고한다.
 class _ExternalSubTabRequestScope extends StatefulWidget {
   final ValueNotifier<int>? notifier;
+  final ValueChanged<int>? onCurrentChanged;
   final Widget child;
 
   const _ExternalSubTabRequestScope({
     required this.notifier,
     required this.child,
+    this.onCurrentChanged,
   });
 
   @override
@@ -82,6 +87,8 @@ class _ExternalSubTabRequestScope extends StatefulWidget {
 class _ExternalSubTabRequestScopeState
     extends State<_ExternalSubTabRequestScope> {
   ValueNotifier<int>? _bound;
+  TabController? _attachedController;
+  int _lastReportedIndex = -1;
 
   @override
   void initState() {
@@ -99,8 +106,17 @@ class _ExternalSubTabRequestScopeState
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // DefaultTabController 가 트리 위쪽에 생긴 직후 한 번, 그리고 컨트롤러가
+    // 교체되는 (사실상 거의 없는) 케이스를 대비해 의존성 변경 시점에 재바인딩.
+    _attachTabController(DefaultTabController.maybeOf(context));
+  }
+
+  @override
   void dispose() {
     _unbind();
+    _detachTabController();
     super.dispose();
   }
 
@@ -113,6 +129,38 @@ class _ExternalSubTabRequestScopeState
   void _unbind() {
     _bound?.removeListener(_onRequest);
     _bound = null;
+  }
+
+  void _attachTabController(TabController? tc) {
+    if (identical(tc, _attachedController)) return;
+    _detachTabController();
+    _attachedController = tc;
+    if (tc == null) return;
+    tc.addListener(_onTabChanged);
+    // 진입 직후 현재 인덱스(초기값) 도 한 번 보고 — 음영 표시 기본값 제공.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _attachedController != tc) return;
+      _reportIndex(tc.index);
+    });
+  }
+
+  void _detachTabController() {
+    _attachedController?.removeListener(_onTabChanged);
+    _attachedController = null;
+  }
+
+  void _onTabChanged() {
+    final tc = _attachedController;
+    if (tc == null) return;
+    // 애니메이션 중간 프레임은 무시하고 정착한 인덱스만 보고.
+    if (tc.indexIsChanging) return;
+    _reportIndex(tc.index);
+  }
+
+  void _reportIndex(int idx) {
+    if (idx == _lastReportedIndex) return;
+    _lastReportedIndex = idx;
+    widget.onCurrentChanged?.call(idx);
   }
 
   void _onRequest() {
@@ -149,11 +197,16 @@ class JobPage extends StatefulWidget {
   /// HomeShell 측에서는 보낼 때마다 -1 → 목표값 순으로 리셋 후 갱신한다.
   final ValueNotifier<int>? subTabRequestNotifier;
 
+  /// 현재 소탭 인덱스가 바뀔 때마다 호출. (외부 요청·내부 스와이프 모두 포함)
+  /// [HomeShell] 이 소탭 메뉴에서 "지금 떼면 갈 곳" 음영 표시용으로 사용한다.
+  final ValueChanged<int>? onSubTabChanged;
+
   const JobPage({
     super.key,
     this.isOnboardingActive = false,
     this.careerSkillAutoHintToken = 0,
     this.subTabRequestNotifier,
+    this.onSubTabChanged,
   });
 
   @override
@@ -296,6 +349,7 @@ class _JobPageState extends State<JobPage> {
             token: widget.careerSkillAutoHintToken,
             child: _ExternalSubTabRequestScope(
               notifier: widget.subTabRequestNotifier,
+              onCurrentChanged: widget.onSubTabChanged,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [

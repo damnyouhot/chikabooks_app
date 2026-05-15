@@ -11,7 +11,11 @@ import 'settings/settings_page.dart';
 
 /// 2번 탭 — 공감투표
 class BondPage extends StatefulWidget {
-  const BondPage({super.key});
+  const BondPage({super.key, this.onSubTabChanged});
+
+  /// 현재 소탭 인덱스가 바뀔 때마다 호출. (외부 요청·내부 스와이프 모두 포함)
+  /// [HomeShell] 이 소탭 메뉴에서 "지금 떼면 갈 곳" 음영 표시용으로 사용한다.
+  final ValueChanged<int>? onSubTabChanged;
 
   @override
   State<BondPage> createState() => BondPageState();
@@ -51,6 +55,7 @@ class BondPageState extends State<BondPage>
   void _markCurrentTabSeen() {
     if (!mounted || _lastMarkedTabIndex == _tabCtrl.index) return;
     _lastMarkedTabIndex = _tabCtrl.index;
+    widget.onSubTabChanged?.call(_tabCtrl.index);
     final key = switch (_tabCtrl.index) {
       0 => ContentReadKeys.bondPolls,
       1 => ContentReadKeys.seniorQuestions,
