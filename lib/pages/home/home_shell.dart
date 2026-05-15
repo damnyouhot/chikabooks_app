@@ -1,5 +1,6 @@
-import 'dart:async' show unawaited;
+import 'dart:async' show Timer, unawaited;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
@@ -15,8 +16,9 @@ import '../../services/ebook_service.dart';
 import '../../services/content_read_state_service.dart';
 import '../../features/onboarding/app_onboarding_controller.dart';
 import '../../features/onboarding/app_onboarding_overlay.dart';
-import '../../features/feedback/widgets/feedback_fab.dart';
 import '../../core/theme/app_colors.dart';
+import 'bottom_tab_sub_menu_overlay.dart';
+import 'sub_tabs_catalog.dart';
 
 /// 메인 홈 (탭 네비게이션)
 class HomeShell extends StatefulWidget {
@@ -54,10 +56,6 @@ class _HomeShellState extends State<HomeShell> {
     3: [ContentReadKeys.jobs],
   };
 
-  // 탭 인덱스 → 화면 레이블 맵
-  static const _tabLabels = ['나(캐릭터)', '같이(파트너)', '성장', '커리어'];
-  static const _tabRoutes = ['/', '/bond', '/growth', '/career'];
-
   // ── 탭 위젯 캐시 (JobPage는 온보딩 상태에 따라 build에서 생성) ──
   final _bondKey = GlobalKey<BondPageState>();
   late final BondPage _bondPage;
@@ -65,6 +63,14 @@ class _HomeShellState extends State<HomeShell> {
 
   final ValueNotifier<int> _growthSubTabNotifier = ValueNotifier<int>(-1);
   final ValueNotifier<int> _hiraTabRequest = ValueNotifier<int>(-1);
+  final ValueNotifier<int> _jobSubTabNotifier = ValueNotifier<int>(-1);
+
+  /// 하단 메인 메뉴 NEW 뱃지용 스트림.
+  ///
+  /// build() 안에서 매번 새로 만들면 StreamBuilder 가 매 setState 마다 재구독하면서
+  /// initialData(빈 집합) 를 잠깐씩 표시 → NEW 뱃지가 깜빡이는 문제 발생.
+  /// initState 에서 단 한 번 만들어 보관하면 setState 반복에도 동일 인스턴스 유지.
+  late final Stream<Set<int>> _mainNavNewStream;
 
   // ── 앱 온보딩 ──
   // OnboardingGate에서 이미 판단 완료 → 즉시 true로 설정
@@ -75,6 +81,51 @@ class _HomeShellState extends State<HomeShell> {
   /// 커리어 탭 3회 진입 시 1회 스킬 시트 자동 오픈용 (JobPage에 전달)
   int _careerSkillAutoHintToken = 0;
 
+  // ─────────────────────────────────────────────────────────
+  // 떠오르는 소탭 메뉴 제스처 상태
+  // ─────────────────────────────────────────────────────────
+  /// 현재 떠오르는 메뉴의 표시 모드 (hidden / hint / interactive)
+  SubMenuMode _subMenuMode = SubMenuMode.hidden;
+
+  /// 현재 메뉴가 보여주고 있는 메인 탭 (1=같이, 2=성장, 3=커리어).
+  /// hidden 모드여도 페이드 아웃 중일 수 있으므로 유지.
+  int _subMenuForTab = -1;
+
+  /// 사용자가 누르고 있는 메인 탭 인덱스 (-1 = 누름 없음)
+  int _pressingTab = -1;
+
+  /// 누르고 있는 손가락의 전역 좌표 (interactive 모드일 때 overlay 에 전달)
+  Offset? _pointerGlobal;
+
+  /// hint → interactive 전환을 트리거하는 타이머 (200ms)
+  Timer? _holdToInteractiveTimer;
+
+  /// hint 모드 자동 페이드 아웃 타이머
+  Timer? _hintFadeOutTimer;
+
+  /// 현재 손가락이 호버 중인 소탭 인덱스 (interactive 모드, -1 = 없음)
+  int _hoveredSubIndex = -1;
+
+  /// 떠오르는 메뉴 학습 카운트 (SharedPreferences) — 일정 횟수 후 페이드 힌트 축소
+  int _subMenuHintShownCount = 0;
+
+  /// 사용자가 한 번이라도 슬라이드로 소탭에 진입한 적이 있는지 (학습 완료 플래그)
+  bool _subMenuGestureLearned = false;
+
+  /// SharedPreferences 키
+  static const _kHintShownCount = 'home_sub_menu_hint_shown_count';
+  static const _kGestureLearned = 'home_sub_menu_gesture_learned';
+
+  /// 페이드 힌트 자동 노출 한도. 이 횟수가 넘어가거나 사용자가 한 번이라도
+  /// 슬라이드로 소탭을 골랐으면 짧은 탭에 대한 힌트는 더 이상 띄우지 않는다.
+  static const int _kHintAutoShowMax = 30;
+
+  /// 누름 시작 후 이 시간이 지나면 [SubMenuMode.interactive] 로 전환
+  static const _kHoldThreshold = Duration(milliseconds: 200);
+
+  /// hint 모드가 화면에 머무는 시간
+  static const _kHintLinger = Duration(milliseconds: 800);
+
   @override
   void initState() {
     super.initState();
@@ -82,6 +133,10 @@ class _HomeShellState extends State<HomeShell> {
     _growthPage = GrowthPage(
       subTabNotifier: _growthSubTabNotifier,
       hiraTabRequestNotifier: _hiraTabRequest,
+    );
+
+    _mainNavNewStream = ContentReadStateService.watchNewIndices(
+      _mainNavContentKeys,
     );
 
     _onboardingCtrl = AppOnboardingController();
@@ -110,6 +165,7 @@ class _HomeShellState extends State<HomeShell> {
       }
       // 로그인 후 아임웹 구매내역 자동 동기화 (fire-and-forget)
       _trySyncImwebPurchases();
+      _loadSubMenuLearningState();
     });
 
     // authStateChanges 리스너: 로그아웃→재로그인 시 OnboardingGate가
@@ -118,10 +174,50 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   void dispose() {
+    _holdToInteractiveTimer?.cancel();
+    _hintFadeOutTimer?.cancel();
     _growthSubTabNotifier.dispose();
     _hiraTabRequest.dispose();
+    _jobSubTabNotifier.dispose();
     _onboardingCtrl.dispose();
     super.dispose();
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // 떠오르는 소탭 메뉴 — 학습 상태 로딩/저장
+  // ─────────────────────────────────────────────────────────
+  Future<void> _loadSubMenuLearningState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (!mounted) return;
+      setState(() {
+        _subMenuHintShownCount = prefs.getInt(_kHintShownCount) ?? 0;
+        _subMenuGestureLearned = prefs.getBool(_kGestureLearned) ?? false;
+      });
+    } catch (_) {
+      // 학습 상태 로딩 실패 시 기본값(0/false)으로 동작 — 사용성에 영향 없음
+    }
+  }
+
+  Future<void> _incrementHintShownCount() async {
+    _subMenuHintShownCount += 1;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_kHintShownCount, _subMenuHintShownCount);
+    } catch (_) {
+      // 카운트 저장 실패는 무시 (다음 진입에서 다시 세면 됨)
+    }
+  }
+
+  Future<void> _markGestureLearned() async {
+    if (_subMenuGestureLearned) return;
+    _subMenuGestureLearned = true;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_kGestureLearned, true);
+    } catch (_) {
+      // 학습 플래그 저장 실패는 무시
+    }
   }
 
   // ─────────────────────────────────────────────────────────
@@ -288,6 +384,199 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   // ─────────────────────────────────────────────────────────
+  // 떠오르는 소탭 메뉴 — 메인 탭별 소탭 점프 통합
+  // ─────────────────────────────────────────────────────────
+  /// 같이/성장/커리어 어느 메인탭이든 [subIdx] 소탭으로 이동.
+  /// 각 페이지가 외부에서 받는 시그널 패턴이 달라 메인탭별 분기.
+  ///
+  /// "같이" 탭(1)은 첫 진입 시 [OnboardingProfileScreen] 진입 가드가 있으므로
+  /// [_onTap] 과 동일한 검사를 거친 뒤에야 소탭 신호를 보낸다.
+  Future<void> _jumpToSubTab(int mainTab, int subIdx) async {
+    if (_onboardingActive) return;
+    if (mainTab < 0 || mainTab > 3) return;
+    if (subIdx < 0) return;
+
+    if (mainTab == _bondTabIndex) {
+      final isCompleted = await UserProfileService.isOnboardingCompleted();
+      if (!mounted) return;
+      if (!isCompleted) {
+        final result = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (_) => const OnboardingProfileScreen(),
+          ),
+        );
+        if (!mounted) return;
+        if (result != true) return;
+      }
+    }
+
+    _setTab(mainTab);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      switch (mainTab) {
+        case 1:
+          // 같이 — BondPageState 가 GlobalKey 로 노출됨
+          _bondKey.currentState?.selectSubTab(subIdx);
+          break;
+        case 2:
+          // 성장 — 기존 _onGrowthSubTabRequested 가 노티파이어를 -1 → subTab 로 토글
+          _growthSubTabNotifier.value = -1;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            _growthSubTabNotifier.value = subIdx;
+          });
+          break;
+        case 3:
+          // 커리어 — JobPage 의 _ExternalSubTabRequestScope 가 받음
+          _jobSubTabNotifier.value = -1;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            _jobSubTabNotifier.value = subIdx;
+          });
+          break;
+      }
+    });
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // 떠오르는 소탭 메뉴 — 제스처 진입 (Listener / raw pointer)
+  // ─────────────────────────────────────────────────────────
+  /// 손가락이 하단 메뉴 영역에 닿았을 때.
+  /// [tabIndex] 가 소탭이 있는 탭이면 메뉴 등장 준비, 누름 유지 시 interactive 전환 예약.
+  void _onTabPointerDown(int tabIndex, Offset globalPosition) {
+    if (_onboardingActive) return;
+    if (!SubTabsCatalog.hasSubTabs(tabIndex)) {
+      // 소탭이 없는 탭(나)은 평소 동작만, 메뉴는 띄우지 않음
+      _pressingTab = tabIndex;
+      return;
+    }
+
+    _hintFadeOutTimer?.cancel();
+    _holdToInteractiveTimer?.cancel();
+
+    _pressingTab = tabIndex;
+    _pointerGlobal = globalPosition;
+    _hoveredSubIndex = -1;
+
+    // 학습 끝난 사용자는 누르자마자 interactive 로 전환하는 게 자연스럽지만,
+    // 그래도 짧은 탭(단순 메인탭 전환) 의도와 구분이 필요하므로 동일한 threshold 사용.
+    setState(() {
+      _subMenuForTab = tabIndex;
+      _subMenuMode = SubMenuMode.hint;
+    });
+
+    _holdToInteractiveTimer = Timer(_kHoldThreshold, () {
+      if (!mounted) return;
+      if (_pressingTab != tabIndex) return;
+      HapticFeedback.selectionClick();
+      setState(() => _subMenuMode = SubMenuMode.interactive);
+    });
+  }
+
+  /// 손가락이 움직이는 동안 호출. interactive 모드일 때만 좌표 갱신.
+  void _onTabPointerMove(Offset globalPosition) {
+    if (_pressingTab < 0) return;
+    if (_subMenuMode != SubMenuMode.interactive) {
+      // 아직 hint 단계 — 좌표만 저장, UI 갱신은 interactive 전환 시.
+      _pointerGlobal = globalPosition;
+      return;
+    }
+    setState(() => _pointerGlobal = globalPosition);
+  }
+
+  /// 사용자가 손을 뗐을 때.
+  void _onTabPointerUp() {
+    final pressed = _pressingTab;
+    final wasInteractive = _subMenuMode == SubMenuMode.interactive;
+    final hovered = _hoveredSubIndex;
+
+    _holdToInteractiveTimer?.cancel();
+    _holdToInteractiveTimer = null;
+    _pressingTab = -1;
+    _pointerGlobal = null;
+
+    if (pressed < 0) return;
+
+    // interactive 모드에서 소탭 위에서 뗀 경우 → 해당 소탭으로 점프
+    if (wasInteractive && hovered >= 0) {
+      HapticFeedback.lightImpact();
+      _hoveredSubIndex = -1;
+      // _subMenuForTab 은 그대로 두고 mode 만 hidden 으로.
+      // 위젯이 페이드아웃을 마치면 onDismissed 콜백에서 -1로 정리한다.
+      setState(() {
+        _subMenuMode = SubMenuMode.hidden;
+      });
+      unawaited(_markGestureLearned());
+      unawaited(_jumpToSubTab(pressed, hovered));
+      return;
+    }
+
+    // 그 외 → 짧은 탭으로 간주, 평소 _onTap 흐름 진행
+    _hoveredSubIndex = -1;
+    _handleShortTap(pressed);
+  }
+
+  /// 제스처가 시스템에 의해 취소되었을 때 (드래그가 너무 길어 OS 가 끼어듦 등)
+  void _onTabPointerCancel() {
+    _holdToInteractiveTimer?.cancel();
+    _holdToInteractiveTimer = null;
+    _pressingTab = -1;
+    _pointerGlobal = null;
+    _hoveredSubIndex = -1;
+    if (_subMenuMode != SubMenuMode.hidden) {
+      // _subMenuForTab 은 그대로 두어 페이드아웃이 보이게 한다.
+      // onDismissed 콜백에서 트리 정리.
+      setState(() {
+        _subMenuMode = SubMenuMode.hidden;
+      });
+    }
+  }
+
+  /// 짧은 탭 시 페이드 힌트 + 평소 탭 전환.
+  void _handleShortTap(int tabIndex) {
+    // 평소 _onTap 흐름 (온보딩/Bond 진입 가드 등 포함)
+    _onTap(tabIndex);
+
+    // 학습 완료 사용자에겐 힌트 생략, 학습 중인 사용자에게만 페이드 힌트
+    final canShowHint =
+        SubTabsCatalog.hasSubTabs(tabIndex) &&
+        !_subMenuGestureLearned &&
+        _subMenuHintShownCount < _kHintAutoShowMax;
+
+    if (!canShowHint) {
+      // 학습 끝 — 메뉴는 페이드아웃으로 부드럽게 사라지게.
+      // (이전엔 _subMenuForTab 을 즉시 -1로 비워 위젯을 unmount → 페이드아웃이 안 보였음)
+      if (_subMenuMode != SubMenuMode.hidden) {
+        setState(() {
+          _subMenuMode = SubMenuMode.hidden;
+        });
+      }
+      return;
+    }
+
+    setState(() {
+      _subMenuForTab = tabIndex;
+      _subMenuMode = SubMenuMode.hint;
+    });
+    unawaited(_incrementHintShownCount());
+
+    _hintFadeOutTimer?.cancel();
+    _hintFadeOutTimer = Timer(_kHintLinger, () {
+      if (!mounted) return;
+      if (_subMenuMode != SubMenuMode.hint) return;
+      setState(() {
+        _subMenuMode = SubMenuMode.hidden;
+      });
+    });
+  }
+
+  void _onOverlayHoveredSubChanged(int idx) {
+    if (idx == _hoveredSubIndex) return;
+    if (idx != -1) HapticFeedback.selectionClick();
+    setState(() => _hoveredSubIndex = idx);
+  }
+
+  // ─────────────────────────────────────────────────────────
   // Build
   // ─────────────────────────────────────────────────────────
   @override
@@ -322,14 +611,33 @@ class _HomeShellState extends State<HomeShell> {
         key: ValueKey('job_$_onboardingActive'),
         isOnboardingActive: _onboardingActive,
         careerSkillAutoHintToken: _careerSkillAutoHintToken,
+        subTabRequestNotifier: _jobSubTabNotifier,
       ),
     ];
     final bottomNavHeight = 72.0 + MediaQuery.of(context).viewPadding.bottom;
+    final screenWidth = MediaQuery.of(context).size.width;
 
     return Scaffold(
       body: Stack(
         children: [
           IndexedStack(index: _selectedIndex, children: pages),
+          // 떠오르는 소탭 메뉴 (온보딩 중에는 hidden 으로만 유지되어 그려지지 않음).
+          // mode 가 hidden 이어도 _subMenuForTab 이 유지되는 동안에는 위젯이
+          // 트리에 살아 있어 페이드아웃 애니메이션이 정상적으로 보인다.
+          if (!_onboardingActive && _subMenuForTab > 0)
+            BottomTabSubMenuOverlay(
+              mainTabIndex: _subMenuForTab,
+              mode: _subMenuMode,
+              bottomNavHeight: bottomNavHeight,
+              pointerGlobalPosition: _pointerGlobal,
+              onHoveredSubIndexChanged: _onOverlayHoveredSubChanged,
+              onDismissed: () {
+                if (!mounted) return;
+                // 사용자가 다른 탭을 다시 누르는 등으로 메뉴가 살아난 경우엔 정리하지 않음.
+                if (_subMenuMode != SubMenuMode.hidden) return;
+                setState(() => _subMenuForTab = -1);
+              },
+            ),
           if (_onboardingActive)
             ListenableBuilder(
               listenable: _onboardingCtrl,
@@ -343,66 +651,88 @@ class _HomeShellState extends State<HomeShell> {
                     onComplete: _onOnboardingComplete,
                   ),
             ),
-          // 피드백 플로팅 버튼 (온보딩 중에는 숨김)
-          if (!_onboardingActive)
-            FeedbackFab(
-              sourceScreenLabel: _tabLabels[_selectedIndex],
-              sourceRoute: _tabRoutes[_selectedIndex],
-            ),
         ],
       ),
-      // BottomNavigationBar: 색상은 AppTheme.light (bottomNavigationBarTheme)에서 고정 관리
+      // BottomNavigationBar: 색상은 AppTheme.light (bottomNavigationBarTheme)에서 고정 관리.
+      // 탭 처리는 Listener 가 raw pointer 이벤트로 가로채 짧은 탭/길게 누름 + 슬라이드를 분기한다.
       bottomNavigationBar: StreamBuilder<Set<int>>(
-        stream: ContentReadStateService.watchNewIndices(_mainNavContentKeys),
+        stream: _mainNavNewStream,
         initialData: const {},
         builder: (context, snapshot) {
           final newMainTabs = snapshot.data ?? const <int>{};
+          final tabWidth = screenWidth / 4;
 
           return SizedBox(
             height: bottomNavHeight,
-            child: BottomNavigationBar(
-              currentIndex: _selectedIndex,
-              onTap: _onTap,
-              items: [
-                const BottomNavigationBarItem(
-                  icon: Icon(Icons.person_outline),
-                  activeIcon: Icon(Icons.person),
-                  label: '나',
+            child: Listener(
+              behavior: HitTestBehavior.opaque,
+              onPointerDown: (event) {
+                if (_onboardingActive) {
+                  // 온보딩 중에는 기존 _onTap 로직만 통과시키고 떠오르는 메뉴는 차단.
+                  final idx = (event.position.dx / tabWidth)
+                      .floor()
+                      .clamp(0, 3);
+                  _onTap(idx);
+                  return;
+                }
+                final idx = (event.position.dx / tabWidth).floor().clamp(0, 3);
+                _onTabPointerDown(idx, event.position);
+              },
+              onPointerMove:
+                  _onboardingActive
+                      ? null
+                      : (event) => _onTabPointerMove(event.position),
+              onPointerUp:
+                  _onboardingActive ? null : (_) => _onTabPointerUp(),
+              onPointerCancel:
+                  _onboardingActive ? null : (_) => _onTabPointerCancel(),
+              child: IgnorePointer(
+                // BottomNavigationBar 의 자체 탭 처리는 비활성 (위의 Listener 가 담당).
+                child: BottomNavigationBar(
+                  currentIndex: _selectedIndex,
+                  onTap: (_) {},
+                  items: [
+                    const BottomNavigationBarItem(
+                      icon: Icon(Icons.person_outline),
+                      activeIcon: Icon(Icons.person),
+                      label: '나',
+                    ),
+                    BottomNavigationBarItem(
+                      icon: _NavIconWithNewBadge(
+                        icon: Icons.people_outline,
+                        showNew: newMainTabs.contains(1),
+                      ),
+                      activeIcon: _NavIconWithNewBadge(
+                        icon: Icons.people,
+                        showNew: newMainTabs.contains(1),
+                      ),
+                      label: '같이',
+                    ),
+                    BottomNavigationBarItem(
+                      icon: _NavIconWithNewBadge(
+                        icon: Icons.menu_book_outlined,
+                        showNew: newMainTabs.contains(2),
+                      ),
+                      activeIcon: _NavIconWithNewBadge(
+                        icon: Icons.menu_book,
+                        showNew: newMainTabs.contains(2),
+                      ),
+                      label: '성장',
+                    ),
+                    BottomNavigationBarItem(
+                      icon: _NavIconWithNewBadge(
+                        icon: Icons.work_outline,
+                        showNew: newMainTabs.contains(3),
+                      ),
+                      activeIcon: _NavIconWithNewBadge(
+                        icon: Icons.work,
+                        showNew: newMainTabs.contains(3),
+                      ),
+                      label: '커리어',
+                    ),
+                  ],
                 ),
-                BottomNavigationBarItem(
-                  icon: _NavIconWithNewBadge(
-                    icon: Icons.people_outline,
-                    showNew: newMainTabs.contains(1),
-                  ),
-                  activeIcon: _NavIconWithNewBadge(
-                    icon: Icons.people,
-                    showNew: newMainTabs.contains(1),
-                  ),
-                  label: '같이',
-                ),
-                BottomNavigationBarItem(
-                  icon: _NavIconWithNewBadge(
-                    icon: Icons.menu_book_outlined,
-                    showNew: newMainTabs.contains(2),
-                  ),
-                  activeIcon: _NavIconWithNewBadge(
-                    icon: Icons.menu_book,
-                    showNew: newMainTabs.contains(2),
-                  ),
-                  label: '성장',
-                ),
-                BottomNavigationBarItem(
-                  icon: _NavIconWithNewBadge(
-                    icon: Icons.work_outline,
-                    showNew: newMainTabs.contains(3),
-                  ),
-                  activeIcon: _NavIconWithNewBadge(
-                    icon: Icons.work,
-                    showNew: newMainTabs.contains(3),
-                  ),
-                  label: '커리어',
-                ),
-              ],
+              ),
             ),
           );
         },

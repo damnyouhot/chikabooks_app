@@ -46,9 +46,6 @@ import '../../features/payment/payment_result_page.dart';
 import '../../features/payment/billing_key_register_page.dart';
 import '../../features/payment/billing_key_success_page.dart';
 import '../../features/payment/billing_key_fail_page.dart';
-import '../../features/feedback/feedback_list_page.dart';
-import '../../features/feedback/feedback_write_page.dart';
-import '../../features/feedback/feedback_detail_page.dart';
 import '../../features/publisher/pages/publisher_signup_page.dart';
 import '../../features/publisher/pages/publisher_forgot_page.dart';
 // 레거시 온보딩 페이지 — 모든 라우트가 /post-job/input으로 리다이렉트
@@ -485,23 +482,6 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/me/resumes/import',
       builder: (_, __) => const OcrReviewScreen(),
-    ),
-
-    // ── 피드백 게시판 ────────────────────────────────────────
-    GoRoute(path: '/feedback', builder: (_, __) => const FeedbackListPage()),
-    GoRoute(
-      path: '/feedback/write',
-      builder: (_, state) {
-        final label = state.uri.queryParameters['label'] ?? '';
-        final route = state.uri.queryParameters['route'] ?? '/feedback/write';
-        return FeedbackWritePage(sourceScreenLabel: label, sourceRoute: route);
-      },
-    ),
-    GoRoute(
-      path: '/feedback/:id',
-      builder:
-          (_, state) =>
-              FeedbackDetailPage(feedbackId: state.pathParameters['id']!),
     ),
 
     // ── 로그인 불필요 — 법적 문서 페이지 ──────────────────

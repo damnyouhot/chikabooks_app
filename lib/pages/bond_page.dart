@@ -25,6 +25,14 @@ class BondPageState extends State<BondPage>
 
   void refreshData() => _pollKey.currentState?.reload();
 
+  /// 외부(HomeShell 의 떠오르는 소탭 메뉴 등)에서 소탭을 전환할 때 사용
+  void selectSubTab(int index) {
+    if (!mounted) return;
+    if (index < 0 || index >= _tabCtrl.length) return;
+    if (_tabCtrl.index == index) return;
+    _tabCtrl.animateTo(index);
+  }
+
   @override
   void initState() {
     super.initState();

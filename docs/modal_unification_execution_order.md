@@ -33,7 +33,7 @@
 | 2026-05-02 | Phase M (순서 48–55) | `app_modal_scaffold.dart`에 `showAppModalBottomSheet` 추가. 일기·구인 필터·빠른지원·수가·HIRA 웹뷰·업데이트 카드/상세 시트의 `showModalBottomSheet`를 래퍼로 통일(배리어·상단 라운드·clip). |
 | 2026-05-02 | Phase N (순서 56–57) | `app_date_pickers.dart`의 `showAppDatePicker`로 커리어·구인·관리자 전자책 날짜 선택 톤 통일. `showLicensePage`는 Flutter 표준 유지(설정 화면). |
 | 2026-05-02 | 순서 58 | `caring_page` 게이지 안내·먹이 안내·「나」탭 개념을 `AppModalDialog`로 통일. |
-| 2026-05-02 | 표 외 후속 | 아래 **§7** 참고 — 피드백 상세·잔여 `showModalBottomSheet`·머티리얼 `Dialog` 정리 및 `showAppModalBottomSheet(showDragHandle)` 보강. |
+| 2026-05-02 | 표 외 후속 | 아래 **§7** 참고 — 잔여 `showModalBottomSheet`·머티리얼 `Dialog` 정리 및 `showAppModalBottomSheet(showDragHandle)` 보강. |
 
 ## 1. 인벤토리 스프레드시트 (착수 직후 1일 이내)
 
@@ -188,7 +188,6 @@
 
 부모 `me_applicants_pool_page.dart`와 **같은 PR**에서 다루는 것을 권장한다.
 
-- `lib/features/feedback/feedback_detail_page.dart` *(표에 없던 화면 — 후속에서 `AlertDialog` 제거)*
 - `lib/features/me/pages/widgets/applicant_resume_dialog.dart` *(인재풀 이력서 보기 — 후속에서 `AppModalDialog`)*
 
 ---
@@ -199,7 +198,6 @@
 
 | 구분 | 파일·범위 | 내용 |
 |------|------------|------|
-| 다이얼로그 | `lib/features/feedback/feedback_detail_page.dart` | 피드백 수정 `AppModalDialog`, 피드백/댓글 삭제 `AppConfirmModal` |
 | 바텀시트 | 시니어 QnA 댓글·스티커 피커, `user_goal_sheet`, `growth_page`(HIRA 카드 탭), `ebook_list_page` 분류 시트 | `showAppModalBottomSheet` (투명/흰 배경·`isScrollControlled` 등 기존과 동등) |
 | 바텀시트 | 커리어 단계·스킬·아이덴티티·네트워크·이력서 피커 | 동일 |
 | 다이얼로그 | `applicant_resume_dialog.dart`, `clinic_selector.dart` | 머티리얼 `Dialog` → `AppModalDialog` (이전 Phase G 로그의 “유지” 이후 재통일) |

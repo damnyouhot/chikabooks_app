@@ -79,12 +79,14 @@ class AppSegmentedControl extends StatelessWidget {
             labelColor: AppColors.onSegmentSelected,
             unselectedLabelColor: AppColors.onSegmentUnselected,
             labelStyle: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.1,
             ),
             unselectedLabelStyle: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w400,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.1,
             ),
             tabs:
                 labels.asMap().entries.map((entry) {
@@ -93,12 +95,12 @@ class AppSegmentedControl extends StatelessWidget {
                   final showNew = visibleNewIndices.contains(i);
                   if (!wipIndices.contains(i) && !showNew) {
                     return Tab(
-                      height: 46,
+                      height: 48,
                       child: _SegmentLabel(label: label, showNew: false),
                     );
                   }
                   return Tab(
-                    height: 46,
+                    height: 48,
                     child: _SegmentLabel(
                       label: label,
                       showNew: showNew,

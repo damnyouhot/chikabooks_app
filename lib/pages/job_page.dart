@@ -62,6 +62,75 @@ class _CareerSkillAutoHintScopeState extends State<_CareerSkillAutoHintScope> {
   Widget build(BuildContext context) => widget.child;
 }
 
+/// 외부([HomeShell] 의 떠오르는 소탭 메뉴 등)에서 보내오는 소탭 요청을 받아
+/// [DefaultTabController] 에 반영한다. [_CareerSkillAutoHintScope] 와 동일한
+/// 패턴으로 [DefaultTabController] 자식 트리 안에 두어야 한다.
+class _ExternalSubTabRequestScope extends StatefulWidget {
+  final ValueNotifier<int>? notifier;
+  final Widget child;
+
+  const _ExternalSubTabRequestScope({
+    required this.notifier,
+    required this.child,
+  });
+
+  @override
+  State<_ExternalSubTabRequestScope> createState() =>
+      _ExternalSubTabRequestScopeState();
+}
+
+class _ExternalSubTabRequestScopeState
+    extends State<_ExternalSubTabRequestScope> {
+  ValueNotifier<int>? _bound;
+
+  @override
+  void initState() {
+    super.initState();
+    _bind(widget.notifier);
+  }
+
+  @override
+  void didUpdateWidget(covariant _ExternalSubTabRequestScope oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.notifier != oldWidget.notifier) {
+      _unbind();
+      _bind(widget.notifier);
+    }
+  }
+
+  @override
+  void dispose() {
+    _unbind();
+    super.dispose();
+  }
+
+  void _bind(ValueNotifier<int>? n) {
+    if (n == null) return;
+    _bound = n;
+    n.addListener(_onRequest);
+  }
+
+  void _unbind() {
+    _bound?.removeListener(_onRequest);
+    _bound = null;
+  }
+
+  void _onRequest() {
+    final idx = _bound?.value ?? -1;
+    if (idx < 0) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final tc = DefaultTabController.maybeOf(context);
+      if (tc == null) return;
+      if (idx < 0 || idx >= tc.length) return;
+      if (tc.index != idx) tc.animateTo(idx);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
 /// 커리어(도전하기) 탭 - 탭4
 ///
 /// - 소탭 0: 채용 · 지원 (JobListingsScreen ↔ JobMapScreen)
@@ -74,10 +143,17 @@ class JobPage extends StatefulWidget {
   final bool isOnboardingActive;
   final int careerSkillAutoHintToken;
 
+  /// 외부([HomeShell] 의 떠오르는 소탭 메뉴 등)에서 소탭 전환을 요청할 때 사용.
+  /// 값을 0(공고 보기) 또는 1(커리어 관리) 로 설정하면 해당 소탭으로 이동.
+  /// -1 은 무시. 같은 값을 다시 보내면 [ValueNotifier] 가 알림을 보내지 않으므로,
+  /// HomeShell 측에서는 보낼 때마다 -1 → 목표값 순으로 리셋 후 갱신한다.
+  final ValueNotifier<int>? subTabRequestNotifier;
+
   const JobPage({
     super.key,
     this.isOnboardingActive = false,
     this.careerSkillAutoHintToken = 0,
+    this.subTabRequestNotifier,
   });
 
   @override
@@ -218,24 +294,27 @@ class _JobPageState extends State<JobPage> {
           initialIndex: widget.isOnboardingActive ? 1 : 0,
           child: _CareerSkillAutoHintScope(
             token: widget.careerSkillAutoHintToken,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // ── 상단 인포/설정 (두 소탭 모두 항상 표시) ──
-                const _JobPageTitleBar(),
-                // ── 공통 소탭바 (채용 · 지원 / 커리어 관리) ──
-                const CareerTabHeader(),
-                // 소탭 본문
-                Expanded(
-                  child: TabBarView(
-                    physics: const NeverScrollableScrollPhysics(),
-                    children: [
-                      _buildJobsTab(),
-                      const CareerTab(),
-                    ],
+            child: _ExternalSubTabRequestScope(
+              notifier: widget.subTabRequestNotifier,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // ── 상단 인포/설정 (두 소탭 모두 항상 표시) ──
+                  const _JobPageTitleBar(),
+                  // ── 공통 소탭바 (채용 · 지원 / 커리어 관리) ──
+                  const CareerTabHeader(),
+                  // 소탭 본문
+                  Expanded(
+                    child: TabBarView(
+                      physics: const NeverScrollableScrollPhysics(),
+                      children: [
+                        _buildJobsTab(),
+                        const CareerTab(),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
