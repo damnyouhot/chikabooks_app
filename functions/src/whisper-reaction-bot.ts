@@ -11,24 +11,25 @@ const REGION = "us-central1";
 // ─────────────────────────────────────────────────────────────
 // 속닥속닥(궁금해요 선배 / seniorQuestions) 좋아요·힘내요 자연 증가 봇
 //
-// 통계 분리 (아주 중요 — poll-empathy-bot.ts 와 동일 원칙)
+// 통계 분리 (poll-empathy-bot.ts 와 동일 원칙)
 //   관리자 대시보드 일별 집계(aggregateAnalyticsDaily)는 activityLogs 만 읽는다.
 //   본 봇은 seniorQuestions / comments / replies 의 likeCount·cheerCount 만
 //   admin SDK 로 FieldValue.increment 하며,
 //   activityLogs / likes·cheers 서브컬렉션(유저 uid 문서) / CaringTreatService 는
 //   절대 건드리지 않는다.
-//   → whisper_reaction 통계는 실제 유저가 앱에서 반응할 때만 기록된다.
 //
-// 정책 (사용자 확정)
-//   - 본문 한 편당: 좋아요·힘내요 각각 같은 일간 곡선(첫날 끝 3 → 매일 +1 → 상한 70)을 기준으로 하되,
-//     서로 꼭 같을 필요 없음 — 글·KST일별 해시 비율 + 매 틱 독립 소량 지터로 목표를 달리 잡는다.
-//   - 70 까지 도달 속도는 이전 대비 약 1/2 로 감속(첫날 7→3, 일일 +2→+1).
-//   - 기존에 이미 목표보다 높은 글은 deficit ≤ 0 이라 봇이 더 올리지 않으며,
-//     봇은 절대 감소시키지 않는다(이미 쌓인 수치는 그대로 유지).
-//   - KST 하루 안에서는 투표 봇과 같은 시간대 가중치로 천천히 올라가고,
-//     그날 자정 직전에는 그날 목표치에 도달하도록 deficit 기반 포아송.
-//   - 70 도달 후에는 60~80 구간에서만 아주 작은 증가(진동, poll 의 band 와 유사).
-//   - 댓글·답글은 본문 목표의 일정 비율(댓글 35%, 답글 28%)로 적게; 답글은 좋아요만.
+// 정책 (사용자 확정 — 2026-05 개편)
+//   본문 좋아요
+//     · 글마다 상한(플래토) = 60..75 해시 고정
+//     · 0일째 끝 = min(상한, 9 + 글 작성 KST일의 앵커 대비 일수)
+//         → "하루마다 첫날 끝 기준이 +1" 을 앵커일수에 녹임
+//     · 1일째 이후 매일 끝 = 이전 끝 + (5..8, 글ID·일번호 해시) → 상한에서 멈춤
+//   힘내요(본문) = 본문 좋아요 × 0.8..0.9 (글ID 해시)  → 항상 좋아요보다 10~20% 낮음
+//   댓글 좋아요 = 본문 좋아요 × 0.8..0.9 (글ID|댓글ID 해시) → 본문보다 10~20% 낮음
+//   답글 좋아요 = 댓글 좋아요 × 0.8..0.9 (글ID|댓글ID|답글ID 해시) → 댓글보다 10~20% 낮음
+//
+//   - 이미 목표보다 높으면 더 올리지 않음; 감소는 하지 않음.
+//   - KST 시간대 가중치 + 자정 수렴 포아송; 플래토 근처는 약한 진동.
 // ─────────────────────────────────────────────────────────────
 
 /** 투표 봇과 동일한 KST 시간대 가중치 (합 ≈ 1.0) */
@@ -39,26 +40,27 @@ const HOURLY_WEIGHTS_KST: number[] = [
   0.075, 0.090, 0.095, 0.080, 0.060, 0.030,
 ];
 
-const PLATEAU = 70;
-const BAND = 10;
-// 첫날 끝 목표 = RAMP_START, 이후 매일 +RAMP_STEP 씩 증가하여 PLATEAU 에서 멈춘다.
-// 현재 정책: 첫날 3 → 매일 +1 → 상한 70 (이전 7/+2 대비 약 1/2 속도)
-const RAMP_START = 3;
-const RAMP_STEP = 1;
+/** 0일째(작성일 당일) 끝 목표 — 글 작성일과 무관하게 고정 */
+const BASE_DAY0 = 9;
 
-/** 본문 대비 댓글 좋아요 목표 비율 */
-const COMMENT_LIKE_RATIO = 0.35;
-/** 본문 대비 답글 좋아요 목표 비율 */
-const REPLY_LIKE_RATIO = 0.28;
+const DAILY_INC_MIN = 5;
+const DAILY_INC_SPAN = 4; // 5 + [0..3] = 5..8
+
+const PLATEAU_MIN = 60;
+const PLATEAU_SPAN = 16; // 60 + [0..15] = 60..75
+
+/** 80~90% 비율 (force 1.0 - ratio = 10~20% 낮음) */
+const RATIO_MIN = 0.8;
+const RATIO_SPAN = 0.1;
+
+const BAND = 10;
 
 const MAX_QUESTIONS_PER_RUN = 24;
 const MAX_COMMENTS_PER_QUESTION = 14;
 const MAX_REPLIES_PER_COMMENT = 8;
 
-const HARD_CEILING = PLATEAU + BAND; // 80 — 봇이 increment 로 올릴 상한
-
 // ═══════════════════════════════════════════════════════════
-// KST (Asia/Seoul) — Intl 로 일·시간만 구함 (luxon 미사용)
+// KST (Asia/Seoul)
 // ═══════════════════════════════════════════════════════════
 
 function kstYmdParts(ms: number): { y: number; m: number; d: number } {
@@ -89,7 +91,7 @@ function kstCalendarDayIndex(createdMs: number, nowMs: number): number {
   return Math.round((b - a) / 86400000);
 }
 
-/** 현재 KST 일 안에서 0..1 (자정 직후 0, 다음 자정 직전 1에 가깝게) */
+/** 현재 KST 일 안에서 0..1 */
 function fracKstDayElapsed(nowMs: number): number {
   const start = kstStartOfCalendarDayUtc(nowMs);
   const elapsed = Math.max(0, nowMs - start);
@@ -105,27 +107,7 @@ function kstHour(nowMs: number): number {
   return parseInt(fmt.format(new Date(nowMs)), 10);
 }
 
-/** 그날 KST 자정 기준 목표 누적(좋아요 또는 힘내요 한 축) */
-function endOfDayTarget(dayIndex: number): number {
-  return Math.min(RAMP_START + RAMP_STEP * dayIndex, PLATEAU);
-}
-
-function startOfDayTarget(dayIndex: number): number {
-  if (dayIndex <= 0) return 0;
-  return Math.min(RAMP_START + RAMP_STEP * (dayIndex - 1), PLATEAU);
-}
-
-/**
- * 지금 이 순간까지 이상이어야 하는 기대 누적(선형 보간).
- * T_prev → T_today 사이를 하루 동안 균등 진행.
- */
-function linearExpectedNow(dayIndex: number, phi: number): number {
-  const t0 = startOfDayTarget(dayIndex);
-  const t1 = endOfDayTarget(dayIndex);
-  return t0 + (t1 - t0) * phi;
-}
-
-/** 0 이상 1 미만 — 동일 입력이면 재현되는 난수(일·축별 편차용) */
+/** 0 이상 1 미만 — 동일 입력이면 재현 */
 function hash01(s: string): number {
   let h = 2166136261;
   for (let i = 0; i < s.length; i++) {
@@ -135,38 +117,68 @@ function hash01(s: string): number {
   return (h >>> 0) / 4294967296;
 }
 
-/** 좋아요·힘내요 각각 다른 목표 기대값 (상한 PLATEAU, 통계 필드 미작성 유지) */
-function bodyExpectedAxes(
+function ratio80to90(key: string): number {
+  return RATIO_MIN + RATIO_SPAN * hash01(key);
+}
+
+/** 본문 좋아요 상한(플래토): 글마다 60..75 */
+function likePlateauForQuestion(questionId: string): number {
+  return PLATEAU_MIN +
+    Math.floor(hash01(`${questionId}|likePlateau`) * PLATEAU_SPAN);
+}
+
+/** d일째→d일째 끝 사이 일일 증가분 5..8 (d >= 1) */
+function dailyLikeIncrement(
   questionId: string,
-  dayIndex: number,
-  phi: number,
-  kstDayKey: string,
-): { expLike: number; expCheer: number; eodLike: number; eodCheer: number } {
-  const base = linearExpectedNow(dayIndex, phi);
-  const eodBase = endOfDayTarget(dayIndex);
-  const likeAxis = 0.82 + 0.36 * hash01(`${questionId}|like|${kstDayKey}`);
-  const cheerAxis = 0.82 + 0.36 * hash01(`${questionId}|cheer|${kstDayKey}`);
-  const jL = 0.88 + 0.24 * Math.random();
-  const jC = 0.88 + 0.24 * Math.random();
-  return {
-    expLike: Math.min(PLATEAU, base * likeAxis * jL),
-    expCheer: Math.min(PLATEAU, base * cheerAxis * jC),
-    eodLike: Math.min(PLATEAU, eodBase * likeAxis * jL),
-    eodCheer: Math.min(PLATEAU, eodBase * cheerAxis * jC),
-  };
+  dayNumberFrom1: number,
+): number {
+  const u = hash01(`${questionId}|likeStep|${dayNumberFrom1}`);
+  return DAILY_INC_MIN + Math.floor(u * DAILY_INC_SPAN);
 }
 
 /**
- * 플래토 70 ± 10 — poll 의 bandScale 과 동형.
- *   ≥80 : 정지
- *   ≥70 : 약한 진동
- *   ≥60 : 감속
- *   <60 : 정상 추격
+ * 본문 좋아요: 각 KST일 끝 누적 목표 T[0..dayIndex].
+ * T[0] = min(plateau, BASE_DAY0)  — 작성일 기준 고정
+ * T[d] = min(plateau, T[d-1] + dailyLikeIncrement(d))
  */
-function bandScaleCounter(count: number): number {
-  if (count >= PLATEAU + BAND) return 0.0;
-  if (count >= PLATEAU) return 0.15;
-  if (count >= PLATEAU - BAND) return 0.45;
+function buildBodyLikeEodChain(
+  questionId: string,
+  createdMs: number,
+  plateau: number,
+  upToDayInclusive: number,
+): number[] {
+  const t: number[] = [];
+  void createdMs; // 작성일은 dayIdx 계산에만 사용; T[0] 은 BASE_DAY0 고정
+  const day0End = Math.min(plateau, BASE_DAY0);
+  t[0] = day0End;
+  for (let d = 1; d <= upToDayInclusive; d++) {
+    const inc = dailyLikeIncrement(questionId, d);
+    t[d] = Math.min(plateau, t[d - 1] + inc);
+  }
+  return t;
+}
+
+/** 그 시점 기대값(선형 보간): T[d-1] → T[d] 를 phi 로 보간 (T[-1]=0) */
+function linearExpectedFromEodChain(
+  chain: number[],
+  dayIndex: number,
+  phi: number,
+): number {
+  if (dayIndex < 0) return 0;
+  const end = chain[dayIndex] ?? chain[chain.length - 1] ?? 0;
+  const start = dayIndex === 0 ? 0 : (chain[dayIndex - 1] ?? 0);
+  return start + (end - start) * phi;
+}
+
+function eodLikeFromChain(chain: number[], dayIndex: number): number {
+  if (dayIndex < 0) return 0;
+  return chain[dayIndex] ?? chain[chain.length - 1] ?? 0;
+}
+
+function bandScaleCounter(count: number, plateau: number): number {
+  if (count >= plateau + BAND) return 0.0;
+  if (count >= plateau) return 0.15;
+  if (count >= plateau - BAND) return 0.45;
   return 1.0;
 }
 
@@ -175,6 +187,7 @@ function poissonSample(lambda: number): number {
   const L = Math.exp(-lambda);
   let k = 0;
   let p = 1;
+  // eslint-disable-next-line no-constant-condition
   while (true) {
     k++;
     p *= Math.random();
@@ -184,11 +197,7 @@ function poissonSample(lambda: number): number {
 
 /**
  * 남은 EOD 목표를 남은 시간 가중치 비율로 분배해 포아송 강도 산출.
- *
- * 구 공식(deficit/remSlots × hourW × 8)은 오전 소가중치 시간대에
- * lambda가 극단적으로 작아지는 결함이 있었음.
- * 신 공식: remaining × (이번 틱 가중치 / 자정까지 남은 가중치 합)
- * → 목표 잔량을 남은 시간 분포에 정확히 비례 배분, 자정에 수렴.
+ * remaining × (이번 틱 가중치 / 자정까지 남은 가중치 합) → 자정 수렴.
  */
 function plannedAdds(
   current: number,
@@ -197,6 +206,8 @@ function plannedAdds(
   hour: number,
   minFrac: number,
   enablePlateauJitter: boolean,
+  plateauForBand: number,
+  hardCeiling: number,
 ): number {
   const deficit = expectedFloat - current;
   if (deficit > 0.001) {
@@ -211,17 +222,25 @@ function plannedAdds(
 
     const tickWeight = hourW / 2;
     let lambda = remaining * (tickWeight / remainingWeight);
-    lambda *= bandScaleCounter(current);
+    lambda *= bandScaleCounter(current, plateauForBand);
     lambda = Math.min(lambda, 3.2);
 
     let raw = poissonSample(lambda);
-    const ceiling = enablePlateauJitter ? HARD_CEILING : Math.ceil(expectedFloat) + 5;
+    const ceiling = enablePlateauJitter ?
+      hardCeiling :
+      Math.ceil(expectedFloat) + 5;
     raw = Math.min(raw, Math.ceil(deficit), Math.max(0, ceiling - current));
     return Math.max(0, raw);
   }
-  if (enablePlateauJitter && current >= PLATEAU && current < HARD_CEILING) {
+  if (
+    enablePlateauJitter &&
+    current >= plateauForBand &&
+    current < hardCeiling
+  ) {
     const hourW = HOURLY_WEIGHTS_KST[hour] ?? 0.04;
-    const p = 0.035 * bandScaleCounter(current) * Math.max(0.15, hourW);
+    const p =
+      0.035 * bandScaleCounter(current, plateauForBand) *
+      Math.max(0.15, hourW);
     return Math.random() < p ? 1 : 0;
   }
   return 0;
@@ -239,9 +258,10 @@ export const tickWhisperReactionBot = functions
     const nowMs = Date.now();
     const hour = kstHour(nowMs);
     const phi = fracKstDayElapsed(nowMs);
-    const minFrac = Math.max(0, Math.min(1, phi * 24 - hour)); // 현재 시간 내 분 비율
+    const minFrac = Math.max(0, Math.min(1, phi * 24 - hour));
     const { y, m, d } = kstYmdParts(nowMs);
-    const kstDayKey = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    const kstDayKey =
+      `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 
     const snap = await db
       .collection("seniorQuestions")
@@ -249,8 +269,8 @@ export const tickWhisperReactionBot = functions
       .limit(120)
       .get();
 
-    const candidates = snap.docs.filter((d) => {
-      const x = d.data();
+    const candidates = snap.docs.filter((doc) => {
+      const x = doc.data();
       return x.isDeleted !== true && x.isHidden !== true;
     });
 
@@ -262,7 +282,9 @@ export const tickWhisperReactionBot = functions
 
     for (const qDoc of candidates) {
       if (qProcessed >= MAX_QUESTIONS_PER_RUN) break;
-      const created = (qDoc.data().createdAt as admin.firestore.Timestamp | undefined)?.toMillis();
+      const created =
+        (qDoc.data().createdAt as admin.firestore.Timestamp | undefined)
+          ?.toMillis();
       if (!created) continue;
 
       const dayIdx = kstCalendarDayIndex(created, nowMs);
@@ -270,38 +292,60 @@ export const tickWhisperReactionBot = functions
 
       qProcessed++;
 
-      const { expLike, expCheer, eodLike, eodCheer } = bodyExpectedAxes(
-        qDoc.id,
+      const qid = qDoc.id;
+      const plateauLike = likePlateauForQuestion(qid);
+      const likeChain = buildBodyLikeEodChain(
+        qid,
+        created,
+        plateauLike,
         dayIdx,
-        phi,
-        kstDayKey,
       );
+
+      const expLike = linearExpectedFromEodChain(likeChain, dayIdx, phi);
+      const eodLike = eodLikeFromChain(likeChain, dayIdx);
+
+      const cheerR = ratio80to90(`${qid}|cheerVsLike`);
+      const expCheer = expLike * cheerR;
+      const eodCheer = eodLike * cheerR;
+      const plateauCheer = plateauLike * cheerR;
+
+      const hardCeilLike = plateauLike + BAND;
+      const hardCeilCheer = Math.ceil(plateauCheer) + BAND;
 
       const like0 = (qDoc.data().likeCount as number) ?? 0;
       const cheer0 = (qDoc.data().cheerCount as number) ?? 0;
 
-      const addL = plannedAdds(like0, expLike, eodLike, hour, minFrac, true);
-      const addC = plannedAdds(cheer0, expCheer, eodCheer, hour, minFrac, true);
+      const addL = plannedAdds(
+        like0, expLike, eodLike, hour, minFrac,
+        true, plateauLike, hardCeilLike,
+      );
+      const addC = plannedAdds(
+        cheer0, expCheer, eodCheer, hour, minFrac,
+        true, plateauCheer, hardCeilCheer,
+      );
 
       const batch = db.batch();
       let ops = 0;
 
       if (addL > 0) {
-        batch.update(qDoc.ref, { likeCount: admin.firestore.FieldValue.increment(addL) });
+        batch.update(qDoc.ref, {
+          likeCount: admin.firestore.FieldValue.increment(addL),
+        });
         bodyLike += addL;
         ops++;
       }
       if (addC > 0) {
-        batch.update(qDoc.ref, { cheerCount: admin.firestore.FieldValue.increment(addC) });
+        batch.update(qDoc.ref, {
+          cheerCount: admin.firestore.FieldValue.increment(addC),
+        });
         bodyCheer += addC;
         ops++;
       }
-
       if (ops > 0) {
         await batch.commit();
       }
 
-      // ── 댓글·답글 (한 루프에서 처리, 본문보다 낮은 목표) ──
+      // ── 댓글·답글: 본문 좋아요 기대치에서 80~90% 씩 곱해 내려감 ──
       const comSnap = await qDoc.ref
         .collection("comments")
         .orderBy("createdAt", "desc")
@@ -313,15 +357,21 @@ export const tickWhisperReactionBot = functions
       for (const cDoc of comSnap.docs) {
         const cd = cDoc.data();
         if (cd.isDeleted === true || cd.isHidden === true) continue;
-        const cCreated = (cd.createdAt as admin.firestore.Timestamp | undefined)?.toMillis();
-        if (!cCreated) continue;
-        const cDay = kstCalendarDayIndex(cCreated, nowMs);
-        const expCL = linearExpectedNow(cDay, phi) * COMMENT_LIKE_RATIO;
-        const eodCL = endOfDayTarget(cDay) * COMMENT_LIKE_RATIO;
+        if (!(cd.createdAt instanceof admin.firestore.Timestamp)) continue;
+
+        const comR = ratio80to90(`${qid}|${cDoc.id}|commentVsBody`);
+        const expCL = expLike * comR;
+        const eodCL = eodLike * comR;
+        const plateauC = plateauLike * comR;
         const cl0 = (cd.likeCount as number) ?? 0;
-        const addCL = plannedAdds(cl0, expCL, eodCL, hour, minFrac, false);
+        const addCL = plannedAdds(
+          cl0, expCL, eodCL, hour, minFrac,
+          false, plateauC, Math.ceil(plateauC) + BAND,
+        );
         if (addCL > 0) {
-          subBatch.update(cDoc.ref, { likeCount: admin.firestore.FieldValue.increment(addCL) });
+          subBatch.update(cDoc.ref, {
+            likeCount: admin.firestore.FieldValue.increment(addCL),
+          });
           commentLike += addCL;
           subOps++;
         }
@@ -335,15 +385,23 @@ export const tickWhisperReactionBot = functions
         for (const rDoc of repSnap.docs) {
           const rd = rDoc.data();
           if (rd.isDeleted === true) continue;
-          const rCreated = (rd.createdAt as admin.firestore.Timestamp | undefined)?.toMillis();
-          if (!rCreated) continue;
-          const rDay = kstCalendarDayIndex(rCreated, nowMs);
-          const expRL = linearExpectedNow(rDay, phi) * REPLY_LIKE_RATIO;
-          const eodRL = endOfDayTarget(rDay) * REPLY_LIKE_RATIO;
+          if (!(rd.createdAt instanceof admin.firestore.Timestamp)) continue;
+
+          const repR = ratio80to90(
+            `${qid}|${cDoc.id}|${rDoc.id}|replyVsComment`,
+          );
+          const expRL = expCL * repR;
+          const eodRL = eodCL * repR;
+          const plateauR = plateauC * repR;
           const rl0 = (rd.likeCount as number) ?? 0;
-          const addRL = plannedAdds(rl0, expRL, eodRL, hour, minFrac, false);
+          const addRL = plannedAdds(
+            rl0, expRL, eodRL, hour, minFrac,
+            false, plateauR, Math.ceil(plateauR) + BAND,
+          );
           if (addRL > 0) {
-            subBatch.update(rDoc.ref, { likeCount: admin.firestore.FieldValue.increment(addRL) });
+            subBatch.update(rDoc.ref, {
+              likeCount: admin.firestore.FieldValue.increment(addRL),
+            });
             replyLike += addRL;
             subOps++;
           }
@@ -357,7 +415,8 @@ export const tickWhisperReactionBot = functions
     functions.logger.info(
       `tickWhisperReactionBot: questions=${qProcessed} ` +
         `bodyLike+=${bodyLike} bodyCheer+=${bodyCheer} ` +
-        `commentLike+=${commentLike} replyLike+=${replyLike} hour=${hour} phi=${phi.toFixed(3)}`,
+        `commentLike+=${commentLike} replyLike+=${replyLike} ` +
+        `hour=${hour} phi=${phi.toFixed(3)} kst=${kstDayKey}`,
     );
     return null;
   });

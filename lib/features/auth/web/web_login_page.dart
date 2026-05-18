@@ -151,6 +151,13 @@ class _WebLoginPageState extends State<WebLoginPage> {
   /// dispose 됐다면 `mounted` 체크로 안전하게 무시된다.)
   void _autoRedirectAfterLogin() {
     if (!mounted) return;
+    // ── [CHIKA_WEB_AUTO_LOGIN] ───────────────────────────────────
+    // 테스트 빌드(좌/우 1-click 자격 증명이 박힌 빌드)에서는, 사용자가
+    // 한쪽으로 로그인했다가 뒤로가기로 /login 으로 돌아왔을 때 또다시
+    // `/` 로 자동 이동시키지 않는다. 그래야 반대편 1-click 으로 즉시
+    // 갈아탈 수 있다. (방금 로그인 직후의 라우팅은 [_handlePostLogin] /
+    // [_loginAsTestClinic] 의 _clinicLoginRedirectPending 분기에서 처리됨.)
+    if (_forceQuickEntryCards) return;
     final next = widget.nextRoute;
     if (next != null && next.isNotEmpty) {
       context.go(next);
@@ -168,8 +175,20 @@ class _WebLoginPageState extends State<WebLoginPage> {
     _clinicLoginRedirecting = false;
   }
 
+  // ── [CHIKA_WEB_AUTO_LOGIN] 테스트 빌드에선 1-click 버튼 양쪽 다 노출 ──
+  // dart-define 으로 좌/우 테스트 자격증명이 박혀 있는 빌드에서는, 이미
+  // 로그인된 상태라도 좌/우 모두 로그인 카드를 그대로 보여줘서 사용자가
+  // 반대편 1-click 으로 즉시 갈아탈 수 있게 한다. (1-click 핸들러가
+  // 내부적으로 signOut 후 sign-in 하므로 세션 교체는 자동.)
+  bool get _forceQuickEntryCards =>
+      kChikaAutoLoginQuickEntryAvailable ||
+      kChikaAutoLoginClinicQuickEntryAvailable;
+
   // ── 좌측(지원자) 영역 — 역할에 따라 다른 카드 ──
   Widget _buildApplicantSide() {
+    if (_forceQuickEntryCards) {
+      return _ApplicantLoginCard(nextRoute: widget.nextRoute);
+    }
     switch (_role) {
       case _LoginRole.guest:
       case _LoginRole.loading:
@@ -194,6 +213,13 @@ class _WebLoginPageState extends State<WebLoginPage> {
 
   // ── 우측(치과) 영역 — 역할에 따라 다른 카드 ──
   Widget _buildClinicSide() {
+    if (_forceQuickEntryCards) {
+      return _ClinicLoginCard(
+        nextRoute: widget.nextRoute,
+        onLoginStarted: _markClinicLoginStarted,
+        onLoginFailed: _clearClinicLoginRedirect,
+      );
+    }
     switch (_role) {
       case _LoginRole.guest:
       case _LoginRole.loading:
