@@ -178,7 +178,7 @@ class _RecordHubSheetContentState extends State<_RecordHubSheetContent>
                   '기록하기',
                   style: TextStyle(
                     fontSize: 18,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
                   ),
                 ),
@@ -222,7 +222,7 @@ class _RecordHubSheetContentState extends State<_RecordHubSheetContent>
               onTap: () => _selectTab(0),
             ),
             _SegmentTab(
-              label: '나의 목표',
+              label: '목표',
               icon: Icons.flag_outlined,
               selected: _index == 1,
               onTap: () => _selectTab(1),

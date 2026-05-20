@@ -29,11 +29,11 @@ class CaringStateService {
   // ═══════════════════════ 상수 ═══════════════════════
 
   /// 시간당 감소량
-  static const double hungerDecayPerHour = 8.0;
+  static const double hungerDecayPerHour = 9.0;
   static const double moodDecayPerHour = 6.0;
-  static const double energyDecayPerHour = 4.0;
-  static const double cleanlinessDecayPerHourAwake = 5.0;
-  static const double cleanlinessDecayPerHourSleeping = 4.0;
+  static const double energyDecayPerHour = 5.0;
+  static const double cleanlinessDecayPerHourAwake = 6.0;
+  static const double cleanlinessDecayPerHourSleeping = 6.0;
 
   /// 시간 감소 하한 캡 (이 아래로는 떨어지지 않음)
   static const double hungerFloor = 5.0;

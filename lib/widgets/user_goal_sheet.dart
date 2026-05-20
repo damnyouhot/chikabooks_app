@@ -176,16 +176,16 @@ class _UserGoalContentState extends State<UserGoalContent>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                '나의 목표',
+                '목표, 기억할 것',
                 style: TextStyle(
                   fontSize: 18,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w600,
                   color: _kText,
                 ),
               ),
               const SizedBox(height: 4),
               Text(
-                '최대 3개 · 루틴/프로젝트 · 주/월/연',
+                '최대 3개 · 루틴/프로젝트 · 오늘/주/월/연',
                 style: TextStyle(fontSize: 11, color: _kText.withOpacity(0.5)),
               ),
             ],

@@ -950,7 +950,7 @@ class _CaringPageState extends State<CaringPage> with TickerProviderStateMixin {
                   color: AppColors.lime,
                   lines: const [
                     '· 마지막 활동 후 약 3분 미만이면 시간 감소 없음',
-                    '· 깨어 있든 자든 시간당 −8',
+                    '· 깨어 있든 자든 시간당 −9',
                     '· 밥(보통) +25 / 10분 안 2회차 +15(3회째는 1시간 쿨)',
                     '· 배부름(85↑) 밥은 +5(과식 분기)',
                   ],
@@ -967,7 +967,7 @@ class _CaringPageState extends State<CaringPage> with TickerProviderStateMixin {
                   color: const Color(0xFF4FC3F7),
                   lines: const [
                     '· 약 3분 미만이면 시간 감소 없음',
-                    '· 깨어 −5·자는 중 −4(시간당)',
+                    '· 깨어 있든 자든 시간당 −6',
                     '· 씻기기: 85 미만 +3, 85↑ +2, 100이면 +0 / 기분 +0.1·에너지 소폭 감소',
                     '· 70↑ 잘 유지 시 유대 보상, 50 미만 오래 가면 유대 주기적 감소',
                   ],
@@ -1001,7 +1001,7 @@ class _CaringPageState extends State<CaringPage> with TickerProviderStateMixin {
                   title: '에너지',
                   color: const Color(0xFF81C784),
                   lines: const [
-                    '· 깨어 있을 때만 시간당 −4(수면 중 시간 감소 없음)',
+                    '· 깨어 있을 때만 시간당 −5(수면 중 시간 감소 없음)',
                     '· 잠 깸: 수면(최대 8h 반영)×시간당 +6, 상한 100 / 30분 이하 깨우면 변화 없음',
                     '· 밥 연속 −8, 과식 −3 / 씻기기 시 −0.2 또는 −0.1',
                     '· 최저 5',
