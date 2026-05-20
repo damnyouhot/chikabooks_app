@@ -38,9 +38,19 @@ class UserGoalService {
     return '${DateTime.now().year}';
   }
 
+  /// 현재 일 키 (`YYYY-MM-DD`)
+  static String currentDayKey() {
+    final now = DateTime.now();
+    return '${now.year}-'
+        '${now.month.toString().padLeft(2, '0')}-'
+        '${now.day.toString().padLeft(2, '0')}';
+  }
+
   /// 기간 타입별 현재 periodKey 반환
   static String getCurrentPeriodKey(PeriodType type) {
     switch (type) {
+      case PeriodType.day:
+        return currentDayKey();
       case PeriodType.week:
         return currentWeekKey();
       case PeriodType.month:

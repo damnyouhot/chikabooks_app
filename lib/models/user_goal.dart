@@ -9,6 +9,7 @@ enum GoalType {
 
 /// 목표 기간 타입
 enum PeriodType {
+  day,    // 일간 (오늘 안에 끝낼 일)
   week,   // 주간
   month,  // 월간
   year,   // 연간
@@ -143,6 +144,8 @@ class UserGoal {
   /// 기간 라벨
   String get periodLabel {
     switch (periodType) {
+      case PeriodType.day:
+        return '오늘';
       case PeriodType.week:
         return '주간';
       case PeriodType.month:
@@ -156,6 +159,9 @@ class UserGoal {
   String get deadlineText {
     final now = DateTime.now();
     switch (periodType) {
+      case PeriodType.day:
+        return '오늘까지';
+
       case PeriodType.week:
         final sunday = now.add(Duration(days: DateTime.sunday - now.weekday));
         final diff = sunday.difference(now).inDays;

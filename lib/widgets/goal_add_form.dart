@@ -126,12 +126,13 @@ class _GoalAddFormState extends State<GoalAddForm> {
               ),
             ),
             const SizedBox(height: 12),
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
+                _buildPeriodChip('오늘', PeriodType.day),
                 _buildPeriodChip('주간', PeriodType.week),
-                const SizedBox(width: 8),
                 _buildPeriodChip('월간', PeriodType.month),
-                const SizedBox(width: 8),
                 _buildPeriodChip('연간', PeriodType.year),
               ],
             ),
@@ -201,7 +202,13 @@ class _GoalAddFormState extends State<GoalAddForm> {
   Widget _buildTypeChip(String label, GoalType type, String subtitle) {
     final isSelected = _selectedType == type;
     return GestureDetector(
-      onTap: () => setState(() => _selectedType = type),
+      onTap: () => setState(() {
+        _selectedType = type;
+        // 루틴은 「오늘」 기간을 쓸 수 없으므로 자동으로 「주간」으로 옮긴다.
+        if (type == GoalType.routine && _selectedPeriod == PeriodType.day) {
+          _selectedPeriod = PeriodType.week;
+        }
+      }),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -238,24 +245,34 @@ class _GoalAddFormState extends State<GoalAddForm> {
 
   Widget _buildPeriodChip(String label, PeriodType type) {
     final isSelected = _selectedPeriod == type;
+    // 「오늘」기간은 단발성 — 루틴(매일 반복)과 의미가 어색하므로 비활성.
+    final isDisabled =
+        type == PeriodType.day && _selectedType == GoalType.routine;
     return GestureDetector(
-      onTap: () => setState(() => _selectedPeriod = type),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.accent.withOpacity(0.3) : Colors.transparent,
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(
-            color: isSelected ? AppColors.accent : AppColors.divider,
-            width: 1,
+      onTap: isDisabled
+          ? null
+          : () => setState(() => _selectedPeriod = type),
+      child: Opacity(
+        opacity: isDisabled ? 0.4 : 1,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? AppColors.accent.withOpacity(0.3)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(
+              color: isSelected ? AppColors.accent : AppColors.divider,
+              width: 1,
+            ),
           ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-            color: AppColors.textPrimary,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+              color: AppColors.textPrimary,
+            ),
           ),
         ),
       ),
