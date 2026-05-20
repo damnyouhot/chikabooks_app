@@ -99,39 +99,41 @@ class _RecordHubSheetContentState extends State<_RecordHubSheetContent>
         if (didPop) return;
         _closeWithResult();
       },
-      child: Container(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.92,
-        ),
-        decoration: const BoxDecoration(
-          color: AppColors.white,
-          borderRadius:
-              BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
-        ),
-        child: SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 12),
-              _buildDragHandle(),
-              const SizedBox(height: 12),
-              _buildHeader(context),
-              const SizedBox(height: 12),
-              _buildSegments(),
-              const SizedBox(height: 12),
-              Flexible(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 180),
-                  switchInCurve: Curves.easeOut,
-                  switchOutCurve: Curves.easeIn,
-                  child: KeyedSubtree(
-                    key: ValueKey<int>(_index),
-                    child: _buildBody(),
+      // 시트 높이를 항상 동일하게 유지해 탭 전환 시 시트가 늘었다 줄었다
+      // 하는 「점프」를 방지한다. (사용자 화면 90% 고정)
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * 0.9,
+        child: Container(
+          decoration: const BoxDecoration(
+            color: AppColors.white,
+            borderRadius:
+                BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              children: [
+                const SizedBox(height: 12),
+                _buildDragHandle(),
+                const SizedBox(height: 12),
+                _buildHeader(context),
+                const SizedBox(height: 12),
+                _buildSegments(),
+                const SizedBox(height: 12),
+                // IndexedStack — 두 콘텐츠를 항상 마운트해 탭 전환 시
+                // 재로딩(initState/Firestore 재조회/입력 초기화)이 일어나지
+                // 않게 한다. 보이는 자식만 화면에 표시.
+                Expanded(
+                  child: IndexedStack(
+                    index: _index,
+                    children: [
+                      _buildDiaryTab(),
+                      _buildGoalTab(),
+                    ],
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -231,30 +233,32 @@ class _RecordHubSheetContentState extends State<_RecordHubSheetContent>
     );
   }
 
-  // ── Body 분기 ────────────────────────────────────────────────
-  Widget _buildBody() {
-    if (_index == 0) {
-      return SingleChildScrollView(
-        physics: const ClampingScrollPhysics(),
-        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-        child: DiaryInputBody(
-          // 시트 카드를 [_RecordHubSheetContent]가 그리고 있어 본문은 데코 없이
-          // 내용만 그린다. 자동 포커스도 끄고, 사용자가 입력 영역을 탭하면
-          // 자연스럽게 키보드가 올라오도록 둔다.
-          decorated: false,
-          autofocus: false,
-          popOnSave: false,
-          onSaved: (text) {
-            // 저장 성공 → 멘트를 버퍼에 담아둔다. 시트는 닫지 않고
-            // 사용자가 닫을 때(드래그/X/시스템 백) 부모에게 함께 전달된다.
-            // (DiaryInputBody 가 popOnSave:false 모드라 입력칸은 자동 비워짐)
-            final ment = DiaryResponseService.getRandomResponse(text);
-            _bufferCharacterMent(ment);
-          },
-        ),
-      );
-    }
-    // 「나의 목표」: 기존 콘텐츠 위젯을 임베드 모드로 사용.
+  // ── 「오늘 한줄」 ─────────────────────────────────────────────
+  Widget _buildDiaryTab() {
+    return SingleChildScrollView(
+      physics: const ClampingScrollPhysics(),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      child: DiaryInputBody(
+        // 시트 카드를 [_RecordHubSheetContent]가 그리고 있어 본문은 데코 없이
+        // 내용만 그린다. 자동 포커스도 끄고, 사용자가 입력 영역을 탭하면
+        // 자연스럽게 키보드가 올라오도록 둔다.
+        decorated: false,
+        autofocus: false,
+        popOnSave: false,
+        onSaved: (text) {
+          // 저장 성공 → 멘트를 버퍼에 담아둔다. 시트는 닫지 않고
+          // 사용자가 닫을 때(드래그/X/시스템 백) 부모에게 함께 전달된다.
+          // (DiaryInputBody 가 popOnSave:false 모드라 입력칸은 자동 비워짐)
+          final ment = DiaryResponseService.getRandomResponse(text);
+          _bufferCharacterMent(ment);
+        },
+      ),
+    );
+  }
+
+  // ── 「나의 목표」 ─────────────────────────────────────────────
+  Widget _buildGoalTab() {
+    // 기존 콘텐츠 위젯을 임베드 모드로 사용.
     // 시트 카드/드래그 핸들은 [_RecordHubSheetContent] 가 그리고 있으므로
     // [UserGoalContent] 는 헤더부터 콘텐츠까지만 그린다.
     return UserGoalContent(
