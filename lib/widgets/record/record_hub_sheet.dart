@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
@@ -13,22 +14,35 @@ import '../user_goal_sheet.dart';
 ///   - 「오늘 한줄」: 나만 보는 한 줄 기록 ([DiaryInputBody])
 ///   - 「나의 목표」: 루틴/프로젝트 목표 ([UserGoalContent])
 ///
-/// 직전 진입 시 마지막으로 본 탭을 SharedPreferences로 기억하는 기능은
-/// 후속 단계에서 추가된다. (현재는 항상 「오늘 한줄」로 시작)
+/// 마지막으로 선택한 탭은 SharedPreferences에 저장되어 다음 진입 시 복원된다.
 class RecordHubSheet {
+  /// SharedPreferences 키 — 마지막으로 본 탭 인덱스(0=오늘 한줄, 1=나의 목표).
+  static const String prefsLastTabKey = 'record_hub_last_tab';
+
   /// 시트를 띄운다. 외부에서 결과를 받지 않는다 (모든 저장은 시트 내부에서 처리).
-  static Future<void> show(BuildContext context) {
+  static Future<void> show(BuildContext context) async {
+    int initialTab = 0;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final stored = prefs.getInt(prefsLastTabKey);
+      if (stored == 0 || stored == 1) initialTab = stored!;
+    } catch (_) {
+      // SharedPreferences 실패 시 기본값(0) 사용 — 사용자 흐름 영향 없음.
+    }
+    if (!context.mounted) return;
     return showAppModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => const _RecordHubSheetContent(),
+      builder: (_) => _RecordHubSheetContent(initialTab: initialTab),
     );
   }
 }
 
 class _RecordHubSheetContent extends StatefulWidget {
-  const _RecordHubSheetContent();
+  const _RecordHubSheetContent({required this.initialTab});
+
+  final int initialTab;
 
   @override
   State<_RecordHubSheetContent> createState() => _RecordHubSheetContentState();
@@ -37,7 +51,16 @@ class _RecordHubSheetContent extends StatefulWidget {
 class _RecordHubSheetContentState extends State<_RecordHubSheetContent>
     with SingleTickerProviderStateMixin {
   /// 0 = 오늘 한줄, 1 = 나의 목표
-  int _index = 0;
+  late int _index = widget.initialTab;
+
+  void _selectTab(int index) {
+    if (_index == index) return;
+    setState(() => _index = index);
+    // 다음 진입 시 복원하기 위해 SharedPreferences 에 저장 (fire-and-forget).
+    SharedPreferences.getInstance()
+        .then((prefs) => prefs.setInt(RecordHubSheet.prefsLastTabKey, index))
+        .catchError((_) => false);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -159,13 +182,13 @@ class _RecordHubSheetContentState extends State<_RecordHubSheetContent>
               label: '오늘 한줄',
               icon: Icons.edit_outlined,
               selected: _index == 0,
-              onTap: () => setState(() => _index = 0),
+              onTap: () => _selectTab(0),
             ),
             _SegmentTab(
               label: '나의 목표',
               icon: Icons.flag_outlined,
               selected: _index == 1,
-              onTap: () => setState(() => _index = 1),
+              onTap: () => _selectTab(1),
             ),
           ],
         ),
