@@ -175,7 +175,7 @@ class _RecordHubSheetContentState extends State<_RecordHubSheetContent>
                 ),
                 SizedBox(height: 2),
                 Text(
-                  '오늘의 한 줄과 나의 목표를 한 곳에서.',
+                  '오늘 한 줄을 남기거나, 꾸준히 챙길 목표를 정해요.',
                   style: TextStyle(
                     fontSize: 12,
                     color: AppColors.textSecondary,

@@ -356,8 +356,10 @@ class _DiaryInputBodyState extends State<DiaryInputBody> {
                 ElevatedButton(
                   onPressed: _isSaving || !hasContent ? null : _save,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.accent,
-                    foregroundColor: AppColors.white,
+                    // 「기록하기」 흐름의 강조색은 앱 레드. 「지금 저장」이라는
+                    // 액션을 명확히 인식시키기 위해 시트 톤과 일치시킴.
+                    backgroundColor: AppColors.lime,
+                    foregroundColor: AppColors.onCardEmphasis,
                     disabledBackgroundColor: AppColors.disabledBg,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -374,7 +376,7 @@ class _DiaryInputBodyState extends State<DiaryInputBody> {
                             height: 16,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: AppColors.white,
+                              color: AppColors.onCardEmphasis,
                             ),
                           )
                           : const Text('저장'),
