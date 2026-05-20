@@ -44,6 +44,19 @@ service firebase.storage {
       allow update, delete: if false;
     }
 
+    // 「기록하기」(나만 보는 일기) 첨부 이미지
+    // 경로: diary_posts/{userId}/{noteId}/image_N.jpg
+    // - 본인만 읽기/쓰기/삭제, 한 장 8MB 이하, 이미지 타입만
+    match /diary_posts/{userId}/{noteId}/{fileName} {
+      allow read:   if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null &&
+                       request.auth.uid == userId &&
+                       request.resource.size < 8 * 1024 * 1024 &&
+                       request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null && request.auth.uid == userId;
+      allow update: if false;
+    }
+
     // 나머지: 로그인한 사용자 읽기만 허용, 쓰기는 금지
     match /{allPaths=**} {
       allow read:  if request.auth != null;

@@ -74,6 +74,10 @@ class _UserGoalContentState extends State<UserGoalContent>
   /// 시트 진입 시 1회 로드. 빠른 진단을 위해 초기값 0.
   int _monthlyTotal = 0;
 
+  /// 카드 리스트 전용 스크롤 컨트롤러 — Scrollbar 와 ListView 가 같은
+  /// 스크롤을 공유하도록 명시적으로 보유.
+  final ScrollController _listScrollController = ScrollController();
+
   @override
   void initState() {
     super.initState();
@@ -87,6 +91,7 @@ class _UserGoalContentState extends State<UserGoalContent>
   @override
   void dispose() {
     _tabController.dispose();
+    _listScrollController.dispose();
     super.dispose();
   }
 
@@ -545,16 +550,26 @@ class _UserGoalContentState extends State<UserGoalContent>
       );
     }
 
-    return ListView.separated(
-      shrinkWrap: true,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      itemCount: items.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
-      itemBuilder: (context, index) {
-        return _currentTab == 0
-            ? _buildRoutineCard(items[index])
-            : _buildProjectCard(items[index]);
-      },
+    // 항목이 많아져 스크롤이 필요할 때 사용자에게 「더 있다」를 알리도록
+    // Scrollbar 를 항상 노출(thumbVisibility: true). 컨트롤러를 공유해
+    // ListView 가 사용하는 동일 스크롤에 붙는다.
+    final controller = _listScrollController;
+    return Scrollbar(
+      controller: controller,
+      thumbVisibility: true,
+      thickness: 3,
+      radius: const Radius.circular(2),
+      child: ListView.separated(
+        controller: controller,
+        padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+        itemCount: items.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 8),
+        itemBuilder: (context, index) {
+          return _currentTab == 0
+              ? _buildRoutineCard(items[index])
+              : _buildProjectCard(items[index]);
+        },
+      ),
     );
   }
 
@@ -610,293 +625,263 @@ class _UserGoalContentState extends State<UserGoalContent>
     final weeklyCount = _weeklyCheckCounts[goal.id] ?? 0;
     final weeklyTarget = goal.weeklyTarget;
 
+    // ── 60% 더 압축한 1행 레이아웃 ───────────────────────────
+    // [원형 체크] [ 제목/배지·빈도 / 진행바 ]   [N/M]   [🗑]
+    // 카드 한 장 높이가 약 60px 수준. 「오늘 했어요」 의 초록 솔리드 강조는
+    // 좌측 원형 체크 버튼이 그대로 가져간다(체크 시 진한 그린 채우기).
     return Container(
-      // 상하 압축: 16 → 12. 카드 사이 빈 여백을 줄여 한 화면 정보량↑.
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: isCheckedToday ? _kSuccess.withOpacity(0.08) : AppColors.white,
-        borderRadius: BorderRadius.circular(14),
+        color: isCheckedToday ? _kSuccess.withOpacity(0.07) : AppColors.white,
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color:
-              isCheckedToday
-                  ? _kSuccess.withOpacity(0.4)
-                  : _kShadow2.withOpacity(0.4),
+          color: isCheckedToday
+              ? _kSuccess.withOpacity(0.35)
+              : _kShadow2.withOpacity(0.4),
           width: 0.5,
         ),
-        // 그림자도 살짝 가볍게.
         boxShadow: [
           BoxShadow(
-            color: _kShadow2.withOpacity(0.10),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: _kShadow2.withOpacity(0.08),
+            blurRadius: 6,
+            offset: const Offset(0, 1),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // ── 상단: 제목 + 배지 + 진행 분수 + 삭제 ──
-          // 진행 분수(1/7)를 같은 줄 우측에 두면 시각적 계층이 명확하고
-          // 카드 높이가 한 줄 줄어든다.
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
+          // ① 원형 체크 토글 (가장 핵심 액션)
+          GestureDetector(
+            onTap: () => _toggleRoutineCheck(goal),
+            behavior: HitTestBehavior.opaque,
+            child: Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: isCheckedToday ? _kSuccess : Colors.transparent,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isCheckedToday
+                      ? _kSuccess
+                      : _kAccent.withOpacity(0.45),
+                  width: 1.4,
+                ),
+              ),
+              child: Icon(
+                isCheckedToday ? Icons.check : Icons.check,
+                size: 18,
+                color: isCheckedToday
+                    ? _kSuccessOn
+                    : _kText.withOpacity(0.25),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+
+          // ② 제목 + 배지/빈도 + 진행 바
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
                   children: [
-                    Text(
-                      goal.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: _kText,
+                    Flexible(
+                      child: Text(
+                        goal.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: _kText,
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        _buildBadge('루틴', _kAccent),
-                        const SizedBox(width: 4),
-                        _buildBadge(goal.periodLabel, _kShadow2),
-                        const SizedBox(width: 6),
-                        Flexible(
-                          child: Text(
-                            goal.frequencyText,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: _kText.withOpacity(0.5),
-                            ),
-                          ),
+                    const SizedBox(width: 6),
+                    _buildBadge('루틴', _kAccent),
+                    const SizedBox(width: 4),
+                    _buildBadge(goal.periodLabel, _kShadow2),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        goal.frequencyText,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: _kText.withOpacity(0.45),
                         ),
-                      ],
+                      ),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(width: 8),
+                const SizedBox(height: 5),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(2),
+                  child: LinearProgressIndicator(
+                    value: weeklyTarget > 0 ? weeklyCount / weeklyTarget : 0,
+                    backgroundColor: _kShadow2.withOpacity(0.25),
+                    valueColor: AlwaysStoppedAnimation(_kSuccess),
+                    minHeight: 3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+
+          // ③ 분수(N/M) + 삭제 — 컴팩트하게 세로 정렬
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
               Text(
                 '$weeklyCount/$weeklyTarget',
                 style: TextStyle(
                   fontSize: 12,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                   color: _kText.withOpacity(0.7),
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(height: 2),
               GestureDetector(
                 onTap: () => _deleteGoal(goal),
                 child: Icon(
                   Icons.delete_outline,
-                  size: 18,
-                  color: _kText.withOpacity(0.35),
+                  size: 16,
+                  color: _kText.withOpacity(0.3),
                 ),
               ),
             ],
-          ),
-
-          const SizedBox(height: 8),
-
-          // ── 진행률 슬림 바 ──
-          ClipRRect(
-            borderRadius: BorderRadius.circular(2),
-            child: LinearProgressIndicator(
-              value: weeklyTarget > 0 ? weeklyCount / weeklyTarget : 0,
-              backgroundColor: _kShadow2.withOpacity(0.25),
-              valueColor: AlwaysStoppedAnimation(_kSuccess),
-              minHeight: 4,
-            ),
-          ),
-
-          const SizedBox(height: 10),
-
-          // ── 오늘 체크 버튼 ──
-          // 체크된 상태는 솔리드 톤(진한 초록 배경 + 흰 텍스트)으로 「확정된
-          // 성과」를 바로 인식.
-          GestureDetector(
-            onTap: () => _toggleRoutineCheck(goal),
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 9),
-              decoration: BoxDecoration(
-                color: isCheckedToday ? _kSuccess : AppColors.white,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: isCheckedToday
-                      ? _kSuccess
-                      : _kAccent.withOpacity(0.3),
-                  width: 1,
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    isCheckedToday
-                        ? Icons.check_circle
-                        : Icons.check_circle_outline,
-                    color: isCheckedToday
-                        ? _kSuccessOn
-                        : _kText.withOpacity(0.6),
-                    size: 18,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    isCheckedToday ? '오늘 했어요' : '오늘 하기',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: isCheckedToday
-                          ? _kSuccessOn
-                          : _kText.withOpacity(0.7),
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ),
         ],
       ),
     );
   }
 
-  /// 프로젝트 카드 — 루틴과 같은 압축 톤(상하 패딩 12, 배지·마감 한 줄).
+  /// 프로젝트 카드 — 루틴과 동일한 1행 압축 레이아웃.
   Widget _buildProjectCard(UserGoal goal) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: goal.isDone ? _kSuccess.withOpacity(0.08) : AppColors.white,
-        borderRadius: BorderRadius.circular(14),
+        color: goal.isDone ? _kSuccess.withOpacity(0.07) : AppColors.white,
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color:
-              goal.isDone
-                  ? _kSuccess.withOpacity(0.4)
-                  : _kShadow2.withOpacity(0.4),
+          color: goal.isDone
+              ? _kSuccess.withOpacity(0.35)
+              : _kShadow2.withOpacity(0.4),
           width: 0.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: _kShadow2.withOpacity(0.10),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: _kShadow2.withOpacity(0.08),
+            blurRadius: 6,
+            offset: const Offset(0, 1),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // ── 상단: 제목 + 배지 + 마감 + 삭제 ──
-          // 마감 안내(아이콘 + 텍스트)를 같은 줄 우측에 압축 배치.
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      goal.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: _kText,
-                        decoration:
-                            goal.isDone ? TextDecoration.lineThrough : null,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        _buildBadge('프로젝트', _kAccent),
-                        const SizedBox(width: 4),
-                        _buildBadge(goal.periodLabel, _kShadow2),
-                        if (goal.isDone) ...[
-                          const SizedBox(width: 4),
-                          _buildBadge('완료', _kSuccess),
-                        ],
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              if (!goal.isDone) ...[
-                Icon(
-                  Icons.schedule,
-                  size: 13,
-                  color: _kText.withOpacity(0.5),
-                ),
-                const SizedBox(width: 3),
-                Flexible(
-                  child: Text(
-                    goal.deadlineText,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: _kText.withOpacity(0.6),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-              ],
-              GestureDetector(
-                onTap: () => _deleteGoal(goal),
-                child: Icon(
-                  Icons.delete_outline,
-                  size: 18,
-                  color: _kText.withOpacity(0.35),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 10),
-
-          // ── 완료 토글 ──
+          // ① 원형 완료 토글
           GestureDetector(
             onTap: () => _toggleProjectDone(goal),
+            behavior: HitTestBehavior.opaque,
             child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 9),
+              width: 34,
+              height: 34,
               decoration: BoxDecoration(
-                color: goal.isDone ? _kSuccess : AppColors.white,
-                borderRadius: BorderRadius.circular(10),
+                color: goal.isDone ? _kSuccess : Colors.transparent,
+                shape: BoxShape.circle,
                 border: Border.all(
                   color: goal.isDone
                       ? _kSuccess
-                      : _kAccent.withOpacity(0.3),
-                  width: 1,
+                      : _kAccent.withOpacity(0.45),
+                  width: 1.4,
                 ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    goal.isDone
-                        ? Icons.check_circle
-                        : Icons.check_circle_outline,
-                    color: goal.isDone
-                        ? _kSuccessOn
-                        : _kText.withOpacity(0.6),
-                    size: 18,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    goal.isDone ? '완료됨' : '완료 체크',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: goal.isDone
-                          ? _kSuccessOn
-                          : _kText.withOpacity(0.7),
+              child: Icon(
+                Icons.check,
+                size: 18,
+                color: goal.isDone
+                    ? _kSuccessOn
+                    : _kText.withOpacity(0.25),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+
+          // ② 제목 + 배지 + 마감
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        goal.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: _kText,
+                          decoration: goal.isDone
+                              ? TextDecoration.lineThrough
+                              : null,
+                        ),
+                      ),
                     ),
+                    const SizedBox(width: 6),
+                    _buildBadge('프로젝트', _kAccent),
+                    const SizedBox(width: 4),
+                    _buildBadge(goal.periodLabel, _kShadow2),
+                    if (goal.isDone) ...[
+                      const SizedBox(width: 4),
+                      _buildBadge('완료', _kSuccess),
+                    ],
+                  ],
+                ),
+                if (!goal.isDone) ...[
+                  const SizedBox(height: 3),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.schedule,
+                        size: 11,
+                        color: _kText.withOpacity(0.45),
+                      ),
+                      const SizedBox(width: 3),
+                      Flexible(
+                        child: Text(
+                          goal.deadlineText,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: _kText.withOpacity(0.5),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
-              ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+
+          // ③ 삭제
+          GestureDetector(
+            onTap: () => _deleteGoal(goal),
+            child: Icon(
+              Icons.delete_outline,
+              size: 16,
+              color: _kText.withOpacity(0.3),
             ),
           ),
         ],
