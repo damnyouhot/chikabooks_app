@@ -17,6 +17,7 @@ import '../data/base_message_data.dart';
 import '../models/hira_update.dart';
 import '../models/ebook.dart';
 import '../widgets/speech_overlay.dart';
+import '../widgets/record/record_hub_sheet.dart';
 import '../pages/ebook/ebook_detail_page.dart';
 import 'settings/settings_page.dart';
 import '../core/theme/app_colors.dart';
@@ -729,16 +730,9 @@ class _CaringPageState extends State<CaringPage> with TickerProviderStateMixin {
   }
 
   /// 「기록하기」 버튼 — 오늘 한줄 + 나의 목표 통합 허브 진입.
-  /// 시트 위젯은 다음 작업 단계에서 연결되며, 그때까지는 안내 스낵바만 표시한다.
   void _onRecordHubTap() {
     if (!_caringReady || widget.isOnboardingActive) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('기록 허브 준비 중이에요. 곧 열려요.'),
-        behavior: SnackBarBehavior.floating,
-        duration: Duration(milliseconds: 1500),
-      ),
-    );
+    RecordHubSheet.show(context);
   }
 
   // ══════════════════════════════════════════════

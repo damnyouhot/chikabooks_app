@@ -8,25 +8,35 @@ import '../services/user_goal_service.dart';
 import 'goal_add_form.dart';
 
 /// 사용자 목표 허브 (완성형)
+///
+/// 내부 콘텐츠는 [UserGoalContent]로 분리되어 [RecordHubSheet] 등 다른 시트에
+/// 재사용 가능하다. 단독 호출은 기존과 동일하게 [show]를 사용한다.
 class UserGoalSheet {
   static Future<void> show(BuildContext context) {
     return showAppModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => const _UserGoalSheetContent(),
+      builder: (_) => const UserGoalContent(),
     );
   }
 }
 
-class _UserGoalSheetContent extends StatefulWidget {
-  const _UserGoalSheetContent();
+/// 「나의 목표」 콘텐츠 본체 (시트 껍데기 없이 어디서든 재사용 가능)
+///
+/// - [embedded] true: 외부 시트 안에 임베드되는 경우. 자체 라운드 카드/드래그 핸들/
+///   외부 패딩을 그리지 않고, 콘텐츠만 출력한다. ([RecordHubSheet]에서 사용)
+/// - [embedded] false: 단독 시트로 쓰일 때. 기존과 동일한 외형(흰색 카드 + 핸들).
+class UserGoalContent extends StatefulWidget {
+  const UserGoalContent({super.key, this.embedded = false});
+
+  final bool embedded;
 
   @override
-  State<_UserGoalSheetContent> createState() => _UserGoalSheetContentState();
+  State<UserGoalContent> createState() => _UserGoalContentState();
 }
 
-class _UserGoalSheetContentState extends State<_UserGoalSheetContent>
+class _UserGoalContentState extends State<UserGoalContent>
     with SingleTickerProviderStateMixin {
   // ── 디자인 컬러 팔레트 → AppColors로 교체 ──
   static const _kAccent = AppColors.accent;
@@ -82,18 +92,13 @@ class _UserGoalSheetContentState extends State<_UserGoalSheetContent>
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.85,
-      ),
-      decoration: const BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // 드래그 핸들
+    final hasItems =
+        !_loading && _goals != null && _goals!.items.isNotEmpty;
+    final inner = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (!widget.embedded) ...[
+          // 드래그 핸들 (단독 시트일 때만)
           const SizedBox(height: 12),
           Container(
             width: 40,
@@ -104,34 +109,45 @@ class _UserGoalSheetContentState extends State<_UserGoalSheetContent>
             ),
           ),
           const SizedBox(height: 16),
-
-          // 헤더
-          _buildHeader(),
-          const SizedBox(height: 8),
-
-          // 상태 요약
-          if (!_loading && _goals != null && _goals!.items.isNotEmpty)
-            _buildSummary(),
-          if (!_loading && _goals != null && _goals!.items.isNotEmpty)
-            const SizedBox(height: 16),
-
-          // 탭
-          if (!_loading && _goals != null && _goals!.items.isNotEmpty)
-            _buildTabs(),
-          if (!_loading && _goals != null && _goals!.items.isNotEmpty)
-            const SizedBox(height: 16),
-
-          // 내용
-          Flexible(
-            child:
-                _loading
-                    ? const Center(child: CircularProgressIndicator())
-                    : _buildContent(),
-          ),
-
-          const SizedBox(height: 20),
         ],
+
+        // 헤더
+        _buildHeader(),
+        const SizedBox(height: 8),
+
+        // 상태 요약
+        if (hasItems) _buildSummary(),
+        if (hasItems) const SizedBox(height: 16),
+
+        // 탭
+        if (hasItems) _buildTabs(),
+        if (hasItems) const SizedBox(height: 16),
+
+        // 내용
+        Flexible(
+          child: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : _buildContent(),
+        ),
+
+        const SizedBox(height: 20),
+      ],
+    );
+
+    if (widget.embedded) {
+      // 시트 외형(라운드 카드/배경)은 바깥 [RecordHubSheet] 가 책임진다.
+      return inner;
+    }
+
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.85,
       ),
+      decoration: const BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: inner,
     );
   }
 

@@ -12,12 +12,11 @@ import '../core/widgets/app_modal_scaffold.dart';
 import '../pages/diary_timeline_page.dart';
 import '../services/diary_image_service.dart';
 
-/// 나만 보는 기록 (BottomSheet)
+/// 나만 보는 기록 (BottomSheet) — 단독 호출용 얇은 래퍼.
 ///
-/// - 본문 입력 (최대 500자)
-/// - 사진 첨부 (최대 3장, 업로드 전 압축)
-/// - 사진 없이 글만 저장 가능
-class DiaryInputSheet extends StatefulWidget {
+/// 실제 본문은 [DiaryInputBody]에 분리되어 [RecordHubSheet] 같은 다른 시트에
+/// 재사용된다. 단독으로 띄울 때는 기존과 동일하게 [show]를 사용한다.
+class DiaryInputSheet extends StatelessWidget {
   final Function(String) onSaved;
 
   const DiaryInputSheet({super.key, required this.onSaved});
@@ -31,10 +30,35 @@ class DiaryInputSheet extends StatefulWidget {
   }
 
   @override
-  State<DiaryInputSheet> createState() => _DiaryInputSheetState();
+  Widget build(BuildContext context) {
+    return DiaryInputBody(onSaved: onSaved, decorated: true);
+  }
 }
 
-class _DiaryInputSheetState extends State<DiaryInputSheet> {
+/// 「오늘 한줄」 콘텐츠 본체 — 시트 껍데기 없이 어디서든 재사용 가능.
+///
+/// - [decorated] true: 기존 시트와 동일하게 흰색 카드 + 상단 라운드를 그린다.
+///   (단독 호출 [DiaryInputSheet.show]에서 사용)
+/// - [decorated] false: 콘텐츠만 그린다. 바깥에서 [RecordHubSheet]가 카드를 그린다.
+/// - [autofocus]: 본문 TextField 자동 포커스 여부. 허브에서는 다른 탭과 충돌을
+///   막기 위해 false 로 시작하고, 사용자가 입력을 시작하면 자연스럽게 받는다.
+class DiaryInputBody extends StatefulWidget {
+  final Function(String) onSaved;
+  final bool decorated;
+  final bool autofocus;
+
+  const DiaryInputBody({
+    super.key,
+    required this.onSaved,
+    this.decorated = false,
+    this.autofocus = false,
+  });
+
+  @override
+  State<DiaryInputBody> createState() => _DiaryInputBodyState();
+}
+
+class _DiaryInputBodyState extends State<DiaryInputBody> {
   final _controller = TextEditingController();
   final _selectedImages = <XFile>[];
   bool _isSaving = false;
@@ -130,21 +154,23 @@ class _DiaryInputSheetState extends State<DiaryInputSheet> {
     final hasContent =
         _controller.text.trim().isNotEmpty || _selectedImages.isNotEmpty;
 
-    return Padding(
+    final inner = Padding(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
       ),
       child: Container(
         padding: const EdgeInsets.all(24),
-        decoration: const BoxDecoration(
-          color: AppColors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
+        decoration: widget.decorated
+            ? const BoxDecoration(
+                color: AppColors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              )
+            : null,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── 제목 + 기록 보기 ──
+            // ── 제목 + 지난 기록 ──
             Row(
               children: [
                 const Text(
@@ -181,7 +207,7 @@ class _DiaryInputSheetState extends State<DiaryInputSheet> {
                         Icon(Icons.history, size: 16, color: AppColors.accent),
                         const SizedBox(width: 4),
                         const Text(
-                          '어제',
+                          '지난 기록',
                           style: TextStyle(
                             fontSize: 12,
                             color: AppColors.accent,
@@ -196,7 +222,7 @@ class _DiaryInputSheetState extends State<DiaryInputSheet> {
             ),
             const SizedBox(height: 6),
             Text(
-              '오늘 하루를 가볍게 남겨보세요.',
+              '오늘 하루를 가볍게 남겨보세요. (나만 보여요)',
               style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 16),
@@ -209,7 +235,7 @@ class _DiaryInputSheetState extends State<DiaryInputSheet> {
               maxLength: 500,
               maxLines: 4,
               minLines: 2,
-              autofocus: true,
+              autofocus: widget.autofocus,
               onChanged: (_) => setState(() {}),
               decoration: InputDecoration(
                 hintText: '지금 마음을 한 문장으로 남겨볼까?',
@@ -346,6 +372,8 @@ class _DiaryInputSheetState extends State<DiaryInputSheet> {
         ),
       ),
     );
+
+    return inner;
   }
 }
 
