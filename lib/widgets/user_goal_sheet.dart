@@ -7,6 +7,7 @@ import '../core/widgets/app_modal_scaffold.dart';
 import '../data/caring_ments.dart';
 import '../models/user_goal.dart';
 import '../models/routine_check.dart';
+import '../services/admin_activity_service.dart';
 import '../services/user_goal_service.dart';
 import 'goal_add_form.dart';
 
@@ -864,7 +865,14 @@ class _UserGoalContentState extends State<UserGoalContent>
       );
 
       // 캐릭터 멘트 (체크 ON일 때만)
-      if (isChecked) _emitCharacterMent(CaringMents.goalChecked);
+      if (isChecked) {
+        _emitCharacterMent(CaringMents.goalChecked);
+        AdminActivityService.log(
+          ActivityEventType.goalRoutineCheck,
+          page: 'record_hub',
+          targetId: goal.id,
+        );
+      }
     }
   }
 
@@ -887,6 +895,11 @@ class _UserGoalContentState extends State<UserGoalContent>
         ),
       );
       _emitCharacterMent(CaringMents.goalCompleted);
+      AdminActivityService.log(
+        ActivityEventType.goalProjectDone,
+        page: 'record_hub',
+        targetId: goal.id,
+      );
     }
   }
 
@@ -905,6 +918,11 @@ class _UserGoalContentState extends State<UserGoalContent>
 
     if (confirm == true) {
       await UserGoalService.deleteGoal(goal.id);
+      AdminActivityService.log(
+        ActivityEventType.goalDelete,
+        page: 'record_hub',
+        targetId: goal.id,
+      );
       await _loadData();
     }
   }
@@ -928,6 +946,10 @@ class _UserGoalContentState extends State<UserGoalContent>
               onAdded: () {
                 _loadData();
                 _emitCharacterMent(CaringMents.goalCreated);
+                AdminActivityService.log(
+                  ActivityEventType.goalCreate,
+                  page: 'record_hub',
+                );
                 Navigator.pop(context);
               },
             ),

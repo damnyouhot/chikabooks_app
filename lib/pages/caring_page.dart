@@ -735,6 +735,10 @@ class _CaringPageState extends State<CaringPage> with TickerProviderStateMixin {
   /// 캐릭터 말풍선([_enqueueReaction])으로 자연스럽게 흘려보낸다.
   Future<void> _onRecordHubTap() async {
     if (!_caringReady || widget.isOnboardingActive) return;
+    AdminActivityService.log(
+      ActivityEventType.tapRecordHubOpen,
+      page: 'home',
+    );
     final ment = await RecordHubSheet.show(context);
     if (!mounted) return;
     if (ment != null && ment.isNotEmpty) _enqueueReaction(ment);

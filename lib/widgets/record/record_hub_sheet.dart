@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../core/widgets/app_modal_scaffold.dart';
+import '../../services/admin_activity_service.dart';
 import '../diary_input_sheet.dart';
 import '../user_goal_sheet.dart';
 
@@ -66,6 +67,12 @@ class _RecordHubSheetContentState extends State<_RecordHubSheetContent>
   void _selectTab(int index) {
     if (_index == index) return;
     setState(() => _index = index);
+    AdminActivityService.log(
+      index == 0
+          ? ActivityEventType.tapRecordTabDiary
+          : ActivityEventType.tapRecordTabGoal,
+      page: 'record_hub',
+    );
     // 다음 진입 시 복원하기 위해 SharedPreferences 에 저장 (fire-and-forget).
     SharedPreferences.getInstance()
         .then((prefs) => prefs.setInt(RecordHubSheet.prefsLastTabKey, index))

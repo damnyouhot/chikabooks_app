@@ -10,6 +10,7 @@ import 'dart:math';
 import '../core/theme/app_colors.dart';
 import '../core/widgets/app_modal_scaffold.dart';
 import '../pages/diary_timeline_page.dart';
+import '../services/admin_activity_service.dart';
 import '../services/diary_image_service.dart';
 
 /// 나만 보는 기록 (BottomSheet) — 단독 호출용 얇은 래퍼.
@@ -142,6 +143,17 @@ class _DiaryInputBodyState extends State<DiaryInputBody> {
         'visibility': 'private',
       });
 
+      AdminActivityService.log(
+        ActivityEventType.noteSaveSuccess,
+        page: 'record_hub',
+        targetId: noteId,
+        extra: {
+          'hasImages': imageUrls.isNotEmpty,
+          'imageCount': imageUrls.length,
+          'textLength': text.length,
+        },
+      );
+
       if (mounted) {
         // 부모(허브)가 닫기를 책임지는 모드일 때는 pop 하지 않고 콜백만 호출한다.
         // 단독 시트일 때는 기존과 동일하게 본 위젯이 pop.
@@ -152,6 +164,11 @@ class _DiaryInputBodyState extends State<DiaryInputBody> {
       }
     } catch (e) {
       debugPrint('❌ [DiaryInput] 저장 실패: $e');
+      AdminActivityService.log(
+        ActivityEventType.noteSaveFail,
+        page: 'record_hub',
+        extra: {'error': e.toString()},
+      );
       if (mounted) _showSnack('저장 실패: $e');
     } finally {
       if (mounted) setState(() => _isSaving = false);

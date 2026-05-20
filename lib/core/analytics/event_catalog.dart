@@ -379,6 +379,62 @@ const Map<String, EventMeta> kEventCatalog = {
     meaningfulBehavior: true,
   ),
 
+  // ── 기록하기 허브 (1탭 「기록하기」 버튼) ───────────────────
+  'tap_record_hub_open': EventMeta(
+    type: 'tap_record_hub_open',
+    labelKo: '기록하기 허브 열기',
+    tab: EventTab.na,
+    meaningfulBehavior: false,
+  ),
+  'tap_record_tab_diary': EventMeta(
+    type: 'tap_record_tab_diary',
+    labelKo: '기록하기-오늘 한줄 탭',
+    tab: EventTab.na,
+    meaningfulBehavior: false,
+  ),
+  'tap_record_tab_goal': EventMeta(
+    type: 'tap_record_tab_goal',
+    labelKo: '기록하기-나의 목표 탭',
+    tab: EventTab.na,
+    meaningfulBehavior: false,
+  ),
+  'note_save_success': EventMeta(
+    type: 'note_save_success',
+    labelKo: '오늘 한줄 저장 성공',
+    tab: EventTab.na,
+    meaningfulBehavior: true,
+  ),
+  'note_save_fail': EventMeta(
+    type: 'note_save_fail',
+    labelKo: '오늘 한줄 저장 실패',
+    tab: EventTab.na,
+    meaningfulBehavior: false,
+  ),
+  'goal_create': EventMeta(
+    type: 'goal_create',
+    labelKo: '목표 생성',
+    tab: EventTab.na,
+    meaningfulBehavior: true,
+  ),
+  'goal_routine_check': EventMeta(
+    type: 'goal_routine_check',
+    labelKo: '루틴 목표 체크',
+    tab: EventTab.na,
+    meaningfulBehavior: true,
+  ),
+  'goal_project_done': EventMeta(
+    type: 'goal_project_done',
+    labelKo: '프로젝트 목표 완료',
+    tab: EventTab.na,
+    meaningfulBehavior: true,
+  ),
+  'goal_delete': EventMeta(
+    type: 'goal_delete',
+    labelKo: '목표 삭제',
+    tab: EventTab.na,
+    meaningfulBehavior: false,
+  ),
+
   'app_open': EventMeta(
     type: 'app_open',
     labelKo: '앱 실행',

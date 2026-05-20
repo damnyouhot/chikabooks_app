@@ -328,6 +328,17 @@ enum ActivityEventType {
   whisperReply('whisper_reply', '속닥속닥 답글'),
   whisperShare('whisper_share', '속닥속닥 공유'),
 
+  // ── 기록하기 허브 (1탭 「기록하기」 버튼) ─────────────────
+  tapRecordHubOpen('tap_record_hub_open', '기록하기 허브 열기'),
+  tapRecordTabDiary('tap_record_tab_diary', '기록하기-오늘 한줄 탭'),
+  tapRecordTabGoal('tap_record_tab_goal', '기록하기-나의 목표 탭'),
+  noteSaveSuccess('note_save_success', '오늘 한줄 저장 성공'),
+  noteSaveFail('note_save_fail', '오늘 한줄 저장 실패'),
+  goalCreate('goal_create', '목표 생성'),
+  goalRoutineCheck('goal_routine_check', '루틴 목표 체크'),
+  goalProjectDone('goal_project_done', '프로젝트 목표 완료'),
+  goalDelete('goal_delete', '목표 삭제'),
+
   // ── 기타 ──────────────────────────────────────────────────
   appOpen('app_open', '앱 실행'),
 
