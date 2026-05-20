@@ -790,18 +790,37 @@ class _UserGoalContentState extends State<UserGoalContent>
                 ),
               ),
               const SizedBox(height: 2),
-              GestureDetector(
-                onTap: () => _deleteGoal(goal),
-                child: Icon(
-                  Icons.delete_outline,
-                  size: 16,
-                  color: _kText.withOpacity(0.3),
-                ),
-              ),
+              _buildGoalActionIcons(goal),
             ],
           ),
         ],
       ),
+    );
+  }
+
+  /// 수정·삭제 아이콘 (쓰레기통 왼쪽에 수정)
+  Widget _buildGoalActionIcons(UserGoal goal) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        GestureDetector(
+          onTap: () => _showEditGoalForm(goal),
+          child: Icon(
+            Icons.edit_outlined,
+            size: 16,
+            color: _kText.withOpacity(0.35),
+          ),
+        ),
+        const SizedBox(width: 6),
+        GestureDetector(
+          onTap: () => _deleteGoal(goal),
+          child: Icon(
+            Icons.delete_outline,
+            size: 16,
+            color: _kText.withOpacity(0.3),
+          ),
+        ),
+      ],
     );
   }
 
@@ -947,14 +966,7 @@ class _UserGoalContentState extends State<UserGoalContent>
                 ),
               ),
               const SizedBox(width: 8),
-              GestureDetector(
-                onTap: () => _deleteGoal(goal),
-                child: Icon(
-                  Icons.delete_outline,
-                  size: 16,
-                  color: _kText.withOpacity(0.3),
-                ),
-              ),
+              _buildGoalActionIcons(goal),
             ],
           ),
 
@@ -1276,6 +1288,23 @@ class _UserGoalContentState extends State<UserGoalContent>
                       'checkpointCount': createdGoal.checkpoints.length,
                   },
                 );
+                Navigator.pop(context);
+              },
+            ),
+        fullscreenDialog: true,
+      ),
+    );
+  }
+
+  /// 목표 수정 폼
+  void _showEditGoalForm(UserGoal goal) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder:
+            (_) => GoalAddForm(
+              editingGoal: goal,
+              onAdded: (updatedGoal) {
+                if (updatedGoal != null) _loadData();
                 Navigator.pop(context);
               },
             ),

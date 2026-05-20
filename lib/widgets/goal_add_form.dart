@@ -7,7 +7,9 @@ import '../core/widgets/app_primary_button.dart';
 import '../models/user_goal.dart';
 import '../services/user_goal_service.dart';
 
-/// 목표 추가 폼 — 「루틴 / 프로젝트」 두 분기를 한 화면에서 받는다.
+/// 목표 추가·수정 폼 — 「루틴 / 프로젝트」 두 분기를 한 화면에서 받는다.
+///
+/// [editingGoal] 이 있으면 수정 모드(타입 변경 불가, id·진행 상태 유지).
 ///
 /// 디자인 톤은 다른 모달/입력 화면과 통일:
 ///   · Scaffold 배경 = AppColors.appBg (크림톤)
@@ -15,13 +17,33 @@ import '../services/user_goal_service.dart';
 ///   · 입력칸은 filled + 밝은 surfaceMuted 배경, border 없음
 ///   · 선택 칩은 미선택=outline / 선택=AppColors.lime 솔리드 + onCardEmphasis
 class GoalAddForm extends StatefulWidget {
-  /// 신규 생성된 목표를 인자로 받는다. 저장 실패 시 null.
+  /// 신규·수정 결과를 인자로 받는다. 저장 실패 시 null.
   final void Function(UserGoal? created) onAdded;
 
-  const GoalAddForm({super.key, required this.onAdded});
+  /// null 이면 신규, 있으면 해당 목표 수정.
+  final UserGoal? editingGoal;
+
+  const GoalAddForm({
+    super.key,
+    required this.onAdded,
+    this.editingGoal,
+  });
 
   @override
   State<GoalAddForm> createState() => _GoalAddFormState();
+}
+
+/// 체크포인트 입력 행 — 수정 시 기존 id·done 상태 보존.
+class _CheckpointRow {
+  _CheckpointRow({
+    required this.controller,
+    this.existingId,
+    this.done = false,
+  });
+
+  final TextEditingController controller;
+  final String? existingId;
+  final bool done;
 }
 
 class _GoalAddFormState extends State<GoalAddForm> {
@@ -35,25 +57,64 @@ class _GoalAddFormState extends State<GoalAddForm> {
   DateTime? _deadline;
 
   /// 프로젝트 — 체크포인트 1~5개. 빈 텍스트는 저장 시 제외.
-  final List<TextEditingController> _checkpointControllers = [];
+  final List<_CheckpointRow> _checkpointRows = [];
 
   static const int _maxCheckpoints = 5;
+
+  bool get _isEditing => widget.editingGoal != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final g = widget.editingGoal;
+    if (g == null) return;
+
+    _titleController.text = g.title;
+    _selectedType = g.type;
+    _selectedPeriod =
+        g.type == GoalType.routine ? g.periodType : PeriodType.week;
+    if (_selectedType == GoalType.routine &&
+        _selectedPeriod == PeriodType.day) {
+      _selectedPeriod = PeriodType.week;
+    }
+    _weeklyTarget = g.weeklyTarget;
+    _deadline = g.deadline;
+    for (final cp in g.checkpoints) {
+      _checkpointRows.add(
+        _CheckpointRow(
+          controller: TextEditingController(text: cp.title),
+          existingId: cp.id,
+          done: cp.done,
+        ),
+      );
+    }
+  }
 
   @override
   void dispose() {
     _titleController.dispose();
-    for (final c in _checkpointControllers) {
-      c.dispose();
+    for (final row in _checkpointRows) {
+      row.controller.dispose();
     }
     super.dispose();
   }
 
   Future<void> _pickDeadline() async {
     final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    var firstDate = today;
+    if (_isEditing && _deadline != null) {
+      final dl = DateTime(
+        _deadline!.year,
+        _deadline!.month,
+        _deadline!.day,
+      );
+      if (dl.isBefore(firstDate)) firstDate = dl;
+    }
     final picked = await showDatePicker(
       context: context,
       initialDate: _deadline ?? now.add(const Duration(days: 7)),
-      firstDate: now,
+      firstDate: firstDate,
       lastDate: DateTime(now.year + 5),
       helpText: '마감일 선택',
       cancelText: '취소',
@@ -75,13 +136,15 @@ class _GoalAddFormState extends State<GoalAddForm> {
   }
 
   void _addCheckpoint() {
-    if (_checkpointControllers.length >= _maxCheckpoints) return;
-    setState(() => _checkpointControllers.add(TextEditingController()));
+    if (_checkpointRows.length >= _maxCheckpoints) return;
+    setState(
+      () => _checkpointRows.add(_CheckpointRow(controller: TextEditingController())),
+    );
   }
 
   void _removeCheckpoint(int i) {
-    final c = _checkpointControllers.removeAt(i);
-    c.dispose();
+    final row = _checkpointRows.removeAt(i);
+    row.controller.dispose();
     setState(() {});
   }
 
@@ -96,9 +159,9 @@ class _GoalAddFormState extends State<GoalAddForm> {
           icon: const Icon(Icons.close, color: AppColors.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          '새 목표',
-          style: TextStyle(
+        title: Text(
+          _isEditing ? '목표 수정' : '새 목표',
+          style: const TextStyle(
             color: AppColors.textPrimary,
             fontWeight: FontWeight.w700,
             fontSize: 16,
@@ -116,28 +179,34 @@ class _GoalAddFormState extends State<GoalAddForm> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // ── 1) 목표 타입 ───────────────────────────────────
-            _SectionCard(
-              title: '목표 타입',
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _buildTypeChip(
-                      title: '루틴',
-                      subtitle: '매일/주간 반복 체크',
-                      icon: Icons.replay_circle_filled_outlined,
-                      type: GoalType.routine,
-                    ),
+            Opacity(
+              opacity: _isEditing ? 0.55 : 1,
+              child: IgnorePointer(
+                ignoring: _isEditing,
+                child: _SectionCard(
+                  title: '목표 타입',
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _buildTypeChip(
+                          title: '루틴',
+                          subtitle: '매일/주간 반복 체크',
+                          icon: Icons.replay_circle_filled_outlined,
+                          type: GoalType.routine,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: _buildTypeChip(
+                          title: '프로젝트',
+                          subtitle: '기한 안에 한 번 완료',
+                          icon: Icons.flag_outlined,
+                          type: GoalType.project,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: _buildTypeChip(
-                      title: '프로젝트',
-                      subtitle: '기한 안에 한 번 완료',
-                      icon: Icons.flag_outlined,
-                      type: GoalType.project,
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
             const SizedBox(height: AppSpacing.sm),
@@ -319,7 +388,7 @@ class _GoalAddFormState extends State<GoalAddForm> {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      '${_checkpointControllers.length}/$_maxCheckpoints',
+                      '${_checkpointRows.length}/$_maxCheckpoints',
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
@@ -327,7 +396,7 @@ class _GoalAddFormState extends State<GoalAddForm> {
                       ),
                     ),
                     const Spacer(),
-                    if (_checkpointControllers.length < _maxCheckpoints)
+                    if (_checkpointRows.length < _maxCheckpoints)
                       GestureDetector(
                         onTap: _addCheckpoint,
                         child: Container(
@@ -369,7 +438,7 @@ class _GoalAddFormState extends State<GoalAddForm> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    if (_checkpointControllers.isEmpty)
+                    if (_checkpointRows.isEmpty)
                       Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 10),
@@ -395,7 +464,7 @@ class _GoalAddFormState extends State<GoalAddForm> {
                           ],
                         ),
                       ),
-                    for (int i = 0; i < _checkpointControllers.length; i++)
+                    for (int i = 0; i < _checkpointRows.length; i++)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 8),
                         child: Row(
@@ -420,7 +489,7 @@ class _GoalAddFormState extends State<GoalAddForm> {
                             const SizedBox(width: 8),
                             Expanded(
                               child: TextField(
-                                controller: _checkpointControllers[i],
+                                controller: _checkpointRows[i].controller,
                                 maxLength: 30,
                                 style: const TextStyle(fontSize: 13),
                                 decoration: InputDecoration(
@@ -469,8 +538,8 @@ class _GoalAddFormState extends State<GoalAddForm> {
             // ── 5) 추가 버튼 ──────────────────────────────────
             const SizedBox(height: AppSpacing.md),
             AppPrimaryButton(
-              label: '추가하기',
-              onPressed: _addGoal,
+              label: _isEditing ? '저장하기' : '추가하기',
+              onPressed: _saveGoal,
               padding: const EdgeInsets.symmetric(vertical: 12),
               fontSize: 13,
             ),
@@ -624,7 +693,20 @@ class _GoalAddFormState extends State<GoalAddForm> {
     return 'D+${-diff}';
   }
 
-  Future<void> _addGoal() async {
+  List<GoalCheckpoint> _buildCheckpointsFromForm() {
+    return [
+      for (final row in _checkpointRows)
+        if (row.controller.text.trim().isNotEmpty)
+          GoalCheckpoint(
+            id: row.existingId ??
+                'cp_${DateTime.now().microsecondsSinceEpoch}_${row.controller.hashCode}',
+            title: row.controller.text.trim(),
+            done: row.done,
+          ),
+    ];
+  }
+
+  Future<void> _saveGoal() async {
     final title = _titleController.text.trim();
     if (title.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -636,29 +718,48 @@ class _GoalAddFormState extends State<GoalAddForm> {
       return;
     }
 
-    // 프로젝트 체크포인트 — 빈 텍스트는 제외, 입력된 것만 모델로 변환.
     final checkpoints = _selectedType == GoalType.project
-        ? [
-            for (final c in _checkpointControllers)
-              if (c.text.trim().isNotEmpty)
-                GoalCheckpoint(
-                  id: 'cp_${DateTime.now().microsecondsSinceEpoch}_${c.hashCode}',
-                  title: c.text.trim(),
-                ),
-          ]
+        ? _buildCheckpointsFromForm()
         : const <GoalCheckpoint>[];
 
-    // 프로젝트는 「기간」 입력을 받지 않으므로, 마감일이 없으면 +7일을 기본으로
-    // 채워 effectiveDeadline 이 항상 의미 있는 값을 갖게 한다.
     DateTime? deadline = _deadline;
     if (_selectedType == GoalType.project && deadline == null) {
       deadline = DateTime.now().add(const Duration(days: 7));
     }
 
-    // 프로젝트는 periodType 의미가 없지만 모델 호환을 위해 month 로 고정.
     final periodType = _selectedType == GoalType.project
         ? PeriodType.month
         : _selectedPeriod;
+
+    if (_isEditing) {
+      final original = widget.editingGoal!;
+      final periodKey = periodType == original.periodType
+          ? original.periodKey
+          : UserGoalService.getCurrentPeriodKey(periodType);
+
+      final updated = original.copyWith(
+        title: title,
+        periodType: periodType,
+        periodKey: periodKey,
+        weeklyTarget: _weeklyTarget,
+        deadline: _selectedType == GoalType.project ? deadline : null,
+        clearDeadline: _selectedType == GoalType.routine,
+        checkpoints: checkpoints,
+      );
+
+      final ok = await UserGoalService.updateGoal(updated);
+      if (!mounted) return;
+      if (ok) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('수정했어요'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        widget.onAdded(updated);
+      }
+      return;
+    }
 
     final created = await UserGoalService.addGoalReturning(
       title: title,
@@ -669,16 +770,14 @@ class _GoalAddFormState extends State<GoalAddForm> {
       checkpoints: checkpoints,
     );
 
-    if (created != null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('목표가 추가됐어요'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-        widget.onAdded(created);
-      }
+    if (created != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('목표가 추가됐어요'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      widget.onAdded(created);
     }
   }
 }
