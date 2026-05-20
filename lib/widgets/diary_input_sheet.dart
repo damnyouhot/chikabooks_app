@@ -78,6 +78,12 @@ class _DiaryInputBodyState extends State<DiaryInputBody> {
   /// 자동으로 false 로 풀려 다시 저장 가능 상태가 된다.
   bool _justSaved = false;
 
+  /// 「오늘 기분」 이모지 — 1개만 선택 가능, 저장 시 notes.mood 로 함께 저장.
+  /// 다른 곳(hira_comment_sheet)에서 쓰는 5개 세트에 「📝(차분)」 1개를
+  /// 더해 「오늘 기분」 표현 폭을 살짝 넓혔다.
+  static const _moodEmojis = ['👍', '❤️', '😊', '💪', '🎉', '📝'];
+  String? _selectedMood;
+
   @override
   void dispose() {
     _controller.dispose();
@@ -123,10 +129,55 @@ class _DiaryInputBodyState extends State<DiaryInputBody> {
     setState(() => _selectedImages.removeAt(index));
   }
 
+  /// 「오늘 기분」 이모지 한 개를 가볍게 태깅하는 칩 행.
+  /// 한 번 더 누르면 해제(null), 다른 걸 누르면 그쪽으로 토글.
+  Widget _buildMoodPicker() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        const Text(
+          '오늘 기분',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final emoji in _moodEmojis)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: _MoodChip(
+                      emoji: emoji,
+                      selected: _selectedMood == emoji,
+                      onTap: () {
+                        setState(() {
+                          _selectedMood =
+                              _selectedMood == emoji ? null : emoji;
+                          _justSaved = false;
+                        });
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   // ── 저장 ──
   Future<void> _save() async {
     final text = _controller.text.trim();
-    if (text.isEmpty && _selectedImages.isEmpty) return;
+    if (text.isEmpty && _selectedImages.isEmpty && _selectedMood == null) {
+      return;
+    }
 
     FocusManager.instance.primaryFocus?.unfocus();
     setState(() => _isSaving = true);
@@ -158,6 +209,7 @@ class _DiaryInputBodyState extends State<DiaryInputBody> {
       await docRef.set({
         'text': text,
         'imageUrls': imageUrls,
+        'mood': _selectedMood,
         'createdAt': FieldValue.serverTimestamp(),
         'visibility': 'private',
       });
@@ -183,6 +235,7 @@ class _DiaryInputBodyState extends State<DiaryInputBody> {
           _controller.clear();
           setState(() {
             _selectedImages.clear();
+            _selectedMood = null;
             _justSaved = true;
           });
           _showSnack('저장됐어요. 오늘도 한 줄 남겼네.');
@@ -208,8 +261,9 @@ class _DiaryInputBodyState extends State<DiaryInputBody> {
 
   @override
   Widget build(BuildContext context) {
-    final hasContent =
-        _controller.text.trim().isNotEmpty || _selectedImages.isNotEmpty;
+    final hasContent = _controller.text.trim().isNotEmpty ||
+        _selectedImages.isNotEmpty ||
+        _selectedMood != null;
 
     final inner = Padding(
       padding: EdgeInsets.only(
@@ -283,6 +337,10 @@ class _DiaryInputBodyState extends State<DiaryInputBody> {
               style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 16),
+
+            // ── 오늘 기분 (이모지 1개) ──
+            _buildMoodPicker(),
+            const SizedBox(height: 12),
 
             // ── 본문 입력 ──
             TextField(
@@ -452,6 +510,50 @@ class _DiaryInputBodyState extends State<DiaryInputBody> {
     );
 
     return inner;
+  }
+}
+
+/// 「오늘 기분」 이모지 한 개 — 토글 칩.
+///
+/// 선택 상태일 때 앱 레드 톤 배경 + 살짝 더 큰 스케일로 강조한다.
+class _MoodChip extends StatelessWidget {
+  const _MoodChip({
+    required this.emoji,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String emoji;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 140),
+        curve: Curves.easeOut,
+        width: 36,
+        height: 36,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.lime.withValues(alpha: 0.12)
+              : AppColors.surfaceMuted,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: selected ? AppColors.lime : AppColors.divider,
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Text(
+          emoji,
+          style: TextStyle(fontSize: selected ? 20 : 18),
+        ),
+      ),
+    );
   }
 }
 

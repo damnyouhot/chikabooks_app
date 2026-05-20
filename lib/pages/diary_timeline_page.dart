@@ -90,10 +90,12 @@ class DiaryTimelinePage extends StatelessWidget {
               final text = data['text'] as String? ?? '';
               final createdAt = data['createdAt'] as Timestamp?;
               final imageUrls = _parseImageUrls(data);
+              final mood = data['mood'] as String?;
 
               return _NoteCard(
                 noteId: note.id,
                 text: text,
+                mood: mood,
                 createdAt: createdAt,
                 imageUrls: imageUrls,
                 uid: uid,
@@ -166,6 +168,7 @@ class DiaryTimelinePage extends StatelessWidget {
 class _NoteCard extends StatelessWidget {
   final String noteId;
   final String text;
+  final String? mood;
   final Timestamp? createdAt;
   final List<String> imageUrls;
   final String uid;
@@ -173,6 +176,7 @@ class _NoteCard extends StatelessWidget {
   const _NoteCard({
     required this.noteId,
     required this.text,
+    required this.mood,
     required this.createdAt,
     required this.imageUrls,
     required this.uid,
@@ -286,14 +290,27 @@ class _NoteCard extends StatelessWidget {
             ),
             const SizedBox(height: 10),
 
-            // 본문
-            if (text.isNotEmpty)
-              Text(
-                text,
-                style: const TextStyle(
-                  fontSize: 15,
-                  color: AppColors.textPrimary,
-                  height: 1.5,
+            // 본문 + 「오늘 기분」 이모지 (있을 때만 본문 머리에 작게 붙임)
+            if (text.isNotEmpty || (mood != null && mood!.isNotEmpty))
+              Text.rich(
+                TextSpan(
+                  children: [
+                    if (mood != null && mood!.isNotEmpty) ...[
+                      TextSpan(
+                        text: '$mood  ',
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                    ],
+                    if (text.isNotEmpty)
+                      TextSpan(
+                        text: text,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          color: AppColors.textPrimary,
+                          height: 1.5,
+                        ),
+                      ),
+                  ],
                 ),
               ),
 
