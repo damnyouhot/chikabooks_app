@@ -31,7 +31,12 @@ class DiaryInputSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DiaryInputBody(onSaved: onSaved, decorated: true);
+    return DiaryInputBody(
+      onSaved: onSaved,
+      decorated: true,
+      autofocus: true,
+      popOnSave: true,
+    );
   }
 }
 
@@ -42,16 +47,20 @@ class DiaryInputSheet extends StatelessWidget {
 /// - [decorated] false: 콘텐츠만 그린다. 바깥에서 [RecordHubSheet]가 카드를 그린다.
 /// - [autofocus]: 본문 TextField 자동 포커스 여부. 허브에서는 다른 탭과 충돌을
 ///   막기 위해 false 로 시작하고, 사용자가 입력을 시작하면 자연스럽게 받는다.
+/// - [popOnSave] true: 저장 성공 시 본 위젯이 직접 [Navigator.pop] 한다(단독 시트).
+///   false: 저장 완료 후 [onSaved] 만 호출하고 pop 은 부모(허브)가 처리한다.
 class DiaryInputBody extends StatefulWidget {
   final Function(String) onSaved;
   final bool decorated;
   final bool autofocus;
+  final bool popOnSave;
 
   const DiaryInputBody({
     super.key,
     required this.onSaved,
     this.decorated = false,
     this.autofocus = false,
+    this.popOnSave = true,
   });
 
   @override
@@ -134,7 +143,11 @@ class _DiaryInputBodyState extends State<DiaryInputBody> {
       });
 
       if (mounted) {
-        Navigator.pop(context);
+        // 부모(허브)가 닫기를 책임지는 모드일 때는 pop 하지 않고 콜백만 호출한다.
+        // 단독 시트일 때는 기존과 동일하게 본 위젯이 pop.
+        if (widget.popOnSave) {
+          Navigator.pop(context);
+        }
         widget.onSaved(text);
       }
     } catch (e) {

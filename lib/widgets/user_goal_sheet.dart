@@ -1,7 +1,10 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
 import '../core/widgets/app_confirm_modal.dart';
 import '../core/widgets/app_modal_scaffold.dart';
+import '../data/caring_ments.dart';
 import '../models/user_goal.dart';
 import '../models/routine_check.dart';
 import '../services/user_goal_service.dart';
@@ -27,10 +30,18 @@ class UserGoalSheet {
 /// - [embedded] true: 외부 시트 안에 임베드되는 경우. 자체 라운드 카드/드래그 핸들/
 ///   외부 패딩을 그리지 않고, 콘텐츠만 출력한다. ([RecordHubSheet]에서 사용)
 /// - [embedded] false: 단독 시트로 쓰일 때. 기존과 동일한 외형(흰색 카드 + 핸들).
+/// - [onCharacterMent]: 사용자의 액션(체크/완료/생성/재시작 등)에 대한 캐릭터
+///   멘트 후보를 부모에 알리는 콜백. [RecordHubSheet]가 시트 종료 시 캐릭터
+///   말풍선으로 흘려보낸다. null이면 기존 토스트만 사용.
 class UserGoalContent extends StatefulWidget {
-  const UserGoalContent({super.key, this.embedded = false});
+  const UserGoalContent({
+    super.key,
+    this.embedded = false,
+    this.onCharacterMent,
+  });
 
   final bool embedded;
+  final ValueChanged<String>? onCharacterMent;
 
   @override
   State<UserGoalContent> createState() => _UserGoalContentState();
@@ -821,6 +832,13 @@ class _UserGoalContentState extends State<UserGoalContent>
 
   // ─── 액션 ───
 
+  /// 캐릭터 멘트 풀에서 1줄 무작위 선택 후 콜백 호출 (선택)
+  void _emitCharacterMent(List<String> pool) {
+    final cb = widget.onCharacterMent;
+    if (cb == null || pool.isEmpty) return;
+    cb(pool[Random().nextInt(pool.length)]);
+  }
+
   /// 루틴 체크 토글
   Future<void> _toggleRoutineCheck(UserGoal goal) async {
     await UserGoalService.toggleRoutineCheck(goal.id);
@@ -844,6 +862,9 @@ class _UserGoalContentState extends State<UserGoalContent>
           duration: const Duration(milliseconds: 1500),
         ),
       );
+
+      // 캐릭터 멘트 (체크 ON일 때만)
+      if (isChecked) _emitCharacterMent(CaringMents.goalChecked);
     }
   }
 
@@ -865,6 +886,7 @@ class _UserGoalContentState extends State<UserGoalContent>
           duration: Duration(milliseconds: 2000),
         ),
       );
+      _emitCharacterMent(CaringMents.goalCompleted);
     }
   }
 
@@ -905,6 +927,7 @@ class _UserGoalContentState extends State<UserGoalContent>
             (_) => GoalAddForm(
               onAdded: () {
                 _loadData();
+                _emitCharacterMent(CaringMents.goalCreated);
                 Navigator.pop(context);
               },
             ),

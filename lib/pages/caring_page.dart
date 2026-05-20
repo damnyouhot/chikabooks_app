@@ -730,9 +730,14 @@ class _CaringPageState extends State<CaringPage> with TickerProviderStateMixin {
   }
 
   /// 「기록하기」 버튼 — 오늘 한줄 + 나의 목표 통합 허브 진입.
-  void _onRecordHubTap() {
+  ///
+  /// 시트가 닫힐 때 마지막 캐릭터 멘트(저장/체크/완료 등)를 받아
+  /// 캐릭터 말풍선([_enqueueReaction])으로 자연스럽게 흘려보낸다.
+  Future<void> _onRecordHubTap() async {
     if (!_caringReady || widget.isOnboardingActive) return;
-    RecordHubSheet.show(context);
+    final ment = await RecordHubSheet.show(context);
+    if (!mounted) return;
+    if (ment != null && ment.isNotEmpty) _enqueueReaction(ment);
   }
 
   // ══════════════════════════════════════════════

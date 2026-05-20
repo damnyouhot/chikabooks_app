@@ -15,12 +15,18 @@ import '../user_goal_sheet.dart';
 ///   - 「나의 목표」: 루틴/프로젝트 목표 ([UserGoalContent])
 ///
 /// 마지막으로 선택한 탭은 SharedPreferences에 저장되어 다음 진입 시 복원된다.
+///
+/// 시트가 닫힐 때 시트 내부에서 발생한 가장 마지막 캐릭터 멘트(저장/체크/완료 등)
+/// 를 [Future] 결과로 돌려준다. 호출자(`CaringPage`)는 이를 캐릭터 말풍선으로
+/// 자연스럽게 흘려보낸다.
 class RecordHubSheet {
   /// SharedPreferences 키 — 마지막으로 본 탭 인덱스(0=오늘 한줄, 1=나의 목표).
   static const String prefsLastTabKey = 'record_hub_last_tab';
 
-  /// 시트를 띄운다. 외부에서 결과를 받지 않는다 (모든 저장은 시트 내부에서 처리).
-  static Future<void> show(BuildContext context) async {
+  /// 시트를 띄운다.
+  ///
+  /// 반환값: 시트 안에서 마지막으로 발생한 캐릭터 멘트(없으면 null).
+  static Future<String?> show(BuildContext context) async {
     int initialTab = 0;
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -29,8 +35,8 @@ class RecordHubSheet {
     } catch (_) {
       // SharedPreferences 실패 시 기본값(0) 사용 — 사용자 흐름 영향 없음.
     }
-    if (!context.mounted) return;
-    return showAppModalBottomSheet<void>(
+    if (!context.mounted) return null;
+    return showAppModalBottomSheet<String?>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -53,6 +59,10 @@ class _RecordHubSheetContentState extends State<_RecordHubSheetContent>
   /// 0 = 오늘 한줄, 1 = 나의 목표
   late int _index = widget.initialTab;
 
+  /// 시트가 닫힐 때 캐릭터 말풍선으로 노출할 마지막 멘트.
+  /// 두 콘텐츠(오늘 한줄·나의 목표)에서 발생한 가장 마지막 한 건만 보존.
+  String? _pendingCharacterMent;
+
   void _selectTab(int index) {
     if (_index == index) return;
     setState(() => _index = index);
@@ -62,42 +72,60 @@ class _RecordHubSheetContentState extends State<_RecordHubSheetContent>
         .catchError((_) => false);
   }
 
+  /// 콘텐츠 위젯에서 호출되는 멘트 후보 수집기.
+  void _bufferCharacterMent(String ment) {
+    _pendingCharacterMent = ment;
+  }
+
+  /// 사용자 닫기 동작(드래그/탭 바깥/X 버튼/Back 등)에서 공통적으로 마지막
+  /// 멘트를 반환값으로 실어 시트를 닫는다.
+  void _closeWithResult() {
+    Navigator.of(context).pop<String?>(_pendingCharacterMent);
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      // 시트가 키보드(viewInsets)를 알아서 피하도록 isScrollControlled+true 와
-      // 내부 콘텐츠가 자체 viewInsets padding을 가진다. 여기서는 카드 외형만 담당.
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.92,
-      ),
-      decoration: const BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 12),
-            _buildDragHandle(),
-            const SizedBox(height: 12),
-            _buildHeader(context),
-            const SizedBox(height: 12),
-            _buildSegments(),
-            const SizedBox(height: 12),
-            Flexible(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 180),
-                switchInCurve: Curves.easeOut,
-                switchOutCurve: Curves.easeIn,
-                child: KeyedSubtree(
-                  key: ValueKey<int>(_index),
-                  child: _buildBody(),
+    return PopScope<String?>(
+      // 사용자가 시스템 백 제스처/드래그로 닫을 때도 멘트가 같이 전달되도록 한다.
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        _closeWithResult();
+      },
+      child: Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.92,
+        ),
+        decoration: const BoxDecoration(
+          color: AppColors.white,
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              _buildDragHandle(),
+              const SizedBox(height: 12),
+              _buildHeader(context),
+              const SizedBox(height: 12),
+              _buildSegments(),
+              const SizedBox(height: 12),
+              Flexible(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 180),
+                  switchInCurve: Curves.easeOut,
+                  switchOutCurve: Curves.easeIn,
+                  child: KeyedSubtree(
+                    key: ValueKey<int>(_index),
+                    child: _buildBody(),
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -159,7 +187,7 @@ class _RecordHubSheetContentState extends State<_RecordHubSheetContent>
           IconButton(
             tooltip: '닫기',
             icon: const Icon(Icons.close, color: AppColors.textPrimary),
-            onPressed: () => Navigator.of(context).maybePop(),
+            onPressed: _closeWithResult,
           ),
         ],
       ),
@@ -208,9 +236,13 @@ class _RecordHubSheetContentState extends State<_RecordHubSheetContent>
           // 자연스럽게 키보드가 올라오도록 둔다.
           decorated: false,
           autofocus: false,
+          popOnSave: false,
           onSaved: (text) {
-            // 후속 단계에서 캐릭터 멘트 연결 시 이 콜백을 사용한다.
-            // 현재는 별도 처리 없음.
+            // 저장 성공 → 멘트를 버퍼에 담고, 허브 시트를 닫으면서 결과로
+            // 부모([CaringPage])에게 멘트를 전달한다.
+            final ment = DiaryResponseService.getRandomResponse(text);
+            _bufferCharacterMent(ment);
+            _closeWithResult();
           },
         ),
       );
@@ -218,7 +250,10 @@ class _RecordHubSheetContentState extends State<_RecordHubSheetContent>
     // 「나의 목표」: 기존 콘텐츠 위젯을 임베드 모드로 사용.
     // 시트 카드/드래그 핸들은 [_RecordHubSheetContent] 가 그리고 있으므로
     // [UserGoalContent] 는 헤더부터 콘텐츠까지만 그린다.
-    return const UserGoalContent(embedded: true);
+    return UserGoalContent(
+      embedded: true,
+      onCharacterMent: _bufferCharacterMent,
+    );
   }
 }
 
