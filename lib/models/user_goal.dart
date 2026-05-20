@@ -15,21 +15,54 @@ enum PeriodType {
   year,   // 연간
 }
 
-/// 사용자 목표 (최대 3개)
+/// 프로젝트 체크포인트(마일스톤). 1~5개. 자유로운 단계 표현.
+class GoalCheckpoint {
+  final String id;
+  final String title;
+  final bool done;
+
+  const GoalCheckpoint({
+    required this.id,
+    required this.title,
+    this.done = false,
+  });
+
+  Map<String, dynamic> toMap() => {'id': id, 'title': title, 'done': done};
+
+  factory GoalCheckpoint.fromMap(Map<String, dynamic> m) => GoalCheckpoint(
+        id: m['id'] as String,
+        title: m['title'] as String,
+        done: m['done'] as bool? ?? false,
+      );
+
+  GoalCheckpoint copyWith({String? title, bool? done}) => GoalCheckpoint(
+        id: id,
+        title: title ?? this.title,
+        done: done ?? this.done,
+      );
+}
+
+/// 사용자 목표
 class UserGoal {
   final String id;
   final String title;
-  final GoalType type;              // ✨ 추가: 루틴/프로젝트
+  final GoalType type;
   final PeriodType periodType;
   final String periodKey;  // "2026-W07", "2026-02", "2026"
-  
+
   // 프로젝트형 필드
   final bool isDone;
   final DateTime? doneAt;
-  
+  /// 사용자가 캘린더로 직접 고른 마감일. 없으면 periodType 기반(주말/월말 등).
+  final DateTime? deadline;
+  /// 1~5개의 마일스톤. 진행률 = 완료 수 / 전체.
+  final List<GoalCheckpoint> checkpoints;
+  /// 「오늘 5분이라도 했어요」 일일 터치 날짜 키(yyyy-MM-dd) 누적.
+  final List<String> dailyTouchDates;
+
   // 루틴형 필드
-  final int weeklyTarget;           // ✨ 추가: 주 n회 목표 (1~7, 기본 7)
-  
+  final int weeklyTarget;
+
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -41,7 +74,10 @@ class UserGoal {
     required this.periodKey,
     this.isDone = false,
     this.doneAt,
-    this.weeklyTarget = 7,          // 기본값: 매일
+    this.deadline,
+    this.checkpoints = const [],
+    this.dailyTouchDates = const [],
+    this.weeklyTarget = 7,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -55,6 +91,9 @@ class UserGoal {
       'periodKey': periodKey,
       'isDone': isDone,
       'doneAt': doneAt != null ? Timestamp.fromDate(doneAt!) : null,
+      'deadline': deadline != null ? Timestamp.fromDate(deadline!) : null,
+      'checkpoints': checkpoints.map((c) => c.toMap()).toList(),
+      'dailyTouchDates': dailyTouchDates,
       'weeklyTarget': weeklyTarget,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
@@ -75,9 +114,18 @@ class UserGoal {
       ),
       periodKey: map['periodKey'] as String,
       isDone: map['isDone'] as bool? ?? false,
-      doneAt: map['doneAt'] != null 
-          ? (map['doneAt'] as Timestamp).toDate() 
+      doneAt: map['doneAt'] != null
+          ? (map['doneAt'] as Timestamp).toDate()
           : null,
+      deadline: map['deadline'] != null
+          ? (map['deadline'] as Timestamp).toDate()
+          : null,
+      checkpoints: ((map['checkpoints'] as List?) ?? const [])
+          .map((e) => GoalCheckpoint.fromMap(e as Map<String, dynamic>))
+          .toList(),
+      dailyTouchDates: ((map['dailyTouchDates'] as List?) ?? const [])
+          .map((e) => e as String)
+          .toList(),
       weeklyTarget: map['weeklyTarget'] as int? ?? 7,
       createdAt: (map['createdAt'] as Timestamp).toDate(),
       updatedAt: (map['updatedAt'] as Timestamp).toDate(),
@@ -91,6 +139,8 @@ class UserGoal {
     required PeriodType periodType,
     required String periodKey,
     int weeklyTarget = 7,
+    DateTime? deadline,
+    List<GoalCheckpoint> checkpoints = const [],
   }) {
     final now = DateTime.now();
     return UserGoal(
@@ -102,6 +152,9 @@ class UserGoal {
       weeklyTarget: weeklyTarget,
       isDone: false,
       doneAt: null,
+      deadline: deadline,
+      checkpoints: checkpoints,
+      dailyTouchDates: const [],
       createdAt: now,
       updatedAt: now,
     );
@@ -114,6 +167,10 @@ class UserGoal {
     String? periodKey,
     bool? isDone,
     DateTime? doneAt,
+    DateTime? deadline,
+    bool clearDeadline = false,
+    List<GoalCheckpoint>? checkpoints,
+    List<String>? dailyTouchDates,
     int? weeklyTarget,
     DateTime? updatedAt,
   }) {
@@ -125,6 +182,9 @@ class UserGoal {
       periodKey: periodKey ?? this.periodKey,
       isDone: isDone ?? this.isDone,
       doneAt: doneAt ?? this.doneAt,
+      deadline: clearDeadline ? null : (deadline ?? this.deadline),
+      checkpoints: checkpoints ?? this.checkpoints,
+      dailyTouchDates: dailyTouchDates ?? this.dailyTouchDates,
       weeklyTarget: weeklyTarget ?? this.weeklyTarget,
       createdAt: createdAt,
       updatedAt: updatedAt ?? DateTime.now(),
@@ -156,8 +216,18 @@ class UserGoal {
   }
 
   /// 마감 안내 문구 (프로젝트용)
+  /// 사용자가 캘린더로 직접 고른 [deadline] 이 있으면 그걸 우선.
   String get deadlineText {
     final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final dl = effectiveDeadline;
+    if (dl != null) {
+      final dlDay = DateTime(dl.year, dl.month, dl.day);
+      final diff = dlDay.difference(today).inDays;
+      if (diff == 0) return '오늘 마감';
+      if (diff < 0) return '${-diff}일 지남';
+      return '$diff일 남음 (${dl.month}/${dl.day})';
+    }
     switch (periodType) {
       case PeriodType.day:
         return '오늘까지';
@@ -167,19 +237,69 @@ class UserGoal {
         final diff = sunday.difference(now).inDays;
         if (diff == 0) return '오늘까지';
         return '$diff일 남음 (${sunday.month}/${sunday.day})';
-      
+
       case PeriodType.month:
         final lastDay = DateTime(now.year, now.month + 1, 0);
         final diff = lastDay.difference(now).inDays;
         if (diff == 0) return '오늘까지';
         return '$diff일 남음 (${lastDay.month}/${lastDay.day})';
-      
+
       case PeriodType.year:
         final lastDay = DateTime(now.year, 12, 31);
         final diff = lastDay.difference(now).inDays;
         if (diff < 30) return '$diff일 남음';
         return '12/31까지';
     }
+  }
+
+  /// periodType 기본 마감 OR 사용자가 직접 지정한 deadline 중 후자 우선.
+  DateTime? get effectiveDeadline {
+    if (deadline != null) return deadline;
+    final now = DateTime.now();
+    switch (periodType) {
+      case PeriodType.day:
+        return DateTime(now.year, now.month, now.day, 23, 59, 59);
+      case PeriodType.week:
+        return now.add(Duration(days: DateTime.sunday - now.weekday));
+      case PeriodType.month:
+        return DateTime(now.year, now.month + 1, 0);
+      case PeriodType.year:
+        return DateTime(now.year, 12, 31);
+    }
+  }
+
+  /// 마감까지 남은 일수(과거면 음수). null = 마감 정보 없음.
+  int? get daysUntilDeadline {
+    final dl = effectiveDeadline;
+    if (dl == null) return null;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final dlDay = DateTime(dl.year, dl.month, dl.day);
+    return dlDay.difference(today).inDays;
+  }
+
+  /// D-N 짧은 칩 라벨 ("D-7", "D-DAY", "D+2"). 없으면 null.
+  String? get dDayLabel {
+    final n = daysUntilDeadline;
+    if (n == null) return null;
+    if (n == 0) return 'D-DAY';
+    if (n > 0) return 'D-$n';
+    return 'D+${-n}';
+  }
+
+  /// 체크포인트 진행률 (0.0 ~ 1.0). 체크포인트 없으면 null.
+  double? get checkpointProgress {
+    if (checkpoints.isEmpty) return null;
+    final done = checkpoints.where((c) => c.done).length;
+    return done / checkpoints.length;
+  }
+
+  /// 오늘 일일 터치 했는지.
+  bool get touchedToday {
+    final now = DateTime.now();
+    final key =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    return dailyTouchDates.contains(key);
   }
 
   /// 루틴 빈도 문구

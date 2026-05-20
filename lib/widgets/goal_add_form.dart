@@ -16,16 +16,51 @@ class GoalAddForm extends StatefulWidget {
 }
 
 class _GoalAddFormState extends State<GoalAddForm> {
-
   final _titleController = TextEditingController();
   GoalType _selectedType = GoalType.routine;
   PeriodType _selectedPeriod = PeriodType.week;
   int _weeklyTarget = 7;
 
+  /// 프로젝트 — 사용자 지정 마감일(선택). null 이면 periodType 기본값 사용.
+  DateTime? _deadline;
+
+  /// 프로젝트 — 체크포인트 1~5개. 빈 텍스트는 저장 시 제외.
+  final List<TextEditingController> _checkpointControllers = [];
+
+  static const int _maxCheckpoints = 5;
+
   @override
   void dispose() {
     _titleController.dispose();
+    for (final c in _checkpointControllers) {
+      c.dispose();
+    }
     super.dispose();
+  }
+
+  Future<void> _pickDeadline() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _deadline ?? now.add(const Duration(days: 7)),
+      firstDate: now,
+      lastDate: DateTime(now.year + 5),
+      helpText: '마감일 선택',
+      cancelText: '취소',
+      confirmText: '선택',
+    );
+    if (picked != null) setState(() => _deadline = picked);
+  }
+
+  void _addCheckpoint() {
+    if (_checkpointControllers.length >= _maxCheckpoints) return;
+    setState(() => _checkpointControllers.add(TextEditingController()));
+  }
+
+  void _removeCheckpoint(int i) {
+    final c = _checkpointControllers.removeAt(i);
+    c.dispose();
+    setState(() {});
   }
 
   @override
@@ -136,6 +171,178 @@ class _GoalAddFormState extends State<GoalAddForm> {
                 _buildPeriodChip('연간', PeriodType.year),
               ],
             ),
+
+            // 4-P. (프로젝트 전용) 마감일 + 체크포인트
+            if (_selectedType == GoalType.project) ...[
+              const SizedBox(height: 24),
+              const Text(
+                '마감일 (선택)',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                '비워두면 위에서 고른 기간(주말/월말 등)을 마감으로 사용합니다.',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: AppColors.textDisabled,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: _pickDeadline,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(AppRadius.md),
+                          border: Border.all(
+                            color: _deadline != null
+                                ? AppColors.accent
+                                : AppColors.divider,
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.calendar_today_outlined,
+                                size: 16, color: AppColors.textSecondary),
+                            const SizedBox(width: 8),
+                            Text(
+                              _deadline == null
+                                  ? '날짜 선택'
+                                  : '${_deadline!.year}년 ${_deadline!.month}월 ${_deadline!.day}일',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: _deadline == null
+                                    ? AppColors.textDisabled
+                                    : AppColors.textPrimary,
+                                fontWeight: _deadline == null
+                                    ? FontWeight.w400
+                                    : FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (_deadline != null) ...[
+                    const SizedBox(width: 6),
+                    IconButton(
+                      tooltip: '날짜 비우기',
+                      onPressed: () => setState(() => _deadline = null),
+                      icon: const Icon(Icons.close,
+                          size: 18, color: AppColors.textSecondary),
+                    ),
+                  ],
+                ],
+              ),
+
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  const Text(
+                    '체크포인트 (선택, 최대 5개)',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const Spacer(),
+                  if (_checkpointControllers.length < _maxCheckpoints)
+                    GestureDetector(
+                      onTap: _addCheckpoint,
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 4),
+                        child: Row(
+                          children: [
+                            Icon(Icons.add_circle_outline,
+                                size: 16, color: AppColors.textPrimary),
+                            SizedBox(width: 4),
+                            Text(
+                              '추가',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                '"자료 조사 → 초안 → 검토" 같은 단계로 쪼개면 진행률이 보여요.',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: AppColors.textDisabled,
+                ),
+              ),
+              const SizedBox(height: 8),
+              for (int i = 0; i < _checkpointControllers.length; i++) ...[
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 22,
+                        height: 22,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: AppColors.divider.withValues(alpha: 0.3),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          '${i + 1}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: _checkpointControllers[i],
+                          maxLength: 30,
+                          decoration: InputDecoration(
+                            hintText: '단계 ${i + 1}',
+                            counterText: '',
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 10),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(
+                                  color: AppColors.divider),
+                            ),
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: '삭제',
+                        onPressed: () => _removeCheckpoint(i),
+                        icon: const Icon(Icons.close,
+                            size: 16, color: AppColors.textDisabled),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
 
             // 4. (루틴 전용) 주 n회
             if (_selectedType == GoalType.routine) ...[
@@ -291,11 +498,25 @@ class _GoalAddFormState extends State<GoalAddForm> {
       return;
     }
 
+    // 프로젝트 체크포인트 — 빈 텍스트는 제외, 입력된 것만 모델로 변환.
+    final checkpoints = _selectedType == GoalType.project
+        ? [
+            for (final c in _checkpointControllers)
+              if (c.text.trim().isNotEmpty)
+                GoalCheckpoint(
+                  id: 'cp_${DateTime.now().microsecondsSinceEpoch}_${c.hashCode}',
+                  title: c.text.trim(),
+                ),
+          ]
+        : const <GoalCheckpoint>[];
+
     final success = await UserGoalService.addGoal(
       title: title,
       type: _selectedType,
       periodType: _selectedPeriod,
       weeklyTarget: _weeklyTarget,
+      deadline: _selectedType == GoalType.project ? _deadline : null,
+      checkpoints: checkpoints,
     );
 
     if (success) {

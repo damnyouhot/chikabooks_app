@@ -761,8 +761,23 @@ class _UserGoalContentState extends State<UserGoalContent>
     );
   }
 
-  /// 프로젝트 카드 — 루틴과 동일한 1행 압축 레이아웃.
+  /// 마감 D-N 색 단계: 7일 초과=중성/3일 이내=주황/1일 이내·과거=빨강.
+  Color _deadlineColor(int? days) {
+    if (days == null) return _kShadow2;
+    if (days <= 1) return const Color(0xFFE05757); // 빨강
+    if (days <= 3) return const Color(0xFFE0833E); // 주황
+    return const Color(0xFF4A8AB6); // 차분한 블루
+  }
+
+  /// 프로젝트 카드 — 1행 헤더 + (체크포인트/오늘 터치 확장 영역).
   Widget _buildProjectCard(UserGoal goal) {
+    final dDay = goal.dDayLabel;
+    final days = goal.daysUntilDeadline;
+    final dColor = _deadlineColor(days);
+    final progress = goal.checkpointProgress;
+    final hasCheckpoints = goal.checkpoints.isNotEmpty;
+    final showTouchRow = !goal.isDone;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
@@ -782,111 +797,280 @@ class _UserGoalContentState extends State<UserGoalContent>
           ),
         ],
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // ① 원형 완료 토글
-          GestureDetector(
-            onTap: () => _toggleProjectDone(goal),
-            behavior: HitTestBehavior.opaque,
-            child: Container(
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(
-                color: goal.isDone ? _kSuccess : Colors.transparent,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: goal.isDone
-                      ? _kSuccess
-                      : _kAccent.withOpacity(0.45),
-                  width: 1.4,
+          // ── 헤더 행: 완료 토글 + 제목/배지/마감 + 삭제 ──
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              GestureDetector(
+                onTap: () => _toggleProjectDone(goal),
+                behavior: HitTestBehavior.opaque,
+                child: Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: goal.isDone ? _kSuccess : Colors.transparent,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: goal.isDone
+                          ? _kSuccess
+                          : _kAccent.withOpacity(0.45),
+                      width: 1.4,
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.check,
+                    size: 18,
+                    color: goal.isDone
+                        ? _kSuccessOn
+                        : _kText.withOpacity(0.25),
+                  ),
                 ),
               ),
-              child: Icon(
-                Icons.check,
-                size: 18,
-                color: goal.isDone
-                    ? _kSuccessOn
-                    : _kText.withOpacity(0.25),
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-
-          // ② 제목 + 배지 + 마감
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Flexible(
-                      child: Text(
-                        goal.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: _kText,
-                          decoration: goal.isDone
-                              ? TextDecoration.lineThrough
-                              : null,
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            goal.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: _kText,
+                              decoration: goal.isDone
+                                  ? TextDecoration.lineThrough
+                                  : null,
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 6),
+                        _buildBadge('프로젝트', _kAccent),
+                        if (goal.isDone) ...[
+                          const SizedBox(width: 4),
+                          _buildBadge('완료', _kSuccess),
+                        ],
+                      ],
                     ),
-                    const SizedBox(width: 6),
-                    _buildBadge('프로젝트', _kAccent),
-                    const SizedBox(width: 4),
-                    _buildBadge(goal.periodLabel, _kShadow2),
-                    if (goal.isDone) ...[
-                      const SizedBox(width: 4),
-                      _buildBadge('완료', _kSuccess),
+                    if (!goal.isDone) ...[
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          if (dDay != null) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 5, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: dColor.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                dDay,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  color: dColor,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                          ],
+                          Flexible(
+                            child: Text(
+                              goal.deadlineText,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: _kText.withOpacity(0.55),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ],
                 ),
-                if (!goal.isDone) ...[
-                  const SizedBox(height: 3),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.schedule,
-                        size: 11,
-                        color: _kText.withOpacity(0.45),
-                      ),
-                      const SizedBox(width: 3),
-                      Flexible(
-                        child: Text(
-                          goal.deadlineText,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: _kText.withOpacity(0.5),
-                          ),
-                        ),
-                      ),
-                    ],
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: () => _deleteGoal(goal),
+                child: Icon(
+                  Icons.delete_outline,
+                  size: 16,
+                  color: _kText.withOpacity(0.3),
+                ),
+              ),
+            ],
+          ),
+
+          // ── 체크포인트 진행 영역 ──
+          if (hasCheckpoints && !goal.isDone) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(2),
+                    child: LinearProgressIndicator(
+                      value: progress ?? 0,
+                      minHeight: 4,
+                      backgroundColor: _kShadow2.withOpacity(0.2),
+                      valueColor: AlwaysStoppedAnimation(_kSuccess),
+                    ),
                   ),
-                ],
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  '${goal.checkpoints.where((c) => c.done).length}/${goal.checkpoints.length}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: _kText.withOpacity(0.7),
+                  ),
+                ),
               ],
             ),
-          ),
-          const SizedBox(width: 8),
-
-          // ③ 삭제
-          GestureDetector(
-            onTap: () => _deleteGoal(goal),
-            child: Icon(
-              Icons.delete_outline,
-              size: 16,
-              color: _kText.withOpacity(0.3),
+            const SizedBox(height: 6),
+            // 체크포인트 칩 — 단계 토글
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                for (final cp in goal.checkpoints)
+                  GestureDetector(
+                    onTap: () => _toggleCheckpoint(goal, cp),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: cp.done
+                            ? _kSuccess.withOpacity(0.15)
+                            : AppColors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: cp.done
+                              ? _kSuccess.withOpacity(0.45)
+                              : _kShadow2.withOpacity(0.4),
+                          width: 0.6,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            cp.done
+                                ? Icons.check_circle
+                                : Icons.radio_button_unchecked,
+                            size: 12,
+                            color: cp.done
+                                ? _kSuccessOn
+                                : _kText.withOpacity(0.4),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            cp.title,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: cp.done
+                                  ? _kSuccessOn
+                                  : _kText.withOpacity(0.85),
+                              decoration: cp.done
+                                  ? TextDecoration.lineThrough
+                                  : null,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
             ),
-          ),
+          ],
+
+          // ── 오늘 5분 했어요 (데일리 터치) ──
+          if (showTouchRow) ...[
+            const SizedBox(height: 8),
+            GestureDetector(
+              onTap: () => _toggleDailyTouch(goal),
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: goal.touchedToday
+                      ? _kSuccess.withOpacity(0.12)
+                      : _kAccent.withOpacity(0.06),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: goal.touchedToday
+                        ? _kSuccess.withOpacity(0.45)
+                        : _kAccent.withOpacity(0.3),
+                    width: 0.6,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      goal.touchedToday
+                          ? Icons.bolt
+                          : Icons.bolt_outlined,
+                      size: 14,
+                      color: goal.touchedToday
+                          ? _kSuccessOn
+                          : _kText.withOpacity(0.6),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      goal.touchedToday
+                          ? '오늘 5분 했어요'
+                          : '오늘 5분이라도 했나요?',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: goal.touchedToday
+                            ? _kSuccessOn
+                            : _kText.withOpacity(0.7),
+                      ),
+                    ),
+                    const Spacer(),
+                    if (goal.dailyTouchDates.isNotEmpty)
+                      Text(
+                        '🔥 ${goal.dailyTouchDates.length}일',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: _kText.withOpacity(0.6),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  Future<void> _toggleCheckpoint(UserGoal goal, GoalCheckpoint cp) async {
+    final ok = await UserGoalService.toggleCheckpoint(goal.id, cp.id);
+    if (ok && mounted) _loadData();
+  }
+
+  Future<void> _toggleDailyTouch(UserGoal goal) async {
+    final ok = await UserGoalService.toggleDailyTouch(goal.id);
+    if (ok && mounted) _loadData();
   }
 
   Widget _buildBadge(String label, Color color) {

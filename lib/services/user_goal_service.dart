@@ -156,6 +156,8 @@ class UserGoalService {
     required GoalType type,
     required PeriodType periodType,
     int weeklyTarget = 7,
+    DateTime? deadline,
+    List<GoalCheckpoint> checkpoints = const [],
   }) async {
     try {
       if (title.trim().isEmpty) {
@@ -171,6 +173,8 @@ class UserGoalService {
         periodType: periodType,
         periodKey: getCurrentPeriodKey(periodType),
         weeklyTarget: weeklyTarget,
+        deadline: deadline,
+        checkpoints: checkpoints,
       );
 
       final updatedItems = [...goals.items, newGoal];
@@ -211,6 +215,48 @@ class UserGoalService {
       return await saveGoals(updatedItems);
     } catch (e) {
       debugPrint('⚠️ UserGoalService.deleteGoal error: $e');
+      return false;
+    }
+  }
+
+  /// 프로젝트 체크포인트 토글
+  static Future<bool> toggleCheckpoint(String goalId, String cpId) async {
+    try {
+      final goals = await loadGoals();
+      final goal = goals.items.firstWhere(
+        (g) => g.id == goalId,
+        orElse: () => throw Exception('목표를 찾을 수 없음'),
+      );
+      final updated = goal.checkpoints
+          .map((c) => c.id == cpId ? c.copyWith(done: !c.done) : c)
+          .toList();
+      return await updateGoal(goal.copyWith(checkpoints: updated));
+    } catch (e) {
+      debugPrint('⚠️ toggleCheckpoint error: $e');
+      return false;
+    }
+  }
+
+  /// 프로젝트 「오늘 5분이라도 했어요」 일일 터치 토글
+  static Future<bool> toggleDailyTouch(String goalId) async {
+    try {
+      final goals = await loadGoals();
+      final goal = goals.items.firstWhere(
+        (g) => g.id == goalId,
+        orElse: () => throw Exception('목표를 찾을 수 없음'),
+      );
+      final now = DateTime.now();
+      final key =
+          '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      final list = [...goal.dailyTouchDates];
+      if (list.contains(key)) {
+        list.remove(key);
+      } else {
+        list.add(key);
+      }
+      return await updateGoal(goal.copyWith(dailyTouchDates: list));
+    } catch (e) {
+      debugPrint('⚠️ toggleDailyTouch error: $e');
       return false;
     }
   }
