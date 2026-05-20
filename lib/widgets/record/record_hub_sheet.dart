@@ -316,6 +316,10 @@ class _DiaryFeedTabState extends State<_DiaryFeedTab> {
   static const int _maxImages = 3;
   static const int _maxLen = 500;
 
+  static const String _composerHint =
+      '예: 바쁜 하루였지만, 한 가지는 잘 해냈다고 적어볼게요.';
+  static const String _composerEditHint = '기록을 고쳐 보세요.';
+
   void _enterEdit({
     required String noteId,
     required String text,
@@ -648,6 +652,9 @@ class _DiaryFeedTabState extends State<_DiaryFeedTab> {
         (_controller.text.trim().isNotEmpty ||
             _selectedImages.isNotEmpty ||
             keepingExistingImages);
+    final stickerCount = _kStickerToken.allMatches(_controller.text).length;
+
+    // 속닥속닥 입력 카드와 같은 3단 구조: 헤더 → 본문 → 작은 아이콘 툴바.
     return Container(
       padding: EdgeInsets.fromLTRB(
         AppSpacing.xl,
@@ -655,37 +662,19 @@ class _DiaryFeedTabState extends State<_DiaryFeedTab> {
         AppSpacing.xl,
         AppSpacing.sm + MediaQuery.of(context).viewInsets.bottom,
       ),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(AppRadius.lg),
+      color: AppColors.appBg,
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceMuted,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.divider.withValues(alpha: 0.45),
-            blurRadius: 12,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // ── 「수정 중」 배너 ─────────────────────────────────────
-          if (isEditing)
-            Container(
-              margin: const EdgeInsets.only(bottom: 6),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.lime.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: AppColors.lime.withValues(alpha: 0.4),
-                  width: 0.5,
-                ),
-              ),
-              child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isEditing) ...[
+              Row(
                 children: [
                   const Icon(Icons.edit_outlined,
                       size: 14, color: AppColors.textPrimary),
@@ -703,20 +692,14 @@ class _DiaryFeedTabState extends State<_DiaryFeedTab> {
                     GestureDetector(
                       onTap: () =>
                           setState(() => _editingClearImages = true),
-                      child: Row(
-                        children: const [
-                          Icon(Icons.image_not_supported_outlined,
-                              size: 12, color: AppColors.textSecondary),
-                          SizedBox(width: 3),
-                          Text(
-                            '사진 비우기',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: AppColors.textSecondary,
-                              decoration: TextDecoration.underline,
-                            ),
-                          ),
-                        ],
+                      child: const Text(
+                        '사진 비우기',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textSecondary,
+                          decoration: TextDecoration.underline,
+                        ),
                       ),
                     ),
                   ],
@@ -735,154 +718,138 @@ class _DiaryFeedTabState extends State<_DiaryFeedTab> {
                   ),
                 ],
               ),
+              const SizedBox(height: AppSpacing.sm),
+            ] else ...[
+              const Text(
+                '나만 보는 한 줄',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+            ],
+            ExtendedTextField(
+              controller: _controller,
+              focusNode: _focus,
+              maxLength: _maxLen,
+              minLines: 2,
+              maxLines: 6,
+              onChanged: (_) => setState(() {}),
+              specialTextSpanBuilder: _StickerSpanBuilder(),
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                height: 1.45,
+                color: AppColors.textPrimary,
+              ),
+              decoration: InputDecoration(
+                hintText: isEditing ? _composerEditHint : _composerHint,
+                hintStyle: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textDisabled.withValues(alpha: 0.85),
+                ),
+                border: InputBorder.none,
+                counterText: '',
+                isDense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
             ),
-          if (_selectedImages.isNotEmpty)
-            SizedBox(
-              height: 56,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.only(bottom: 6),
-                itemCount: _selectedImages.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 6),
-                itemBuilder: (_, i) {
-                  return Stack(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.file(
-                          File(_selectedImages[i].path),
-                          width: 48,
-                          height: 48,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
-                            width: 48,
-                            height: 48,
-                            color: AppColors.surfaceMuted,
-                            child: const Icon(Icons.image,
-                                size: 18, color: AppColors.textDisabled),
+            if (_selectedImages.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.sm),
+              SizedBox(
+                height: 64,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _selectedImages.length,
+                  separatorBuilder: (_, __) =>
+                      const SizedBox(width: AppSpacing.sm),
+                  itemBuilder: (_, i) {
+                    return Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.file(
+                            File(_selectedImages[i].path),
+                            width: 56,
+                            height: 56,
+                            fit: BoxFit.cover,
                           ),
                         ),
-                      ),
-                      Positioned(
-                        top: -4,
-                        right: -4,
-                        child: GestureDetector(
-                          onTap: () => setState(
-                              () => _selectedImages.removeAt(i)),
-                          child: Container(
-                            width: 18,
-                            height: 18,
-                            decoration: const BoxDecoration(
-                              color: Colors.black54,
-                              shape: BoxShape.circle,
+                        Positioned(
+                          top: -4,
+                          right: -4,
+                          child: GestureDetector(
+                            onTap: () =>
+                                setState(() => _selectedImages.removeAt(i)),
+                            child: Container(
+                              width: 18,
+                              height: 18,
+                              decoration: const BoxDecoration(
+                                color: Colors.black54,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.close,
+                                  size: 12, color: Colors.white),
                             ),
-                            child: const Icon(Icons.close,
-                                size: 12, color: Colors.white),
                           ),
                         ),
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              IconButton(
-                tooltip: '사진 첨부',
-                onPressed:
-                    _selectedImages.length >= _maxImages ? null : _pickImages,
-                icon: Icon(
-                  Icons.photo_camera_back_outlined,
-                  color: _selectedImages.length >= _maxImages
-                      ? AppColors.textDisabled
-                      : AppColors.textSecondary,
+                      ],
+                    );
+                  },
                 ),
-              ),
-              IconButton(
-                tooltip: '스티커',
-                onPressed: _isSaving ? null : _insertSticker,
-                icon: const Icon(
-                  Icons.emoji_emotions_outlined,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              Expanded(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 120),
-                  child: ExtendedTextField(
-                    controller: _controller,
-                    focusNode: _focus,
-                    maxLength: _maxLen,
-                    minLines: 1,
-                    maxLines: 4,
-                    onChanged: (_) => setState(() {}),
-                    // [[s:id]] 토큰을 입력 중에도 인라인 스티커로 보여준다.
-                    specialTextSpanBuilder: _StickerSpanBuilder(),
-                    decoration: InputDecoration(
-                      hintText: '',
-                      counterText: '',
-                      filled: true,
-                      fillColor: AppColors.surfaceMuted,
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 10),
-                      isDense: true,
-                      border: OutlineInputBorder(
-                        borderRadius:
-                            BorderRadius.circular(AppRadius.md),
-                        borderSide: BorderSide.none,
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius:
-                            BorderRadius.circular(AppRadius.md),
-                        borderSide: BorderSide.none,
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius:
-                            BorderRadius.circular(AppRadius.md),
-                        borderSide: const BorderSide(
-                            color: AppColors.lime, width: 1.5),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 6),
-              ElevatedButton(
-                onPressed: canSave ? _save : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.lime,
-                  foregroundColor: AppColors.onCardEmphasis,
-                  disabledBackgroundColor:
-                      AppColors.divider.withValues(alpha: 0.4),
-                  disabledForegroundColor: AppColors.textDisabled,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                ),
-                child: _isSaving
-                    ? const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: AppColors.onCardEmphasis,
-                        ),
-                      )
-                    : Text(
-                        isEditing ? '수정' : '저장',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
               ),
             ],
-          ),
-        ],
+            const SizedBox(height: AppSpacing.xs),
+            Row(
+              children: [
+                _RecordComposerAction(
+                  icon: Icons.image_outlined,
+                  label:
+                      '이미지 ${_selectedImages.length}/$_maxImages',
+                  onTap: _isSaving || _selectedImages.length >= _maxImages
+                      ? null
+                      : _pickImages,
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                _RecordComposerAction(
+                  icon: Icons.emoji_emotions_outlined,
+                  label: stickerCount > 0
+                      ? '스티커 $stickerCount'
+                      : '스티커',
+                  onTap: _isSaving ? null : _insertSticker,
+                ),
+                const Spacer(),
+                TextButton(
+                  onPressed: canSave && !_isSaving ? _save : null,
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.lime,
+                    disabledForegroundColor: AppColors.textDisabled,
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    textStyle: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  child: _isSaving
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.lime,
+                          ),
+                        )
+                      : Text(isEditing ? '수정' : '저장'),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1218,6 +1185,53 @@ class _ImageLightboxState extends State<_ImageLightbox> {
                   ),
                 ),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 속닥속닥 [_ComposerAction] 과 동일 톤 — 작은 아이콘 + 라벨.
+class _RecordComposerAction extends StatelessWidget {
+  const _RecordComposerAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadius.sm),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 15,
+              color: onTap == null
+                  ? AppColors.textDisabled
+                  : AppColors.textSecondary,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: onTap == null
+                    ? AppColors.textDisabled
+                    : AppColors.textSecondary,
+              ),
+            ),
           ],
         ),
       ),
