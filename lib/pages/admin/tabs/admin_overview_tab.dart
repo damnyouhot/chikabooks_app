@@ -46,6 +46,7 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
   int? _longAbsent;
   int? _recentErrors;
   int? _noteCount;
+  int? _goalCount;
 
   List<CareerGroupCount>? _careerGroups;
 
@@ -111,6 +112,7 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
         () => AdminDashboardService.getRecentErrorCount(since: widget.since),
       ),
       _safe(() => AdminDashboardService.getNoteCount(since: widget.since)),
+      _safe(() => AdminDashboardService.getGoalCount(since: widget.since)),
       _safeCareer(),
     ]);
 
@@ -122,7 +124,8 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
     final absent = results[3] as int?;
     final errors = results[4] as int?;
     final notes = results[5] as int?;
-    final careerList = results[6] as List<CareerGroupCount>?;
+    final goals = results[6] as int?;
+    final careerList = results[7] as List<CareerGroupCount>?;
 
     final everyKpiFailed =
         total == null &&
@@ -131,6 +134,7 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
         absent == null &&
         errors == null &&
         notes == null &&
+        goals == null &&
         careerList == null;
 
     setState(() {
@@ -140,6 +144,7 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
       _longAbsent = absent;
       _recentErrors = errors;
       _noteCount = notes;
+      _goalCount = goals;
       _careerGroups = careerList;
       _lastSync = DateTime.now();
       _loading = false;
@@ -199,6 +204,11 @@ class _AdminOverviewTabState extends State<AdminOverviewTab>
               DashboardKpi(
                 label: '기록하기 수',
                 value: _fmtNote(_noteCount),
+                sublabel: widget.period,
+              ),
+              DashboardKpi(
+                label: '목표 생성',
+                value: _fmtNote(_goalCount),
                 sublabel: widget.period,
               ),
               DashboardKpi(

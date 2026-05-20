@@ -189,6 +189,25 @@ class AdminDashboardService {
     }
   }
 
+  /// 1번 탭 '기록하기 → 목표' 에서 사용자가 새로 만든 goals 개수.
+  ///
+  /// `users/{uid}/goals` 서브콜렉션을 collectionGroup 으로 묶어 createdAt 기간
+  /// 필터로 카운트한다. (created Firebase 인덱스 필요 — collectionGroup goals,
+  /// createdAt asc) 인덱스가 없으면 콘솔 안내 링크가 떨어지며, 실패 시 0 반환.
+  static Future<int> getGoalCount({required DateTime since}) async {
+    try {
+      final snap = await _db
+          .collectionGroup('goals')
+          .where('createdAt', isGreaterThan: Timestamp.fromDate(since))
+          .count()
+          .get();
+      return snap.count ?? 0;
+    } catch (e) {
+      debugPrint('⚠️ getGoalCount: $e');
+      return 0;
+    }
+  }
+
 
   // ─── Quiz Pool ────────────────────────────────────────────────
 
