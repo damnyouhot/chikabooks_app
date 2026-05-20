@@ -73,10 +73,23 @@ class _DiaryInputBodyState extends State<DiaryInputBody> {
   final _selectedImages = <XFile>[];
   bool _isSaving = false;
 
+  /// 직전 저장이 성공한 직후를 표시. true 인 동안 저장 버튼은 「저장됨 ✓」
+  /// 라벨로 비활성화되고, 사용자가 새 입력을 시작하거나 사진을 첨부하면
+  /// 자동으로 false 로 풀려 다시 저장 가능 상태가 된다.
+  bool _justSaved = false;
+
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  /// 사용자가 새 입력을 시작했음을 감지 — 「저장됨」 상태를 풀어 다시
+  /// 저장 가능 상태로 되돌린다.
+  void _markDirty() {
+    if (_justSaved) {
+      setState(() => _justSaved = false);
+    }
   }
 
   // ── 사진 선택 ──
@@ -94,9 +107,15 @@ class _DiaryInputBodyState extends State<DiaryInputBody> {
     if (total > DiaryImageService.maxImages) {
       _showSnack('사진은 최대 ${DiaryImageService.maxImages}장까지 첨부할 수 있어요.');
       final allowed = DiaryImageService.maxImages - _selectedImages.length;
-      setState(() => _selectedImages.addAll(picked.take(allowed)));
+      setState(() {
+        _selectedImages.addAll(picked.take(allowed));
+        _justSaved = false;
+      });
     } else {
-      setState(() => _selectedImages.addAll(picked));
+      setState(() {
+        _selectedImages.addAll(picked);
+        _justSaved = false;
+      });
     }
   }
 
@@ -159,10 +178,13 @@ class _DiaryInputBodyState extends State<DiaryInputBody> {
           // 단독 시트: 기존과 동일하게 본 위젯이 닫는다.
           Navigator.pop(context);
         } else {
-          // 허브 임베드: 시트를 닫지 않고 입력만 비워 다음 한 줄을 이어 쓰거나
-          // 다른 탭으로 자연스럽게 넘어갈 수 있게 한다.
+          // 허브 임베드: 시트를 닫지 않고 입력만 비우고, 저장 버튼을
+          // 「저장됨 ✓」 비활성 상태로 바꿔 명확한 피드백을 준다.
           _controller.clear();
-          setState(() => _selectedImages.clear());
+          setState(() {
+            _selectedImages.clear();
+            _justSaved = true;
+          });
           _showSnack('저장됐어요. 오늘도 한 줄 남겼네.');
         }
         widget.onSaved(text);
@@ -271,7 +293,10 @@ class _DiaryInputBodyState extends State<DiaryInputBody> {
               maxLines: 4,
               minLines: 2,
               autofocus: widget.autofocus,
-              onChanged: (_) => setState(() {}),
+              onChanged: (_) {
+                _markDirty();
+                setState(() {});
+              },
               decoration: InputDecoration(
                 hintText: '지금 마음을 한 문장으로 남겨볼까?',
                 hintStyle: TextStyle(
@@ -376,13 +401,21 @@ class _DiaryInputBodyState extends State<DiaryInputBody> {
                 ),
                 const SizedBox(width: 8),
                 ElevatedButton(
-                  onPressed: _isSaving || !hasContent ? null : _save,
+                  onPressed: (_isSaving || !hasContent || _justSaved)
+                      ? null
+                      : _save,
                   style: ElevatedButton.styleFrom(
                     // 「기록하기」 흐름의 강조색은 앱 레드. 「지금 저장」이라는
                     // 액션을 명확히 인식시키기 위해 시트 톤과 일치시킴.
                     backgroundColor: AppColors.lime,
                     foregroundColor: AppColors.onCardEmphasis,
-                    disabledBackgroundColor: AppColors.disabledBg,
+                    // 저장 직후엔 「초록색 저장됨」으로 명확히 알린다.
+                    disabledBackgroundColor: _justSaved
+                        ? const Color(0xFF1F8A4C) // user_goal_sheet 와 동일 톤
+                        : AppColors.disabledBg,
+                    disabledForegroundColor: _justSaved
+                        ? Colors.white
+                        : AppColors.disabledText,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -391,16 +424,24 @@ class _DiaryInputBodyState extends State<DiaryInputBody> {
                       vertical: 12,
                     ),
                   ),
-                  child:
-                      _isSaving
-                          ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppColors.onCardEmphasis,
-                            ),
-                          )
+                  child: _isSaving
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.onCardEmphasis,
+                          ),
+                        )
+                      : _justSaved
+                          ? const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.check, size: 16),
+                                SizedBox(width: 4),
+                                Text('저장됨'),
+                              ],
+                            )
                           : const Text('저장'),
                 ),
               ],
