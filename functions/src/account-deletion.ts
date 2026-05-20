@@ -493,6 +493,30 @@ async function deleteWeeklyGoals(uid: string) {
 }
 
 /**
+ * 「나의 목표」 / 루틴 체크 명시 삭제 (방어적)
+ *
+ * `deleteUserData` 의 `recursiveDelete` 가 사용자 하위 컬렉션을 모두 지우지만,
+ * 향후 누군가가 그 함수를 명시 삭제로 교체하더라도 기록 허브 데이터가 남지
+ * 않도록 한 번 더 안전망을 둔다. 실패해도 전체 탈퇴는 진행시킨다.
+ */
+async function deleteRecordHubData(uid: string) {
+  try {
+    const userRef = db.collection("users").doc(uid);
+    const subPaths = ["goals", "routineChecks", "notes"];
+    for (const sub of subPaths) {
+      const snap = await userRef.collection(sub).get();
+      if (snap.empty) continue;
+      const batch = db.batch();
+      snap.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+      console.log(`✅ users/${uid}/${sub} 삭제 완료: ${snap.size}건`);
+    }
+  } catch (error) {
+    console.warn("⚠️ deleteRecordHubData 실패 (recursiveDelete 가 처리):", error);
+  }
+}
+
+/**
  * 사용자 데이터 완전 삭제
  */
 /**
@@ -573,6 +597,7 @@ export async function performAccountDeletion(uid: string): Promise<void> {
 
   // ── 2단계: 개인 데이터 삭제 ────────────────────────
   await deleteWeeklyGoals(uid);
+  await deleteRecordHubData(uid);
 
   // ── 3단계: 그룹 멤버 제거 ──────────────────────────
   await removeFromPartnerGroups(uid);
