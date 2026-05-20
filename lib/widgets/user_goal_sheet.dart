@@ -868,15 +868,15 @@ class _UserGoalContentState extends State<UserGoalContent>
                           if (dDay != null) ...[
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 5, vertical: 1),
+                                  horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
                                 color: dColor.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(4),
+                                borderRadius: BorderRadius.circular(5),
                               ),
                               child: Text(
                                 dDay,
                                 style: TextStyle(
-                                  fontSize: 10,
+                                  fontSize: 12,
                                   fontWeight: FontWeight.w800,
                                   color: dColor,
                                 ),
@@ -890,8 +890,9 @@ class _UserGoalContentState extends State<UserGoalContent>
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                fontSize: 10,
-                                color: _kText.withOpacity(0.55),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: _kText.withOpacity(0.78),
                               ),
                             ),
                           ),
@@ -933,9 +934,9 @@ class _UserGoalContentState extends State<UserGoalContent>
                 Text(
                   '${goal.checkpoints.where((c) => c.done).length}/${goal.checkpoints.length}',
                   style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: _kText.withOpacity(0.7),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: _kText.withOpacity(0.85),
                   ),
                 ),
               ],
@@ -971,20 +972,20 @@ class _UserGoalContentState extends State<UserGoalContent>
                             cp.done
                                 ? Icons.check_circle
                                 : Icons.radio_button_unchecked,
-                            size: 12,
+                            size: 14,
                             color: cp.done
                                 ? _kSuccessOn
-                                : _kText.withOpacity(0.4),
+                                : _kText.withOpacity(0.5),
                           ),
-                          const SizedBox(width: 4),
+                          const SizedBox(width: 5),
                           Text(
                             cp.title,
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 12,
                               fontWeight: FontWeight.w600,
                               color: cp.done
                                   ? _kSuccessOn
-                                  : _kText.withOpacity(0.85),
+                                  : _kText.withOpacity(0.9),
                               decoration: cp.done
                                   ? TextDecoration.lineThrough
                                   : null,
@@ -1006,17 +1007,17 @@ class _UserGoalContentState extends State<UserGoalContent>
               behavior: HitTestBehavior.opaque,
               child: Container(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
                   color: goal.touchedToday
-                      ? _kSuccess.withOpacity(0.12)
-                      : _kAccent.withOpacity(0.06),
-                  borderRadius: BorderRadius.circular(8),
+                      ? _kSuccess.withOpacity(0.14)
+                      : _kAccent.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(10),
                   border: Border.all(
                     color: goal.touchedToday
-                        ? _kSuccess.withOpacity(0.45)
-                        : _kAccent.withOpacity(0.3),
-                    width: 0.6,
+                        ? _kSuccess.withOpacity(0.5)
+                        : _kAccent.withOpacity(0.35),
+                    width: 0.8,
                   ),
                 ),
                 child: Row(
@@ -1025,22 +1026,22 @@ class _UserGoalContentState extends State<UserGoalContent>
                       goal.touchedToday
                           ? Icons.bolt
                           : Icons.bolt_outlined,
-                      size: 14,
+                      size: 16,
                       color: goal.touchedToday
                           ? _kSuccessOn
-                          : _kText.withOpacity(0.6),
+                          : _kText.withOpacity(0.75),
                     ),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: 6),
                     Text(
                       goal.touchedToday
                           ? '오늘 5분 했어요'
                           : '오늘 5분이라도 했나요?',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 13,
                         fontWeight: FontWeight.w700,
                         color: goal.touchedToday
                             ? _kSuccessOn
-                            : _kText.withOpacity(0.7),
+                            : _kText.withOpacity(0.88),
                       ),
                     ),
                     const Spacer(),
@@ -1048,9 +1049,9 @@ class _UserGoalContentState extends State<UserGoalContent>
                       Text(
                         '🔥 ${goal.dailyTouchDates.length}일',
                         style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: _kText.withOpacity(0.6),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: _kText.withOpacity(0.75),
                         ),
                       ),
                   ],
