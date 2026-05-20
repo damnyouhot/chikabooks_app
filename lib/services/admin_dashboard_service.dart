@@ -5,6 +5,7 @@ import '../core/analytics/event_catalog.dart';
 import '../models/admin_dashboard_models.dart';
 import '../models/quiz_schedule.dart';
 import 'quiz_pool_service.dart';
+import 'stats_user_filter.dart';
 
 /// 관리자 대시보드 데이터를 Firestore에서 읽어오는 서비스
 ///
@@ -174,36 +175,64 @@ class AdminDashboardService {
 
   /// [since] 이후 기록하기(한 줄 기록) 수
   ///
-  /// 1번 탭 '기록하기'에서 사용자가 작성한 notes 개수
+  /// `activityLogs` 의 `note_save_success` 이벤트 중, `mode: 'edit'` 이 아닌
+  /// 신규 작성 건만 카운트한다. 통계 제외 유저(`excludeFromStats` / 이메일
+  /// 화이트리스트)는 [StatsUserFilter] 로 걸러낸다.
+  ///
+  /// 이전 구현은 `collectionGroup('notes')` 의 문서 수를 셌는데,
+  ///   - 관리자/테스트 계정 글이 그대로 포함되고
+  ///   - 「수정」을 했을 때는 안 늘고, 「삭제」 했을 때만 줄어드는
+  /// 불일치가 있어 이벤트 기반으로 통일했다.
   static Future<int> getNoteCount({required DateTime since}) async {
-    try {
-      final snap = await _db
-          .collectionGroup('notes')
-          .where('createdAt', isGreaterThan: Timestamp.fromDate(since))
-          .count()
-          .get();
-      return snap.count ?? 0;
-    } catch (e) {
-      debugPrint('⚠️ getNoteCount: $e');
-      return 0;
-    }
+    return _countEventByUser(
+      types: const {'note_save_success'},
+      since: since,
+    );
   }
 
-  /// 1번 탭 '기록하기 → 목표' 에서 사용자가 새로 만든 goals 개수.
+  /// [since] 이후 새로 만든 목표(루틴+프로젝트) 수
   ///
-  /// `users/{uid}/goals` 서브콜렉션을 collectionGroup 으로 묶어 createdAt 기간
-  /// 필터로 카운트한다. (created Firebase 인덱스 필요 — collectionGroup goals,
-  /// createdAt asc) 인덱스가 없으면 콘솔 안내 링크가 떨어지며, 실패 시 0 반환.
+  /// `goal_create` 이벤트(통계 제외 유저 제외)를 센다.
+  /// 데이터 모델상 모든 목표가 `users/{uid}/goals/current` 한 문서의 배열로
+  /// 들어가 collectionGroup 카운트가 의미를 잃으므로 이벤트로 통일.
   static Future<int> getGoalCount({required DateTime since}) async {
+    return _countEventByUser(
+      types: const {'goal_create'},
+      since: since,
+    );
+  }
+
+  /// `activityLogs` 에서 지정 [types] 발생 건수를 센다.
+  ///
+  /// - `isFunnel`, publisher 계정 이벤트는 제외
+  /// - 통계 제외 유저([StatsUserFilter]) 제외
+  /// - 동일 유저가 여러 번 수행하면 그만큼 카운트
+  static Future<int> _countEventByUser({
+    required Set<String> types,
+    required DateTime since,
+  }) async {
     try {
-      final snap = await _db
-          .collectionGroup('goals')
-          .where('createdAt', isGreaterThan: Timestamp.fromDate(since))
-          .count()
-          .get();
-      return snap.count ?? 0;
+      final validUserIds = await StatsUserFilter.validUserIds(_db);
+      int count = 0;
+      // type 별로 쿼리해야 인덱스(type, timestamp)를 활용할 수 있다.
+      for (final type in types) {
+        final snap = await _db
+            .collection('activityLogs')
+            .where('type', isEqualTo: type)
+            .where('timestamp', isGreaterThan: Timestamp.fromDate(since))
+            .get();
+        for (final doc in snap.docs) {
+          final data = doc.data();
+          if (data['isFunnel'] == true) continue;
+          if (data['accountType'] == 'publisher') continue;
+          final uid = data['userId'] as String? ?? '';
+          if (uid.isEmpty || !validUserIds.contains(uid)) continue;
+          count++;
+        }
+      }
+      return count;
     } catch (e) {
-      debugPrint('⚠️ getGoalCount: $e');
+      debugPrint('⚠️ _countEventByUser($types): $e');
       return 0;
     }
   }
@@ -390,6 +419,7 @@ class AdminDashboardService {
     final steps = EventCatalog.onboardingFunnelOrderedSteps;
     final result = <FunnelStep>[];
     Set<String>? eligible;
+    final validUserIds = await StatsUserFilter.validUserIds(_db);
 
     debugPrint('📊 getFunnelSteps (sequential ∩) since=$since');
     for (final (key, label) in steps) {
@@ -403,7 +433,9 @@ class AdminDashboardService {
         final stepUsers = <String>{};
         for (final doc in snap.docs) {
           final uid = doc.data()['userId'] as String?;
-          if (uid != null && uid.isNotEmpty) stepUsers.add(uid);
+          if (uid == null || uid.isEmpty) continue;
+          if (!validUserIds.contains(uid)) continue;
+          stepUsers.add(uid);
         }
         final intersected = eligible == null
             ? stepUsers
@@ -487,6 +519,7 @@ class AdminDashboardService {
     DateTime? since,
   }) async {
     try {
+      final validUserIds = await StatsUserFilter.validUserIds(_db);
       // isFunnel 필터를 Firestore 쿼리에서 제거 → 클라이언트에서 필터링
       // (기존 문서에 isFunnel 필드 자체가 없어서 isEqualTo: false 매치 불가)
       Query<Map<String, dynamic>> q = _db
@@ -511,6 +544,7 @@ class AdminDashboardService {
         if (data['isFunnel'] == true) continue;
         final type = data['type'] as String? ?? '';
         final uid = data['userId'] as String? ?? '';
+        if (uid.isEmpty || !validUserIds.contains(uid)) continue;
         if (type.isEmpty) continue;
         final prev = typeMap[type];
         if (prev == null) {

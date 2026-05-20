@@ -150,8 +150,31 @@ class UserGoalService {
     }
   }
 
-  /// 목표 추가
+  /// 목표 추가 (호환용 — 성공 여부만 반환)
   static Future<bool> addGoal({
+    required String title,
+    required GoalType type,
+    required PeriodType periodType,
+    int weeklyTarget = 7,
+    DateTime? deadline,
+    List<GoalCheckpoint> checkpoints = const [],
+  }) async {
+    final created = await addGoalReturning(
+      title: title,
+      type: type,
+      periodType: periodType,
+      weeklyTarget: weeklyTarget,
+      deadline: deadline,
+      checkpoints: checkpoints,
+    );
+    return created != null;
+  }
+
+  /// 목표 추가 — 생성된 목표 객체 반환 (실패 시 null).
+  ///
+  /// 대시보드 이벤트(`goal_create`) 의 `goalType` / `periodType` extra 를 채우기
+  /// 위해 호출 측에서 사용. 기존 [addGoal] 은 호환을 위해 유지.
+  static Future<UserGoal?> addGoalReturning({
     required String title,
     required GoalType type,
     required PeriodType periodType,
@@ -162,7 +185,7 @@ class UserGoalService {
     try {
       if (title.trim().isEmpty) {
         debugPrint('⚠️ 목표 내용이 비어있음');
-        return false;
+        return null;
       }
 
       final goals = await loadGoals();
@@ -178,10 +201,11 @@ class UserGoalService {
       );
 
       final updatedItems = [...goals.items, newGoal];
-      return await saveGoals(updatedItems);
+      final ok = await saveGoals(updatedItems);
+      return ok ? newGoal : null;
     } catch (e) {
-      debugPrint('⚠️ UserGoalService.addGoal error: $e');
-      return false;
+      debugPrint('⚠️ UserGoalService.addGoalReturning error: $e');
+      return null;
     }
   }
 

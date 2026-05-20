@@ -7,7 +7,9 @@ import '../core/theme/app_colors.dart';
 import '../core/theme/app_tokens.dart';
 import '../core/widgets/app_confirm_modal.dart';
 import '../core/widgets/app_muted_card.dart';
+import '../services/admin_activity_service.dart';
 import '../services/diary_image_service.dart';
+import '../widgets/timeline/image_thumb_row.dart';
 
 /// 나의 기록 타임라인 페이지
 ///
@@ -224,6 +226,12 @@ class _NoteCard extends StatelessWidget {
           .doc(noteId)
           .delete();
 
+      AdminActivityService.log(
+        ActivityEventType.noteDelete,
+        page: 'diary_timeline',
+        targetId: noteId,
+      );
+
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('기록이 삭제되었습니다')),
@@ -299,153 +307,10 @@ class _NoteCard extends StatelessWidget {
             // 이미지 썸네일
             if (imageUrls.isNotEmpty) ...[
               const SizedBox(height: 12),
-              _ImageRow(imageUrls: imageUrls),
+              ImageThumbRow(imageUrls: imageUrls),
             ],
           ],
         ),
-      ),
-    );
-  }
-}
-
-/// 이미지 행: 최대 3장 가로 나열, 탭 시 크게 보기
-class _ImageRow extends StatelessWidget {
-  final List<String> imageUrls;
-  const _ImageRow({required this.imageUrls});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 80,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: imageUrls.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, i) {
-          return GestureDetector(
-            onTap: () => _openViewer(context, i),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: Image.network(
-                imageUrls[i],
-                width: 80,
-                height: 80,
-                fit: BoxFit.cover,
-                cacheWidth: 200,
-                loadingBuilder: (_, child, progress) {
-                  if (progress == null) return child;
-                  return Container(
-                    width: 80,
-                    height: 80,
-                    color: AppColors.surfaceMuted,
-                    child: const Center(
-                      child: SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    ),
-                  );
-                },
-                errorBuilder: (_, __, ___) => Container(
-                  width: 80,
-                  height: 80,
-                  color: AppColors.surfaceMuted,
-                  child: const Icon(Icons.broken_image_outlined,
-                      size: 24, color: AppColors.textDisabled),
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  void _openViewer(BuildContext context, int initialIndex) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => _FullImageViewer(
-          imageUrls: imageUrls,
-          initialIndex: initialIndex,
-        ),
-      ),
-    );
-  }
-}
-
-/// 전체 화면 이미지 뷰어 (좌우 스와이프)
-class _FullImageViewer extends StatefulWidget {
-  final List<String> imageUrls;
-  final int initialIndex;
-
-  const _FullImageViewer({
-    required this.imageUrls,
-    required this.initialIndex,
-  });
-
-  @override
-  State<_FullImageViewer> createState() => _FullImageViewerState();
-}
-
-class _FullImageViewerState extends State<_FullImageViewer> {
-  late final PageController _pageCtrl;
-  late int _current;
-
-  @override
-  void initState() {
-    super.initState();
-    _current = widget.initialIndex;
-    _pageCtrl = PageController(initialPage: _current);
-  }
-
-  @override
-  void dispose() {
-    _pageCtrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
-        title: Text(
-          '${_current + 1} / ${widget.imageUrls.length}',
-          style: const TextStyle(fontSize: 16),
-        ),
-        elevation: 0,
-      ),
-      body: PageView.builder(
-        controller: _pageCtrl,
-        itemCount: widget.imageUrls.length,
-        onPageChanged: (i) => setState(() => _current = i),
-        itemBuilder: (_, i) {
-          return InteractiveViewer(
-            minScale: 0.5,
-            maxScale: 3.0,
-            child: Center(
-              child: Image.network(
-                widget.imageUrls[i],
-                fit: BoxFit.contain,
-                loadingBuilder: (_, child, progress) {
-                  if (progress == null) return child;
-                  return const Center(
-                    child:
-                        CircularProgressIndicator(color: Colors.white54),
-                  );
-                },
-                errorBuilder: (_, __, ___) => const Center(
-                  child: Icon(Icons.broken_image_outlined,
-                      size: 48, color: Colors.white38),
-                ),
-              ),
-            ),
-          );
-        },
       ),
     );
   }

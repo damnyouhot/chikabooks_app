@@ -10,6 +10,7 @@ import 'tabs/admin_feature_tab.dart';
 import 'tabs/admin_moderation_tab.dart';
 import 'tabs/admin_overview_tab.dart';
 import 'tabs/admin_publisher_tab.dart';
+import 'tabs/admin_timeline_tab.dart';
 import 'tabs/admin_trends_tab.dart';
 import 'tabs/admin_user_tab.dart';
 import 'tabs/admin_userflow_tab.dart';
@@ -19,20 +20,21 @@ import 'tabs/admin_verify_tab.dart';
 ///
 /// ── 탭 구성 (운영 우선 → 분석 순) ─────────────────────────────
 ///   1. Overview      : 핵심 KPI (읽기 전용)
-///   2. Content Ops   : 공감투표 · 퀴즈 · 오늘 단어 · 오늘 문제 슬롯
-///   3. Publisher     : 공고자 / 주문 / 공고권 KPI
-///   4. Moderation    : 신고 누적·자동 숨김 게시물 검토 (P1.A)
-///   5. Users         : 사용자 검색·상세·플래그 토글 (P1.B)
-///   6. Billing       : 충전 · 세금계산서 · 현금영수증 큐 (미처리 배지)
-///   7. 인증 검토     : 사업자 인증 / 상호 확인 큐 (미처리 배지)
-///   8. User Flow     : 온보딩 퍼널
-///   9. Feature       : 기능 반응 + 오류 모니터
-///   10. Behavior     : 7개 행동 지표
-///   11. Trends       : 일별 추세 차트
+///   2. 타임라인      : 전체 유저 기록·목표 통합 피드 (운영 모니터링)
+///   3. Content Ops   : 공감투표 · 퀴즈 · 오늘 단어 · 오늘 문제 슬롯
+///   4. Publisher     : 공고자 / 주문 / 공고권 KPI
+///   5. Moderation    : 신고 누적·자동 숨김 게시물 검토 (P1.A)
+///   6. Users         : 사용자 검색·상세·플래그 토글 (P1.B)
+///   7. Billing       : 충전 · 세금계산서 · 현금영수증 큐 (미처리 배지)
+///   8. 인증 검토     : 사업자 인증 / 상호 확인 큐 (미처리 배지)
+///   9. User Flow     : 온보딩 퍼널
+///   10. Feature      : 기능 반응 + 오류 모니터
+///   11. Behavior     : 7개 행동 지표
+///   12. Trends       : 일별 추세 차트
 ///
-/// 상단 기간 필터(오늘/7일/30일)는 Overview · Publisher · UserFlow · Feature ·
-/// Behavior 5개 탭에만 적용됩니다. Trends 는 자체 기간 칩을, Content Ops /
-/// Moderation / Users / Billing / Verify 는 기간 개념이 없습니다.
+/// 상단 기간 필터(오늘/7일/30일)는 Overview · 타임라인 · Publisher · UserFlow ·
+/// Feature · Behavior 6개 탭에 적용됩니다. Trends 는 자체 기간 칩을,
+/// Content Ops / Moderation / Users / Billing / Verify 는 기간 개념이 없습니다.
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
 
@@ -55,7 +57,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 11,
+      length: 12,
       child: Scaffold(
         backgroundColor: AppColors.appBg,
         appBar: AppBar(
@@ -102,6 +104,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 tabAlignment: TabAlignment.start,
                 tabs: const [
                   Tab(text: 'Overview'),
+                  Tab(text: '타임라인'),
                   Tab(text: 'Content Ops'),
                   Tab(text: 'Publisher'),
                   Tab(text: 'Moderation'),
@@ -120,6 +123,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         body: TabBarView(
           children: [
             AdminOverviewTab(since: _since, period: _period.label),
+            AdminTimelineTab(since: _since),
             const AdminContentOpsTab(),
             AdminPublisherTab(since: _since),
             const AdminModerationTab(),

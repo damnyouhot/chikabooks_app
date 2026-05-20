@@ -243,7 +243,12 @@ class _RecordHubPageState extends State<_RecordHubPage> {
 
   Widget _buildSegments() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxl),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.xl,
+        AppSpacing.xs,
+        AppSpacing.xl,
+        0,
+      ),
       child: Container(
         padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
@@ -270,6 +275,10 @@ class _RecordHubPageState extends State<_RecordHubPage> {
     );
   }
 }
+
+/// 피드 카드 순번 라벨 — 「기록 01」 형식(2자리 0 패딩).
+String _recordOrderLabel(int orderNumber) =>
+    '기록 ${orderNumber.toString().padLeft(2, '0')}';
 
 // ═════════════════════════════════════════════════════════════════
 // 다이어리 피드 탭 — 트위터식 자기 글 피드 + 하단 고정 입력 바
@@ -423,11 +432,10 @@ class _DiaryFeedTabState extends State<_DiaryFeedTab> {
         });
 
         AdminActivityService.log(
-          ActivityEventType.noteSaveSuccess,
+          ActivityEventType.noteEdit,
           page: 'record_hub',
           targetId: noteId,
           extra: {
-            'mode': 'edit',
             'imageCount': finalUrls.length,
             'textLength': text.length,
           },
@@ -555,33 +563,48 @@ class _DiaryFeedTabState extends State<_DiaryFeedTab> {
               });
               if (docs.isEmpty) {
                 return Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      Icon(Icons.edit_note_outlined,
-                          size: 56, color: AppColors.textDisabled),
-                      SizedBox(height: 12),
-                      Text(
-                        '아직 기록이 없어요',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: AppColors.textSecondary,
-                        ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.xl),
+                    child: AppMutedCard(
+                      padding: const EdgeInsets.symmetric(
+                          vertical: AppSpacing.xxl,
+                          horizontal: AppSpacing.lg),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.edit_note_outlined,
+                              size: 48, color: AppColors.textDisabled),
+                          SizedBox(height: AppSpacing.md),
+                          Text(
+                            '아직 기록이 없어요',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          SizedBox(height: 6),
+                          Text(
+                            '아래에 한 줄을 남겨보세요.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
                       ),
-                      SizedBox(height: 4),
-                      Text(
-                        '아래에 한 줄을 남겨보세요.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textDisabled,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 );
               }
               return ListView.separated(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.xl,
+                  AppSpacing.sm,
+                  AppSpacing.xl,
+                  AppSpacing.md,
+                ),
                 itemCount: docs.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 8),
                 itemBuilder: (context, i) {
@@ -589,7 +612,10 @@ class _DiaryFeedTabState extends State<_DiaryFeedTab> {
                   final m = d.data() as Map<String, dynamic>;
                   final urls = _parseImageUrls(m);
                   final txt = m['text'] as String? ?? '';
+                  // 최신순 → i=0 이 가장 최근. 순번은 오래된 글=01, 최신=N.
+                  final orderNumber = docs.length - i;
                   return _FeedCard(
+                    recordLabel: _recordOrderLabel(orderNumber),
                     noteId: d.id,
                     uid: uid,
                     text: txt,
@@ -624,16 +650,23 @@ class _DiaryFeedTabState extends State<_DiaryFeedTab> {
             keepingExistingImages);
     return Container(
       padding: EdgeInsets.fromLTRB(
-        12,
-        8,
-        12,
-        8 + MediaQuery.of(context).viewInsets.bottom,
+        AppSpacing.xl,
+        AppSpacing.sm,
+        AppSpacing.xl,
+        AppSpacing.sm + MediaQuery.of(context).viewInsets.bottom,
       ),
       decoration: BoxDecoration(
         color: AppColors.white,
-        border: Border(
-          top: BorderSide(color: AppColors.divider, width: 1),
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(AppRadius.lg),
         ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.divider.withValues(alpha: 0.45),
+            blurRadius: 12,
+            offset: const Offset(0, -2),
+          ),
+        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -787,15 +820,30 @@ class _DiaryFeedTabState extends State<_DiaryFeedTab> {
                     onChanged: (_) => setState(() {}),
                     // [[s:id]] 토큰을 입력 중에도 인라인 스티커로 보여준다.
                     specialTextSpanBuilder: _StickerSpanBuilder(),
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       hintText: '',
                       counterText: '',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(20)),
-                      ),
-                      contentPadding:
-                          EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      filled: true,
+                      fillColor: AppColors.surfaceMuted,
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
                       isDense: true,
+                      border: OutlineInputBorder(
+                        borderRadius:
+                            BorderRadius.circular(AppRadius.md),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius:
+                            BorderRadius.circular(AppRadius.md),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius:
+                            BorderRadius.circular(AppRadius.md),
+                        borderSide: const BorderSide(
+                            color: AppColors.lime, width: 1.5),
+                      ),
                     ),
                   ),
                 ),
@@ -852,6 +900,7 @@ class _DiaryFeedTabState extends State<_DiaryFeedTab> {
 
 class _FeedCard extends StatelessWidget {
   const _FeedCard({
+    required this.recordLabel,
     required this.noteId,
     required this.uid,
     required this.text,
@@ -862,6 +911,7 @@ class _FeedCard extends StatelessWidget {
     required this.onTapEdit,
   });
 
+  final String recordLabel;
   final String noteId;
   final String uid;
   final String text;
@@ -926,13 +976,22 @@ class _FeedCard extends StatelessWidget {
         children: [
           Row(
             children: [
+              Text(
+                recordLabel,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(width: 8),
               const Icon(Icons.schedule,
                   size: 12, color: AppColors.textDisabled),
               const SizedBox(width: 3),
               Text(
                 _formatDate(createdAt),
                 style: const TextStyle(
-                  fontSize: 11,
+                  fontSize: 12,
                   color: AppColors.textSecondary,
                 ),
               ),
@@ -1190,17 +1249,12 @@ class _SegmentTab extends StatelessWidget {
           curve: Curves.easeOut,
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            color: selected ? AppColors.white : Colors.transparent,
+            color: selected ? AppColors.lime : Colors.transparent,
             borderRadius: BorderRadius.circular(AppRadius.sm),
-            boxShadow: selected
-                ? [
-                    BoxShadow(
-                      color: AppColors.divider.withValues(alpha: 0.5),
-                      blurRadius: 6,
-                      offset: const Offset(0, 1),
-                    ),
-                  ]
-                : const [],
+            border: Border.all(
+              color: selected ? AppColors.lime : Colors.transparent,
+              width: selected ? 1.5 : 0,
+            ),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -1209,7 +1263,7 @@ class _SegmentTab extends StatelessWidget {
                 icon,
                 size: 16,
                 color: selected
-                    ? AppColors.textPrimary
+                    ? AppColors.onCardEmphasis
                     : AppColors.textSecondary,
               ),
               const SizedBox(width: 6),
@@ -1217,9 +1271,9 @@ class _SegmentTab extends StatelessWidget {
                 label,
                 style: TextStyle(
                   fontSize: 13,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
                   color: selected
-                      ? AppColors.textPrimary
+                      ? AppColors.onCardEmphasis
                       : AppColors.textSecondary,
                 ),
               ),

@@ -46,6 +46,14 @@ const MEANINGFUL_ACTIONS = new Set([
   "whisper_comment",
   "whisper_reply",
   "whisper_share",
+  // 기록하기 · 목표
+  "note_save_success",
+  "note_edit",
+  "goal_create",
+  "goal_routine_check",
+  "goal_project_done",
+  "goal_checkpoint_toggle",
+  "goal_daily_touch",
 ]);
 
 // EventCatalog.dailyFeatureUsageTypes 와 동일
@@ -59,6 +67,10 @@ const FEATURE_KEYS = [
   "whisper_create_complete",
   "whisper_reaction",
   "whisper_comment",
+  "note_save_success",
+  "goal_create",
+  "goal_routine_check",
+  "goal_project_done",
 ];
 
 const TAB_KEYS = ["view_home", "view_job", "view_growth", "view_bond"];

@@ -2,7 +2,9 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
+import '../core/theme/app_tokens.dart';
 import '../core/widgets/app_confirm_modal.dart';
+import '../core/widgets/app_muted_card.dart';
 import '../core/widgets/app_modal_scaffold.dart';
 import '../data/caring_ments.dart';
 import '../models/user_goal.dart';
@@ -185,7 +187,9 @@ class _UserGoalContentState extends State<UserGoalContent>
   /// 가 노출되므로 본문 타이틀/부제는 숨겨 중복을 줄이고, 우측 「+ 추가」 컨트롤만 살린다.
   Widget _buildHeader() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: EdgeInsets.symmetric(
+        horizontal: widget.embedded ? AppSpacing.xl : 24,
+      ),
       child: Row(
         children: [
           if (!widget.embedded)
@@ -297,116 +301,125 @@ class _UserGoalContentState extends State<UserGoalContent>
 
     // 흰 카드 + 1px 라인 → 다른 카드들과 톤 통일.
     // 상단: 주간/월간 두 레벨 칩 / 하단: 보조 수치(오늘 체크 · 이번 주 · 이번 달).
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.divider, width: 1),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
+    final summaryBody = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
           children: [
-            // ── 상단: 주간 레벨 칩 + 월간 레벨 칩 ──
-            Row(
-              children: [
-                Expanded(
-                  child: _LevelChip(
-                    tier: weekly,
-                    suffix: '주간',
-                    rate: weeklyRate,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _LevelChip(
-                    tier: monthly,
-                    suffix: '월간',
-                    rate: monthlyRate,
-                  ),
-                ),
-              ],
+            Expanded(
+              child: _LevelChip(
+                tier: weekly,
+                suffix: '주간',
+                rate: weeklyRate,
+              ),
             ),
-            const SizedBox(height: 10),
-            // ── 하단: 보조 수치(오늘 체크 · 이번 주 · 이번 달) ──
-            Row(
-              children: [
-                Icon(
-                  Icons.check_circle_outline,
-                  size: 14,
-                  color: _kSuccess,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  '오늘',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: _kText.withOpacity(0.55),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  '$todayChecked/${routines.length}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: _kText,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Container(
-                  width: 1,
-                  height: 10,
-                  color: _kShadow2.withOpacity(0.6),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  '이번 주',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: _kText.withOpacity(0.55),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  weeklyMax > 0 ? '$weeklyTotal/$weeklyMax' : '$weeklyTotal',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: _kText,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Container(
-                  width: 1,
-                  height: 10,
-                  color: _kShadow2.withOpacity(0.6),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  '이번 달',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: _kText.withOpacity(0.55),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  monthlyMax > 0 ? '$_monthlyTotal/$monthlyMax' : '$_monthlyTotal',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: _kText,
-                  ),
-                ),
-              ],
+            const SizedBox(width: 8),
+            Expanded(
+              child: _LevelChip(
+                tier: monthly,
+                suffix: '월간',
+                rate: monthlyRate,
+              ),
             ),
           ],
         ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Icon(
+              Icons.check_circle_outline,
+              size: 14,
+              color: _kSuccess,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '오늘',
+              style: TextStyle(
+                fontSize: 12,
+                color: _kText.withOpacity(0.55),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '$todayChecked/${routines.length}',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: _kText,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Container(
+              width: 1,
+              height: 10,
+              color: _kShadow2.withOpacity(0.6),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              '이번 주',
+              style: TextStyle(
+                fontSize: 12,
+                color: _kText.withOpacity(0.55),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              weeklyMax > 0 ? '$weeklyTotal/$weeklyMax' : '$weeklyTotal',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: _kText,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Container(
+              width: 1,
+              height: 10,
+              color: _kShadow2.withOpacity(0.6),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              '이번 달',
+              style: TextStyle(
+                fontSize: 12,
+                color: _kText.withOpacity(0.55),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              monthlyMax > 0 ? '$_monthlyTotal/$monthlyMax' : '$_monthlyTotal',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: _kText,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+
+    return Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: widget.embedded ? AppSpacing.xl : 24,
       ),
+      child: widget.embedded
+          ? AppMutedCard(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 14, vertical: 12),
+              child: summaryBody,
+            )
+          : Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.divider, width: 1),
+              ),
+              child: summaryBody,
+            ),
     );
   }
 
@@ -435,32 +448,45 @@ class _UserGoalContentState extends State<UserGoalContent>
 
   /// 탭 (루틴 / 프로젝트)
   Widget _buildTabs() {
+    final hubStyle = widget.embedded;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: EdgeInsets.symmetric(
+        horizontal: hubStyle ? AppSpacing.xl : 24,
+      ),
       child: Container(
+        padding: hubStyle ? const EdgeInsets.all(4) : null,
         decoration: BoxDecoration(
-          color: _kShadow2.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(12),
+          color: hubStyle
+              ? AppColors.surfaceMuted
+              : _kShadow2.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(AppRadius.md),
         ),
         child: TabBar(
           controller: _tabController,
           indicator: BoxDecoration(
-            color: AppColors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: _kShadow2.withOpacity(0.3),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            color: hubStyle ? AppColors.lime : AppColors.white,
+            borderRadius: BorderRadius.circular(
+              hubStyle ? AppRadius.sm : 12,
+            ),
+            boxShadow: hubStyle
+                ? null
+                : [
+                    BoxShadow(
+                      color: _kShadow2.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
           ),
           indicatorSize: TabBarIndicatorSize.tab,
-          labelColor: _kText,
-          unselectedLabelColor: _kText.withOpacity(0.5),
-          labelStyle: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
+          labelColor:
+              hubStyle ? AppColors.onCardEmphasis : _kText,
+          unselectedLabelColor: hubStyle
+              ? AppColors.textSecondary
+              : _kText.withOpacity(0.5),
+          labelStyle: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
           ),
           dividerColor: Colors.transparent,
           tabs: [
@@ -561,7 +587,12 @@ class _UserGoalContentState extends State<UserGoalContent>
       radius: const Radius.circular(2),
       child: ListView.separated(
         controller: controller,
-        padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+        padding: EdgeInsets.fromLTRB(
+          widget.embedded ? AppSpacing.xl : 24,
+          0,
+          widget.embedded ? AppSpacing.xl : 24,
+          8,
+        ),
         itemCount: items.length,
         separatorBuilder: (_, __) => const SizedBox(height: 8),
         itemBuilder: (context, index) {
@@ -575,46 +606,54 @@ class _UserGoalContentState extends State<UserGoalContent>
 
   /// 빈 상태
   Widget _buildEmptyState() {
+    final body = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Text('🎯', style: TextStyle(fontSize: 48)),
+        const SizedBox(height: 16),
+        const Text(
+          '챙기고 싶은 목표를 자유롭게 적어보세요.',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: _kText,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '작고 하찮은 게 오래 가요.',
+          style: TextStyle(fontSize: 14, color: _kText.withOpacity(0.6)),
+        ),
+        const SizedBox(height: 24),
+        ElevatedButton.icon(
+          onPressed: _showAddGoalForm,
+          icon: const Icon(Icons.add),
+          label: const Text('목표 추가'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.lime,
+            foregroundColor: AppColors.onCardEmphasis,
+            padding: const EdgeInsets.symmetric(
+              horizontal: 24,
+              vertical: 12,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+      ],
+    );
+
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('🎯', style: TextStyle(fontSize: 48)),
-            const SizedBox(height: 16),
-            const Text(
-              '챙기고 싶은 목표를 자유롭게 적어보세요.',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: _kText,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '작고 하찮은 게 오래 가요.',
-              style: TextStyle(fontSize: 14, color: _kText.withOpacity(0.6)),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: _showAddGoalForm,
-              icon: const Icon(Icons.add),
-              label: const Text('목표 추가'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.lime,
-                foregroundColor: AppColors.onCardEmphasis,
+        padding: EdgeInsets.all(widget.embedded ? AppSpacing.xl : 32),
+        child: widget.embedded
+            ? AppMutedCard(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-          ],
-        ),
+                    vertical: 28, horizontal: 20),
+                child: body,
+              )
+            : body,
       ),
     );
   }
@@ -1066,12 +1105,27 @@ class _UserGoalContentState extends State<UserGoalContent>
 
   Future<void> _toggleCheckpoint(UserGoal goal, GoalCheckpoint cp) async {
     final ok = await UserGoalService.toggleCheckpoint(goal.id, cp.id);
-    if (ok && mounted) _loadData();
+    if (ok) {
+      AdminActivityService.log(
+        ActivityEventType.goalCheckpointToggle,
+        page: 'record_hub',
+        targetId: goal.id,
+        extra: {'checkpointId': cp.id, 'doneAfter': !cp.done},
+      );
+      if (mounted) _loadData();
+    }
   }
 
   Future<void> _toggleDailyTouch(UserGoal goal) async {
     final ok = await UserGoalService.toggleDailyTouch(goal.id);
-    if (ok && mounted) _loadData();
+    if (ok) {
+      AdminActivityService.log(
+        ActivityEventType.goalDailyTouch,
+        page: 'record_hub',
+        targetId: goal.id,
+      );
+      if (mounted) _loadData();
+    }
   }
 
   Widget _buildBadge(String label, Color color) {
@@ -1130,12 +1184,14 @@ class _UserGoalContentState extends State<UserGoalContent>
       // 캐릭터 멘트 (체크 ON일 때만)
       if (isChecked) {
         _emitCharacterMent(CaringMents.goalChecked);
-        AdminActivityService.log(
-          ActivityEventType.goalRoutineCheck,
-          page: 'record_hub',
-          targetId: goal.id,
-        );
       }
+      AdminActivityService.log(
+        isChecked
+            ? ActivityEventType.goalRoutineCheck
+            : ActivityEventType.goalRoutineUncheck,
+        page: 'record_hub',
+        targetId: goal.id,
+      );
     }
   }
 
@@ -1158,12 +1214,14 @@ class _UserGoalContentState extends State<UserGoalContent>
         ),
       );
       _emitCharacterMent(CaringMents.goalCompleted);
-      AdminActivityService.log(
-        ActivityEventType.goalProjectDone,
-        page: 'record_hub',
-        targetId: goal.id,
-      );
     }
+    AdminActivityService.log(
+      updated.isDone
+          ? ActivityEventType.goalProjectDone
+          : ActivityEventType.goalProjectUndone,
+      page: 'record_hub',
+      targetId: goal.id,
+    );
   }
 
   /// 목표 삭제
@@ -1185,6 +1243,7 @@ class _UserGoalContentState extends State<UserGoalContent>
         ActivityEventType.goalDelete,
         page: 'record_hub',
         targetId: goal.id,
+        extra: {'goalType': goal.type.name},
       );
       await _loadData();
     }
@@ -1196,12 +1255,21 @@ class _UserGoalContentState extends State<UserGoalContent>
       MaterialPageRoute(
         builder:
             (_) => GoalAddForm(
-              onAdded: () {
+              onAdded: (createdGoal) {
                 _loadData();
                 _emitCharacterMent(CaringMents.goalCreated);
                 AdminActivityService.log(
                   ActivityEventType.goalCreate,
                   page: 'record_hub',
+                  targetId: createdGoal?.id,
+                  extra: {
+                    'goalType': createdGoal?.type.name ?? 'unknown',
+                    if (createdGoal != null)
+                      'periodType': createdGoal.periodType.name,
+                    if (createdGoal != null &&
+                        createdGoal.checkpoints.isNotEmpty)
+                      'checkpointCount': createdGoal.checkpoints.length,
+                  },
                 );
                 Navigator.pop(context);
               },

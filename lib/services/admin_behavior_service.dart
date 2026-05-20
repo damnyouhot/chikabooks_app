@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
 import '../core/analytics/event_catalog.dart';
+import 'stats_user_filter.dart';
 
 /// 행동 분석 대시보드 데이터 서비스
 ///
@@ -22,14 +23,7 @@ class AdminBehaviorService {
   }) async {
     try {
       // ── Step 1: 유효 UID 집합 확보 ──
-      final usersSnap = await _db
-          .collection('users')
-          .where('excludeFromStats', isEqualTo: false)
-          .get();
-      final validUserIds = <String>{};
-      for (final doc in usersSnap.docs) {
-        validUserIds.add(doc.id);
-      }
+      final validUserIds = await StatsUserFilter.validUserIds(_db);
       final total = validUserIds.length;
       debugPrint('📊 [Behavior] validUserIds: $total명');
 

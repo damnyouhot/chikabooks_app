@@ -15,7 +15,8 @@ import '../services/user_goal_service.dart';
 ///   · 입력칸은 filled + 밝은 surfaceMuted 배경, border 없음
 ///   · 선택 칩은 미선택=outline / 선택=AppColors.lime 솔리드 + onCardEmphasis
 class GoalAddForm extends StatefulWidget {
-  final VoidCallback onAdded;
+  /// 신규 생성된 목표를 인자로 받는다. 저장 실패 시 null.
+  final void Function(UserGoal? created) onAdded;
 
   const GoalAddForm({super.key, required this.onAdded});
 
@@ -644,7 +645,7 @@ class _GoalAddFormState extends State<GoalAddForm> {
         ? PeriodType.month
         : _selectedPeriod;
 
-    final success = await UserGoalService.addGoal(
+    final created = await UserGoalService.addGoalReturning(
       title: title,
       type: _selectedType,
       periodType: periodType,
@@ -653,7 +654,7 @@ class _GoalAddFormState extends State<GoalAddForm> {
       checkpoints: checkpoints,
     );
 
-    if (success) {
+    if (created != null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -661,7 +662,7 @@ class _GoalAddFormState extends State<GoalAddForm> {
             behavior: SnackBarBehavior.floating,
           ),
         );
-        widget.onAdded();
+        widget.onAdded(created);
       }
     }
   }

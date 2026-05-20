@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/user_public_profile.dart';
+import 'admin_activity_service.dart';
 import 'career_profile_onboarding_sync.dart';
 
 
@@ -269,7 +270,10 @@ class UserProfileService {
         'updatedAt': FieldValue.serverTimestamp(),
       });
       // 자신에 대한 설정이면 캐시 초기화
-      if (targetUid == _auth.currentUser?.uid) _cache = null;
+      if (targetUid == _auth.currentUser?.uid) {
+        _cache = null;
+        AdminActivityService.clearCache();
+      }
     } catch (e) {
       debugPrint('⚠️ UserProfileService.setExcludeFromStats error: $e');
       rethrow;

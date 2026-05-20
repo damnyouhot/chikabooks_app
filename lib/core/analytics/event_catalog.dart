@@ -410,6 +410,18 @@ const Map<String, EventMeta> kEventCatalog = {
     tab: EventTab.na,
     meaningfulBehavior: false,
   ),
+  'note_edit': EventMeta(
+    type: 'note_edit',
+    labelKo: '오늘 한줄 수정',
+    tab: EventTab.na,
+    meaningfulBehavior: true,
+  ),
+  'note_delete': EventMeta(
+    type: 'note_delete',
+    labelKo: '오늘 한줄 삭제',
+    tab: EventTab.na,
+    meaningfulBehavior: false,
+  ),
   'goal_create': EventMeta(
     type: 'goal_create',
     labelKo: '목표 생성',
@@ -422,9 +434,33 @@ const Map<String, EventMeta> kEventCatalog = {
     tab: EventTab.na,
     meaningfulBehavior: true,
   ),
+  'goal_routine_uncheck': EventMeta(
+    type: 'goal_routine_uncheck',
+    labelKo: '루틴 목표 체크 해제',
+    tab: EventTab.na,
+    meaningfulBehavior: false,
+  ),
   'goal_project_done': EventMeta(
     type: 'goal_project_done',
     labelKo: '프로젝트 목표 완료',
+    tab: EventTab.na,
+    meaningfulBehavior: true,
+  ),
+  'goal_project_undone': EventMeta(
+    type: 'goal_project_undone',
+    labelKo: '프로젝트 목표 완료 취소',
+    tab: EventTab.na,
+    meaningfulBehavior: false,
+  ),
+  'goal_checkpoint_toggle': EventMeta(
+    type: 'goal_checkpoint_toggle',
+    labelKo: '프로젝트 체크포인트 토글',
+    tab: EventTab.na,
+    meaningfulBehavior: true,
+  ),
+  'goal_daily_touch': EventMeta(
+    type: 'goal_daily_touch',
+    labelKo: '프로젝트 일일 터치',
     tab: EventTab.na,
     meaningfulBehavior: true,
   ),
@@ -538,6 +574,14 @@ const List<(String label, Set<String> types)> kBehaviorFeatureUsageRows = [
     'whisper_comment',
     'whisper_reply',
   }),
+  ('한 줄 기록 작성', {'note_save_success'}),
+  ('목표 생성', {'goal_create'}),
+  ('루틴 목표 체크', {'goal_routine_check'}),
+  ('프로젝트 진행', {
+    'goal_checkpoint_toggle',
+    'goal_daily_touch',
+    'goal_project_done',
+  }),
 ];
 
 /// «반복 사용» — (라벨, 이벤트 타입, 최소 횟수, 분모 설명)
@@ -643,6 +687,10 @@ abstract final class EventCatalog {
     'whisper_create_complete',
     'whisper_reaction',
     'whisper_comment',
+    'note_save_success',
+    'goal_create',
+    'goal_routine_check',
+    'goal_project_done',
   };
 
   /// `tabConversions`: 탭 진입 + 핵심 행동 **동시** 만족 유저 수 (키: `tab__action`)

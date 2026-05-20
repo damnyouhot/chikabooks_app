@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
+import '../core/analytics/stats_excluded_emails.dart';
+
 /// 관리자 대시보드용 사용자 행동 기록 서비스
 ///
 /// 컬렉션: `activityLogs`
@@ -209,13 +211,19 @@ class AdminActivityService {
   static Future<bool> _isExcluded(String uid) async {
     if (_excludedCache != null) return _excludedCache!;
     try {
+      final authEmail = _auth.currentUser?.email;
+      if (StatsExcludedEmails.isExcludedEmail(authEmail)) {
+        _excludedCache = true;
+        return true;
+      }
       final doc = await _db.collection('users').doc(uid).get();
-      _excludedCache = doc.data()?['excludeFromStats'] == true;
+      final data = doc.data();
+      _excludedCache = StatsExcludedEmails.isExcludedUserData(data);
       // 첫 로드 시 스냅샷도 함께 캐시
-      _snapshotCache ??= _UserSnapshot.fromMap(doc.data() ?? {});
+      _snapshotCache ??= _UserSnapshot.fromMap(data ?? {});
       return _excludedCache!;
     } catch (_) {
-      return false;
+      return StatsExcludedEmails.isExcludedEmail(_auth.currentUser?.email);
     }
   }
 
@@ -224,7 +232,7 @@ class AdminActivityService {
     if (_snapshotCache != null) return _snapshotCache!;
     try {
       final doc = await _db.collection('users').doc(uid).get();
-      _excludedCache ??= doc.data()?['excludeFromStats'] == true;
+      _excludedCache ??= StatsExcludedEmails.isExcludedUserData(doc.data());
       _snapshotCache = _UserSnapshot.fromMap(doc.data() ?? {});
       return _snapshotCache!;
     } catch (_) {
@@ -334,9 +342,15 @@ enum ActivityEventType {
   tapRecordTabGoal('tap_record_tab_goal', '기록하기-나의 목표 탭'),
   noteSaveSuccess('note_save_success', '오늘 한줄 저장 성공'),
   noteSaveFail('note_save_fail', '오늘 한줄 저장 실패'),
+  noteEdit('note_edit', '오늘 한줄 수정'),
+  noteDelete('note_delete', '오늘 한줄 삭제'),
   goalCreate('goal_create', '목표 생성'),
   goalRoutineCheck('goal_routine_check', '루틴 목표 체크'),
+  goalRoutineUncheck('goal_routine_uncheck', '루틴 목표 체크 해제'),
   goalProjectDone('goal_project_done', '프로젝트 목표 완료'),
+  goalProjectUndone('goal_project_undone', '프로젝트 목표 완료 취소'),
+  goalCheckpointToggle('goal_checkpoint_toggle', '프로젝트 체크포인트 토글'),
+  goalDailyTouch('goal_daily_touch', '프로젝트 일일 터치'),
   goalDelete('goal_delete', '목표 삭제'),
 
   // ── 기타 ──────────────────────────────────────────────────
