@@ -54,7 +54,10 @@ class _UserGoalContentState extends State<UserGoalContent>
   static const _kAccent = AppColors.accent;
   static const _kText = AppColors.textPrimary;
   static const _kShadow2 = AppColors.divider;
-  static const _kSuccess = AppColors.success;
+  // 목표 시트 전용 그린 — 흰 배경 위에서 텍스트 가독성을 위해 더 진한 톤.
+  // 전역 [AppColors.success] 는 형광 톤이라 큰 면적에서 글자 콘트라스트가 낮음.
+  static const _kSuccess = Color(0xFF1F8A4C);
+  static const _kSuccessOn = Color(0xFFFFFFFF); // 솔리드 버튼 위 텍스트(흰색)
 
   UserGoals? _goals;
   RoutineCheck? _todayCheck;
@@ -584,21 +587,19 @@ class _UserGoalContentState extends State<UserGoalContent>
           const SizedBox(height: 16),
 
           // 오늘 체크 버튼 (가장 중요)
+          // 체크된 상태는 「확정된 성과」를 바로 인식할 수 있도록 솔리드 톤
+          // (진한 초록 배경 + 흰 텍스트) — 큰 면적의 옅은 그린은 가독성↓.
           GestureDetector(
             onTap: () => _toggleRoutineCheck(goal),
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 12),
               decoration: BoxDecoration(
-                color:
-                    isCheckedToday
-                        ? _kSuccess.withOpacity(0.2)
-                        : _kAccent.withOpacity(0.1),
+                color: isCheckedToday ? _kSuccess : AppColors.white,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color:
-                      isCheckedToday
-                          ? _kSuccess.withOpacity(0.5)
-                          : _kAccent.withOpacity(0.3),
+                  color: isCheckedToday
+                      ? _kSuccess
+                      : _kAccent.withOpacity(0.3),
                   width: 1,
                 ),
               ),
@@ -609,7 +610,9 @@ class _UserGoalContentState extends State<UserGoalContent>
                     isCheckedToday
                         ? Icons.check_circle
                         : Icons.check_circle_outline,
-                    color: isCheckedToday ? _kSuccess : _kText.withOpacity(0.6),
+                    color: isCheckedToday
+                        ? _kSuccessOn
+                        : _kText.withOpacity(0.6),
                     size: 20,
                   ),
                   const SizedBox(width: 8),
@@ -618,8 +621,9 @@ class _UserGoalContentState extends State<UserGoalContent>
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color:
-                          isCheckedToday ? _kSuccess : _kText.withOpacity(0.7),
+                      color: isCheckedToday
+                          ? _kSuccessOn
+                          : _kText.withOpacity(0.7),
                     ),
                   ),
                 ],
@@ -774,22 +778,18 @@ class _UserGoalContentState extends State<UserGoalContent>
 
           const SizedBox(height: 12),
 
-          // 완료 토글
+          // 완료 토글 — 「오늘 했어요」와 동일하게 솔리드 그린 패턴.
           GestureDetector(
             onTap: () => _toggleProjectDone(goal),
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 12),
               decoration: BoxDecoration(
-                color:
-                    goal.isDone
-                        ? _kSuccess.withOpacity(0.2)
-                        : _kAccent.withOpacity(0.1),
+                color: goal.isDone ? _kSuccess : AppColors.white,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color:
-                      goal.isDone
-                          ? _kSuccess.withOpacity(0.5)
-                          : _kAccent.withOpacity(0.3),
+                  color: goal.isDone
+                      ? _kSuccess
+                      : _kAccent.withOpacity(0.3),
                   width: 1,
                 ),
               ),
@@ -800,7 +800,9 @@ class _UserGoalContentState extends State<UserGoalContent>
                     goal.isDone
                         ? Icons.check_circle
                         : Icons.check_circle_outline,
-                    color: goal.isDone ? _kSuccess : _kText.withOpacity(0.6),
+                    color: goal.isDone
+                        ? _kSuccessOn
+                        : _kText.withOpacity(0.6),
                     size: 20,
                   ),
                   const SizedBox(width: 8),
@@ -809,7 +811,9 @@ class _UserGoalContentState extends State<UserGoalContent>
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: goal.isDone ? _kSuccess : _kText.withOpacity(0.7),
+                      color: goal.isDone
+                          ? _kSuccessOn
+                          : _kText.withOpacity(0.7),
                     ),
                   ),
                 ],
