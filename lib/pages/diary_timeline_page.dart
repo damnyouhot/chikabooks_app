@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -13,73 +11,16 @@ import '../services/diary_image_service.dart';
 
 /// 나의 기록 타임라인 페이지
 ///
-/// 과거에 작성한 기록들을 시간 순으로 보여줌.
-/// 이미지가 있으면 썸네일 1장 + 이미지 수 배지 표시.
+/// 과거에 작성한 기록들을 최신순으로 보여준다.
 ///
-/// 첫 응답이 일정 시간 내에 오지 않으면 「인덱스 빌드 중일 가능성」 을
-/// 사용자에게 알려준다. (Firestore 가 첫 쿼리 시 단일 필드 인덱스를
-/// 자동 빌드 — 보통 수 초 ~ 수 분 소요. 이 동안 stream 은 응답을 주지
-/// 않고 대기 상태로 머물러 사용자가 무한 로딩처럼 느낀다.)
-class DiaryTimelinePage extends StatefulWidget {
+/// 설계 메모
+/// - Firestore 쿼리에 `orderBy` 를 쓰지 않는다. 메모는 한 사용자가 평생 수백
+///   개 안 쌓이는 데이터라 단일 필드 색인 빌드 / `createdAt` 누락 같은 문제를
+///   감수할 이유가 없다. 전부 받아 클라이언트에서 정렬한다.
+/// - 정렬 키 우선순위: `createdAt`(있으면) desc → 문서 ID desc(자동 ID 는
+///   생성 시각이 어느 정도 단조 증가). 둘 다 없는 케이스는 사실상 발생 X.
+class DiaryTimelinePage extends StatelessWidget {
   const DiaryTimelinePage({super.key});
-
-  @override
-  State<DiaryTimelinePage> createState() => _DiaryTimelinePageState();
-}
-
-class _DiaryTimelinePageState extends State<DiaryTimelinePage> {
-  /// 첫 응답이 6초 내에 오지 않으면 「오래 걸려요」 안내를 표시한다.
-  static const _slowResponseThreshold = Duration(seconds: 6);
-
-  Timer? _slowTimer;
-  bool _slow = false;
-  bool _firstResponseReceived = false;
-
-  /// 사용자가 「정렬 없이 보기」를 눌렀을 때 true.
-  /// orderBy 없이 limit 50 으로 페치 후 클라이언트에서 정렬한다.
-  /// (createdAt 누락 문서 / 단일필드 색인 빌드 지연을 우회하는 진단·임시 수단)
-  bool _useFallback = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _slowTimer = Timer(_slowResponseThreshold, () {
-      if (!mounted || _firstResponseReceived) return;
-      setState(() => _slow = true);
-    });
-  }
-
-  @override
-  void dispose() {
-    _slowTimer?.cancel();
-    super.dispose();
-  }
-
-  void _markFirstResponse() {
-    if (_firstResponseReceived) return;
-    _firstResponseReceived = true;
-    _slowTimer?.cancel();
-    if (_slow && mounted) {
-      // 응답이 도착했으면 안내 배너를 즉시 내린다.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() => _slow = false);
-      });
-    }
-  }
-
-  void _enableFallback() {
-    if (_useFallback) return;
-    setState(() {
-      _useFallback = true;
-      _slow = false;
-      _firstResponseReceived = false;
-    });
-    _slowTimer?.cancel();
-    _slowTimer = Timer(_slowResponseThreshold, () {
-      if (!mounted || _firstResponseReceived) return;
-      setState(() => _slow = true);
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -109,40 +50,38 @@ class _DiaryTimelinePageState extends State<DiaryTimelinePage> {
         elevation: 0,
       ),
       body: StreamBuilder<QuerySnapshot>(
-        // 기본은 createdAt desc. 사용자가 6초 무응답 후 「정렬 없이 보기」를
-        // 누르면 orderBy 를 빼고 limit 50 만 받아 클라이언트에서 정렬한다.
-        stream: _buildNotesStream(uid),
+        stream: FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .collection('notes')
+            .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            debugPrint('⚠️ DiaryTimeline error: ${snapshot.error}');
-            return _buildErrorState(snapshot.error);
-          }
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return _buildLoadingState(
-              slow: _slow,
-              showFallbackButton: !_useFallback,
-              onUseFallback: _enableFallback,
+            // 권한/네트워크 등 진짜 에러일 때만 도달. 메시지는 짧게.
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: Text(
+                  '기록을 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
             );
           }
-          _markFirstResponse();
-
-          var notes = snapshot.data?.docs ?? [];
-          if (_useFallback) {
-            // 클라이언트 정렬: createdAt(있으면) desc, 없으면 그대로.
-            final list = [...notes];
-            list.sort((a, b) {
-              final aTs = (a.data() as Map<String, dynamic>)['createdAt']
-                  as Timestamp?;
-              final bTs = (b.data() as Map<String, dynamic>)['createdAt']
-                  as Timestamp?;
-              if (aTs == null && bTs == null) return 0;
-              if (aTs == null) return 1; // 누락은 뒤로
-              if (bTs == null) return -1;
-              return bTs.compareTo(aTs); // desc
-            });
-            notes = list;
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(
+              child: CircularProgressIndicator(color: AppColors.accent),
+            );
           }
-          if (notes.isEmpty) {
+
+          final docs = [...?snapshot.data?.docs];
+          docs.sort(_compareNotesDesc);
+
+          if (docs.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -162,39 +101,11 @@ class _DiaryTimelinePageState extends State<DiaryTimelinePage> {
             );
           }
 
-          // fallback 모드에서 결과를 받아 표시 중일 때, 사용자에게 상태를
-          // 살짝 알려준다. (얇은 1줄 배지)
-          final list = ListView.builder(
-            padding: EdgeInsets.fromLTRB(
-              16,
-              _useFallback ? 8 : 16,
-              16,
-              16,
-            ),
-            itemCount: notes.length + (_useFallback ? 1 : 0),
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: docs.length,
             itemBuilder: (context, index) {
-              if (_useFallback && index == 0) {
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceMuted,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Text(
-                    '임시 정렬 모드 · 시간 정보가 없는 기록은 아래쪽에 표시돼요',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                );
-              }
-              final i = _useFallback ? index - 1 : index;
-              final note = notes[i];
+              final note = docs[index];
               final data = note.data() as Map<String, dynamic>;
               final text = data['text'] as String? ?? '';
               final createdAt = data['createdAt'] as Timestamp?;
@@ -210,121 +121,22 @@ class _DiaryTimelinePageState extends State<DiaryTimelinePage> {
               );
             },
           );
-          return list;
         },
       ),
     );
   }
 
-  /// 노트 stream — fallback 모드에서는 orderBy 를 빼고 limit 50 만 받아온다.
-  Stream<QuerySnapshot> _buildNotesStream(String uid) {
-    final col = FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
-        .collection('notes');
-    if (_useFallback) {
-      return col.limit(50).snapshots();
-    }
-    return col.orderBy('createdAt', descending: true).snapshots();
-  }
-
-  /// 로딩 상태 — 일정 시간이 지나도 첫 응답이 없으면 [slow] 안내를 함께 노출.
-  /// fallback 미적용 상태일 때만 「정렬 없이 보기」 버튼을 노출해 사용자가
-  /// 인덱스 빌드 대기/createdAt 누락 케이스를 즉시 우회할 수 있게 한다.
-  Widget _buildLoadingState({
-    required bool slow,
-    required bool showFallbackButton,
-    required VoidCallback onUseFallback,
-  }) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          CircularProgressIndicator(color: AppColors.accent),
-          if (slow) ...[
-            const SizedBox(height: 16),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 32),
-              child: Text(
-                '처음 한 번은 정렬 인덱스를 만드는 데 시간이 걸려요.\n잠시 후 자동으로 표시됩니다.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 12,
-                  height: 1.4,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ),
-            if (showFallbackButton) ...[
-              const SizedBox(height: 12),
-              TextButton.icon(
-                onPressed: onUseFallback,
-                icon: const Icon(Icons.refresh, size: 16),
-                label: const Text('정렬 없이 바로 보기'),
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.accent,
-                  textStyle: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ],
-      ),
-    );
-  }
-
-  /// 에러 상태 — 인덱스 빌드 중(`failed-precondition`)은 별도 메시지로 안내.
+  /// 최신순 정렬 비교자.
   ///
-  /// 다른 일반 에러는 한 줄 간략히 보여주고, 자세한 내용은 디버그 콘솔로.
-  Widget _buildErrorState(Object? error) {
-    final raw = error?.toString() ?? '';
-    final isIndexBuilding =
-        raw.contains('failed-precondition') ||
-        raw.contains('requires an index');
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              isIndexBuilding
-                  ? Icons.hourglass_top_rounded
-                  : Icons.error_outline_rounded,
-              size: 56,
-              color: AppColors.textDisabled,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              isIndexBuilding ? '잠시만요, 준비 중이에요' : '잠깐 문제가 생겼어요',
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              isIndexBuilding
-                  ? '기록 정렬을 처음 준비하는 중이라 1~2분 정도 걸려요.\n조금 뒤에 다시 들어와 주세요.'
-                  : '잠시 뒤 다시 시도해 주세요.',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 13,
-                color: AppColors.textSecondary,
-                height: 1.4,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  /// `createdAt` 이 있는 쪽을 우선해 desc, 둘 중 하나만 없으면 있는 쪽이 위로.
+  /// 둘 다 없으면 문서 ID(자동 생성 ID 는 시간 근사) desc 로 보조 정렬.
+  static int _compareNotesDesc(QueryDocumentSnapshot a, QueryDocumentSnapshot b) {
+    final aTs = (a.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+    final bTs = (b.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+    if (aTs != null && bTs != null) return bTs.compareTo(aTs);
+    if (aTs != null) return -1;
+    if (bTs != null) return 1;
+    return b.id.compareTo(a.id);
   }
 
   static List<String> _parseImageUrls(Map<String, dynamic> data) {

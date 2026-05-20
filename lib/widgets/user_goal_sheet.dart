@@ -275,10 +275,20 @@ class _UserGoalContentState extends State<UserGoalContent>
       weeklyTotal += count;
     }
 
-    // 주간 7단계 (담담한 진척 톤)
-    final weekly = _resolveWeeklyTier(weeklyTotal);
-    // 월간 5단계 (월초~오늘 누적)
-    final monthly = _resolveMonthlyTier(_monthlyTotal);
+    // ── 달성률 기반 레벨 ─────────────────────────────────────
+    // 분모: 활성 루틴 수에 비례한 「가능한 최대 체크」
+    //   주간 = 활성 루틴 × 7
+    //   월간 = 활성 루틴 × 월초~오늘 일수
+    // 활성 루틴이 0 이면 분모 0 → tier 가 null 인 「루틴 추가 유도」 칩.
+    final activeRoutines = routines.length;
+    final today = DateTime.now();
+    final daysIntoMonth = today.day; // 1..31
+    final weeklyMax = activeRoutines * 7;
+    final monthlyMax = activeRoutines * daysIntoMonth;
+    final weeklyRate = weeklyMax > 0 ? weeklyTotal / weeklyMax : null;
+    final monthlyRate = monthlyMax > 0 ? _monthlyTotal / monthlyMax : null;
+    final weekly = _resolveWeeklyTier(weeklyRate);
+    final monthly = _resolveMonthlyTier(monthlyRate);
 
     // 흰 카드 + 1px 라인 → 다른 카드들과 톤 통일.
     // 상단: 주간/월간 두 레벨 칩 / 하단: 보조 수치(오늘 체크 · 이번 주 · 이번 달).
@@ -300,17 +310,17 @@ class _UserGoalContentState extends State<UserGoalContent>
               children: [
                 Expanded(
                   child: _LevelChip(
-                    medal: weekly.medal,
-                    title: weekly.title,
+                    tier: weekly,
                     suffix: '주간',
+                    rate: weeklyRate,
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: _LevelChip(
-                    medal: monthly.medal,
-                    title: monthly.title,
+                    tier: monthly,
                     suffix: '월간',
+                    rate: monthlyRate,
                   ),
                 ),
               ],
@@ -357,7 +367,7 @@ class _UserGoalContentState extends State<UserGoalContent>
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  '$weeklyTotal회',
+                  weeklyMax > 0 ? '$weeklyTotal/$weeklyMax' : '$weeklyTotal',
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -380,7 +390,7 @@ class _UserGoalContentState extends State<UserGoalContent>
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  '$_monthlyTotal회',
+                  monthlyMax > 0 ? '$_monthlyTotal/$monthlyMax' : '$_monthlyTotal',
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -395,24 +405,26 @@ class _UserGoalContentState extends State<UserGoalContent>
     );
   }
 
-  // ── 레벨 산출 (주간 7단계 / 월간 5단계) ──────────────────────
-  // 임계치는 「루틴 최대 3개 × 7일 = 21회/주」 분포에 맞춰 7단계로 잘게,
-  // 월간은 4주 누적 추세를 5단계로 담담하게.
-  static _Tier _resolveWeeklyTier(int total) {
-    if (total >= 18) return const _Tier('빛나는 한 주', '💎');
-    if (total >= 14) return const _Tier('결이 잡힘', '🥇');
-    if (total >= 10) return const _Tier('단단해지는 중', '🥈');
-    if (total >= 6) return const _Tier('흐름 좋음', '🥈');
-    if (total >= 3) return const _Tier('페이스 잡힘', '🥉');
-    if (total >= 1) return const _Tier('시작', '🥉');
+  // ── 레벨 산출 (달성률 기반, 루틴 개수에 공평) ──────────────
+  // 분모(활성 루틴 × 기간일수) 가 0 이면 null 을 반환 → 칩이 「루틴 추가
+  // 유도」 톤으로 바뀐다.
+  static _Tier? _resolveWeeklyTier(double? rate) {
+    if (rate == null) return null;
+    if (rate >= 0.90) return const _Tier('빛나는 한 주', '💎');
+    if (rate >= 0.70) return const _Tier('결이 잡힘', '🥇');
+    if (rate >= 0.50) return const _Tier('단단해지는 중', '🥈');
+    if (rate >= 0.30) return const _Tier('흐름 좋음', '🥈');
+    if (rate >= 0.15) return const _Tier('페이스 잡힘', '🥉');
+    if (rate > 0) return const _Tier('시작', '🥉');
     return const _Tier('시작 전', '▫️');
   }
 
-  static _Tier _resolveMonthlyTier(int total) {
-    if (total >= 26) return const _Tier('결이 단단해진 달', '💎');
-    if (total >= 18) return const _Tier('단단해지는 중', '🥇');
-    if (total >= 10) return const _Tier('흐름 좋음', '🥈');
-    if (total >= 4) return const _Tier('페이스 잡힘', '🥉');
+  static _Tier? _resolveMonthlyTier(double? rate) {
+    if (rate == null) return null;
+    if (rate >= 0.75) return const _Tier('결이 단단해진 달', '💎');
+    if (rate >= 0.50) return const _Tier('단단해지는 중', '🥇');
+    if (rate >= 0.25) return const _Tier('흐름 좋음', '🥈');
+    if (rate > 0) return const _Tier('페이스 잡힘', '🥉');
     return const _Tier('시작', '▫️');
   }
 
@@ -537,7 +549,7 @@ class _UserGoalContentState extends State<UserGoalContent>
       shrinkWrap: true,
       padding: const EdgeInsets.symmetric(horizontal: 24),
       itemCount: items.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         return _currentTab == 0
             ? _buildRoutineCard(items[index])
@@ -599,10 +611,11 @@ class _UserGoalContentState extends State<UserGoalContent>
     final weeklyTarget = goal.weeklyTarget;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      // 상하 압축: 16 → 12. 카드 사이 빈 여백을 줄여 한 화면 정보량↑.
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: isCheckedToday ? _kSuccess.withOpacity(0.1) : AppColors.white,
-        borderRadius: BorderRadius.circular(16),
+        color: isCheckedToday ? _kSuccess.withOpacity(0.08) : AppColors.white,
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color:
               isCheckedToday
@@ -610,44 +623,54 @@ class _UserGoalContentState extends State<UserGoalContent>
                   : _kShadow2.withOpacity(0.4),
           width: 0.5,
         ),
+        // 그림자도 살짝 가볍게.
         boxShadow: [
           BoxShadow(
-            color: _kShadow2.withOpacity(0.15),
-            blurRadius: 12,
-            offset: const Offset(0, 3),
+            color: _kShadow2.withOpacity(0.10),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 상단: 제목 + 배지 + 삭제
+          // ── 상단: 제목 + 배지 + 진행 분수 + 삭제 ──
+          // 진행 분수(1/7)를 같은 줄 우측에 두면 시각적 계층이 명확하고
+          // 카드 높이가 한 줄 줄어든다.
           Row(
             children: [
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       goal.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
                         color: _kText,
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Row(
                       children: [
                         _buildBadge('루틴', _kAccent),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: 4),
                         _buildBadge(goal.periodLabel, _kShadow2),
                         const SizedBox(width: 6),
-                        Text(
-                          goal.frequencyText,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: _kText.withOpacity(0.5),
+                        Flexible(
+                          child: Text(
+                            goal.frequencyText,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: _kText.withOpacity(0.5),
+                            ),
                           ),
                         ),
                       ],
@@ -655,29 +678,52 @@ class _UserGoalContentState extends State<UserGoalContent>
                   ],
                 ),
               ),
+              const SizedBox(width: 8),
+              Text(
+                '$weeklyCount/$weeklyTarget',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: _kText.withOpacity(0.7),
+                ),
+              ),
+              const SizedBox(width: 6),
               GestureDetector(
                 onTap: () => _deleteGoal(goal),
                 child: Icon(
                   Icons.delete_outline,
-                  size: 20,
-                  color: _kText.withOpacity(0.4),
+                  size: 18,
+                  color: _kText.withOpacity(0.35),
                 ),
               ),
             ],
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
 
-          // 오늘 체크 버튼 (가장 중요)
-          // 체크된 상태는 「확정된 성과」를 바로 인식할 수 있도록 솔리드 톤
-          // (진한 초록 배경 + 흰 텍스트) — 큰 면적의 옅은 그린은 가독성↓.
+          // ── 진행률 슬림 바 ──
+          ClipRRect(
+            borderRadius: BorderRadius.circular(2),
+            child: LinearProgressIndicator(
+              value: weeklyTarget > 0 ? weeklyCount / weeklyTarget : 0,
+              backgroundColor: _kShadow2.withOpacity(0.25),
+              valueColor: AlwaysStoppedAnimation(_kSuccess),
+              minHeight: 4,
+            ),
+          ),
+
+          const SizedBox(height: 10),
+
+          // ── 오늘 체크 버튼 ──
+          // 체크된 상태는 솔리드 톤(진한 초록 배경 + 흰 텍스트)으로 「확정된
+          // 성과」를 바로 인식.
           GestureDetector(
             onTap: () => _toggleRoutineCheck(goal),
             child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 12),
+              padding: const EdgeInsets.symmetric(vertical: 9),
               decoration: BoxDecoration(
                 color: isCheckedToday ? _kSuccess : AppColors.white,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
                 border: Border.all(
                   color: isCheckedToday
                       ? _kSuccess
@@ -695,13 +741,13 @@ class _UserGoalContentState extends State<UserGoalContent>
                     color: isCheckedToday
                         ? _kSuccessOn
                         : _kText.withOpacity(0.6),
-                    size: 20,
+                    size: 18,
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   Text(
                     isCheckedToday ? '오늘 했어요' : '오늘 하기',
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: isCheckedToday
                           ? _kSuccessOn
@@ -712,61 +758,18 @@ class _UserGoalContentState extends State<UserGoalContent>
               ),
             ),
           ),
-
-          const SizedBox(height: 12),
-
-          // 진행률
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          '이번 주',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: _kText.withOpacity(0.6),
-                          ),
-                        ),
-                        const Spacer(),
-                        Text(
-                          '$weeklyCount/$weeklyTarget',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: _kText,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    LinearProgressIndicator(
-                      value: weeklyTarget > 0 ? weeklyCount / weeklyTarget : 0,
-                      backgroundColor: _kShadow2.withOpacity(0.3),
-                      valueColor: AlwaysStoppedAnimation(_kSuccess),
-                      minHeight: 6,
-                      borderRadius: BorderRadius.circular(3),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );
   }
 
-  /// 프로젝트 카드
+  /// 프로젝트 카드 — 루틴과 같은 압축 톤(상하 패딩 12, 배지·마감 한 줄).
   Widget _buildProjectCard(UserGoal goal) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: goal.isDone ? _kSuccess.withOpacity(0.1) : AppColors.white,
-        borderRadius: BorderRadius.circular(16),
+        color: goal.isDone ? _kSuccess.withOpacity(0.08) : AppColors.white,
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color:
               goal.isDone
@@ -776,98 +779,92 @@ class _UserGoalContentState extends State<UserGoalContent>
         ),
         boxShadow: [
           BoxShadow(
-            color: _kShadow2.withOpacity(0.15),
-            blurRadius: 12,
-            offset: const Offset(0, 3),
+            color: _kShadow2.withOpacity(0.10),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 상단: 제목 + 배지 + 삭제
+          // ── 상단: 제목 + 배지 + 마감 + 삭제 ──
+          // 마감 안내(아이콘 + 텍스트)를 같은 줄 우측에 압축 배치.
           Row(
             children: [
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       goal.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
                         color: _kText,
                         decoration:
                             goal.isDone ? TextDecoration.lineThrough : null,
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Row(
                       children: [
                         _buildBadge('프로젝트', _kAccent),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: 4),
                         _buildBadge(goal.periodLabel, _kShadow2),
                         if (goal.isDone) ...[
-                          const SizedBox(width: 6),
-                          _buildBadge('완료됨', _kSuccess),
+                          const SizedBox(width: 4),
+                          _buildBadge('완료', _kSuccess),
                         ],
                       ],
                     ),
                   ],
                 ),
               ),
+              if (!goal.isDone) ...[
+                Icon(
+                  Icons.schedule,
+                  size: 13,
+                  color: _kText.withOpacity(0.5),
+                ),
+                const SizedBox(width: 3),
+                Flexible(
+                  child: Text(
+                    goal.deadlineText,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: _kText.withOpacity(0.6),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+              ],
               GestureDetector(
                 onTap: () => _deleteGoal(goal),
                 child: Icon(
                   Icons.delete_outline,
-                  size: 20,
-                  color: _kText.withOpacity(0.4),
+                  size: 18,
+                  color: _kText.withOpacity(0.35),
                 ),
               ),
             ],
           ),
 
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
 
-          // 마감 안내
-          if (!goal.isDone)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: _kAccent.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.schedule,
-                    size: 14,
-                    color: _kText.withOpacity(0.6),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    goal.deadlineText,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: _kText.withOpacity(0.7),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-          const SizedBox(height: 12),
-
-          // 완료 토글 — 「오늘 했어요」와 동일하게 솔리드 그린 패턴.
+          // ── 완료 토글 ──
           GestureDetector(
             onTap: () => _toggleProjectDone(goal),
             child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 12),
+              padding: const EdgeInsets.symmetric(vertical: 9),
               decoration: BoxDecoration(
                 color: goal.isDone ? _kSuccess : AppColors.white,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
                 border: Border.all(
                   color: goal.isDone
                       ? _kSuccess
@@ -885,13 +882,13 @@ class _UserGoalContentState extends State<UserGoalContent>
                     color: goal.isDone
                         ? _kSuccessOn
                         : _kText.withOpacity(0.6),
-                    size: 20,
+                    size: 18,
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   Text(
                     goal.isDone ? '완료됨' : '완료 체크',
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: goal.isDone
                           ? _kSuccessOn
@@ -1062,20 +1059,68 @@ class _Tier {
   final String medal;
 }
 
-/// 요약 카드 상단의 레벨 칩 — 메달 + 칭호 + 우측의 작은 「주간/월간」 라벨.
+/// 요약 카드 상단의 레벨 칩 — 메달 + 칭호 + 우측의 작은 「주간/월간 N%」 라벨.
+///
+/// [tier] 가 null 이면 「루틴 추가 유도」 톤으로 자동 전환.
 class _LevelChip extends StatelessWidget {
   const _LevelChip({
-    required this.medal,
-    required this.title,
+    required this.tier,
     required this.suffix,
+    required this.rate,
   });
 
-  final String medal;
-  final String title;
+  final _Tier? tier;
   final String suffix;
+  final double? rate;
 
   @override
   Widget build(BuildContext context) {
+    final t = tier;
+    if (t == null) {
+      // 활성 루틴이 0개 → 분모가 없어 의미 있는 레벨이 안 나옴.
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceMuted,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            const Text('▫️', style: TextStyle(fontSize: 16)),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    suffix,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary.withOpacity(0.5),
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  const Text(
+                    '루틴을 추가해 보세요',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final pct = rate == null ? null : (rate! * 100).round();
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
@@ -1084,24 +1129,39 @@ class _LevelChip extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Text(medal, style: const TextStyle(fontSize: 16)),
+          Text(t.medal, style: const TextStyle(fontSize: 16)),
           const SizedBox(width: 6),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  suffix,
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary.withOpacity(0.5),
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      suffix,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary.withOpacity(0.5),
+                      ),
+                    ),
+                    if (pct != null) ...[
+                      const SizedBox(width: 4),
+                      Text(
+                        '· $pct%',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary.withOpacity(0.5),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
                 const SizedBox(height: 1),
                 Text(
-                  title,
+                  t.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
