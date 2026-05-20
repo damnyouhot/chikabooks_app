@@ -225,8 +225,8 @@ class UserGoals {
   /// 목표 개수
   int get count => items.length;
 
-  /// 추가 가능 여부 (최대 3개)
-  bool get canAdd => items.length < 3;
+  /// 추가 가능 여부 — 상한 없음(필요 시 클라이언트 UX 측면에서만 제한).
+  bool get canAdd => true;
 
   /// 루틴형 목표만
   List<UserGoal> get routines => items.where((g) => g.type == GoalType.routine).toList();

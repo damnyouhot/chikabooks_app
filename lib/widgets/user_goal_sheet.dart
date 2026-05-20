@@ -202,7 +202,7 @@ class _UserGoalContentState extends State<UserGoalContent>
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '최대 3개 · 루틴/프로젝트 · 오늘/주/월/연',
+                  '루틴/프로젝트 · 오늘/주/월/연',
                   style: TextStyle(
                     fontSize: 11,
                     color: _kText.withOpacity(0.5),
@@ -584,7 +584,7 @@ class _UserGoalContentState extends State<UserGoalContent>
             const Text('🎯', style: TextStyle(fontSize: 48)),
             const SizedBox(height: 16),
             const Text(
-              '이번 기간 목표는 딱 1~3개만.',
+              '챙기고 싶은 목표를 자유롭게 적어보세요.',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
@@ -1005,18 +1005,8 @@ class _UserGoalContentState extends State<UserGoalContent>
     }
   }
 
-  /// 목표 추가 폼
+  /// 목표 추가 폼 — 상한 없음.
   void _showAddGoalForm() {
-    if (!_goals!.canAdd) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('목표는 최대 3개까지예요.'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-
     Navigator.of(context).push(
       MaterialPageRoute(
         builder:

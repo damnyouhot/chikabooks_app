@@ -206,8 +206,43 @@ class _DiaryFeedTabState extends State<_DiaryFeedTab> {
   final List<XFile> _selectedImages = [];
   bool _isSaving = false;
 
+  /// 편집 중인 노트 ID. null 이면 신규 작성 모드.
+  String? _editingNoteId;
+
+  /// 편집 진입 시 기존에 저장돼 있던 이미지 URL 목록(읽기 전용).
+  /// 사용자가 그대로 두면 유지되고, 「사진 비우기」 버튼으로 모두 제거 가능.
+  List<String> _editingExistingUrls = const [];
+  bool _editingClearImages = false;
+
   static const int _maxImages = 3;
   static const int _maxLen = 500;
+
+  void _enterEdit({
+    required String noteId,
+    required String text,
+    required List<String> imageUrls,
+  }) {
+    setState(() {
+      _editingNoteId = noteId;
+      _editingExistingUrls = imageUrls;
+      _editingClearImages = false;
+      _selectedImages.clear();
+      _controller.text = text;
+      _controller.selection = TextSelection.collapsed(offset: text.length);
+    });
+    _focus.requestFocus();
+  }
+
+  void _cancelEdit() {
+    setState(() {
+      _editingNoteId = null;
+      _editingExistingUrls = const [];
+      _editingClearImages = false;
+      _selectedImages.clear();
+      _controller.clear();
+    });
+    FocusManager.instance.primaryFocus?.unfocus();
+  }
 
   @override
   void dispose() {
@@ -226,65 +261,134 @@ class _DiaryFeedTabState extends State<_DiaryFeedTab> {
 
   Future<void> _save() async {
     final text = _controller.text.trim();
-    if (text.isEmpty && _selectedImages.isEmpty) return;
+    final isEditing = _editingNoteId != null;
+    final keepingExistingImages =
+        isEditing && !_editingClearImages && _editingExistingUrls.isNotEmpty;
+    if (text.isEmpty &&
+        _selectedImages.isEmpty &&
+        !keepingExistingImages) {
+      return;
+    }
     FocusManager.instance.primaryFocus?.unfocus();
     setState(() => _isSaving = true);
     try {
       final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid == null) throw Exception('로그인 필요');
 
-      final docRef = FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .collection('notes')
-          .doc();
-      final noteId = docRef.id;
+      if (isEditing) {
+        // ── 수정 모드 ────────────────────────────────────────────
+        // 기존 첨부 이미지 처리:
+        // - 「비우기」 했으면 모두 삭제.
+        // - 사용자가 새 이미지를 추가했으면 기존 것 모두 삭제 후 새로 업로드
+        //   (mixed 케이스를 단순화. 부분 교체는 나중 라운드에서 고려).
+        final noteId = _editingNoteId!;
+        List<String> finalUrls = _editingExistingUrls;
 
-      List<String> imageUrls = [];
-      if (_selectedImages.isNotEmpty) {
-        imageUrls = await DiaryImageService.uploadAll(
-          uid: uid,
-          noteId: noteId,
-          files: _selectedImages,
+        if (_editingClearImages || _selectedImages.isNotEmpty) {
+          if (_editingExistingUrls.isNotEmpty) {
+            await DiaryImageService.deleteAll(
+              uid: uid,
+              noteId: noteId,
+              imageUrls: _editingExistingUrls,
+            );
+          }
+          if (_selectedImages.isNotEmpty) {
+            finalUrls = await DiaryImageService.uploadAll(
+              uid: uid,
+              noteId: noteId,
+              files: _selectedImages,
+            );
+          } else {
+            finalUrls = const [];
+          }
+        }
+
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .collection('notes')
+            .doc(noteId)
+            .update({
+          'text': text,
+          'imageUrls': finalUrls,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+
+        AdminActivityService.log(
+          ActivityEventType.noteSaveSuccess,
+          page: 'record_hub',
+          targetId: noteId,
+          extra: {
+            'mode': 'edit',
+            'imageCount': finalUrls.length,
+            'textLength': text.length,
+          },
+        );
+
+        if (!mounted) return;
+        _cancelEdit();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('수정됐어요.'),
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(milliseconds: 1500),
+          ),
+        );
+      } else {
+        // ── 신규 작성 모드 ──────────────────────────────────────
+        final docRef = FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .collection('notes')
+            .doc();
+        final noteId = docRef.id;
+
+        List<String> imageUrls = [];
+        if (_selectedImages.isNotEmpty) {
+          imageUrls = await DiaryImageService.uploadAll(
+            uid: uid,
+            noteId: noteId,
+            files: _selectedImages,
+          );
+        }
+
+        await docRef.set({
+          'text': text,
+          'imageUrls': imageUrls,
+          'createdAt': FieldValue.serverTimestamp(),
+          'visibility': 'private',
+        });
+
+        AdminActivityService.log(
+          ActivityEventType.noteSaveSuccess,
+          page: 'record_hub',
+          targetId: noteId,
+          extra: {
+            'mode': 'create',
+            'hasImages': imageUrls.isNotEmpty,
+            'imageCount': imageUrls.length,
+            'textLength': text.length,
+          },
+        );
+
+        widget.onCharacterMent(DiaryResponseService.getRandomResponse(text));
+
+        if (!mounted) return;
+        _controller.clear();
+        setState(() => _selectedImages.clear());
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('저장됐어요. 오늘도 한 줄 남겼네.'),
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(milliseconds: 1500),
+          ),
         );
       }
-
-      await docRef.set({
-        'text': text,
-        'imageUrls': imageUrls,
-        'createdAt': FieldValue.serverTimestamp(),
-        'visibility': 'private',
-      });
-
-      AdminActivityService.log(
-        ActivityEventType.noteSaveSuccess,
-        page: 'record_hub',
-        targetId: noteId,
-        extra: {
-          'hasImages': imageUrls.isNotEmpty,
-          'imageCount': imageUrls.length,
-          'textLength': text.length,
-        },
-      );
-
-      // 캐릭터 멘트 — 페이지가 닫힐 때 캐릭터에 흘려보낸다.
-      widget.onCharacterMent(DiaryResponseService.getRandomResponse(text));
-
-      if (!mounted) return;
-      _controller.clear();
-      setState(() => _selectedImages.clear());
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('저장됐어요. 오늘도 한 줄 남겼네.'),
-          behavior: SnackBarBehavior.floating,
-          duration: Duration(milliseconds: 1500),
-        ),
-      );
     } catch (e) {
       AdminActivityService.log(
         ActivityEventType.noteSaveFail,
         page: 'record_hub',
-        extra: {'error': e.toString()},
+        extra: {'error': e.toString(), 'mode': isEditing ? 'edit' : 'create'},
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -375,13 +479,21 @@ class _DiaryFeedTabState extends State<_DiaryFeedTab> {
                 itemBuilder: (context, i) {
                   final d = docs[i];
                   final m = d.data() as Map<String, dynamic>;
+                  final urls = _parseImageUrls(m);
+                  final txt = m['text'] as String? ?? '';
                   return _FeedCard(
                     noteId: d.id,
                     uid: uid,
-                    text: m['text'] as String? ?? '',
+                    text: txt,
                     mood: m['mood'] as String?,
                     createdAt: m['createdAt'] as Timestamp?,
-                    imageUrls: _parseImageUrls(m),
+                    imageUrls: urls,
+                    isEditing: _editingNoteId == d.id,
+                    onTapEdit: () => _enterEdit(
+                      noteId: d.id,
+                      text: txt,
+                      imageUrls: urls,
+                    ),
                   );
                 },
               );
@@ -395,8 +507,13 @@ class _DiaryFeedTabState extends State<_DiaryFeedTab> {
   }
 
   Widget _buildComposer() {
-    final canSave =
-        !_isSaving && (_controller.text.trim().isNotEmpty || _selectedImages.isNotEmpty);
+    final isEditing = _editingNoteId != null;
+    final keepingExistingImages =
+        isEditing && !_editingClearImages && _editingExistingUrls.isNotEmpty;
+    final canSave = !_isSaving &&
+        (_controller.text.trim().isNotEmpty ||
+            _selectedImages.isNotEmpty ||
+            keepingExistingImages);
     return Container(
       padding: EdgeInsets.fromLTRB(
         12,
@@ -413,6 +530,71 @@ class _DiaryFeedTabState extends State<_DiaryFeedTab> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // ── 「수정 중」 배너 ─────────────────────────────────────
+          if (isEditing)
+            Container(
+              margin: const EdgeInsets.only(bottom: 6),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.lime.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: AppColors.lime.withValues(alpha: 0.4),
+                  width: 0.5,
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.edit_outlined,
+                      size: 14, color: AppColors.textPrimary),
+                  const SizedBox(width: 6),
+                  const Text(
+                    '기록 수정 중',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  if (keepingExistingImages) ...[
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () =>
+                          setState(() => _editingClearImages = true),
+                      child: Row(
+                        children: const [
+                          Icon(Icons.image_not_supported_outlined,
+                              size: 12, color: AppColors.textSecondary),
+                          SizedBox(width: 3),
+                          Text(
+                            '사진 비우기',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textSecondary,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: _cancelEdit,
+                    child: const Text(
+                      '취소',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           if (_selectedImages.isNotEmpty)
             SizedBox(
               height: 56,
@@ -488,7 +670,9 @@ class _DiaryFeedTabState extends State<_DiaryFeedTab> {
                     maxLines: 4,
                     onChanged: (_) => setState(() {}),
                     decoration: const InputDecoration(
-                      hintText: '지금 마음을 한 문장으로 남겨볼까?',
+                      // 비어있을 때 우상단 「저장」 버튼 옆에 placeholder 가 같이
+                      // 보이면 시각적으로 산만하다는 피드백 → 안내 문구 제거.
+                      hintText: '',
                       counterText: '',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.all(Radius.circular(20)),
@@ -524,9 +708,9 @@ class _DiaryFeedTabState extends State<_DiaryFeedTab> {
                           color: AppColors.onCardEmphasis,
                         ),
                       )
-                    : const Text(
-                        '저장',
-                        style: TextStyle(
+                    : Text(
+                        isEditing ? '수정' : '저장',
+                        style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
                         ),
@@ -558,6 +742,8 @@ class _FeedCard extends StatelessWidget {
     required this.mood,
     required this.createdAt,
     required this.imageUrls,
+    required this.isEditing,
+    required this.onTapEdit,
   });
 
   final String noteId;
@@ -566,6 +752,8 @@ class _FeedCard extends StatelessWidget {
   final String? mood;
   final Timestamp? createdAt;
   final List<String> imageUrls;
+  final bool isEditing;
+  final VoidCallback onTapEdit;
 
   String _formatDate(Timestamp? ts) {
     if (ts == null) return '';
@@ -617,6 +805,7 @@ class _FeedCard extends StatelessWidget {
     return AppMutedCard(
       radius: AppRadius.lg,
       padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+      onTap: onTapEdit,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -632,6 +821,25 @@ class _FeedCard extends StatelessWidget {
                   color: AppColors.textSecondary,
                 ),
               ),
+              if (isEditing) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.lime.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    '수정 중',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
               const Spacer(),
               GestureDetector(
                 onTap: () => _confirmDelete(context),

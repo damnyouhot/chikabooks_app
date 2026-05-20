@@ -119,13 +119,8 @@ class UserGoalService {
     }
   }
 
-  /// 목표 저장 (최대 3개 검증)
+  /// 목표 저장 — 상한 없음.
   static Future<bool> saveGoals(List<UserGoal> items) async {
-    if (items.length > 3) {
-      debugPrint('⚠️ 목표는 최대 3개까지만 저장 가능');
-      return false;
-    }
-
     final goals = UserGoals(
       items: items,
       updatedAt: DateTime.now(),
@@ -169,11 +164,6 @@ class UserGoalService {
       }
 
       final goals = await loadGoals();
-      
-      if (!goals.canAdd) {
-        debugPrint('⚠️ 목표는 최대 3개까지만 추가 가능');
-        return false;
-      }
 
       final newGoal = UserGoal.create(
         title: title.trim(),
