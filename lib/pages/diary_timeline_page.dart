@@ -52,8 +52,7 @@ class DiaryTimelinePage extends StatelessWidget {
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            return Center(
-                child: Text('오류가 발생했습니다: ${snapshot.error}'));
+            return _buildErrorState(snapshot.error);
           }
           if (snapshot.connectionState == ConnectionState.waiting) {
             return Center(
@@ -102,6 +101,56 @@ class DiaryTimelinePage extends StatelessWidget {
             },
           );
         },
+      ),
+    );
+  }
+
+  /// 에러 상태 — 인덱스 빌드 중(`failed-precondition`)은 별도 메시지로 안내.
+  ///
+  /// 다른 일반 에러는 한 줄 간략히 보여주고, 자세한 내용은 디버그 콘솔로.
+  Widget _buildErrorState(Object? error) {
+    final raw = error?.toString() ?? '';
+    final isIndexBuilding =
+        raw.contains('failed-precondition') ||
+        raw.contains('requires an index');
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isIndexBuilding
+                  ? Icons.hourglass_top_rounded
+                  : Icons.error_outline_rounded,
+              size: 56,
+              color: AppColors.textDisabled,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              isIndexBuilding ? '잠시만요, 준비 중이에요' : '잠깐 문제가 생겼어요',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              isIndexBuilding
+                  ? '기록 정렬을 처음 준비하는 중이라 1~2분 정도 걸려요.\n조금 뒤에 다시 들어와 주세요.'
+                  : '잠시 뒤 다시 시도해 주세요.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+                height: 1.4,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
