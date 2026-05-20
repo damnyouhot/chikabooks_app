@@ -112,7 +112,7 @@ List<InlineSpan> buildInlineStickerSpans(
 /// - 두 기능을 한 화면에 섞지 않고 **세그먼트로 명확히 분리**한다:
 ///   - 「오늘, 지금」: 트위터식 자기 글 피드 + 하단 고정 입력 바
 ///     (별도 「지난 기록」 진입이 필요 없음 — 화면 자체가 피드)
-///   - 「목표, 리마인드」: 기존 [UserGoalContent] 그대로 임베드
+///   - 「목표」: 기존 [UserGoalContent] 그대로 임베드
 ///
 /// 마지막으로 선택한 탭은 SharedPreferences 에 저장되어 다음 진입 시 복원된다.
 /// 페이지가 닫힐 때 발생한 마지막 캐릭터 멘트를 [push] 결과로 반환한다.
@@ -148,7 +148,7 @@ class _RecordHubPage extends StatefulWidget {
 }
 
 class _RecordHubPageState extends State<_RecordHubPage> {
-  /// 0 = 오늘, 지금 / 1 = 목표, 리마인드
+  /// 0 = 오늘, 지금 / 1 = 목표
   late int _index = widget.initialTab;
 
   /// 페이지가 닫힐 때 캐릭터 말풍선으로 노출할 마지막 멘트.
@@ -264,7 +264,7 @@ class _RecordHubPageState extends State<_RecordHubPage> {
               onTap: () => _selectTab(0),
             ),
             _SegmentTab(
-              label: '목표, 리마인드',
+              label: '목표',
               icon: Icons.flag_outlined,
               selected: _index == 1,
               onTap: () => _selectTab(1),
@@ -577,11 +577,8 @@ class _DiaryFeedTabState extends State<_DiaryFeedTab> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: const [
-                          Icon(Icons.edit_note_outlined,
-                              size: 48, color: AppColors.textDisabled),
-                          SizedBox(height: AppSpacing.md),
                           Text(
-                            '아직 기록이 없어요',
+                            '기억해야 할 지금을 남겨보세요',
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w700,
@@ -590,7 +587,7 @@ class _DiaryFeedTabState extends State<_DiaryFeedTab> {
                           ),
                           SizedBox(height: 6),
                           Text(
-                            '아래에 한 줄을 남겨보세요.',
+                            '나만 볼 수 있어요',
                             style: TextStyle(
                               fontSize: 13,
                               color: AppColors.textSecondary,

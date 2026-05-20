@@ -108,9 +108,9 @@ class _GoalAddFormState extends State<GoalAddForm> {
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(
           AppSpacing.xl,
-          AppSpacing.md,
+          AppSpacing.sm,
           AppSpacing.xl,
-          AppSpacing.xxl + AppSpacing.lg,
+          AppSpacing.lg + AppSpacing.md,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -128,7 +128,7 @@ class _GoalAddFormState extends State<GoalAddForm> {
                       type: GoalType.routine,
                     ),
                   ),
-                  const SizedBox(width: AppSpacing.md),
+                  const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: _buildTypeChip(
                       title: '프로젝트',
@@ -140,7 +140,7 @@ class _GoalAddFormState extends State<GoalAddForm> {
                 ],
               ),
             ),
-            const SizedBox(height: AppSpacing.lg),
+            const SizedBox(height: AppSpacing.sm),
 
             // ── 2) 목표 내용 ───────────────────────────────────
             _SectionCard(
@@ -149,20 +149,20 @@ class _GoalAddFormState extends State<GoalAddForm> {
                 controller: _titleController,
                 maxLength: 60,
                 onChanged: (_) => setState(() {}),
-                style: const TextStyle(fontSize: 14),
+                style: const TextStyle(fontSize: 13),
                 decoration: InputDecoration(
                   hintText: _selectedType == GoalType.routine
                       ? '예) 잠들기 전 책 5쪽 읽기'
                       : '예) 보험청구 강의 듣기',
                   hintStyle: const TextStyle(
                     color: AppColors.textDisabled,
-                    fontSize: 14,
+                    fontSize: 13,
                   ),
                   filled: true,
                   fillColor: AppColors.white,
                   isDense: true,
                   contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 12),
+                      horizontal: 12, vertical: 10),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppRadius.md),
                     borderSide: BorderSide.none,
@@ -185,24 +185,29 @@ class _GoalAddFormState extends State<GoalAddForm> {
                 ),
               ),
             ),
-            const SizedBox(height: AppSpacing.lg),
+            const SizedBox(height: AppSpacing.sm),
 
             // ── 3-R) (루틴 전용) 기간 ─────────────────────────
             if (_selectedType == GoalType.routine) ...[
               _SectionCard(
                 title: '기간',
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                child: Row(
                   children: [
-                    _buildPeriodChip('오늘', PeriodType.day),
-                    _buildPeriodChip('주간', PeriodType.week),
-                    _buildPeriodChip('월간', PeriodType.month),
-                    _buildPeriodChip('연간', PeriodType.year),
+                    Expanded(
+                        child: _buildPeriodChip('오늘', PeriodType.day)),
+                    const SizedBox(width: 6),
+                    Expanded(
+                        child: _buildPeriodChip('주간', PeriodType.week)),
+                    const SizedBox(width: 6),
+                    Expanded(
+                        child: _buildPeriodChip('월간', PeriodType.month)),
+                    const SizedBox(width: 6),
+                    Expanded(
+                        child: _buildPeriodChip('연간', PeriodType.year)),
                   ],
                 ),
               ),
-              const SizedBox(height: AppSpacing.lg),
+              const SizedBox(height: AppSpacing.sm),
             ],
 
             // ── 3-P) (프로젝트 전용) 마감일 ──────────────────
@@ -216,7 +221,7 @@ class _GoalAddFormState extends State<GoalAddForm> {
                         onTap: _pickDeadline,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 14),
+                              horizontal: 12, vertical: 10),
                           decoration: BoxDecoration(
                             color: AppColors.white,
                             borderRadius:
@@ -243,7 +248,7 @@ class _GoalAddFormState extends State<GoalAddForm> {
                                     ? '날짜 선택'
                                     : '${_deadline!.year}년 ${_deadline!.month}월 ${_deadline!.day}일',
                                 style: TextStyle(
-                                  fontSize: 14,
+                                  fontSize: 13,
                                   color: _deadline == null
                                       ? AppColors.textDisabled
                                       : AppColors.textPrimary,
@@ -280,53 +285,23 @@ class _GoalAddFormState extends State<GoalAddForm> {
                   ],
                 ),
               ),
-              const SizedBox(height: AppSpacing.lg),
+              const SizedBox(height: AppSpacing.sm),
             ],
 
             // ── 4-R) (루틴 전용) 빈도 ─────────────────────────
             if (_selectedType == GoalType.routine) ...[
               _SectionCard(
                 title: '빈도 (주 몇 회?)',
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: List.generate(7, (i) {
-                    final target = i + 1;
-                    final isSelected = _weeklyTarget == target;
-                    return GestureDetector(
-                      onTap: () => setState(() => _weeklyTarget = target),
-                      child: Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? AppColors.lime
-                              : AppColors.white,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: isSelected
-                                ? AppColors.lime
-                                : AppColors.divider,
-                            width: isSelected ? 1.5 : 1,
-                          ),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          '$target',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                            color: isSelected
-                                ? AppColors.onCardEmphasis
-                                : AppColors.textPrimary,
-                          ),
-                        ),
-                      ),
-                    );
-                  }),
+                child: Row(
+                  children: [
+                    for (int i = 0; i < 7; i++) ...[
+                      if (i > 0) const SizedBox(width: 6),
+                      Expanded(child: _buildFrequencyCircle(i + 1)),
+                    ],
+                  ],
                 ),
               ),
-              const SizedBox(height: AppSpacing.lg),
+              const SizedBox(height: AppSpacing.sm),
             ],
 
             // ── 4-P) (프로젝트 전용) 체크포인트 ──────────────
@@ -337,7 +312,7 @@ class _GoalAddFormState extends State<GoalAddForm> {
                     const Text(
                       '체크포인트',
                       style: TextStyle(
-                        fontSize: 15,
+                        fontSize: 13,
                         fontWeight: FontWeight.w700,
                         color: AppColors.textPrimary,
                       ),
@@ -393,11 +368,11 @@ class _GoalAddFormState extends State<GoalAddForm> {
                         color: AppColors.textDisabled,
                       ),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 8),
                     if (_checkpointControllers.isEmpty)
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 14),
+                            horizontal: 12, vertical: 10),
                         decoration: BoxDecoration(
                           color: AppColors.white,
                           borderRadius: BorderRadius.circular(AppRadius.md),
@@ -488,14 +463,16 @@ class _GoalAddFormState extends State<GoalAddForm> {
                   ],
                 ),
               ),
-              const SizedBox(height: AppSpacing.lg),
+              const SizedBox(height: AppSpacing.sm),
             ],
 
             // ── 5) 추가 버튼 ──────────────────────────────────
-            const SizedBox(height: AppSpacing.lg),
+            const SizedBox(height: AppSpacing.md),
             AppPrimaryButton(
               label: '추가하기',
               onPressed: _addGoal,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              fontSize: 13,
             ),
           ],
         ),
@@ -522,8 +499,7 @@ class _GoalAddFormState extends State<GoalAddForm> {
       }),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 120),
-        padding: const EdgeInsets.symmetric(
-            horizontal: 14, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.lime : AppColors.white,
           borderRadius: BorderRadius.circular(AppRadius.md),
@@ -537,16 +513,16 @@ class _GoalAddFormState extends State<GoalAddForm> {
           children: [
             Icon(
               icon,
-              size: 20,
+              size: 16,
               color: isSelected
                   ? AppColors.onCardEmphasis
                   : AppColors.textPrimary,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             Text(
               title,
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 13,
                 fontWeight: FontWeight.w800,
                 color: isSelected
                     ? AppColors.onCardEmphasis
@@ -557,7 +533,7 @@ class _GoalAddFormState extends State<GoalAddForm> {
             Text(
               subtitle,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 10,
                 color: isSelected
                     ? AppColors.onCardEmphasis.withValues(alpha: 0.8)
                     : AppColors.textDisabled,
@@ -575,8 +551,7 @@ class _GoalAddFormState extends State<GoalAddForm> {
       onTap: () => setState(() => _selectedPeriod = type),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 120),
-        padding: const EdgeInsets.symmetric(
-            horizontal: 16, vertical: 10),
+        padding: const EdgeInsets.symmetric(vertical: 8),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.lime : AppColors.white,
           borderRadius: BorderRadius.circular(AppRadius.md),
@@ -585,14 +560,54 @@ class _GoalAddFormState extends State<GoalAddForm> {
             width: isSelected ? 1.5 : 1,
           ),
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: isSelected
-                ? AppColors.onCardEmphasis
-                : AppColors.textPrimary,
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: isSelected
+                  ? AppColors.onCardEmphasis
+                  : AppColors.textPrimary,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 빈도 원 — 목표 탭 루틴 체크 버튼(최대 34px)과 비슷한 크기.
+  Widget _buildFrequencyCircle(int target) {
+    final isSelected = _weeklyTarget == target;
+    return GestureDetector(
+      onTap: () => setState(() => _weeklyTarget = target),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 34, maxHeight: 34),
+          child: AspectRatio(
+            aspectRatio: 1,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: isSelected ? AppColors.lime : AppColors.white,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isSelected ? AppColors.lime : AppColors.divider,
+                  width: isSelected ? 1.5 : 1,
+                ),
+              ),
+              child: Center(
+                child: Text(
+                  '$target',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: isSelected
+                        ? AppColors.onCardEmphasis
+                        : AppColors.textPrimary,
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -683,7 +698,10 @@ class _SectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppMutedCard(
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 14,
+        vertical: 12,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -693,12 +711,12 @@ class _SectionCard extends StatelessWidget {
             Text(
               title!,
               style: const TextStyle(
-                fontSize: 15,
+                fontSize: 13,
                 fontWeight: FontWeight.w700,
                 color: AppColors.textPrimary,
               ),
             ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           child,
         ],
       ),

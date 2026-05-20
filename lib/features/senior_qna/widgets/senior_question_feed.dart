@@ -219,7 +219,7 @@ class _Composer extends StatelessWidget {
               const SizedBox(width: AppSpacing.sm),
               const Expanded(
                 child: Text(
-                  '선배나 동료에게 조언을 구해봐요',
+                  '동료들과 편하게 이야기 나눠요',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
@@ -243,7 +243,7 @@ class _Composer extends StatelessWidget {
               color: AppColors.textPrimary,
             ),
             decoration: InputDecoration(
-              hintText: '예: 면접에서 이런 질문을 받으면 어떻게 답하면 좋을까요?',
+              hintText: '점심 뭐 먹을까?',
               hintStyle: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,

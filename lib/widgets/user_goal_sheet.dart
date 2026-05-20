@@ -56,10 +56,7 @@ class _UserGoalContentState extends State<UserGoalContent>
   static const _kAccent = AppColors.accent;
   static const _kText = AppColors.textPrimary;
   static const _kShadow2 = AppColors.divider;
-  // 목표 시트 전용 그린 — 흰 배경 위에서 텍스트 가독성을 위해 더 진한 톤.
-  // 전역 [AppColors.success] 는 형광 톤이라 큰 면적에서 글자 콘트라스트가 낮음.
-  static const _kSuccess = Color(0xFF1F8A4C);
-  static const _kSuccessOn = Color(0xFFFFFFFF); // 솔리드 버튼 위 텍스트(흰색)
+  // 루틴·프로젝트 체크/진행 강조 — 앱 블루(accent) + onAccent(흰색).
 
   UserGoals? _goals;
   RoutineCheck? _todayCheck;
@@ -183,7 +180,7 @@ class _UserGoalContentState extends State<UserGoalContent>
 
   /// 헤더 (제목 + 추가 버튼)
   ///
-  /// 허브 임베드 모드에서는 시트 헤더와 세그먼트 라벨에 이미 「목표, 리마인드」
+  /// 허브 임베드 모드에서는 시트 헤더와 세그먼트 라벨에 이미 「목표」
   /// 가 노출되므로 본문 타이틀/부제는 숨겨 중복을 줄이고, 우측 「+ 추가」 컨트롤만 살린다.
   Widget _buildHeader() {
     return Padding(
@@ -330,7 +327,7 @@ class _UserGoalContentState extends State<UserGoalContent>
             Icon(
               Icons.check_circle_outline,
               size: 14,
-              color: _kSuccess,
+              color: _kAccent,
             ),
             const SizedBox(width: 4),
             Text(
@@ -666,16 +663,15 @@ class _UserGoalContentState extends State<UserGoalContent>
 
     // ── 60% 더 압축한 1행 레이아웃 ───────────────────────────
     // [원형 체크] [ 제목/배지·빈도 / 진행바 ]   [N/M]   [🗑]
-    // 카드 한 장 높이가 약 60px 수준. 「오늘 했어요」 의 초록 솔리드 강조는
-    // 좌측 원형 체크 버튼이 그대로 가져간다(체크 시 진한 그린 채우기).
+    // 카드 한 장 높이가 약 60px 수준. 체크 시 앱 블루 솔리드 원형 버튼.
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: isCheckedToday ? _kSuccess.withOpacity(0.07) : AppColors.white,
+        color: isCheckedToday ? _kAccent.withOpacity(0.07) : AppColors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isCheckedToday
-              ? _kSuccess.withOpacity(0.35)
+              ? _kAccent.withOpacity(0.35)
               : _kShadow2.withOpacity(0.4),
           width: 0.5,
         ),
@@ -698,11 +694,11 @@ class _UserGoalContentState extends State<UserGoalContent>
               width: 34,
               height: 34,
               decoration: BoxDecoration(
-                color: isCheckedToday ? _kSuccess : Colors.transparent,
+                color: isCheckedToday ? _kAccent : Colors.transparent,
                 shape: BoxShape.circle,
                 border: Border.all(
                   color: isCheckedToday
-                      ? _kSuccess
+                      ? _kAccent
                       : _kAccent.withOpacity(0.45),
                   width: 1.4,
                 ),
@@ -711,7 +707,7 @@ class _UserGoalContentState extends State<UserGoalContent>
                 isCheckedToday ? Icons.check : Icons.check,
                 size: 18,
                 color: isCheckedToday
-                    ? _kSuccessOn
+                    ? AppColors.onAccent
                     : _kText.withOpacity(0.25),
               ),
             ),
@@ -731,9 +727,11 @@ class _UserGoalContentState extends State<UserGoalContent>
                         goal.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: isCheckedToday
+                              ? FontWeight.w800
+                              : FontWeight.w700,
                           color: _kText,
                         ),
                       ),
@@ -750,7 +748,12 @@ class _UserGoalContentState extends State<UserGoalContent>
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 10,
-                          color: _kText.withOpacity(0.45),
+                          fontWeight: isCheckedToday
+                              ? FontWeight.w600
+                              : FontWeight.w500,
+                          color: isCheckedToday
+                              ? _kAccent.withOpacity(0.9)
+                              : _kText.withOpacity(0.45),
                         ),
                       ),
                     ),
@@ -762,7 +765,7 @@ class _UserGoalContentState extends State<UserGoalContent>
                   child: LinearProgressIndicator(
                     value: weeklyTarget > 0 ? weeklyCount / weeklyTarget : 0,
                     backgroundColor: _kShadow2.withOpacity(0.25),
-                    valueColor: AlwaysStoppedAnimation(_kSuccess),
+                    valueColor: AlwaysStoppedAnimation(_kAccent),
                     minHeight: 3,
                   ),
                 ),
@@ -780,8 +783,10 @@ class _UserGoalContentState extends State<UserGoalContent>
                 '$weeklyCount/$weeklyTarget',
                 style: TextStyle(
                   fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: _kText.withOpacity(0.7),
+                  fontWeight: FontWeight.w800,
+                  color: isCheckedToday
+                      ? _kAccent
+                      : _kText.withOpacity(0.7),
                 ),
               ),
               const SizedBox(height: 2),
@@ -820,11 +825,11 @@ class _UserGoalContentState extends State<UserGoalContent>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: goal.isDone ? _kSuccess.withOpacity(0.07) : AppColors.white,
+        color: goal.isDone ? _kAccent.withOpacity(0.07) : AppColors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: goal.isDone
-              ? _kSuccess.withOpacity(0.35)
+              ? _kAccent.withOpacity(0.35)
               : _kShadow2.withOpacity(0.4),
           width: 0.5,
         ),
@@ -851,11 +856,11 @@ class _UserGoalContentState extends State<UserGoalContent>
                   width: 34,
                   height: 34,
                   decoration: BoxDecoration(
-                    color: goal.isDone ? _kSuccess : Colors.transparent,
+                    color: goal.isDone ? _kAccent : Colors.transparent,
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: goal.isDone
-                          ? _kSuccess
+                          ? _kAccent
                           : _kAccent.withOpacity(0.45),
                       width: 1.4,
                     ),
@@ -864,7 +869,7 @@ class _UserGoalContentState extends State<UserGoalContent>
                     Icons.check,
                     size: 18,
                     color: goal.isDone
-                        ? _kSuccessOn
+                        ? AppColors.onAccent
                         : _kText.withOpacity(0.25),
                   ),
                 ),
@@ -896,7 +901,7 @@ class _UserGoalContentState extends State<UserGoalContent>
                         _buildBadge('프로젝트', _kAccent),
                         if (goal.isDone) ...[
                           const SizedBox(width: 4),
-                          _buildBadge('완료', _kSuccess),
+                          _buildBadge('완료', _kAccent),
                         ],
                       ],
                     ),
@@ -965,7 +970,7 @@ class _UserGoalContentState extends State<UserGoalContent>
                       value: progress ?? 0,
                       minHeight: 4,
                       backgroundColor: _kShadow2.withOpacity(0.2),
-                      valueColor: AlwaysStoppedAnimation(_kSuccess),
+                      valueColor: AlwaysStoppedAnimation(_kAccent),
                     ),
                   ),
                 ),
@@ -994,12 +999,12 @@ class _UserGoalContentState extends State<UserGoalContent>
                           horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: cp.done
-                            ? _kSuccess.withOpacity(0.15)
+                            ? _kAccent.withOpacity(0.15)
                             : AppColors.white,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: cp.done
-                              ? _kSuccess.withOpacity(0.45)
+                              ? _kAccent.withOpacity(0.45)
                               : _kShadow2.withOpacity(0.4),
                           width: 0.6,
                         ),
@@ -1013,7 +1018,7 @@ class _UserGoalContentState extends State<UserGoalContent>
                                 : Icons.radio_button_unchecked,
                             size: 14,
                             color: cp.done
-                                ? _kSuccessOn
+                                ? AppColors.onAccent
                                 : _kText.withOpacity(0.5),
                           ),
                           const SizedBox(width: 5),
@@ -1023,7 +1028,7 @@ class _UserGoalContentState extends State<UserGoalContent>
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
                               color: cp.done
-                                  ? _kSuccessOn
+                                  ? AppColors.onAccent
                                   : _kText.withOpacity(0.9),
                               decoration: cp.done
                                   ? TextDecoration.lineThrough
@@ -1049,12 +1054,12 @@ class _UserGoalContentState extends State<UserGoalContent>
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
                   color: goal.touchedToday
-                      ? _kSuccess.withOpacity(0.14)
+                      ? _kAccent.withOpacity(0.14)
                       : _kAccent.withOpacity(0.08),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
                     color: goal.touchedToday
-                        ? _kSuccess.withOpacity(0.5)
+                        ? _kAccent.withOpacity(0.5)
                         : _kAccent.withOpacity(0.35),
                     width: 0.8,
                   ),
@@ -1067,7 +1072,7 @@ class _UserGoalContentState extends State<UserGoalContent>
                           : Icons.bolt_outlined,
                       size: 16,
                       color: goal.touchedToday
-                          ? _kSuccessOn
+                          ? AppColors.onAccent
                           : _kText.withOpacity(0.75),
                     ),
                     const SizedBox(width: 6),
@@ -1079,7 +1084,7 @@ class _UserGoalContentState extends State<UserGoalContent>
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
                         color: goal.touchedToday
-                            ? _kSuccessOn
+                            ? AppColors.onAccent
                             : _kText.withOpacity(0.88),
                       ),
                     ),
