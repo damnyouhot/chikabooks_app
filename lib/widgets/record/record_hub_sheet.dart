@@ -1,99 +1,67 @@
+import 'dart:io';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
-import '../../core/widgets/app_modal_scaffold.dart';
-import '../../pages/diary_timeline_page.dart';
+import '../../core/widgets/app_confirm_modal.dart';
+import '../../core/widgets/app_muted_card.dart';
 import '../../services/admin_activity_service.dart';
+import '../../services/diary_image_service.dart';
 import '../diary_input_sheet.dart';
 import '../user_goal_sheet.dart';
 
-/// 시트가 닫힐 때 부모에게 전달되는 결과.
+/// 「기록하기」 통합 풀스크린 페이지 (B안 — 기존 BottomSheet 에서 페이지로 승격)
 ///
-/// - [characterMent]: 캐릭터 말풍선으로 흘려보낼 마지막 멘트.
-/// - [openPastRecords]: true 이면 호출자가 시트를 닫은 직후
-///   [DiaryTimelinePage]를 띄워야 함. 타임라인이 닫히면 다시 시트를 열어
-///   사용자가 「지난 기록」 → 뒤로가기 흐름을 자연스럽게 쓸 수 있게 한다.
-class RecordHubResult {
-  const RecordHubResult({this.characterMent, this.openPastRecords = false});
-
-  final String? characterMent;
-  final bool openPastRecords;
-}
-
-/// 「기록하기」 통합 허브 시트
-///
-/// - 1탭(나) 하단 「기록하기」(앱 레드) 버튼을 누르면 이 시트가 열린다.
+/// - 1탭(나) 「기록하기」(앱 레드) 버튼을 누르면 이 페이지가 push 된다.
 /// - 두 기능을 한 화면에 섞지 않고 **세그먼트로 명확히 분리**한다:
-///   - 「오늘 한줄」: 나만 보는 한 줄 기록 ([DiaryInputBody])
-///   - 「목표, 기억할 것」: 루틴/프로젝트 목표 ([UserGoalContent])
+///   - 「오늘, 지금」: 트위터식 자기 글 피드 + 하단 고정 입력 바
+///     (별도 「지난 기록」 진입이 필요 없음 — 화면 자체가 피드)
+///   - 「목표, 리마인드」: 기존 [UserGoalContent] 그대로 임베드
 ///
-/// 마지막으로 선택한 탭은 SharedPreferences에 저장되어 다음 진입 시 복원된다.
-///
-/// 사용자가 「지난 기록」을 누르면 시트가 닫히고 [DiaryTimelinePage]가 푸시된다.
-/// 타임라인에서 뒤로 가면 [show] 호출자가 시트를 한 번 더 열어 사용자 흐름이
-/// 끊기지 않게 한다.
+/// 마지막으로 선택한 탭은 SharedPreferences 에 저장되어 다음 진입 시 복원된다.
+/// 페이지가 닫힐 때 발생한 마지막 캐릭터 멘트를 [push] 결과로 반환한다.
 class RecordHubSheet {
   /// SharedPreferences 키 — 마지막으로 본 탭 인덱스(0=오늘 한줄, 1=목표).
   static const String prefsLastTabKey = 'record_hub_last_tab';
 
-  /// 시트를 띄운다.
-  ///
-  /// 사용자가 「지난 기록」을 눌러 닫혔다면 자동으로 타임라인을 푸시하고,
-  /// 타임라인에서 뒤로 돌아오면 시트를 다시 한 번 더 띄운다.
-  /// 최종적으로 시트가 완전히 종료될 때 마지막 캐릭터 멘트를 반환한다.
+  /// 페이지를 띄우고 마지막 캐릭터 멘트를 반환한다.
   static Future<String?> show(BuildContext context) async {
-    String? lastMent;
-    while (true) {
-      int initialTab = 0;
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        final stored = prefs.getInt(prefsLastTabKey);
-        if (stored == 0 || stored == 1) initialTab = stored!;
-      } catch (_) {
-        // SharedPreferences 실패 시 기본값(0) 사용 — 사용자 흐름 영향 없음.
-      }
-      if (!context.mounted) return lastMent;
-      final result = await showAppModalBottomSheet<RecordHubResult>(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (_) => _RecordHubSheetContent(initialTab: initialTab),
-      );
-      lastMent = result?.characterMent ?? lastMent;
-
-      // 「지난 기록」으로 닫힌 경우 타임라인을 띄우고, 닫히면 시트를 한 번 더.
-      if (result?.openPastRecords == true && context.mounted) {
-        await Navigator.of(context).push<void>(
-          MaterialPageRoute(
-            builder: (_) => const DiaryTimelinePage(),
-          ),
-        );
-        if (!context.mounted) return lastMent;
-        continue; // 시트 다시 열기
-      }
-      return lastMent;
-    }
+    int initialTab = 0;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final stored = prefs.getInt(prefsLastTabKey);
+      if (stored == 0 || stored == 1) initialTab = stored!;
+    } catch (_) {/* 기본 0 으로 진행 */}
+    if (!context.mounted) return null;
+    return await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) => _RecordHubPage(initialTab: initialTab),
+        fullscreenDialog: true,
+      ),
+    );
   }
 }
 
-class _RecordHubSheetContent extends StatefulWidget {
-  const _RecordHubSheetContent({required this.initialTab});
+class _RecordHubPage extends StatefulWidget {
+  const _RecordHubPage({required this.initialTab});
 
   final int initialTab;
 
   @override
-  State<_RecordHubSheetContent> createState() => _RecordHubSheetContentState();
+  State<_RecordHubPage> createState() => _RecordHubPageState();
 }
 
-class _RecordHubSheetContentState extends State<_RecordHubSheetContent>
-    with SingleTickerProviderStateMixin {
-  /// 0 = 오늘 한줄, 1 = 나의 목표
+class _RecordHubPageState extends State<_RecordHubPage> {
+  /// 0 = 오늘, 지금 / 1 = 목표, 리마인드
   late int _index = widget.initialTab;
 
-  /// 시트가 닫힐 때 캐릭터 말풍선으로 노출할 마지막 멘트.
-  /// 두 콘텐츠(오늘 한줄·나의 목표)에서 발생한 가장 마지막 한 건만 보존.
+  /// 페이지가 닫힐 때 캐릭터 말풍선으로 노출할 마지막 멘트.
   String? _pendingCharacterMent;
 
   void _selectTab(int index) {
@@ -105,143 +73,84 @@ class _RecordHubSheetContentState extends State<_RecordHubSheetContent>
           : ActivityEventType.tapRecordTabGoal,
       page: 'record_hub',
     );
-    // 다음 진입 시 복원하기 위해 SharedPreferences 에 저장 (fire-and-forget).
     SharedPreferences.getInstance()
         .then((prefs) => prefs.setInt(RecordHubSheet.prefsLastTabKey, index))
         .catchError((_) => false);
   }
 
-  /// 콘텐츠 위젯에서 호출되는 멘트 후보 수집기.
   void _bufferCharacterMent(String ment) {
     _pendingCharacterMent = ment;
   }
 
-  /// 사용자 닫기 동작(드래그/탭 바깥/X 버튼/Back 등)에서 공통적으로 마지막
-  /// 멘트를 반환값으로 실어 시트를 닫는다.
-  void _closeWithResult({bool openPastRecords = false}) {
-    Navigator.of(context).pop<RecordHubResult>(
-      RecordHubResult(
-        characterMent: _pendingCharacterMent,
-        openPastRecords: openPastRecords,
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    return PopScope<RecordHubResult>(
-      // 사용자가 시스템 백 제스처/드래그로 닫을 때도 멘트가 같이 전달되도록 한다.
+    // PopScope 로 시스템 백/AppBar 백 누를 때 마지막 멘트를 결과로 실어 보낸다.
+    return PopScope<String?>(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
-        _closeWithResult();
+        Navigator.of(context).pop<String?>(_pendingCharacterMent);
       },
-      // 시트 높이를 항상 동일하게 유지해 탭 전환 시 시트가 늘었다 줄었다
-      // 하는 「점프」를 방지한다. (사용자 화면 90% 고정)
-      child: SizedBox(
-        height: MediaQuery.of(context).size.height * 0.9,
-        child: Container(
-          decoration: const BoxDecoration(
-            color: AppColors.white,
-            borderRadius:
-                BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
-          ),
-          child: SafeArea(
-            top: false,
-            child: Column(
-              children: [
-                const SizedBox(height: 12),
-                _buildDragHandle(),
-                const SizedBox(height: 12),
-                _buildHeader(context),
-                const SizedBox(height: 12),
-                _buildSegments(),
-                const SizedBox(height: 12),
-                // IndexedStack — 두 콘텐츠를 항상 마운트해 탭 전환 시
-                // 재로딩(initState/Firestore 재조회/입력 초기화)이 일어나지
-                // 않게 한다. 보이는 자식만 화면에 표시.
-                Expanded(
-                  child: IndexedStack(
-                    index: _index,
-                    children: [
-                      _buildDiaryTab(),
-                      _buildGoalTab(),
-                    ],
-                  ),
+      child: Scaffold(
+        backgroundColor: AppColors.appBg,
+        appBar: AppBar(
+          backgroundColor: AppColors.appBg,
+          foregroundColor: AppColors.textPrimary,
+          elevation: 0,
+          titleSpacing: 0,
+          title: Row(
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: AppColors.lime,
+                  shape: BoxShape.circle,
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                '기록하기',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          leading: IconButton(
+            icon: const Icon(Icons.close),
+            onPressed: () =>
+                Navigator.of(context).pop<String?>(_pendingCharacterMent),
+          ),
+        ),
+        body: SafeArea(
+          top: false,
+          child: Column(
+            children: [
+              const SizedBox(height: 4),
+              _buildSegments(),
+              const SizedBox(height: 8),
+              Expanded(
+                child: IndexedStack(
+                  index: _index,
+                  children: [
+                    _DiaryFeedTab(onCharacterMent: _bufferCharacterMent),
+                    UserGoalContent(
+                      embedded: true,
+                      onCharacterMent: _bufferCharacterMent,
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  // ── Drag handle ─────────────────────────────────────────────
-  Widget _buildDragHandle() {
-    return Container(
-      width: 40,
-      height: 4,
-      decoration: BoxDecoration(
-        color: AppColors.textPrimary.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(2),
-      ),
-    );
-  }
-
-  // ── Header (앱레드 점 + 「기록하기」 + 부제 + 닫기) ───────────
-  Widget _buildHeader(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxl),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // 앱레드 강조 점 — 1탭 「기록하기」 버튼 색과 일치
-          Container(
-            width: 10,
-            height: 10,
-            decoration: const BoxDecoration(
-              color: AppColors.lime,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: const [
-                Text(
-                  '기록하기',
-                  style: TextStyle(
-                    // 「오늘의 공감투표」 등 카드 헤더와 동일 톤(15/w600)으로 통일
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  '오늘 한 줄을 남기거나, 꾸준히 챙길 목표를 정해요.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            tooltip: '닫기',
-            icon: const Icon(Icons.close, color: AppColors.textPrimary),
-            onPressed: _closeWithResult,
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Segmented control (오늘 한줄 / 나의 목표) ───────────────
   Widget _buildSegments() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxl),
@@ -270,41 +179,521 @@ class _RecordHubSheetContentState extends State<_RecordHubSheetContent>
       ),
     );
   }
+}
 
-  // ── 「오늘 한줄」 ─────────────────────────────────────────────
-  Widget _buildDiaryTab() {
-    return SingleChildScrollView(
-      physics: const ClampingScrollPhysics(),
-      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      child: DiaryInputBody(
-        // 시트 카드를 [_RecordHubSheetContent]가 그리고 있어 본문은 데코 없이
-        // 내용만 그린다. 자동 포커스도 끄고, 사용자가 입력 영역을 탭하면
-        // 자연스럽게 키보드가 올라오도록 둔다.
-        decorated: false,
-        autofocus: false,
-        popOnSave: false,
-        // 「지난 기록」 칩 → 시트를 닫고, 호출자(RecordHubSheet.show)가
-        // 타임라인을 띄운 뒤 시트를 다시 열어준다. (뒤로가기 흐름 자연스럽게)
-        onShowPastRecords: () => _closeWithResult(openPastRecords: true),
-        onSaved: (text) {
-          // 저장 성공 → 멘트를 버퍼에 담아둔다. 시트는 닫지 않고
-          // 사용자가 닫을 때(드래그/X/시스템 백) 부모에게 함께 전달된다.
-          // (DiaryInputBody 가 popOnSave:false 모드라 입력칸은 자동 비워짐)
-          final ment = DiaryResponseService.getRandomResponse(text);
-          _bufferCharacterMent(ment);
+// ═════════════════════════════════════════════════════════════════
+// 다이어리 피드 탭 — 트위터식 자기 글 피드 + 하단 고정 입력 바
+// ═════════════════════════════════════════════════════════════════
+//
+// 위쪽: 자기 글 최신순 (Firestore stream, 클라이언트 정렬 — 인덱스 의존 없음)
+// 아래: 텍스트필드 + 사진(0~3장) + 전송 버튼이 키보드 위에 고정.
+//
+// (스티커 인라인 삽입은 다음 라운드에서 senior_qna 스티커 시스템과 연결.
+//  지금은 기존 mood 단일 이모지 호환성 유지.)
+
+class _DiaryFeedTab extends StatefulWidget {
+  const _DiaryFeedTab({required this.onCharacterMent});
+
+  final ValueChanged<String> onCharacterMent;
+
+  @override
+  State<_DiaryFeedTab> createState() => _DiaryFeedTabState();
+}
+
+class _DiaryFeedTabState extends State<_DiaryFeedTab> {
+  final TextEditingController _controller = TextEditingController();
+  final FocusNode _focus = FocusNode();
+  final List<XFile> _selectedImages = [];
+  bool _isSaving = false;
+
+  static const int _maxImages = 3;
+  static const int _maxLen = 500;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickImages() async {
+    final remaining = _maxImages - _selectedImages.length;
+    if (remaining <= 0) return;
+    final picked = await DiaryImageService.pickImages(remaining: remaining);
+    if (!mounted || picked.isEmpty) return;
+    setState(() => _selectedImages.addAll(picked));
+  }
+
+  Future<void> _save() async {
+    final text = _controller.text.trim();
+    if (text.isEmpty && _selectedImages.isEmpty) return;
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() => _isSaving = true);
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) throw Exception('로그인 필요');
+
+      final docRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('notes')
+          .doc();
+      final noteId = docRef.id;
+
+      List<String> imageUrls = [];
+      if (_selectedImages.isNotEmpty) {
+        imageUrls = await DiaryImageService.uploadAll(
+          uid: uid,
+          noteId: noteId,
+          files: _selectedImages,
+        );
+      }
+
+      await docRef.set({
+        'text': text,
+        'imageUrls': imageUrls,
+        'createdAt': FieldValue.serverTimestamp(),
+        'visibility': 'private',
+      });
+
+      AdminActivityService.log(
+        ActivityEventType.noteSaveSuccess,
+        page: 'record_hub',
+        targetId: noteId,
+        extra: {
+          'hasImages': imageUrls.isNotEmpty,
+          'imageCount': imageUrls.length,
+          'textLength': text.length,
         },
+      );
+
+      // 캐릭터 멘트 — 페이지가 닫힐 때 캐릭터에 흘려보낸다.
+      widget.onCharacterMent(DiaryResponseService.getRandomResponse(text));
+
+      if (!mounted) return;
+      _controller.clear();
+      setState(() => _selectedImages.clear());
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('저장됐어요. 오늘도 한 줄 남겼네.'),
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(milliseconds: 1500),
+        ),
+      );
+    } catch (e) {
+      AdminActivityService.log(
+        ActivityEventType.noteSaveFail,
+        page: 'record_hub',
+        extra: {'error': e.toString()},
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('저장 실패: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      return const Center(child: Text('로그인이 필요합니다'));
+    }
+    return Column(
+      children: [
+        // ── 피드 ──
+        Expanded(
+          child: StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('users')
+                .doc(uid)
+                .collection('notes')
+                .snapshots(),
+            builder: (context, snap) {
+              if (snap.hasError) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    child: const Text(
+                      '기록을 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                );
+              }
+              if (snap.connectionState == ConnectionState.waiting) {
+                return Center(
+                  child: CircularProgressIndicator(color: AppColors.accent),
+                );
+              }
+              final docs = [...?snap.data?.docs];
+              docs.sort((a, b) {
+                final at = (a.data() as Map)['createdAt'] as Timestamp?;
+                final bt = (b.data() as Map)['createdAt'] as Timestamp?;
+                if (at != null && bt != null) return bt.compareTo(at);
+                if (at != null) return -1;
+                if (bt != null) return 1;
+                return b.id.compareTo(a.id);
+              });
+              if (docs.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(Icons.edit_note_outlined,
+                          size: 56, color: AppColors.textDisabled),
+                      SizedBox(height: 12),
+                      Text(
+                        '아직 기록이 없어요',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        '아래에 한 줄을 남겨보세요.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textDisabled,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+              return ListView.separated(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                itemCount: docs.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                itemBuilder: (context, i) {
+                  final d = docs[i];
+                  final m = d.data() as Map<String, dynamic>;
+                  return _FeedCard(
+                    noteId: d.id,
+                    uid: uid,
+                    text: m['text'] as String? ?? '',
+                    mood: m['mood'] as String?,
+                    createdAt: m['createdAt'] as Timestamp?,
+                    imageUrls: _parseImageUrls(m),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+        // ── 하단 고정 입력 바 (키보드 따라 올라옴) ──
+        _buildComposer(),
+      ],
+    );
+  }
+
+  Widget _buildComposer() {
+    final canSave =
+        !_isSaving && (_controller.text.trim().isNotEmpty || _selectedImages.isNotEmpty);
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+        12,
+        8,
+        12,
+        8 + MediaQuery.of(context).viewInsets.bottom,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        border: Border(
+          top: BorderSide(color: AppColors.divider, width: 1),
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_selectedImages.isNotEmpty)
+            SizedBox(
+              height: 56,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.only(bottom: 6),
+                itemCount: _selectedImages.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 6),
+                itemBuilder: (_, i) {
+                  return Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.file(
+                          File(_selectedImages[i].path),
+                          width: 48,
+                          height: 48,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            width: 48,
+                            height: 48,
+                            color: AppColors.surfaceMuted,
+                            child: const Icon(Icons.image,
+                                size: 18, color: AppColors.textDisabled),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        top: -4,
+                        right: -4,
+                        child: GestureDetector(
+                          onTap: () => setState(
+                              () => _selectedImages.removeAt(i)),
+                          child: Container(
+                            width: 18,
+                            height: 18,
+                            decoration: const BoxDecoration(
+                              color: Colors.black54,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.close,
+                                size: 12, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              IconButton(
+                tooltip: '사진 첨부',
+                onPressed:
+                    _selectedImages.length >= _maxImages ? null : _pickImages,
+                icon: Icon(
+                  Icons.photo_camera_back_outlined,
+                  color: _selectedImages.length >= _maxImages
+                      ? AppColors.textDisabled
+                      : AppColors.textSecondary,
+                ),
+              ),
+              Expanded(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 120),
+                  child: TextField(
+                    controller: _controller,
+                    focusNode: _focus,
+                    maxLength: _maxLen,
+                    minLines: 1,
+                    maxLines: 4,
+                    onChanged: (_) => setState(() {}),
+                    decoration: const InputDecoration(
+                      hintText: '지금 마음을 한 문장으로 남겨볼까?',
+                      counterText: '',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(20)),
+                      ),
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      isDense: true,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              ElevatedButton(
+                onPressed: canSave ? _save : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.lime,
+                  foregroundColor: AppColors.onCardEmphasis,
+                  disabledBackgroundColor:
+                      AppColors.divider.withValues(alpha: 0.4),
+                  disabledForegroundColor: AppColors.textDisabled,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+                child: _isSaving
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.onCardEmphasis,
+                        ),
+                      )
+                    : const Text(
+                        '저장',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 
-  // ── 「나의 목표」 ─────────────────────────────────────────────
-  Widget _buildGoalTab() {
-    // 기존 콘텐츠 위젯을 임베드 모드로 사용.
-    // 시트 카드/드래그 핸들은 [_RecordHubSheetContent] 가 그리고 있으므로
-    // [UserGoalContent] 는 헤더부터 콘텐츠까지만 그린다.
-    return UserGoalContent(
-      embedded: true,
-      onCharacterMent: _bufferCharacterMent,
+  static List<String> _parseImageUrls(Map<String, dynamic> data) {
+    final raw = data['imageUrls'];
+    if (raw is List) return raw.cast<String>();
+    return [];
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════
+// 피드 카드 — 트위터식 1열 카드
+// ═════════════════════════════════════════════════════════════════
+
+class _FeedCard extends StatelessWidget {
+  const _FeedCard({
+    required this.noteId,
+    required this.uid,
+    required this.text,
+    required this.mood,
+    required this.createdAt,
+    required this.imageUrls,
+  });
+
+  final String noteId;
+  final String uid;
+  final String text;
+  final String? mood;
+  final Timestamp? createdAt;
+  final List<String> imageUrls;
+
+  String _formatDate(Timestamp? ts) {
+    if (ts == null) return '';
+    final d = ts.toDate();
+    final now = DateTime.now();
+    final diff = now.difference(d);
+    if (diff.inMinutes < 1) return '방금';
+    if (diff.inHours < 1) return '${diff.inMinutes}분 전';
+    if (diff.inDays == 0) return DateFormat('HH:mm').format(d);
+    if (diff.inDays == 1) return '어제 ${DateFormat('HH:mm').format(d)}';
+    if (d.year == now.year) {
+      return DateFormat('M월 d일 HH:mm').format(d);
+    }
+    return DateFormat('yy/M/d HH:mm').format(d);
+  }
+
+  Future<void> _confirmDelete(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AppConfirmModal(
+        title: '기록 삭제',
+        message: imageUrls.isEmpty
+            ? '이 기록을 삭제하시겠습니까?'
+            : '이 기록과 첨부된 사진 ${imageUrls.length}장을 함께 삭제합니다.',
+        confirmLabel: '삭제',
+        destructive: true,
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    try {
+      if (imageUrls.isNotEmpty) {
+        await DiaryImageService.deleteAll(
+          uid: uid,
+          noteId: noteId,
+          imageUrls: imageUrls,
+        );
+      }
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('notes')
+          .doc(noteId)
+          .delete();
+    } catch (_) {/* 토스트는 부모 컨텍스트에서 처리하지 않음 */}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AppMutedCard(
+      radius: AppRadius.lg,
+      padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.schedule,
+                  size: 12, color: AppColors.textDisabled),
+              const SizedBox(width: 3),
+              Text(
+                _formatDate(createdAt),
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const Spacer(),
+              GestureDetector(
+                onTap: () => _confirmDelete(context),
+                child: const Icon(Icons.delete_outline,
+                    size: 16, color: AppColors.textDisabled),
+              ),
+            ],
+          ),
+          if (text.isNotEmpty || (mood != null && mood!.isNotEmpty)) ...[
+            const SizedBox(height: 6),
+            Text.rich(
+              TextSpan(
+                children: [
+                  if (mood != null && mood!.isNotEmpty)
+                    TextSpan(
+                      text: '$mood  ',
+                      style: const TextStyle(fontSize: 15),
+                    ),
+                  if (text.isNotEmpty)
+                    TextSpan(
+                      text: text,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        height: 1.45,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+          if (imageUrls.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 76,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: imageUrls.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 6),
+                itemBuilder: (_, i) {
+                  return ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.network(
+                      imageUrls[i],
+                      width: 76,
+                      height: 76,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        width: 76,
+                        height: 76,
+                        color: AppColors.surfaceMuted,
+                        child: const Icon(Icons.broken_image_outlined,
+                            size: 18, color: AppColors.textDisabled),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
