@@ -4,45 +4,77 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../core/widgets/app_modal_scaffold.dart';
+import '../../pages/diary_timeline_page.dart';
 import '../../services/admin_activity_service.dart';
 import '../diary_input_sheet.dart';
 import '../user_goal_sheet.dart';
+
+/// 시트가 닫힐 때 부모에게 전달되는 결과.
+///
+/// - [characterMent]: 캐릭터 말풍선으로 흘려보낼 마지막 멘트.
+/// - [openPastRecords]: true 이면 호출자가 시트를 닫은 직후
+///   [DiaryTimelinePage]를 띄워야 함. 타임라인이 닫히면 다시 시트를 열어
+///   사용자가 「지난 기록」 → 뒤로가기 흐름을 자연스럽게 쓸 수 있게 한다.
+class RecordHubResult {
+  const RecordHubResult({this.characterMent, this.openPastRecords = false});
+
+  final String? characterMent;
+  final bool openPastRecords;
+}
 
 /// 「기록하기」 통합 허브 시트
 ///
 /// - 1탭(나) 하단 「기록하기」(앱 레드) 버튼을 누르면 이 시트가 열린다.
 /// - 두 기능을 한 화면에 섞지 않고 **세그먼트로 명확히 분리**한다:
 ///   - 「오늘 한줄」: 나만 보는 한 줄 기록 ([DiaryInputBody])
-///   - 「나의 목표」: 루틴/프로젝트 목표 ([UserGoalContent])
+///   - 「목표, 기억할 것」: 루틴/프로젝트 목표 ([UserGoalContent])
 ///
 /// 마지막으로 선택한 탭은 SharedPreferences에 저장되어 다음 진입 시 복원된다.
 ///
-/// 시트가 닫힐 때 시트 내부에서 발생한 가장 마지막 캐릭터 멘트(저장/체크/완료 등)
-/// 를 [Future] 결과로 돌려준다. 호출자(`CaringPage`)는 이를 캐릭터 말풍선으로
-/// 자연스럽게 흘려보낸다.
+/// 사용자가 「지난 기록」을 누르면 시트가 닫히고 [DiaryTimelinePage]가 푸시된다.
+/// 타임라인에서 뒤로 가면 [show] 호출자가 시트를 한 번 더 열어 사용자 흐름이
+/// 끊기지 않게 한다.
 class RecordHubSheet {
-  /// SharedPreferences 키 — 마지막으로 본 탭 인덱스(0=오늘 한줄, 1=나의 목표).
+  /// SharedPreferences 키 — 마지막으로 본 탭 인덱스(0=오늘 한줄, 1=목표).
   static const String prefsLastTabKey = 'record_hub_last_tab';
 
   /// 시트를 띄운다.
   ///
-  /// 반환값: 시트 안에서 마지막으로 발생한 캐릭터 멘트(없으면 null).
+  /// 사용자가 「지난 기록」을 눌러 닫혔다면 자동으로 타임라인을 푸시하고,
+  /// 타임라인에서 뒤로 돌아오면 시트를 다시 한 번 더 띄운다.
+  /// 최종적으로 시트가 완전히 종료될 때 마지막 캐릭터 멘트를 반환한다.
   static Future<String?> show(BuildContext context) async {
-    int initialTab = 0;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final stored = prefs.getInt(prefsLastTabKey);
-      if (stored == 0 || stored == 1) initialTab = stored!;
-    } catch (_) {
-      // SharedPreferences 실패 시 기본값(0) 사용 — 사용자 흐름 영향 없음.
+    String? lastMent;
+    while (true) {
+      int initialTab = 0;
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final stored = prefs.getInt(prefsLastTabKey);
+        if (stored == 0 || stored == 1) initialTab = stored!;
+      } catch (_) {
+        // SharedPreferences 실패 시 기본값(0) 사용 — 사용자 흐름 영향 없음.
+      }
+      if (!context.mounted) return lastMent;
+      final result = await showAppModalBottomSheet<RecordHubResult>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => _RecordHubSheetContent(initialTab: initialTab),
+      );
+      lastMent = result?.characterMent ?? lastMent;
+
+      // 「지난 기록」으로 닫힌 경우 타임라인을 띄우고, 닫히면 시트를 한 번 더.
+      if (result?.openPastRecords == true && context.mounted) {
+        await Navigator.of(context).push<void>(
+          MaterialPageRoute(
+            builder: (_) => const DiaryTimelinePage(),
+          ),
+        );
+        if (!context.mounted) return lastMent;
+        continue; // 시트 다시 열기
+      }
+      return lastMent;
     }
-    if (!context.mounted) return null;
-    return showAppModalBottomSheet<String?>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _RecordHubSheetContent(initialTab: initialTab),
-    );
   }
 }
 
@@ -86,13 +118,18 @@ class _RecordHubSheetContentState extends State<_RecordHubSheetContent>
 
   /// 사용자 닫기 동작(드래그/탭 바깥/X 버튼/Back 등)에서 공통적으로 마지막
   /// 멘트를 반환값으로 실어 시트를 닫는다.
-  void _closeWithResult() {
-    Navigator.of(context).pop<String?>(_pendingCharacterMent);
+  void _closeWithResult({bool openPastRecords = false}) {
+    Navigator.of(context).pop<RecordHubResult>(
+      RecordHubResult(
+        characterMent: _pendingCharacterMent,
+        openPastRecords: openPastRecords,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return PopScope<String?>(
+    return PopScope<RecordHubResult>(
       // 사용자가 시스템 백 제스처/드래그로 닫을 때도 멘트가 같이 전달되도록 한다.
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -245,6 +282,9 @@ class _RecordHubSheetContentState extends State<_RecordHubSheetContent>
         decorated: false,
         autofocus: false,
         popOnSave: false,
+        // 「지난 기록」 칩 → 시트를 닫고, 호출자(RecordHubSheet.show)가
+        // 타임라인을 띄운 뒤 시트를 다시 열어준다. (뒤로가기 흐름 자연스럽게)
+        onShowPastRecords: () => _closeWithResult(openPastRecords: true),
         onSaved: (text) {
           // 저장 성공 → 멘트를 버퍼에 담아둔다. 시트는 닫지 않고
           // 사용자가 닫을 때(드래그/X/시스템 백) 부모에게 함께 전달된다.

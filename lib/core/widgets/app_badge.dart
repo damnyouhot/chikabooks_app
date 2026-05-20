@@ -134,9 +134,9 @@ class AppStatusBadge extends StatelessWidget {
   }
 }
 
-/// '준비중' — 어두운 녹색([AppColors.prepBadgeGreen]) 배경 + 크림 화이트 텍스트 ([AppColors.appBg])
+/// '준비중' — 앱 레드([AppColors.emphasisBadgeBg]) 배경 + 크림 화이트 텍스트
 ///
-/// 사용: 나 탭 Jobs 카드, 커리어 소탭(채용 · 지원) 등
+/// 사용: 커리어 소탭(공고 보기), 나 탭 Jobs 카드 등
 class PrepInProgressBadge extends StatelessWidget {
   const PrepInProgressBadge({super.key});
 
@@ -145,7 +145,7 @@ class PrepInProgressBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: AppColors.prepBadgeGreen,
+        color: AppColors.emphasisBadgeBg,
         borderRadius: BorderRadius.circular(4),
       ),
       child: const Text(
@@ -153,7 +153,7 @@ class PrepInProgressBadge extends StatelessWidget {
         style: TextStyle(
           fontSize: 9,
           fontWeight: FontWeight.w700,
-          color: AppColors.appBg,
+          color: AppColors.emphasisBadgeText,
           letterSpacing: -0.2,
         ),
       ),

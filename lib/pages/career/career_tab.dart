@@ -78,6 +78,7 @@ class _CareerTabHeaderState extends State<CareerTabHeader> {
         return AppSegmentedControl(
           controller: DefaultTabController.of(context),
           labels: const ['공고 보기', '커리어 관리'],
+          wipIndices: const {0},
           newIndices: snapshot.data ?? const {},
           margin: const EdgeInsets.symmetric(
             horizontal: AppSpacing.xl,

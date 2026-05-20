@@ -50,11 +50,16 @@ class DiaryInputSheet extends StatelessWidget {
 ///   막기 위해 false 로 시작하고, 사용자가 입력을 시작하면 자연스럽게 받는다.
 /// - [popOnSave] true: 저장 성공 시 본 위젯이 직접 [Navigator.pop] 한다(단독 시트).
 ///   false: 저장 완료 후 [onSaved] 만 호출하고 pop 은 부모(허브)가 처리한다.
+/// - [onShowPastRecords]: 「지난 기록」 칩 동작을 부모에 위임할 때 사용한다.
+///   null 이면 본 위젯이 직접 시트를 닫고 [DiaryTimelinePage] 를 푸시(기존 동작).
+///   허브 모드에서는 부모가 이 콜백으로 시트를 닫고, 타임라인에서 돌아왔을 때
+///   허브 시트를 다시 띄워주는 책임을 진다.
 class DiaryInputBody extends StatefulWidget {
   final Function(String) onSaved;
   final bool decorated;
   final bool autofocus;
   final bool popOnSave;
+  final VoidCallback? onShowPastRecords;
 
   const DiaryInputBody({
     super.key,
@@ -62,6 +67,7 @@ class DiaryInputBody extends StatefulWidget {
     this.decorated = false,
     this.autofocus = false,
     this.popOnSave = true,
+    this.onShowPastRecords,
   });
 
   @override
@@ -296,6 +302,14 @@ class _DiaryInputBodyState extends State<DiaryInputBody> {
                 GestureDetector(
                   onTap: () {
                     FocusManager.instance.primaryFocus?.unfocus();
+                    final delegate = widget.onShowPastRecords;
+                    if (delegate != null) {
+                      // 허브 모드: 부모가 시트 닫기/타임라인 푸시/시트 재오픈을
+                      // 책임진다. 본 위젯은 콜백만 호출.
+                      delegate();
+                      return;
+                    }
+                    // 기본(단독 시트): 시트 닫고 타임라인 푸시.
                     Navigator.pop(context);
                     Navigator.push(
                       context,
