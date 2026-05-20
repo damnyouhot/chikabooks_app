@@ -245,11 +245,11 @@ class _RecordHubSheetContentState extends State<_RecordHubSheetContent>
           autofocus: false,
           popOnSave: false,
           onSaved: (text) {
-            // 저장 성공 → 멘트를 버퍼에 담고, 허브 시트를 닫으면서 결과로
-            // 부모([CaringPage])에게 멘트를 전달한다.
+            // 저장 성공 → 멘트를 버퍼에 담아둔다. 시트는 닫지 않고
+            // 사용자가 닫을 때(드래그/X/시스템 백) 부모에게 함께 전달된다.
+            // (DiaryInputBody 가 popOnSave:false 모드라 입력칸은 자동 비워짐)
             final ment = DiaryResponseService.getRandomResponse(text);
             _bufferCharacterMent(ment);
-            _closeWithResult();
           },
         ),
       );

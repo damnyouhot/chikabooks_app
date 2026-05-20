@@ -155,10 +155,15 @@ class _DiaryInputBodyState extends State<DiaryInputBody> {
       );
 
       if (mounted) {
-        // 부모(허브)가 닫기를 책임지는 모드일 때는 pop 하지 않고 콜백만 호출한다.
-        // 단독 시트일 때는 기존과 동일하게 본 위젯이 pop.
         if (widget.popOnSave) {
+          // 단독 시트: 기존과 동일하게 본 위젯이 닫는다.
           Navigator.pop(context);
+        } else {
+          // 허브 임베드: 시트를 닫지 않고 입력만 비워 다음 한 줄을 이어 쓰거나
+          // 다른 탭으로 자연스럽게 넘어갈 수 있게 한다.
+          _controller.clear();
+          setState(() => _selectedImages.clear());
+          _showSnack('저장됐어요. 오늘도 한 줄 남겼네.');
         }
         widget.onSaved(text);
       }
