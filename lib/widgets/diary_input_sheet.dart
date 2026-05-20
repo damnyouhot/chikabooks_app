@@ -211,7 +211,7 @@ class _DiaryInputBodyState extends State<DiaryInputBody> {
                 const Text(
                   '오늘, 지금',
                   style: TextStyle(
-                    fontSize: 20,
+                    fontSize: 18,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
                   ),

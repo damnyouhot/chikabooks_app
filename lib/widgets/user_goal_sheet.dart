@@ -178,7 +178,7 @@ class _UserGoalContentState extends State<UserGoalContent>
               const Text(
                 '나의 목표',
                 style: TextStyle(
-                  fontSize: 22,
+                  fontSize: 18,
                   fontWeight: FontWeight.w700,
                   color: _kText,
                 ),

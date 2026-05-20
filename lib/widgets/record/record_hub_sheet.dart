@@ -175,7 +175,7 @@ class _RecordHubSheetContentState extends State<_RecordHubSheetContent>
                 Text(
                   '기록하기',
                   style: TextStyle(
-                    fontSize: 20,
+                    fontSize: 18,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
                   ),
