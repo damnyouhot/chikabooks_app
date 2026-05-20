@@ -197,20 +197,25 @@ class _UserGoalContentState extends State<UserGoalContent>
                   vertical: 8,
                 ),
                 decoration: BoxDecoration(
-                  color: _kAccent.withOpacity(0.3),
+                  // 「기록하기」 흐름의 강조색 — 1탭 버튼/시트 헤더 점과 동일.
+                  color: AppColors.lime,
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.add, size: 18, color: _kText),
+                    Icon(
+                      Icons.add,
+                      size: 18,
+                      color: AppColors.onCardEmphasis,
+                    ),
                     SizedBox(width: 4),
                     Text(
                       '추가',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: _kText,
+                        color: AppColors.onCardEmphasis,
                       ),
                     ),
                   ],
@@ -485,11 +490,14 @@ class _UserGoalContentState extends State<UserGoalContent>
               icon: const Icon(Icons.add),
               label: const Text('목표 추가'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: _kAccent,
-                foregroundColor: _kText,
+                backgroundColor: AppColors.lime,
+                foregroundColor: AppColors.onCardEmphasis,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 24,
                   vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
               ),
             ),
