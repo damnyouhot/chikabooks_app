@@ -152,9 +152,9 @@ class _CaringPageState extends State<CaringPage> with TickerProviderStateMixin {
         ),
       );
     });
-    _btnAnims = List.generate(3, (i) {
-      final start = (500 + i * 150) / 1200;
-      final end = (500 + i * 150 + 300) / 1200;
+    _btnAnims = List.generate(4, (i) {
+      final start = (500 + i * 130) / 1200;
+      final end = (500 + i * 130 + 300) / 1200;
       return CurvedAnimation(
         parent: _revealCtrl,
         curve: Interval(
@@ -726,6 +726,19 @@ class _CaringPageState extends State<CaringPage> with TickerProviderStateMixin {
     } finally {
       if (mounted) setState(() => _caringPersistBusy = false);
     }
+  }
+
+  /// 「기록하기」 버튼 — 오늘 한줄 + 나의 목표 통합 허브 진입.
+  /// 시트 위젯은 다음 작업 단계에서 연결되며, 그때까지는 안내 스낵바만 표시한다.
+  void _onRecordHubTap() {
+    if (!_caringReady || widget.isOnboardingActive) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('기록 허브 준비 중이에요. 곧 열려요.'),
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(milliseconds: 1500),
+      ),
+    );
   }
 
   // ══════════════════════════════════════════════
@@ -1442,6 +1455,17 @@ class _CaringPageState extends State<CaringPage> with TickerProviderStateMixin {
         // 저장 FIFO 중 loadState→save가 끼어들면 밥 반영이 날아갈 수 있어 동일 잠금
         disabled: !_caringReady || _caringPersistBusy,
         suppressInteractionFade: isOnboarding,
+      ),
+      // 「기록하기」 — 한 줄 기록 + 나의 목표 통합 진입점 (앱 레드 강조)
+      // 캐릭터 상태와 무관하므로 _caringReady만 충족하면 활성.
+      _ActionBtn(
+        icon: Icons.edit_note_outlined,
+        label: '기록하기',
+        onTap: _onRecordHubTap,
+        disabled: isOnboarding || !_caringReady,
+        suppressInteractionFade: isOnboarding,
+        activeBackgroundColor: AppColors.lime,
+        activeForegroundColor: AppColors.onCardEmphasis,
       ),
     ];
     return Row(
@@ -2418,6 +2442,12 @@ class _ActionBtn extends StatefulWidget {
 
     /// true면 활성/비활성 페이드 없음(즉시). 온보딩 시 바깥 [FadeTransition]과 곱연산 이중 페이드 완화.
     this.suppressInteractionFade = false,
+
+    /// 활성 상태일 때 원형 배경색을 강제로 지정 (강조 버튼용). null이면 [AppColors.accent].
+    this.activeBackgroundColor,
+
+    /// 활성 상태일 때 아이콘 전경색을 강제로 지정. null이면 [AppColors.onAccent].
+    this.activeForegroundColor,
   });
 
   final IconData icon;
@@ -2425,6 +2455,8 @@ class _ActionBtn extends StatefulWidget {
   final VoidCallback onTap;
   final bool disabled;
   final bool suppressInteractionFade;
+  final Color? activeBackgroundColor;
+  final Color? activeForegroundColor;
 
   @override
   State<_ActionBtn> createState() => _ActionBtnState();
@@ -2479,10 +2511,12 @@ class _ActionBtnState extends State<_ActionBtn>
             final screenW = MediaQuery.of(ctx).size.width;
             final btnSize = (screenW * 0.13).clamp(44.0, 64.0);
             final iconSize = (btnSize * 0.43).clamp(20.0, 28.0);
-            final bgColor =
-                widget.disabled ? AppColors.disabledBg : AppColors.accent;
-            final fgColor =
-                widget.disabled ? AppColors.disabledText : AppColors.onAccent;
+            final bgColor = widget.disabled
+                ? AppColors.disabledBg
+                : (widget.activeBackgroundColor ?? AppColors.accent);
+            final fgColor = widget.disabled
+                ? AppColors.disabledText
+                : (widget.activeForegroundColor ?? AppColors.onAccent);
             final labelColor =
                 widget.disabled
                     ? AppColors.textDisabled
