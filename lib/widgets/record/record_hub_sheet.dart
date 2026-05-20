@@ -11,10 +11,45 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../core/widgets/app_confirm_modal.dart';
 import '../../core/widgets/app_muted_card.dart';
+import '../../features/senior_qna/widgets/senior_sticker_widgets.dart';
 import '../../services/admin_activity_service.dart';
 import '../../services/diary_image_service.dart';
 import '../diary_input_sheet.dart';
 import '../user_goal_sheet.dart';
+
+/// 스티커 인라인 토큰 — 텍스트 안에 `[[s:stickerId]]` 형태로 끼워 저장하고
+/// 렌더링 시 [SeniorStickerView] 로 치환한다. 형식이 단순하고 사람이 읽어도
+/// 의미를 짐작할 수 있어 마이그레이션·디버깅에 안전.
+final RegExp _kStickerToken = RegExp(r'\[\[s:([A-Za-z0-9_\-]+)\]\]');
+
+/// 스티커 토큰을 [InlineSpan] 시퀀스로 변환.
+List<InlineSpan> buildInlineStickerSpans(
+  String text, {
+  TextStyle? textStyle,
+  double stickerSize = 22,
+}) {
+  final spans = <InlineSpan>[];
+  int last = 0;
+  for (final m in _kStickerToken.allMatches(text)) {
+    if (m.start > last) {
+      spans.add(TextSpan(text: text.substring(last, m.start), style: textStyle));
+    }
+    spans.add(
+      WidgetSpan(
+        alignment: PlaceholderAlignment.middle,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 1),
+          child: SeniorStickerView(stickerId: m.group(1)!, size: stickerSize),
+        ),
+      ),
+    );
+    last = m.end;
+  }
+  if (last < text.length) {
+    spans.add(TextSpan(text: text.substring(last), style: textStyle));
+  }
+  return spans;
+}
 
 /// 「기록하기」 통합 풀스크린 페이지 (B안 — 기존 BottomSheet 에서 페이지로 승격)
 ///
@@ -249,6 +284,24 @@ class _DiaryFeedTabState extends State<_DiaryFeedTab> {
     _controller.dispose();
     _focus.dispose();
     super.dispose();
+  }
+
+  Future<void> _insertSticker() async {
+    final pickedId = await showSeniorStickerPicker(context);
+    if (!mounted || pickedId == null || pickedId.isEmpty) return;
+    final token = '[[s:$pickedId]]';
+    final sel = _controller.selection;
+    final txt = _controller.text;
+    // 커서 위치가 유효하지 않으면 끝에 붙인다.
+    final start = (sel.start >= 0 && sel.start <= txt.length) ? sel.start : txt.length;
+    final end = (sel.end >= 0 && sel.end <= txt.length) ? sel.end : txt.length;
+    final next = txt.replaceRange(start, end, token);
+    _controller.value = TextEditingValue(
+      text: next,
+      selection: TextSelection.collapsed(offset: start + token.length),
+    );
+    setState(() {});
+    _focus.requestFocus();
   }
 
   Future<void> _pickImages() async {
@@ -595,6 +648,63 @@ class _DiaryFeedTabState extends State<_DiaryFeedTab> {
                 ],
               ),
             ),
+          // ── 토큰 미리보기 (입력 중에도 어떤 스티커가 들어가있는지 시각화) ──
+          // 토큰 텍스트 「[[s:id]]」 자체를 입력칸에서 가리려면 커스텀 에디터가
+          // 필요해 비용이 큼. 대신 컴포저 위에 「현재 본문에 들어있는 스티커」
+          // 칩 줄을 띄워 사용자가 추가/삭제를 시각적으로 확인할 수 있게 한다.
+          Builder(builder: (_) {
+            final ids = _kStickerToken
+                .allMatches(_controller.text)
+                .map((m) => m.group(1)!)
+                .toList();
+            if (ids.isEmpty) return const SizedBox.shrink();
+            return Container(
+              margin: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                children: [
+                  const Icon(Icons.emoji_emotions_outlined,
+                      size: 14, color: AppColors.textDisabled),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: SizedBox(
+                      height: 30,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: ids.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 4),
+                        itemBuilder: (_, i) => SeniorStickerView(
+                          stickerId: ids[i],
+                          size: 24,
+                        ),
+                      ),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () {
+                      final cleared =
+                          _controller.text.replaceAll(_kStickerToken, '').trim();
+                      _controller.value = TextEditingValue(
+                        text: cleared,
+                        selection: TextSelection.collapsed(offset: cleared.length),
+                      );
+                      setState(() {});
+                    },
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4),
+                      child: Text(
+                        '비우기',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textSecondary,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
           if (_selectedImages.isNotEmpty)
             SizedBox(
               height: 56,
@@ -657,6 +767,14 @@ class _DiaryFeedTabState extends State<_DiaryFeedTab> {
                   color: _selectedImages.length >= _maxImages
                       ? AppColors.textDisabled
                       : AppColors.textSecondary,
+                ),
+              ),
+              IconButton(
+                tooltip: '스티커',
+                onPressed: _isSaving ? null : _insertSticker,
+                icon: const Icon(
+                  Icons.emoji_emotions_outlined,
+                  color: AppColors.textSecondary,
                 ),
               ),
               Expanded(
@@ -850,6 +968,8 @@ class _FeedCard extends StatelessWidget {
           ),
           if (text.isNotEmpty || (mood != null && mood!.isNotEmpty)) ...[
             const SizedBox(height: 6),
+            // 본문 — 스티커 토큰 [[s:id]] 은 인라인 위젯스팬으로 치환.
+            // 기존 mood(단일 이모지) 데이터는 본문 앞에 그대로 표시해 호환.
             Text.rich(
               TextSpan(
                 children: [
@@ -858,15 +978,15 @@ class _FeedCard extends StatelessWidget {
                       text: '$mood  ',
                       style: const TextStyle(fontSize: 15),
                     ),
-                  if (text.isNotEmpty)
-                    TextSpan(
-                      text: text,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        height: 1.45,
-                        color: AppColors.textPrimary,
-                      ),
+                  ...buildInlineStickerSpans(
+                    text,
+                    textStyle: const TextStyle(
+                      fontSize: 14,
+                      height: 1.45,
+                      color: AppColors.textPrimary,
                     ),
+                    stickerSize: 22,
+                  ),
                 ],
               ),
             ),
