@@ -70,6 +70,10 @@ class _UserGoalContentState extends State<UserGoalContent>
   // 주간 체크 횟수 캐시 (goalId -> count)
   final Map<String, int> _weeklyCheckCounts = {};
 
+  /// 이번 달(월초~오늘) 모든 루틴 체크 누적 합계.
+  /// 시트 진입 시 1회 로드. 빠른 진단을 위해 초기값 0.
+  int _monthlyTotal = 0;
+
   @override
   void initState() {
     super.initState();
@@ -96,10 +100,14 @@ class _UserGoalContentState extends State<UserGoalContent>
       _weeklyCheckCounts[goal.id] = count;
     }
 
+    // 월간 누적 합계 (모든 루틴 통합) 1회 로드.
+    final monthly = await UserGoalService.getMonthlyTotalChecks();
+
     if (mounted) {
       setState(() {
         _goals = goals;
         _todayCheck = todayCheck;
+        _monthlyTotal = monthly;
         _loading = false;
       });
     }
@@ -267,24 +275,13 @@ class _UserGoalContentState extends State<UserGoalContent>
       weeklyTotal += count;
     }
 
-    // 칭호 + 메달 단계 계산
-    // 0~1회: 🥉 버티는 중 / 2~4회: 🥈 조금 회복 / 5회+: 🥇 이번 주 꽤 잘했다
-    String title;
-    String medal;
-    if (weeklyTotal >= 5) {
-      title = '이번 주 꽤 잘했다';
-      medal = '🥇';
-    } else if (weeklyTotal >= 2) {
-      title = '조금 회복';
-      medal = '🥈';
-    } else {
-      title = '버티는 중';
-      medal = '🥉';
-    }
+    // 주간 7단계 (담담한 진척 톤)
+    final weekly = _resolveWeeklyTier(weeklyTotal);
+    // 월간 5단계 (월초~오늘 누적)
+    final monthly = _resolveMonthlyTier(_monthlyTotal);
 
     // 흰 카드 + 1px 라인 → 다른 카드들과 톤 통일.
-    // 칭호를 상단 한 줄로 분리해 시각 위계를 분명히 하고, 보조 수치는
-    // 하단에 12/500 톤으로 한 줄 배치한다.
+    // 상단: 주간/월간 두 레벨 칩 / 하단: 보조 수치(오늘 체크 · 이번 주 · 이번 달).
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Container(
@@ -298,43 +295,28 @@ class _UserGoalContentState extends State<UserGoalContent>
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ── 상단: 메달 + 칭호 + 「레벨」 라벨 ──
+            // ── 상단: 주간 레벨 칩 + 월간 레벨 칩 ──
             Row(
               children: [
-                Text(medal, style: const TextStyle(fontSize: 18)),
-                const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: _kText,
-                    ),
+                  child: _LevelChip(
+                    medal: weekly.medal,
+                    title: weekly.title,
+                    suffix: '주간',
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _kAccent.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    '레벨',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: _kAccent.withOpacity(0.85),
-                    ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _LevelChip(
+                    medal: monthly.medal,
+                    title: monthly.title,
+                    suffix: '월간',
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            // ── 하단: 보조 수치(오늘 체크 · 이번 주) ──
+            const SizedBox(height: 10),
+            // ── 하단: 보조 수치(오늘 체크 · 이번 주 · 이번 달) ──
             Row(
               children: [
                 Icon(
@@ -344,7 +326,7 @@ class _UserGoalContentState extends State<UserGoalContent>
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  '오늘 체크',
+                  '오늘',
                   style: TextStyle(
                     fontSize: 12,
                     color: _kText.withOpacity(0.55),
@@ -382,12 +364,56 @@ class _UserGoalContentState extends State<UserGoalContent>
                     color: _kText,
                   ),
                 ),
+                const SizedBox(width: 12),
+                Container(
+                  width: 1,
+                  height: 10,
+                  color: _kShadow2.withOpacity(0.6),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  '이번 달',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: _kText.withOpacity(0.55),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '$_monthlyTotal회',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: _kText,
+                  ),
+                ),
               ],
             ),
           ],
         ),
       ),
     );
+  }
+
+  // ── 레벨 산출 (주간 7단계 / 월간 5단계) ──────────────────────
+  // 임계치는 「루틴 최대 3개 × 7일 = 21회/주」 분포에 맞춰 7단계로 잘게,
+  // 월간은 4주 누적 추세를 5단계로 담담하게.
+  static _Tier _resolveWeeklyTier(int total) {
+    if (total >= 18) return const _Tier('빛나는 한 주', '💎');
+    if (total >= 14) return const _Tier('결이 잡힘', '🥇');
+    if (total >= 10) return const _Tier('단단해지는 중', '🥈');
+    if (total >= 6) return const _Tier('흐름 좋음', '🥈');
+    if (total >= 3) return const _Tier('페이스 잡힘', '🥉');
+    if (total >= 1) return const _Tier('시작', '🥉');
+    return const _Tier('시작 전', '▫️');
+  }
+
+  static _Tier _resolveMonthlyTier(int total) {
+    if (total >= 26) return const _Tier('결이 단단해진 달', '💎');
+    if (total >= 18) return const _Tier('단단해지는 중', '🥇');
+    if (total >= 10) return const _Tier('흐름 좋음', '🥈');
+    if (total >= 4) return const _Tier('페이스 잡힘', '🥉');
+    return const _Tier('시작', '▫️');
   }
 
   /// 탭 (루틴 / 프로젝트)
@@ -912,14 +938,16 @@ class _UserGoalContentState extends State<UserGoalContent>
   Future<void> _toggleRoutineCheck(UserGoal goal) async {
     await UserGoalService.toggleRoutineCheck(goal.id);
 
-    // 데이터 리로드
+    // 데이터 리로드 (오늘 체크 + 해당 루틴 주간 카운트 + 월간 누적)
     final todayCheck = await UserGoalService.loadTodayCheck();
     final weeklyCount = await UserGoalService.getWeeklyCheckCount(goal.id);
+    final monthly = await UserGoalService.getMonthlyTotalChecks();
 
     if (mounted) {
       setState(() {
         _todayCheck = todayCheck;
         _weeklyCheckCounts[goal.id] = weeklyCount;
+        _monthlyTotal = monthly;
       });
 
       // 피드백 토스트
@@ -1022,6 +1050,70 @@ class _UserGoalContentState extends State<UserGoalContent>
               },
             ),
         fullscreenDialog: true,
+      ),
+    );
+  }
+}
+
+/// 주간/월간 레벨 산출 결과 — 칭호와 메달 이모지를 함께 묶는다.
+class _Tier {
+  const _Tier(this.title, this.medal);
+  final String title;
+  final String medal;
+}
+
+/// 요약 카드 상단의 레벨 칩 — 메달 + 칭호 + 우측의 작은 「주간/월간」 라벨.
+class _LevelChip extends StatelessWidget {
+  const _LevelChip({
+    required this.medal,
+    required this.title,
+    required this.suffix,
+  });
+
+  final String medal;
+  final String title;
+  final String suffix;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceMuted,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Text(medal, style: const TextStyle(fontSize: 16)),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  suffix,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary.withOpacity(0.5),
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

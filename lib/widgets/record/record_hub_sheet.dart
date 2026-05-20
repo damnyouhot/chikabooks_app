@@ -214,8 +214,9 @@ class _RecordHubSheetContentState extends State<_RecordHubSheetContent>
                 Text(
                   '기록하기',
                   style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
+                    // 「오늘의 공감투표」 등 카드 헤더와 동일 톤(15/w600)으로 통일
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
                   ),
                 ),

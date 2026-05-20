@@ -35,6 +35,11 @@ class _DiaryTimelinePageState extends State<DiaryTimelinePage> {
   bool _slow = false;
   bool _firstResponseReceived = false;
 
+  /// 사용자가 「정렬 없이 보기」를 눌렀을 때 true.
+  /// orderBy 없이 limit 50 으로 페치 후 클라이언트에서 정렬한다.
+  /// (createdAt 누락 문서 / 단일필드 색인 빌드 지연을 우회하는 진단·임시 수단)
+  bool _useFallback = false;
+
   @override
   void initState() {
     super.initState();
@@ -60,6 +65,20 @@ class _DiaryTimelinePageState extends State<DiaryTimelinePage> {
         if (mounted) setState(() => _slow = false);
       });
     }
+  }
+
+  void _enableFallback() {
+    if (_useFallback) return;
+    setState(() {
+      _useFallback = true;
+      _slow = false;
+      _firstResponseReceived = false;
+    });
+    _slowTimer?.cancel();
+    _slowTimer = Timer(_slowResponseThreshold, () {
+      if (!mounted || _firstResponseReceived) return;
+      setState(() => _slow = true);
+    });
   }
 
   @override
@@ -90,24 +109,39 @@ class _DiaryTimelinePageState extends State<DiaryTimelinePage> {
         elevation: 0,
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('users')
-            .doc(uid)
-            .collection('notes')
-            .orderBy('createdAt', descending: true)
-            .snapshots(),
+        // 기본은 createdAt desc. 사용자가 6초 무응답 후 「정렬 없이 보기」를
+        // 누르면 orderBy 를 빼고 limit 50 만 받아 클라이언트에서 정렬한다.
+        stream: _buildNotesStream(uid),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            // 진단용: 에러 코드를 콘솔에 한 번만 흘려보낸다.
             debugPrint('⚠️ DiaryTimeline error: ${snapshot.error}');
             return _buildErrorState(snapshot.error);
           }
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return _buildLoadingState(slow: _slow);
+            return _buildLoadingState(
+              slow: _slow,
+              showFallbackButton: !_useFallback,
+              onUseFallback: _enableFallback,
+            );
           }
           _markFirstResponse();
 
-          final notes = snapshot.data?.docs ?? [];
+          var notes = snapshot.data?.docs ?? [];
+          if (_useFallback) {
+            // 클라이언트 정렬: createdAt(있으면) desc, 없으면 그대로.
+            final list = [...notes];
+            list.sort((a, b) {
+              final aTs = (a.data() as Map<String, dynamic>)['createdAt']
+                  as Timestamp?;
+              final bTs = (b.data() as Map<String, dynamic>)['createdAt']
+                  as Timestamp?;
+              if (aTs == null && bTs == null) return 0;
+              if (aTs == null) return 1; // 누락은 뒤로
+              if (bTs == null) return -1;
+              return bTs.compareTo(aTs); // desc
+            });
+            notes = list;
+          }
           if (notes.isEmpty) {
             return Center(
               child: Column(
@@ -128,17 +162,44 @@ class _DiaryTimelinePageState extends State<DiaryTimelinePage> {
             );
           }
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: notes.length,
+          // fallback 모드에서 결과를 받아 표시 중일 때, 사용자에게 상태를
+          // 살짝 알려준다. (얇은 1줄 배지)
+          final list = ListView.builder(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              _useFallback ? 8 : 16,
+              16,
+              16,
+            ),
+            itemCount: notes.length + (_useFallback ? 1 : 0),
             itemBuilder: (context, index) {
-              final note = notes[index];
+              if (_useFallback && index == 0) {
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceMuted,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Text(
+                    '임시 정렬 모드 · 시간 정보가 없는 기록은 아래쪽에 표시돼요',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                );
+              }
+              final i = _useFallback ? index - 1 : index;
+              final note = notes[i];
               final data = note.data() as Map<String, dynamic>;
               final text = data['text'] as String? ?? '';
               final createdAt = data['createdAt'] as Timestamp?;
               final imageUrls = _parseImageUrls(data);
               final mood = data['mood'] as String?;
-
               return _NoteCard(
                 noteId: note.id,
                 text: text,
@@ -149,13 +210,32 @@ class _DiaryTimelinePageState extends State<DiaryTimelinePage> {
               );
             },
           );
+          return list;
         },
       ),
     );
   }
 
+  /// 노트 stream — fallback 모드에서는 orderBy 를 빼고 limit 50 만 받아온다.
+  Stream<QuerySnapshot> _buildNotesStream(String uid) {
+    final col = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('notes');
+    if (_useFallback) {
+      return col.limit(50).snapshots();
+    }
+    return col.orderBy('createdAt', descending: true).snapshots();
+  }
+
   /// 로딩 상태 — 일정 시간이 지나도 첫 응답이 없으면 [slow] 안내를 함께 노출.
-  Widget _buildLoadingState({required bool slow}) {
+  /// fallback 미적용 상태일 때만 「정렬 없이 보기」 버튼을 노출해 사용자가
+  /// 인덱스 빌드 대기/createdAt 누락 케이스를 즉시 우회할 수 있게 한다.
+  Widget _buildLoadingState({
+    required bool slow,
+    required bool showFallbackButton,
+    required VoidCallback onUseFallback,
+  }) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -176,6 +256,21 @@ class _DiaryTimelinePageState extends State<DiaryTimelinePage> {
                 ),
               ),
             ),
+            if (showFallbackButton) ...[
+              const SizedBox(height: 12),
+              TextButton.icon(
+                onPressed: onUseFallback,
+                icon: const Icon(Icons.refresh, size: 16),
+                label: const Text('정렬 없이 바로 보기'),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.accent,
+                  textStyle: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
           ],
         ],
       ),

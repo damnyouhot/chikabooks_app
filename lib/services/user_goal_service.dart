@@ -359,6 +359,39 @@ class UserGoalService {
     }
   }
 
+  /// 이번 달 모든 루틴 체크 누적 합계.
+  ///
+  /// 매월 1일부터 오늘까지의 `routineChecks/{dateKey}` 를 순회하며 각 문서에서
+  /// 체크된 항목 수를 합산한다. 호출 횟수: 최대 31회/월 (작음).
+  static Future<int> getMonthlyTotalChecks() async {
+    try {
+      final uid = _auth.currentUser?.uid;
+      if (uid == null) return 0;
+
+      final now = DateTime.now();
+      int total = 0;
+      for (int day = 1; day <= now.day; day++) {
+        final dateKey =
+            '${now.year}-${now.month.toString().padLeft(2, '0')}-'
+            '${day.toString().padLeft(2, '0')}';
+        final doc = await _db
+            .collection('users')
+            .doc(uid)
+            .collection('routineChecks')
+            .doc(dateKey)
+            .get();
+        if (doc.exists && doc.data() != null) {
+          final check = RoutineCheck.fromMap(doc.data()!);
+          total += check.checkedGoalIds.length;
+        }
+      }
+      return total;
+    } catch (e) {
+      debugPrint('⚠️ getMonthlyTotalChecks error: $e');
+      return 0;
+    }
+  }
+
   /// 연속 체크 일수 (스트릭)
   static Future<int> getStreak(String goalId) async {
     try {
