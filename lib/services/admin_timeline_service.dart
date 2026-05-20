@@ -11,18 +11,30 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 ///
 /// notes 쿼리는 [firestore.indexes.json] 의 collectionGroup 색인이 필요합니다.
 /// goals 는 collectionGroup 전체 스냅샷 후 클라이언트에서 기간·정렬 처리합니다.
+///
+/// `users.isAdmin == true` 계정의 기록·목표는 타임라인에서 제외합니다.
 class AdminTimelineService {
   AdminTimelineService._();
 
   static final _db = FirebaseFirestore.instance;
 
+  /// `isAdmin == true` 유저 UID 집합 (실시간).
+  static Stream<Set<String>> _adminUidStream() {
+    return _db
+        .collection('users')
+        .where('isAdmin', isEqualTo: true)
+        .snapshots()
+        .map((snap) => snap.docs.map((d) => d.id).toSet());
+  }
+
   /// 통합 피드 스트림 (실시간).
   ///
-  /// notes / goals 중 하나가 갱신되면 목록이 다시 emit 됩니다.
+  /// notes / goals / 관리자 목록 중 하나가 바뀌면 목록이 다시 emit 됩니다.
   static Stream<List<TimelineItem>> watchFeed({
     required DateTime since,
     int limit = 100,
   }) {
+    final adminStream = _adminUidStream();
     final notesStream = _db
         .collectionGroup('notes')
         .where('createdAt', isGreaterThan: Timestamp.fromDate(since))
@@ -33,40 +45,50 @@ class AdminTimelineService {
     // goals/current 문서만 구독 — items[] 안 각 목표의 createdAt 으로 필터
     final goalsStream = _db.collectionGroup('goals').snapshots();
 
-    return _combineLatest2(notesStream, goalsStream, (notesSnap, goalsSnap) {
-      final items = <TimelineItem>[];
-      for (final doc in notesSnap.docs) {
-        final item = TimelineItem.fromNoteDoc(doc);
-        if (item != null) items.add(item);
-      }
-      items.addAll(TimelineItem.fromGoalsSnapshot(goalsSnap, since: since));
-      items.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      if (items.length > limit) {
-        return items.sublist(0, limit);
-      }
-      return items;
-    });
+    return _combineLatest3(
+      adminStream,
+      notesStream,
+      goalsStream,
+      (adminUids, notesSnap, goalsSnap) {
+        final items = <TimelineItem>[];
+        for (final doc in notesSnap.docs) {
+          final item = TimelineItem.fromNoteDoc(doc);
+          if (item != null) items.add(item);
+        }
+        items.addAll(TimelineItem.fromGoalsSnapshot(goalsSnap, since: since));
+        items.removeWhere((i) => adminUids.contains(i.uid));
+        items.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        if (items.length > limit) {
+          return items.sublist(0, limit);
+        }
+        return items;
+      },
+    );
   }
 }
 
-/// 두 스트림이 모두 최소 한 번 이상 값을 내놓은 시점부터 결합해 emit.
-Stream<R> _combineLatest2<A, B, R>(
+/// 세 스트림이 모두 최소 한 번 이상 값을 내놓은 시점부터 결합해 emit.
+Stream<R> _combineLatest3<A, B, C, R>(
   Stream<A> a,
   Stream<B> b,
-  R Function(A, B) combiner,
+  Stream<C> c,
+  R Function(A, B, C) combiner,
 ) {
   late StreamController<R> controller;
   StreamSubscription<A>? subA;
   StreamSubscription<B>? subB;
+  StreamSubscription<C>? subC;
 
   A? latestA;
   B? latestB;
+  C? latestC;
   bool hasA = false;
   bool hasB = false;
+  bool hasC = false;
 
   void emit() {
-    if (hasA && hasB) {
-      controller.add(combiner(latestA as A, latestB as B));
+    if (hasA && hasB && hasC) {
+      controller.add(combiner(latestA as A, latestB as B, latestC as C));
     }
   }
 
@@ -88,10 +110,19 @@ Stream<R> _combineLatest2<A, B, R>(
         },
         onError: controller.addError,
       );
+      subC = c.listen(
+        (v) {
+          latestC = v;
+          hasC = true;
+          emit();
+        },
+        onError: controller.addError,
+      );
     },
     onCancel: () async {
       await subA?.cancel();
       await subB?.cancel();
+      await subC?.cancel();
     },
   );
 
