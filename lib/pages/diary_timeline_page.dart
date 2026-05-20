@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -13,8 +15,52 @@ import '../services/diary_image_service.dart';
 ///
 /// 과거에 작성한 기록들을 시간 순으로 보여줌.
 /// 이미지가 있으면 썸네일 1장 + 이미지 수 배지 표시.
-class DiaryTimelinePage extends StatelessWidget {
+///
+/// 첫 응답이 일정 시간 내에 오지 않으면 「인덱스 빌드 중일 가능성」 을
+/// 사용자에게 알려준다. (Firestore 가 첫 쿼리 시 단일 필드 인덱스를
+/// 자동 빌드 — 보통 수 초 ~ 수 분 소요. 이 동안 stream 은 응답을 주지
+/// 않고 대기 상태로 머물러 사용자가 무한 로딩처럼 느낀다.)
+class DiaryTimelinePage extends StatefulWidget {
   const DiaryTimelinePage({super.key});
+
+  @override
+  State<DiaryTimelinePage> createState() => _DiaryTimelinePageState();
+}
+
+class _DiaryTimelinePageState extends State<DiaryTimelinePage> {
+  /// 첫 응답이 6초 내에 오지 않으면 「오래 걸려요」 안내를 표시한다.
+  static const _slowResponseThreshold = Duration(seconds: 6);
+
+  Timer? _slowTimer;
+  bool _slow = false;
+  bool _firstResponseReceived = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _slowTimer = Timer(_slowResponseThreshold, () {
+      if (!mounted || _firstResponseReceived) return;
+      setState(() => _slow = true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _slowTimer?.cancel();
+    super.dispose();
+  }
+
+  void _markFirstResponse() {
+    if (_firstResponseReceived) return;
+    _firstResponseReceived = true;
+    _slowTimer?.cancel();
+    if (_slow && mounted) {
+      // 응답이 도착했으면 안내 배너를 즉시 내린다.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _slow = false);
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,13 +98,14 @@ class DiaryTimelinePage extends StatelessWidget {
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
+            // 진단용: 에러 코드를 콘솔에 한 번만 흘려보낸다.
+            debugPrint('⚠️ DiaryTimeline error: ${snapshot.error}');
             return _buildErrorState(snapshot.error);
           }
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(
-              child: CircularProgressIndicator(color: AppColors.accent),
-            );
+            return _buildLoadingState(slow: _slow);
           }
+          _markFirstResponse();
 
           final notes = snapshot.data?.docs ?? [];
           if (notes.isEmpty) {
@@ -103,6 +150,34 @@ class DiaryTimelinePage extends StatelessWidget {
             },
           );
         },
+      ),
+    );
+  }
+
+  /// 로딩 상태 — 일정 시간이 지나도 첫 응답이 없으면 [slow] 안내를 함께 노출.
+  Widget _buildLoadingState({required bool slow}) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CircularProgressIndicator(color: AppColors.accent),
+          if (slow) ...[
+            const SizedBox(height: 16),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 32),
+              child: Text(
+                '처음 한 번은 정렬 인덱스를 만드는 데 시간이 걸려요.\n잠시 후 자동으로 표시됩니다.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.4,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

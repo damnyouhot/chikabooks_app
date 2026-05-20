@@ -215,7 +215,7 @@ class _RecordHubSheetContentState extends State<_RecordHubSheetContent>
                   '기록하기',
                   style: TextStyle(
                     fontSize: 18,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
                   ),
                 ),
@@ -253,13 +253,13 @@ class _RecordHubSheetContentState extends State<_RecordHubSheetContent>
         child: Row(
           children: [
             _SegmentTab(
-              label: '오늘 한줄',
+              label: '오늘, 지금',
               icon: Icons.edit_outlined,
               selected: _index == 0,
               onTap: () => _selectTab(0),
             ),
             _SegmentTab(
-              label: '목표',
+              label: '목표, 리마인드',
               icon: Icons.flag_outlined,
               selected: _index == 1,
               onTap: () => _selectTab(1),

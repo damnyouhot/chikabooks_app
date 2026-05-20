@@ -167,29 +167,36 @@ class _UserGoalContentState extends State<UserGoalContent>
   }
 
   /// 헤더 (제목 + 추가 버튼)
+  ///
+  /// 허브 임베드 모드에서는 시트 헤더와 세그먼트 라벨에 이미 「목표, 리마인드」
+  /// 가 노출되므로 본문 타이틀/부제는 숨겨 중복을 줄이고, 우측 「+ 추가」 컨트롤만 살린다.
   Widget _buildHeader() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Row(
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                '목표, 기억할 것',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: _kText,
+          if (!widget.embedded)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '목표, 기억할 것',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: _kText,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '최대 3개 · 루틴/프로젝트 · 오늘/주/월/연',
-                style: TextStyle(fontSize: 11, color: _kText.withOpacity(0.5)),
-              ),
-            ],
-          ),
+                const SizedBox(height: 4),
+                Text(
+                  '최대 3개 · 루틴/프로젝트 · 오늘/주/월/연',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: _kText.withOpacity(0.5),
+                  ),
+                ),
+              ],
+            ),
           const Spacer(),
           if (_goals != null && _goals!.canAdd)
             GestureDetector(
@@ -260,77 +267,126 @@ class _UserGoalContentState extends State<UserGoalContent>
       weeklyTotal += count;
     }
 
-    // 칭호 계산
-    String title = '버티는 중';
+    // 칭호 + 메달 단계 계산
+    // 0~1회: 🥉 버티는 중 / 2~4회: 🥈 조금 회복 / 5회+: 🥇 이번 주 꽤 잘했다
+    String title;
+    String medal;
     if (weeklyTotal >= 5) {
       title = '이번 주 꽤 잘했다';
+      medal = '🥇';
     } else if (weeklyTotal >= 2) {
       title = '조금 회복';
+      medal = '🥈';
+    } else {
+      title = '버티는 중';
+      medal = '🥉';
     }
 
+    // 흰 카드 + 1px 라인 → 다른 카드들과 톤 통일.
+    // 칭호를 상단 한 줄로 분리해 시각 위계를 분명히 하고, 보조 수치는
+    // 하단에 12/500 톤으로 한 줄 배치한다.
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: _kAccent.withOpacity(0.1),
+          color: AppColors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: _kAccent.withOpacity(0.3), width: 0.5),
+          border: Border.all(color: AppColors.divider, width: 1),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            _buildSummaryItem(
-              icon: '✓',
-              label: '오늘 체크',
-              value: '$todayChecked/${routines.length}',
+            // ── 상단: 메달 + 칭호 + 「레벨」 라벨 ──
+            Row(
+              children: [
+                Text(medal, style: const TextStyle(fontSize: 18)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: _kText,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _kAccent.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '레벨',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: _kAccent.withOpacity(0.85),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            Container(width: 1, height: 20, color: _kShadow2.withOpacity(0.5)),
-            _buildSummaryItem(
-              icon: '📊',
-              label: '이번 주',
-              value: '$weeklyTotal회',
-            ),
-            Container(width: 1, height: 20, color: _kShadow2.withOpacity(0.5)),
-            _buildSummaryItem(
-              icon: '🏅',
-              label: title,
-              value: '',
-              isTitle: true,
+            const SizedBox(height: 8),
+            // ── 하단: 보조 수치(오늘 체크 · 이번 주) ──
+            Row(
+              children: [
+                Icon(
+                  Icons.check_circle_outline,
+                  size: 14,
+                  color: _kSuccess,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '오늘 체크',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: _kText.withOpacity(0.55),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '$todayChecked/${routines.length}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: _kText,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Container(
+                  width: 1,
+                  height: 10,
+                  color: _kShadow2.withOpacity(0.6),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  '이번 주',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: _kText.withOpacity(0.55),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '$weeklyTotal회',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: _kText,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildSummaryItem({
-    required String icon,
-    required String label,
-    required String value,
-    bool isTitle = false,
-  }) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(icon, style: const TextStyle(fontSize: 16)),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(fontSize: 11, color: _kText.withOpacity(0.6)),
-        ),
-        if (!isTitle) ...[
-          const SizedBox(height: 2),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: _kText,
-            ),
-          ),
-        ],
-      ],
     );
   }
 

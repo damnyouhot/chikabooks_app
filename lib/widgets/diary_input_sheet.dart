@@ -288,16 +288,20 @@ class _DiaryInputBodyState extends State<DiaryInputBody> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── 제목 + 지난 기록 ──
+            // 허브에 임베드된 모드(decorated=false)에서는 시트 헤더와 세그먼트
+            // 라벨에 이미 「오늘, 지금」이 노출되므로 본문 타이틀은 숨겨 중복을
+            // 줄이고, 우측의 「지난 기록」 칩만 살린다.
             Row(
               children: [
-                const Text(
-                  '오늘, 지금',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
+                if (widget.decorated)
+                  const Text(
+                    '오늘, 지금',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
-                ),
                 const Spacer(),
                 GestureDetector(
                   onTap: () {
@@ -345,11 +349,15 @@ class _DiaryInputBodyState extends State<DiaryInputBody> {
                 ),
               ],
             ),
-            const SizedBox(height: 6),
-            Text(
-              '오늘 하루를 가볍게 남겨보세요. (나만 보여요)',
-              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-            ),
+            // 단독 시트일 때만 부제 노출. 허브 모드에서는 시트 헤더 부제와
+            // 겹치므로 생략한다.
+            if (widget.decorated) ...[
+              const SizedBox(height: 6),
+              Text(
+                '오늘 하루를 가볍게 남겨보세요. (나만 보여요)',
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+              ),
+            ],
             const SizedBox(height: 16),
 
             // ── 오늘 기분 (이모지 1개) ──
