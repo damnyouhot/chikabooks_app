@@ -1,6 +1,8 @@
 import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:extended_text_field/extended_text_field.dart';
+import 'package:extended_text_library/extended_text_library.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -21,6 +23,59 @@ import '../user_goal_sheet.dart';
 /// 렌더링 시 [SeniorStickerView] 로 치환한다. 형식이 단순하고 사람이 읽어도
 /// 의미를 짐작할 수 있어 마이그레이션·디버깅에 안전.
 final RegExp _kStickerToken = RegExp(r'\[\[s:([A-Za-z0-9_\-]+)\]\]');
+
+/// ExtendedTextField 용 — 입력칸에서도 토큰 [[s:id]] 을 실시간으로
+/// SeniorStickerView 인라인 위젯으로 치환해 보여준다. 백스페이스 한 번에
+/// 토큰이 통째로 지워지는 「special text」 처리는 라이브러리가 알아서 해 줌.
+const String _kStickerStartFlag = '[[s:';
+const String _kStickerEndFlag = ']]';
+
+class _StickerSpanBuilder extends SpecialTextSpanBuilder {
+  _StickerSpanBuilder();
+
+  @override
+  SpecialText? createSpecialText(
+    String flag, {
+    TextStyle? textStyle,
+    SpecialTextGestureTapCallback? onTap,
+    int? index,
+  }) {
+    if (flag.isEmpty) return null;
+    if (flag == _kStickerStartFlag) {
+      return _StickerSpecialText(textStyle, onTap, start: index ?? 0);
+    }
+    return null;
+  }
+}
+
+class _StickerSpecialText extends SpecialText {
+  _StickerSpecialText(
+    TextStyle? textStyle,
+    SpecialTextGestureTapCallback? onTap, {
+    required this.start,
+  }) : super(_kStickerStartFlag, _kStickerEndFlag, textStyle, onTap: onTap);
+
+  final int start;
+
+  @override
+  InlineSpan finishText() {
+    final raw = toString();
+    final id = raw.substring(
+      _kStickerStartFlag.length,
+      raw.length - _kStickerEndFlag.length,
+    );
+    return ExtendedWidgetSpan(
+      actualText: raw,
+      start: start,
+      alignment: PlaceholderAlignment.middle,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 1),
+        child: SeniorStickerView(stickerId: id, size: 20),
+      ),
+      deleteAll: true,
+    );
+  }
+}
 
 /// 스티커 토큰을 [InlineSpan] 시퀀스로 변환.
 List<InlineSpan> buildInlineStickerSpans(
@@ -648,63 +703,6 @@ class _DiaryFeedTabState extends State<_DiaryFeedTab> {
                 ],
               ),
             ),
-          // ── 토큰 미리보기 (입력 중에도 어떤 스티커가 들어가있는지 시각화) ──
-          // 토큰 텍스트 「[[s:id]]」 자체를 입력칸에서 가리려면 커스텀 에디터가
-          // 필요해 비용이 큼. 대신 컴포저 위에 「현재 본문에 들어있는 스티커」
-          // 칩 줄을 띄워 사용자가 추가/삭제를 시각적으로 확인할 수 있게 한다.
-          Builder(builder: (_) {
-            final ids = _kStickerToken
-                .allMatches(_controller.text)
-                .map((m) => m.group(1)!)
-                .toList();
-            if (ids.isEmpty) return const SizedBox.shrink();
-            return Container(
-              margin: const EdgeInsets.only(bottom: 6),
-              child: Row(
-                children: [
-                  const Icon(Icons.emoji_emotions_outlined,
-                      size: 14, color: AppColors.textDisabled),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: SizedBox(
-                      height: 30,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: ids.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 4),
-                        itemBuilder: (_, i) => SeniorStickerView(
-                          stickerId: ids[i],
-                          size: 24,
-                        ),
-                      ),
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: () {
-                      final cleared =
-                          _controller.text.replaceAll(_kStickerToken, '').trim();
-                      _controller.value = TextEditingValue(
-                        text: cleared,
-                        selection: TextSelection.collapsed(offset: cleared.length),
-                      );
-                      setState(() {});
-                    },
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 4),
-                      child: Text(
-                        '비우기',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textSecondary,
-                          decoration: TextDecoration.underline,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
           if (_selectedImages.isNotEmpty)
             SizedBox(
               height: 56,
@@ -780,16 +778,16 @@ class _DiaryFeedTabState extends State<_DiaryFeedTab> {
               Expanded(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxHeight: 120),
-                  child: TextField(
+                  child: ExtendedTextField(
                     controller: _controller,
                     focusNode: _focus,
                     maxLength: _maxLen,
                     minLines: 1,
                     maxLines: 4,
                     onChanged: (_) => setState(() {}),
+                    // [[s:id]] 토큰을 입력 중에도 인라인 스티커로 보여준다.
+                    specialTextSpanBuilder: _StickerSpanBuilder(),
                     decoration: const InputDecoration(
-                      // 비어있을 때 우상단 「저장」 버튼 옆에 placeholder 가 같이
-                      // 보이면 시각적으로 산만하다는 피드백 → 안내 문구 제거.
                       hintText: '',
                       counterText: '',
                       border: OutlineInputBorder(
@@ -923,7 +921,6 @@ class _FeedCard extends StatelessWidget {
     return AppMutedCard(
       radius: AppRadius.lg,
       padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
-      onTap: onTapEdit,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -960,9 +957,29 @@ class _FeedCard extends StatelessWidget {
               ],
               const Spacer(),
               GestureDetector(
+                onTap: onTapEdit,
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 6, vertical: 2),
+                  child: Icon(
+                    Icons.edit_outlined,
+                    size: 16,
+                    color: isEditing
+                        ? AppColors.textPrimary
+                        : AppColors.textDisabled,
+                  ),
+                ),
+              ),
+              GestureDetector(
                 onTap: () => _confirmDelete(context),
-                child: const Icon(Icons.delete_outline,
-                    size: 16, color: AppColors.textDisabled),
+                behavior: HitTestBehavior.opaque,
+                child: const Padding(
+                  padding:
+                      EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  child: Icon(Icons.delete_outline,
+                      size: 16, color: AppColors.textDisabled),
+                ),
               ),
             ],
           ),
@@ -1000,19 +1017,25 @@ class _FeedCard extends StatelessWidget {
                 itemCount: imageUrls.length,
                 separatorBuilder: (_, __) => const SizedBox(width: 6),
                 itemBuilder: (_, i) {
-                  return ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                      imageUrls[i],
-                      width: 76,
-                      height: 76,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        width: 76,
-                        height: 76,
-                        color: AppColors.surfaceMuted,
-                        child: const Icon(Icons.broken_image_outlined,
-                            size: 18, color: AppColors.textDisabled),
+                  return GestureDetector(
+                    onTap: () => _openLightbox(context, i),
+                    child: Hero(
+                      tag: 'note_$noteId\_$i',
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          imageUrls[i],
+                          width: 76,
+                          height: 76,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            width: 76,
+                            height: 76,
+                            color: AppColors.surfaceMuted,
+                            child: const Icon(Icons.broken_image_outlined,
+                                size: 18, color: AppColors.textDisabled),
+                          ),
+                        ),
                       ),
                     ),
                   );
@@ -1021,6 +1044,123 @@ class _FeedCard extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  void _openLightbox(BuildContext context, int initialIndex) {
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: false,
+        barrierColor: Colors.black,
+        transitionDuration: const Duration(milliseconds: 200),
+        pageBuilder: (_, __, ___) => _ImageLightbox(
+          noteId: noteId,
+          urls: imageUrls,
+          initialIndex: initialIndex,
+        ),
+      ),
+    );
+  }
+}
+
+/// 사진 라이트박스 — 풀스크린 + 핀치 줌 + PageView 좌우 스와이프.
+/// 어디든 탭하면 닫힘.
+class _ImageLightbox extends StatefulWidget {
+  const _ImageLightbox({
+    required this.noteId,
+    required this.urls,
+    required this.initialIndex,
+  });
+
+  final String noteId;
+  final List<String> urls;
+  final int initialIndex;
+
+  @override
+  State<_ImageLightbox> createState() => _ImageLightboxState();
+}
+
+class _ImageLightboxState extends State<_ImageLightbox> {
+  late final PageController _pageController =
+      PageController(initialPage: widget.initialIndex);
+  late int _index = widget.initialIndex;
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasMany = widget.urls.length > 1;
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            GestureDetector(
+              onTap: () => Navigator.of(context).pop(),
+              child: PageView.builder(
+                controller: _pageController,
+                itemCount: widget.urls.length,
+                onPageChanged: (i) => setState(() => _index = i),
+                itemBuilder: (_, i) {
+                  return Center(
+                    child: Hero(
+                      tag: 'note_${widget.noteId}_$i',
+                      child: InteractiveViewer(
+                        minScale: 1.0,
+                        maxScale: 4.0,
+                        child: Image.network(
+                          widget.urls[i],
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => const Icon(
+                            Icons.broken_image_outlined,
+                            color: Colors.white54,
+                            size: 48,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ),
+            if (hasMany)
+              Positioned(
+                bottom: 16,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.45),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${_index + 1} / ${widget.urls.length}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

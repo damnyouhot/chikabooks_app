@@ -64,6 +64,7 @@ dependencies:
   # 웹 전용 Toss 결제(toss_payment_service_web) — 조건부 import로 모바일 빌드에 포함되지 않음
   web: ^1.1.1
   flutter_riverpod: ^3.3.1
+  extended_text_field: ^16.0.2
 
 dev_dependencies:
   flutter_test:
