@@ -13,6 +13,7 @@ export {
   adminResolveBusinessNameReview,
 } from "./admin-verification";
 export { aggregateAnalyticsDaily } from "./scheduled-analytics";
+export { scheduleDailyWordTurn } from "./daily-word-turns";
 export {verifyBusinessLicense} from "./biz-license-verify";
 
 // ── 어드민 모더레이션 (P1.A) ──────────────────────────────────

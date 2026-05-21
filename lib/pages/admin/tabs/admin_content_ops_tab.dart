@@ -9,6 +9,7 @@ import '../../../models/quiz_pool_item.dart';
 import '../../../models/quiz_schedule.dart';
 import '../../../services/admin_dashboard_service.dart';
 import '../../../services/daily_word_service.dart';
+import '../../../services/quiz_meta_ops_service.dart';
 import '../../../services/quiz_content_config_service.dart';
 import '../../../services/quiz_pool_service.dart';
 import '../widgets/admin_common_widgets.dart';
@@ -93,7 +94,8 @@ class _AdminContentOpsTabState extends State<AdminContentOpsTab>
     final partialErrors = <String>[];
 
     try {
-      quizMeta = await AdminDashboardService.getQuizMetaState();
+      final rawMeta = await AdminDashboardService.getQuizMetaState();
+      quizMeta = await QuizMetaOpsService.enrichForDashboard(rawMeta);
     } catch (e) {
       partialErrors.add('퀴즈 메타: $e');
     }
@@ -1096,7 +1098,7 @@ class _QuizPoolCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '$cycle사이클 · quiz_meta 집계 (읽기 전용)',
+                '$cycle사이클 · 이번 사이클 스케줄 기준 (읽기 전용)',
                 style: const TextStyle(
                   fontSize: 12,
                   color: AppColors.textSecondary,
@@ -1261,8 +1263,9 @@ class _DailyWordPoolCard extends StatelessWidget {
     }
 
     final total = ops!.totalActiveCount;
-    final used = ops!.skippedCount;
+    final used = ops!.servedCount;
     final remaining = ops!.remainingCount;
+    final turnDays = ops!.turnDaysRecorded;
     final daysLeft =
         DailyWordService.dailyCount > 0
             ? (remaining / DailyWordService.dailyCount).ceil()
@@ -1284,7 +1287,7 @@ class _DailyWordPoolCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                '단어 소모 집계',
+                '서비스 소모 (일별 3개)',
                 style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
               ),
               Text(
@@ -1299,7 +1302,8 @@ class _DailyWordPoolCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            '남은 단어 약 $remaining개 (하루 ${DailyWordService.dailyCount}개 기준 약 $daysLeft일치)',
+            '기록된 운영일 $turnDays일 · 남은 단어 약 $remaining개 '
+            '(하루 ${DailyWordService.dailyCount}개 기준 약 $daysLeft일치)',
             style: const TextStyle(fontSize: 11, color: AppColors.textDisabled),
           ),
           const SizedBox(height: 14),
@@ -1324,9 +1328,10 @@ class _DailyWordPoolCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '소모 수에는 전역 제외 단어와 현재 노출 후보가 함께 포함됩니다. '
-            '다음턴으로 넘기면 현재 후보가 전역 제외 목록에 추가되어 앞으로 노출 후보에서 빠집니다. '
-            '원본 JSON과 사용자별 저장/아는 단어 기록은 유지됩니다.',
+            '소모 수 = ${DailyWordService.poolTrackingStartDateKey} 이후 KST 일별 전역 배정(하루 '
+            '${DailyWordService.dailyCount}개) + 관리자 수동 제외. '
+            '「다음턴」은 오늘 배정을 수동 제외하고 같은 날 새 3개로 교체합니다. '
+            '원본 JSON·사용자별 아는 단어/저장 기록은 유지됩니다.',
             style: TextStyle(
               fontSize: 10,
               height: 1.35,

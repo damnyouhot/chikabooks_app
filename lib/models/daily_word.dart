@@ -113,17 +113,29 @@ class SavedDailyWord {
 class DailyWordOpsSummary {
   const DailyWordOpsSummary({
     required this.totalActiveCount,
-    required this.skippedCount,
+    required this.servedCount,
     required this.remainingCount,
     required this.currentWords,
     required this.skippedWordIds,
+    required this.turnDaysRecorded,
     required this.updatedAt,
   });
 
   final int totalActiveCount;
-  final int skippedCount;
+
+  /// 서비스 기준 소모 단어 수 (일별 턴 + 관리자 수동 제외, 오늘 배정 포함).
+  final int servedCount;
+
+  /// [servedCount] 레거시 필드명 — 기존 UI·호출 호환.
+  int get skippedCount => servedCount;
+
   final int remainingCount;
   final List<DailyWord> currentWords;
+
+  /// 관리자 「다음턴」 수동 제외 ID (일별 자동 소모와 별도).
   final Set<String> skippedWordIds;
+
+  /// `daily_word_turns` 에 기록된 일수 (KST dateKey 문서 수).
+  final int turnDaysRecorded;
   final DateTime? updatedAt;
 }

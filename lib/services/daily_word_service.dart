@@ -24,6 +24,9 @@ class DailyWordService {
   static const String _turnsCollection = 'daily_word_turns';
   static const String _selectionVersion = 'stable_random_v1';
 
+  /// v1.1.4 오늘 단어 출시일 (KST). 이 날짜부터 일별 3개 소모를 소급 집계.
+  static const String poolTrackingStartDateKey = '2026-04-28';
+
   static Future<List<DailyWord>>? _assetWordsFuture;
 
   static String? get _uid => _auth.currentUser?.uid;
@@ -79,6 +82,11 @@ class DailyWordService {
 
   static Future<DailyWordDeck> loadTodayDeck() async {
     final dateKey = todayKey;
+    try {
+      await ensureTodayTurnOnly();
+    } catch (e) {
+      debugPrint('⚠️ DailyWordService.loadTodayDeck ensureTodayTurn: $e');
+    }
     final allWords = await loadWordPool();
     final globallySkippedIds = await _loadGloballySkippedWordIds();
     final activeWords =
@@ -199,7 +207,8 @@ class DailyWordService {
     }
   }
 
-  static List<DailyWord> _pickWordsForToday(
+  static List<DailyWord> _pickWordsForDateKey(
+    String dateKey,
     List<DailyWord> activeWords,
     Map<String, DailyWordStatus> progress, {
     String seedScope = 'global',
@@ -211,9 +220,184 @@ class DailyWordService {
           ..sort((a, b) => a.order.compareTo(b.order));
     if (candidates.isEmpty) return const [];
 
-    final seed = _stableSeed('$todayKey|$seedScope|${candidates.length}');
+    final seed = _stableSeed('$dateKey|$seedScope|${candidates.length}');
     candidates.shuffle(Random(seed));
     return candidates.take(dailyCount).toList(growable: false);
+  }
+
+  static List<DailyWord> _pickWordsForToday(
+    List<DailyWord> activeWords,
+    Map<String, DailyWordStatus> progress, {
+    String seedScope = 'global',
+  }) => _pickWordsForDateKey(
+    todayKey,
+    activeWords,
+    progress,
+    seedScope: seedScope,
+  );
+
+  static DateTime _parseDateKey(String key) {
+    final parts = key.split('-');
+    if (parts.length != 3) return _todayKst;
+    return DateTime(
+      int.parse(parts[0]),
+      int.parse(parts[1]),
+      int.parse(parts[2]),
+    );
+  }
+
+  static Iterable<String> _dateKeysInclusive(String fromKey, String toKey) sync* {
+    var cur = _parseDateKey(fromKey);
+    final end = _parseDateKey(toKey);
+    while (!cur.isAfter(end)) {
+      yield _dateKey(cur);
+      cur = cur.add(const Duration(days: 1));
+    }
+  }
+
+  static Future<void> _syncActiveWordIndexToMeta(
+    List<DailyWord> activeWords,
+  ) async {
+    try {
+      await _db.doc(_metaPath).set({
+        'activeWordIndex': activeWords
+            .map(
+              (w) => {
+                'id': w.id,
+                'order': w.order,
+                'isActive': w.isActive,
+                'english': w.english,
+              },
+            )
+            .toList(growable: false),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('⚠️ DailyWordService._syncActiveWordIndexToMeta: $e');
+    }
+  }
+
+  /// KST [startDateKey]~[throughDateKey] 일별 전역 턴을 채우고 풀 소모 집계를 맞춘다.
+  /// 오늘(KST) 전역 턴 1건만 없으면 생성 — 앱 진입용(전체 소급 없음).
+  static Future<void> ensureTodayTurnOnly() async {
+    final turnRef = _db.collection(_turnsCollection).doc(todayKey);
+    if ((await turnRef.get()).exists) return;
+
+    final allWords = await loadWordPool();
+    final activeWords = allWords.where((word) => word.isActive).toList();
+    await _syncActiveWordIndexToMeta(activeWords);
+
+    final metaDoc = await _db.doc(_metaPath).get();
+    final meta = metaDoc.data() ?? {};
+    final startKey =
+        meta['poolTrackingStartDateKey'] as String? ??
+        poolTrackingStartDateKey;
+    final manualExcluded =
+        List<String>.from(meta['skippedWordIds'] as List? ?? []).toSet();
+
+    final priorSnap =
+        await _db
+            .collection(_turnsCollection)
+            .where(FieldPath.documentId, isGreaterThanOrEqualTo: startKey)
+            .where(FieldPath.documentId, isLessThan: todayKey)
+            .get();
+
+    var consumed = Set<String>.from(manualExcluded);
+    for (final doc in priorSnap.docs) {
+      consumed.addAll(List<String>.from(doc.data()['wordIds'] as List? ?? []));
+    }
+
+    final available =
+        activeWords.where((w) => !consumed.contains(w.id)).toList();
+    final picked = _pickWordsForDateKey(
+      todayKey,
+      available,
+      const {},
+      seedScope: 'global',
+    );
+    if (picked.isEmpty) return;
+
+    await turnRef.set({
+      'dateKey': todayKey,
+      'wordIds': picked.map((w) => w.id).toList(),
+      'selectionMode': 'stableRandom',
+      'selectionVersion': _selectionVersion,
+      'seedScope': 'global',
+      'recordedAt': FieldValue.serverTimestamp(),
+    });
+
+    await _db.doc(_metaPath).set({
+      'poolTrackingStartDateKey': startKey,
+      'lastRecordedTurnDateKey': todayKey,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  static Future<void> ensureTurnHistoryThroughDate(String throughDateKey) async {
+    final allWords = await loadWordPool();
+    final activeWords = allWords.where((word) => word.isActive).toList();
+    await _syncActiveWordIndexToMeta(activeWords);
+
+    final metaDoc = await _db.doc(_metaPath).get();
+    final meta = metaDoc.data() ?? {};
+    final startKey =
+        meta['poolTrackingStartDateKey'] as String? ??
+        poolTrackingStartDateKey;
+    final manualExcluded =
+        List<String>.from(
+          meta['skippedWordIds'] as List? ?? [],
+        ).toSet();
+
+    final existingSnap =
+        await _db
+            .collection(_turnsCollection)
+            .where(FieldPath.documentId, isGreaterThanOrEqualTo: startKey)
+            .where(FieldPath.documentId, isLessThanOrEqualTo: throughDateKey)
+            .get();
+
+    final existingByDate = <String, List<String>>{};
+    for (final doc in existingSnap.docs) {
+      existingByDate[doc.id] = List<String>.from(
+        doc.data()['wordIds'] as List? ?? [],
+      );
+    }
+
+    var consumed = Set<String>.from(manualExcluded);
+
+    for (final dateKey in _dateKeysInclusive(startKey, throughDateKey)) {
+      final existingIds = existingByDate[dateKey];
+      if (existingIds != null && existingIds.isNotEmpty) {
+        consumed.addAll(existingIds);
+        continue;
+      }
+
+      final available =
+          activeWords.where((w) => !consumed.contains(w.id)).toList();
+      final picked = _pickWordsForDateKey(
+        dateKey,
+        available,
+        const {},
+        seedScope: 'global',
+      );
+      if (picked.isEmpty) break;
+
+      final wordIds = picked.map((w) => w.id).toList();
+      await _db.collection(_turnsCollection).doc(dateKey).set({
+        'dateKey': dateKey,
+        'wordIds': wordIds,
+        'selectionMode': 'stableRandom',
+        'selectionVersion': _selectionVersion,
+        'seedScope': 'global',
+        'recordedAt': FieldValue.serverTimestamp(),
+      });
+      consumed.addAll(wordIds);
+    }
+
+    await _db.doc(_metaPath).set({
+      'poolTrackingStartDateKey': startKey,
+      'lastRecordedTurnDateKey': throughDateKey,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
   }
 
   static Future<Set<String>> _loadGloballySkippedWordIds() async {
@@ -234,25 +418,50 @@ class DailyWordService {
     final wordById = {for (final word in activeWords) word.id: word};
 
     try {
+      await ensureTurnHistoryThroughDate(todayKey);
+
       final doc = await _db.doc(_metaPath).get();
       final data = doc.data() ?? {};
-      final skippedIds =
+      final manualExcluded =
           List<String>.from(
             data['skippedWordIds'] as List? ?? [],
           ).where(wordById.containsKey).toSet();
-      final availableWords = activeWords
-          .where((word) => !skippedIds.contains(word.id))
-          .toList(growable: false);
-      final currentWords = _pickWordsForToday(availableWords, const {});
-      final consumedIds = {
-        ...skippedIds,
-        ...currentWords.map((word) => word.id),
-      };
-      final remainingCount = activeWords.length - consumedIds.length;
+
+      final startKey =
+          data['poolTrackingStartDateKey'] as String? ??
+          poolTrackingStartDateKey;
+      final turnsSnap =
+          await _db
+              .collection(_turnsCollection)
+              .where(FieldPath.documentId, isGreaterThanOrEqualTo: startKey)
+              .where(FieldPath.documentId, isLessThanOrEqualTo: todayKey)
+              .get();
+
+      final servedIds = Set<String>.from(manualExcluded);
+      for (final turn in turnsSnap.docs) {
+        for (final id in List<String>.from(turn.data()['wordIds'] as List? ?? [])) {
+          if (wordById.containsKey(id)) servedIds.add(id);
+        }
+      }
+
+      var todayWordIds = <String>[];
+      for (final d in turnsSnap.docs) {
+        if (d.id == todayKey) {
+          todayWordIds = List<String>.from(d.data()['wordIds'] as List? ?? []);
+          break;
+        }
+      }
+      final currentWords =
+          todayWordIds
+              .map((id) => wordById[id])
+              .whereType<DailyWord>()
+              .toList(growable: false);
+
+      final remainingCount = activeWords.length - servedIds.length;
 
       return DailyWordOpsSummary(
         totalActiveCount: activeWords.length,
-        skippedCount: consumedIds.length,
+        servedCount: servedIds.length,
         remainingCount:
             remainingCount < 0
                 ? 0
@@ -260,7 +469,8 @@ class DailyWordService {
                 ? activeWords.length
                 : remainingCount,
         currentWords: currentWords,
-        skippedWordIds: skippedIds,
+        skippedWordIds: manualExcluded,
+        turnDaysRecorded: turnsSnap.docs.length,
         updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
       );
     } catch (e) {
@@ -270,7 +480,7 @@ class DailyWordService {
       final remainingCount = activeWords.length - consumedCount;
       return DailyWordOpsSummary(
         totalActiveCount: activeWords.length,
-        skippedCount: consumedCount,
+        servedCount: consumedCount,
         remainingCount:
             remainingCount < 0
                 ? 0
@@ -279,15 +489,20 @@ class DailyWordService {
                 : remainingCount,
         currentWords: currentWords,
         skippedWordIds: const {},
+        turnDaysRecorded: 0,
         updatedAt: null,
       );
     }
   }
 
   static Future<DailyWordOpsSummary> skipCurrentTurn() async {
+    await ensureTurnHistoryThroughDate(todayKey);
     final summary = await loadOpsSummary();
     final currentIds = summary.currentWords.map((word) => word.id).toList();
     if (currentIds.isEmpty) return summary;
+
+    final allWords = await loadWordPool();
+    final activeWords = allWords.where((word) => word.isActive).toList();
 
     final metaRef = _db.doc(_metaPath);
     await metaRef.set({
@@ -301,15 +516,48 @@ class DailyWordService {
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
 
-    // If a global turn document is introduced later, this keeps the admin action
-    // idempotent and ensures the current turn is not reused.
-    await _db.collection(_turnsCollection).doc(todayKey).delete().catchError((
-      Object e,
-    ) {
-      debugPrint('⚠️ DailyWordService.skipCurrentTurn delete turn: $e');
-    });
     await _deleteTodayUserDecksContaining(currentIds).catchError((Object e) {
       debugPrint('⚠️ DailyWordService.skipCurrentTurn delete user decks: $e');
+    });
+
+    final startKey =
+        (await metaRef.get()).data()?['poolTrackingStartDateKey'] as String? ??
+        poolTrackingStartDateKey;
+    final turnsSnap =
+        await _db
+            .collection(_turnsCollection)
+            .where(FieldPath.documentId, isGreaterThanOrEqualTo: startKey)
+            .where(FieldPath.documentId, isLessThanOrEqualTo: todayKey)
+            .get();
+    final consumed = <String>{
+      ...List<String>.from(
+        (await metaRef.get()).data()?['skippedWordIds'] as List? ?? [],
+      ),
+    };
+    for (final doc in turnsSnap.docs) {
+      if (doc.id == todayKey) continue;
+      for (final id in List<String>.from(doc.data()['wordIds'] as List? ?? [])) {
+        consumed.add(id);
+      }
+    }
+
+    final available =
+        activeWords.where((w) => !consumed.contains(w.id)).toList();
+    final replacement = _pickWordsForDateKey(
+      todayKey,
+      available,
+      const {},
+      seedScope: 'global|admin_skip',
+    );
+
+    await _db.collection(_turnsCollection).doc(todayKey).set({
+      'dateKey': todayKey,
+      'wordIds': replacement.map((w) => w.id).toList(),
+      'selectionMode': 'stableRandom',
+      'selectionVersion': _selectionVersion,
+      'seedScope': 'global|admin_skip',
+      'recordedAt': FieldValue.serverTimestamp(),
+      'replacedAfterManualSkip': true,
     });
 
     return loadOpsSummary();

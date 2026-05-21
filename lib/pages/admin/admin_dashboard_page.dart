@@ -103,18 +103,18 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 isScrollable: true,
                 tabAlignment: TabAlignment.start,
                 tabs: const [
-                  Tab(text: 'Overview'),
+                  Tab(text: '요약'),
                   Tab(text: '타임라인'),
-                  Tab(text: 'Content Ops'),
-                  Tab(text: 'Publisher'),
-                  Tab(text: 'Moderation'),
-                  Tab(text: 'Users'),
+                  Tab(text: '콘텐츠'),
+                  Tab(text: '공고'),
+                  Tab(text: '신고'),
+                  Tab(text: '사용자'),
                   Tab(child: _BillingTabLabel()),
                   Tab(child: _VerifyTabLabel()),
-                  Tab(text: 'User Flow'),
-                  Tab(text: 'Feature'),
-                  Tab(text: 'Behavior'),
-                  Tab(text: 'Trends'),
+                  Tab(text: '가입'),
+                  Tab(text: '기능'),
+                  Tab(text: '행동'),
+                  Tab(text: '추세'),
                 ],
               ),
             ),
@@ -187,7 +187,7 @@ class _BillingTabLabel extends StatelessWidget {
       builder: (context, snap) {
         final c = snap.data;
         final count = c == null ? 0 : (c.payment + c.tax + c.cash);
-        return _TabLabelWithBadge(text: 'Billing', count: count);
+        return _TabLabelWithBadge(text: '결제', count: count);
       },
     );
   }
